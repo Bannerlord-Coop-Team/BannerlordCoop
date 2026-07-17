@@ -36,11 +36,12 @@ public interface IMissionManager
 
     /// <summary>
     /// Record that <paramref name="controllerId"/> (on <paramref name="peer"/>) has left
-    /// <paramref name="instanceId"/>, dropping it from the relay routing table. No-op if the instance is
-    /// unknown. Driven by a client <c>MissionLeft</c>. Returns the members still present so the caller can
-    /// notify them the controller is gone.
+    /// <paramref name="instanceId"/>, dropping it from the relay routing table. Returns false if that exact
+    /// peer/controller membership is no longer current. Driven by a client <c>MissionLeft</c>. On success,
+    /// <paramref name="remaining"/> holds the members still present so the caller can notify them.
     /// </summary>
-    IReadOnlyList<(string controllerId, NetPeer peer)> LeaveMission(NetPeer peer, string controllerId, string instanceId);
+    bool TryLeaveMission(NetPeer peer, string controllerId, string instanceId,
+        out IReadOnlyList<(string controllerId, NetPeer peer)> remaining);
 
     /// <summary>
     /// Drop <paramref name="peer"/> from whichever instance it belongs to after an ungraceful disconnect,
@@ -159,23 +160,33 @@ public class MissionManager : IMissionManager
         }
     }
 
-    public IReadOnlyList<(string controllerId, NetPeer peer)> LeaveMission(NetPeer peer, string controllerId, string instanceId)
+    public bool TryLeaveMission(NetPeer peer, string controllerId, string instanceId,
+        out IReadOnlyList<(string controllerId, NetPeer peer)> remaining)
     {
+        remaining = Array.Empty<(string, NetPeer)>();
+
         lock (gate)
         {
             if (byInstanceId.TryGetValue(instanceId, out var instance) == false)
             {
                 Logger.Warning("Mission leave for unknown instance {Instance} from {Controller}",
                     instanceId, controllerId);
-                return Array.Empty<(string, NetPeer)>();
+                return false;
             }
 
-            instance.RemovePeer(peer);
+            if (instance.RemovePeer(peer, controllerId) == false)
+            {
+                Logger.Warning(
+                    "Ignoring stale mission leave for controller {Controller} in instance {Instance} on {Peer}",
+                    controllerId, instanceId, peer);
+                return false;
+            }
+
             Logger.Information("Controller {Controller} left instance {Instance}", controllerId, instanceId);
 
-            var remaining = Members(instance);
+            remaining = Members(instance);
             PruneIfEmpty(instanceId, remaining.Count);
-            return remaining;
+            return true;
         }
     }
 
@@ -202,7 +213,9 @@ public class MissionManager : IMissionManager
             if (found == null)
                 return false;
 
-            found.RemovePeer(peer);
+            if (found.RemovePeer(peer, controllerId) == false)
+                return false;
+
             remaining = Members(found);
             Logger.Information("Controller {Controller} disconnected from instance {Instance}", controllerId, instanceId);
             PruneIfEmpty(instanceId, remaining.Count);

@@ -43,29 +43,6 @@ public class BattleHostRegistry : IBattleHostRegistry
         }
     }
 
-    public bool IsControllerAssigned(string controllerId)
-    {
-        if (string.IsNullOrEmpty(controllerId))
-            return false;
-
-        lock (gate)
-        {
-            foreach (var assignment in assignments.Values)
-            {
-                if (assignment.HostControllerId == controllerId)
-                    return true;
-
-                foreach (var successorId in assignment.SuccessorControllerIds)
-                {
-                    if (successorId == controllerId)
-                        return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     public void Remove(string mapEventId)
     {
         lock (gate)

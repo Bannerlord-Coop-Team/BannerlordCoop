@@ -1,9 +1,12 @@
+using Autofac;
+using Common.Network.Messages;
 using Common.Network.Session;
 using Common.Tests.Utils;
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Missions;
 using LiteNetLib;
 using Missions.Messages;
 using Moq;
@@ -12,18 +15,33 @@ using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Services.Instances;
 
 public class ServerMissionMembershipHandlerTests
 {
     private const string InstanceId = "battle-1";
+    private readonly ITestOutputHelper output;
 
     private static readonly ConstructorInfo PeerConstructor = typeof(NetPeer).GetConstructor(
         BindingFlags.NonPublic | BindingFlags.Instance,
         binder: null,
         new[] { typeof(NetManager), typeof(IPEndPoint), typeof(int) },
         modifiers: null)!;
+
+    public ServerMissionMembershipHandlerTests(ITestOutputHelper output)
+    {
+        this.output = output;
+    }
+
+    [Fact]
+    public void ServerTestComponent_ResolvesMissionMembershipRegistry()
+    {
+        using var container = new ServerTestComponent(output).Container;
+
+        Assert.IsType<MissionMembershipRegistry>(container.Resolve<IMissionMembershipRegistry>());
+    }
 
     [Fact]
     public void MissionEntered_FansOutTheOppositePeersTunnelSteamId()
@@ -101,6 +119,118 @@ public class ServerMissionMembershipHandlerTests
         });
     }
 
+    [Fact]
+    public void MissionEnteredAndLeft_UpdatesMembershipRegistry()
+    {
+        var messageBroker = new TestMessageBroker();
+        var membershipRegistry = new MissionMembershipRegistry();
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51007), 7);
+        var tunnelHost = new Mock<ISessionTunnelIdentityResolver>();
+
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker,
+            new MissionManager(),
+            new TestNetwork(),
+            tunnelHost.Object,
+            membershipRegistry);
+
+        messageBroker.Publish(peer, new NetworkMissionEntered("controller", InstanceId));
+        Assert.True(membershipRegistry.IsControllerInMission("controller"));
+
+        messageBroker.Publish(peer, new NetworkMissionLeft("controller", InstanceId));
+        Assert.False(membershipRegistry.IsControllerInMission("controller"));
+    }
+
+    [Fact]
+    public void ReplacedPeer_StaleLeaveKeepsCurrentMissionMembership()
+    {
+        const string controllerId = "controller";
+        var messageBroker = new TestMessageBroker();
+        var membershipRegistry = new MissionMembershipRegistry();
+        var missionManager = new MissionManager();
+        var network = new TestNetwork();
+        var oldPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51008), 8);
+        var newPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51009), 9);
+
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker,
+            missionManager,
+            network,
+            new Mock<ISessionTunnelIdentityResolver>().Object,
+            membershipRegistry);
+
+        messageBroker.Publish(oldPeer, new NetworkMissionEntered(controllerId, InstanceId));
+        messageBroker.Publish(newPeer, new NetworkMissionEntered(controllerId, InstanceId));
+        messageBroker.Messages.Clear();
+        network.Clear();
+
+        messageBroker.Publish(oldPeer, new NetworkMissionLeft(controllerId, InstanceId));
+
+        Assert.True(membershipRegistry.IsControllerInMission(controllerId));
+        Assert.True(missionManager.TryGetRelayTarget(InstanceId, controllerId, out var currentPeer));
+        Assert.Same(newPeer, currentPeer);
+        Assert.Empty(network.SentNetworkMessages);
+        Assert.Empty(messageBroker.GetMessagesFromType<MissionMemberDeparted>());
+
+        messageBroker.Publish(newPeer, new NetworkMissionLeft(controllerId, InstanceId));
+
+        Assert.False(membershipRegistry.IsControllerInMission(controllerId));
+        Assert.False(missionManager.TryGetRelayTarget(InstanceId, controllerId, out _));
+        Assert.Single(messageBroker.GetMessagesFromType<MissionMemberDeparted>());
+    }
+
+    [Fact]
+    public void ReplacedPeer_StaleDisconnectKeepsCurrentMissionMembership()
+    {
+        const string controllerId = "controller";
+        var messageBroker = new TestMessageBroker();
+        var membershipRegistry = new MissionMembershipRegistry();
+        var missionManager = new MissionManager();
+        var oldPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51010), 10);
+        var newPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51011), 11);
+
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker,
+            missionManager,
+            new TestNetwork(),
+            new Mock<ISessionTunnelIdentityResolver>().Object,
+            membershipRegistry);
+
+        messageBroker.Publish(oldPeer, new NetworkMissionEntered(controllerId, InstanceId));
+        messageBroker.Publish(newPeer, new NetworkMissionEntered(controllerId, InstanceId));
+        messageBroker.Messages.Clear();
+
+        messageBroker.Publish(this, new PlayerDisconnected(oldPeer, default));
+
+        Assert.True(membershipRegistry.IsControllerInMission(controllerId));
+        Assert.True(missionManager.TryGetRelayTarget(InstanceId, controllerId, out var currentPeer));
+        Assert.Same(newPeer, currentPeer);
+        Assert.Empty(messageBroker.GetMessagesFromType<MissionMemberDeparted>());
+
+        messageBroker.Publish(this, new PlayerDisconnected(newPeer, default));
+
+        Assert.False(membershipRegistry.IsControllerInMission(controllerId));
+        Assert.False(missionManager.TryGetRelayTarget(InstanceId, controllerId, out _));
+        Assert.Single(messageBroker.GetMessagesFromType<MissionMemberDeparted>());
+    }
+
+    [Fact]
+    public void MissionManager_WrongControllerLeaveDoesNotRemoveCurrentPeer()
+    {
+        var missionManager = new MissionManager();
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51012), 12);
+        missionManager.EnterMission(peer, "controller", InstanceId);
+
+        Assert.False(missionManager.TryLeaveMission(
+            peer,
+            "different-controller",
+            InstanceId,
+            out var remaining));
+        Assert.Empty(remaining);
+        Assert.True(missionManager.TryGetRelayTarget(InstanceId, "controller", out var currentPeer));
+        Assert.Same(peer, currentPeer);
+    }
+
     private static TestNetwork PublishEntry(
         NetPeer newcomer,
         string newcomerControllerId,
@@ -119,7 +249,7 @@ public class ServerMissionMembershipHandlerTests
 
         var network = new TestNetwork();
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, network, tunnelHost);
+            messageBroker, missionManager.Object, network, tunnelHost, new MissionMembershipRegistry());
 
         messageBroker.Publish(newcomer, new NetworkMissionEntered(newcomerControllerId, InstanceId));
         return network;

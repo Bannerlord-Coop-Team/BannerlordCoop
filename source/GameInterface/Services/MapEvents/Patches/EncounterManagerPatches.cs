@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Players;
@@ -32,6 +33,9 @@ internal class EncounterManagerPatches
         if (IsPendingParty(attackerParty?.Party))
             return false;
 
+        if (IsAwaitingMissionExit(attackerParty?.Party))
+            return false;
+
         if (RaidAiInterventionSuppression.ShouldSuppressSettlementEncounter(attackerParty, settlement))
             return false;
 
@@ -56,7 +60,7 @@ internal class EncounterManagerPatches
         if (IsPendingParty(attackerParty) || IsPendingParty(defenderParty))
             return false;
 
-        if (IsAwaitingBattleMissionExit(attackerParty) || IsAwaitingBattleMissionExit(defenderParty))
+        if (IsAwaitingMissionExit(attackerParty) || IsAwaitingMissionExit(defenderParty))
             return false;
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -100,7 +104,7 @@ internal class EncounterManagerPatches
     internal static bool IsPendingParty(PartyBase party) =>
         PendingMapEventPartyMovementPatch.IsPending(party);
 
-    internal static bool IsAwaitingBattleMissionExit(PartyBase party)
+    internal static bool IsAwaitingMissionExit(PartyBase party)
     {
         if (ModInformation.IsClient || party?.MapEvent != null || party?.MobileParty == null)
             return false;
@@ -108,8 +112,8 @@ internal class EncounterManagerPatches
         if (!PlayerManager.TryGetControlledObjectInfo(party.MobileParty, out var controlledObject))
             return false;
 
-        return ContainerProvider.TryResolve<IBattleHostRegistry>(out var hostRegistry)
-            && hostRegistry.IsControllerAssigned(controlledObject.ObjectControllerId);
+        return ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var membershipRegistry)
+            && membershipRegistry.IsControllerInMission(controlledObject.ObjectControllerId);
     }
 
     // EncounterManager.RestartPlayerEncounter is private; patch by name. It is the path that opens the encounter

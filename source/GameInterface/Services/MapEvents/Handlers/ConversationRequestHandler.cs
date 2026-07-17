@@ -7,6 +7,7 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -45,7 +46,7 @@ internal class ConversationRequestHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly PlayerPartyInteractionHandler playerPartyInteractionHandler;
-    private readonly IBattleHostRegistry battleHostRegistry;
+    private readonly IMissionMembershipRegistry missionMembershipRegistry;
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
 
@@ -60,14 +61,14 @@ internal class ConversationRequestHandler : IHandler
         IObjectManager objectManager,
         ConversationPartyTracker conversationPartyTracker,
         PlayerPartyInteractionHandler playerPartyInteractionHandler,
-        IBattleHostRegistry battleHostRegistry)
+        IMissionMembershipRegistry missionMembershipRegistry)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.conversationPartyTracker = conversationPartyTracker;
         this.playerPartyInteractionHandler = playerPartyInteractionHandler;
-        this.battleHostRegistry = battleHostRegistry;
+        this.missionMembershipRegistry = missionMembershipRegistry;
 
         messageBroker.Subscribe<ConversationRequested>(Handle_ConversationRequested);
         messageBroker.Subscribe<NetworkRequestConversation>(Handle_NetworkRequestConversation);
@@ -181,11 +182,11 @@ internal class ConversationRequestHandler : IHandler
         var defenderInMapEvent = defender.MapEvent != null;
 
         // A concluded map event is finalized before every client has to leave its victory screen. Keep those
-        // remaining mission parties unavailable until their MissionLeft removes them from the host assignment.
-        if (IsAwaitingBattleMissionExit(attacker) || IsAwaitingBattleMissionExit(defender))
+        // remaining parties unavailable until their MissionLeft removes them from the mission membership.
+        if (IsAwaitingMissionExit(attacker) || IsAwaitingMissionExit(defender))
         {
             Logger.Information(
-                "[BattleMissionGuard] Refused campaign interaction while a party is still leaving its battle mission. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                "[MissionExitGuard] Refused campaign interaction while a party is still leaving its mission. AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
             network.Send(requestingPeer, new NetworkConversationDenied());
             return false;
@@ -257,13 +258,13 @@ internal class ConversationRequestHandler : IHandler
         return true;
     }
 
-    private bool IsAwaitingBattleMissionExit(PartyBase party)
+    private bool IsAwaitingMissionExit(PartyBase party)
     {
         if (party?.MapEvent != null || party?.MobileParty == null)
             return false;
 
         return PlayerManager.TryGetControlledObjectInfo(party.MobileParty, out var controlledObject)
-            && battleHostRegistry.IsControllerAssigned(controlledObject.ObjectControllerId);
+            && missionMembershipRegistry.IsControllerInMission(controlledObject.ObjectControllerId);
     }
 
     /// <summary>

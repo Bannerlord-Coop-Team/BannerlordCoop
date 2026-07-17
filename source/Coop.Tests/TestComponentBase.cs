@@ -16,6 +16,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
@@ -86,6 +87,7 @@ internal abstract class TestComponentBase
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreationSettlementTracker>().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
+        builder.RegisterType<MissionMembershipRegistry>().As<IMissionMembershipRegistry>().InstancePerLifetimeScope();
 
         RegisterMock<ILogger>(builder);
         RegisterMock<IGameInterface>(builder);
