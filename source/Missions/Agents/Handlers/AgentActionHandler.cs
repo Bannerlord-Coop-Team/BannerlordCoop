@@ -29,7 +29,10 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
     void CatchUpJoiner(string controllerId);
 
-    /// <summary>[Game thread] Reassert received puppet guards once per mission frame.</summary>
+    /// <summary>[Game thread] Reassert received puppet defend state from the mission pre-tick hook.</summary>
+    void ReassertRemoteDefendStates();
+
+    /// <summary>[Game thread] Apply queued remote actions and refresh their retained defend state.</summary>
     void ApplyRemoteGuardStates();
 }
 
@@ -105,15 +108,18 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly struct RemoteGuardState
     {
         public readonly string ControllerId;
+        public readonly Agent.MovementControlFlag DefendFlags;
         public readonly Agent.GuardMode GuardMode;
         public readonly int BattleHostEpoch;
 
         public RemoteGuardState(
             string controllerId,
+            Agent.MovementControlFlag defendFlags,
             Agent.GuardMode guardMode,
             int battleHostEpoch)
         {
             ControllerId = controllerId;
+            DefendFlags = defendFlags;
             GuardMode = guardMode;
             BattleHostEpoch = battleHostEpoch;
         }
@@ -373,7 +379,7 @@ public class AgentActionHandler : IAgentActionHandler
 
         using (new AllowedThread())
         {
-            AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
+            ClearRemoteDefendState(agent);
         }
     }
 
@@ -382,6 +388,13 @@ public class AgentActionHandler : IAgentActionHandler
         if (_disposed || Mission.Current == null) return;
 
         ApplyPendingRemoteActions();
+        ReassertRemoteDefendStates();
+    }
+
+    public void ReassertRemoteDefendStates()
+    {
+        if (_disposed || Mission.Current == null) return;
+
         if (_remoteGuardStates.Count == 0) return;
 
         List<Guid> staleIds = null;
@@ -390,8 +403,10 @@ public class AgentActionHandler : IAgentActionHandler
             foreach (var guardState in _remoteGuardStates)
             {
                 Guid agentId = guardState.Key;
-                if (agentRegistry.IsLocallyControlled(agentId)
-                    || !agentRegistry.TryGetAgentInfo(agentId, out var info))
+                if (agentRegistry.IsLocallyControlled(agentId))
+                    continue;
+
+                if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
                 {
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
@@ -409,13 +424,20 @@ public class AgentActionHandler : IAgentActionHandler
                     guardState.Value.ControllerId,
                     guardState.Value.BattleHostEpoch))
                 {
-                    AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
+                    ClearRemoteDefendState(agent);
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
 
-                // Vanilla's cautious behavior asserts SetWeaponGuard every agent tick while guarding.
-                AgentActionData.ApplyGuardState(agent, guardState.Value.GuardMode);
+                AgentActionData.ApplyDefendMovementFlags(
+                    agent,
+                    guardState.Value.DefendFlags);
+                if (AgentActionData.IsGuardMode(guardState.Value.GuardMode))
+                {
+                    AgentActionData.ApplyGuardState(
+                        agent,
+                        guardState.Value.GuardMode);
+                }
             }
         }
 
@@ -563,19 +585,30 @@ public class AgentActionHandler : IAgentActionHandler
         Agent agent,
         int battleHostEpoch)
     {
+        Agent.MovementControlFlag defendFlags = data.DefendFlags;
         Agent.GuardMode guardMode = data.GuardMode;
-        if (AgentActionData.IsGuardMode(guardMode))
+        if (defendFlags != Agent.MovementControlFlag.None
+            || AgentActionData.IsGuardMode(guardMode))
         {
             _remoteGuardStates[agentId] = new RemoteGuardState(
                 controllerId,
+                defendFlags,
                 guardMode,
                 battleHostEpoch);
         }
         else
         {
             _remoteGuardStates.Remove(agentId);
-            AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
+            ClearRemoteDefendState(agent);
         }
+    }
+
+    private static void ClearRemoteDefendState(Agent agent)
+    {
+        AgentActionData.ApplyDefendMovementFlags(
+            agent,
+            Agent.MovementControlFlag.None);
+        AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
     }
 
     private void BufferPendingRemoteAction(

@@ -37,6 +37,15 @@ namespace Missions.Agents.Packets
             return movementFlags & DefendMovementFlagsMask;
         }
 
+        internal static void ApplyDefendMovementFlags(
+            Agent agent,
+            Agent.MovementControlFlag defendFlags)
+        {
+            Agent.MovementControlFlag movementFlags =
+                agent.MovementFlags & ~DefendMovementFlagsMask;
+            agent.MovementFlags = movementFlags | GetDefendMovementFlags(defendFlags);
+        }
+
         internal static void ApplyGuardState(Agent agent, Agent.GuardMode guardMode)
         {
             if (!IsGuardMode(guardMode))
@@ -185,6 +194,8 @@ namespace Missions.Agents.Packets
         public bool CrouchMode { get; }
         [ProtoMember(12)]
         public int GuardState { get; }
+        internal Agent.MovementControlFlag DefendFlags =>
+            GetDefendMovementFlags((Agent.MovementControlFlag)MovementFlag);
         internal Agent.GuardMode GuardMode => FromWireGuardState(GuardState);
     }
 }

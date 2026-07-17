@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Autofac;
 using Common;
 using Common.Messaging;
 using E2E.Tests.Environment.Mock;
@@ -7,6 +8,7 @@ using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using Missions;
 using Missions.Agents.Packets;
+using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -59,6 +61,102 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(Agent.GuardMode.Left, data.GuardMode);
             Assert.Equal(1L, Assert.Single(packet.Sequences));
             Assert.Equal(0, packet.BattleHostEpoch);
+        });
+    }
+
+    [Fact]
+    public void PollActions_DefendFlagsWithoutGuard_SendsActionPacket()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        SetControllerId(owner, "owner");
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            var component = owner.Resolve<ICoopMissionComponent>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+            var network = owner.Resolve<MockBattleNetwork>();
+            var agentId = Guid.NewGuid();
+
+            var agent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.Player));
+            Assert.True(registry.TryRegisterAgent("owner", agentId, agent));
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+
+            component.AgentActionHandler.PollActions();
+            Assert.Empty(network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+
+            Agent.MovementControlFlag defendFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            mirror.MovementFlags = defendFlags;
+            component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            AgentActionData data = Assert.Single(packet.Actions);
+            Assert.Equal(defendFlags, data.DefendFlags);
+            Assert.Equal(Agent.GuardMode.None, data.GuardMode);
+        });
+    }
+
+    [Fact]
+    public void MissionPreTick_ReassertsHeldDefendFlagsWithoutGuardMode_ThenClears()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var controller = peer.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), component));
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            BasicCharacterObject character = Game.Current.PlayerTroop;
+            var agentId = Guid.NewGuid();
+
+            var puppet = mock.SpawnAgent(
+                new AgentBuildData(character).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("owner", agentId, puppet));
+
+            var owner = mock.SpawnAgent(
+                new AgentBuildData(character).Controller(AgentControllerType.Player));
+            Assert.True(AgentMirror.TryGet(owner, out var ownerMirror));
+            Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+            Agent.MovementControlFlag defendFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.MovementFlags = defendFlags;
+            ApplyOwnerAction(component, 1L, agentId, owner);
+            component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
+            controller.OnPreMissionTick(0f);
+
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward | defendFlags,
+                puppetMirror.MovementFlags);
+
+            puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
+            controller.OnPreMissionTick(0f);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward | defendFlags,
+                puppetMirror.MovementFlags);
+
+            ownerMirror.MovementFlags = Agent.MovementControlFlag.None;
+            ApplyOwnerAction(component, 2L, agentId, owner);
+            component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
+            controller.OnPreMissionTick(0f);
+
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward,
+                puppetMirror.MovementFlags);
         });
     }
 
@@ -546,6 +644,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 var oldHostAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                     .Controller(AgentControllerType.Player));
                 Assert.True(AgentMirror.TryGet(oldHostAgent, out var oldHostMirror));
+                Agent.MovementControlFlag defendFlags =
+                    Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendLeft;
+                oldHostMirror.MovementFlags = defendFlags;
                 oldHostMirror.GuardMode = Agent.GuardMode.Left;
 
                 ApplyOwnerAction(
@@ -558,6 +660,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 DrainGameThread();
                 component.AgentActionHandler.ApplyRemoteGuardStates();
                 Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
+                Assert.Equal(
+                    defendFlags,
+                    AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
 
                 broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
                 AssignBattleHost(
@@ -571,6 +676,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 component.AgentActionHandler.ApplyRemoteGuardStates();
 
                 Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+                Assert.Equal(
+                    Agent.MovementControlFlag.None,
+                    AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
                 Assert.Equal(1, puppetMirror.ResetGuardCalls);
             }
             finally
@@ -862,15 +970,25 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             var ownerA = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                 .Controller(AgentControllerType.Player));
             Assert.True(AgentMirror.TryGet(ownerA, out var ownerAMirror));
+            Agent.MovementControlFlag defendFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            ownerAMirror.MovementFlags = defendFlags;
             ownerAMirror.GuardMode = Agent.GuardMode.Left;
 
             ApplyOwnerAction(component, "owner-a", 1L, agentId, ownerA);
             component.AgentActionHandler.ApplyRemoteGuardStates();
             Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
+            Assert.Equal(
+                defendFlags,
+                AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
 
             Assert.True(registry.TryTransferAuthority("owner-b", agentId));
             component.AgentActionHandler.ApplyRemoteGuardStates();
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.None,
+                AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
             Assert.Equal(1, puppetMirror.ResetGuardCalls);
 
             ApplyOwnerAction(component, "owner-a", 2L, agentId, ownerA);
@@ -901,6 +1019,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         {
             var mock = fixture.CreateMission(peer);
             var component = peer.Resolve<ICoopMissionComponent>();
+            var controller = peer.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), component));
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var network = peer.Resolve<MockBattleNetwork>();
             var agentId = Guid.NewGuid();
@@ -913,16 +1033,30 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             var ownerA = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                 .Controller(AgentControllerType.Player));
             Assert.True(AgentMirror.TryGet(ownerA, out var ownerAMirror));
+            Agent.MovementControlFlag defendFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            ownerAMirror.MovementFlags = defendFlags;
             ownerAMirror.GuardMode = Agent.GuardMode.Left;
 
             ApplyOwnerAction(component, "owner-a", 1L, agentId, ownerA);
             component.AgentActionHandler.ApplyRemoteGuardStates();
             Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
+            Assert.Equal(
+                defendFlags,
+                AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
 
             Assert.True(registry.TryTransferAuthority("owner-b", agentId));
+            controller.OnPreMissionTick(0f);
+            Assert.Equal(
+                defendFlags,
+                AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
             component.AgentActionHandler.PollActions();
 
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.None,
+                AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
             Assert.Equal(1, puppetMirror.ResetGuardCalls);
             Assert.Empty(network.NetworkSentPackets.GetPackets<AgentActionPacket>());
         });

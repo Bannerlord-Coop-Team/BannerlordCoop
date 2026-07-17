@@ -63,11 +63,17 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
 
-        // Controller.None puppets have no AI component to maintain a scripted guard, so reassert received
-        // guard state every frame just before the engine ticks the agents.
         coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
         coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
+    }
+
+    public override void OnPreMissionTick(float dt)
+    {
+        base.OnPreMissionTick(dt);
+
+        // OnMissionTick runs after native Mission.Tick, so restore puppet defend input in the pre-tick hook.
+        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates();
     }
 
     public virtual void Dispose()
