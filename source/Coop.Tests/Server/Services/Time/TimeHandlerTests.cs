@@ -6,6 +6,7 @@ using Coop.Core.Server.Services.Time.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.Heroes.Messages;
 using Moq;
 using Xunit;
 
@@ -16,102 +17,51 @@ public class TimeHandlerTests
     [Fact]
     public void Dispose_RemovesAllHandlers()
     {
-        // Arrange
         var broker = new TestMessageBroker();
-        var network = new TestNetwork();
         var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, timeControlInterface.Object);
+        var handler = new TimeHandler(broker, timeControlInterface.Object);
 
         Assert.True(broker.GetTotalSubscribers() > 0);
 
-        // Act
         handler.Dispose();
 
-        // Assert
         Assert.Equal(0, broker.GetTotalSubscribers());
     }
 
     [Fact]
-    public void LoadingPlayersChanged_WhenPlayersLoading_LeavesTimeRunningAndLocksClients()
+    public void NetworkTimeRequest_WhilePlayerLoading_IsApplied()
     {
-        // Arrange
-        var broker = new TestMessageBroker();
-        var network = new TestNetwork();
-        var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, timeControlInterface.Object);
-        var peer = network.CreatePeer();
-        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(2));
-
-        // Act
-        handler.Handle_LoadingPlayersChanged(payload);
-
-        // Assert
-        timeControlInterface.Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
-        var lockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(peer));
-        Assert.True(lockMessage.IsLocked);
-        Assert.Equal(2, lockMessage.LoadingPlayers);
-    }
-
-    [Fact]
-    public void LoadingPlayersChanged_WhenNoPlayersLoading_UnlocksClients()
-    {
-        // Arrange
-        var broker = new TestMessageBroker();
-        var network = new TestNetwork();
-        var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, timeControlInterface.Object);
-        var peer = network.CreatePeer();
-        var payload = new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(0));
-
-        // Act
-        handler.Handle_LoadingPlayersChanged(payload);
-
-        // Assert
-        timeControlInterface.Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
-        var lockMessage = Assert.Single(network.GetPeerMessagesFromType<NetworkTimeControlLockChanged>(peer));
-        Assert.False(lockMessage.IsLocked);
-        Assert.Equal(0, lockMessage.LoadingPlayers);
-    }
-
-    [Fact]
-    public void NetworkTimeRequest_WhilePlayerLoading_IsIgnored()
-    {
-        // Arrange
         var broker = new TestMessageBroker();
         var network = new TestNetwork();
         var peer = network.CreatePeer();
         var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, timeControlInterface.Object);
-        handler.Handle_LoadingPlayersChanged(
-            new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(1)));
+        var handler = new TimeHandler(broker, timeControlInterface.Object);
+        broker.Publish(this, new LoadingPlayersChanged(1));
 
-        // Act
         handler.Handle_NetworkRequestTimeSpeedChange(
-            new MessagePayload<NetworkRequestTimeSpeedChange>(peer, new NetworkRequestTimeSpeedChange(TimeControlEnum.Play_2x)));
+            new MessagePayload<NetworkRequestTimeSpeedChange>(
+                peer,
+                new NetworkRequestTimeSpeedChange(TimeControlEnum.Play_2x)));
 
-        // Assert
-        timeControlInterface.Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
+        timeControlInterface.Verify(
+            m => m.ServerSetTimeControl(TimeControlEnum.Play_2x),
+            Times.Once);
     }
 
     [Fact]
-    public void NetworkTimeRequest_AfterPlayersFinishLoading_IsApplied()
+    public void TimeSpeedChangedAttempt_IsApplied()
     {
-        // Arrange
         var broker = new TestMessageBroker();
-        var network = new TestNetwork();
-        var peer = network.CreatePeer();
         var timeControlInterface = new Mock<ITimeControlInterface>();
-        var handler = new TimeHandler(broker, network, timeControlInterface.Object);
-        handler.Handle_LoadingPlayersChanged(
-            new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(1)));
-        handler.Handle_LoadingPlayersChanged(
-            new MessagePayload<LoadingPlayersChanged>(this, new LoadingPlayersChanged(0)));
+        var handler = new TimeHandler(broker, timeControlInterface.Object);
 
-        // Act
-        handler.Handle_NetworkRequestTimeSpeedChange(
-            new MessagePayload<NetworkRequestTimeSpeedChange>(peer, new NetworkRequestTimeSpeedChange(TimeControlEnum.Play_2x)));
+        handler.Handle_TimeSpeedChanged(
+            new MessagePayload<TimeSpeedChangedAttempted>(
+                this,
+                new TimeSpeedChangedAttempted(TimeControlEnum.Pause)));
 
-        // Assert
-        timeControlInterface.Verify(m => m.ServerSetTimeControl(TimeControlEnum.Play_2x), Times.Once);
+        timeControlInterface.Verify(
+            m => m.ServerSetTimeControl(TimeControlEnum.Pause),
+            Times.Once);
     }
 }

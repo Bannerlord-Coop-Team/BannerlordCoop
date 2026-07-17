@@ -2,24 +2,18 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.Heroes.Messages;
-using System.Threading;
 
 namespace Coop.Core.Server.Services.Connection.Handlers;
 
 /// <summary>
-/// Sends player-facing messaging about the loading lock. It tracks the loading count from the
-/// registry's <see cref="LoadingPlayersChanged"/> signal so it never has to query connection
-/// state itself.
+/// Sends player-facing messages when players start or finish joining the campaign.
 /// </summary>
 public class PlayerConnectionServerMessageHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
 
-    private const string TimeControlsReadyMessage = "All players connected, time controls enabled";
-
-    private int loadingPlayerCount;
+    private const string AllPlayersConnectedMessage = "All players connected";
 
     public PlayerConnectionServerMessageHandler(IMessageBroker messageBroker, INetwork network)
     {
@@ -27,28 +21,17 @@ public class PlayerConnectionServerMessageHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<LoadingPlayersChanged>(Handle_LoadingPlayersChanged);
-        messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangeAttempted);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<LoadingPlayersChanged>(Handle_LoadingPlayersChanged);
-        messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangeAttempted);
     }
 
     internal void Handle_LoadingPlayersChanged(MessagePayload<LoadingPlayersChanged> obj)
     {
-        Volatile.Write(ref loadingPlayerCount, obj.What.LoadingPlayerCount);
-
-        BroadcastNotification(loadingPlayerCount > 0 ? LoadingMessage(loadingPlayerCount) : TimeControlsReadyMessage);
-    }
-
-    internal void Handle_TimeSpeedChangeAttempted(MessagePayload<TimeSpeedChangedAttempted> obj)
-    {
-        // Remind whoever just tried to change the speed why it is locked.
-        if (Volatile.Read(ref loadingPlayerCount) <= 0) return;
-
-        BroadcastNotification(LoadingMessage(loadingPlayerCount));
+        var loadingPlayerCount = obj.What.LoadingPlayerCount;
+        BroadcastNotification(loadingPlayerCount > 0 ? LoadingMessage(loadingPlayerCount) : AllPlayersConnectedMessage);
     }
 
     private void BroadcastNotification(string text)
@@ -59,5 +42,5 @@ public class PlayerConnectionServerMessageHandler : IHandler
     }
 
     private static string LoadingMessage(int loadingPlayers) =>
-        "Time controls disabled, " + loadingPlayers + " player(s) are currently joining the game";
+        loadingPlayers + " player(s) are currently joining the game";
 }
