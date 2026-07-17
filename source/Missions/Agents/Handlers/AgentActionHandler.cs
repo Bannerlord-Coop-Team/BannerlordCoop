@@ -1,13 +1,18 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents.Packets;
+using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -46,8 +51,11 @@ public class AgentActionHandler : IAgentActionHandler
 
     private readonly IBattleNetwork client;
     private readonly IPacketManager packetManager;
+    private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IBattleHostRegistry battleHostRegistry;
+    private readonly IMissionContext missionContext;
 
     // Last observed action indices, defend input, and guard state per owned agent, so we broadcast only on change. WasDiscrete
     // lets us also send the END of a discrete action while still skipping locomotion<->locomotion churn.
@@ -59,7 +67,16 @@ public class AgentActionHandler : IAgentActionHandler
         new Dictionary<Guid, RemoteActionSequence>();
     private readonly Dictionary<Guid, Dictionary<string, PendingRemoteAction>> _pendingRemoteActions =
         new Dictionary<Guid, Dictionary<string, PendingRemoteAction>>();
+    private readonly Dictionary<Guid, MigratedActionAuthority> _migratedActionAuthorities =
+        new Dictionary<Guid, MigratedActionAuthority>();
+    private readonly Dictionary<int, MigrationLineage> _migrationLineages =
+        new Dictionary<int, MigrationLineage>();
+    private readonly HashSet<string> _knownBattleHostControllers =
+        new HashSet<string>();
+    private readonly object _knownBattleHostControllersGate = new object();
 
+    private int _appliedMigrationEpoch;
+    private int _highestReceivedHostActionEpoch;
     private bool _disposed;
 
     private readonly struct ActionState
@@ -89,11 +106,16 @@ public class AgentActionHandler : IAgentActionHandler
     {
         public readonly string ControllerId;
         public readonly Agent.GuardMode GuardMode;
+        public readonly int BattleHostEpoch;
 
-        public RemoteGuardState(string controllerId, Agent.GuardMode guardMode)
+        public RemoteGuardState(
+            string controllerId,
+            Agent.GuardMode guardMode,
+            int battleHostEpoch)
         {
             ControllerId = controllerId;
             GuardMode = guardMode;
+            BattleHostEpoch = battleHostEpoch;
         }
     }
 
@@ -102,12 +124,49 @@ public class AgentActionHandler : IAgentActionHandler
         public readonly string ControllerId;
         public readonly AgentActionData Data;
         public readonly long Sequence;
+        public readonly int BattleHostEpoch;
 
-        public PendingRemoteAction(string controllerId, AgentActionData data, long sequence)
+        public PendingRemoteAction(
+            string controllerId,
+            AgentActionData data,
+            long sequence,
+            int battleHostEpoch)
         {
             ControllerId = controllerId;
             Data = data;
             Sequence = sequence;
+            BattleHostEpoch = battleHostEpoch;
+        }
+    }
+
+    private readonly struct MigratedActionAuthority
+    {
+        public readonly string ObservedAuthority;
+        public readonly string ControllerId;
+        public readonly int BattleHostEpoch;
+
+        public MigratedActionAuthority(
+            string observedAuthority,
+            string controllerId,
+            int battleHostEpoch)
+        {
+            ObservedAuthority = observedAuthority;
+            ControllerId = controllerId;
+            BattleHostEpoch = battleHostEpoch;
+        }
+    }
+
+    private readonly struct MigrationLineage
+    {
+        public readonly string HostControllerId;
+        public readonly HashSet<string> SourceAuthorities;
+
+        public MigrationLineage(
+            string hostControllerId,
+            HashSet<string> sourceAuthorities)
+        {
+            HostControllerId = hostControllerId;
+            SourceAuthorities = sourceAuthorities;
         }
     }
 
@@ -115,26 +174,38 @@ public class AgentActionHandler : IAgentActionHandler
     {
         public readonly string ControllerId;
         public readonly long Sequence;
+        public readonly int BattleHostEpoch;
 
-        public RemoteActionSequence(string controllerId, long sequence)
+        public RemoteActionSequence(
+            string controllerId,
+            long sequence,
+            int battleHostEpoch)
         {
             ControllerId = controllerId;
             Sequence = sequence;
+            BattleHostEpoch = battleHostEpoch;
         }
     }
 
     public AgentActionHandler(
         IBattleNetwork client,
         IPacketManager packetManager,
+        IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        IBattleHostRegistry battleHostRegistry,
+        IMissionContext missionContext)
     {
         this.client = client;
         this.packetManager = packetManager;
+        this.messageBroker = messageBroker;
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
+        this.battleHostRegistry = battleHostRegistry;
+        this.missionContext = missionContext;
 
         this.packetManager.RegisterPacketHandler(this);
+        this.messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
     }
 
     public PacketType PacketType => PacketType.AgentAction;
@@ -258,13 +329,14 @@ public class AgentActionHandler : IAgentActionHandler
         });
     }
 
-    private static void SendActionPackets(
+    private void SendActionPackets(
         string controllerId,
         List<Guid> ids,
         List<AgentActionData> actions,
         List<long> sequences,
         Action<AgentActionPacket> send)
     {
+        int battleHostEpoch = GetOutgoingBattleHostEpoch();
         for (int start = 0; start < ids.Count; start += MaxAgentsPerActionPacket)
         {
             int count = Math.Min(MaxAgentsPerActionPacket, ids.Count - start);
@@ -274,7 +346,12 @@ public class AgentActionHandler : IAgentActionHandler
             ids.CopyTo(start, idChunk, 0, count);
             actions.CopyTo(start, dataChunk, 0, count);
             sequences.CopyTo(start, sequenceChunk, 0, count);
-            send(new AgentActionPacket(controllerId, idChunk, dataChunk, sequenceChunk));
+            send(new AgentActionPacket(
+                controllerId,
+                idChunk,
+                dataChunk,
+                sequenceChunk,
+                battleHostEpoch));
         }
     }
 
@@ -290,6 +367,7 @@ public class AgentActionHandler : IAgentActionHandler
     {
         _pendingRemoteActions.Remove(agentId);
         _remoteActionSequences.Remove(agentId);
+        _migratedActionAuthorities.Remove(agentId);
         if (!_remoteGuardStates.Remove(agentId)) return;
         if (agent == null || agent.Mission != Mission.Current || !agent.IsActive()) return;
 
@@ -326,7 +404,10 @@ public class AgentActionHandler : IAgentActionHandler
                     continue;
                 }
 
-                if (guardState.Value.ControllerId != info.CurrentAuthority)
+                if (!IsCurrentActionAuthority(
+                    info,
+                    guardState.Value.ControllerId,
+                    guardState.Value.BattleHostEpoch))
                 {
                     AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
                     (staleIds ??= new List<Guid>()).Add(agentId);
@@ -350,6 +431,7 @@ public class AgentActionHandler : IAgentActionHandler
         if (_pendingRemoteActions.Count == 0) return;
 
         List<Guid> resolvedIds = null;
+        int appliedMigrationEpoch = _appliedMigrationEpoch;
         using (new AllowedThread())
         {
             foreach (var pendingByAgent in _pendingRemoteActions)
@@ -364,17 +446,46 @@ public class AgentActionHandler : IAgentActionHandler
                 if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
                     continue;
 
-                if (!pendingByAgent.Value.TryGetValue(
-                    info.CurrentAuthority,
-                    out PendingRemoteAction pending))
+                PromotePendingMigration(info, pendingByAgent.Value);
+                string authority = GetCurrentActionAuthority(
+                    info,
+                    out int requiredHostEpoch);
+                RemoveExpiredPendingActions(
+                    pendingByAgent.Value,
+                    authority,
+                    requiredHostEpoch,
+                    appliedMigrationEpoch);
+
+                bool hasCurrentPending = pendingByAgent.Value.TryGetValue(
+                    authority,
+                    out PendingRemoteAction pending);
+                if (!hasCurrentPending
+                    || (requiredHostEpoch != 0
+                        && pending.BattleHostEpoch != requiredHostEpoch)
+                    || !IsCurrentActionAuthority(
+                        info,
+                        pending.ControllerId,
+                        pending.BattleHostEpoch))
                 {
-                    (resolvedIds ??= new List<Guid>()).Add(agentId);
+                    if (hasCurrentPending
+                        && pending.BattleHostEpoch <= appliedMigrationEpoch)
+                    {
+                        pendingByAgent.Value.Remove(pending.ControllerId);
+                    }
+                    if (pendingByAgent.Value.Count == 0)
+                        (resolvedIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
 
-                if (IsStaleRemoteAction(agentId, pending.ControllerId, pending.Sequence))
+                if (IsStaleRemoteAction(
+                    agentId,
+                    pending.ControllerId,
+                    pending.Sequence,
+                    pending.BattleHostEpoch))
                 {
-                    (resolvedIds ??= new List<Guid>()).Add(agentId);
+                    pendingByAgent.Value.Remove(pending.ControllerId);
+                    if (pendingByAgent.Value.Count == 0)
+                        (resolvedIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
 
@@ -383,13 +494,20 @@ public class AgentActionHandler : IAgentActionHandler
                     continue;
 
                 pending.Data.Apply(agent);
-                RecordRemoteActionSequence(agentId, pending.ControllerId, pending.Sequence);
+                RecordRemoteActionSequence(
+                    agentId,
+                    pending.ControllerId,
+                    pending.Sequence,
+                    pending.BattleHostEpoch);
                 UpdateRemoteGuardState(
                     agentId,
                     pending.ControllerId,
                     pending.Data,
-                    agent);
-                (resolvedIds ??= new List<Guid>()).Add(agentId);
+                    agent,
+                    pending.BattleHostEpoch);
+                pendingByAgent.Value.Remove(pending.ControllerId);
+                if (pendingByAgent.Value.Count == 0)
+                    (resolvedIds ??= new List<Guid>()).Add(agentId);
             }
         }
 
@@ -400,16 +518,58 @@ public class AgentActionHandler : IAgentActionHandler
         }
     }
 
+    private void PromotePendingMigration(
+        CoopAgentInfo info,
+        Dictionary<string, PendingRemoteAction> actionsByController)
+    {
+        int highestReceivedEpoch = Volatile.Read(
+            ref _highestReceivedHostActionEpoch);
+        foreach (PendingRemoteAction pending in actionsByController.Values)
+        {
+            if (pending.BattleHostEpoch <= 0
+                || pending.BattleHostEpoch < highestReceivedEpoch
+                || !_migrationLineages.TryGetValue(
+                    pending.BattleHostEpoch,
+                    out MigrationLineage lineage)
+                || lineage.HostControllerId != pending.ControllerId
+                || !lineage.SourceAuthorities.Contains(info.CurrentAuthority)
+                || !IsCurrentBattleHostGeneration(
+                    pending.ControllerId,
+                    pending.BattleHostEpoch))
+            {
+                continue;
+            }
+
+            if (_migratedActionAuthorities.TryGetValue(
+                info.AgentId,
+                out MigratedActionAuthority existing)
+                && existing.BattleHostEpoch > pending.BattleHostEpoch)
+            {
+                continue;
+            }
+
+            _migratedActionAuthorities[info.AgentId] =
+                new MigratedActionAuthority(
+                    info.CurrentAuthority,
+                    pending.ControllerId,
+                    pending.BattleHostEpoch);
+        }
+    }
+
     private void UpdateRemoteGuardState(
         Guid agentId,
         string controllerId,
         AgentActionData data,
-        Agent agent)
+        Agent agent,
+        int battleHostEpoch)
     {
         Agent.GuardMode guardMode = data.GuardMode;
         if (AgentActionData.IsGuardMode(guardMode))
         {
-            _remoteGuardStates[agentId] = new RemoteGuardState(controllerId, guardMode);
+            _remoteGuardStates[agentId] = new RemoteGuardState(
+                controllerId,
+                guardMode,
+                battleHostEpoch);
         }
         else
         {
@@ -422,42 +582,312 @@ public class AgentActionHandler : IAgentActionHandler
         Guid agentId,
         string controllerId,
         long sequence,
-        AgentActionData data)
+        AgentActionData data,
+        int battleHostEpoch)
     {
+        if (battleHostEpoch > 0
+            && battleHostEpoch < Volatile.Read(
+                ref _highestReceivedHostActionEpoch))
+        {
+            return;
+        }
+
         if (!_pendingRemoteActions.TryGetValue(agentId, out var actionsByController))
         {
             actionsByController = new Dictionary<string, PendingRemoteAction>();
             _pendingRemoteActions[agentId] = actionsByController;
         }
 
-        if (actionsByController.TryGetValue(controllerId, out var existing)
-            && existing.Sequence >= sequence)
-            return;
+        if (actionsByController.TryGetValue(controllerId, out var existing))
+        {
+            if (existing.BattleHostEpoch > battleHostEpoch)
+                return;
+            if (existing.BattleHostEpoch == battleHostEpoch
+                && existing.Sequence >= sequence)
+                return;
+        }
 
         actionsByController[controllerId] =
-            new PendingRemoteAction(controllerId, data, sequence);
+            new PendingRemoteAction(
+                controllerId,
+                data,
+                sequence,
+                battleHostEpoch);
     }
 
-    private bool IsStaleRemoteAction(Guid agentId, string controllerId, long sequence)
+    private bool IsStaleRemoteAction(
+        Guid agentId,
+        string controllerId,
+        long sequence,
+        int battleHostEpoch)
     {
         return _remoteActionSequences.TryGetValue(agentId, out var last)
             && last.ControllerId == controllerId
+            && last.BattleHostEpoch == battleHostEpoch
             && last.Sequence >= sequence;
     }
 
     private bool HasPendingRemoteActionAtOrAfter(
         Guid agentId,
         string controllerId,
-        long sequence)
+        long sequence,
+        int battleHostEpoch)
     {
         return _pendingRemoteActions.TryGetValue(agentId, out var actionsByController)
             && actionsByController.TryGetValue(controllerId, out var pending)
+            && pending.BattleHostEpoch == battleHostEpoch
             && pending.Sequence >= sequence;
     }
 
-    private void RecordRemoteActionSequence(Guid agentId, string controllerId, long sequence)
+    private void RecordRemoteActionSequence(
+        Guid agentId,
+        string controllerId,
+        long sequence,
+        int battleHostEpoch)
     {
-        _remoteActionSequences[agentId] = new RemoteActionSequence(controllerId, sequence);
+        _remoteActionSequences[agentId] = new RemoteActionSequence(
+            controllerId,
+            sequence,
+            battleHostEpoch);
+    }
+
+    private void RemovePendingRemoteAction(
+        Guid agentId,
+        string controllerId,
+        int battleHostEpoch)
+    {
+        if (!_pendingRemoteActions.TryGetValue(agentId, out var actionsByController))
+            return;
+
+        if (actionsByController.TryGetValue(controllerId, out var pending)
+            && pending.BattleHostEpoch == battleHostEpoch)
+        {
+            actionsByController.Remove(controllerId);
+        }
+        if (actionsByController.Count == 0)
+            _pendingRemoteActions.Remove(agentId);
+    }
+
+    private void RemoveExpiredPendingActions(
+        Dictionary<string, PendingRemoteAction> actionsByController,
+        string currentAuthority,
+        int requiredHostEpoch,
+        int appliedMigrationEpoch)
+    {
+        List<string> expiredControllers = null;
+        foreach (var pendingByController in actionsByController)
+        {
+            PendingRemoteAction pending = pendingByController.Value;
+            if (pending.BattleHostEpoch > 0
+                && pending.BattleHostEpoch < Volatile.Read(
+                    ref _highestReceivedHostActionEpoch))
+            {
+                (expiredControllers ??= new List<string>())
+                    .Add(pendingByController.Key);
+                continue;
+            }
+
+            bool isCurrentAuthority = pending.ControllerId == currentAuthority
+                && (requiredHostEpoch == 0
+                    || pending.BattleHostEpoch == requiredHostEpoch);
+            if (isCurrentAuthority
+                || pending.BattleHostEpoch > appliedMigrationEpoch)
+            {
+                continue;
+            }
+
+            (expiredControllers ??= new List<string>()).Add(pendingByController.Key);
+        }
+
+        if (expiredControllers == null) return;
+        foreach (string controllerId in expiredControllers)
+            actionsByController.Remove(controllerId);
+    }
+
+    private bool IsCurrentActionAuthority(
+        CoopAgentInfo info,
+        string controllerId,
+        int battleHostEpoch)
+    {
+        if (battleHostEpoch > 0
+            && battleHostEpoch < Volatile.Read(
+                ref _highestReceivedHostActionEpoch))
+        {
+            return false;
+        }
+
+        string authority = GetCurrentActionAuthority(
+            info,
+            out int requiredHostEpoch);
+        return authority == controllerId
+            && (requiredHostEpoch != 0
+                ? requiredHostEpoch == battleHostEpoch
+                : battleHostEpoch == 0
+                    || IsCurrentBattleHostGeneration(
+                        controllerId,
+                        battleHostEpoch));
+    }
+
+    private string GetCurrentActionAuthority(
+        CoopAgentInfo info,
+        out int requiredHostEpoch)
+    {
+        requiredHostEpoch = 0;
+        if (_migratedActionAuthorities.TryGetValue(
+            info.AgentId,
+            out MigratedActionAuthority migrated))
+        {
+            if (migrated.ObservedAuthority == info.CurrentAuthority)
+            {
+                requiredHostEpoch = migrated.BattleHostEpoch;
+                return migrated.ControllerId;
+            }
+
+            _migratedActionAuthorities.Remove(info.AgentId);
+        }
+
+        return info.CurrentAuthority;
+    }
+
+    private int GetOutgoingBattleHostEpoch()
+    {
+        string mapEventId = BattleSpawnGate.ActiveMapEventId;
+        if (mapEventId == null
+            || !battleHostRegistry.TryGet(mapEventId, out var assignment)
+            || assignment.HostControllerId != controllerIdProvider.ControllerId)
+        {
+            return 0;
+        }
+
+        return assignment.Epoch;
+    }
+
+    private bool IsCurrentBattleHostGeneration(
+        string controllerId,
+        int battleHostEpoch)
+    {
+        string mapEventId = BattleSpawnGate.ActiveMapEventId;
+        return mapEventId != null
+            && battleHostRegistry.TryGet(mapEventId, out var assignment)
+            && assignment.HostControllerId == controllerId
+            && assignment.Epoch == battleHostEpoch;
+    }
+
+    private bool ShouldBufferForHostAssignment(AgentActionPacket packet)
+    {
+        if (packet.BattleHostEpoch <= 0)
+            return false;
+
+        string mapEventId = BattleSpawnGate.ActiveMapEventId;
+        if (mapEventId == null)
+            return false;
+        if (!battleHostRegistry.TryGet(mapEventId, out var assignment))
+            return true;
+        if (packet.BattleHostEpoch > assignment.Epoch)
+            return true;
+
+        return packet.BattleHostEpoch == assignment.Epoch
+            && packet.ControllerId == assignment.HostControllerId;
+    }
+
+    private void ObserveHostActionEpoch(int battleHostEpoch)
+    {
+        if (battleHostEpoch <= 0) return;
+
+        int observed = Volatile.Read(ref _highestReceivedHostActionEpoch);
+        while (battleHostEpoch > observed)
+        {
+            int previous = Interlocked.CompareExchange(
+                ref _highestReceivedHostActionEpoch,
+                battleHostEpoch,
+                observed);
+            if (previous == observed)
+                return;
+            observed = previous;
+        }
+    }
+
+    private void Handle_BattleHostAssigned(
+        MessagePayload<NetworkBattleHostAssigned> payload)
+    {
+        if (_disposed) return;
+
+        NetworkBattleHostAssigned message = payload.What;
+        if (message.MapEventId != BattleSpawnGate.ActiveMapEventId)
+            return;
+        if (!battleHostRegistry.TryGet(message.MapEventId, out var assignment)
+            || assignment.Epoch != message.Epoch
+            || assignment.HostControllerId != message.HostControllerId)
+            return;
+
+        var presentControllers = new HashSet<string>(
+            missionContext.ControllersInMission)
+        {
+            controllerIdProvider.ControllerId,
+            message.HostControllerId
+        };
+
+        var candidateAuthorities = new HashSet<string>(
+            agentRegistry.GetControllerIds());
+        lock (_knownBattleHostControllersGate)
+        {
+            foreach (string controllerId in _knownBattleHostControllers)
+                candidateAuthorities.Add(controllerId);
+            _knownBattleHostControllers.Add(message.HostControllerId);
+        }
+
+        var absentAuthorities = new List<string>();
+        foreach (string controllerId in candidateAuthorities)
+        {
+            if (string.IsNullOrEmpty(controllerId)
+                || presentControllers.Contains(controllerId))
+            {
+                continue;
+            }
+
+            absentAuthorities.Add(controllerId);
+        }
+
+        string mapEventId = message.MapEventId;
+        string hostControllerId = message.HostControllerId;
+        int hostEpoch = message.Epoch;
+        GameThread.RunSafe(() =>
+        {
+            if (_disposed
+                || Mission.Current == null
+                || BattleSpawnGate.ActiveMapEventId != mapEventId)
+            {
+                return;
+            }
+
+            var sourceAuthorities = new HashSet<string>(absentAuthorities);
+            _migrationLineages[hostEpoch] =
+                new MigrationLineage(hostControllerId, sourceAuthorities);
+
+            foreach (string observedAuthority in sourceAuthorities)
+            {
+                foreach (CoopAgentInfo info in agentRegistry.GetAgents(
+                    observedAuthority))
+                {
+                    if (_migratedActionAuthorities.TryGetValue(
+                        info.AgentId,
+                        out MigratedActionAuthority existing)
+                        && existing.BattleHostEpoch > hostEpoch)
+                    {
+                        continue;
+                    }
+
+                    _migratedActionAuthorities[info.AgentId] =
+                        new MigratedActionAuthority(
+                            observedAuthority,
+                            hostControllerId,
+                            hostEpoch);
+                }
+            }
+
+            if (_appliedMigrationEpoch < hostEpoch)
+                _appliedMigrationEpoch = hostEpoch;
+        });
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -466,8 +896,12 @@ public class AgentActionHandler : IAgentActionHandler
         if (actionPacket.AgentIds == null
             || actionPacket.Actions == null
             || actionPacket.Sequences == null
+            || actionPacket.AgentIds.Length != actionPacket.Actions.Length
+            || actionPacket.AgentIds.Length != actionPacket.Sequences.Length
             || string.IsNullOrEmpty(actionPacket.ControllerId))
             return;
+
+        ObserveHostActionEpoch(actionPacket.BattleHostEpoch);
 
         // Resolve and apply the whole batch in ONE game-thread action, matching AgentMovementHandler.
         // Resolving here keeps this ordered behind earlier game-thread spawn/register work.
@@ -475,6 +909,8 @@ public class AgentActionHandler : IAgentActionHandler
         {
             if (Mission.Current == null) return;
 
+            bool shouldBufferForHostAssignment =
+                ShouldBufferForHostAssignment(actionPacket);
             using (new AllowedThread())
             {
                 for (int i = 0; i < actionPacket.AgentIds.Length; i++)
@@ -497,24 +933,43 @@ public class AgentActionHandler : IAgentActionHandler
                             agentId,
                             actionPacket.ControllerId,
                             sequence,
-                            data);
+                            data,
+                            actionPacket.BattleHostEpoch);
                         continue;
                     }
 
-                    if (info.CurrentAuthority != actionPacket.ControllerId)
+                    if (!IsCurrentActionAuthority(
+                        info,
+                        actionPacket.ControllerId,
+                        actionPacket.BattleHostEpoch))
                     {
+                        if (shouldBufferForHostAssignment)
+                        {
+                            BufferPendingRemoteAction(
+                                agentId,
+                                actionPacket.ControllerId,
+                                sequence,
+                                data,
+                                actionPacket.BattleHostEpoch);
+                        }
+
                         continue;
                     }
 
                     if (HasPendingRemoteActionAtOrAfter(
                         agentId,
                         actionPacket.ControllerId,
-                        sequence))
+                        sequence,
+                        actionPacket.BattleHostEpoch))
                     {
                         continue;
                     }
 
-                    if (IsStaleRemoteAction(agentId, actionPacket.ControllerId, sequence))
+                    if (IsStaleRemoteAction(
+                        agentId,
+                        actionPacket.ControllerId,
+                        sequence,
+                        actionPacket.BattleHostEpoch))
                     {
                         continue;
                     }
@@ -528,14 +983,27 @@ public class AgentActionHandler : IAgentActionHandler
                             agentId,
                             actionPacket.ControllerId,
                             sequence,
-                            data);
+                            data,
+                            actionPacket.BattleHostEpoch);
                         continue;
                     }
 
-                    _pendingRemoteActions.Remove(agentId);
+                    RemovePendingRemoteAction(
+                        agentId,
+                        actionPacket.ControllerId,
+                        actionPacket.BattleHostEpoch);
                     data.Apply(agent);
-                    RecordRemoteActionSequence(agentId, actionPacket.ControllerId, sequence);
-                    UpdateRemoteGuardState(agentId, actionPacket.ControllerId, data, agent);
+                    RecordRemoteActionSequence(
+                        agentId,
+                        actionPacket.ControllerId,
+                        sequence,
+                        actionPacket.BattleHostEpoch);
+                    UpdateRemoteGuardState(
+                        agentId,
+                        actionPacket.ControllerId,
+                        data,
+                        agent,
+                        actionPacket.BattleHostEpoch);
                 }
             }
         });
@@ -563,11 +1031,18 @@ public class AgentActionHandler : IAgentActionHandler
         if (_disposed) return;
         _disposed = true;
 
+        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
         packetManager.RemovePacketHandler(this);
         _lastActions.Clear();
         _localActionSequences.Clear();
         _remoteGuardStates.Clear();
         _remoteActionSequences.Clear();
         _pendingRemoteActions.Clear();
+        _migratedActionAuthorities.Clear();
+        _migrationLineages.Clear();
+        lock (_knownBattleHostControllersGate)
+        {
+            _knownBattleHostControllers.Clear();
+        }
     }
 }

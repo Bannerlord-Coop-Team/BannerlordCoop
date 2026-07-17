@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Linq;
+using Common;
+using Common.Messaging;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents;
 using Missions;
 using Missions.Agents.Packets;
+using Missions.Messages;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -174,6 +178,600 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
             Assert.Equal(1, puppetMirror.ResetGuardCalls);
+        });
+    }
+
+    [Fact]
+    public void MigratedHostAction_RemainsAuthoritativeAfterOldHostRejoins()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var mock = fixture.CreateMission(observer);
+                var component = observer.Resolve<ICoopMissionComponent>();
+                var registry = observer.Resolve<INetworkAgentRegistry>();
+                var broker = observer.Resolve<IMessageBroker>();
+                var hosts = observer.Resolve<IBattleHostRegistry>();
+                var migratedAgentId = Guid.NewGuid();
+                var activeOwnerAgentId = Guid.NewGuid();
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("D", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "A",
+                    new[] { "B", "D" },
+                    epoch: 1);
+                DrainGameThread();
+
+                var migratedPuppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                var activeOwnerPuppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                var rejoinedOwnerPuppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                var rejoinedOwnerAgentId = Guid.NewGuid();
+                Assert.True(registry.TryRegisterAgent("A", migratedAgentId, migratedPuppet));
+                Assert.True(registry.TryRegisterAgent("D", activeOwnerAgentId, activeOwnerPuppet));
+                Assert.True(AgentMirror.TryGet(migratedPuppet, out var migratedMirror));
+                Assert.True(AgentMirror.TryGet(activeOwnerPuppet, out var activeOwnerMirror));
+                Assert.True(AgentMirror.TryGet(rejoinedOwnerPuppet, out var rejoinedOwnerMirror));
+
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "B",
+                    new[] { "D" },
+                    epoch: 2);
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                bool rejoinedAgentRegistered = false;
+                GameThread.RunSafe(() =>
+                    rejoinedAgentRegistered = registry.TryRegisterAgent(
+                        "A",
+                        rejoinedOwnerAgentId,
+                        rejoinedOwnerPuppet));
+                DrainGameThread();
+                Assert.True(rejoinedAgentRegistered);
+
+                var hostAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                Assert.True(AgentMirror.TryGet(hostAgent, out var hostMirror));
+                hostMirror.GuardMode = Agent.GuardMode.Right;
+                var guard = new AgentActionData(hostAgent);
+
+                component.AgentActionHandler.HandlePacket(null,
+                    new AgentActionPacket(
+                        "B",
+                        new[]
+                        {
+                            migratedAgentId,
+                            activeOwnerAgentId
+                        },
+                        new[] { guard, guard },
+                        new[] { 1L, 1L },
+                        battleHostEpoch: 2));
+                hostMirror.GuardMode = Agent.GuardMode.Up;
+                ApplyOwnerAction(
+                    component,
+                    "A",
+                    1L,
+                    rejoinedOwnerAgentId,
+                    hostAgent);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+
+                Assert.Equal(Agent.GuardMode.Right, migratedMirror.GuardMode);
+                Assert.Equal(1, migratedMirror.SetWeaponGuardCalls);
+                Assert.Equal(Agent.GuardMode.None, activeOwnerMirror.GuardMode);
+                Assert.Equal(0, activeOwnerMirror.SetWeaponGuardCalls);
+                Assert.Equal(Agent.GuardMode.Up, rejoinedOwnerMirror.GuardMode);
+                Assert.Equal(1, rejoinedOwnerMirror.SetWeaponGuardCalls);
+
+                migratedMirror.GuardMode = Agent.GuardMode.None;
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+
+                Assert.Equal(Agent.GuardMode.Right, migratedMirror.GuardMode);
+                Assert.Equal(2, migratedMirror.SetWeaponGuardCalls);
+                Assert.Equal(Agent.GuardMode.None, activeOwnerMirror.GuardMode);
+                Assert.Equal(Agent.GuardMode.Up, rejoinedOwnerMirror.GuardMode);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
+        });
+    }
+
+    [Fact]
+    public void QueuedOldHostRegistration_BeforeAssignment_IsMigrated()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var mock = fixture.CreateMission(observer);
+                var component = observer.Resolve<ICoopMissionComponent>();
+                var registry = observer.Resolve<INetworkAgentRegistry>();
+                var broker = observer.Resolve<IMessageBroker>();
+                var hosts = observer.Resolve<IBattleHostRegistry>();
+                var agentId = Guid.NewGuid();
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "A",
+                    new[] { "B" },
+                    epoch: 1);
+                DrainGameThread();
+
+                var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+                bool oldHostAgentRegistered = false;
+                GameThread.RunSafe(() =>
+                    oldHostAgentRegistered = registry.TryRegisterAgent(
+                        "A",
+                        agentId,
+                        puppet));
+
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "B",
+                    Array.Empty<string>(),
+                    epoch: 2);
+                DrainGameThread();
+                Assert.True(oldHostAgentRegistered);
+
+                var hostAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                Assert.True(AgentMirror.TryGet(hostAgent, out var hostMirror));
+                hostMirror.GuardMode = Agent.GuardMode.Left;
+
+                ApplyOwnerAction(
+                    component,
+                    "B",
+                    1L,
+                    agentId,
+                    hostAgent,
+                    battleHostEpoch: 2);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+
+                Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
+                Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
+        });
+    }
+
+    [Fact]
+    public void LateOldHostRegistration_UsesPendingSuccessorAction()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var mock = fixture.CreateMission(observer);
+                var component = observer.Resolve<ICoopMissionComponent>();
+                var registry = observer.Resolve<INetworkAgentRegistry>();
+                var broker = observer.Resolve<IMessageBroker>();
+                var hosts = observer.Resolve<IBattleHostRegistry>();
+                var agentId = Guid.NewGuid();
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "A",
+                    new[] { "B" },
+                    epoch: 1);
+                DrainGameThread();
+
+                var hostAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                Assert.True(AgentMirror.TryGet(hostAgent, out var hostMirror));
+                hostMirror.GuardMode = Agent.GuardMode.Down;
+
+                ApplyOwnerAction(
+                    component,
+                    "B",
+                    1L,
+                    agentId,
+                    hostAgent,
+                    battleHostEpoch: 2);
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "B",
+                    Array.Empty<string>(),
+                    epoch: 2);
+                DrainGameThread();
+
+                var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                Assert.True(registry.TryRegisterAgent("A", agentId, puppet));
+                Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+
+                Assert.Equal(Agent.GuardMode.Down, puppetMirror.GuardMode);
+                Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
+        });
+    }
+
+    [Fact]
+    public void DepartedHostGuard_ClearsWhenSuccessorTakesAuthority()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var mock = fixture.CreateMission(observer);
+                var component = observer.Resolve<ICoopMissionComponent>();
+                var registry = observer.Resolve<INetworkAgentRegistry>();
+                var broker = observer.Resolve<IMessageBroker>();
+                var hosts = observer.Resolve<IBattleHostRegistry>();
+                var agentId = Guid.NewGuid();
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "A",
+                    new[] { "B" },
+                    epoch: 1);
+                DrainGameThread();
+
+                var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                Assert.True(registry.TryRegisterAgent("A", agentId, puppet));
+                Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+                var oldHostAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                Assert.True(AgentMirror.TryGet(oldHostAgent, out var oldHostMirror));
+                oldHostMirror.GuardMode = Agent.GuardMode.Left;
+
+                ApplyOwnerAction(
+                    component,
+                    "A",
+                    1L,
+                    agentId,
+                    oldHostAgent,
+                    battleHostEpoch: 1);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
+
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "B",
+                    Array.Empty<string>(),
+                    epoch: 2);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+
+                Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+                Assert.Equal(1, puppetMirror.ResetGuardCalls);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
+        });
+    }
+
+    [Fact]
+    public void SuccessorAction_BeforeHostAssignment_WaitsForMigration()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var mock = fixture.CreateMission(observer);
+                var component = observer.Resolve<ICoopMissionComponent>();
+                var registry = observer.Resolve<INetworkAgentRegistry>();
+                var broker = observer.Resolve<IMessageBroker>();
+                var hosts = observer.Resolve<IBattleHostRegistry>();
+                var agentId = Guid.NewGuid();
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "A",
+                    new[] { "B" },
+                    epoch: 1);
+                DrainGameThread();
+
+                var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                Assert.True(registry.TryRegisterAgent("A", agentId, puppet));
+                Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+                var successorAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                Assert.True(AgentMirror.TryGet(successorAgent, out var successorMirror));
+                successorMirror.GuardMode = Agent.GuardMode.Down;
+
+                ApplyOwnerAction(
+                    component,
+                    "B",
+                    1L,
+                    agentId,
+                    successorAgent,
+                    battleHostEpoch: 2);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "B",
+                    Array.Empty<string>(),
+                    epoch: 2);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+
+                Assert.Equal(Agent.GuardMode.Down, puppetMirror.GuardMode);
+                Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
+        });
+    }
+
+    [Fact]
+    public void LaterSuccessorAction_WaitsAcrossConsecutiveMigrations()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var mock = fixture.CreateMission(observer);
+                var component = observer.Resolve<ICoopMissionComponent>();
+                var registry = observer.Resolve<INetworkAgentRegistry>();
+                var broker = observer.Resolve<IMessageBroker>();
+                var hosts = observer.Resolve<IBattleHostRegistry>();
+                var agentId = Guid.NewGuid();
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("C", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "A",
+                    new[] { "B", "C" },
+                    epoch: 1);
+                DrainGameThread();
+
+                var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                Assert.True(registry.TryRegisterAgent("A", agentId, puppet));
+                Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+                var finalHostAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                var intermediateHostAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                Assert.True(AgentMirror.TryGet(finalHostAgent, out var finalHostMirror));
+                Assert.True(AgentMirror.TryGet(
+                    intermediateHostAgent,
+                    out var intermediateHostMirror));
+                finalHostMirror.GuardMode = Agent.GuardMode.Up;
+                intermediateHostMirror.GuardMode = Agent.GuardMode.Down;
+
+                ApplyOwnerAction(
+                    component,
+                    "C",
+                    1L,
+                    agentId,
+                    finalHostAgent,
+                    battleHostEpoch: 3);
+                ApplyOwnerAction(
+                    component,
+                    "B",
+                    1L,
+                    agentId,
+                    intermediateHostAgent,
+                    battleHostEpoch: 2);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+                Assert.Equal(0, puppetMirror.SetWeaponGuardCalls);
+
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "B",
+                    new[] { "C" },
+                    epoch: 2);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+                Assert.Equal(0, puppetMirror.SetWeaponGuardCalls);
+
+                broker.Publish(this, new MissionPeerDisconnected("B", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "C",
+                    Array.Empty<string>(),
+                    epoch: 3);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+
+                Assert.Equal(Agent.GuardMode.Up, puppetMirror.GuardMode);
+                Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
+        });
+    }
+
+    [Fact]
+    public void SupersededPendingAction_DoesNotDiscardFutureHostAction()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var mock = fixture.CreateMission(observer);
+                var component = observer.Resolve<ICoopMissionComponent>();
+                var registry = observer.Resolve<INetworkAgentRegistry>();
+                var broker = observer.Resolve<IMessageBroker>();
+                var hosts = observer.Resolve<IBattleHostRegistry>();
+                var agentId = Guid.NewGuid();
+
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "A",
+                    new[] { "B" },
+                    epoch: 1);
+                DrainGameThread();
+
+                var oldHostAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                var successorAgent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.Player));
+                Assert.True(AgentMirror.TryGet(oldHostAgent, out var oldHostMirror));
+                Assert.True(AgentMirror.TryGet(successorAgent, out var successorMirror));
+                oldHostMirror.GuardMode = Agent.GuardMode.Left;
+                successorMirror.GuardMode = Agent.GuardMode.Right;
+
+                ApplyOwnerAction(
+                    component,
+                    "B",
+                    1L,
+                    agentId,
+                    successorAgent,
+                    battleHostEpoch: 2);
+                ApplyOwnerAction(
+                    component,
+                    "A",
+                    1L,
+                    agentId,
+                    oldHostAgent,
+                    battleHostEpoch: 1);
+                DrainGameThread();
+
+                var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                Assert.True(registry.TryRegisterAgent("A", agentId, puppet));
+                Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                AssignBattleHost(
+                    broker,
+                    hosts,
+                    mapEventId,
+                    "B",
+                    Array.Empty<string>(),
+                    epoch: 2);
+                DrainGameThread();
+                component.AgentActionHandler.ApplyRemoteGuardStates();
+
+                Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+                Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
         });
     }
 
@@ -377,18 +975,48 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         ApplyOwnerAction(component, "owner", sequence, agentId, owner);
     }
 
+    private static void DrainGameThread()
+    {
+        GameThread.Run(() => { }, blocking: true);
+    }
+
     private static void ApplyOwnerAction(
         ICoopMissionComponent component,
         string controllerId,
         long sequence,
         Guid agentId,
-        Agent owner)
+        Agent owner,
+        int battleHostEpoch = 0)
     {
         component.AgentActionHandler.HandlePacket(null,
             new AgentActionPacket(
                 controllerId,
                 new[] { agentId },
                 new[] { new AgentActionData(owner) },
-                new[] { sequence }));
+                new[] { sequence },
+                battleHostEpoch));
+    }
+
+    private static void AssignBattleHost(
+        IMessageBroker broker,
+        IBattleHostRegistry hosts,
+        string mapEventId,
+        string hostControllerId,
+        string[] successorControllerIds,
+        int epoch)
+    {
+        hosts.Set(
+            mapEventId,
+            new BattleHostAssignment(
+                hostControllerId,
+                successorControllerIds,
+                epoch));
+        broker.Publish(
+            typeof(BattleBlockingSyncTests),
+            new NetworkBattleHostAssigned(
+                mapEventId,
+                hostControllerId,
+                successorControllerIds,
+                epoch));
     }
 }

@@ -25,17 +25,21 @@ namespace Missions.Agents.Packets
         public string ControllerId { get; }
         [ProtoMember(4)]
         public long[] Sequences { get; }
+        [ProtoMember(5)]
+        public int BattleHostEpoch { get; }
 
         public AgentActionPacket(
             string controllerId,
             Guid[] agentIds,
             AgentActionData[] actions,
-            long[] sequences)
+            long[] sequences,
+            int battleHostEpoch = 0)
         {
             ControllerId = controllerId;
             AgentIds = agentIds;
             Actions = actions;
             Sequences = sequences;
+            BattleHostEpoch = battleHostEpoch;
         }
     }
 }
