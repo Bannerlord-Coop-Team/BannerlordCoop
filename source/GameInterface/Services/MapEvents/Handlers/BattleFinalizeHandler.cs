@@ -561,6 +561,7 @@ internal class BattleFinalizeHandler : IHandler
             return;
 
         data.ForcePosition = true;
+        data.ResetMovementToHold = true;
 
         // The gate reset must reach clients before the encounter close allows another map command.
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
