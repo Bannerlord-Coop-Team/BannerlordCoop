@@ -46,16 +46,19 @@ internal class TradeSkillHandler : IHandler
 
             if (playerHero != Hero.MainHero) return;
 
-            if (data.IsTrading)
+            if (data.PurchasedItems != null && data.IsTrading)
             {
                 foreach (ValueTuple<ItemRosterElement, int> valueTuple in data.PurchasedItems)
                 {
                     tradeSkillBehavior.ProcessPurchases(valueTuple.Item1, valueTuple.Item2);
                 }
             }
-            foreach (ValueTuple<ItemRosterElement, int> valueTuple2 in data.SoldItems)
+            if (data.SoldItems != null)
             {
-                tradeSkillBehavior.ProcessSales(valueTuple2.Item1, valueTuple2.Item2, data.IsTrading);
+                foreach (ValueTuple<ItemRosterElement, int> valueTuple2 in data.SoldItems)
+                {
+                    tradeSkillBehavior.ProcessSales(valueTuple2.Item1, valueTuple2.Item2, data.IsTrading);
+                }
             }
         });
     }

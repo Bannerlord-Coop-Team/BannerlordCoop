@@ -1,6 +1,7 @@
-﻿using ProtoBuf;
+﻿using GameInterface.Services.Inventory.TradeSkills.Data;
+using ProtoBuf;
+using System;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Inventory.TradeSkills;
 
@@ -14,9 +15,9 @@ public class TradePlayerData
 {
     // Dictionary<PlayerHeroId, <ItemObjectId, ItemTradeData>>
     [ProtoMember(1)]
-    public Dictionary<string, Dictionary<string, TradeSkillCampaignBehavior.ItemTradeData>> PlayerItemsTradeData { get; }
+    public Dictionary<string, Dictionary<string, Tuple<float, int>>> PlayerItemsTradeData { get; }
 
-    public TradePlayerData(Dictionary<string, Dictionary<string, TradeSkillCampaignBehavior.ItemTradeData>> playerItemsTradeData)
+    public TradePlayerData(Dictionary<string, Dictionary<string, Tuple<float, int>>> playerItemsTradeData)
     {
         PlayerItemsTradeData = playerItemsTradeData;
     }

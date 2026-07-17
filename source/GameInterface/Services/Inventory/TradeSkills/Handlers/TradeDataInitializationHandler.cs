@@ -89,7 +89,7 @@ internal class TradeDataInitializationHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<ItemObject>(itemIdData.Key, out var item)) continue;
 
-            itemsTradeData[item] = itemIdData.Value;
+            itemsTradeData[item] = new TradeSkillCampaignBehavior.ItemTradeData(itemIdData.Value.Item1, itemIdData.Value.Item2);
         }
 
         return itemsTradeData;

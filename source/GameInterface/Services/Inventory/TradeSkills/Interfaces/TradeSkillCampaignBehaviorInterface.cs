@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Network;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Inventory.TradeSkills.Data;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -80,14 +81,13 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
         if (itemRosterElement.EquipmentElement.ItemModifier != null) return;
         if (!objectManager.TryGetIdWithLogging(itemRosterElement.EquipmentElement.Item, out var itemId)) return;
 
-        ItemTradeData itemTradeData;
-        if (!TradePlayerData.PlayerItemsTradeData[playerHeroId].TryGetValue(itemId, out itemTradeData))
+        if (!TradePlayerData.PlayerItemsTradeData[playerHeroId].TryGetValue(itemId, out Tuple<float, int> itemTradeData))
         {
-            itemTradeData = default(ItemTradeData);
+            itemTradeData = new Tuple<float, int>(0, 0);
         }
-        int num = itemTradeData.NumItemsPurchased + itemRosterElement.Amount;
-        float averagePrice = (itemTradeData.AveragePrice * (float)itemTradeData.NumItemsPurchased + (float)totalPrice) / MathF.Max(0.0001f, (float)num);
-        TradePlayerData.PlayerItemsTradeData[playerHeroId][itemId] = new ItemTradeData(averagePrice, num);
+        int num = itemTradeData.Item2 + itemRosterElement.Amount;
+        float averagePrice = (itemTradeData.Item1 * (float)itemTradeData.Item2 + (float)totalPrice) / MathF.Max(0.0001f, (float)num);
+        TradePlayerData.PlayerItemsTradeData[playerHeroId][itemId] = new Tuple<float, int>(averagePrice, num);
     }
 
     /// <summary>
@@ -99,14 +99,13 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
         if (!objectManager.TryGetIdWithLogging(itemRosterElement.EquipmentElement.Item, out var itemId)) return 0;
 
         int result = 0;
-        ItemTradeData itemTradeData;
-        if (TradePlayerData.PlayerItemsTradeData[playerHeroId].TryGetValue(itemId, out itemTradeData))
+        if (TradePlayerData.PlayerItemsTradeData[playerHeroId].TryGetValue(itemId, out Tuple<float, int> itemTradeData))
         {
             if (isTrading)
             {
-                int num = MathF.Min(itemTradeData.NumItemsPurchased, itemRosterElement.Amount);
-                int num2 = itemTradeData.NumItemsPurchased - num;
-                float f = (float)num * itemTradeData.AveragePrice;
+                int num = MathF.Min(itemTradeData.Item2, itemRosterElement.Amount);
+                int num2 = itemTradeData.Item2 - num;
+                float f = (float)num * itemTradeData.Item1;
                 float num3 = (float)totalPrice / MathF.Max(0.001f, (float)itemRosterElement.Amount);
                 int num4 = MathF.Round((float)num * num3);
                 result = MathF.Max(0, num4 - MathF.Floor(f));
@@ -116,7 +115,7 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
                 }
                 else
                 {
-                    TradePlayerData.PlayerItemsTradeData[playerHeroId][itemId] = new ItemTradeData(itemTradeData.AveragePrice, num2);
+                    TradePlayerData.PlayerItemsTradeData[playerHeroId][itemId] = new Tuple<float, int>(itemTradeData.Item1, num2);
                 }
             }
             else
@@ -129,9 +128,9 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
                 else
                 {
                     int amount = playerParty.ItemRoster.GetElementCopyAtIndex(num5).Amount;
-                    if (itemTradeData.NumItemsPurchased > amount)
+                    if (itemTradeData.Item2 > amount)
                     {
-                        TradePlayerData.PlayerItemsTradeData[playerHeroId][itemId] = new ItemTradeData(itemTradeData.AveragePrice, amount);
+                        TradePlayerData.PlayerItemsTradeData[playerHeroId][itemId] = new Tuple<float, int>(itemTradeData.Item1, amount);
                     }
                 }
             }
@@ -158,7 +157,7 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
 
         if (!TradePlayerData.PlayerItemsTradeData.ContainsKey(playerHeroId))
         {
-            TradePlayerData.PlayerItemsTradeData[playerHeroId] = new Dictionary<string, ItemTradeData>();
+            TradePlayerData.PlayerItemsTradeData[playerHeroId] = new Dictionary<string, Tuple<float, int>>();
         }
     }
 }
