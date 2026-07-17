@@ -157,6 +157,9 @@ internal class HeroInterface : IHeroInterface
 
     private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
     {
+        // Player birth dates come from a separate character-creation campaign, so rebase them to this campaign.
+        hero.SetBirthDay(CampaignTime.YearsFromNow(-hero._defaultAge));
+
         var party = hero.PartyBelongedTo;
 
         party.Anchor = new AnchorPoint(party);
