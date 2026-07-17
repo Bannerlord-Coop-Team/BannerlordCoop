@@ -1498,7 +1498,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 responderParty,
                 initiatorParty,
                 forcePlayerOutFromSettlement: false,
-                ConversationRestartSource.PlayerEncounter));
+                ConversationRestartSource.PlayerEncounter, 
+                armyTalkEncounter: false));
         });
     }
 
