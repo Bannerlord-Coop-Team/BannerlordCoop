@@ -11,6 +11,7 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
+using System.Globalization;
 
 namespace Coop.Core.Client.States;
 
@@ -35,6 +36,7 @@ public class CampaignState : ClientStateBase
     private volatile bool timeCatchUpCheckQueued;
     private volatile bool waitingForWorldReady;
     private volatile bool joinCompletionQueued;
+    private volatile int lastJoinPacketsRemaining = -1;
 
     public CampaignState(
         IClientLogic logic,
@@ -61,6 +63,7 @@ public class CampaignState : ClientStateBase
             messageBroker.Subscribe<NetworkJoinReplayComplete>(Handle_JoinReplayComplete);
             messageBroker.Subscribe<JoinCampaignBaselineApplied>(Handle_JoinCampaignBaselineApplied);
             messageBroker.Subscribe<CampaignTimeSampleReceived>(Handle_CampaignTimeSampleReceived);
+            messageBroker.Subscribe<JoinCatchUpProgressReceived>(Handle_JoinCatchUpProgressReceived);
             messageBroker.Subscribe<NetworkJoinWorldReady>(Handle_JoinWorldReady);
         }
 
@@ -86,6 +89,7 @@ public class CampaignState : ClientStateBase
             messageBroker.Unsubscribe<NetworkJoinReplayComplete>(Handle_JoinReplayComplete);
             messageBroker.Unsubscribe<JoinCampaignBaselineApplied>(Handle_JoinCampaignBaselineApplied);
             messageBroker.Unsubscribe<CampaignTimeSampleReceived>(Handle_CampaignTimeSampleReceived);
+            messageBroker.Unsubscribe<JoinCatchUpProgressReceived>(Handle_JoinCatchUpProgressReceived);
             messageBroker.Unsubscribe<NetworkJoinWorldReady>(Handle_JoinWorldReady);
         }
     }
@@ -113,9 +117,7 @@ public class CampaignState : ClientStateBase
         baselineResponseExpected = false;
         finalBaselineResponseExpected = false;
 
-        loadingInterface.SetLoadingMessage(
-            "Loading Host Campaign",
-            "Catching up to the host...");
+        SetCatchUpLoadingMessage();
 
         if (!obj.What.Success)
         {
@@ -149,6 +151,42 @@ public class CampaignState : ClientStateBase
         baselineResponseExpected = true;
         finalBaselineResponseExpected = isFinalBaseline;
         network.SendAll(new NetworkJoinCampaignBaselineRequested());
+    }
+
+    internal void Handle_JoinCatchUpProgressReceived(
+        MessagePayload<JoinCatchUpProgressReceived> obj)
+    {
+        if (joinCompletionQueued || obj.What.PacketsRemaining == lastJoinPacketsRemaining) return;
+
+        lastJoinPacketsRemaining = obj.What.PacketsRemaining;
+        GameThread.RunSafe(() =>
+        {
+            if (ReferenceEquals(Logic.State, this) == false || joinCompletionQueued) return;
+            SetCatchUpLoadingMessage();
+        }, context: nameof(Handle_JoinCatchUpProgressReceived));
+    }
+
+    private void SetCatchUpLoadingMessage()
+    {
+        string description;
+        if (lastJoinPacketsRemaining > 0)
+        {
+            description = "Catching up to the host... " +
+                          lastJoinPacketsRemaining.ToString("N0", CultureInfo.InvariantCulture) +
+                          " packets remaining";
+        }
+        else if (lastJoinPacketsRemaining == 0)
+        {
+            // The transport queue can reach zero while already-received game-thread applies and the
+            // final baseline barrier still have work left.
+            description = "Finishing synchronization...";
+        }
+        else
+        {
+            description = "Catching up to the host...";
+        }
+
+        loadingInterface.SetLoadingMessage("Loading Host Campaign", description);
     }
 
     internal void Handle_CampaignTimeSampleReceived(MessagePayload<CampaignTimeSampleReceived> obj)

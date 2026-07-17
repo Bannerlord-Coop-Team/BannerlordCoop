@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Coop.Core.Server.Connections;
 
@@ -55,9 +56,18 @@ public interface IConnectionMessageQueue
     void Flush(NetPeer peer);
 
     /// <summary>
+    /// Gets the join work still held by this gate plus the peer's reliable world-channel backlog.
+    /// Returns <c>false</c> before queueing starts and after catch-up has completed.
+    /// </summary>
+    bool TryGetCatchUpPacketsRemaining(NetPeer peer, out int packetsRemaining);
+
+    /// <summary>
     /// Replays everything held for a peer, appends a reliable marker, and opens the peer atomically.
     /// </summary>
     void OpenWithTail(NetPeer peer, IMessage tailMarker);
+
+    /// <summary>Stops progress tracking after the client applies the ordered join tail.</summary>
+    void CompleteCatchUp(NetPeer peer);
 }
 
 /// <inheritdoc cref="IConnectionMessageQueue"/>
@@ -73,8 +83,9 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     private sealed class PeerChannel
     {
         public readonly object Gate = new object();
-        public Phase Phase = Phase.Dropping;
+        public volatile Phase Phase = Phase.Dropping;
         public readonly Queue<IPacket> Pending = new Queue<IPacket>();
+        public int PendingCount;
     }
 
     private static readonly ILogger Logger = LogManager.GetLogger<ConnectionMessageQueue>();
@@ -114,6 +125,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
             {
                 case Phase.Queueing:
                     channel.Pending.Enqueue(packet);
+                    Interlocked.Increment(ref channel.PendingCount);
                     return true;
                 case Phase.Dropping:
                     // Already in the save the peer is about to load; discard.
@@ -170,6 +182,19 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         Logger.Debug("Flushed {Count} queued packets to peer {Peer} while joining", replayed, peer.Id);
     }
 
+    public bool TryGetCatchUpPacketsRemaining(NetPeer peer, out int packetsRemaining)
+    {
+        packetsRemaining = 0;
+        if (channels.TryGetValue(peer, out var channel) == false) return false;
+
+        if (channel.Phase == Phase.Dropping) return false;
+
+        packetsRemaining = Volatile.Read(ref channel.PendingCount) +
+                           peer.GetPacketsCountInReliableQueue(0, true) +
+                           peer.GetPacketsCountInReliableQueue(0, false);
+        return true;
+    }
+
     public void OpenWithTail(NetPeer peer, IMessage tailMarker)
     {
         if (tailMarker == null) throw new ArgumentNullException(nameof(tailMarker));
@@ -192,15 +217,27 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
             channel.Phase = Phase.Open;
         }
 
-        channels.TryRemove(peer, out _);
         Logger.Debug("Opened peer {Peer} after {Count} queued packets and the join tail marker", peer.Id, replayed);
+    }
+
+    public void CompleteCatchUp(NetPeer peer)
+    {
+        if (channels.TryGetValue(peer, out var channel) == false) return;
+
+        lock (channel.Gate)
+        {
+            if (channel.Phase != Phase.Open) return;
+            channels.TryRemove(peer, out _);
+        }
     }
 
     private void Drain(NetPeer peer, PeerChannel channel)
     {
         while (channel.Pending.Count > 0)
         {
-            network.Value.SendImmediate(peer, channel.Pending.Dequeue());
+            var packet = channel.Pending.Dequeue();
+            Interlocked.Decrement(ref channel.PendingCount);
+            network.Value.SendImmediate(peer, packet);
         }
     }
 }

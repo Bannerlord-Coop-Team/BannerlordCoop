@@ -118,6 +118,33 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
+    public void CatchUpProgress_CombinesHeldAndReliablePacketsUntilClientAcknowledges()
+    {
+        var peer = Connect();
+        peer.SetQueueLength(5);
+
+        Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
+
+        queue.BeginQueueing(peer);
+        queue.TryHandleBroadcast(peer, new FakePacket());
+        queue.TryHandleBroadcast(peer, new FakePacket());
+
+        Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int queued));
+        Assert.Equal(7, queued);
+
+        queue.Flush(peer);
+        Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int draining));
+        Assert.Equal(5, draining);
+
+        queue.OpenWithTail(peer, new NetworkJoinWorldReady());
+        Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int opened));
+        Assert.Equal(5, opened);
+
+        queue.CompleteCatchUp(peer);
+        Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
+    }
+
+    [Fact]
     public void BeginQueueing_BeforePlayerConnected_StillQueuesAndFlushes()
     {
         var peer = network.CreatePeer();

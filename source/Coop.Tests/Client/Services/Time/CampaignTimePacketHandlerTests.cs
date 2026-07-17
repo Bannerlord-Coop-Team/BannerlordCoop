@@ -37,6 +37,21 @@ public class CampaignTimePacketHandlerTests
 
         mapTimeTracker.Verify(m => m.SyncCampaignTime(packet.ServerTicks, 0f), Times.Once);
         Assert.Single(broker.GetMessagesFromType<CampaignTimeSampleReceived>());
+        Assert.Empty(broker.GetMessagesFromType<JoinCatchUpProgressReceived>());
+    }
+
+    [Fact]
+    public void CampaignTimePacket_WithJoinProgress_PublishesRemainingPackets()
+    {
+        var broker = new TestMessageBroker();
+        var packetManager = new Mock<IPacketManager>();
+        var mapTimeTracker = new Mock<IMapTimeTrackerInterface>();
+        var handler = new CampaignTimePacketHandler(broker, packetManager.Object, mapTimeTracker.Object);
+
+        handler.HandlePacket(null, new CampaignTimePacket(123456L, 4321));
+
+        var progress = Assert.Single(broker.GetMessagesFromType<JoinCatchUpProgressReceived>());
+        Assert.Equal(4321, progress.PacketsRemaining);
     }
 
     [Theory]

@@ -277,6 +277,30 @@ public class CampaignStateTests
     }
 
     [Fact]
+    public void EnteringCampaign_ShowsJoinPacketCountdownAndFinishingState()
+    {
+        clientComponent.TestNetwork.CreatePeer();
+        var loadingInterface = clientComponent.Container.Resolve<Mock<ILoadingInterface>>();
+        _ = clientLogic.SetState<LoadingState>();
+        _ = clientLogic.SetState<CampaignState>();
+        loadingInterface.Reset();
+
+        TestMessageBroker.Publish(this, new JoinCatchUpProgressReceived(12345));
+        GameThread.Run(() => { }, blocking: true);
+
+        loadingInterface.Verify(m => m.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Catching up to the host... 12,345 packets remaining"), Times.Once);
+
+        TestMessageBroker.Publish(this, new JoinCatchUpProgressReceived(0));
+        GameThread.Run(() => { }, blocking: true);
+
+        loadingInterface.Verify(m => m.SetLoadingMessage(
+            "Loading Host Campaign",
+            "Finishing synchronization..."), Times.Once);
+    }
+
+    [Fact]
     public void EnteringCampaignFromMission_DoesNotWaitForJoinCatchUpMarker()
     {
         // Arrange

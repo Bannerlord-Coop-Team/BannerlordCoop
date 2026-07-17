@@ -134,15 +134,19 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     }
 
     /// <summary>
-    /// Sends straight to the peer, bypassing any per-peer send gating (the server's connection queue)
-    /// and message aggregation. For connection-level traffic that must reach a peer regardless of its
-    /// load state — the transfer save and the join handshake — and for the queue's own replay.
+    /// Sends a packet straight to the peer, bypassing any per-peer send gating. Queued replay
+    /// <see cref="MessagePacket"/>s retain normal aggregation; non-message packets such as the
+    /// transfer save are sent directly.
     /// </summary>
     public void SendImmediate(NetPeer netPeer, IPacket packet)
     {
-        SendInternal(netPeer, packet, immediate: true);
+        SendInternal(netPeer, packet);
     }
 
+    /// <summary>
+    /// Sends connection-level message traffic straight to the peer and flushes any earlier aggregated
+    /// replay first, so handshake messages remain exact reliable-ordered barriers.
+    /// </summary>
     public void SendImmediate(NetPeer netPeer, IMessage message)
     {
         SendInternal(netPeer, MessagePacket.Create(message, serializer), immediate: true);

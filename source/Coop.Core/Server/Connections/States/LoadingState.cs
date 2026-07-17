@@ -197,6 +197,7 @@ public class LoadingState : ConnectionStateBase
         {
             if (ReferenceEquals(ConnectionLogic.State, this) == false) return;
 
+            connectionMessageQueue.CompleteCatchUp(playerId);
             ConnectionLogic.EnterCampaign();
         }, context: nameof(JoinCatchUpAppliedHandler));
     }
