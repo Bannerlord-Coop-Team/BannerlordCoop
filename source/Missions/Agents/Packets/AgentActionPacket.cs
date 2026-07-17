@@ -1,4 +1,4 @@
-using Common.PacketHandlers;
+﻿using Common.PacketHandlers;
 using LiteNetLib;
 using ProtoBuf;
 using System;
@@ -21,9 +21,12 @@ namespace Missions.Agents.Packets
         public Guid[] AgentIds { get; }
         [ProtoMember(2)]
         public AgentActionData[] Actions { get; }
+        [ProtoMember(3)]
+        public string ControllerId { get; }
 
-        public AgentActionPacket(Guid[] agentIds, AgentActionData[] actions)
+        public AgentActionPacket(string controllerId, Guid[] agentIds, AgentActionData[] actions)
         {
+            ControllerId = controllerId;
             AgentIds = agentIds;
             Actions = actions;
         }

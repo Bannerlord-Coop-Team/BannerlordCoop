@@ -91,6 +91,40 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ActionPacket_BeforeAgentRegistration_AppliesAfterRegistration()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var agentId = Guid.NewGuid();
+
+            var owner = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.Player));
+            Assert.True(AgentMirror.TryGet(owner, out var ownerMirror));
+            ownerMirror.GuardMode = Agent.GuardMode.Down;
+
+            component.AgentActionHandler.HandlePacket(null,
+                new AgentActionPacket("owner", new[] { agentId }, new[] { new AgentActionData(owner) }));
+
+            var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("owner", agentId, puppet));
+            Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+            component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(Agent.GuardMode.Down, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+        });
+    }
+
+    [Fact]
     public void ActionTick_ReassertsHeldGuardAfterNativeDecay_WithoutAnotherPacket()
     {
         using var fixture = new MissionEngineFixture();
@@ -134,6 +168,56 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
             Assert.Equal(1, puppetMirror.ResetGuardCalls);
+        });
+    }
+
+    [Fact]
+    public void AuthorityTransfer_DiscardsPreviousOwnersGuardStateAndPackets()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var agentId = Guid.NewGuid();
+
+            var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("owner-a", agentId, puppet));
+            Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+            var ownerA = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.Player));
+            Assert.True(AgentMirror.TryGet(ownerA, out var ownerAMirror));
+            ownerAMirror.GuardMode = Agent.GuardMode.Left;
+
+            ApplyOwnerAction(component, "owner-a", agentId, ownerA);
+            component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
+
+            Assert.True(registry.TryTransferAuthority("owner-b", agentId));
+            component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.ResetGuardCalls);
+
+            ApplyOwnerAction(component, "owner-a", agentId, ownerA);
+            component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+
+            var ownerB = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.Player));
+            Assert.True(AgentMirror.TryGet(ownerB, out var ownerBMirror));
+            ownerBMirror.GuardMode = Agent.GuardMode.Right;
+
+            ApplyOwnerAction(component, "owner-b", agentId, ownerB);
+            component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
         });
     }
 
@@ -189,9 +273,24 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
-    private static void ApplyOwnerAction(ICoopMissionComponent component, Guid agentId, Agent owner)
+    private static void ApplyOwnerAction(
+        ICoopMissionComponent component,
+        Guid agentId,
+        Agent owner)
+    {
+        ApplyOwnerAction(component, "owner", agentId, owner);
+    }
+
+    private static void ApplyOwnerAction(
+        ICoopMissionComponent component,
+        string controllerId,
+        Guid agentId,
+        Agent owner)
     {
         component.AgentActionHandler.HandlePacket(null,
-            new AgentActionPacket(new[] { agentId }, new[] { new AgentActionData(owner) }));
+            new AgentActionPacket(
+                controllerId,
+                new[] { agentId },
+                new[] { new AgentActionData(owner) }));
     }
 }

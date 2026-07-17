@@ -52,8 +52,10 @@ public class AgentActionHandler : IAgentActionHandler
     // Last observed action indices, defend input, and guard state per owned agent, so we broadcast only on change. WasDiscrete
     // lets us also send the END of a discrete action while still skipping locomotion<->locomotion churn.
     private readonly Dictionary<Guid, ActionState> _lastActions = new Dictionary<Guid, ActionState>();
-    private readonly Dictionary<Guid, Agent.GuardMode> _remoteGuardStates =
-        new Dictionary<Guid, Agent.GuardMode>();
+    private readonly Dictionary<Guid, RemoteGuardState> _remoteGuardStates =
+        new Dictionary<Guid, RemoteGuardState>();
+    private readonly Dictionary<Guid, PendingRemoteAction> _pendingRemoteActions =
+        new Dictionary<Guid, PendingRemoteAction>();
 
     private bool _disposed;
 
@@ -77,6 +79,30 @@ public class AgentActionHandler : IAgentActionHandler
             DefendFlags = defendFlags;
             GuardMode = guardMode;
             WasDiscrete = wasDiscrete;
+        }
+    }
+
+    private readonly struct RemoteGuardState
+    {
+        public readonly string ControllerId;
+        public readonly Agent.GuardMode GuardMode;
+
+        public RemoteGuardState(string controllerId, Agent.GuardMode guardMode)
+        {
+            ControllerId = controllerId;
+            GuardMode = guardMode;
+        }
+    }
+
+    private readonly struct PendingRemoteAction
+    {
+        public readonly string ControllerId;
+        public readonly AgentActionData Data;
+
+        public PendingRemoteAction(string controllerId, AgentActionData data)
+        {
+            ControllerId = controllerId;
+            Data = data;
         }
     }
 
@@ -168,7 +194,11 @@ public class AgentActionHandler : IAgentActionHandler
 
         if (ids == null) return;
 
-        SendActionPackets(ids, actions, packet => client.SendAll(packet));
+        SendActionPackets(
+            controllerIdProvider.ControllerId,
+            ids,
+            actions,
+            packet => client.SendAll(packet));
     }
 
     public void CatchUpJoiner(string controllerId)
@@ -196,11 +226,16 @@ public class AgentActionHandler : IAgentActionHandler
             }
 
             if (ids == null) return;
-            SendActionPackets(ids, actions, packet => client.Send(controllerId, packet));
+            SendActionPackets(
+                controllerIdProvider.ControllerId,
+                ids,
+                actions,
+                packet => client.Send(controllerId, packet));
         });
     }
 
     private static void SendActionPackets(
+        string controllerId,
         List<Guid> ids,
         List<AgentActionData> actions,
         Action<AgentActionPacket> send)
@@ -212,13 +247,16 @@ public class AgentActionHandler : IAgentActionHandler
             var dataChunk = new AgentActionData[count];
             ids.CopyTo(start, idChunk, 0, count);
             actions.CopyTo(start, dataChunk, 0, count);
-            send(new AgentActionPacket(idChunk, dataChunk));
+            send(new AgentActionPacket(controllerId, idChunk, dataChunk));
         }
     }
 
     public void ApplyRemoteGuardStates()
     {
-        if (_disposed || Mission.Current == null || _remoteGuardStates.Count == 0) return;
+        if (_disposed || Mission.Current == null) return;
+
+        ApplyPendingRemoteActions();
+        if (_remoteGuardStates.Count == 0) return;
 
         List<Guid> staleIds = null;
         using (new AllowedThread())
@@ -240,8 +278,15 @@ public class AgentActionHandler : IAgentActionHandler
                     continue;
                 }
 
+                if (guardState.Value.ControllerId != info.CurrentAuthority)
+                {
+                    AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
+                    (staleIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
                 // Vanilla's cautious behavior asserts SetWeaponGuard every agent tick while guarding.
-                AgentActionData.ApplyGuardState(agent, guardState.Value);
+                AgentActionData.ApplyGuardState(agent, guardState.Value.GuardMode);
             }
         }
 
@@ -252,10 +297,73 @@ public class AgentActionHandler : IAgentActionHandler
         }
     }
 
+    private void ApplyPendingRemoteActions()
+    {
+        if (_pendingRemoteActions.Count == 0) return;
+
+        List<Guid> resolvedIds = null;
+        using (new AllowedThread())
+        {
+            foreach (var pending in _pendingRemoteActions)
+            {
+                Guid agentId = pending.Key;
+                if (agentRegistry.IsLocallyControlled(agentId))
+                {
+                    (resolvedIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
+                if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
+                    continue;
+
+                if (pending.Value.ControllerId != info.CurrentAuthority)
+                {
+                    (resolvedIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
+                Agent agent = info.Agent;
+                if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
+                    continue;
+
+                pending.Value.Data.Apply(agent);
+                UpdateRemoteGuardState(
+                    agentId,
+                    pending.Value.ControllerId,
+                    pending.Value.Data,
+                    agent);
+                (resolvedIds ??= new List<Guid>()).Add(agentId);
+            }
+        }
+
+        if (resolvedIds == null) return;
+        foreach (Guid agentId in resolvedIds)
+        {
+            _pendingRemoteActions.Remove(agentId);
+        }
+    }
+
+    private void UpdateRemoteGuardState(
+        Guid agentId,
+        string controllerId,
+        AgentActionData data,
+        Agent agent)
+    {
+        Agent.GuardMode guardMode = data.GuardMode;
+        if (AgentActionData.IsGuardMode(guardMode))
+        {
+            _remoteGuardStates[agentId] = new RemoteGuardState(controllerId, guardMode);
+        }
+        else if (_remoteGuardStates.Remove(agentId))
+        {
+            AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
+        }
+    }
+
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
         var actionPacket = (AgentActionPacket)packet;
-        if (actionPacket.AgentIds == null) return;
+        if (actionPacket.AgentIds == null || string.IsNullOrEmpty(actionPacket.ControllerId)) return;
 
         // Resolve and apply the whole batch in ONE game-thread action, matching AgentMovementHandler.
         // Resolving here keeps this ordered behind earlier game-thread spawn/register work.
@@ -268,27 +376,38 @@ public class AgentActionHandler : IAgentActionHandler
                 for (int i = 0; i < actionPacket.AgentIds.Length; i++)
                 {
                     var agentId = actionPacket.AgentIds[i];
-                    if (agentRegistry.IsLocallyControlled(agentId)) continue;
-                    if (!agentRegistry.TryGetAgentInfo(agentId, out var info)) continue;
+                    AgentActionData data = actionPacket.Actions[i];
+                    if (agentRegistry.IsLocallyControlled(agentId))
+                    {
+                        _pendingRemoteActions.Remove(agentId);
+                        continue;
+                    }
+
+                    if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
+                    {
+                        _pendingRemoteActions[agentId] =
+                            new PendingRemoteAction(actionPacket.ControllerId, data);
+                        continue;
+                    }
+
+                    if (info.CurrentAuthority != actionPacket.ControllerId)
+                    {
+                        continue;
+                    }
 
                     Agent agent = info.Agent;
-                    AgentActionData data = actionPacket.Actions[i];
 
                     // The agent may have become invalid between queueing and running; only apply while active.
                     if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
+                    {
+                        _pendingRemoteActions[agentId] =
+                            new PendingRemoteAction(actionPacket.ControllerId, data);
                         continue;
+                    }
 
+                    _pendingRemoteActions.Remove(agentId);
                     data.Apply(agent);
-
-                    Agent.GuardMode guardMode = data.GuardMode;
-                    if (AgentActionData.IsGuardMode(guardMode))
-                    {
-                        _remoteGuardStates[agentId] = guardMode;
-                    }
-                    else if (_remoteGuardStates.Remove(agentId))
-                    {
-                        AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
-                    }
+                    UpdateRemoteGuardState(agentId, actionPacket.ControllerId, data, agent);
                 }
             }
         });
@@ -319,5 +438,6 @@ public class AgentActionHandler : IAgentActionHandler
         packetManager.RemovePacketHandler(this);
         _lastActions.Clear();
         _remoteGuardStates.Clear();
+        _pendingRemoteActions.Clear();
     }
 }

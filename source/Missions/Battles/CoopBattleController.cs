@@ -316,7 +316,6 @@ public class CoopBattleController : CoopMissionController
         // ...and on the live battle itself: replay the agents WE own so the joiner spawns matching puppets,
         // plus the siege engine placement when we are the deployer (a no-op in field battles).
         replicator.ReplicateCurrentAgentsTo(controllerId);
-        coopMissionComponent.AgentActionHandler.CatchUpJoiner(controllerId);
         siegeEngineDeployment.CatchUpJoiner(controllerId);
         siegeMachineState.CatchUpJoiner(controllerId);
     }
