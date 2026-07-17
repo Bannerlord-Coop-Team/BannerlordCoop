@@ -116,6 +116,11 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerPartyTradeOfferUpdated>(Handle_NetworkPlayerPartyTradeOfferUpdated);
         messageBroker.Unsubscribe<NetworkPlayerPartyTradeAcceptChanged>(Handle_NetworkPlayerPartyTradeAcceptChanged);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+
+        // The dialog state is a process-wide static, not container state: a session that ends mid-dialog
+        // would otherwise leave HasActiveState set after this handler's container is torn down, and
+        // ConversationRequestHandler silently drops every conversation request while it is set.
+        PlayerPartyInteractionDialogState.Clear();
     }
 
     public bool TryStartSession(

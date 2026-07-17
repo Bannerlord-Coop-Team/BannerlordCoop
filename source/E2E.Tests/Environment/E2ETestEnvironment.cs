@@ -75,24 +75,33 @@ public class E2ETestEnvironment : IDisposable
             if (disposed) return;
             disposed = true;
 
-            if (AutoSyncConfiguration.Enabled)
+            try
             {
-                Server.Resolve<AutoSyncHandler>().Dispose();
+                if (AutoSyncConfiguration.Enabled)
+                {
+                    Server.Resolve<AutoSyncHandler>().Dispose();
+                    foreach (var client in Clients)
+                    {
+                        client.Resolve<AutoSyncHandler>().Dispose();
+                    }
+                }
+
+                Server.Dispose();
+
                 foreach (var client in Clients)
                 {
-                    client.Resolve<AutoSyncHandler>().Dispose();
+                    client.Dispose();
                 }
             }
-
-            Server.Dispose();
-
-            foreach (var client in Clients)
+            finally
             {
-                client.Dispose();
+                // Must run even when a disposal above throws: a live container left in ContainerProvider
+                // makes CallOriginalPolicy deny originals for every later environment-less test in the
+                // process (the shared Harmony patches stay applied), silently corrupting game-object
+                // construction there.
+                OutputSinkManager.RemoveLogCallback(TestOutputCallback);
+                ContainerProvider.Clear();
             }
-
-            OutputSinkManager.RemoveLogCallback(TestOutputCallback);
-            ContainerProvider.Clear();
         }
         finally
         {
