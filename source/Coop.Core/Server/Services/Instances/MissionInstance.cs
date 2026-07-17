@@ -52,20 +52,13 @@ internal class MissionInstance
         peerToController[peer] = controllerId;
     }
 
-    /// <summary>Drop a member only when both its controller and connection still match.</summary>
-    public bool RemovePeer(NetPeer peer, string controllerId)
+    /// <summary>Drop a member by its connection (e.g. on disconnect).</summary>
+    public void RemovePeer(NetPeer peer)
     {
-        if (peerToController.TryGetValue(peer, out var mappedControllerId) == false ||
-            mappedControllerId != controllerId)
-            return false;
-
-        if (controllerToPeer.TryGetValue(controllerId, out var mappedPeer) == false ||
-            ReferenceEquals(mappedPeer, peer) == false)
-            return false;
-
-        peerToController.TryRemove(peer, out _);
-        controllerToPeer.TryRemove(controllerId, out _);
-        return true;
+        if (peerToController.TryRemove(peer, out var controllerId))
+        {
+            controllerToPeer.TryRemove(controllerId, out _);
+        }
     }
 
     /// <summary>Resolve a single member's live connection.</summary>

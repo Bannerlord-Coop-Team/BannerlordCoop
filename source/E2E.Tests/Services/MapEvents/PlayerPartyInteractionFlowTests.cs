@@ -10,7 +10,6 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
-using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.PartyComponents.Messages;
@@ -1317,23 +1316,23 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void PlayerAwaitingBattleMissionExit_BlocksPlayerAndAiEncountersUntilMissionLeft()
+    public void PlayerAwaitingBattleMissionExit_BlocksEncountersUntilMissionLeft()
     {
         var (_, client2, _, responderPartyId) = CreateTwoPlayerParties();
         var aiPartyId = CreateMobilePartyBase();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         const string concludedBattleId = "concluded-battle";
 
+        Server.SimulateMessage(client2.NetPeer, new NetworkMissionEntered("PlayerTwo", "stale-battle"));
         Server.SimulateMessage(client2.NetPeer, new NetworkMissionEntered("PlayerTwo", concludedBattleId));
+        Server.SimulateMessage(client2.NetPeer, new NetworkMissionLeft("PlayerTwo", "stale-battle"));
         Server.Call(() =>
         {
-            Assert.True(Server.Resolve<IMissionMembershipRegistry>().IsControllerInMission("PlayerTwo"));
-
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            Assert.False(InvokeStartPartyEncounterPrefix(aiParty, responderParty));
-            Assert.False(InvokeStartSettlementEncounterPrefix(responderParty.MobileParty, settlement));
+            Assert.False(InvokeEncounterPrefix("StartPartyEncounterPrefix", aiParty, responderParty));
+            Assert.False(InvokeEncounterPrefix("Prefix", responderParty.MobileParty, settlement));
         });
 
         RequestInteraction(client2, responderPartyId, aiPartyId);
@@ -1345,15 +1344,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Server.SimulateMessage(client2.NetPeer, new NetworkMissionLeft("PlayerTwo", concludedBattleId));
         Server.Call(() =>
         {
-            Assert.False(Server.Resolve<IMissionMembershipRegistry>().IsControllerInMission("PlayerTwo"));
-
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            Assert.True(InvokeStartPartyEncounterPrefix(aiParty, responderParty));
-            Assert.True(InvokeStartSettlementEncounterPrefix(responderParty.MobileParty, settlement));
+            Assert.True(InvokeEncounterPrefix("StartPartyEncounterPrefix", aiParty, responderParty));
+            Assert.True(InvokeEncounterPrefix("Prefix", responderParty.MobileParty, settlement));
         });
-
         RequestInteraction(client2, responderPartyId, aiPartyId);
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
@@ -1507,22 +1503,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             disabledMethods);
     }
 
-    private static bool InvokeStartPartyEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
+    private static bool InvokeEncounterPrefix(string methodName, params object[] arguments)
     {
         var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.EncounterManagerPatches");
-        var prefix = AccessTools.Method(patchType, "StartPartyEncounterPrefix");
+        var prefix = AccessTools.Method(patchType, methodName);
         Assert.NotNull(prefix);
 
-        return (bool)prefix.Invoke(null, new object[] { attackerParty, defenderParty })!;
-    }
-
-    private static bool InvokeStartSettlementEncounterPrefix(MobileParty attackerParty, Settlement settlement)
-    {
-        var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.EncounterManagerPatches");
-        var prefix = AccessTools.Method(patchType, "Prefix");
-        Assert.NotNull(prefix);
-
-        return (bool)prefix.Invoke(null, new object[] { attackerParty, settlement })!;
+        return (bool)prefix.Invoke(null, arguments)!;
     }
 
     private void SubmitOption(

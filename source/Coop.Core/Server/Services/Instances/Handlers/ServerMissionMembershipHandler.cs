@@ -3,7 +3,6 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Network.Session;
 using Coop.Core.Common.Session;
-using GameInterface.Services.Missions;
 using LiteNetLib;
 using Missions.Messages;
 using System.Globalization;
@@ -21,14 +20,12 @@ public class ServerMissionMembershipHandler : IHandler
     private readonly IMissionManager missionManager;
     private readonly INetwork network;
     private readonly ISessionTunnelIdentityResolver tunnelIdentityResolver;
-    private readonly IMissionMembershipRegistry missionMembershipRegistry;
 
     public ServerMissionMembershipHandler(
         IMessageBroker messageBroker,
         IMissionManager missionManager,
-        INetwork network,
-        IMissionMembershipRegistry missionMembershipRegistry)
-        : this(messageBroker, missionManager, network, null, missionMembershipRegistry)
+        INetwork network)
+        : this(messageBroker, missionManager, network, null)
     {
     }
 
@@ -36,14 +33,12 @@ public class ServerMissionMembershipHandler : IHandler
         IMessageBroker messageBroker,
         IMissionManager missionManager,
         INetwork network,
-        ISessionTunnelIdentityResolver tunnelIdentityResolver,
-        IMissionMembershipRegistry missionMembershipRegistry)
+        ISessionTunnelIdentityResolver tunnelIdentityResolver)
     {
         this.messageBroker = messageBroker;
         this.missionManager = missionManager;
         this.network = network;
         this.tunnelIdentityResolver = tunnelIdentityResolver;
-        this.missionMembershipRegistry = missionMembershipRegistry;
 
         messageBroker.Subscribe<NetworkMissionEntered>(Handle_MissionEntered);
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_MissionLeft);
@@ -63,7 +58,6 @@ public class ServerMissionMembershipHandler : IHandler
         var message = payload.What;
 
         var others = missionManager.EnterMission(peer, message.ControllerId, message.InstanceId);
-        missionMembershipRegistry.Enter(message.InstanceId, message.ControllerId, peer);
 
         // Introduce the newcomer and each existing member to each other so BOTH sides send their join info
         // (replaces the direct PeerConnected trigger). The introduction travels over the campaign/relay
@@ -105,14 +99,7 @@ public class ServerMissionMembershipHandler : IHandler
         var peer = (NetPeer)payload.Who;
         var message = payload.What;
 
-        if (missionManager.TryLeaveMission(
-                peer,
-                message.ControllerId,
-                message.InstanceId,
-                out var remaining) == false)
-            return;
-
-        missionMembershipRegistry.Leave(message.InstanceId, message.ControllerId, peer);
+        var remaining = missionManager.LeaveMission(peer, message.ControllerId, message.InstanceId);
 
         // Mirror the entry fan-out: tell the members still present that the controller is gone so they
         // despawn its party.
@@ -135,8 +122,6 @@ public class ServerMissionMembershipHandler : IHandler
         // PlayerDisconnected fires for every disconnect; only act on a peer that was in a mission instance.
         if (missionManager.TryHandleDisconnect(payload.What.PlayerId, out var controllerId, out var instanceId, out var remaining) == false)
             return;
-
-        missionMembershipRegistry.Leave(instanceId, controllerId, payload.What.PlayerId);
 
         foreach (var (_, otherPeer) in remaining)
         {

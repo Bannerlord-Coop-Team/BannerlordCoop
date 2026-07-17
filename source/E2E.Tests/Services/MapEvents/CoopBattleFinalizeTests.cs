@@ -7,6 +7,7 @@ using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
@@ -148,58 +149,36 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     }
 
     [Fact]
-    public void ActiveSuccessorMission_DestroyBeforeClose_PreservesMapEventUntilMissionExit()
+    public void ActiveMission_DestroyBeforeClose_PreservesMapEventUntilMissionExit()
     {
         var (ctx, _, _, successorPartyBaseId) = SetupTwoAlliedPlayersInBattle();
-        var host = Clients.First();
         var successor = Clients.Last();
-
-        Server.Call(() => Server.Resolve<IBattleHostRegistry>().Set(
-            ctx.MapEventId,
-            new BattleHostAssignment("1", new[] { "2" })));
-
-        var closeReceived = false;
-        var mapEventRemovedBeforeClose = false;
-        successor.Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(payload =>
-        {
-            if (!payload.What.PartyIds.Contains(successorPartyBaseId)) return;
-            closeReceived = true;
-            mapEventRemovedBeforeClose = !successor.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out _);
-        });
-
         MapEvent destroyedMapEvent = null;
+        MockMission mission = null;
+
         using (var fixture = new MissionEngineFixture())
         {
             successor.Call(() =>
             {
-                fixture.CreateMission(successor);
+                mission = fixture.CreateMission(successor);
                 Assert.True(successor.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out destroyedMapEvent));
-                Assert.Same(destroyedMapEvent, MobileParty.MainParty.MapEvent);
             });
 
-            var disabled = MapEventDisabledMethods
-                .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
-                .ToList();
+            successor.SimulateMessage(Server, new NetworkDestroyInstance<MapEvent>(ctx.MapEventId));
+            successor.SimulateMessage(Server, new NetworkClosePvpEncounter(
+                new[] { successorPartyBaseId }, mapEventId: ctx.MapEventId));
 
-            host.Call(() =>
-            {
-                Assert.True(host.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-                host.Resolve<IMessageBroker>().Publish(this, new MapEventFinalizeAttempted(mapEvent));
-            }, disabled);
-
-            Assert.True(closeReceived);
-            Assert.True(mapEventRemovedBeforeClose);
             AssertMapEventRemoved(successor, ctx.MapEventId);
             successor.Call(() =>
             {
                 Assert.NotNull(Mission.Current);
+                Assert.False(mission.EndMissionCalled);
                 Assert.Same(destroyedMapEvent, MobileParty.MainParty.MapEvent);
             });
         }
 
         successor.Call(() =>
         {
-            Assert.Null(PlayerEncounter.Current);
             successor.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
         });

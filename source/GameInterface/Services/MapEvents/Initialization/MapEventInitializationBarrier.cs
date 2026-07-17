@@ -46,8 +46,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
-    private PartyBase pendingDestroyedMapEventParty;
-    private MapEvent pendingDestroyedMapEvent;
     private bool disposed;
 
     public MapEventInitializationBarrier(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
@@ -67,8 +65,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         messageBroker.Unsubscribe<NetworkMapEventPartyPending>(HandlePendingParty);
         messageBroker.Unsubscribe<NetworkMapEventInitialized>(HandleCommit);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
-        pendingDestroyedMapEventParty = null;
-        pendingDestroyedMapEvent = null;
         states.Clear();
     }
 
@@ -282,12 +278,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     public void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null)
     {
         if (mapEvent == null) return;
-        if (preservedParty?._mapEventSide?.MapEvent == mapEvent)
-        {
-            pendingDestroyedMapEventParty = preservedParty;
-            pendingDestroyedMapEvent = mapEvent;
-        }
-
         if (!states.TryGetValue(mapEvent, out var state)) state = new State(mapEvent);
         Capture(state, mapEvent);
         Campaign.Current?.MapEventManager?._mapEvents.Remove(mapEvent);
@@ -307,17 +297,15 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
-        if (ModInformation.IsServer) return;
-        if (pendingDestroyedMapEvent == null) return;
-        if (MissionState.Current != null || Mission.Current != null || PlayerEncounter.Current != null) return;
+        if (ModInformation.IsServer || MissionState.Current != null ||
+            Mission.Current != null || PlayerEncounter.Current != null) return;
 
-        var party = pendingDestroyedMapEventParty;
-        var mapEvent = pendingDestroyedMapEvent;
-        pendingDestroyedMapEventParty = null;
-        pendingDestroyedMapEvent = null;
+        var party = MobileParty.MainParty?.Party;
+        var mapEvent = party?.MapEvent;
+        if (mapEvent == null || IsPending(mapEvent)) return;
+        if (Campaign.Current?.MapEventManager?.MapEvents.Contains(mapEvent) == true) return;
 
-        if (party?.MapEvent == mapEvent)
-            party._mapEventSide = null;
+        party._mapEventSide = null;
     }
 
     private static void PublishVisual(GauntletMapEventVisual visual, CampaignVec2 position)

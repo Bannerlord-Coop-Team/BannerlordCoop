@@ -1,5 +1,6 @@
 using Common.Logging;
 using Common.Network.Data;
+using GameInterface.Services.Missions;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -36,12 +37,11 @@ public interface IMissionManager
 
     /// <summary>
     /// Record that <paramref name="controllerId"/> (on <paramref name="peer"/>) has left
-    /// <paramref name="instanceId"/>, dropping it from the relay routing table. Returns false if that exact
-    /// peer/controller membership is no longer current. Driven by a client <c>MissionLeft</c>. On success,
-    /// <paramref name="remaining"/> holds the members still present so the caller can notify them.
+    /// <paramref name="instanceId"/>, dropping it from the relay routing table. No-op if the instance is
+    /// unknown. Driven by a client <c>MissionLeft</c>. Returns the members still present so the caller can
+    /// notify them the controller is gone.
     /// </summary>
-    bool TryLeaveMission(NetPeer peer, string controllerId, string instanceId,
-        out IReadOnlyList<(string controllerId, NetPeer peer)> remaining);
+    IReadOnlyList<(string controllerId, NetPeer peer)> LeaveMission(NetPeer peer, string controllerId, string instanceId);
 
     /// <summary>
     /// Drop <paramref name="peer"/> from whichever instance it belongs to after an ungraceful disconnect,
@@ -60,12 +60,14 @@ public interface IMissionManager
 }
 
 /// <inheritdoc cref="IMissionManager"/>
-public class MissionManager : IMissionManager
+public class MissionManager : IMissionManager, IMissionMembershipRegistry
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MissionManager>();
 
     private readonly object gate = new object();
     private readonly Dictionary<string, MissionInstance> byInstanceId = new Dictionary<string, MissionInstance>();
+    private readonly Dictionary<string, (string instanceId, NetPeer peer)> membershipByController =
+        new Dictionary<string, (string, NetPeer)>();
 
     public void HandleIntroductionRequest(
         NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -153,6 +155,7 @@ public class MissionManager : IMissionManager
                 .ToList();
 
             instance.MapPeer(controllerId, peer);
+            membershipByController[controllerId] = (instanceId, peer);
             Logger.Information("Controller {Controller} entered instance {Instance} on {Peer}",
                 controllerId, instanceId, peer);
 
@@ -160,33 +163,24 @@ public class MissionManager : IMissionManager
         }
     }
 
-    public bool TryLeaveMission(NetPeer peer, string controllerId, string instanceId,
-        out IReadOnlyList<(string controllerId, NetPeer peer)> remaining)
+    public IReadOnlyList<(string controllerId, NetPeer peer)> LeaveMission(NetPeer peer, string controllerId, string instanceId)
     {
-        remaining = Array.Empty<(string, NetPeer)>();
-
         lock (gate)
         {
             if (byInstanceId.TryGetValue(instanceId, out var instance) == false)
             {
                 Logger.Warning("Mission leave for unknown instance {Instance} from {Controller}",
                     instanceId, controllerId);
-                return false;
+                return Array.Empty<(string, NetPeer)>();
             }
 
-            if (instance.RemovePeer(peer, controllerId) == false)
-            {
-                Logger.Warning(
-                    "Ignoring stale mission leave for controller {Controller} in instance {Instance} on {Peer}",
-                    controllerId, instanceId, peer);
-                return false;
-            }
-
+            instance.RemovePeer(peer);
+            RemoveMembership(instanceId, controllerId, peer);
             Logger.Information("Controller {Controller} left instance {Instance}", controllerId, instanceId);
 
-            remaining = Members(instance);
+            var remaining = Members(instance);
             PruneIfEmpty(instanceId, remaining.Count);
-            return true;
+            return remaining;
         }
     }
 
@@ -213,14 +207,32 @@ public class MissionManager : IMissionManager
             if (found == null)
                 return false;
 
-            if (found.RemovePeer(peer, controllerId) == false)
-                return false;
-
+            found.RemovePeer(peer);
+            RemoveMembership(instanceId, controllerId, peer);
             remaining = Members(found);
             Logger.Information("Controller {Controller} disconnected from instance {Instance}", controllerId, instanceId);
             PruneIfEmpty(instanceId, remaining.Count);
             return true;
         }
+    }
+
+    public bool IsControllerInMission(string controllerId)
+    {
+        if (controllerId == null)
+            return false;
+
+        lock (gate)
+        {
+            return membershipByController.ContainsKey(controllerId);
+        }
+    }
+
+    private void RemoveMembership(string instanceId, string controllerId, NetPeer peer)
+    {
+        if (!membershipByController.TryGetValue(controllerId, out var membership) ||
+            membership.instanceId != instanceId || !ReferenceEquals(membership.peer, peer)) return;
+
+        membershipByController.Remove(controllerId);
     }
 
     // Drop the instance record once its last member is gone (BR-017: destroying the battle instance includes

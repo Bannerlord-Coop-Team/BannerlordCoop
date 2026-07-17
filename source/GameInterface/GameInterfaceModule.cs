@@ -15,7 +15,6 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MobileParties.Data;
-using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Logging;
@@ -47,7 +46,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<MissionMembershipRegistry>().As<IMissionMembershipRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().InstancePerLifetimeScope();
         builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().InstancePerLifetimeScope();
