@@ -52,10 +52,13 @@ public class AgentActionHandler : IAgentActionHandler
     // Last observed action indices, defend input, and guard state per owned agent, so we broadcast only on change. WasDiscrete
     // lets us also send the END of a discrete action while still skipping locomotion<->locomotion churn.
     private readonly Dictionary<Guid, ActionState> _lastActions = new Dictionary<Guid, ActionState>();
+    private readonly Dictionary<Guid, long> _localActionSequences = new Dictionary<Guid, long>();
     private readonly Dictionary<Guid, RemoteGuardState> _remoteGuardStates =
         new Dictionary<Guid, RemoteGuardState>();
-    private readonly Dictionary<Guid, PendingRemoteAction> _pendingRemoteActions =
-        new Dictionary<Guid, PendingRemoteAction>();
+    private readonly Dictionary<Guid, RemoteActionSequence> _remoteActionSequences =
+        new Dictionary<Guid, RemoteActionSequence>();
+    private readonly Dictionary<Guid, Dictionary<string, PendingRemoteAction>> _pendingRemoteActions =
+        new Dictionary<Guid, Dictionary<string, PendingRemoteAction>>();
 
     private bool _disposed;
 
@@ -98,11 +101,25 @@ public class AgentActionHandler : IAgentActionHandler
     {
         public readonly string ControllerId;
         public readonly AgentActionData Data;
+        public readonly long Sequence;
 
-        public PendingRemoteAction(string controllerId, AgentActionData data)
+        public PendingRemoteAction(string controllerId, AgentActionData data, long sequence)
         {
             ControllerId = controllerId;
             Data = data;
+            Sequence = sequence;
+        }
+    }
+
+    private readonly struct RemoteActionSequence
+    {
+        public readonly string ControllerId;
+        public readonly long Sequence;
+
+        public RemoteActionSequence(string controllerId, long sequence)
+        {
+            ControllerId = controllerId;
+            Sequence = sequence;
         }
     }
 
@@ -128,10 +145,12 @@ public class AgentActionHandler : IAgentActionHandler
 
         List<Guid> ids = null;
         List<AgentActionData> actions = null;
+        List<long> sequences = null;
 
         foreach (var info in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
         {
             Agent agent = info.Agent;
+            ClearRemoteStateForLocalAgent(info.AgentId, agent);
             if (agent == null || agent.Mission == null || !agent.IsActive() || agent.Health <= 0)
                 continue;
 
@@ -190,6 +209,7 @@ public class AgentActionHandler : IAgentActionHandler
 
             (ids ??= new List<Guid>()).Add(info.AgentId);
             (actions ??= new List<AgentActionData>()).Add(new AgentActionData(agent));
+            (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
         }
 
         if (ids == null) return;
@@ -198,6 +218,7 @@ public class AgentActionHandler : IAgentActionHandler
             controllerIdProvider.ControllerId,
             ids,
             actions,
+            sequences,
             packet => client.SendAll(packet));
     }
 
@@ -209,6 +230,7 @@ public class AgentActionHandler : IAgentActionHandler
 
             List<Guid> ids = null;
             List<AgentActionData> actions = null;
+            List<long> sequences = null;
 
             foreach (var info in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
             {
@@ -223,6 +245,7 @@ public class AgentActionHandler : IAgentActionHandler
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);
                 (actions ??= new List<AgentActionData>()).Add(new AgentActionData(agent));
+                (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
             }
 
             if (ids == null) return;
@@ -230,6 +253,7 @@ public class AgentActionHandler : IAgentActionHandler
                 controllerIdProvider.ControllerId,
                 ids,
                 actions,
+                sequences,
                 packet => client.Send(controllerId, packet));
         });
     }
@@ -238,6 +262,7 @@ public class AgentActionHandler : IAgentActionHandler
         string controllerId,
         List<Guid> ids,
         List<AgentActionData> actions,
+        List<long> sequences,
         Action<AgentActionPacket> send)
     {
         for (int start = 0; start < ids.Count; start += MaxAgentsPerActionPacket)
@@ -245,9 +270,32 @@ public class AgentActionHandler : IAgentActionHandler
             int count = Math.Min(MaxAgentsPerActionPacket, ids.Count - start);
             var idChunk = new Guid[count];
             var dataChunk = new AgentActionData[count];
+            var sequenceChunk = new long[count];
             ids.CopyTo(start, idChunk, 0, count);
             actions.CopyTo(start, dataChunk, 0, count);
-            send(new AgentActionPacket(controllerId, idChunk, dataChunk));
+            sequences.CopyTo(start, sequenceChunk, 0, count);
+            send(new AgentActionPacket(controllerId, idChunk, dataChunk, sequenceChunk));
+        }
+    }
+
+    private long NextActionSequence(Guid agentId)
+    {
+        _localActionSequences.TryGetValue(agentId, out long sequence);
+        sequence++;
+        _localActionSequences[agentId] = sequence;
+        return sequence;
+    }
+
+    private void ClearRemoteStateForLocalAgent(Guid agentId, Agent agent)
+    {
+        _pendingRemoteActions.Remove(agentId);
+        _remoteActionSequences.Remove(agentId);
+        if (!_remoteGuardStates.Remove(agentId)) return;
+        if (agent == null || agent.Mission != Mission.Current || !agent.IsActive()) return;
+
+        using (new AllowedThread())
+        {
+            AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
         }
     }
 
@@ -304,9 +352,9 @@ public class AgentActionHandler : IAgentActionHandler
         List<Guid> resolvedIds = null;
         using (new AllowedThread())
         {
-            foreach (var pending in _pendingRemoteActions)
+            foreach (var pendingByAgent in _pendingRemoteActions)
             {
-                Guid agentId = pending.Key;
+                Guid agentId = pendingByAgent.Key;
                 if (agentRegistry.IsLocallyControlled(agentId))
                 {
                     (resolvedIds ??= new List<Guid>()).Add(agentId);
@@ -316,7 +364,15 @@ public class AgentActionHandler : IAgentActionHandler
                 if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
                     continue;
 
-                if (pending.Value.ControllerId != info.CurrentAuthority)
+                if (!pendingByAgent.Value.TryGetValue(
+                    info.CurrentAuthority,
+                    out PendingRemoteAction pending))
+                {
+                    (resolvedIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
+                if (IsStaleRemoteAction(agentId, pending.ControllerId, pending.Sequence))
                 {
                     (resolvedIds ??= new List<Guid>()).Add(agentId);
                     continue;
@@ -326,11 +382,12 @@ public class AgentActionHandler : IAgentActionHandler
                 if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
                     continue;
 
-                pending.Value.Data.Apply(agent);
+                pending.Data.Apply(agent);
+                RecordRemoteActionSequence(agentId, pending.ControllerId, pending.Sequence);
                 UpdateRemoteGuardState(
                     agentId,
-                    pending.Value.ControllerId,
-                    pending.Value.Data,
+                    pending.ControllerId,
+                    pending.Data,
                     agent);
                 (resolvedIds ??= new List<Guid>()).Add(agentId);
             }
@@ -354,16 +411,53 @@ public class AgentActionHandler : IAgentActionHandler
         {
             _remoteGuardStates[agentId] = new RemoteGuardState(controllerId, guardMode);
         }
-        else if (_remoteGuardStates.Remove(agentId))
+        else
         {
+            _remoteGuardStates.Remove(agentId);
             AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
         }
+    }
+
+    private void BufferPendingRemoteAction(
+        Guid agentId,
+        string controllerId,
+        long sequence,
+        AgentActionData data)
+    {
+        if (!_pendingRemoteActions.TryGetValue(agentId, out var actionsByController))
+        {
+            actionsByController = new Dictionary<string, PendingRemoteAction>();
+            _pendingRemoteActions[agentId] = actionsByController;
+        }
+
+        if (actionsByController.TryGetValue(controllerId, out var existing)
+            && existing.Sequence >= sequence)
+            return;
+
+        actionsByController[controllerId] =
+            new PendingRemoteAction(controllerId, data, sequence);
+    }
+
+    private bool IsStaleRemoteAction(Guid agentId, string controllerId, long sequence)
+    {
+        return _remoteActionSequences.TryGetValue(agentId, out var last)
+            && last.ControllerId == controllerId
+            && last.Sequence >= sequence;
+    }
+
+    private void RecordRemoteActionSequence(Guid agentId, string controllerId, long sequence)
+    {
+        _remoteActionSequences[agentId] = new RemoteActionSequence(controllerId, sequence);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
         var actionPacket = (AgentActionPacket)packet;
-        if (actionPacket.AgentIds == null || string.IsNullOrEmpty(actionPacket.ControllerId)) return;
+        if (actionPacket.AgentIds == null
+            || actionPacket.Actions == null
+            || actionPacket.Sequences == null
+            || string.IsNullOrEmpty(actionPacket.ControllerId))
+            return;
 
         // Resolve and apply the whole batch in ONE game-thread action, matching AgentMovementHandler.
         // Resolving here keeps this ordered behind earlier game-thread spawn/register work.
@@ -377,6 +471,10 @@ public class AgentActionHandler : IAgentActionHandler
                 {
                     var agentId = actionPacket.AgentIds[i];
                     AgentActionData data = actionPacket.Actions[i];
+                    long sequence = actionPacket.Sequences[i];
+                    if (sequence <= 0)
+                        continue;
+
                     if (agentRegistry.IsLocallyControlled(agentId))
                     {
                         _pendingRemoteActions.Remove(agentId);
@@ -385,12 +483,20 @@ public class AgentActionHandler : IAgentActionHandler
 
                     if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
                     {
-                        _pendingRemoteActions[agentId] =
-                            new PendingRemoteAction(actionPacket.ControllerId, data);
+                        BufferPendingRemoteAction(
+                            agentId,
+                            actionPacket.ControllerId,
+                            sequence,
+                            data);
                         continue;
                     }
 
                     if (info.CurrentAuthority != actionPacket.ControllerId)
+                    {
+                        continue;
+                    }
+
+                    if (IsStaleRemoteAction(agentId, actionPacket.ControllerId, sequence))
                     {
                         continue;
                     }
@@ -400,13 +506,17 @@ public class AgentActionHandler : IAgentActionHandler
                     // The agent may have become invalid between queueing and running; only apply while active.
                     if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
                     {
-                        _pendingRemoteActions[agentId] =
-                            new PendingRemoteAction(actionPacket.ControllerId, data);
+                        BufferPendingRemoteAction(
+                            agentId,
+                            actionPacket.ControllerId,
+                            sequence,
+                            data);
                         continue;
                     }
 
                     _pendingRemoteActions.Remove(agentId);
                     data.Apply(agent);
+                    RecordRemoteActionSequence(agentId, actionPacket.ControllerId, sequence);
                     UpdateRemoteGuardState(agentId, actionPacket.ControllerId, data, agent);
                 }
             }
@@ -437,7 +547,9 @@ public class AgentActionHandler : IAgentActionHandler
 
         packetManager.RemovePacketHandler(this);
         _lastActions.Clear();
+        _localActionSequences.Clear();
         _remoteGuardStates.Clear();
+        _remoteActionSequences.Clear();
         _pendingRemoteActions.Clear();
     }
 }

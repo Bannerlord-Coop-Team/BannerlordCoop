@@ -23,12 +23,19 @@ namespace Missions.Agents.Packets
         public AgentActionData[] Actions { get; }
         [ProtoMember(3)]
         public string ControllerId { get; }
+        [ProtoMember(4)]
+        public long[] Sequences { get; }
 
-        public AgentActionPacket(string controllerId, Guid[] agentIds, AgentActionData[] actions)
+        public AgentActionPacket(
+            string controllerId,
+            Guid[] agentIds,
+            AgentActionData[] actions,
+            long[] sequences)
         {
             ControllerId = controllerId;
             AgentIds = agentIds;
             Actions = actions;
+            Sequences = sequences;
         }
     }
 }
