@@ -445,6 +445,16 @@ public class AgentActionHandler : IAgentActionHandler
             && last.Sequence >= sequence;
     }
 
+    private bool HasPendingRemoteActionAtOrAfter(
+        Guid agentId,
+        string controllerId,
+        long sequence)
+    {
+        return _pendingRemoteActions.TryGetValue(agentId, out var actionsByController)
+            && actionsByController.TryGetValue(controllerId, out var pending)
+            && pending.Sequence >= sequence;
+    }
+
     private void RecordRemoteActionSequence(Guid agentId, string controllerId, long sequence)
     {
         _remoteActionSequences[agentId] = new RemoteActionSequence(controllerId, sequence);
@@ -492,6 +502,14 @@ public class AgentActionHandler : IAgentActionHandler
                     }
 
                     if (info.CurrentAuthority != actionPacket.ControllerId)
+                    {
+                        continue;
+                    }
+
+                    if (HasPendingRemoteActionAtOrAfter(
+                        agentId,
+                        actionPacket.ControllerId,
+                        sequence))
                     {
                         continue;
                     }

@@ -266,7 +266,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void OutOfOrderCatchUp_BeforeRegistration_DoesNotReplaceNewerRelease()
+    public void OlderCatchUp_AfterRegistration_DoesNotReplaceBufferedRelease()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -293,18 +293,19 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                     new[] { agentId },
                     new[] { releasedGuard },
                     new[] { 2L }));
-            component.AgentActionHandler.HandlePacket(null,
-                new AgentActionPacket(
-                    "owner",
-                    new[] { agentId },
-                    new[] { heldGuard },
-                    new[] { 1L }));
 
             var puppet = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                 .Controller(AgentControllerType.None));
             Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
             puppetMirror.GuardMode = Agent.GuardMode.Left;
             Assert.True(registry.TryRegisterAgent("owner", agentId, puppet));
+
+            component.AgentActionHandler.HandlePacket(null,
+                new AgentActionPacket(
+                    "owner",
+                    new[] { agentId },
+                    new[] { heldGuard },
+                    new[] { 1L }));
 
             component.AgentActionHandler.ApplyRemoteGuardStates();
             component.AgentActionHandler.ApplyRemoteGuardStates();
