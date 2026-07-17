@@ -66,8 +66,6 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
     private readonly object gate = new object();
     private readonly Dictionary<string, MissionInstance> byInstanceId = new Dictionary<string, MissionInstance>();
-    private readonly Dictionary<string, MissionMembership> membershipByController =
-        new Dictionary<string, MissionMembership>();
 
     public void HandleIntroductionRequest(
         NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -155,7 +153,6 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 .ToList();
 
             instance.MapPeer(controllerId, peer);
-            membershipByController[controllerId] = new MissionMembership(instanceId, peer);
             Logger.Information("Controller {Controller} entered instance {Instance} on {Peer}",
                 controllerId, instanceId, peer);
 
@@ -175,7 +172,6 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             }
 
             instance.RemovePeer(peer);
-            RemoveMembership(instanceId, controllerId, peer);
             Logger.Information("Controller {Controller} left instance {Instance}", controllerId, instanceId);
 
             var remaining = Members(instance);
@@ -208,7 +204,6 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 return false;
 
             found.RemovePeer(peer);
-            RemoveMembership(instanceId, controllerId, peer);
             remaining = Members(found);
             Logger.Information("Controller {Controller} disconnected from instance {Instance}", controllerId, instanceId);
             PruneIfEmpty(instanceId, remaining.Count);
@@ -223,27 +218,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
-            return membershipByController.ContainsKey(controllerId);
-        }
-    }
-
-    private void RemoveMembership(string instanceId, string controllerId, NetPeer peer)
-    {
-        if (!membershipByController.TryGetValue(controllerId, out var membership) ||
-            membership.InstanceId != instanceId || !ReferenceEquals(membership.Peer, peer)) return;
-
-        membershipByController.Remove(controllerId);
-    }
-
-    private readonly struct MissionMembership
-    {
-        public string InstanceId { get; }
-        public NetPeer Peer { get; }
-
-        public MissionMembership(string instanceId, NetPeer peer)
-        {
-            InstanceId = instanceId;
-            Peer = peer;
+            return byInstanceId.Values.Any(instance => instance.TryGetPeer(controllerId, out _));
         }
     }
 
