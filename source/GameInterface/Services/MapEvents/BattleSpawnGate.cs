@@ -81,7 +81,7 @@ public static class BattleSpawnGate
     /// </summary>
     public static Func<Agent, bool?> MountAuthorityProbe { get; set; }
 
-    /// <summary>Runs a routed blow with its original missile weapon available to the hit-reward patch.</summary>
+    /// <summary>Temporarily exposes a routed missile's serialized weapon while vanilla calculates hit rewards.</summary>
     public static void RunWithRoutedAttackerWeapon(WeaponComponentData attackerWeapon, Action applyBlow)
     {
         var previousWeapon = _routedAttackerWeapon;

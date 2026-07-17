@@ -210,6 +210,8 @@ public class BattleDamageRouter : IBattleDamageRouter
             int missileIndex = payload.What.Blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
             if (Mission.Current?._missilesDictionary.TryGetValue(missileIndex, out var missile) == true)
                 attackerWeapon = missile.Weapon.CurrentUsageItem;
+            else
+                Logger.Error("Failed to resolve routed missile weapon at source index {MissileIndex}", missileIndex);
 
             if (coopMissionComponent.MissileHandler.TryTakeLocalShot(missileIndex,
                 out Guid shotAgentId, out shotSequence))
