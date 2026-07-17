@@ -44,6 +44,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IConnectionMessageQueue connectionMessageQueue;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
+    private readonly object coalescerFlushQueueKey = new object();
+    private readonly Action flushCoalescedSends;
     // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
     // on INetwork (this server). It is only needed each Update, so deferring construction is fine.
     private readonly Lazy<IOverloadedPeerManager> overloadedPeerManager;
@@ -72,6 +74,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
         this.coalescer = coalescer;
+        flushCoalescedSends = FlushCoalescedSends;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -180,12 +183,19 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // path. Inert until a send path enqueues, so the guard avoids queueing an empty flush every tick.
         if (coalescer.HasPending)
         {
-            GameThread.RunSafe(() => coalescer.Flush(this));
+            // Coalescer producers run on the game thread. Any queued producer breaks adjacency, so only
+            // flush requests with no intervening game-thread work collapse.
+            GameThread.RunSafeOnceAtQueueTail(
+                coalescerFlushQueueKey,
+                flushCoalescedSends,
+                context: nameof(FlushCoalescedSends));
         }
 
         // Send any sub-budget aggregated messages so nothing waits longer than one poll interval.
         FlushPendingMessages();
     }
+
+    private void FlushCoalescedSends() => coalescer.Flush(this);
 
     public override void Start()
     {

@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Util;
 using Serilog;
 using System;
@@ -22,6 +22,7 @@ public class GameThread : IUpdateable
         new Queue<(Action, EventWaitHandle, string)>();
 
     private readonly object m_QueueLock = new object();
+    private object m_QueueTailKey;
     private int m_GameLoopThreadId;
 
     public int QueueLength
@@ -101,6 +102,7 @@ public class GameThread : IUpdateable
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
+            m_QueueTailKey = null;
         }
 
         if (!Instrument)
@@ -208,6 +210,17 @@ public class GameThread : IUpdateable
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
     {
+        Run(action, blocking, label, callerFile, callerMember, null);
+    }
+
+    private static void Run(
+        Action action,
+        bool blocking,
+        string label,
+        string callerFile,
+        string callerMember,
+        object queueTailKey)
+    {
         if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
         {
             action();
@@ -217,11 +230,17 @@ public class GameThread : IUpdateable
             EventWaitHandle ewh = blocking ?
                 new EventWaitHandle(false, EventResetMode.ManualReset) :
                 null;
-
             string resolved = label ?? BuildLabel(callerFile, callerMember);
+
             lock (Instance.m_QueueLock)
             {
+                if (queueTailKey != null && ReferenceEquals(Instance.m_QueueTailKey, queueTailKey))
+                {
+                    return;
+                }
+
                 Instance.m_Queue.Enqueue((action, ewh, resolved));
+                Instance.m_QueueTailKey = queueTailKey;
             }
 
             if (ewh != null && ewh.WaitOne(BlockingTimeout) == false)
@@ -253,7 +272,29 @@ public class GameThread : IUpdateable
         [CallerMemberName] string callerMember = null)
     {
         string label = context ?? BuildLabel(callerFile, callerMember);
-        Run(() =>
+        Run(CreateSafeAction(action, context), blocking, label, null, null, null);
+    }
+
+    /// <summary>
+    /// Runs a guarded action immediately on the game thread or queues it once per matching queue tail.
+    /// Ordinary queued actions form boundaries; this is non-blocking because duplicates cannot signal completion.
+    /// </summary>
+    public static void RunSafeOnceAtQueueTail(
+        object queueTailKey,
+        Action action,
+        string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
+    {
+        if (queueTailKey == null) throw new ArgumentNullException(nameof(queueTailKey));
+
+        string label = context ?? BuildLabel(callerFile, callerMember);
+        Run(CreateSafeAction(action, context), false, label, null, null, queueTailKey);
+    }
+
+    private static Action CreateSafeAction(Action action, string context)
+    {
+        return () =>
         {
             try
             {
@@ -263,7 +304,7 @@ public class GameThread : IUpdateable
             {
                 Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
             }
-        }, blocking, label);
+        };
     }
 
     /// <summary>
