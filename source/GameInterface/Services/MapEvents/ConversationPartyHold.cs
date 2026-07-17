@@ -10,11 +10,11 @@ namespace GameInterface.Services.MapEvents;
 /// keeping the bookkeeping in <see cref="ConversationPartyTracker"/> and the party's AI state in step.
 /// </summary>
 /// <remarks>
-/// Holding stops the party's current movement (<see cref="MobileParty.SetMoveModeHold"/>) and freezes its decision
-/// making (<see cref="MobilePartyAi.DisableAi"/>) so it stays in place while campaign time keeps running for the
-/// other players. <c>MobilePartyAi._isDisabled</c> is dynamically synced, so clients see the held state too. A
-/// party whose AI was already disabled (e.g. by a quest) is tracked but left untouched. All methods must run on
-/// the game's main thread.
+/// Holding stops a roaming party's current movement (<see cref="MobileParty.SetMoveModeHold"/>) and freezes its
+/// decision making (<see cref="MobilePartyAi.DisableAi"/>) so it stays in place while campaign time keeps running
+/// for the other players. Besiegers retain their siege movement state because the camp already keeps them stationary.
+/// <c>MobilePartyAi._isDisabled</c> is dynamically synced, so clients see the held state too. A party whose AI was
+/// already disabled (e.g. by a quest) is tracked but left untouched. All methods must run on the game's main thread.
 /// </remarks>
 internal static class ConversationPartyHold
 {
@@ -50,7 +50,9 @@ internal static class ConversationPartyHold
 
         if (!wasAiDisabled)
         {
-            party.SetMoveModeHold();
+            // A besieger is already stationary; SetMoveModeHold clears BesiegeSettlement and vanilla evicts it next tick.
+            if (party.BesiegerCamp == null)
+                party.SetMoveModeHold();
 
             // Certain parties such as caravans are still able to make new decisions even with their AI disabled
             // Setting DoNotMakeNewDecisions to true blocks setting new behaviors for these parties

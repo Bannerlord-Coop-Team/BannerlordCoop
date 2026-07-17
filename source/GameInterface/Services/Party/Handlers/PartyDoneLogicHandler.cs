@@ -105,7 +105,8 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.PartyInfluenceChangeAmount,
             obj.What.PartyMoraleChangeAmount,
             obj.What.DoNotApplyGoldTransactions,
-            releaserPartyPosition
+            releaserPartyPosition,
+            obj.What.PartyScreenMode
         );
 
         network.SendAll(message);
@@ -152,7 +153,12 @@ internal class PartyDoneLogicHandler : IHandler
                 rightPrisonerRosterData);
 
             PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
-            troopRosterInterface.ApplyTroopRosterDeltas(rosterDeltas);
+
+            // Only apply deltas if not ransoming. SellPrisonersAction already changes troop rosters
+            if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
+            {
+                troopRosterInterface.ApplyTroopRosterDeltas(rosterDeltas);
+            }
             ApplyRightOwnerPartyItemRoster(mainHero, message);
             NotifyDonatedPrisonersChanged(donatedPrisonersRoster);
             ApplyPartyRewardChanges(mainHero, message);

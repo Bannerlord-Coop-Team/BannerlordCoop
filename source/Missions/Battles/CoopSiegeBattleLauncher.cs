@@ -62,7 +62,8 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
         var mission = CreateCoopSiegeBattle(rec, mapEventId, wallHitPointRatios, attackerWeapons, defenderWeapons);
 
         // Same post-open coop entry as the field launcher: the controller requests the P2P instance and
-        // the host handler requests election + this client's troop reserves.
+        // the host handler requests this client's OWN troop reserves; the host election follows at
+        // mission-ready (CoopBattleController.AfterStart, once loading finishes).
         messageBroker.Publish(mapEvent, new PlayerEnteredBattle(mapEvent));
         return mission;
     }

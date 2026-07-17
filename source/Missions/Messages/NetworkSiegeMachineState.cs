@@ -40,8 +40,15 @@ public class NetworkSiegeMachineState : IEvent
     public readonly float AimDirection;
     [ProtoMember(10)]
     public readonly float AimReleaseAngle;
+    /// <summary>
+    /// BR-102: the sender's host epoch for this battle. Receivers drop a snapshot stamped by an
+    /// earlier hosting generation (a deposed host's host-owned fields in flight across a migration);
+    /// 0 = unstamped (sender had no assignment yet), always accepted.
+    /// </summary>
+    [ProtoMember(11)]
+    public readonly int HostEpoch;
 
-    public NetworkSiegeMachineState(int machineId, float hitPoints, int destructionState, int gateState, int ladderState, float moveDistance, bool hasArrived, int weaponState, float aimDirection, float aimReleaseAngle)
+    public NetworkSiegeMachineState(int machineId, float hitPoints, int destructionState, int gateState, int ladderState, float moveDistance, bool hasArrived, int weaponState, float aimDirection, float aimReleaseAngle, int hostEpoch = 0)
     {
         MachineId = machineId;
         HitPoints = hitPoints;
@@ -53,5 +60,6 @@ public class NetworkSiegeMachineState : IEvent
         WeaponState = weaponState;
         AimDirection = aimDirection;
         AimReleaseAngle = aimReleaseAngle;
+        HostEpoch = hostEpoch;
     }
 }

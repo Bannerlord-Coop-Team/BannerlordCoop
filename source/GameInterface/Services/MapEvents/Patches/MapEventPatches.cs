@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -46,9 +47,13 @@ internal class MapEventPatches
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     private static bool Prefix_FinalizeEventAux(MapEvent __instance, out bool __state)
     {
         __state = false;
+
+        if (ModInformation.IsServer)
+            MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
 
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
@@ -79,8 +84,13 @@ internal class MapEventPatches
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     private static bool Prefix_BattleState(MapEvent __instance, BattleState value)
     {
+        if (ModInformation.IsServer &&
+            (value == BattleState.AttackerVictory || value == BattleState.DefenderVictory))
+            MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
+
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             return true;
