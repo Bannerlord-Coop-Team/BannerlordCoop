@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Inventory.TradeSkills.Data;
-using ProtoBuf;
+﻿using ProtoBuf;
 using System;
 using System.Collections.Generic;
 

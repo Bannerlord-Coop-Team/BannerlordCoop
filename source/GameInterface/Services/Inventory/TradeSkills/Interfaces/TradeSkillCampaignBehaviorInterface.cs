@@ -1,7 +1,6 @@
 using Common.Logging;
 using Common.Network;
 using GameInterface.CoopSessionData;
-using GameInterface.Services.Inventory.TradeSkills.Data;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
