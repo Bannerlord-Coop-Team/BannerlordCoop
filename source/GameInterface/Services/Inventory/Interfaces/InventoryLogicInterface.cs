@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.MobileParties.Extensions;
 using Helpers;
 using Serilog;
@@ -42,6 +43,13 @@ namespace GameInterface.Services.Inventory.Interfaces
     internal class InventoryLogicInterface : IInventoryLogicInterface
     {
         static readonly ILogger logger = LogManager.GetLogger<InventoryLogicInterface>();
+
+        private readonly ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface;
+
+        public InventoryLogicInterface(ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface)
+        {
+            this.tradeSkillCampaignBehaviorInterface = tradeSkillCampaignBehaviorInterface;
+        }
 
         public void ApplyDoneLogic(
             ItemRoster fromRoster,
@@ -142,7 +150,7 @@ namespace GameInterface.Services.Inventory.Interfaces
                 }
             }
 
-            CampaignEventDispatcher.Instance.OnPlayerInventoryExchange(boughtItems, soldItems, isTrading);
+            tradeSkillCampaignBehaviorInterface.UpdatePlayerInventory(ownerHero, boughtItems, soldItems, isTrading);
             if (currentSettlementComponent != null && isTrading)
             {
                 // Sets the gold of the other party

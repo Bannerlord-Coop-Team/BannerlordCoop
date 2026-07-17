@@ -67,6 +67,7 @@ public class TransferSaveState : ConnectionStateBase
                 Clone(coopSessionProvider.CoopSession?.CaravansPlayerData),
                 Clone(coopSessionProvider.CoopSession?.AlleyPlayerData),
                 Clone(coopSessionProvider.CoopSession?.InteractionsPlayerData),
+                Clone(coopSessionProvider.CoopSession?.TradePlayerData),
                 attachmentIdMapper.BuildServerMap());
 
             // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
@@ -88,6 +89,7 @@ public class TransferSaveState : ConnectionStateBase
             snapshot.CaravansPlayerData,
             snapshot.AlleyPlayerData,
             snapshot.InteractionsPlayerData,
+            snapshot.TradePlayerData,
             snapshot.AttachmentIdMap);
 
         network.SendImmediate(ConnectionLogic.Peer, savePacket);

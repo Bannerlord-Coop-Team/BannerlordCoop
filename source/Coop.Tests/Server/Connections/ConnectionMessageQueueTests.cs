@@ -1,7 +1,9 @@
 ﻿using Common.Network;
 using Common.Network.Messages;
 using Common.PacketHandlers;
+using Common.Serialization;
 using Common.Tests.Utils;
+using Coop.Core.Common.Session.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Tests.Extensions;
@@ -142,6 +144,16 @@ public class ConnectionMessageQueueTests
 
         queue.CompleteCatchUp(peer);
         Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
+    }
+
+    [Fact]
+    public void SessionLobbyChangeBypassesTheLoadQueue()
+    {
+        var peer = Connect();
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        var packet = MessagePacket.Create(new NetworkSessionLobbyChanged(123), serializer);
+
+        Assert.False(queue.TryHandleBroadcast(peer, packet));
     }
 
     [Fact]

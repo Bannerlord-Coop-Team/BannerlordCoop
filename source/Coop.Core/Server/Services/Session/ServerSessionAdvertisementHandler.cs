@@ -1,8 +1,9 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
+using Coop.Core.Common.Session.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Session.Messages;
 using Coop.Steam;
@@ -24,7 +25,9 @@ public class ServerSessionAdvertisementHandler : IDisposable
     private static readonly TimeSpan StartRetryDelay = TimeSpan.FromSeconds(5);
 
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
     private readonly ISessionAdvertiser advertiser;
+    private readonly ISteamLobbyOwner lobbyOwner;
     private readonly ISessionTunnelHost tunnelHost;
     private readonly ISessionJoinInfoSource joinInfoSource;
     private readonly INetworkConfig networkConfig;
@@ -39,19 +42,25 @@ public class ServerSessionAdvertisementHandler : IDisposable
 
     public ServerSessionAdvertisementHandler(
         IMessageBroker messageBroker,
+        INetwork network,
         ISessionAdvertiser advertiser,
+        ISteamLobbyOwner lobbyOwner,
         ISessionTunnelHost tunnelHost,
         ISessionJoinInfoSource joinInfoSource,
         INetworkConfig networkConfig)
     {
         this.messageBroker = messageBroker;
+        this.network = network;
         this.advertiser = advertiser;
+        this.lobbyOwner = lobbyOwner;
         this.tunnelHost = tunnelHost;
         this.joinInfoSource = joinInfoSource;
         this.networkConfig = networkConfig;
 
         messageBroker.Subscribe<ServerListening>(Handle_ServerListening);
         messageBroker.Subscribe<ConnectedPlayersChanged>(Handle_ConnectedPlayersChanged);
+        messageBroker.Subscribe<PlayerConnected>(Handle_PlayerConnected);
+        lobbyOwner.LobbyChanged += Handle_LobbyChanged;
         SteamGameServerBoot.LoggedOn += OnGameServerLoggedOn;
     }
 
@@ -67,6 +76,20 @@ public class ServerSessionAdvertisementHandler : IDisposable
     {
         int count = Math.Max(0, payload.What.ConnectedPlayers);
         GameThread.RunSafe(() => RefreshConnectedPlayers(count), context: "ServerRefreshConnectedPlayers");
+    }
+
+    private void Handle_PlayerConnected(MessagePayload<PlayerConnected> payload)
+    {
+        if (lobbyOwner.LobbyId == 0) return;
+
+        network.Send(payload.What.PlayerPeer, new NetworkSessionLobbyChanged(lobbyOwner.LobbyId));
+    }
+
+    private void Handle_LobbyChanged(ulong lobbyId)
+    {
+        if (lobbyId == 0) return;
+
+        network.SendAll(new NetworkSessionLobbyChanged(lobbyId));
     }
 
     private void TryStartAdvertising()
@@ -134,6 +157,8 @@ public class ServerSessionAdvertisementHandler : IDisposable
         CancelRetry();
         messageBroker.Unsubscribe<ServerListening>(Handle_ServerListening);
         messageBroker.Unsubscribe<ConnectedPlayersChanged>(Handle_ConnectedPlayersChanged);
+        messageBroker.Unsubscribe<PlayerConnected>(Handle_PlayerConnected);
+        lobbyOwner.LobbyChanged -= Handle_LobbyChanged;
         SteamGameServerBoot.LoggedOn -= OnGameServerLoggedOn;
 
         GameThread.RunSafe(() =>

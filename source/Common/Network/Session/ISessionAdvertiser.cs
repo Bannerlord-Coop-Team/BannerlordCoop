@@ -19,6 +19,9 @@ public interface ISessionAdvertiser : IDisposable
 {
     bool IsAdvertising { get; }
 
+    /// <summary>Whether this client can invite friends to its current Steam lobby.</summary>
+    bool CanInviteFriends { get; }
+
     /// <summary>
     /// Starts or refreshes the advertisement. Safe to call again with updated info.
     /// </summary>
@@ -28,7 +31,7 @@ public interface ISessionAdvertiser : IDisposable
 
     /// <summary>
     /// Opens the platform's invite UI. Returns false when no invite UI could be shown
-    /// (no active advertisement or no overlay), so the caller can surface an alternative.
+    /// (no active lobby or no overlay), so the caller can surface an alternative.
     /// </summary>
     bool InviteFriends();
 }

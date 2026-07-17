@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.PacketHandlers;
+using Coop.Core.Common.Session.Messages;
 using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
 using Serilog;
@@ -142,7 +143,11 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     private static bool ShouldBypassLoadingQueue(IPacket packet)
     {
         // Campaign time is a periodic current-state sample, not history to replay after loading.
-        return packet.PacketType == PacketType.CampaignTime;
+        if (packet.PacketType == PacketType.CampaignTime) return true;
+
+        // Lobby membership is connection metadata, not campaign state contained in the save.
+        return packet is MessagePacket messagePacket &&
+               messagePacket.MessageType == typeof(NetworkSessionLobbyChanged);
     }
 
     public void BeginQueueing(NetPeer peer)
