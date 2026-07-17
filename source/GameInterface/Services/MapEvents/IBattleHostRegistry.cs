@@ -31,5 +31,8 @@ public interface IBattleHostRegistry
     /// <summary>True if this instance is the elected host for the given battle.</summary>
     bool IsHost(string mapEventId);
 
+    /// <summary>True while the controller is still present in an elected battle mission.</summary>
+    bool IsControllerAssigned(string controllerId);
+
     void Remove(string mapEventId);
 }

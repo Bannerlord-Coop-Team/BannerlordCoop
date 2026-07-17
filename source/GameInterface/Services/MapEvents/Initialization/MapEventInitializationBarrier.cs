@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
@@ -13,9 +14,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Initialization;
 
@@ -30,7 +33,7 @@ public interface IMapEventInitializationBarrier : IGameAbstraction
     void AttachClient(MapEventSide side, MapEventParty party, Action afterCommit = null);
     void TrackParty(MapEvent mapEvent, MapEventParty party);
     void DeferVisual(GauntletMapEventVisual visual, CampaignVec2 position);
-    void DestroyGraph(MapEvent mapEvent);
+    void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null);
 }
 
 internal sealed class MapEventInitializationBarrier : IMapEventInitializationBarrier, IDisposable
@@ -43,6 +46,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
+    private PartyBase pendingDestroyedMapEventParty;
+    private MapEvent pendingDestroyedMapEvent;
     private bool disposed;
 
     public MapEventInitializationBarrier(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
@@ -52,6 +57,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         this.objectManager = objectManager;
         messageBroker.Subscribe<NetworkMapEventPartyPending>(HandlePendingParty);
         messageBroker.Subscribe<NetworkMapEventInitialized>(HandleCommit);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
@@ -60,6 +66,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         disposed = true;
         messageBroker.Unsubscribe<NetworkMapEventPartyPending>(HandlePendingParty);
         messageBroker.Unsubscribe<NetworkMapEventInitialized>(HandleCommit);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        pendingDestroyedMapEventParty = null;
+        pendingDestroyedMapEvent = null;
         states.Clear();
     }
 
@@ -270,9 +279,15 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         using (new AllowedThread()) visual.OnMapEventEnd();
     }
 
-    public void DestroyGraph(MapEvent mapEvent)
+    public void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null)
     {
         if (mapEvent == null) return;
+        if (preservedParty?._mapEventSide?.MapEvent == mapEvent)
+        {
+            pendingDestroyedMapEventParty = preservedParty;
+            pendingDestroyedMapEvent = mapEvent;
+        }
+
         if (!states.TryGetValue(mapEvent, out var state)) state = new State(mapEvent);
         Capture(state, mapEvent);
         Campaign.Current?.MapEventManager?._mapEvents.Remove(mapEvent);
@@ -280,7 +295,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         {
             var party = mapEventParty.Party;
             if (party == null || (party._mapEventSide != null && party._mapEventSide.MapEvent != mapEvent)) continue;
-            if (party._mapEventSide?.MapEvent == mapEvent) party._mapEventSide = null;
+            if (party != preservedParty && party._mapEventSide?.MapEvent == mapEvent) party._mapEventSide = null;
             if (party.MobileParty != null) party.MobileParty.EventPositionAdder = Vec2.Zero;
             party.SetVisualAsDirty();
         }
@@ -288,6 +303,21 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         foreach (var visual in state.Owned.OfType<GauntletMapEventVisual>().ToArray()) EndVisual(visual);
         states.Remove(mapEvent);
         foreach (var instance in state.Owned) objectManager.Remove(instance);
+    }
+
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        if (ModInformation.IsServer) return;
+        if (pendingDestroyedMapEvent == null) return;
+        if (MissionState.Current != null || Mission.Current != null || PlayerEncounter.Current != null) return;
+
+        var party = pendingDestroyedMapEventParty;
+        var mapEvent = pendingDestroyedMapEvent;
+        pendingDestroyedMapEventParty = null;
+        pendingDestroyedMapEvent = null;
+
+        if (party?.MapEvent == mapEvent)
+            party._mapEventSide = null;
     }
 
     private static void PublishVisual(GauntletMapEventVisual visual, CampaignVec2 position)

@@ -4,6 +4,7 @@ using System.Reflection;
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -17,6 +18,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -99,6 +101,64 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         // BattleConcludesWithVictory_StagesEachWinnersEncounterForBattleResults.
         AssertHasPlayerEncounter(Clients.First(), expected: false);
         AssertHasPlayerEncounter(Clients.Last(), expected: false);
+    }
+
+    [Fact]
+    public void ActiveSuccessorMission_DestroyBeforeClose_PreservesMapEventUntilMissionExit()
+    {
+        var (ctx, _, _, successorPartyBaseId) = SetupTwoAlliedPlayersInBattle();
+        var host = Clients.First();
+        var successor = Clients.Last();
+
+        Server.Call(() => Server.Resolve<IBattleHostRegistry>().Set(
+            ctx.MapEventId,
+            new BattleHostAssignment("1", new[] { "2" })));
+
+        var closeReceived = false;
+        var mapEventRemovedBeforeClose = false;
+        successor.Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(payload =>
+        {
+            if (!payload.What.PartyIds.Contains(successorPartyBaseId)) return;
+            closeReceived = true;
+            mapEventRemovedBeforeClose = !successor.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out _);
+        });
+
+        MapEvent destroyedMapEvent = null;
+        using (var fixture = new MissionEngineFixture())
+        {
+            successor.Call(() =>
+            {
+                fixture.CreateMission(successor);
+                Assert.True(successor.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out destroyedMapEvent));
+                Assert.Same(destroyedMapEvent, MobileParty.MainParty.MapEvent);
+            });
+
+            var disabled = MapEventDisabledMethods
+                .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+                .ToList();
+
+            host.Call(() =>
+            {
+                Assert.True(host.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+                host.Resolve<IMessageBroker>().Publish(this, new MapEventFinalizeAttempted(mapEvent));
+            }, disabled);
+
+            Assert.True(closeReceived);
+            Assert.True(mapEventRemovedBeforeClose);
+            AssertMapEventRemoved(successor, ctx.MapEventId);
+            successor.Call(() =>
+            {
+                Assert.NotNull(Mission.Current);
+                Assert.Same(destroyedMapEvent, MobileParty.MainParty.MapEvent);
+            });
+        }
+
+        successor.Call(() =>
+        {
+            Assert.Null(PlayerEncounter.Current);
+            successor.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            Assert.Null(MobileParty.MainParty.Party.MapEventSide);
+        });
     }
 
     [Fact]

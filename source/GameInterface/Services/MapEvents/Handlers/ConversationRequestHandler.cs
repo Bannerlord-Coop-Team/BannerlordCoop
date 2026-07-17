@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -44,6 +45,7 @@ internal class ConversationRequestHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly PlayerPartyInteractionHandler playerPartyInteractionHandler;
+    private readonly IBattleHostRegistry battleHostRegistry;
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
 
@@ -57,13 +59,15 @@ internal class ConversationRequestHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         ConversationPartyTracker conversationPartyTracker,
-        PlayerPartyInteractionHandler playerPartyInteractionHandler)
+        PlayerPartyInteractionHandler playerPartyInteractionHandler,
+        IBattleHostRegistry battleHostRegistry)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.conversationPartyTracker = conversationPartyTracker;
         this.playerPartyInteractionHandler = playerPartyInteractionHandler;
+        this.battleHostRegistry = battleHostRegistry;
 
         messageBroker.Subscribe<ConversationRequested>(Handle_ConversationRequested);
         messageBroker.Subscribe<NetworkRequestConversation>(Handle_NetworkRequestConversation);
@@ -176,6 +180,17 @@ internal class ConversationRequestHandler : IHandler
         var attackerInMapEvent = attacker.MapEvent != null;
         var defenderInMapEvent = defender.MapEvent != null;
 
+        // A concluded map event is finalized before every client has to leave its victory screen. Keep those
+        // remaining mission parties unavailable until their MissionLeft removes them from the host assignment.
+        if (IsAwaitingBattleMissionExit(attacker) || IsAwaitingBattleMissionExit(defender))
+        {
+            Logger.Information(
+                "[BattleMissionGuard] Refused campaign interaction while a party is still leaving its battle mission. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+            network.Send(requestingPeer, new NetworkConversationDenied());
+            return false;
+        }
+
         // PvP: a party joining an existing battle (exactly one side is already in a map event) is allowed through so
         // the joining player's PlayerEncounter can attach to that battle. There is no AI party to hold for a join.
         if (attackerInMapEvent ^ defenderInMapEvent)
@@ -240,6 +255,15 @@ internal class ConversationRequestHandler : IHandler
             request.AttackerId, request.DefenderId);
 
         return true;
+    }
+
+    private bool IsAwaitingBattleMissionExit(PartyBase party)
+    {
+        if (party?.MapEvent != null || party?.MobileParty == null)
+            return false;
+
+        return PlayerManager.TryGetControlledObjectInfo(party.MobileParty, out var controlledObject)
+            && battleHostRegistry.IsControllerAssigned(controlledObject.ObjectControllerId);
     }
 
     /// <summary>

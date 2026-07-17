@@ -81,7 +81,10 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
-        initializationBarrier.DestroyGraph(obj);
+        var preservedParty = localPartyWasInvolved && IsBattleMissionActive()
+            ? MobileParty.MainParty?.Party
+            : null;
+        initializationBarrier.DestroyGraph(obj, preservedParty);
         CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
     }
 
@@ -139,7 +142,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        if (MissionState.Current != null)
+        if (IsBattleMissionActive())
         {
             return;
         }
@@ -176,6 +179,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         ForceCloseCurrentEncounterMenu();
     }
+
+    private static bool IsBattleMissionActive() =>
+        MissionState.Current != null || Mission.Current != null;
 
     private static bool HasEncounterMenuToClose()
     {

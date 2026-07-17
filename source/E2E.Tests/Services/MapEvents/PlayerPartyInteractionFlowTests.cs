@@ -5,6 +5,7 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -16,6 +17,7 @@ using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
+using Missions.Messages;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -1274,7 +1276,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void ExistingBattleJoin_UsesExistingAllowPath()
+    public void ExistingBattleJoin_WithAssignedMissionPlayer_UsesExistingAllowPath()
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         var mapEventSideId = CreateServerMapEventSide();
@@ -1285,6 +1287,9 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
 
             responderParty.MapEventSide = side;
+            Server.Resolve<IBattleHostRegistry>().Set(
+                "live-battle",
+                new BattleHostAssignment("PlayerTwo", Array.Empty<string>()));
         }, MapEventDisabledMethods);
 
         RequestInteraction(client1, initiatorPartyId, responderPartyId);
@@ -1294,6 +1299,49 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(responderPartyId, allowed.DefenderId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
+    }
+
+    [Fact]
+    public void PlayerAwaitingBattleMissionExit_BlocksPlayerAndAiEncountersUntilMissionLeft()
+    {
+        var (_, client2, _, responderPartyId) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        const string concludedBattleId = "concluded-battle";
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IBattleHostRegistry>().Set(
+                concludedBattleId,
+                new BattleHostAssignment("PlayerOne", new[] { "PlayerTwo" }));
+
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.False(InvokeStartPartyEncounterPrefix(aiParty, responderParty));
+        });
+
+        RequestInteraction(client2, responderPartyId, aiPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(this,
+                new MissionMemberDeparted("PlayerTwo", concludedBattleId, wasRetreat: true, isInstanceEmpty: false));
+
+            Assert.True(Server.Resolve<IBattleHostRegistry>().TryGet(concludedBattleId, out var assignment));
+            Assert.Equal("PlayerOne", assignment.HostControllerId);
+            Assert.DoesNotContain("PlayerTwo", assignment.SuccessorControllerIds);
+
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(InvokeStartPartyEncounterPrefix(aiParty, responderParty));
+        });
+
+        RequestInteraction(client2, responderPartyId, aiPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
     }
 
     private (EnvironmentInstance client1, EnvironmentInstance client2, string initiatorPartyId, string responderPartyId) CreateTwoPlayerParties()
@@ -1442,6 +1490,15 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 forcePlayerOutFromSettlement: false,
                 ConversationRestartSource.PlayerEncounter)),
             disabledMethods);
+    }
+
+    private static bool InvokeStartPartyEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.EncounterManagerPatches");
+        var prefix = AccessTools.Method(patchType, "StartPartyEncounterPrefix");
+        Assert.NotNull(prefix);
+
+        return (bool)prefix.Invoke(null, new object[] { attackerParty, defenderParty })!;
     }
 
     private void SubmitOption(
