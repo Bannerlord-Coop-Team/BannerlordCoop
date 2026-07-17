@@ -41,16 +41,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
 
-    // Watch FinalizeEventAux, not FinishBattle: every way a battle ends on the server funnels through
-    // FinalizeEventAux (FinishBattle -> FinalizeEventAux, FinalizeEvent -> FinalizeEventAux, and the
-    // finalize-on-request handler calls it directly), whereas FinishBattle is a tiny wrapper the JIT
-    // inlines into MapEvent.Update, so a postfix on it never runs and the destroy is never replicated.
-    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
-    {
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle)),
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEvent)),
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))
-    };
+    // FinalizeEventAux re-enters during siege teardown, so MapEventPatches publishes destruction
+    // only after the outer call completes.
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
     public override void RegisterAllObjects()
     {

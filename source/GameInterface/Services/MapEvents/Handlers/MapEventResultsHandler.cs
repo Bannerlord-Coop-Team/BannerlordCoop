@@ -6,6 +6,8 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -22,26 +24,43 @@ internal class MapEventResultsHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IMapEventResultsInterface mapEventResultsInterface;
+    private readonly IMapEventContributionBarrier contributionBarrier;
 
     public MapEventResultsHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IMapEventResultsInterface mapEventResultsInterface)
+        IMapEventResultsInterface mapEventResultsInterface,
+        IMapEventContributionBarrier contributionBarrier)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.mapEventResultsInterface = mapEventResultsInterface;
+        this.contributionBarrier = contributionBarrier;
 
         messageBroker.Subscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
         messageBroker.Subscribe<NetworkCommitMapEventResults>(Handle_NetworkCommitMapEventResults);
+        messageBroker.Subscribe<MapEventContributionFlushRequested>(Handle_MapEventContributionFlushRequested);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
         messageBroker.Unsubscribe<NetworkCommitMapEventResults>(Handle_NetworkCommitMapEventResults);
+        messageBroker.Unsubscribe<MapEventContributionFlushRequested>(Handle_MapEventContributionFlushRequested);
+    }
+
+    private void Handle_MapEventContributionFlushRequested(
+        MessagePayload<MapEventContributionFlushRequested> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        // Keep this inline so the publishing patch cannot continue into result or teardown before the flush.
+        if (payload.What.MapEventParty != null)
+            contributionBarrier.Flush(payload.What.MapEventParty);
+        else
+            contributionBarrier.Flush(payload.What.MapEvent);
     }
 
     private void Handle_CommitMapEventResults(MessagePayload<CommitMapEventResults> obj)
@@ -52,6 +71,7 @@ internal class MapEventResultsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
 
+            contributionBarrier.Flush(mapEvent);
             mapEventResultsInterface.CalculateAndCommitMapEventResults(mapEvent, out NetworkPlayerLootData networkPlayerLootData);
 
             var message = new NetworkCommitMapEventResults(mapEventId, mapEvent.WinningSide, networkPlayerLootData);

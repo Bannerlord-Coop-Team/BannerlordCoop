@@ -1,11 +1,14 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -38,6 +41,47 @@ namespace E2E.Tests.Services.MapEvents;
 public class CoopBattleFinalizeTests : MapEventTestBase
 {
     public CoopBattleFinalizeTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void MissionStart_WoundedSoleOpponent_FinalizesWithoutOpeningMission()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(setup.recipientHeroId, out var recipientHero));
+            recipientHero.HitPoints = 1;
+            Assert.True(recipientHero.IsWounded);
+        }, MapEventDisabledMethods);
+
+        Server.NetworkSentMessages.Clear();
+
+        try
+        {
+            var initiatorClient = Clients.First();
+            initiatorClient.Call(() => initiatorClient.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+                Guid.NewGuid().ToString(),
+                (int)BattleStartMode.Mission,
+                setup.ctx.MapEventId,
+                setup.initiatorPartyId)), MapEventDisabledMethods);
+
+            var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().Single();
+            Assert.False(reply.Accepted);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkStartSiegeMission>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
+
+            AssertMapEventRemoved(Server, setup.ctx.MapEventId);
+            foreach (var client in Clients)
+                AssertMapEventRemoved(client, setup.ctx.MapEventId);
+
+            Assert.True(ServerBattleModeArbiter.TryClaimSimulation(setup.ctx.MapEventId));
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(setup.ctx.MapEventId);
+        }
+    }
 
     /// <summary>
     /// The explicit post-victory leave: the winning side leader finalizes, the server tears down the shared

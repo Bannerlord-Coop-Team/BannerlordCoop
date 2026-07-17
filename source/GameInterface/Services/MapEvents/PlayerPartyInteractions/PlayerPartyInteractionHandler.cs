@@ -925,7 +925,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (party == null) return;
 
         party.SetMoveModeHold();
-        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
     private static string GetPartyName(PartyBase party, string fallback)
@@ -1177,7 +1177,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (party.MapEvent != null) return;
 
         party.SetMoveModeHold();
-        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
     private bool TryGetLocalPartyId(out string partyId)

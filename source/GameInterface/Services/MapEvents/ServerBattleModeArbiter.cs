@@ -24,16 +24,24 @@ internal static class ServerBattleModeArbiter
     /// Try to claim the event for a live mission. Succeeds if the event is unclaimed or already a mission (another
     /// player joining the same mission); fails only if an auto-resolve simulation already owns the event.
     /// </summary>
-    public static bool TryClaimMission(string mapEventId) => TryClaim(mapEventId, Mode.Mission);
+    public static bool TryClaimMission(string mapEventId) => TryClaimMission(mapEventId, out _);
+
+    /// <summary>
+    /// Try to claim the event for a live mission and report whether this request created the claim rather than
+    /// joining an existing mission.
+    /// </summary>
+    public static bool TryClaimMission(string mapEventId, out bool isNewClaim) =>
+        TryClaim(mapEventId, Mode.Mission, out isNewClaim);
 
     /// <summary>
     /// Try to claim the event for an auto-resolve simulation. Succeeds if the event is unclaimed or already a
     /// simulation; fails only if a live mission already owns the event.
     /// </summary>
-    public static bool TryClaimSimulation(string mapEventId) => TryClaim(mapEventId, Mode.Simulation);
+    public static bool TryClaimSimulation(string mapEventId) => TryClaim(mapEventId, Mode.Simulation, out _);
 
-    private static bool TryClaim(string mapEventId, Mode mode)
+    private static bool TryClaim(string mapEventId, Mode mode, out bool isNewClaim)
     {
+        isNewClaim = false;
         if (mapEventId == null) return true;
 
         lock (lockObj)
@@ -42,6 +50,7 @@ internal static class ServerBattleModeArbiter
                 return current == mode;
 
             modes[mapEventId] = mode;
+            isNewClaim = true;
             return true;
         }
     }

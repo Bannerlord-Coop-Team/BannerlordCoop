@@ -54,6 +54,7 @@ internal class BattleFinalizeHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
@@ -64,6 +65,7 @@ internal class BattleFinalizeHandler : IHandler
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
         INetwork network,
         IMapEventLogger mapEventLogger,
         IBattleTroopReserveBuilder reserveBuilder,
@@ -73,6 +75,7 @@ internal class BattleFinalizeHandler : IHandler
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
         this.network = network;
         this.mapEventLogger = mapEventLogger;
         this.reserveBuilder = reserveBuilder;
@@ -529,8 +532,8 @@ internal class BattleFinalizeHandler : IHandler
             using (new AllowedThread())
             {
                 mobileParty.SetMoveModeHold();
+                mobileParty.ResetNavigationToHold();
             }
-            mobileParty.ResetNavigationToHold();
             PublishPartyBehaviorUpdate(mobileParty);
         }
     }
@@ -552,22 +555,12 @@ internal class BattleFinalizeHandler : IHandler
 
     private void PublishPartyBehaviorUpdate(MobileParty mobileParty)
     {
-        if (!objectManager.TryGetId(mobileParty, out var mobilePartyId))
+        if (!mobilePartyBehaviorSnapshot.TryCreate(
+                mobileParty,
+                out PartyBehaviorUpdateData data))
             return;
 
-        var data = new PartyBehaviorUpdateData(
-            mobilePartyId,
-            mobileParty.DefaultBehavior,
-            null,
-            mobileParty.Position,
-            false,
-            mobileParty.Position,
-            mobileParty.DefaultBehavior,
-            mobileParty.TargetPosition,
-            mobileParty.DesiredAiNavigationType)
-        {
-            ForcePosition = true,
-        };
+        data.ForcePosition = true;
 
         // The gate reset must reach clients before the encounter close allows another map command.
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));

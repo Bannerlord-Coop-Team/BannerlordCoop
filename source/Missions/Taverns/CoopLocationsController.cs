@@ -225,10 +225,10 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             Agent agent = info.Agent;
             GameThread.Run(() =>
             {
-                if (agent != null && agent.Health > 0)
+                if (agent != null && agent.IsActive() && agent.Health > 0)
                 {
-                    agent.MakeDead(false, ActionIndexCache.act_none);
-                    agent.FadeOut(false, true);
+                    bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
+                    agent.FadeOut(false, hideMount);
                 }
             });
 

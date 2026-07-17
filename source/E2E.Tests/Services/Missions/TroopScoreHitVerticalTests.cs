@@ -1,7 +1,10 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -140,6 +143,79 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         AssertClientsConvergedOn(partyId, serverContribution);
     }
 
+    [Fact]
+    public void RepeatedScoreHitsInOneTick_SendLatestContributionOnce()
+    {
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+
+        Server.NetworkSentMessages.Clear();
+
+        int serverContribution = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 10, isFatal: false, isTeamKill: false, null, isSimulatedHit: true);
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 20, isFatal: false, isTeamKill: false, null, isSimulatedHit: true);
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 30, isFatal: true, isTeamKill: false, null, isSimulatedHit: true);
+
+            serverContribution = party.ContributionToBattle;
+        });
+
+        Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+
+        FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+        AssertClientsConvergedOn(partyId, serverContribution);
+    }
+
+    [Fact]
+    public void LastPartyLeave_FlushesPendingContributionBeforeMapEventDestroy()
+    {
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+
+        string? partyBaseId = null;
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetId(party.Party, out partyBaseId));
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+
+            party.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), victim, 30,
+                isFatal: true, isTeamKill: false, null, isSimulatedHit: true);
+        });
+
+        Assert.NotNull(partyBaseId);
+        Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+
+        Server.SimulateMessage(this, new NetworkRequestLeaveBattle(partyBaseId!));
+
+        var messages = Server.NetworkSentMessages.Messages;
+        int contributionIndex = messages.FindIndex(message => IsContributionMessageFor(message, partyId));
+        int destroyIndex = messages.FindIndex(message => message is NetworkDestroyInstance<MapEvent>);
+        int leaveIndex = messages.FindIndex(message => message is NetworkPartyLeftBattle);
+
+        Assert.Single(messages, message => IsContributionMessageFor(message, partyId));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkDestroyInstance<MapEvent>>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+        Assert.True(contributionIndex < destroyIndex,
+            $"Contribution packet index {contributionIndex} was not before destroy index {destroyIndex}");
+        Assert.True(contributionIndex < leaveIndex,
+            $"Contribution packet index {contributionIndex} was not before leave index {leaveIndex}");
+    }
+
+    private static bool IsContributionMessageFor(IMessage message, string partyId)
+    {
+        if (message.GetType().Name != "MapEventParty__contributionToBattle_SetNetworkMessage") return false;
+
+        var instanceId = AccessTools.Property(message.GetType(), "InstanceId").GetValue(message) as string;
+        return instanceId == ObjectManager.Compact(partyId, typeof(MapEventParty));
+    }
+
     /// <summary>
     /// Stands up a coop battle whose attacker-side party holds one flattened troop, ready to be scored
     /// against: returns the party's id, the troop's roster descriptor seed and the victim character's id
@@ -194,6 +270,8 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     /// <summary>The _contributionToBattle autosync broadcast the server value to every client's copy.</summary>
     private void AssertClientsConvergedOn(string partyId, int serverContribution)
     {
+        FlushCoalescer();
+
         foreach (var client in Clients)
         {
             client.Call(() =>

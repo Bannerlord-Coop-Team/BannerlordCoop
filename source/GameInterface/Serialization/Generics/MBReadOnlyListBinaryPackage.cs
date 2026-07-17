@@ -1,5 +1,7 @@
 ﻿using Common.Extensions;
+using Common.Logging;
 using GameInterface.Serialization.Native;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +13,8 @@ namespace GameInterface.Serialization.Generics
     [Serializable]
     public class MBReadOnlyListBinaryPackage : IEnumerableBinaryPackage
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<MBReadOnlyListBinaryPackage>();
+
         [NonSerialized]
         private bool IsUnpacked = false;
 
@@ -49,12 +53,27 @@ namespace GameInterface.Serialization.Generics
 
             IsUnpacked = true;
             var type = Type.GetType(ObjectType);
+
+            // The stored name is the PACKER's AssemblyQualifiedName; surface a cross-runtime
+            // resolution failure identifiably instead of as an anonymous NRE below.
+            if (type == null)
+                throw new InvalidOperationException($"Could not resolve packed type '{ObjectType}' on this runtime");
+
             Object = FormatterServices.GetUninitializedObject(type);
             var fields = type.GetAllInstanceFields();
 
             foreach (string fieldName in StoredFields.Keys)
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                // Cross-runtime field skew (see BinaryPackageBase.UnpackFields): a net472 sender
+                // packs List<T>._syncRoot, which does not exist on the net6 dedicated server —
+                // the null SetValue here was the join-time hero-transfer fatal. Skip unknowns.
+                if (field == null)
+                {
+                    Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping packed value", type.Name, fieldName);
+                    continue;
+                }
 
                 if (type.IsValueType)
                 {
