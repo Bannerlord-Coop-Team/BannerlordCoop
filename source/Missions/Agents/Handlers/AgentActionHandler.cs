@@ -21,6 +21,9 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// </summary>
     void PollActions();
 
+    /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
+    void CatchUpJoiner(string controllerId);
+
     /// <summary>[Game thread] Reassert received puppet guards once per mission frame.</summary>
     void ApplyRemoteGuardStates();
 }
@@ -165,6 +168,43 @@ public class AgentActionHandler : IAgentActionHandler
 
         if (ids == null) return;
 
+        SendActionPackets(ids, actions, packet => client.SendAll(packet));
+    }
+
+    public void CatchUpJoiner(string controllerId)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (_disposed || Mission.Current == null) return;
+
+            List<Guid> ids = null;
+            List<AgentActionData> actions = null;
+
+            foreach (var info in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
+            {
+                Agent agent = info.Agent;
+                if (agent == null || agent.Mission == null || !agent.IsActive() || agent.Health <= 0 || agent.IsMount)
+                    continue;
+
+                var defendFlags = AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
+                if (defendFlags == Agent.MovementControlFlag.None
+                    && !AgentActionData.IsGuardMode(agent.CurrentGuardMode))
+                    continue;
+
+                (ids ??= new List<Guid>()).Add(info.AgentId);
+                (actions ??= new List<AgentActionData>()).Add(new AgentActionData(agent));
+            }
+
+            if (ids == null) return;
+            SendActionPackets(ids, actions, packet => client.Send(controllerId, packet));
+        });
+    }
+
+    private static void SendActionPackets(
+        List<Guid> ids,
+        List<AgentActionData> actions,
+        Action<AgentActionPacket> send)
+    {
         for (int start = 0; start < ids.Count; start += MaxAgentsPerActionPacket)
         {
             int count = Math.Min(MaxAgentsPerActionPacket, ids.Count - start);
@@ -172,7 +212,7 @@ public class AgentActionHandler : IAgentActionHandler
             var dataChunk = new AgentActionData[count];
             ids.CopyTo(start, idChunk, 0, count);
             actions.CopyTo(start, dataChunk, 0, count);
-            client.SendAll(new AgentActionPacket(idChunk, dataChunk));
+            send(new AgentActionPacket(idChunk, dataChunk));
         }
     }
 

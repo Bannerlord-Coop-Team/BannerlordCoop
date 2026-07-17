@@ -19,6 +19,7 @@ public class MockBattleNetwork : IBattleNetwork
 
     public NetPeer NetPeer { get; } = NetPeerExtensions.CreatePeer();
     public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
+    public List<(string ControllerId, IPacket Packet)> DirectPacketSends { get; } = new();
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
@@ -35,6 +36,10 @@ public class MockBattleNetwork : IBattleNetwork
 
     // Packet broadcasts are captured for sender-path assertions; packet-level mesh routing isn't exercised.
     public void SendAll(IPacket packet) => NetworkSentPackets.Add(packet);
-    public void Send(string controllerId, IPacket packet) => throw new NotImplementedException();
+    public void Send(string controllerId, IPacket packet)
+    {
+        NetworkSentPackets.Add(packet);
+        DirectPacketSends.Add((controllerId, packet));
+    }
     public void SendAllBut(string controllerId, IPacket packet) => throw new NotImplementedException();
 }

@@ -57,6 +57,40 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void CatchUpJoiner_HeldGuard_SendsCurrentStateToJoiningPeer()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        SetControllerId(owner, "owner");
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            var component = owner.Resolve<ICoopMissionComponent>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+            var network = owner.Resolve<MockBattleNetwork>();
+            var agentId = Guid.NewGuid();
+
+            var agent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.Player));
+            Assert.True(registry.TryRegisterAgent("owner", agentId, agent));
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+
+            mirror.GuardMode = Agent.GuardMode.Right;
+            component.AgentActionHandler.PollActions();
+            network.NetworkSentPackets.Packets.Clear();
+
+            component.AgentActionHandler.CatchUpJoiner("joiner");
+
+            var directSend = Assert.Single(network.DirectPacketSends);
+            Assert.Equal("joiner", directSend.ControllerId);
+            var packet = Assert.IsType<AgentActionPacket>(directSend.Packet);
+            Assert.Equal(agentId, Assert.Single(packet.AgentIds));
+            Assert.Equal(Agent.GuardMode.Right, Assert.Single(packet.Actions).GuardMode);
+        });
+    }
+
+    [Fact]
     public void ActionTick_ReassertsHeldGuardAfterNativeDecay_WithoutAnotherPacket()
     {
         using var fixture = new MissionEngineFixture();
