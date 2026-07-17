@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
@@ -30,7 +31,8 @@ public class ConnectionContext
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        IJoinMobilePartyPositionSnapshotSender joinMobilePartyPositionSnapshotSender)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -45,6 +47,7 @@ public class ConnectionContext
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
         ExistingPlayerSender = existingPlayerSender;
+        JoinMobilePartyPositionSnapshotSender = joinMobilePartyPositionSnapshotSender;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -60,4 +63,5 @@ public class ConnectionContext
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
+    public IJoinMobilePartyPositionSnapshotSender JoinMobilePartyPositionSnapshotSender { get; }
 }

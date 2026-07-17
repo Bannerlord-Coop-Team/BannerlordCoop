@@ -148,6 +148,19 @@ public class MapTimeTrackerInterfaceTests
     }
 
     [Fact]
+    public void ResetForCampaignJoin_NextHeartbeatRequestsHardSync()
+    {
+        var tracker = CreateSynchronizedTracker();
+        Assert.False(tracker.BeginCorrection(110L, 1000L));
+
+        tracker.ResetForCampaignJoin();
+
+        Assert.True(tracker.BeginCorrection(120L, 1000L));
+        Assert.True(tracker.TryConsumeHardSync(out long serverTicks));
+        Assert.Equal(120L, serverTicks);
+    }
+
+    [Fact]
     public void GetTickCorrection_BeforeFirstHeartbeatLeavesSimulationUnchanged()
     {
         var tracker = new MapTimeTrackerInterface();

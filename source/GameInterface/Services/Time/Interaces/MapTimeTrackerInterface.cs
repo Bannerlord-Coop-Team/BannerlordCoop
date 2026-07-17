@@ -34,6 +34,11 @@ public interface IMapTimeTrackerInterface : IGameAbstraction
     void ApplyClientSimulationTime(Campaign campaign, float realDt);
 
     /// <summary>
+    /// Clears time samples from a previous campaign so the next server heartbeat hard-syncs a joiner.
+    /// </summary>
+    void ResetForCampaignJoin();
+
+    /// <summary>
     /// Advances the campaign time forward by the given number of ticks.
     /// Intended for debugging the time-sync correction from the server/host.
     /// </summary>
@@ -193,6 +198,27 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 
             tracker._numTicks += ticks;
         }, context: nameof(MapTimeTrackerInterface));
+    }
+
+    public void ResetForCampaignJoin()
+    {
+        Volatile.Write(ref latestServerTimeSample, null);
+        hasServerTime = false;
+        hasPendingHardSync = false;
+        hasEstimatedServerRate = false;
+        isPausedForServer = false;
+        skipNextHeartbeatAgeIncrement = false;
+        previousServerTicks = 0L;
+        lastServerProgressTicks = 0L;
+        pendingServerTicks = 0L;
+        pendingServerOneWayLatencySeconds = 0f;
+        localTicksPerSecond = 0d;
+        serverTicksPerSecond = 0d;
+        correctionTicksPerSecond = 0d;
+        correctionAccumulator = 0d;
+        secondsSinceHeartbeat = 0f;
+        secondsSinceServerSample = 0f;
+        ResetPacingDiagnostics();
     }
 
     internal bool BeginCorrection(

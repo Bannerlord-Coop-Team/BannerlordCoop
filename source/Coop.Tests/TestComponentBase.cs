@@ -26,6 +26,7 @@ using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
+using Coop.Core.Server.Services.MobileParties;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI;
 using GameInterface.Services.UI.Interfaces;
@@ -97,6 +98,7 @@ internal abstract class TestComponentBase
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
+        RegisterMock<IJoinMobilePartyPositionSnapshotSender>(builder);
         RegisterMock<ILoadingInterface>(builder);
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);

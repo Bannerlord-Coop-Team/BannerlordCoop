@@ -7,6 +7,7 @@ using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 
@@ -21,6 +22,7 @@ public class CampaignState : ClientStateBase
     private readonly ILoadingInterface loadingInterface;
     private readonly IGameStateInterface gameStateInterface;
     private readonly ICoopFinalizer coopFinalizer;
+    private readonly INetwork network;
     private readonly bool waitingForJoinCatchUp;
 
     public CampaignState(
@@ -29,18 +31,21 @@ public class CampaignState : ClientStateBase
         INetwork network,
         ILoadingInterface loadingInterface,
         IGameStateInterface gameStateInterface,
-        ICoopFinalizer coopFinalizer) : base(logic)
+        ICoopFinalizer coopFinalizer,
+        IMapTimeTrackerInterface mapTimeTrackerInterface) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.loadingInterface = loadingInterface;
         this.gameStateInterface = gameStateInterface;
         this.coopFinalizer = coopFinalizer;
+        this.network = network;
         waitingForJoinCatchUp = logic.State is LoadingState;
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
         if (waitingForJoinCatchUp)
         {
+            mapTimeTrackerInterface.ResetForCampaignJoin();
             messageBroker.Subscribe<NetworkJoinCatchUpComplete>(Handle_JoinCatchUpComplete);
         }
 
@@ -75,6 +80,7 @@ public class CampaignState : ClientStateBase
         GameThread.RunSafe(() =>
         {
             CompleteCampaignEntry();
+            network.SendAll(new NetworkJoinCatchUpApplied());
         }, context: nameof(Handle_JoinCatchUpComplete));
     }
 

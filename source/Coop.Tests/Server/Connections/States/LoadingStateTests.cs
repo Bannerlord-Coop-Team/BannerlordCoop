@@ -4,9 +4,13 @@ using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using Coop.Core.Server.Services.MobileParties;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
 using LiteNetLib;
+using Moq;
+using System;
 using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
@@ -79,6 +83,14 @@ namespace Coop.Tests.Server.Connections.States
             // Assert
             Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
             Assert.Single(serverComponent.TestNetwork.GetPeerMessagesFromType<NetworkJoinCatchUpComplete>(playerPeer));
+            serverComponent.Container.Resolve<Mock<IJoinMobilePartyPositionSnapshotSender>>()
+                .Verify(sender => sender.Send(playerPeer), Times.Once);
+
+            Assert.IsType<LoadingState>(connectionLogic.State);
+
+            currentState.JoinCatchUpAppliedHandler(
+                new MessagePayload<NetworkJoinCatchUpApplied>(playerPeer, new NetworkJoinCatchUpApplied()));
+            DrainGameThread();
 
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
@@ -107,8 +119,11 @@ namespace Coop.Tests.Server.Connections.States
         {
             // Arrange
             var currentState = connectionLogic.SetState<LoadingState>();
-            serverComponent.TestMessageBroker.Subscribe<PlayerCampaignEntered>(_ =>
-                serverComponent.TestNetwork.SendImmediate(playerPeer, new NetworkPlayerCampaignEntered()));
+            serverComponent.Container.Resolve<Mock<IJoinMobilePartyPositionSnapshotSender>>()
+                .Setup(sender => sender.Send(playerPeer))
+                .Callback(() => serverComponent.TestNetwork.SendImmediate(
+                    playerPeer,
+                    new NetworkJoinMobilePartyPositions(Array.Empty<MobilePartyPositionData>())));
 
             // Act
             currentState.PlayerCampaignEnteredHandler(
@@ -117,7 +132,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Assert
             var messages = serverComponent.TestNetwork.GetPeerMessages(playerPeer).ToArray();
-            Assert.Contains(messages, message => message is NetworkPlayerCampaignEntered);
+            Assert.Contains(messages, message => message is NetworkJoinMobilePartyPositions);
             Assert.IsType<NetworkJoinCatchUpComplete>(messages.Last());
         }
 

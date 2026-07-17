@@ -7,6 +7,7 @@ using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using Moq;
@@ -118,6 +119,7 @@ public class CampaignStateTests
         // Arrange
         clientComponent.TestNetwork.CreatePeer();
         var loadingInterface = clientComponent.Container.Resolve<Mock<ILoadingInterface>>();
+        var mapTimeTracker = clientComponent.Container.Resolve<Mock<IMapTimeTrackerInterface>>();
         _ = clientLogic.SetState<LoadingState>();
         loadingInterface.Reset();
         _ = clientLogic.SetState<CampaignState>();
@@ -126,6 +128,7 @@ public class CampaignStateTests
         Assert.Single(clientComponent.TestNetwork.GetPeerMessagesFromType<NetworkPlayerCampaignEntered>(
             clientComponent.TestNetwork.Peers[0]));
         loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Never);
+        mapTimeTracker.Verify(m => m.ResetForCampaignJoin(), Times.Once);
         Assert.Empty(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
 
         // Act
@@ -135,6 +138,8 @@ public class CampaignStateTests
         // Assert catch-up release
         loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Once);
         Assert.Single(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
+        Assert.Single(clientComponent.TestNetwork.GetPeerMessagesFromType<NetworkJoinCatchUpApplied>(
+            clientComponent.TestNetwork.Peers[0]));
     }
 
     [Fact]
@@ -142,6 +147,7 @@ public class CampaignStateTests
     {
         // Arrange
         var loadingInterface = clientComponent.Container.Resolve<Mock<ILoadingInterface>>();
+        var mapTimeTracker = clientComponent.Container.Resolve<Mock<IMapTimeTrackerInterface>>();
         _ = clientLogic.SetState<MissionState>();
         loadingInterface.Reset();
 
@@ -150,6 +156,7 @@ public class CampaignStateTests
 
         // Assert
         loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Once);
+        mapTimeTracker.Verify(m => m.ResetForCampaignJoin(), Times.Never);
         Assert.Single(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
     }
 }
