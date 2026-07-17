@@ -8,6 +8,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -50,6 +51,10 @@ public class E2ETestEnvironment : IDisposable
         GameThread.Instance.MarkGameThread();
 
         GameBootStrap.Initialize();
+
+        // Process-wide interaction state must not leak between E2E test environments.
+        PlayerPartyInteractionDialogState.Clear();
+        PlayerPartyTradeContext.End();
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
