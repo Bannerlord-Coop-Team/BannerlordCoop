@@ -86,7 +86,7 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
             itemTradeData = new Tuple<float, int>(0, 0);
         }
         int num = itemTradeData.Item2 + itemRosterElement.Amount;
-        float averagePrice = (itemTradeData.Item1 * (float)itemTradeData.Item2 + (float)totalPrice) / MathF.Max(0.0001f, (float)num);
+        float averagePrice = ((itemTradeData.Item1 * (float)itemTradeData.Item2) + (float)totalPrice) / MathF.Max(0.0001f, (float)num);
         TradePlayerData.PlayerItemsTradeData[playerHeroId][itemId] = new Tuple<float, int>(averagePrice, num);
     }
 
