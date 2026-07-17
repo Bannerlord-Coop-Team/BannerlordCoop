@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Network;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
@@ -86,7 +86,7 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
             itemTradeData = default(ItemTradeData);
         }
         int num = itemTradeData.NumItemsPurchased + itemRosterElement.Amount;
-        float averagePrice = (itemTradeData.AveragePrice * (float)itemTradeData.NumItemsPurchased + (float)totalPrice) / MathF.Max(0.0001f, (float)num);
+        float averagePrice = ((itemTradeData.AveragePrice * (float)itemTradeData.NumItemsPurchased) + (float)totalPrice) / MathF.Max(0.0001f, (float)num);
         TradePlayerData.PlayerItemsTradeData[playerHeroId][itemId] = new ItemTradeData(averagePrice, num);
     }
 
