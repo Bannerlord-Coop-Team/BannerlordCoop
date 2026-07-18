@@ -429,6 +429,8 @@ namespace GameInterface.Services.Smithing.Handlers
                     if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
                     if (!objectManager.TryGetObjectWithLogging(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
 
+                    if (!objectManager.TryGetObjectWithLogging(obj.PlayerHeroId, out Hero playerHero)) return;
+
                     ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
 
                     ItemModifierGroup itemModifierGroup = null;
@@ -457,7 +459,8 @@ namespace GameInterface.Services.Smithing.Handlers
                         ref craftedItemObject,
                         nextCraftedItemId);
 
-                    if (GameStateManager.Current.ActiveState is CraftingState currentState && currentState.CraftingLogic._craftedItemObject.StringId == nextCraftedItemId) // Only run on associated client with matching id
+                    // Only run on associated client
+                    if (GameStateManager.Current.ActiveState is CraftingState currentState && currentState.CraftingLogic._craftedItemObject.StringId == nextCraftedItemId && playerHero == Hero.MainHero)
                     {
                         currentState.CraftingLogic._craftedItemObject = craftedItemObject;
 

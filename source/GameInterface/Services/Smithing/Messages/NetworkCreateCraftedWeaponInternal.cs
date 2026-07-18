@@ -105,6 +105,9 @@ public class NetworkCreateCraftedWeaponInternalClients : ICommand
     [ProtoMember(10)]
     public string ItemModifierGroupId;
 
+    [ProtoMember(11)]
+    public string PlayerHeroId;
+
     public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject)
     {
         CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
@@ -117,5 +120,6 @@ public class NetworkCreateCraftedWeaponInternalClients : ICommand
         WeaponDesignElementCraftingPieceIds = cloneObject.WeaponDesignElementCraftingPieceIds;
         WeaponDesignElementScalePercentages = cloneObject.WeaponDesignElementScalePercentages;
         ItemModifierGroupId = cloneObject.ItemModifierGroupId;
+        PlayerHeroId = cloneObject.PlayerHeroId;
     }
 }
