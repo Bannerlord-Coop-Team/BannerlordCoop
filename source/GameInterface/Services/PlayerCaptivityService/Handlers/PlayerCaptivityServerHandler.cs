@@ -278,32 +278,25 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
-
-        PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
-            playerParty.StringId, payload.What.MapEventId);
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
-                if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
 
-                Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
-                    string.Join(",", playerPartyIds),
-                    surrenderedPartyId ?? "<none>",
-                    payload.What.MapEventId ?? "<none>");
-                PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
-                mapEvent.DoSurrender(playerParty.Party.Side);
-                messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to surrender");
-            }
-        }, blocking: true);
+            PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
+                playerParty.StringId, payload.What.MapEventId);
+
+            var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+            if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
+
+            Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
+                string.Join(",", playerPartyIds),
+                surrenderedPartyId ?? "<none>",
+                payload.What.MapEventId ?? "<none>");
+            PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
+            mapEvent.DoSurrender(playerParty.Party.Side);
+            messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
+        }, blocking: true, context: nameof(Handle_NetworkPlayerSurrendered));
     }
 
     /// <summary>
