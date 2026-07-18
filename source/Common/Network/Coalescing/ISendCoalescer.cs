@@ -1,5 +1,15 @@
 ﻿namespace Common.Network.Coalescing;
 
+/// <summary>Controls when a coalesced update is sent relative to other pending updates.</summary>
+public enum CoalescedSendPriority
+{
+    /// <summary>Sent before normal updates that may contain state derived from this update.</summary>
+    Prerequisite,
+
+    /// <summary>The default priority for independent updates.</summary>
+    Normal,
+}
+
 /// <summary>
 /// Buffers per-change network sends and collapses many updates to the same <see cref="CoalesceKey"/>
 /// into one merged send per server tick. A send path enqueues instead of calling
@@ -24,7 +34,10 @@ public interface ISendCoalescer
     /// Buffers an update for <paramref name="key"/>, merging it into any update already pending for that
     /// key via the payload's strategy.
     /// </summary>
-    void Enqueue(CoalesceKey key, ICoalescedPayload payload);
+    void Enqueue(
+        CoalesceKey key,
+        ICoalescedPayload payload,
+        CoalescedSendPriority priority = CoalescedSendPriority.Normal);
 
     /// <summary>
     /// Broadcasts the merged message for every pending key and clears the buffer. Call once per server

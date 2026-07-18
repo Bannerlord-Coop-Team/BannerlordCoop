@@ -1,7 +1,8 @@
-using Common.Network;
+﻿using Common.Network;
 using Common.Network.Coalescing;
 using E2E.Tests.Util;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -18,6 +19,8 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
     const string MarketDataId = "e2e_town_market_data";
 
     readonly string categoryId;
+    readonly string itemId;
+    readonly string itemRosterId;
 
     public TownMarketDataDictionarySyncTests(ITestOutputHelper output) : base(output)
     {
@@ -33,6 +36,26 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
         }
 
         categoryId = TestEnvironment.CreateRegisteredObject<ItemCategory>();
+        itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        itemRosterId = TestEnvironment.CreateRegisteredObject<ItemRoster>();
+
+        ConfigureTownRoster(Server);
+        foreach (var client in Clients)
+        {
+            ConfigureTownRoster(client);
+        }
+    }
+
+    void ConfigureTownRoster(E2E.Tests.Environment.Instance.EnvironmentInstance instance)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject(MarketDataId, out TownMarketData marketData));
+        Assert.True(instance.ObjectManager.TryGetObject(categoryId, out ItemCategory category));
+        Assert.True(instance.ObjectManager.TryGetObject(itemId, out ItemObject item));
+        Assert.True(instance.ObjectManager.TryGetObject(itemRosterId, out ItemRoster itemRoster));
+
+        item.ItemCategory = category;
+        item.Value = 100;
+        itemRoster.RosterUpdatedEvent += marketData.OnTownInventoryUpdated;
     }
 
     void AssertClientsHave(string itemCategoryId, ItemData expected)
@@ -85,6 +108,27 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
         // Assert
         AssertClientCounts(1);
         AssertClientsHave(categoryId, itemData);
+    }
+
+    [Fact]
+    public void Server_TownRosterUpdate_AppliesBeforeAuthoritativeMarketData()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(itemRosterId, out ItemRoster serverRoster));
+            Assert.True(Server.ObjectManager.TryGetObject(itemId, out ItemObject serverItem));
+
+            serverRoster.AddToCounts(new EquipmentElement(serverItem), 3);
+        });
+
+        FlushServerCoalescer();
+
+        Assert.True(Server.ObjectManager.TryGetObject(categoryId, out ItemCategory serverCategory));
+        Assert.True(Server.ObjectManager.TryGetObject(MarketDataId, out TownMarketData serverMarketData));
+        ItemData expected = serverMarketData.GetCategoryData(serverCategory);
+        Assert.Equal(3, expected.InStore);
+        Assert.Equal(300, expected.InStoreValue);
+        AssertClientsHave(categoryId, expected);
     }
 
     [Fact]
