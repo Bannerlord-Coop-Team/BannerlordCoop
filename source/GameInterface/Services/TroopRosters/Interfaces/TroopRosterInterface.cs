@@ -56,6 +56,12 @@ public interface ITroopRosterInterface : IGameAbstraction
     /// Runs troop recruitment logic for client requests.
     /// </summary>
     void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart);
+
+    /// <summary>
+    /// Players are able to change the order of their party roster.
+    /// Used to pack the order of elements in a TroopRoster to reshuffle after apply deltas.
+    /// </summary>
+    TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster);
 }
 
 internal class TroopRosterInterface : ITroopRosterInterface
@@ -255,5 +261,19 @@ internal class TroopRosterInterface : ITroopRosterInterface
         }
 
         GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, cost, false);
+    }
+
+    public TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster)
+    {
+        var troopRosterOrderData = new TroopRosterOrderData(new());
+        for (int i = 0; i < roster.data.Length; i++)
+        {
+            var character = roster.data[i].Character;
+
+            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) continue;
+
+            troopRosterOrderData.IndexCharacterIds[i] = characterId;
+        }
+        return troopRosterOrderData;
     }
 }
