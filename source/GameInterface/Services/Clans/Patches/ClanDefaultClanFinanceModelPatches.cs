@@ -7,7 +7,6 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Clans.Patches;
 
