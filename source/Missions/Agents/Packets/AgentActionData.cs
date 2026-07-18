@@ -48,62 +48,40 @@ namespace Missions.Agents.Packets
 
         internal static void ApplyGuardState(Agent agent, Agent.GuardMode guardMode)
         {
-            if (!IsGuardMode(guardMode))
+            if (IsGuardMode(guardMode))
             {
-                if (guardMode == Agent.GuardMode.None && IsGuardMode(agent.CurrentGuardMode))
-                {
-                    agent.ResetGuard();
-                }
+                agent.SetWeaponGuard(GuardModeToUsageDirection(guardMode));
                 return;
             }
 
-            Agent.UsageDirection direction = GuardModeToUsageDirection(guardMode);
-            if (direction != Agent.UsageDirection.None)
+            if (guardMode == Agent.GuardMode.None && IsGuardMode(agent.CurrentGuardMode))
             {
-                agent.SetWeaponGuard(direction);
+                agent.ResetGuard();
             }
         }
 
-        internal static bool IsGuardMode(Agent.GuardMode guardMode)
-        {
-            switch (guardMode)
+        internal static bool IsGuardMode(Agent.GuardMode guardMode) =>
+            guardMode == Agent.GuardMode.Up
+            || guardMode == Agent.GuardMode.Down
+            || guardMode == Agent.GuardMode.Left
+            || guardMode == Agent.GuardMode.Right;
+
+        private static Agent.UsageDirection GuardModeToUsageDirection(
+            Agent.GuardMode guardMode) =>
+            guardMode switch
             {
-                case Agent.GuardMode.Up:
-                case Agent.GuardMode.Down:
-                case Agent.GuardMode.Left:
-                case Agent.GuardMode.Right:
-                    return true;
-                default:
-                    return false;
-            }
-        }
+                Agent.GuardMode.Up => Agent.UsageDirection.AttackUp,
+                Agent.GuardMode.Down => Agent.UsageDirection.AttackDown,
+                Agent.GuardMode.Left => Agent.UsageDirection.AttackLeft,
+                Agent.GuardMode.Right => Agent.UsageDirection.AttackRight,
+                _ => Agent.UsageDirection.None
+            };
 
-        private static Agent.UsageDirection GuardModeToUsageDirection(Agent.GuardMode guardMode)
-        {
-            switch (guardMode)
-            {
-                case Agent.GuardMode.Up:
-                    return Agent.UsageDirection.AttackUp;
-                case Agent.GuardMode.Down:
-                    return Agent.UsageDirection.AttackDown;
-                case Agent.GuardMode.Left:
-                    return Agent.UsageDirection.AttackLeft;
-                case Agent.GuardMode.Right:
-                    return Agent.UsageDirection.AttackRight;
-                default:
-                    return Agent.UsageDirection.None;
-            }
-        }
+        private static int ToWireGuardState(Agent.GuardMode guardMode) =>
+            IsGuardMode(guardMode) ? (int)guardMode + 1 : 0;
 
-        private static int ToWireGuardState(Agent.GuardMode guardMode)
-        {
-            return IsGuardMode(guardMode) ? (int)guardMode + 1 : 0;
-        }
-
-        private static Agent.GuardMode FromWireGuardState(int guardState)
-        {
-            return guardState > 0 ? (Agent.GuardMode)(guardState - 1) : Agent.GuardMode.None;
-        }
+        private static Agent.GuardMode FromWireGuardState(int guardState) =>
+            guardState > 0 ? (Agent.GuardMode)(guardState - 1) : Agent.GuardMode.None;
 
         public AgentActionData(Agent agent)
         {

@@ -49,7 +49,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         public RemoteGuardState? RetainedGuard;
         public RemoteActionSequence? LastSequence;
-        public Dictionary<string, PendingRemoteAction> PendingByController;
+        public Dictionary<string, RemoteAction> PendingByController;
         public MigratedActionAuthority? MigratedAuthority;
 
         public bool IsEmpty =>
@@ -57,6 +57,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && !LastSequence.HasValue
             && (PendingByController == null || PendingByController.Count == 0)
             && !MigratedAuthority.HasValue;
+    }
+
+    private enum RemoteActionApplyResult
+    {
+        Applied,
+        AgentNotReady,
+        Stale,
+        WrongAuthority
     }
 
     private readonly struct RemoteGuardState
@@ -79,14 +87,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
     }
 
-    private readonly struct PendingRemoteAction
+    private readonly struct RemoteAction
     {
         public readonly string ControllerId;
         public readonly AgentActionData Data;
         public readonly long Sequence;
         public readonly int BattleHostEpoch;
 
-        public PendingRemoteAction(
+        public RemoteAction(
             string controllerId,
             AgentActionData data,
             long sequence,
@@ -295,10 +303,15 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 for (int i = 0; i < packet.AgentIds.Length; i++)
                 {
                     Guid agentId = packet.AgentIds[i];
-                    AgentActionData data = packet.Actions[i];
                     long sequence = packet.Sequences[i];
                     if (sequence <= 0)
                         continue;
+
+                    var action = new RemoteAction(
+                        packet.ControllerId,
+                        packet.Actions[i],
+                        sequence,
+                        packet.BattleHostEpoch);
 
                     if (agentRegistry.IsLocallyControlled(agentId))
                     {
@@ -308,79 +321,24 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
                     if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
                     {
-                        BufferPendingRemoteAction(
-                            agentId,
-                            packet.ControllerId,
-                            sequence,
-                            data,
-                            packet.BattleHostEpoch);
+                        BufferPendingRemoteAction(agentId, action);
                         continue;
                     }
 
-                    if (!IsCurrentActionAuthority(
+                    if (HasPendingRemoteActionAtOrAfter(agentId, action))
+                        continue;
+
+                    RemoteActionApplyResult result = TryApplyRemoteAction(
+                        agentId,
                         info,
-                        packet.ControllerId,
-                        packet.BattleHostEpoch))
+                        action,
+                        removePendingBeforeApply: true);
+                    if (result == RemoteActionApplyResult.AgentNotReady
+                        || (result == RemoteActionApplyResult.WrongAuthority
+                            && shouldBufferForHostAssignment))
                     {
-                        if (shouldBufferForHostAssignment)
-                        {
-                            BufferPendingRemoteAction(
-                                agentId,
-                                packet.ControllerId,
-                                sequence,
-                                data,
-                                packet.BattleHostEpoch);
-                        }
-
-                        continue;
+                        BufferPendingRemoteAction(agentId, action);
                     }
-
-                    if (HasPendingRemoteActionAtOrAfter(
-                        agentId,
-                        packet.ControllerId,
-                        sequence,
-                        packet.BattleHostEpoch))
-                    {
-                        continue;
-                    }
-
-                    if (IsStaleRemoteAction(
-                        agentId,
-                        packet.ControllerId,
-                        sequence,
-                        packet.BattleHostEpoch))
-                    {
-                        continue;
-                    }
-
-                    Agent agent = info.Agent;
-                    if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
-                    {
-                        BufferPendingRemoteAction(
-                            agentId,
-                            packet.ControllerId,
-                            sequence,
-                            data,
-                            packet.BattleHostEpoch);
-                        continue;
-                    }
-
-                    RemovePendingRemoteAction(
-                        agentId,
-                        packet.ControllerId,
-                        packet.BattleHostEpoch);
-                    data.Apply(agent);
-                    RecordRemoteActionSequence(
-                        agentId,
-                        packet.ControllerId,
-                        sequence,
-                        packet.BattleHostEpoch);
-                    UpdateRemoteGuardState(
-                        agentId,
-                        packet.ControllerId,
-                        data,
-                        agent,
-                        packet.BattleHostEpoch);
                 }
             }
         });
@@ -538,7 +496,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     continue;
                 }
 
-                Dictionary<string, PendingRemoteAction> pendingByController =
+                Dictionary<string, RemoteAction> pendingByController =
                     state.PendingByController;
                 if (pendingByController == null
                     || pendingByController.Count == 0)
@@ -571,53 +529,27 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
                 bool hasCurrentPending = pendingByController.TryGetValue(
                     authority,
-                    out PendingRemoteAction pending);
-                if (!hasCurrentPending
-                    || (requiredHostEpoch != 0
-                        && pending.BattleHostEpoch != requiredHostEpoch)
-                    || !IsCurrentActionAuthority(
-                        info,
-                        pending.ControllerId,
-                        pending.BattleHostEpoch))
+                    out RemoteAction pending);
+                if (!hasCurrentPending)
                 {
-                    if (hasCurrentPending
-                        && pending.BattleHostEpoch <= appliedMigrationEpoch)
-                    {
-                        pendingByController.Remove(pending.ControllerId);
-                    }
                     if (pendingByController.Count == 0)
                         (resolvedIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
 
-                if (IsStaleRemoteAction(
+                RemoteActionApplyResult result = TryApplyRemoteAction(
                     agentId,
-                    pending.ControllerId,
-                    pending.Sequence,
-                    pending.BattleHostEpoch))
+                    info,
+                    pending,
+                    removePendingBeforeApply: false);
+                if (result == RemoteActionApplyResult.AgentNotReady)
+                    continue;
+                if (result == RemoteActionApplyResult.WrongAuthority
+                    && pending.BattleHostEpoch > appliedMigrationEpoch)
                 {
-                    pendingByController.Remove(pending.ControllerId);
-                    if (pendingByController.Count == 0)
-                        (resolvedIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
 
-                Agent agent = info.Agent;
-                if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
-                    continue;
-
-                pending.Data.Apply(agent);
-                RecordRemoteActionSequence(
-                    agentId,
-                    pending.ControllerId,
-                    pending.Sequence,
-                    pending.BattleHostEpoch);
-                UpdateRemoteGuardState(
-                    agentId,
-                    pending.ControllerId,
-                    pending.Data,
-                    agent,
-                    pending.BattleHostEpoch);
                 pendingByController.Remove(pending.ControllerId);
                 if (pendingByController.Count == 0)
                     (resolvedIds ??= new List<Guid>()).Add(agentId);
@@ -636,14 +568,46 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
     }
 
+    private RemoteActionApplyResult TryApplyRemoteAction(
+        Guid agentId,
+        CoopAgentInfo info,
+        RemoteAction action,
+        bool removePendingBeforeApply)
+    {
+        if (!IsCurrentActionAuthority(
+            info,
+            action.ControllerId,
+            action.BattleHostEpoch))
+        {
+            return RemoteActionApplyResult.WrongAuthority;
+        }
+
+        if (IsStaleRemoteAction(agentId, action))
+        {
+            return RemoteActionApplyResult.Stale;
+        }
+
+        Agent agent = info.Agent;
+        if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
+            return RemoteActionApplyResult.AgentNotReady;
+
+        if (removePendingBeforeApply)
+            RemovePendingRemoteAction(agentId, action);
+
+        action.Data.Apply(agent);
+        RecordRemoteActionSequence(agentId, action);
+        UpdateRemoteGuardState(agentId, action, agent);
+        return RemoteActionApplyResult.Applied;
+    }
+
     private void PromotePendingMigration(
         CoopAgentInfo info,
         RemoteAgentActionState state,
-        Dictionary<string, PendingRemoteAction> actionsByController)
+        Dictionary<string, RemoteAction> actionsByController)
     {
         int highestReceivedEpoch = Volatile.Read(
             ref _highestReceivedHostActionEpoch);
-        foreach (PendingRemoteAction pending in actionsByController.Values)
+        foreach (RemoteAction pending in actionsByController.Values)
         {
             if (pending.BattleHostEpoch <= 0
                 || pending.BattleHostEpoch < highestReceivedEpoch
@@ -676,22 +640,20 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private void UpdateRemoteGuardState(
         Guid agentId,
-        string controllerId,
-        AgentActionData data,
-        Agent agent,
-        int battleHostEpoch)
+        RemoteAction action,
+        Agent agent)
     {
-        Agent.MovementControlFlag defendFlags = data.DefendFlags;
-        Agent.GuardMode guardMode = data.GuardMode;
+        Agent.MovementControlFlag defendFlags = action.Data.DefendFlags;
+        Agent.GuardMode guardMode = action.Data.GuardMode;
         if (defendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(guardMode))
         {
             GetOrCreateAgentState(agentId).RetainedGuard =
                 new RemoteGuardState(
-                    controllerId,
+                    action.ControllerId,
                     defendFlags,
                     guardMode,
-                    battleHostEpoch);
+                    action.BattleHostEpoch);
             _retainedGuardAgentIds.Add(agentId);
             return;
         }
@@ -713,92 +675,69 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
     }
 
-    private void BufferPendingRemoteAction(
-        Guid agentId,
-        string controllerId,
-        long sequence,
-        AgentActionData data,
-        int battleHostEpoch)
+    private void BufferPendingRemoteAction(Guid agentId, RemoteAction action)
     {
-        if (battleHostEpoch > 0
-            && battleHostEpoch < Volatile.Read(
+        if (action.BattleHostEpoch > 0
+            && action.BattleHostEpoch < Volatile.Read(
                 ref _highestReceivedHostActionEpoch))
         {
             return;
         }
 
         RemoteAgentActionState state = GetOrCreateAgentState(agentId);
-        Dictionary<string, PendingRemoteAction> actionsByController =
+        Dictionary<string, RemoteAction> actionsByController =
             state.PendingByController;
         if (actionsByController == null)
         {
-            actionsByController = new Dictionary<string, PendingRemoteAction>();
+            actionsByController = new Dictionary<string, RemoteAction>();
             state.PendingByController = actionsByController;
             _pendingActionAgentIds.Add(agentId);
         }
 
-        if (actionsByController.TryGetValue(controllerId, out var existing))
+        if (actionsByController.TryGetValue(action.ControllerId, out var existing))
         {
-            if (existing.BattleHostEpoch > battleHostEpoch)
+            if (existing.BattleHostEpoch > action.BattleHostEpoch)
                 return;
-            if (existing.BattleHostEpoch == battleHostEpoch
-                && existing.Sequence >= sequence)
+            if (existing.BattleHostEpoch == action.BattleHostEpoch
+                && existing.Sequence >= action.Sequence)
                 return;
         }
 
-        actionsByController[controllerId] =
-            new PendingRemoteAction(
-                controllerId,
-                data,
-                sequence,
-                battleHostEpoch);
+        actionsByController[action.ControllerId] = action;
     }
 
-    private bool IsStaleRemoteAction(
-        Guid agentId,
-        string controllerId,
-        long sequence,
-        int battleHostEpoch)
+    private bool IsStaleRemoteAction(Guid agentId, RemoteAction action)
     {
         return _agentStates.TryGetValue(agentId, out RemoteAgentActionState state)
             && state.LastSequence.HasValue
-            && state.LastSequence.Value.ControllerId == controllerId
-            && state.LastSequence.Value.BattleHostEpoch == battleHostEpoch
-            && state.LastSequence.Value.Sequence >= sequence;
+            && state.LastSequence.Value.ControllerId == action.ControllerId
+            && state.LastSequence.Value.BattleHostEpoch == action.BattleHostEpoch
+            && state.LastSequence.Value.Sequence >= action.Sequence;
     }
 
     private bool HasPendingRemoteActionAtOrAfter(
         Guid agentId,
-        string controllerId,
-        long sequence,
-        int battleHostEpoch)
+        RemoteAction action)
     {
         return _agentStates.TryGetValue(agentId, out RemoteAgentActionState state)
             && state.PendingByController != null
             && state.PendingByController.TryGetValue(
-                controllerId,
-                out PendingRemoteAction pending)
-            && pending.BattleHostEpoch == battleHostEpoch
-            && pending.Sequence >= sequence;
+                action.ControllerId,
+                out RemoteAction pending)
+            && pending.BattleHostEpoch == action.BattleHostEpoch
+            && pending.Sequence >= action.Sequence;
     }
 
-    private void RecordRemoteActionSequence(
-        Guid agentId,
-        string controllerId,
-        long sequence,
-        int battleHostEpoch)
+    private void RecordRemoteActionSequence(Guid agentId, RemoteAction action)
     {
         GetOrCreateAgentState(agentId).LastSequence =
             new RemoteActionSequence(
-                controllerId,
-                sequence,
-                battleHostEpoch);
+                action.ControllerId,
+                action.Sequence,
+                action.BattleHostEpoch);
     }
 
-    private void RemovePendingRemoteAction(
-        Guid agentId,
-        string controllerId,
-        int battleHostEpoch)
+    private void RemovePendingRemoteAction(Guid agentId, RemoteAction action)
     {
         if (!_agentStates.TryGetValue(agentId, out RemoteAgentActionState state)
             || state.PendingByController == null)
@@ -807,11 +746,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
 
         if (state.PendingByController.TryGetValue(
-            controllerId,
-            out PendingRemoteAction pending)
-            && pending.BattleHostEpoch == battleHostEpoch)
+            action.ControllerId,
+            out RemoteAction pending)
+            && pending.BattleHostEpoch == action.BattleHostEpoch)
         {
-            state.PendingByController.Remove(controllerId);
+            state.PendingByController.Remove(action.ControllerId);
         }
         if (state.PendingByController.Count == 0)
         {
@@ -832,7 +771,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     }
 
     private void RemoveExpiredPendingActions(
-        Dictionary<string, PendingRemoteAction> actionsByController,
+        Dictionary<string, RemoteAction> actionsByController,
         string currentAuthority,
         int requiredHostEpoch,
         int appliedMigrationEpoch)
@@ -840,7 +779,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         List<string> expiredControllers = null;
         foreach (var pendingByController in actionsByController)
         {
-            PendingRemoteAction pending = pendingByController.Value;
+            RemoteAction pending = pendingByController.Value;
             if (pending.BattleHostEpoch > 0
                 && pending.BattleHostEpoch < Volatile.Read(
                     ref _highestReceivedHostActionEpoch))

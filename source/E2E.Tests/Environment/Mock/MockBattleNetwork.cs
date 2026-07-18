@@ -7,6 +7,18 @@ using Missions;
 
 namespace E2E.Tests.Environment.Mock;
 
+public sealed class DirectPacketSend
+{
+    public string ControllerId { get; }
+    public IPacket Packet { get; }
+
+    public DirectPacketSend(string controllerId, IPacket packet)
+    {
+        ControllerId = controllerId;
+        Packet = packet;
+    }
+}
+
 /// <summary>
 /// Mock of the mission P2P mesh (<see cref="IBattleNetwork"/>) for E2E tests. The real mesh is a direct
 /// client-to-client LiteNetLib link; this routes <see cref="IMessage"/> traffic between client instances
@@ -19,7 +31,7 @@ public class MockBattleNetwork : IBattleNetwork
 
     public NetPeer NetPeer { get; } = NetPeerExtensions.CreatePeer();
     public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
-    public List<(string ControllerId, IPacket Packet)> DirectPacketSends { get; } = new();
+    public List<DirectPacketSend> DirectPacketSends { get; } = new();
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
@@ -39,7 +51,7 @@ public class MockBattleNetwork : IBattleNetwork
     public void Send(string controllerId, IPacket packet)
     {
         NetworkSentPackets.Add(packet);
-        DirectPacketSends.Add((controllerId, packet));
+        DirectPacketSends.Add(new DirectPacketSend(controllerId, packet));
     }
     public void SendAllBut(string controllerId, IPacket packet) => throw new NotImplementedException();
 }
