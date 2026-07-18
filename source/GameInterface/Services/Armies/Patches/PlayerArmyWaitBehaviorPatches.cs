@@ -2,11 +2,10 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
-using SandBox.CampaignBehaviors;
 using Serilog;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -21,7 +20,7 @@ namespace GameInterface.Services.Armies.Patches;
 [HarmonyPatch]
 internal class PlayerArmyWaitBehaviorPatches
 {
-    [HarmonyPatch(nameof(PlayerArmyWaitBehavior.OnTick))]
+    [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.OnTick))]
     static bool Prefix() => ModInformation.IsClient;
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerArmyWaitBehaviorPatches>();
     [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.wait_menu_army_leave_on_consequence))]
@@ -38,7 +37,7 @@ internal class PlayerArmyWaitBehaviorPatches
         }
         if (Settlement.CurrentSettlement != null)
         {
-            LeaveSettlementAction.ApplyForParty(MobileParty.MainParty);
+            MessageBroker.Instance.Publish(MobileParty.MainParty, new EndSettlementEncounterAttempted(MobileParty.MainParty));
             PartyBase.MainParty.SetVisualAsDirty();
         }
         var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);

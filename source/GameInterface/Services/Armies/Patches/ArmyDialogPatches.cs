@@ -2,11 +2,11 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Patches;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Serilog;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -68,7 +68,7 @@ internal class ArmyDialogPatches
         }
         if (Settlement.CurrentSettlement != null)
         {
-            LeaveSettlementAction.ApplyForParty(MobileParty.MainParty);
+            MessageBroker.Instance.Publish(MobileParty.MainParty, new EndSettlementEncounterAttempted(MobileParty.MainParty));
             PartyBase.MainParty.SetVisualAsDirty();
         }
         var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
