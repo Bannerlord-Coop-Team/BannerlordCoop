@@ -71,6 +71,8 @@ public static class PartyBehaviorPatch
         return true;
     }
 
+    // Vanilla seeds GoToSettlement from TargetPosition without recomputing the settlement gate.
+    // A saved current-position target therefore feeds back forever unless we repair it here.
     private static void RepairInvalidSettlementTarget(
         MobilePartyAi partyAi,
         AiBehavior behavior,
@@ -94,7 +96,7 @@ public static class PartyBehaviorPatch
         if (!correctedTarget.IsValid() || correctedTarget == party.Position)
             return;
 
-        Logger.Warning(
+        Logger.Information(
             "Repairing current-position settlement target for {PartyId}: {SettlementId} at {Target}",
             party.StringId,
             settlement.StringId,
