@@ -65,12 +65,12 @@ public class ServerSettlementExitEnterHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty))
             {
-                RejectSettlementEncounter(peer, payload);
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
                 return;
             }
             if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement))
             {
-                RejectSettlementEncounter(peer, payload);
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
                 return;
             }
 
@@ -79,7 +79,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                 Logger.Warning(
                     "Rejecting settlement entry for party {PartyId} because it is already in a map event",
                     payload.PartyId);
-                RejectSettlementEncounter(peer, payload);
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
                 return;
             }
 
@@ -97,7 +97,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                         objectManager.TryGetId(mobileParty.CurrentSettlement, out var currentSettlementId)
                             ? currentSettlementId
                             : mobileParty.CurrentSettlement.StringId);
-                    RejectSettlementEncounter(peer, payload);
+                    network.Send(peer, new NetworkSettlementEncounterRejected(payload));
                 }
                 return;
             }
@@ -109,13 +109,6 @@ public class ServerSettlementExitEnterHandler : IHandler
 
             settlementInterface.PartyEnterSettlement(mobileParty, settlement);
         }, context: nameof(NetworkRequestStartSettlementEncounter));
-    }
-
-    private void RejectSettlementEncounter(
-        NetPeer peer,
-        NetworkRequestStartSettlementEncounter payload)
-    {
-        network.Send(peer, new NetworkSettlementEncounterRejected(payload));
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
