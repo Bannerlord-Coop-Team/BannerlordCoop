@@ -171,7 +171,8 @@ public class PlayerCaptivityReleasePositionTests
             0,
             true,
             releasePosition,
-            Helpers.PartyScreenHelper.PartyScreenMode.Normal);
+            Helpers.PartyScreenHelper.PartyScreenMode.Normal,
+            new TroopRosterOrderData(new()));
 
         byte[] bytes;
         using (var ms = new MemoryStream())
