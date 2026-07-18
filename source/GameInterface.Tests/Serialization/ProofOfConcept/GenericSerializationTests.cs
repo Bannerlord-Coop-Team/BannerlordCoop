@@ -19,7 +19,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
         }
 
         [Fact]
-        public void CircularReference_Full_Serialization()
+        public void CustomPackageOutsideProductionAssembly_IsRejected()
         {
             TestClassA testClassA = new TestClassA();
 
@@ -29,16 +29,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
             package.Pack();
 
-            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
-
-            ClassABinaryPackage deserialized = BinaryFormatterSerializer.Deserialize<ClassABinaryPackage>(bytes);
-
-            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
-            TestClassA classA = deserialized.Unpack<TestClassA>(deserializeFactory);
-
-            Assert.Same(classA, classA.testClassB.testClassA);
+            Assert.Throws<System.Runtime.Serialization.SerializationException>(() =>
+                BinaryPackageSerializer.Serialize(package));
         }
     }
 }

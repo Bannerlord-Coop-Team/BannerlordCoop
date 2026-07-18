@@ -113,6 +113,10 @@ internal class PlayerEncounterPatches
 
         if (ModInformation.IsServer) return true;
 
+        // Preserve vanilla's local pending state so a delayed server response cannot enqueue duplicate surrender requests.
+        if (__instance._playerSurrender) return false;
+        __instance._playerSurrender = true;
+
         Logger.Information(
             "[PvPBattleEncounterTrace] Battle encounter option clicked: surrender; party={PartyId} mapEvent={MapEventId} menu={Menu} encounter={Encounter}",
             DescribePartyForTrace(MobileParty.MainParty?.Party),

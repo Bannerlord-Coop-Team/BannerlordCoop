@@ -60,7 +60,32 @@ internal class EncounterManagerPatches
         if (TryRequestActiveSlowRaidSettlementEncounter(attackerParty, defenderParty))
             return false;
 
-        return !RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty);
+        if (RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty))
+            return false;
+
+        if (ModInformation.IsServer && TryRequestServerPlayerConversation(attackerParty, defenderParty))
+            return false;
+
+        return true;
+    }
+
+    private static bool TryRequestServerPlayerConversation(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (attackerParty?.MapEvent != null || defenderParty?.MapEvent != null)
+            return false;
+
+        var attackerIsPlayer = attackerParty?.MobileParty?.IsPlayerParty() == true;
+        var defenderIsPlayer = defenderParty?.MobileParty?.IsPlayerParty() == true;
+        if (attackerIsPlayer == defenderIsPlayer)
+            return false;
+
+        // The dedicated server has no MainParty, so send fresh AI/player encounters to the player's conversation flow.
+        MessageBroker.Instance.Publish(null, new ConversationRequested(
+            defenderParty,
+            attackerParty,
+            forcePlayerOutFromSettlement: false,
+            ConversationRestartSource.EncounterManager));
+        return true;
     }
 
     [HarmonyPrefix]

@@ -66,6 +66,9 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     [ProtoMember(18)]
     public readonly PartyScreenHelper.PartyScreenMode PartyScreenMode;
 
+    [ProtoMember(19)]
+    public readonly TroopRosterOrderData RightMemberOrderData;
+
     public NetworkCompleteDoneLogic(
         string mainHeroId,
         FlattenedTroop[] takenPrisonersRoster,
@@ -84,7 +87,8 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         int partyMoraleChangeAmount,
         bool doNotApplyGoldTransactions,
         CampaignVec2 releaserPartyPosition,
-        PartyScreenHelper.PartyScreenMode partyScreenMode)
+        PartyScreenHelper.PartyScreenMode partyScreenMode,
+        TroopRosterOrderData rightMemberOrderData)
     {
         MainHeroId = mainHeroId;
         TakenPrisonersRoster = takenPrisonersRoster;
@@ -104,5 +108,6 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         DoNotApplyGoldTransactions = doNotApplyGoldTransactions;
         ReleaserPartyPosition = releaserPartyPosition;
         PartyScreenMode = partyScreenMode;
+        RightMemberOrderData = rightMemberOrderData;
     }
 }

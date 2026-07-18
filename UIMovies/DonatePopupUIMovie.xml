@@ -31,6 +31,8 @@
                            StackLayout.LayoutMethod="VerticalTopToBottom">
                   <Children>
                     <Standard.Button WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="60"
+                                     MarginBottom="14" Command.Click="ActionPayPal" Parameter.Text="@PayPalButtonText"/>
+                    <Standard.Button WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="60"
                                      MarginBottom="14" Command.Click="ActionBuyMeACoffee" Parameter.Text="@BuyMeACoffeeButtonText"/>
                     <Standard.Button WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="60"
                                      MarginBottom="14" Command.Click="ActionIfdian" Parameter.Text="@IfdianButtonText"/>

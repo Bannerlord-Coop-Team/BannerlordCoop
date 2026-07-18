@@ -1,10 +1,10 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.UI.Notifications.Patches;
 
@@ -13,16 +13,23 @@ internal class DailyGoldChangePatch
 {
     [HarmonyPatch(nameof(ClanVariablesCampaignBehavior.DailyTickClan))]
     [HarmonyPrefix]
-    public static bool DailyTickClanPrefix(ref ClanVariablesCampaignBehavior __instance, Clan clan)
+    public static void DailyTickClanPrefix(Clan clan, out int? __state)
     {
-        // Only need to notify of daily gold change for player clans
-        if (clan == null || !clan.IsPlayerClan()) return true;
+        __state = null;
+        if (ModInformation.IsServer && clan != null && clan.IsPlayerClan())
+        {
+            __state = clan.Gold;
+        }
+    }
 
-        int goldChange = MathF.Round(Campaign.Current.Models.ClanFinanceModel.CalculateClanGoldChange(clan, false, false, false).ResultNumber);
+    [HarmonyPatch(nameof(ClanVariablesCampaignBehavior.DailyTickClan))]
+    [HarmonyPostfix]
+    public static void DailyTickClanPostfix(ClanVariablesCampaignBehavior __instance, Clan clan, int? __state)
+    {
+        if (!__state.HasValue) return;
 
+        int goldChange = clan.Gold - __state.Value;
         var message = new NotifyDailyGoldChange(clan, goldChange);
         MessageBroker.Instance.Publish(__instance, message);
-
-        return true;
     }
 }

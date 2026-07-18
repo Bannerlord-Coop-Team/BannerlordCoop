@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.Generics
 {
@@ -27,17 +28,19 @@ namespace GameInterface.Serialization.Generics
         protected Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         string ObjectType;
+        private Type ResolvedType => SerializedTypeResolver.ResolveType(
+            ObjectType, typeof(MBReadOnlyList<>), typeof(MBList<>));
 
         public MBReadOnlyListBinaryPackage(object obj, IBinaryPackageFactory binaryPackageFactory)
         {
             BinaryPackageFactory = binaryPackageFactory;
-            ObjectType = obj.GetType().AssemblyQualifiedName;
+            ObjectType = SerializedTypeResolver.Encode(obj.GetType());
             Object = obj;
         }
 
         public void Pack()
         {
-            var type = Type.GetType(ObjectType);
+            var type = ResolvedType;
             foreach (FieldInfo field in type.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First()))
             {
                 object obj = field.GetValue(Object);
@@ -52,13 +55,7 @@ namespace GameInterface.Serialization.Generics
             BinaryPackageFactory = binaryPackageFactory;
 
             IsUnpacked = true;
-            var type = Type.GetType(ObjectType);
-
-            // The stored name is the PACKER's AssemblyQualifiedName; surface a cross-runtime
-            // resolution failure identifiably instead of as an anonymous NRE below.
-            if (type == null)
-                throw new InvalidOperationException($"Could not resolve packed type '{ObjectType}' on this runtime");
-
+            var type = ResolvedType;
             Object = FormatterServices.GetUninitializedObject(type);
             var fields = type.GetAllInstanceFields();
 

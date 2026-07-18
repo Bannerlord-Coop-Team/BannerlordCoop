@@ -1,3 +1,4 @@
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
@@ -58,17 +59,26 @@ public class TournamentMissionRulesTests
         string controllerId,
         Guid mountId = default,
         string mountCharacterId = "horse-character")
-        => new TournamentAgentSpawnData(
-            agentId, slotId, characterId, seed, teamId, color, null, controllerId,
-            EquipmentAt(EquipmentIndex.WeaponItemBeginSlot, new ItemObject("weapon")),
-            new Vec3(1, 2, 3), new Vec2(0, 1), 100,
-            mountId,
-            mountId == Guid.Empty ? null : mountCharacterId,
-            77,
-            mountId == Guid.Empty
-                ? Array.Empty<EquipmentElement>()
-                : EquipmentAt(EquipmentIndex.Horse, new ItemObject("horse-item")),
-            mountId == Guid.Empty ? 0 : 90);
+    {
+        // This class runs without a test environment, but the process-wide Harmony patches from earlier
+        // environment-based tests stay applied, and MBObjectBasePatches gates the StringId setter on the
+        // ambient sync policy. AllowedThread makes ItemObject construction run the original regardless of
+        // what container state a previously-run test left behind.
+        using (new AllowedThread())
+        {
+            return new TournamentAgentSpawnData(
+                agentId, slotId, characterId, seed, teamId, color, null, controllerId,
+                EquipmentAt(EquipmentIndex.WeaponItemBeginSlot, new ItemObject("weapon")),
+                new Vec3(1, 2, 3), new Vec2(0, 1), 100,
+                mountId,
+                mountId == Guid.Empty ? null : mountCharacterId,
+                77,
+                mountId == Guid.Empty
+                    ? Array.Empty<EquipmentElement>()
+                    : EquipmentAt(EquipmentIndex.Horse, new ItemObject("horse-item")),
+                mountId == Guid.Empty ? 0 : 90);
+        }
+    }
 
     private static EquipmentElement[] EquipmentAt(EquipmentIndex index, ItemObject item)
     {
