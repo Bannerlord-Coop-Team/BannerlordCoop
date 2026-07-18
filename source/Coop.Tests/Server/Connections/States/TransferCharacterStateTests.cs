@@ -64,7 +64,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void EnteringState_SendsSaveDataPacket_ToJoiningPeerOnly()
+        public void EnteringState_SendsSaveDataChunks_ToJoiningPeerOnly()
         {
             // Arrange — the save interface returns a known payload.
             byte[] data = new byte[] { 1, 2, 3 };
@@ -75,20 +75,43 @@ namespace Coop.Tests.Server.Connections.States
             // Act — entering the state packages the save and sends it to the joining peer.
             connectionLogic.SetState<TransferSaveState>();
 
-            // Assert — exactly one save packet, carrying the save data (deflate-compressed on the
-            // wire; decompressing verifies the round trip the client handler performs), to the
-            // joining peer.
-            var packet = Assert.Single(serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataPacket>(playerPeer));
-            Assert.Equal(data, SaveDataCompression.Decompress(packet.GameSaveData));
+            // Assert — exactly one save chunk for this tiny save, carrying the deflate-compressed
+            // save data to the joining peer.
+            var packet = Assert.Single(serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer));
+            Assert.Equal(data, SaveDataCompression.Decompress(packet.ChunkData));
             Assert.Equal(campaignId, packet.CampaignID);
+            Assert.Equal(0, packet.ChunkIndex);
+            Assert.Equal(1, packet.ChunkCount);
             serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
                 .Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
 
             // The directed save is not sent to any other peer.
             var otherPeerGotSave =
                 serverComponent.TestNetwork.SentPackets.TryGetValue(differentPeer.Id, out var packets) &&
-                packets.OfType<GameSaveDataPacket>().Any();
+                packets.OfType<GameSaveDataChunkPacket>().Any();
             Assert.False(otherPeerGotSave);
+        }
+
+        [Fact]
+        public void EnteringState_SplitsLargeSaveData_IntoChunks()
+        {
+            // Arrange
+            byte[] data = new byte[GameSaveDataChunkPacket.ChunkSize * 2 + 17];
+            new System.Random(42).NextBytes(data);
+            var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
+            saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, "12345"));
+
+            // Act
+            connectionLogic.SetState<TransferSaveState>();
+
+            // Assert
+            var packets = serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer).ToArray();
+            Assert.True(packets.Length > 1);
+            Assert.Equal(Enumerable.Range(0, packets.Length), packets.Select(x => x.ChunkIndex));
+            Assert.All(packets, x => Assert.Equal(packets.Length, x.ChunkCount));
+            Assert.All(packets, x => Assert.True(x.ChunkData.Length <= GameSaveDataChunkPacket.ChunkSize));
+            Assert.Equal("12345", packets[0].CampaignID);
+            Assert.All(packets.Skip(1), x => Assert.Null(x.CampaignID));
         }
     }
 }

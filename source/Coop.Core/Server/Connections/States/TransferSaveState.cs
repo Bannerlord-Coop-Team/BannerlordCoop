@@ -9,6 +9,7 @@ using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using Serilog;
 using System;
+using System.Threading;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -19,6 +20,7 @@ namespace Coop.Core.Server.Connections.States;
 public class TransferSaveState : ConnectionStateBase
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TransferSaveState>();
+    private static int nextSaveTransferId;
 
     public TransferSaveState(
         IConnectionLogic connectionLogic,
@@ -81,18 +83,51 @@ public class TransferSaveState : ConnectionStateBase
 
         if (!snapshotCreated) return;
 
-        var savePacket = new GameSaveDataPacket(
-            SaveDataCompression.Compress(snapshot.GameSaveData),
-            snapshot.CampaignID,
-            snapshot.CraftingPlayerData,
-            snapshot.WorkshopPlayerData,
-            snapshot.CaravansPlayerData,
-            snapshot.AlleyPlayerData,
-            snapshot.InteractionsPlayerData,
-            snapshot.TradePlayerData,
-            snapshot.AttachmentIdMap);
+        byte[] compressedSave = SaveDataCompression.Compress(snapshot.GameSaveData);
+        SendSaveChunks(network, snapshot, compressedSave);
+    }
 
-        network.SendImmediate(ConnectionLogic.Peer, savePacket);
+    private void SendSaveChunks(INetwork network, GameSaveDataPacket snapshot, byte[] compressedSave)
+    {
+        int transferId = Interlocked.Increment(ref nextSaveTransferId);
+        int chunkCount = Math.Max(1, (compressedSave.Length + GameSaveDataChunkPacket.ChunkSize - 1) / GameSaveDataChunkPacket.ChunkSize);
+
+        Logger.Information(
+            "Sending join save transfer {TransferId} to peer {PeerId}: {ChunkCount} chunks, {CompressedSize:N0} compressed bytes, {UncompressedSize:N0} save bytes",
+            transferId,
+            ConnectionLogic.Peer.Id,
+            chunkCount,
+            compressedSave.Length,
+            snapshot.GameSaveData?.Length ?? 0);
+
+        for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
+        {
+            int offset = chunkIndex * GameSaveDataChunkPacket.ChunkSize;
+            int length = Math.Min(GameSaveDataChunkPacket.ChunkSize, compressedSave.Length - offset);
+            byte[] chunkData = length <= 0 ? Array.Empty<byte>() : new byte[length];
+            if (length > 0)
+            {
+                Buffer.BlockCopy(compressedSave, offset, chunkData, 0, length);
+            }
+
+            var chunkPacket = new GameSaveDataChunkPacket(
+                transferId,
+                chunkIndex,
+                chunkCount,
+                compressedSave.Length,
+                snapshot.GameSaveData?.Length ?? 0,
+                chunkData,
+                chunkIndex == 0 ? snapshot.CampaignID : null,
+                chunkIndex == 0 ? snapshot.CraftingPlayerData : null,
+                chunkIndex == 0 ? snapshot.WorkshopPlayerData : null,
+                chunkIndex == 0 ? snapshot.CaravansPlayerData : null,
+                chunkIndex == 0 ? snapshot.AlleyPlayerData : null,
+                chunkIndex == 0 ? snapshot.InteractionsPlayerData : null,
+                chunkIndex == 0 ? snapshot.TradePlayerData : null,
+                chunkIndex == 0 ? snapshot.AttachmentIdMap : null);
+
+            network.SendImmediate(ConnectionLogic.Peer, chunkPacket);
+        }
     }
 
     private static T Clone<T>(T value) where T : class =>

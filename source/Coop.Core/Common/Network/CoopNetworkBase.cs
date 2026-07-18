@@ -160,9 +160,11 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
         return "peer queues: " + string.Join(", ", peers.Select(peer =>
         {
-            var queued = peer.GetPacketsCountInReliableQueue(0, true) +
-                         peer.GetPacketsCountInReliableQueue(0, false);
-            return $"{peer.Id}@{peer.Address} queue={queued} ping={peer.Ping}ms";
+            var worldQueued = peer.GetPacketsCountInReliableQueue(0, true) +
+                              peer.GetPacketsCountInReliableQueue(0, false);
+            var bulkQueued = peer.GetPacketsCountInReliableQueue(BulkChannel, true) +
+                             peer.GetPacketsCountInReliableQueue(BulkChannel, false);
+            return $"{peer.Id}@{peer.Address} worldQueue={worldQueued} bulkQueue={bulkQueued} ping={peer.Ping}ms";
         }));
     }
 
@@ -221,7 +223,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     /// </summary>
     public const byte BulkChannel = 1;
 
-    private static byte GetChannel(IPacket packet) => packet is GameSaveDataPacket ? BulkChannel : (byte)0;
+    private static byte GetChannel(IPacket packet) => packet is GameSaveDataPacket or GameSaveDataChunkPacket ? BulkChannel : (byte)0;
 
     #region Message aggregation
 
