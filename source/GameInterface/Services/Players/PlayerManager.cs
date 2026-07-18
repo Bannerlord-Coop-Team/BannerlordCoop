@@ -43,6 +43,11 @@ public interface IPlayerManager
     void SetPeer(string controllerId, NetPeer peer);
 
     /// <summary>
+    /// Resolves the currently associated peer for a registered controller.
+    /// </summary>
+    bool TryGetPeer(string controllerId, out NetPeer peer);
+
+    /// <summary>
     /// Removes a peer's association, for example, on disconnect. The Player
     /// registration is untouched, only the live peer link is dropped.
     /// </summary>
@@ -68,6 +73,8 @@ public class PlayerManager : IPlayerManager
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ConcurrentDictionary<NetPeer, Player> peerToPlayer = new();
+    private readonly Dictionary<string, NetPeer> controllerToPeer = new();
+    private readonly object peerSync = new();
 
     public IReadOnlyCollection<Player> Players => _players;
     private readonly HashSet<Player> _players = new HashSet<Player>();
@@ -149,12 +156,31 @@ public class PlayerManager : IPlayerManager
             return;
         }
 
-        peerToPlayer[peer] = player;
+        lock (peerSync)
+        {
+            peerToPlayer[peer] = player;
+            controllerToPeer[controllerId] = peer;
+        }
+    }
+
+    public bool TryGetPeer(string controllerId, out NetPeer peer)
+    {
+        lock (peerSync)
+        {
+            return controllerToPeer.TryGetValue(controllerId, out peer);
+        }
     }
 
     public void ClearPeer(NetPeer peer)
     {
-        peerToPlayer.TryRemove(peer, out _);
+        lock (peerSync)
+        {
+            if (!peerToPlayer.TryRemove(peer, out var player)) return;
+
+            if (controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) &&
+                ReferenceEquals(currentPeer, peer))
+                controllerToPeer.Remove(player.ControllerId);
+        }
     }
 
     public bool TryGetPlayer(NetPeer peer, out Player player)
