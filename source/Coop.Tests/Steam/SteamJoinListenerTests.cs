@@ -186,6 +186,33 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void OwnLobby_StaysInLobbyAfterResolving()
+        {
+            SetupLobby(42, address: null, serverSteamId: 76561198000000042);
+            api.UserSteamId = api.LobbyOwner;
+
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Single(resolved);
+            Assert.Empty(failed);
+            // Leaving as the lobby's owning account would empty the lobby and Steam would
+            // destroy it, delisting the dedicated server this client just joined.
+            Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
+        public void OwnLobby_StaysEvenWhenJoinInfoIsRejected()
+        {
+            api.UserSteamId = api.LobbyOwner;
+
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Empty(resolved);
+            Assert.Single(failed);
+            Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
         public void DirectOnlyLobby_ResolvesWithoutHostSteamId()
         {
             SetupLobby(42, version: SessionJoinInfo.MinTunnelVersion - 1);

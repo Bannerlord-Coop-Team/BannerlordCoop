@@ -99,7 +99,8 @@ public class SteamJoinListener : IDisposable
                 return;
             }
 
-            // Membership is only needed to read the join info; leaving keeps the host's slots free.
+            // Membership is only needed to read the join info; guests leave afterward to keep
+            // the host's slots free.
             bool decoded = LobbyDataCodec.TryDecode(key => lobbyApi.GetLobbyData(lobbyId, key), out var info, out var error);
 
             // A standalone server advertises its own game-server identity to tunnel to; otherwise the
@@ -113,7 +114,7 @@ public class SteamJoinListener : IDisposable
                 info.HostSteamId = lobbyApi.GetLobbyOwner(lobbyId);
             }
 
-            lobbyApi.LeaveLobby(lobbyId);
+            LeaveUnlessOwnLobby(lobbyId);
 
             if (!decoded)
             {
@@ -135,6 +136,25 @@ public class SteamJoinListener : IDisposable
             Logger.Error(ex, "Failed to read Steam lobby {LobbyId}", lobbyId.ToString());
             messageBroker.Publish(this, new SessionJoinFailed("Could not read the Steam lobby"));
         }
+    }
+
+    /// <summary>
+    /// Guests leave after reading the join info so they don't hold one of the host's slots.
+    /// The lobby's owning account must stay: Steam tracks membership per account, not per
+    /// process, so when a dedicated server's operator joins from the same account the server
+    /// advertises with, leaving would empty the lobby and Steam would destroy it, delisting
+    /// the server for everyone.
+    /// </summary>
+    private void LeaveUnlessOwnLobby(ulong lobbyId)
+    {
+        ulong localSteamId = lobbyApi.LocalSteamId;
+        if (localSteamId != 0 && lobbyApi.GetLobbyOwner(lobbyId) == localSteamId)
+        {
+            Logger.Information("Staying in own Steam lobby {LobbyId}; the advertisement needs this account's membership", lobbyId.ToString());
+            return;
+        }
+
+        lobbyApi.LeaveLobby(lobbyId);
     }
 
     public static bool TryParseConnectLobby(string text, out ulong lobbyId)
