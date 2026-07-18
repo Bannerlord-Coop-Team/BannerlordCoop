@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
@@ -9,6 +10,7 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
 
@@ -24,15 +26,18 @@ internal class TroopRosterReorderHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISendCoalescer sendCoalescer;
 
     public TroopRosterReorderHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<ApplyTroopRosterOrder>(Handle_ApplyTroopRosterOrder);
         messageBroker.Subscribe<NetworkApplyTroopRosterOrder>(Handle_NetworkApplyTroopRosterOrder);
@@ -69,6 +74,9 @@ internal class TroopRosterReorderHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.TroopRosterId, out var troopRoster)) return;
+
+            var compactId = Compact(data.TroopRosterId, typeof(TroopRoster));
+            sendCoalescer?.FlushInstance(compactId, network);
 
             // Apply on clients
             using (new AllowedThread())
