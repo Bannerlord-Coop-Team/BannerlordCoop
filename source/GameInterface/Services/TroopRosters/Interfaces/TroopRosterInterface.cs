@@ -266,6 +266,8 @@ internal class TroopRosterInterface : ITroopRosterInterface
     public TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster)
     {
         var troopRosterOrderData = new TroopRosterOrderData(new());
+        if (roster == null || roster.data == null) return null;
+
         for (int i = 0; i < roster.data.Length; i++)
         {
             var character = roster.data[i].Character;

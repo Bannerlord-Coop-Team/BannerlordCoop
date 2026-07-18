@@ -52,6 +52,8 @@ internal class TroopRosterReorderHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(data.TroopRoster, out var troopRosterId)) return;
 
+            if (data.OrderData == null) return;
+
             // Apply on the server
             ApplyReorder(data.OrderData.IndexCharacterIds, data.TroopRoster);
 
