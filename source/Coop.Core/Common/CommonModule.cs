@@ -9,6 +9,7 @@ using Coop.Core.Common.Configuration;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using System.Threading;
 
 namespace Coop.Core.Common;
 
@@ -38,7 +39,7 @@ public abstract class CommonModule : Module
         #endregion
 
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
-        builder.RegisterType<GameThreadSession>().As<IGameThreadSession>().InstancePerLifetimeScope();
+        builder.Register(_ => new CancellationTokenSource()).InstancePerLifetimeScope();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 
         builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().InstancePerLifetimeScope();

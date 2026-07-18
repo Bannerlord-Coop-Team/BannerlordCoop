@@ -152,9 +152,7 @@ public class MapTimeTrackerInterfaceTests
     {
         var tracker = CreateSynchronizedTracker();
         Assert.False(tracker.BeginCorrection(110L, 1000L));
-
         tracker.ResetForCampaignJoin();
-
         Assert.True(tracker.BeginCorrection(120L, 1000L));
         Assert.True(tracker.TryConsumeHardSync(out long serverTicks));
         Assert.Equal(120L, serverTicks);
@@ -164,120 +162,73 @@ public class MapTimeTrackerInterfaceTests
     public void ResetForCampaignJoin_DropsHeartbeatsUntilJoinBaseline()
     {
         var tracker = CreateSynchronizedTracker();
-
         tracker.ResetForCampaignJoin();
         tracker.SyncCampaignTime(120L, 0f);
-
-        Assert.False(tracker.TryConsumeHardSync(out _));
-    }
-
-    [Fact]
-    public void CompleteCampaignJoinBaseline_NextHeartbeatDoesNotHardSyncAgain()
-    {
-        var tracker = CreateSynchronizedTracker();
-        tracker.ResetForCampaignJoin();
-        tracker.CompleteCampaignJoinBaseline(120L);
-
-        Assert.False(tracker.BeginCorrection(130L, 1000L));
         Assert.False(tracker.TryConsumeHardSync(out _));
     }
 
     [Fact]
     public void CompleteCampaignJoinBaseline_WaitsForPostBaselineHeartbeatBeforeCompletingJoin()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.ResetForCampaignJoin();
-        tracker.CompleteCampaignJoinBaseline(120L);
-
-        Assert.False(tracker.TryCompleteCampaignJoinCatchUp(120L, 10L, out bool refreshRequired));
-        Assert.False(refreshRequired);
-
+        var tracker = CreateJoinTracker(120L);
+        AssertJoinStatus(tracker, 120L, 10L, false, false);
         tracker.BeginCorrection(130L, 1000L);
-
-        Assert.True(tracker.TryCompleteCampaignJoinCatchUp(130L, 10L, out refreshRequired));
-        Assert.False(refreshRequired);
+        AssertJoinStatus(tracker, 130L, 10L, true, false);
     }
 
     [Fact]
     public void CompleteCampaignJoinBaseline_ExcessivelyStaleHeartbeatRequestsRefreshImmediately()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.ResetForCampaignJoin();
-        tracker.CompleteCampaignJoinBaseline(100L);
+        var tracker = CreateJoinTracker(100L);
         for (int frame = 0; frame < 5; frame++)
         {
             tracker.GetTickCorrection(10L, 0.05f);
         }
-
         tracker.BeginCorrection(1000L, 10000L);
-
-        Assert.True(tracker.TryCompleteCampaignJoinCatchUp(100L, 10L, out bool refreshRequired));
-        Assert.True(refreshRequired);
+        AssertJoinStatus(tracker, 100L, 10L, true, true);
     }
 
     [Fact]
     public void CompleteCampaignJoinBaseline_FixedTransitDelayCatchesUpWithoutAnotherRefresh()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.ResetForCampaignJoin();
-        tracker.CompleteCampaignJoinBaseline(100L);
+        var tracker = CreateJoinTracker(100L);
         tracker.GetTickCorrection(10L, 0.1f);
-
         tracker.BeginCorrection(200L, 1000L);
-
-        Assert.False(tracker.TryCompleteCampaignJoinCatchUp(110L, 10L, out bool refreshRequired));
-        Assert.False(refreshRequired);
-        Assert.True(tracker.TryCompleteCampaignJoinCatchUp(200L, 10L, out refreshRequired));
-        Assert.False(refreshRequired);
+        AssertJoinStatus(tracker, 110L, 10L, false, false);
+        AssertJoinStatus(tracker, 200L, 10L, true, false);
     }
 
     [Fact]
     public void CompleteCampaignJoinBaseline_PausedClientRequestsRefreshInsteadOfWaiting()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.ResetForCampaignJoin();
-        tracker.CompleteCampaignJoinBaseline(100L);
+        var tracker = CreateJoinTracker(100L);
         tracker.GetTickCorrection(10L, 0.1f);
         tracker.BeginCorrection(200L, 1000L);
-
-        Assert.False(tracker.TryCompleteCampaignJoinCatchUp(110L, 0L, out bool refreshRequired));
-        Assert.False(refreshRequired);
-
+        AssertJoinStatus(tracker, 110L, 0L, false, false);
         tracker.BeginCorrection(200L, 1000L);
-
-        Assert.True(tracker.TryCompleteCampaignJoinCatchUp(110L, 0L, out refreshRequired));
-        Assert.True(refreshRequired);
+        AssertJoinStatus(tracker, 110L, 0L, true, true);
     }
 
     [Fact]
     public void CompleteCampaignJoinBaseline_IgnoresHeartbeatOlderThanBaseline()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.ResetForCampaignJoin();
-        tracker.CompleteCampaignJoinBaseline(200L);
-
+        var tracker = CreateJoinTracker(200L);
         Assert.False(tracker.BeginCorrection(190L, 1000L));
-        Assert.False(tracker.TryCompleteCampaignJoinCatchUp(200L, 10L, out bool refreshRequired));
-        Assert.False(refreshRequired);
+        AssertJoinStatus(tracker, 200L, 10L, false, false);
         Assert.False(tracker.TryConsumeHardSync(out _));
 
         Assert.False(tracker.BeginCorrection(210L, 1000L));
-        Assert.True(tracker.TryCompleteCampaignJoinCatchUp(210L, 10L, out refreshRequired));
-        Assert.False(refreshRequired);
+        AssertJoinStatus(tracker, 210L, 10L, true, false);
         Assert.False(tracker.TryConsumeHardSync(out _));
     }
 
     [Fact]
     public void CompleteCampaignJoinBaseline_NormalCorrectionResumesAfterCurrentHeartbeat()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.ResetForCampaignJoin();
-        tracker.CompleteCampaignJoinBaseline(200L);
-
+        var tracker = CreateJoinTracker(200L);
         Assert.False(tracker.BeginCorrection(210L, 100L));
         Assert.False(tracker.TryConsumeHardSync(out _));
-        Assert.True(tracker.TryCompleteCampaignJoinCatchUp(210L, 10L, out bool refreshRequired));
-        Assert.False(refreshRequired);
+        AssertJoinStatus(tracker, 210L, 10L, true, false);
 
         Assert.True(tracker.BeginCorrection(1000L, 100L));
         Assert.True(tracker.TryConsumeHardSync(out long serverTicks));
@@ -287,14 +238,10 @@ public class MapTimeTrackerInterfaceTests
     [Fact]
     public void CompleteCampaignJoinBaseline_ForwardDiscontinuityRequestsRefreshWithoutHardSync()
     {
-        var tracker = CreateSynchronizedTracker();
-        tracker.ResetForCampaignJoin();
-        tracker.CompleteCampaignJoinBaseline(100L);
-
+        var tracker = CreateJoinTracker(100L);
         Assert.False(tracker.BeginCorrection(2000L, 100L));
         Assert.False(tracker.TryConsumeHardSync(out _));
-        Assert.True(tracker.TryCompleteCampaignJoinCatchUp(100L, 10L, out bool refreshRequired));
-        Assert.True(refreshRequired);
+        AssertJoinStatus(tracker, 100L, 10L, true, true);
     }
 
     [Fact]
@@ -345,5 +292,25 @@ public class MapTimeTrackerInterfaceTests
 
         tracker.BeginCorrection(150L, 1000L);
         return tracker;
+    }
+
+    private static MapTimeTrackerInterface CreateJoinTracker(long baselineTicks)
+    {
+        var tracker = CreateSynchronizedTracker();
+        tracker.ResetForCampaignJoin();
+        tracker.CompleteCampaignJoinBaseline(baselineTicks);
+        return tracker;
+    }
+
+    private static void AssertJoinStatus(
+        MapTimeTrackerInterface tracker,
+        long localTicks,
+        long localDeltaTicks,
+        bool expectedComplete,
+        bool expectedRefresh)
+    {
+        Assert.Equal(expectedComplete,
+            tracker.TryCompleteCampaignJoinCatchUp(localTicks, localDeltaTicks, out bool refreshRequired));
+        Assert.Equal(expectedRefresh, refreshRequired);
     }
 }

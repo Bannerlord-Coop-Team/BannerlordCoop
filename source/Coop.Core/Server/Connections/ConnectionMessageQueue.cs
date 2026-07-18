@@ -51,20 +51,13 @@ public interface IConnectionMessageQueue
     /// </summary>
     void BeginQueueing(NetPeer peer);
 
-    /// <summary>
-    /// Replays everything currently held for a peer while keeping later broadcasts queued.
-    /// </summary>
+    /// <summary>Replays held packets while keeping later broadcasts queued.</summary>
     void Flush(NetPeer peer);
 
-    /// <summary>
-    /// Gets the join work still held by this gate plus the peer's reliable world-channel backlog.
-    /// Returns <c>false</c> before queueing starts and after catch-up has completed.
-    /// </summary>
+    /// <summary>Gets the gate and reliable-channel backlog while catch-up is active.</summary>
     bool TryGetCatchUpPacketsRemaining(NetPeer peer, out int packetsRemaining);
 
-    /// <summary>
-    /// Replays everything held for a peer, appends a reliable marker, and opens the peer atomically.
-    /// </summary>
+    /// <summary>Replays held packets, appends a reliable marker, and opens the peer atomically.</summary>
     void OpenWithTail(NetPeer peer, IMessage tailMarker);
 
     /// <summary>Stops progress tracking after the client applies the ordered join tail.</summary>

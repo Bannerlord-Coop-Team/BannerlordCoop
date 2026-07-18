@@ -47,13 +47,9 @@ public class CampaignTimePacketHandler : IPacketHandler
         var timePacket = (CampaignTimePacket)packet;
         UpdateOneWayLatencyEstimate(peer);
         mapTimeTrackerInterface.SyncCampaignTime(timePacket.ServerTicks, oneWayLatencySeconds);
-        messageBroker.Publish(this, new CampaignTimeSampleReceived());
-        if (timePacket.JoinPacketsRemaining >= 0)
-        {
-            messageBroker.Publish(
-                this,
-                new JoinCatchUpProgressReceived(timePacket.JoinPacketsRemaining));
-        }
+        messageBroker.Publish(
+            this,
+            new CampaignTimeSampleReceived(timePacket.JoinPacketsRemaining));
     }
 
     private void Handle_NetworkConnected(MessagePayload<NetworkConnected> obj)

@@ -26,7 +26,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     protected readonly ICommonSerializer serializer;
 
     private readonly Poller poller;
-    private readonly IGameThreadSession gameThreadSession;
+    private readonly CancellationTokenSource sessionCancellation;
     private int pollerStarted;
 
     // Profiles outbound packets; dumps per-type counts and byte totals every 10 seconds (server only).
@@ -40,11 +40,11 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     protected CoopNetworkBase(
         INetworkConfig configuration,
         ICommonSerializer serializer,
-        IGameThreadSession gameThreadSession)
+        CancellationTokenSource sessionCancellation)
     {
         Config = configuration;
         this.serializer = serializer;
-        this.gameThreadSession = gameThreadSession;
+        this.sessionCancellation = sessionCancellation;
 
         netManager = new NetManager(this)
         {
@@ -63,20 +63,20 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         // surface it (plus ping) in every profile dump to make congestion visible in the log.
         packetProfiler.ExtraStatsProvider = DescribePeerQueues;
 
-        poller = new Poller(UpdateWithinGameThreadSession, Config.NetworkPollInterval);
+        poller = new Poller(UpdateWithinSession, Config.NetworkPollInterval);
     }
 
-    private void UpdateWithinGameThreadSession(TimeSpan frameTime)
+    private void UpdateWithinSession(TimeSpan frameTime)
     {
-        using (gameThreadSession.Activate())
+        using (GameThread.ActivateCancellation(sessionCancellation.Token))
         {
-            if (gameThreadSession.IsActive == false) return;
+            if (sessionCancellation.IsCancellationRequested) return;
 
             try
             {
                 Update(frameTime);
             }
-            catch (OperationCanceledException) when (gameThreadSession.IsActive == false)
+            catch (OperationCanceledException) when (sessionCancellation.IsCancellationRequested)
             {
                 // Teardown woke a blocking game-thread marshal in this callback.
             }
@@ -102,7 +102,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         if (Interlocked.Exchange(ref disposed, 1) != 0) return;
 
         // Wake blocking game-thread marshals before waiting for the poll callback to return.
-        gameThreadSession.Cancel();
+        sessionCancellation.Cancel();
         poller.StopAndWait(Timeout.InfiniteTimeSpan);
         packetProfiler.Dispose();
         netManager.Stop();

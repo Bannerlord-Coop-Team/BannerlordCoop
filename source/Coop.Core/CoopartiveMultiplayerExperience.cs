@@ -461,28 +461,20 @@ namespace Coop.Core
         {
             int startGeneration = Interlocked.Increment(ref coopStartGeneration);
             coopStarting = true;
-            var gameThreadSession = container.Resolve<IGameThreadSession>();
+            CancellationToken sessionCancellation = container.Resolve<CancellationTokenSource>().Token;
 
             Task.Factory.StartNew(() =>
             {
-                using (gameThreadSession.Activate())
+                using (GameThread.ActivateCancellation(sessionCancellation))
                 {
-                    if (gameThreadSession.IsActive == false)
-                    {
-                        CompleteCoopStart(startGeneration);
-                        return;
-                    }
+                    if (CompleteCanceledStart(sessionCancellation, startGeneration)) return;
 
                     try
                     {
                         // Teardown must not dispose the scope while patching is still binding handlers.
                         lock (containerGate)
                         {
-                            if (gameThreadSession.IsActive == false)
-                            {
-                                CompleteCoopStart(startGeneration);
-                                return;
-                            }
+                            if (CompleteCanceledStart(sessionCancellation, startGeneration)) return;
 
                             gameInterface.PatchAll();
                         }
@@ -495,17 +487,13 @@ namespace Coop.Core
                         return;
                     }
 
-                    if (gameThreadSession.IsActive == false)
-                    {
-                        CompleteCoopStart(startGeneration);
-                        return;
-                    }
+                    if (CompleteCanceledStart(sessionCancellation, startGeneration)) return;
 
                     GameThread.RunSafe(() =>
                     {
                         lock (containerGate)
                         {
-                            if (gameThreadSession.IsActive == false ||
+                            if (sessionCancellation.IsCancellationRequested ||
                                 Volatile.Read(ref coopStartGeneration) != startGeneration)
                             {
                                 CompleteCoopStart(startGeneration);
@@ -529,6 +517,14 @@ namespace Coop.Core
                     });
                 }
             }, TaskCreationOptions.LongRunning);
+        }
+
+        private bool CompleteCanceledStart(CancellationToken cancellation, int startGeneration)
+        {
+            if (!cancellation.IsCancellationRequested) return false;
+
+            CompleteCoopStart(startGeneration);
+            return true;
         }
 
         private void CompleteCoopStart(int startGeneration)
@@ -627,7 +623,7 @@ namespace Coop.Core
 
             try
             {
-                oldContainer.Resolve<IGameThreadSession>().Cancel();
+                oldContainer.Resolve<CancellationTokenSource>().Cancel();
                 oldContainer.Resolve<INetwork>().Dispose();
                 oldContainer.Resolve<IGameInterface>().UnpatchAll();
             }

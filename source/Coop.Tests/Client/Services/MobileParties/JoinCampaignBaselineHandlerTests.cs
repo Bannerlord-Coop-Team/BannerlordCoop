@@ -32,21 +32,7 @@ public class JoinCampaignBaselineHandlerTests
     [Fact]
     public void CompleteBaseline_AppliesAllPartyStateBeforePublishingSuccess()
     {
-        var partyStates = new[]
-        {
-            new MobilePartyJoinState
-            {
-                Behavior = new PartyBehaviorUpdateData(
-                    "main_party",
-                    default,
-                    null,
-                    default,
-                    default,
-                    default,
-                    default,
-                    default),
-            },
-        };
+        var partyStates = new[] { new MobilePartyJoinState() };
         bool timeApplied = false;
         bool partyStateApplied = false;
         mapTimeTracker
@@ -67,58 +53,42 @@ public class JoinCampaignBaselineHandlerTests
             Assert.True(payload.What.Success);
         });
 
-        messageBroker.Publish(
-            this,
-            new NetworkJoinCampaignBaseline(123456L, partyStates));
-        GameThread.Run(() => { }, blocking: true);
+        var applied = Apply(new NetworkJoinCampaignBaseline(123456L, partyStates));
 
         mapTimeTracker.Verify(tracker => tracker.ApplyCampaignJoinBaseline(123456L), Times.Once);
         mobilePartyBehaviorSnapshot.Verify(
             snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()),
             Times.Once);
-        var applied = Assert.Single(messageBroker.GetMessagesFromType<JoinCampaignBaselineApplied>());
         Assert.True(applied.Success);
     }
 
-    [Fact]
-    public void IncompleteBaseline_PublishesFailureWithoutApplyingState()
-    {
-        var partyStates = Array.Empty<MobilePartyJoinState>();
-
-        messageBroker.Publish(
-            this,
-            new NetworkJoinCampaignBaseline(123456L, partyStates, isComplete: false));
-        GameThread.Run(() => { }, blocking: true);
-
-        mobilePartyBehaviorSnapshot.Verify(
-            snapshot => snapshot.TryApplyJoinBaseline(
-                It.IsAny<MobilePartyJoinState[]>(),
-                It.IsAny<Action>()),
-            Times.Never);
-        mapTimeTracker.Verify(
-            tracker => tracker.ApplyCampaignJoinBaseline(It.IsAny<long>()),
-            Times.Never);
-        var applied = Assert.Single(messageBroker.GetMessagesFromType<JoinCampaignBaselineApplied>());
-        Assert.False(applied.Success);
-    }
-
-    [Fact]
-    public void RejectedPartyState_PublishesFailureWithoutApplyingTime()
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public void IncompleteOrRejectedBaseline_PublishesFailureWithoutApplyingTime(
+        bool isComplete,
+        int expectedApplyAttempts)
     {
         var partyStates = Array.Empty<MobilePartyJoinState>();
         mobilePartyBehaviorSnapshot
             .Setup(snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()))
             .Returns(false);
 
-        messageBroker.Publish(
-            this,
-            new NetworkJoinCampaignBaseline(123456L, partyStates));
-        GameThread.Run(() => { }, blocking: true);
+        var applied = Apply(new NetworkJoinCampaignBaseline(123456L, partyStates, isComplete));
 
+        mobilePartyBehaviorSnapshot.Verify(
+            snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()),
+            Times.Exactly(expectedApplyAttempts));
         mapTimeTracker.Verify(
             tracker => tracker.ApplyCampaignJoinBaseline(It.IsAny<long>()),
             Times.Never);
-        var applied = Assert.Single(messageBroker.GetMessagesFromType<JoinCampaignBaselineApplied>());
         Assert.False(applied.Success);
+    }
+
+    private JoinCampaignBaselineApplied Apply(NetworkJoinCampaignBaseline baseline)
+    {
+        messageBroker.Publish(this, baseline);
+        GameThread.Run(() => { }, blocking: true);
+        return Assert.Single(messageBroker.GetMessagesFromType<JoinCampaignBaselineApplied>());
     }
 }

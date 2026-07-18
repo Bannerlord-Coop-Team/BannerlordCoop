@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Serialization;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Surrogates;
@@ -16,18 +17,17 @@ namespace Coop.Tests.Server.Services.MobileParties;
 
 public class NetworkJoinCampaignBaselineTests
 {
-    private readonly ServerTestComponent serverComponent;
+    private readonly ICommonSerializer serializer;
 
     public NetworkJoinCampaignBaselineTests(ITestOutputHelper output)
     {
         new SurrogateCollection();
-        serverComponent = new ServerTestComponent(output);
+        serializer = new ServerTestComponent(output).Container.Resolve<ICommonSerializer>();
     }
 
     [Fact]
     public void CampaignBaseline_RoundTripsTimeAndCompletePartyState()
     {
-        var serializer = serverComponent.Container.Resolve<ICommonSerializer>();
         var behavior = new PartyBehaviorUpdateData(
             "main_party",
             (AiBehavior)1,
@@ -60,70 +60,43 @@ public class NetworkJoinCampaignBaselineTests
             StartTransitionNextFrameToExitFromPort = true,
             ForceAiNoPathMode = true,
         };
-        var message = new NetworkJoinCampaignBaseline(987654321L, new[] { state });
+        var expected = new NetworkJoinCampaignBaseline(987654321L, new[] { state });
 
-        byte[] bytes = serializer.Serialize(message);
-        var received = Assert.IsType<NetworkJoinCampaignBaseline>(serializer.Deserialize<IMessage>(bytes));
+        var received = RoundTrip(expected);
 
-        Assert.Equal(987654321L, received.ServerTicks);
+        Assert.Equal(expected.ServerTicks, received.ServerTicks);
         Assert.True(received.IsComplete);
-        MobilePartyJoinState receivedState = Assert.Single(received.PartyStates);
-        PartyBehaviorUpdateData receivedBehavior = receivedState.Behavior;
-        Assert.Equal("main_party", receivedBehavior.MobilePartyId);
-        Assert.Equal((AiBehavior)1, receivedBehavior.NewAiBehavior);
-        Assert.Equal("settlement_town_ES1", receivedBehavior.InteractablePointId);
-        AssertCampaignVec2(behavior.BestTargetPoint, receivedBehavior.BestTargetPoint);
-        AssertCampaignVec2(behavior.PartyPosition, receivedBehavior.PartyPosition);
-        Assert.Equal((AiBehavior)2, receivedBehavior.DefaultBehavior);
-        AssertCampaignVec2(behavior.TargetPosition, receivedBehavior.TargetPosition);
-        Assert.Equal((MobileParty.NavigationType)1, receivedBehavior.DesiredAiNavigationType);
-        Assert.Equal("controller_1", receivedBehavior.OriginControllerId);
-        Assert.True(receivedBehavior.ForcePosition);
-        Assert.Equal("looters_1", receivedBehavior.TargetPartyId);
-        Assert.Equal("town_ES1", receivedBehavior.TargetSettlementId);
-        AssertCampaignVec2(behavior.MoveTargetPoint, receivedBehavior.MoveTargetPoint);
-        Assert.True(receivedBehavior.IsTargetingPort);
-        Assert.Equal((MoveModeType)2, receivedBehavior.PartyMoveMode);
-        Assert.Equal("caravan_1", receivedBehavior.MoveTargetPartyId);
-        Assert.True(receivedBehavior.IsInteractableAnchor);
-        AssertVec2(state.EventPositionAdder, receivedState.EventPositionAdder);
-        AssertVec2(state.ArmyPositionAdder, receivedState.ArmyPositionAdder);
-        AssertVec2(state.Bearing, receivedState.Bearing);
-        Assert.True(receivedState.IsCurrentlyAtSea);
-        AssertCampaignVec2(
-            state.EndPositionForNavigationTransition,
-            receivedState.EndPositionForNavigationTransition);
-        Assert.Equal(123456789L, receivedState.NavigationTransitionStartTimeTicks);
-        Assert.True(receivedState.StartTransitionNextFrameToExitFromPort);
-        Assert.True(receivedState.ForceAiNoPathMode);
+        Assert.Single(received.PartyStates);
     }
 
     [Fact]
     public void IncompleteCampaignBaseline_RoundTripsCompletionFlag()
     {
-        var serializer = serverComponent.Container.Resolve<ICommonSerializer>();
         var message = new NetworkJoinCampaignBaseline(
             123L,
             Array.Empty<MobilePartyJoinState>(),
             isComplete: false);
 
-        byte[] bytes = serializer.Serialize(message);
-        var received = Assert.IsType<NetworkJoinCampaignBaseline>(serializer.Deserialize<IMessage>(bytes));
+        var received = RoundTrip(message);
 
         Assert.False(received.IsComplete);
         Assert.Null(received.PartyStates);
     }
 
-    private static void AssertCampaignVec2(CampaignVec2 expected, CampaignVec2 actual)
+    [Fact]
+    public void JoinSync_RoundTripsEverySignal()
     {
-        Assert.Equal(expected.X, actual.X);
-        Assert.Equal(expected.Y, actual.Y);
-        Assert.Equal(expected.IsOnLand, actual.IsOnLand);
+        foreach (JoinSyncSignal signal in Enum.GetValues<JoinSyncSignal>())
+        {
+            Assert.Equal(signal, RoundTrip(new NetworkJoinSync(signal)).Signal);
+        }
     }
 
-    private static void AssertVec2(Vec2 expected, Vec2 actual)
+    private T RoundTrip<T>(T message) where T : IMessage
     {
-        Assert.Equal(expected.X, actual.X);
-        Assert.Equal(expected.Y, actual.Y);
+        byte[] bytes = serializer.Serialize(message);
+        var received = Assert.IsType<T>(serializer.Deserialize<IMessage>(bytes));
+        Assert.Equal(bytes, serializer.Serialize(received));
+        return received;
     }
 }

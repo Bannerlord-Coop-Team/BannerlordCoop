@@ -15,6 +15,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 
 namespace Coop.Core.Client;
 
@@ -46,7 +47,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         IPacketManager packetManager,
         IMessagePacketHandler messagePacketHandler,
         ICommonSerializer serializer,
-        IGameThreadSession gameThreadSession) : base(config, serializer, gameThreadSession)
+        CancellationTokenSource sessionCancellation) : base(config, serializer, sessionCancellation)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;

@@ -19,6 +19,7 @@ using Serilog;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 
 namespace Coop.Core.Server;
 
@@ -63,7 +64,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ISendCoalescer coalescer,
         ICommonSerializer serializer,
-        IGameThreadSession gameThreadSession) : base(configuration, serializer, gameThreadSession)
+        CancellationTokenSource sessionCancellation) : base(configuration, serializer, sessionCancellation)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;

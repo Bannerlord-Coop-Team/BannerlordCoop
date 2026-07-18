@@ -8,25 +8,30 @@ using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.States;
 
-/// <summary>
-/// State representing a connection loading
-/// </summary>
+/// <summary>State representing a connection loading the campaign.</summary>
 public class LoadingState : ConnectionStateBase
 {
+    private enum JoinPhase
+    {
+        WaitingForCampaignEntry,
+        CampaignEntryQueued,
+        WaitingForReplayApplied,
+        InitialBaselineQueued,
+        WaitingForInitialBaseline,
+        FinalBaselineQueued,
+        WaitingForFinalBaseline,
+        WorldReadyQueued,
+        WaitingForCatchUpApplied,
+        CatchUpAppliedQueued,
+    }
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IJoinCampaignBaselineSender campaignBaselineSender;
     private readonly IConnectionMessageQueue connectionMessageQueue;
     private readonly ISendCoalescer coalescer;
-    private bool campaignEntryQueued;
-    private volatile bool replayMarkerSent;
-    private volatile bool baselineSendQueued;
-    private volatile int initialBaselinesSent;
-    private volatile int finalBaselinesSent;
-    private volatile bool finalBaselinePhase;
-    private bool finalBarrierQueued;
-    private volatile bool worldReadySent;
-    private bool catchUpAppliedQueued;
+    private volatile JoinPhase phase;
+    private int initialBaselinesSent;
 
     public LoadingState(
         IConnectionLogic connectionLogic,
@@ -44,11 +49,7 @@ public class LoadingState : ConnectionStateBase
         this.coalescer = coalescer;
 
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-        messageBroker.Subscribe<NetworkJoinReplayApplied>(JoinReplayAppliedHandler);
-        messageBroker.Subscribe<NetworkJoinCampaignBaselineRequested>(JoinCampaignBaselineRequestedHandler);
-        messageBroker.Subscribe<NetworkJoinCampaignBaselineApplied>(JoinCampaignBaselineAppliedHandler);
-        messageBroker.Subscribe<NetworkJoinFinalCampaignBaselineApplied>(JoinFinalCampaignBaselineAppliedHandler);
-        messageBroker.Subscribe<NetworkJoinCatchUpApplied>(JoinCatchUpAppliedHandler);
+        messageBroker.Subscribe<NetworkJoinSync>(JoinSyncHandler);
     }
 
     public override bool IsLoading => true;
@@ -56,151 +57,102 @@ public class LoadingState : ConnectionStateBase
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-        messageBroker.Unsubscribe<NetworkJoinReplayApplied>(JoinReplayAppliedHandler);
-        messageBroker.Unsubscribe<NetworkJoinCampaignBaselineRequested>(JoinCampaignBaselineRequestedHandler);
-        messageBroker.Unsubscribe<NetworkJoinCampaignBaselineApplied>(JoinCampaignBaselineAppliedHandler);
-        messageBroker.Unsubscribe<NetworkJoinFinalCampaignBaselineApplied>(JoinFinalCampaignBaselineAppliedHandler);
-        messageBroker.Unsubscribe<NetworkJoinCatchUpApplied>(JoinCatchUpAppliedHandler);
+        messageBroker.Unsubscribe<NetworkJoinSync>(JoinSyncHandler);
     }
 
-    internal void PlayerCampaignEnteredHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
+    internal void PlayerCampaignEnteredHandler(MessagePayload<NetworkPlayerCampaignEntered> payload)
     {
-        var playerId = (NetPeer)obj.Who;
+        var peer = (NetPeer)payload.Who;
+        if (peer != ConnectionLogic.Peer || phase != JoinPhase.WaitingForCampaignEntry) return;
 
-        if (playerId != ConnectionLogic.Peer || campaignEntryQueued) return;
-
-        campaignEntryQueued = true;
+        phase = JoinPhase.CampaignEntryQueued;
         GameThread.RunSafe(() =>
         {
-            if (ReferenceEquals(ConnectionLogic.State, this) == false) return;
+            if (!IsCurrent(JoinPhase.CampaignEntryQueued)) return;
 
-            messageBroker.Publish(this, new PlayerCampaignEntered(playerId));
-            connectionMessageQueue.Flush(playerId);
-            replayMarkerSent = true;
-            network.SendImmediate(playerId, new NetworkJoinReplayComplete());
+            messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+            connectionMessageQueue.Flush(peer);
+            phase = JoinPhase.WaitingForReplayApplied;
+            network.SendImmediate(peer, new NetworkJoinSync(JoinSyncSignal.ReplayComplete));
         }, context: nameof(PlayerCampaignEnteredHandler));
     }
 
-    internal void JoinReplayAppliedHandler(MessagePayload<NetworkJoinReplayApplied> obj)
+    internal void JoinSyncHandler(MessagePayload<NetworkJoinSync> payload)
     {
-        var playerId = (NetPeer)obj.Who;
-        if (playerId != ConnectionLogic.Peer || !replayMarkerSent || initialBaselinesSent != 0) return;
+        var peer = (NetPeer)payload.Who;
+        if (peer != ConnectionLogic.Peer) return;
 
-        QueueBaseline(
-            playerId,
-            isFinalBaseline: false,
-            context: nameof(JoinReplayAppliedHandler));
-    }
-
-    internal void JoinCampaignBaselineRequestedHandler(
-        MessagePayload<NetworkJoinCampaignBaselineRequested> obj)
-    {
-        var playerId = (NetPeer)obj.Who;
-        if (playerId != ConnectionLogic.Peer ||
-            initialBaselinesSent == 0 ||
-            finalBarrierQueued)
+        switch (payload.What.Signal)
         {
-            return;
+            case JoinSyncSignal.ReplayApplied when phase == JoinPhase.WaitingForReplayApplied:
+                QueueBaseline(peer, isFinal: false, nameof(JoinSyncSignal.ReplayApplied));
+                break;
+            case JoinSyncSignal.BaselineRequested when phase == JoinPhase.WaitingForInitialBaseline:
+                QueueBaseline(peer, isFinal: false, nameof(JoinSyncSignal.BaselineRequested));
+                break;
+            case JoinSyncSignal.BaselineRequested when phase == JoinPhase.WaitingForFinalBaseline:
+                QueueBaseline(peer, isFinal: true, nameof(JoinSyncSignal.BaselineRequested));
+                break;
+            case JoinSyncSignal.BaselineApplied
+                when phase == JoinPhase.WaitingForInitialBaseline && initialBaselinesSent >= 2:
+                QueueBaseline(peer, isFinal: true, nameof(JoinSyncSignal.BaselineApplied));
+                break;
+            case JoinSyncSignal.FinalBaselineApplied when phase == JoinPhase.WaitingForFinalBaseline:
+                QueueWorldReady(peer);
+                break;
+            case JoinSyncSignal.CatchUpApplied when phase == JoinPhase.WaitingForCatchUpApplied:
+                QueueCampaignEntry(peer);
+                break;
         }
-
-        QueueBaseline(
-            playerId,
-            isFinalBaseline: finalBaselinePhase,
-            context: nameof(JoinCampaignBaselineRequestedHandler));
     }
 
-    private void QueueBaseline(NetPeer playerId, bool isFinalBaseline, string context)
+    private void QueueBaseline(NetPeer peer, bool isFinal, string context)
     {
-        if (baselineSendQueued || finalBarrierQueued) return;
+        JoinPhase queued = isFinal ? JoinPhase.FinalBaselineQueued : JoinPhase.InitialBaselineQueued;
+        JoinPhase waiting = isFinal ? JoinPhase.WaitingForFinalBaseline : JoinPhase.WaitingForInitialBaseline;
+        phase = queued;
 
-        baselineSendQueued = true;
         GameThread.RunSafe(() =>
         {
-            if (ReferenceEquals(ConnectionLogic.State, this) == false)
-            {
-                baselineSendQueued = false;
-                return;
-            }
+            if (!IsCurrent(queued)) return;
 
             coalescer.Flush(network);
-            connectionMessageQueue.Flush(playerId);
-            if (isFinalBaseline)
-            {
-                finalBaselinesSent++;
-            }
-            else
-            {
-                initialBaselinesSent++;
-            }
-            baselineSendQueued = false;
-            campaignBaselineSender.Send(playerId);
+            connectionMessageQueue.Flush(peer);
+            if (!isFinal) initialBaselinesSent++;
+            phase = waiting;
+            campaignBaselineSender.Send(peer);
         }, context: context);
     }
 
-    internal void JoinCampaignBaselineAppliedHandler(
-        MessagePayload<NetworkJoinCampaignBaselineApplied> obj)
+    private void QueueWorldReady(NetPeer peer)
     {
-        var playerId = (NetPeer)obj.Who;
-        if (playerId != ConnectionLogic.Peer ||
-            initialBaselinesSent < 2 ||
-            baselineSendQueued ||
-            finalBaselinePhase ||
-            finalBarrierQueued)
-        {
-            return;
-        }
-
-        finalBaselinePhase = true;
-        QueueBaseline(
-            playerId,
-            isFinalBaseline: true,
-            context: nameof(JoinCampaignBaselineAppliedHandler));
-    }
-
-    internal void JoinFinalCampaignBaselineAppliedHandler(
-        MessagePayload<NetworkJoinFinalCampaignBaselineApplied> obj)
-    {
-        var playerId = (NetPeer)obj.Who;
-        if (playerId != ConnectionLogic.Peer ||
-            !finalBaselinePhase ||
-            finalBaselinesSent == 0 ||
-            baselineSendQueued ||
-            finalBarrierQueued)
-        {
-            return;
-        }
-
-        finalBarrierQueued = true;
+        phase = JoinPhase.WorldReadyQueued;
         GameThread.RunSafe(() =>
         {
-            if (ReferenceEquals(ConnectionLogic.State, this) == false) return;
+            if (!IsCurrent(JoinPhase.WorldReadyQueued)) return;
 
             coalescer.Flush(network);
-            worldReadySent = true;
-            connectionMessageQueue.OpenWithTail(playerId, new NetworkJoinWorldReady());
-        }, context: nameof(JoinFinalCampaignBaselineAppliedHandler));
+            phase = JoinPhase.WaitingForCatchUpApplied;
+            connectionMessageQueue.OpenWithTail(
+                peer,
+                new NetworkJoinSync(JoinSyncSignal.WorldReady));
+        }, context: nameof(JoinSyncSignal.FinalBaselineApplied));
     }
 
-    internal void JoinCatchUpAppliedHandler(MessagePayload<NetworkJoinCatchUpApplied> obj)
+    private void QueueCampaignEntry(NetPeer peer)
     {
-        var playerId = (NetPeer)obj.Who;
-
-        if (playerId != ConnectionLogic.Peer ||
-            !worldReadySent ||
-            catchUpAppliedQueued)
-        {
-            return;
-        }
-
-        catchUpAppliedQueued = true;
+        phase = JoinPhase.CatchUpAppliedQueued;
         GameThread.RunSafe(() =>
         {
-            if (ReferenceEquals(ConnectionLogic.State, this) == false) return;
+            if (!IsCurrent(JoinPhase.CatchUpAppliedQueued)) return;
 
-            connectionMessageQueue.CompleteCatchUp(playerId);
+            connectionMessageQueue.CompleteCatchUp(peer);
             ConnectionLogic.EnterCampaign();
-        }, context: nameof(JoinCatchUpAppliedHandler));
+        }, context: nameof(JoinSyncSignal.CatchUpApplied));
     }
+
+    private bool IsCurrent(JoinPhase expected) =>
+        ReferenceEquals(ConnectionLogic.State, this) && phase == expected;
 
     public override void CreateCharacter()
     {
@@ -214,10 +166,7 @@ public class LoadingState : ConnectionStateBase
     {
     }
 
-    public override void EnterCampaign()
-    {
-        ConnectionLogic.SetState<CampaignState>();
-    }
+    public override void EnterCampaign() => ConnectionLogic.SetState<CampaignState>();
 
     public override void EnterMission()
     {

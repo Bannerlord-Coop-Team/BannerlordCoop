@@ -138,7 +138,7 @@ public class ConnectionMessageQueueTests
         Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int draining));
         Assert.Equal(5, draining);
 
-        queue.OpenWithTail(peer, new NetworkJoinWorldReady());
+        queue.OpenWithTail(peer, new NetworkJoinSync(JoinSyncSignal.WorldReady));
         Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int opened));
         Assert.Equal(5, opened);
 
@@ -184,7 +184,7 @@ public class ConnectionMessageQueueTests
         Assert.True(queue.TryHandleBroadcast(peer, held));
         Assert.True(NothingSentTo(peer));
 
-        var marker = new NetworkJoinWorldReady();
+        var marker = new NetworkJoinSync(JoinSyncSignal.WorldReady);
         queue.OpenWithTail(peer, marker);
 
         Assert.Equal(new object[] { held, marker }, network.GetPeerPayloads(peer));
@@ -204,7 +204,7 @@ public class ConnectionMessageQueueTests
         var afterFlush = new FakePacket();
         queue.TryHandleBroadcast(peer, afterFlush);
 
-        var marker = new NetworkJoinWorldReady();
+        var marker = new NetworkJoinSync(JoinSyncSignal.WorldReady);
         queue.OpenWithTail(peer, marker);
 
         var live = new FakePacket();
