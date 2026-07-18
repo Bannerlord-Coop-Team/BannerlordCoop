@@ -284,57 +284,50 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
-
-        PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
-            playerParty.StringId, payload.What.MapEventId);
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
+            if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
+
+            PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
+                playerParty.StringId, payload.What.MapEventId);
+
+            // While a live mission or an auto-resolve simulation owns this event, a surrender would
+            // conclude the battle under the players resolving it — refuse it until the claim releases
+            // (mission instance emptied / event finalized). The client menu already refuses the option
+            // while claimed (BattleModeEncounterOptionsPatch); this is the authoritative backstop for
+            // the race where the claim lands between the client's menu refresh and its click.
+            if (ServerBattleModeArbiter.IsClaimed(payload.What.MapEventId))
             {
-                // While a live mission or an auto-resolve simulation owns this event, a surrender would
-                // conclude the battle under the players resolving it — refuse it until the claim releases
-                // (mission instance emptied / event finalized). The client menu already refuses the option
-                // while claimed (BattleModeEncounterOptionsPatch); this is the authoritative backstop for
-                // the race where the claim lands between the client's menu refresh and its click.
-                if (ServerBattleModeArbiter.IsClaimed(payload.What.MapEventId))
-                {
-                    Logger.Information("[PvPEncounterClose] Refused surrender of {PartyId} in {MapEventId}: the event is claimed by an active mission/simulation",
-                        playerParty.StringId, payload.What.MapEventId ?? "<none>");
-                    return;
-                }
-
-                if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
-
-                // While OTHER parties on the surrenderer's side can still fight, DoSurrender below would end
-                // the battle for all of them (it marks the whole side surrendered and hands the other side
-                // the win). Capture just the surrendering party instead and let the battle continue.
-                var side = playerParty.Party.MapEventSide;
-                var hasHealthyAllies = side != null &&
-                    side.Parties.Any(p => p.Party != playerParty.Party && p.Party?.NumberOfHealthyMembers > 0);
-                if (hasHealthyAllies)
-                {
-                    ApplyPartialSurrender(mapEvent, playerParty, surrenderedPartyId);
-                    return;
-                }
-
-                var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
-
-                Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
-                    string.Join(",", playerPartyIds),
-                    surrenderedPartyId ?? "<none>",
-                    payload.What.MapEventId ?? "<none>");
-                PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
-                mapEvent.DoSurrender(playerParty.Party.Side);
-                messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
+                Logger.Information("[PvPEncounterClose] Refused surrender of {PartyId} in {MapEventId}: the event is claimed by an active mission/simulation",
+                    playerParty.StringId, payload.What.MapEventId ?? "<none>");
+                return;
             }
-            catch (Exception ex)
+
+            if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
+
+            // While OTHER parties on the surrenderer's side can still fight, DoSurrender below would end
+            // the battle for all of them (it marks the whole side surrendered and hands the other side
+            // the win). Capture just the surrendering party instead and let the battle continue.
+            var side = playerParty.Party.MapEventSide;
+            var hasHealthyAllies = side != null &&
+                side.Parties.Any(p => p.Party != playerParty.Party && p.Party?.NumberOfHealthyMembers > 0);
+            if (hasHealthyAllies)
             {
-                Logger.Error(ex, "Failed to surrender");
+                ApplyPartialSurrender(mapEvent, playerParty, surrenderedPartyId);
+                return;
             }
-        }, blocking: true);
+
+            var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+
+            Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
+                string.Join(",", playerPartyIds),
+                surrenderedPartyId ?? "<none>",
+                payload.What.MapEventId ?? "<none>");
+            PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
+            mapEvent.DoSurrender(playerParty.Party.Side);
+            messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
+        }, blocking: true, context: nameof(Handle_NetworkPlayerSurrendered));
     }
 
     /// <summary>
