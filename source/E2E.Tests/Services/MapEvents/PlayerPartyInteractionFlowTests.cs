@@ -1529,7 +1529,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 initiatorParty,
                 forcePlayerOutFromSettlement: false,
                 ConversationRestartSource.PlayerEncounter, 
-                armyTalkEncounter: false));
+                armyTalkEncounter: true));
         });
     }
 

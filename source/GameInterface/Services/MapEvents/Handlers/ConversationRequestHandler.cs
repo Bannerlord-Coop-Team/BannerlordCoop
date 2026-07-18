@@ -146,7 +146,8 @@ internal class ConversationRequestHandler : IHandler
                 defenderId,
                 attackerId,
                 request.ForcePlayerOutFromSettlement,
-                request.Source));
+                request.Source,
+                false));
     }
 
     /// <summary>[Server] Validate the request; reply to allow, or stay silent to reject.</summary>

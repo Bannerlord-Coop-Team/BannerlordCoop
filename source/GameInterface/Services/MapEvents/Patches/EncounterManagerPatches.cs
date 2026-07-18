@@ -84,7 +84,8 @@ internal class EncounterManagerPatches
             defenderParty,
             attackerParty,
             forcePlayerOutFromSettlement: false,
-            ConversationRestartSource.EncounterManager));
+            ConversationRestartSource.EncounterManager,
+            armyTalkEncounter: true));
         return true;
     }
 
