@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
@@ -15,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -297,8 +299,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
-        if (ModInformation.IsServer || MissionState.Current != null ||
-            Mission.Current != null || PlayerEncounter.Current != null) return;
+        if (ModInformation.IsServer || MissionState.Current != null || Mission.Current != null) return;
 
         var party = MobileParty.MainParty?.Party;
         var mapEvent = party?.MapEvent;
@@ -306,6 +307,113 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (Campaign.Current?.MapEventManager?.MapEvents.Contains(mapEvent) == true) return;
 
         party._mapEventSide = null;
+        if (!CloseStaleDestroyedEncounter(mapEvent))
+            ClearEngageOrder(party.MobileParty);
+    }
+
+    private void ClearEngageOrder(MobileParty party)
+    {
+        if (party == null)
+            return;
+
+        party.SetMoveModeHold();
+        messageBroker.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
+    }
+
+    private bool CloseStaleDestroyedEncounter(MapEvent mapEvent)
+    {
+        if (PlayerCaptivity.IsCaptive)
+            return false;
+
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
+        {
+            ForceCloseCurrentEncounterMenu();
+            return false;
+        }
+
+        if (!References(encounter, mapEvent))
+            return false;
+
+        if (IsBattleResultEncounter(encounter))
+            return false;
+
+        PlayerEncounter.LeaveEncounter = true;
+        try
+        {
+            PlayerEncounter.Finish(true);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "[PvPEncounterClose] Deferred map event cleanup failed to finish stale encounter");
+        }
+        finally
+        {
+            Campaign.Current.PlayerEncounter = null;
+        }
+
+        ForceCloseCurrentEncounterMenu();
+        return true;
+    }
+
+    private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
+        encounter?._mapEvent == mapEvent ||
+        GetPlayerEncounterBattle() == mapEvent ||
+        GetPlayerEncounterEncounteredBattle() == mapEvent;
+
+    private static bool IsBattleResultEncounter(PlayerEncounter encounter)
+    {
+        switch (encounter.EncounterState)
+        {
+            case PlayerEncounterState.CaptureHeroes:
+            case PlayerEncounterState.FreeHeroes:
+            case PlayerEncounterState.LootParty:
+            case PlayerEncounterState.LootInventory:
+            case PlayerEncounterState.LootShips:
+            case PlayerEncounterState.End:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static MapEvent GetPlayerEncounterBattle()
+    {
+        try
+        {
+            return PlayerEncounter.Battle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static MapEvent GetPlayerEncounterEncounteredBattle()
+    {
+        try
+        {
+            return PlayerEncounter.EncounteredBattle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static void ForceCloseCurrentEncounterMenu()
+    {
+        try
+        {
+            GameMenu.ExitToLast();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[PvPEncounterClose] Deferred map event cleanup failed to exit current menu");
+        }
+
+        if (Campaign.Current?.MapStateData != null)
+            Campaign.Current.MapStateData.GameMenuId = null;
     }
 
     private static void PublishVisual(GauntletMapEventVisual visual, CampaignVec2 position)

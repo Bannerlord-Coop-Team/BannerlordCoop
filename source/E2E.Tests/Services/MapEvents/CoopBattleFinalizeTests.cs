@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -13,6 +13,7 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -155,6 +156,9 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         var successor = Clients.Last();
         MapEvent destroyedMapEvent = null;
         MockMission mission = null;
+        var holdRequests = 0;
+
+        successor.Resolve<IMessageBroker>().Subscribe<PartyBehaviorChangeAttempted>(_ => holdRequests++);
 
         using (var fixture = new MissionEngineFixture())
         {
@@ -163,6 +167,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
                 mission = fixture.CreateMission(successor);
                 Assert.True(successor.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out destroyedMapEvent));
             });
+
+            SetMockPlayerEncounter(successor, mapEventId: ctx.MapEventId);
 
             successor.SimulateMessage(Server, new NetworkDestroyInstance<MapEvent>(ctx.MapEventId));
             successor.SimulateMessage(Server, new NetworkClosePvpEncounter(
@@ -181,7 +187,10 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         {
             successor.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
+            Assert.Null(PlayerEncounter.Current);
         });
+
+        Assert.Equal(1, holdRequests);
     }
 
     [Fact]
