@@ -7,8 +7,7 @@ namespace Common.Network.Coalescing;
 public sealed class SendCoalescer : ISendCoalescer
 {
     private readonly Dictionary<CoalesceKey, ICoalescedPayload> pending = new();
-    private readonly Dictionary<CoalesceKey, CoalescedSendPriority> priorities = new();
-    private readonly SortedDictionary<CoalescedSendPriority, List<CoalesceKey>> orderByPriority = new();
+    private readonly List<CoalesceKey> order = new();
     private readonly object gate = new();
 
     public bool HasPending
@@ -22,10 +21,7 @@ public sealed class SendCoalescer : ISendCoalescer
         }
     }
 
-    public void Enqueue(
-        CoalesceKey key,
-        ICoalescedPayload payload,
-        CoalescedSendPriority priority = CoalescedSendPriority.Normal)
+    public void Enqueue(CoalesceKey key, ICoalescedPayload payload)
     {
         if (payload == null) throw new ArgumentNullException(nameof(payload));
 
@@ -33,23 +29,11 @@ public sealed class SendCoalescer : ISendCoalescer
         {
             if (pending.TryGetValue(key, out var existing))
             {
-                if (priorities[key] != priority)
-                {
-                    throw new InvalidOperationException($"The coalesced key '{key}' was enqueued with different priorities.");
-                }
-
                 pending[key] = existing.Merge(payload);
                 return;
             }
 
             pending.Add(key, payload);
-            priorities.Add(key, priority);
-            if (!orderByPriority.TryGetValue(priority, out var order))
-            {
-                order = new List<CoalesceKey>();
-                orderByPriority.Add(priority, order);
-            }
-
             order.Add(key);
         }
     }
@@ -64,18 +48,13 @@ public sealed class SendCoalescer : ISendCoalescer
             if (pending.Count == 0) return;
 
             toSend = new ICoalescedPayload[pending.Count];
-            int index = 0;
-            foreach (var priorityGroup in orderByPriority)
+            for (int i = 0; i < order.Count; i++)
             {
-                foreach (var key in priorityGroup.Value)
-                {
-                    toSend[index++] = pending[key];
-                }
+                toSend[i] = pending[order[i]];
             }
 
             pending.Clear();
-            priorities.Clear();
-            orderByPriority.Clear();
+            order.Clear();
         }
 
         foreach (var payload in toSend)
@@ -109,37 +88,18 @@ public sealed class SendCoalescer : ISendCoalescer
         lock (gate)
         {
             List<ICoalescedPayload> payloads = null;
-            List<CoalescedSendPriority> emptyPriorities = null;
-            foreach (var priorityGroup in orderByPriority)
+            for (int i = 0; i < order.Count;)
             {
-                var order = priorityGroup.Value;
-                for (int i = 0; i < order.Count;)
+                var key = order[i];
+                if (string.Equals(key.InstanceId, instanceId, StringComparison.Ordinal))
                 {
-                    var key = order[i];
-                    if (string.Equals(key.InstanceId, instanceId, StringComparison.Ordinal))
-                    {
-                        (payloads ??= new List<ICoalescedPayload>()).Add(pending[key]);
-                        pending.Remove(key);
-                        priorities.Remove(key);
-                        order.RemoveAt(i);
-                        continue;
-                    }
-
-                    i++;
+                    (payloads ??= new List<ICoalescedPayload>()).Add(pending[key]);
+                    pending.Remove(key);
+                    order.RemoveAt(i);
+                    continue;
                 }
 
-                if (order.Count == 0)
-                {
-                    (emptyPriorities ??= new List<CoalescedSendPriority>()).Add(priorityGroup.Key);
-                }
-            }
-
-            if (emptyPriorities != null)
-            {
-                foreach (var priority in emptyPriorities)
-                {
-                    orderByPriority.Remove(priority);
-                }
+                i++;
             }
 
             return payloads;

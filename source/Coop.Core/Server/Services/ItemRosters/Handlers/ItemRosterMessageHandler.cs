@@ -56,9 +56,7 @@ public class ItemRosterMessageHandler : IHandler
         coalescer.Enqueue(key, new SummedPayload<int>(
             message.Amount,
             (running, next) => running + next,
-            total => new NetworkItemRosterUpdate(itemRosterId, itemId, itemModifierId, total)),
-            // Clients must replay the roster callback before applying authoritative derived market data.
-            CoalescedSendPriority.Prerequisite);
+            total => new NetworkItemRosterUpdate(itemRosterId, itemId, itemModifierId, total)));
     }
 
     public void Handle(MessagePayload<ItemRosterCleared> payload)

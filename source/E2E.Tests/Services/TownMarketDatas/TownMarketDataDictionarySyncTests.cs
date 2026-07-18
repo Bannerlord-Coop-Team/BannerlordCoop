@@ -111,7 +111,7 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
     }
 
     [Fact]
-    public void Server_TownRosterUpdate_AppliesBeforeAuthoritativeMarketData()
+    public void Server_TownRosterUpdate_DoesNotDoubleApplyMarketDataOnClients()
     {
         Server.Call(() =>
         {

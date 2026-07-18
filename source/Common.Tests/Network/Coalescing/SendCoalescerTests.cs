@@ -111,44 +111,6 @@ public class SendCoalescerTests
     }
 
     [Fact]
-    public void Flush_SendsPrerequisitesBeforeNormalUpdates()
-    {
-        var (coalescer, network, sent) = NewFixture();
-
-        coalescer.Enqueue(new CoalesceKey("market", "m1", "first"),
-            new LatestWinsPayload(new TestMessage("normalFirst", 1)));
-        coalescer.Enqueue(new CoalesceKey("roster", "r1", "first"),
-            new LatestWinsPayload(new TestMessage("prerequisiteFirst", 2)),
-            CoalescedSendPriority.Prerequisite);
-        coalescer.Enqueue(new CoalesceKey("market", "m1", "second"),
-            new LatestWinsPayload(new TestMessage("normalSecond", 3)));
-        coalescer.Enqueue(new CoalesceKey("roster", "r1", "second"),
-            new LatestWinsPayload(new TestMessage("prerequisiteSecond", 4)),
-            CoalescedSendPriority.Prerequisite);
-
-        coalescer.Flush(network);
-
-        Assert.Collection(sent,
-            first => Assert.Equal("prerequisiteFirst", TagOf(first)),
-            second => Assert.Equal("prerequisiteSecond", TagOf(second)),
-            third => Assert.Equal("normalFirst", TagOf(third)),
-            fourth => Assert.Equal("normalSecond", TagOf(fourth)));
-    }
-
-    [Fact]
-    public void Enqueue_SameKeyWithDifferentPriority_Throws()
-    {
-        var (coalescer, _, _) = NewFixture();
-        var key = new CoalesceKey("roster", "r1", "item1");
-        coalescer.Enqueue(key, new LatestWinsPayload(new TestMessage("first", 1)));
-
-        Assert.Throws<InvalidOperationException>(() => coalescer.Enqueue(
-            key,
-            new LatestWinsPayload(new TestMessage("second", 2)),
-            CoalescedSendPriority.Prerequisite));
-    }
-
-    [Fact]
     public void Flush_ClearsPending()
     {
         var (coalescer, network, sent) = NewFixture();
@@ -193,26 +155,6 @@ public class SendCoalescerTests
         Assert.Collection(sent,
             first => Assert.Equal("firstUpdated", TagOf(first)),
             second => Assert.Equal("second", TagOf(second)));
-    }
-
-    [Fact]
-    public void FlushInstance_SendsPrerequisitesBeforeNormalUpdates()
-    {
-        var (coalescer, network, sent) = NewFixture();
-        coalescer.Enqueue(new CoalesceKey("market", "h1", "Price"),
-            new LatestWinsPayload(new TestMessage("normal", 1)));
-        coalescer.Enqueue(new CoalesceKey("roster", "h2", "Item"),
-            new LatestWinsPayload(new TestMessage("other", 2)),
-            CoalescedSendPriority.Prerequisite);
-        coalescer.Enqueue(new CoalesceKey("roster", "h1", "Item"),
-            new LatestWinsPayload(new TestMessage("prerequisite", 3)),
-            CoalescedSendPriority.Prerequisite);
-
-        coalescer.FlushInstance("h1", network);
-
-        Assert.Collection(sent,
-            first => Assert.Equal("prerequisite", TagOf(first)),
-            second => Assert.Equal("normal", TagOf(second)));
     }
 
     [Fact]
