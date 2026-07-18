@@ -324,7 +324,7 @@ internal class OtherNotificationsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
-            network.SendAll(new NetworkNotifyMoraleLossDueToFunds(mobilePartyId));
+            network.SendAll(new NetworkNotifyMoraleLossDueToFunds(mobilePartyId, obj.What.MoraleChange));
         });
     }
 
@@ -336,6 +336,7 @@ internal class OtherNotificationsHandler : IHandler
 
             if (mobileParty != MobileParty.MainParty) return;
 
+            MBTextManager.SetTextVariable("reg1", MathF.Round(MathF.Abs(obj.What.MoraleChange), 1), 2);
             MBInformationManager.AddQuickInformation(GameTexts.FindText("str_party_loses_moral_due_to_insufficent_funds", null), 0, null, null, "");
         });
     }

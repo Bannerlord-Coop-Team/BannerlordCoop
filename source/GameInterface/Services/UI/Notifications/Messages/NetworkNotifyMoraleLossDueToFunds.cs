@@ -9,8 +9,12 @@ internal readonly struct NetworkNotifyMoraleLossDueToFunds : ICommand
     [ProtoMember(1)]
     public readonly string MobilePartyId;
 
-    public NetworkNotifyMoraleLossDueToFunds(string mobilePartyId)
+    [ProtoMember(2)]
+    public readonly float MoraleChange;
+
+    public NetworkNotifyMoraleLossDueToFunds(string mobilePartyId, float moraleChange)
     {
         MobilePartyId = mobilePartyId;
+        MoraleChange = moraleChange;
     }
 }
