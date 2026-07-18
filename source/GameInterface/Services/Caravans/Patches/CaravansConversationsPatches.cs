@@ -174,7 +174,7 @@ internal class CaravansConversationsPatches
         MobileParty encounteredMobileParty = PlayerEncounter.EncounteredMobileParty;
 
         // Locally set player interaction, and then save in CoopSession on server
-        __instance.SetPlayerInteraction(MobileParty.ConversationParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
+        __instance.SetPlayerInteraction(encounteredMobileParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
 
         // Call helper function to implement vanilla open loot screen logic
         ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
