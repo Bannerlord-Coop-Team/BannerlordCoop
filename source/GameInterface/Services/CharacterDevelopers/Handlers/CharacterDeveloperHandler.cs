@@ -151,6 +151,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             {
                 string skillId = skillIds[i];
 
+                // Reject the whole request so focus changes are applied atomically.
                 if (!objectManager.TryGetObjectWithLogging<SkillObject>(skillId, out var currentSkill)) return;
 
                 int targetFocusLevel = skillFocusLevels[i];
