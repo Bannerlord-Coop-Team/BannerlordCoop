@@ -63,14 +63,42 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
-            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty))
+            {
+                RejectSettlementEncounter(peer, payload);
+                return;
+            }
+            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement))
+            {
+                RejectSettlementEncounter(peer, payload);
+                return;
+            }
 
             if (mobileParty.Party?.MapEventSide != null)
             {
                 Logger.Warning(
                     "Rejecting settlement entry for party {PartyId} because it is already in a map event",
                     payload.PartyId);
+                RejectSettlementEncounter(peer, payload);
+                return;
+            }
+
+            if (mobileParty.CurrentSettlement != null)
+            {
+                if (mobileParty.CurrentSettlement == settlement)
+                {
+                    network.Send(peer, new NetworkStartSettlementEncounter(payload));
+                }
+                else
+                {
+                    Logger.Warning(
+                        "Rejecting settlement entry for party {PartyId} because it is already in settlement {SettlementId}",
+                        payload.PartyId,
+                        objectManager.TryGetId(mobileParty.CurrentSettlement, out var currentSettlementId)
+                            ? currentSettlementId
+                            : mobileParty.CurrentSettlement.StringId);
+                    RejectSettlementEncounter(peer, payload);
+                }
                 return;
             }
 
@@ -81,6 +109,13 @@ public class ServerSettlementExitEnterHandler : IHandler
 
             settlementInterface.PartyEnterSettlement(mobileParty, settlement);
         }, context: nameof(NetworkRequestStartSettlementEncounter));
+    }
+
+    private void RejectSettlementEncounter(
+        NetPeer peer,
+        NetworkRequestStartSettlementEncounter payload)
+    {
+        network.Send(peer, new NetworkSettlementEncounterRejected(payload));
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
