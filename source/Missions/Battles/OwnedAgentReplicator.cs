@@ -148,7 +148,6 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
             var spawnEquipment = agent.SpawnEquipment;
             var bodyProperties = agent.BodyPropertiesValue;
-            var banner = agent.Origin.Banner;
             var missionEquipmentData = PackMissionEquipmentData(agent.Equipment);
 
             // Catch-up records carry the current holder. A migrated NPC must stay under the successor when its
@@ -156,7 +155,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
                 session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,
-                spawnEquipment, bodyProperties, banner, missionEquipmentData,
+                spawnEquipment, bodyProperties, missionEquipmentData,
                 ResolveMountIdFor(info.AgentId, agent), formationIndex));
         }
         return records;
@@ -259,12 +258,11 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
         var spawnEquipment = agent.SpawnEquipment;
         var bodyProperties = agent.BodyPropertiesValue;
-        var agentBanner = agent.Origin.Banner;
         var missionEquipmentData = PackMissionEquipmentData(agent.Equipment);
 
         BattleSideEnum side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None;
         int formationIndex = agent.Formation != null ? (int)agent.Formation.FormationIndex : -1;
-        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, spawnEquipment, bodyProperties, agentBanner, missionEquipmentData, mountAgentId, formationIndex);
+        var data = new BattleAgentSpawnData(agentId, characterId, agent.Position, side, agent.Health, owner, mapEventPartyId, troopSeed, spawnEquipment, bodyProperties, missionEquipmentData, mountAgentId, formationIndex);
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
         messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));
@@ -335,16 +333,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         // Items can be null
         objectManager.TryGetId(weapon.Item, out var itemId);
 
-        var missionWeaponData = new MissionWeaponData(itemId, weapon.ItemModifier, weapon.Banner, weapon._dataValue, weapon.ReloadPhase, PackMissionSubWeapon(weapon._ammoWeapon));
+        var missionWeaponData = new MissionWeaponData(itemId, weapon.ItemModifier, weapon.Banner, weapon._dataValue, weapon.ReloadPhase, null);
         return missionWeaponData;
-    }
-
-    private MissionSubWeaponData PackMissionSubWeapon(MissionWeapon.MissionSubWeapon subWeapon)
-    {
-        MissionSubWeaponData missionSubWeaponData = null;
-        if (subWeapon == null) return missionSubWeaponData;
-
-        missionSubWeaponData = new(PackMissionWeapon(subWeapon.Value));
-        return missionSubWeaponData;
     }
 }

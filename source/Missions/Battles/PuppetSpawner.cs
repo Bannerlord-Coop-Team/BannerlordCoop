@@ -172,13 +172,11 @@ public class PuppetSpawner : IPuppetSpawner
         var missionEquipment = ResolveMissionEquipment(data.MissionEquipmentData);
 
         var buildData = new AgentBuildData(character);
-        buildData.BodyProperties(character.GetBodyPropertiesMax());
         buildData.InitialPosition(data.Position);
         buildData.Team(team);
         buildData.InitialDirection(Vec2.Forward);
         buildData.Equipment(data.SpawnEquipment); // Use calculated equipment from spawning client instead of character equipment (random per troop per client)
         buildData.BodyProperties(data.BodyProperties);
-        buildData.Banner(data.Banner);
         buildData.TroopOrigin(origin);
         buildData.MissionEquipment(missionEquipment);
         buildData.Controller(isOwnHero ? AgentControllerType.Player
@@ -433,16 +431,7 @@ public class PuppetSpawner : IPuppetSpawner
         // Items can be null
         objectManager.TryGetObject<ItemObject>(data.ItemObjectId, out var item);
 
-        var missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, ResolveMissionSubWeapon(data.AmmoWeaponData)?.Value);
+        var missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, null);
         return missionWeapon;
-    }
-
-    private MissionWeapon.MissionSubWeapon ResolveMissionSubWeapon(MissionSubWeaponData data)
-    {
-        MissionWeapon.MissionSubWeapon missionSubWeapon = null;
-        if (data == null) return missionSubWeapon;
-
-        missionSubWeapon = new MissionWeapon.MissionSubWeapon(ResolveMissionWeapon(data.Value));
-        return missionSubWeapon;
     }
 }
