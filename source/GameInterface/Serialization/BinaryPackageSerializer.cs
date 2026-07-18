@@ -9,7 +9,7 @@ namespace GameInterface.Serialization;
 
 public static class BinaryPackageSerializer
 {
-    public const int MaxPayloadBytes = 32 * 1024 * 1024;
+    public const int MaxPayloadBytes = 128 * 1024 * 1024;
     private const int MaxItemsInObjectGraph = 2_000_000;
 
     private static readonly HashSet<Type> PackageTypes = new HashSet<Type>(
@@ -56,7 +56,7 @@ public static class BinaryPackageSerializer
         {
             MaxArrayLength = MaxPayloadBytes,
             MaxBytesPerRead = 4096,
-            MaxDepth = 128,
+            MaxDepth = 512,
             MaxNameTableCharCount = 16 * 1024,
             MaxStringContentLength = MaxPayloadBytes,
         });
