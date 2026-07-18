@@ -1,7 +1,14 @@
-﻿using GameInterface.Services.Clans.Interfaces;
+﻿using Common.Messaging;
+using GameInterface.Services.Clans.Interfaces;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Patches;
 
@@ -29,5 +36,15 @@ internal class DefaultClanFinanceModelPatches
         financeModelInterface.CalculateClanIncomeInternal(__instance, clan, ref goldChange, applyWithdrawals, includeDetails);
 
         return false;
+    }
+
+    [HarmonyPatch(nameof(DefaultClanFinanceModel.ApplyMoraleEffect))]
+    [HarmonyPostfix]
+    public static void ApplyMoraleEffectPostfix(DefaultClanFinanceModel __instance, MobileParty mobileParty, int wage, int paymentAmount)
+    {
+        if (paymentAmount < wage && wage > 0 && mobileParty.IsPlayerParty())
+        {
+            MessageBroker.Instance.Publish(__instance, new NotifyMoraleLossDueToFunds(mobileParty));
+        }
     }
 }
