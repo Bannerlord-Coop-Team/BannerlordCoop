@@ -18,9 +18,9 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// Ownership changes when a player leaves a coop battle. A graceful leave or disconnect withdraws the player's
-/// own-party troops on every client. When the departed player was the host, the server promotes a successor,
-/// which adopts only the AI the old host was running (enemy side + allied NPC parties). Because that adoption
+/// Ownership changes when a player leaves a coop battle. A graceful leave withdraws the player's own-party
+/// troops on every client. A disconnect instead leaves those troops in the battle for the current or promoted
+/// host to adopt. When the departed player was the host, the server promotes a successor. Because that adoption
 /// is local to the acting host, every other registry can keep inherited NPC agents keyed to an earlier host.
 /// The promotion therefore also sweeps: the new host
 /// adopts every agent still keyed to ANY controller no longer in the mission, not just the departed host's —
@@ -103,11 +103,16 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         HandlePartyWithdrawal(payload.What.ControllerId, payload.What.InstanceId, "retreated");
     }
 
-    // A disconnect uses the same visible withdrawal as a retreat. The server forgets that player's reserve,
-    // so a later rejoin fields a fresh party instead of reclaiming frozen survivors.
+    // A disconnect preserves both the remaining reserve and already-fielded agents. The current host adopts a
+    // non-host's agents immediately; a departed host's successor adopts them when the migration assignment lands.
     private void Handle_PeerDisconnected(MessagePayload<MissionPeerDisconnected> payload)
     {
-        HandlePartyWithdrawal(payload.What.ControllerId, payload.What.InstanceId, "disconnected");
+        var controllerId = payload.What.ControllerId;
+        if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+        if (session.IsHostController(controllerId)) return;
+        if (!session.IsLocalHost) return;
+
+        AdoptAgentsFrom(controllerId, "player disconnect", withdrawOwnParty: false);
     }
 
     private void HandlePartyWithdrawal(string controllerId, string instanceId, string reason)
@@ -287,9 +292,9 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     }
 
     // [New host] The previous host departed and the server promoted us — adopt its orphaned agents so the
-    // battle continues under us. Published only to the promoted client, so no host check here. Consumes the
-    // withdrawal record: the old host's own party withdraws (DespawnOwnPartyTroops) and only the AI
-    // it ran is adopted.
+    // battle continues under us. Published only to the promoted client, so no host check here. A graceful
+    // retreat records a withdrawal and excludes the old host's own party; a disconnect records nothing, so
+    // every already-fielded survivor is adopted.
     private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
     {
         if (payload.What.MapEventId != session.InstanceId) return;
@@ -365,9 +370,11 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
                 if (Mission.Current == null) return;
 
-                // A migration can promote us while AI ticking is gated off (e.g. mid-deployment); turn it back on so
-                // the adopted agents actually tick, exactly as the NPC-release path does.
-                Mission.Current.AllowAiTicking = true;
+                // Keep an adoption during Order of Battle behind the same activation gate as every other NPC.
+                // The normal deployment activation path wakes it later; a live battle wakes it immediately here.
+                bool activateAi = deployment.IsActivated;
+                if (activateAi)
+                    Mission.Current.AllowAiTicking = true;
 
                 var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
                 var formations = new HashSet<Formation>();
@@ -389,7 +396,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                     // us) — it is not a combatant: no AI controller, no formation, no wake.
                     if (agent.IsMount) continue;
 
-                    ConvertPuppetToHostAi(agent);
+                    ConvertPuppetToHostAi(agent, activateAi);
                     if (agent.Controller == AgentControllerType.AI) aiCount++;
                     if (agent.Formation != null) formations.Add(agent.Formation);
                 }
@@ -470,7 +477,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // command: keep the formation slot its owner placed it in (mirrored at spawn) and hand it to the engine AI
     // so it maneuvers and fights like the host's own AI troops. The formation is set AI-controlled because in a
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
-    private void ConvertPuppetToHostAi(Agent agent)
+    private void ConvertPuppetToHostAi(Agent agent, bool wakeAi)
     {
         // Fall back to the troop-class default only if the puppet has no formation yet.
         var formation = agent.Formation ?? formationAssigner.Assign(agent);
@@ -478,12 +485,11 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
         agent.Controller = AgentControllerType.AI;
 
-        // Wake the AI the same way the NPC-release path does. Without this an adopted agent is AI-controlled
-        // but NOT alarmed and holds stale enemy caches, so it ignores its formation's Charge order and stands
-        // idle — the "allied NPCs don't move after host migration" bug. The ally side never goes through the
-        // NPC release (which only frees the ENEMY side), so the adopt path must do the wake itself; only
-        // combat troops reach this conversion (the adoption loop skips registered mounts), so the
-        // CanWieldWeapon guard the NPC release uses is unnecessary here.
-        AgentAiWaker.Wake(agent);
+        // In a live battle, wake the AI the same way the NPC-release path does. Without this an adopted agent
+        // is AI-controlled but not alarmed and holds stale enemy caches, so it ignores its formation's Charge
+        // order. During deployment the normal activation path owns this wake instead. Only combat troops reach
+        // this conversion, so the CanWieldWeapon guard the NPC release uses is unnecessary here.
+        if (wakeAi)
+            AgentAiWaker.Wake(agent);
     }
 }

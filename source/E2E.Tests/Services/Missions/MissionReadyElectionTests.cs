@@ -2,6 +2,7 @@
 using Common.Network;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using GameInterface.Services.Players;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -79,6 +80,40 @@ public class MissionReadyElectionTests : MissionTestEnvironment
         AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
         foreach (var client in Clients)
             AssertHost(client, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-010")]
+    public void EnteredButNotReadyPlayer_RetainsItsReserveWhileTheFirstHostIsElected()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "loader-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var loader = clients[1];
+        string loaderMapEventPartyId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var loaderParty));
+            var mapEventParty = mapEvent.PartiesOnSide(loaderParty.Party.Side)
+                .Single(party => party.Party == loaderParty.Party);
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out loaderMapEventPartyId));
+        });
+
+        EnterBattle(loader, mapEventId, missionReady: false);
+        EnterBattle(host, mapEventId, missionReady: false);
+        int baseline = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+            .Count(message => message.MapEventId == mapEventId);
+
+        MakeMissionReady(host, mapEventId);
+
+        var hostElectionFeeds = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+            .Where(message => message.MapEventId == mapEventId)
+            .Skip(baseline)
+            .ToArray();
+        Assert.DoesNotContain(hostElectionFeeds.SelectMany(feed => feed.Parties),
+            party => party.PartyId == loaderMapEventPartyId);
     }
 
     /// <summary>
@@ -162,6 +197,14 @@ public class MissionReadyElectionTests : MissionTestEnvironment
         CoopTroopSupplierRegistry.Register(hostDefender);
         try
         {
+            Server.Call(() =>
+            {
+                var playerManager = Server.Resolve<IPlayerManager>();
+                playerManager.SetPeer("other-ctrl", clients[1].NetPeer);
+                Assert.True(playerManager.TryGetPlayer("other-ctrl", out var otherPlayer));
+                Assert.True(playerManager.IsConnected(otherPlayer));
+            });
+
             EnterBattle(clients[0], mapEventId, missionReady: false);
 
             // Entry: only the owned side arrives. The unowned (defender/NPC) side must NOT arrive — not even

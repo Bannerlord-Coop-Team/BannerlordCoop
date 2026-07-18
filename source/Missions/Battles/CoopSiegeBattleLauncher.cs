@@ -59,7 +59,13 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             return null;
         }
 
-        var mission = CreateCoopSiegeBattle(rec, mapEventId, wallHitPointRatios, attackerWeapons, defenderWeapons);
+        var playerPartyId = CoopFieldBattleLauncher.GetLocalPlayerPartyId(mapEvent, objectManager);
+        if (playerPartyId == null)
+            Logger.Error("[BattleSync] Local player party is not resolvable; opening the siege battle so its mission lifecycle can reject it safely");
+
+        var mission = CreateCoopSiegeBattle(rec, mapEventId, playerPartyId,
+            wallHitPointRatios, attackerWeapons, defenderWeapons);
+        if (mission == null) return null;
 
         // Same post-open coop entry as the field launcher: the controller requests the P2P instance and
         // the host handler requests this client's OWN troop reserves; the host election follows at
@@ -68,7 +74,8 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
         return mission;
     }
 
-    private Mission CreateCoopSiegeBattle(MissionInitializerRecord rec, string mapEventId, float[] wallHitPointRatios,
+    private Mission CreateCoopSiegeBattle(MissionInitializerRecord rec, string mapEventId,
+        string playerPartyId, float[] wallHitPointRatios,
         List<MissionSiegeWeapon> attackerWeapons, List<MissionSiegeWeapon> defenderWeapons)
     {
         bool hasAnySiegeTower = attackerWeapons.Exists(weapon => weapon.Type == DefaultSiegeEngineTypes.SiegeTower);
@@ -123,7 +130,8 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
                 behaviors.Add(new WorkshopMissionHandler(currentTown));
             }
 
-            behaviors.Add(new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier));
+            behaviors.Add(new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
+                PartyBase.MainParty.Side, playerPartyId));
             behaviors.Add(spawnLogic);
             behaviors.Add(new BattlePowerCalculationLogic());
             behaviors.Add(new BattleObserverMissionLogic());

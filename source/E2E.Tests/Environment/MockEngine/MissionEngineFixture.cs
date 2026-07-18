@@ -380,10 +380,12 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_SetIsAIPaused(Agent __instance)
+    private static bool Agent_SetIsAIPaused(Agent __instance, bool isPaused)
     {
-        // No AI loop headless — accept the call so ConvertPuppetToHostAi doesn't deref the native agent.
-        return !AgentMirror.TryGet(__instance, out _);
+        // No AI loop headless — mirror the pause state without dereferencing the native agent.
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.IsAiPaused = isPaused;
+        return false;
     }
 
     private static bool Agent_SetAlarmState(Agent __instance, ref bool __result)

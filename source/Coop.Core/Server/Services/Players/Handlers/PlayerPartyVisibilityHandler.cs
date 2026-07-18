@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
@@ -128,6 +129,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
         GameThread.RunSafe(() =>
         {
             deferredMapEventParking.Remove(party);
+            if (party.MapEvent != null)
+                messageBroker.Publish(this, new PlayerReconnectedToMapEvent());
+
             if (party.IsActive)
             {
                 return; // fresh join, never parked, nothing to restore

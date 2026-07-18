@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using Common.Messaging;
 using Common.Network;
 using E2E.Tests.Environment.Instance;
@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Handlers;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -133,13 +134,12 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             EnterBattle(clients[1], mapEventId); // successor
             AssertHost(Server, mapEventId, "host-ctrl", "returner-ctrl");
 
-            // The returner DROPS (server-observed, not a retreat -> the reserve pointer is kept).
+            int baseline = FeedBaseline(host, mapEventId);
+
+            // The returner DROPS (server-observed, not a retreat -> the reserve pointer is kept and the
+            // current host is pushed its enlarged reserve scope).
             DepartBattle("returner-ctrl", mapEventId, wasRetreat: false);
             AssertHost(Server, mapEventId, "host-ctrl");
-
-            // The host adopts and pulls its updated owned set, exactly as the adoption path does.
-            int baseline = FeedBaseline(host, mapEventId);
-            RequestOwnedReserves(host, mapEventId, "host-ctrl");
 
             var feeds = FeedsSince(host, mapEventId, baseline);
 
@@ -225,6 +225,52 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             var hostHeld = hostAttacker.Concat(hostDefender);
             var returnerHeld = returnerDefender.Concat(LatestSideParties(returnerFeeds, BattleSideEnum.Attacker) ?? Array.Empty<string>());
             Assert.Empty(hostHeld.Intersect(returnerHeld));
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void OfflinePlayerEnteringForTheFirstTime_ReclaimsItsReserveFromTheHost()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "offline-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var returning = clients[1];
+
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
+            var returningMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
+
+            // The second player is registered in the MapEvent but offline and has never entered this mission.
+            // The first host therefore adopts that player's reserve during election.
+            EnterBattle(host, mapEventId);
+            var adopted = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+                .Where(message => message.MapEventId == mapEventId)
+                .SelectMany(message => message.Parties)
+                .LastOrDefault(party => party.PartyId == returningMepId);
+            Assert.NotNull(adopted);
+
+            int hostBaseline = FeedBaseline(host, mapEventId);
+            int returnerBaseline = FeedBaseline(returning, mapEventId);
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("offline-ctrl", returning.NetPeer));
+
+            EnterBattle(returning, mapEventId);
+
+            var hostFeeds = FeedsSince(host, mapEventId, hostBaseline);
+            var hostDefender = LatestSideParties(hostFeeds, BattleSideEnum.Defender);
+            Assert.NotNull(hostDefender);
+            Assert.DoesNotContain(returningMepId, hostDefender);
+
+            var returnerFeeds = FeedsSince(returning, mapEventId, returnerBaseline);
+            var returnerDefender = LatestSideParties(returnerFeeds, BattleSideEnum.Defender);
+            Assert.NotNull(returnerDefender);
+            Assert.Contains(returningMepId, returnerDefender);
         }
         finally
         {

@@ -1,5 +1,8 @@
 ﻿using Missions.Battles;
+using GameInterface.Services.MapEvents.TroopSupply;
+using System;
 using System.Collections.Generic;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -44,6 +47,82 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         Assert.True(sizing.Ready);
         Assert.True(sizing.SizeNow);
         Assert.True(sizing.HasAnyOwnedTroops);
+    }
+
+    [Fact]
+    public void EnemyOnlyReserve_DoesNotOpenDeploymentWithoutLocalPlayerOrigin()
+    {
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null);
+        attacker.SetReserve(Array.Empty<PartyReserve>());
+        defender.SetReserve(new[]
+        {
+            new PartyReserve("enemy-party", 0, new[]
+            {
+                new TroopReserveEntry(1, "looter", formationClass: 0),
+            }),
+        });
+
+        var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
+            defenderPopulated: true, attackerPopulated: true, defenderOwned: 1, attackerOwned: 0);
+
+        Assert.True(sizing.SizeNow);
+        Assert.False(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
+            BattleSideEnum.Attacker, "player-party", defender, attacker));
+    }
+
+    [Fact]
+    public void LocalPartyHeroOrigin_AllowsDeploymentSizing()
+    {
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null);
+        attacker.SetReserve(new[]
+        {
+            new PartyReserve("player-party", 0, new[]
+            {
+                new TroopReserveEntry(1, "main-hero", formationClass: 0),
+            }),
+        });
+        defender.SetReserve(Array.Empty<PartyReserve>());
+
+        Assert.True(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
+            BattleSideEnum.Attacker, "player-party", defender, attacker));
+    }
+
+    [Fact]
+    public void LocalPartyWithoutHero_AllowsLeaderlessDeployment()
+    {
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null);
+        attacker.SetReserve(new[]
+        {
+            new PartyReserve("player-party", suppliedCount: 0, new[]
+            {
+                new TroopReserveEntry(1, "recruit", formationClass: 0),
+            }),
+        });
+        defender.SetReserve(Array.Empty<PartyReserve>());
+
+        Assert.True(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
+            BattleSideEnum.Attacker, "player-party", defender, attacker));
+    }
+
+    [Fact]
+    public void ExhaustedLocalParty_DoesNotOpenDeployment()
+    {
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null);
+        attacker.SetReserve(new[]
+        {
+            new PartyReserve("player-party", suppliedCount: 1, new[]
+            {
+                new TroopReserveEntry(1, "main-hero", formationClass: 0),
+            }),
+        });
+        defender.SetReserve(Array.Empty<PartyReserve>());
+
+        Assert.False(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
+            BattleSideEnum.Attacker, "player-party", defender, attacker));
     }
 
     [Fact]
