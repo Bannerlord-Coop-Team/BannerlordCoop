@@ -51,6 +51,8 @@ public static class PartyBehaviorPatch
             return true;
         }
 
+        RepairInvalidSettlementTarget(__instance, newAiBehavior, interactablePoint, ref bestTargetPoint);
+
         __state = !BehaviorIsSame(__instance, newAiBehavior, interactablePoint, bestTargetPoint) &&
             __instance._mobileParty.IsControlledByThisInstance();
         if (!__state)
@@ -67,6 +69,38 @@ public static class PartyBehaviorPatch
         }
 
         return true;
+    }
+
+    private static void RepairInvalidSettlementTarget(
+        MobilePartyAi partyAi,
+        AiBehavior behavior,
+        IInteractablePoint interactable,
+        ref CampaignVec2 target)
+    {
+        var party = partyAi._mobileParty;
+        if (behavior != AiBehavior.GoToSettlement ||
+            target != party.Position ||
+            interactable is not PartyBase partyBase ||
+            !partyBase.IsSettlement)
+            return;
+
+        var settlement = partyBase.Settlement;
+        if (settlement == null || party.CurrentSettlement == settlement)
+            return;
+
+        var correctedTarget = party.IsTargetingPort && settlement.HasPort
+            ? settlement.PortPosition
+            : settlement.GatePosition;
+        if (!correctedTarget.IsValid() || correctedTarget == party.Position)
+            return;
+
+        Logger.Warning(
+            "Repairing current-position settlement target for {PartyId}: {SettlementId} at {Target}",
+            party.StringId,
+            settlement.StringId,
+            correctedTarget);
+        party.TargetPosition = correctedTarget;
+        target = correctedTarget;
     }
 
     [HarmonyPostfix]
