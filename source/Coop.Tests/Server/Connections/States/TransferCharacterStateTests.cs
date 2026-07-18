@@ -96,7 +96,7 @@ namespace Coop.Tests.Server.Connections.States
         public void EnteringState_SplitsLargeSaveData_IntoChunks()
         {
             // Arrange
-            byte[] data = new byte[GameSaveDataChunkPacket.ChunkSize * 2 + 17];
+            byte[] data = new byte[(GameSaveDataChunkPacket.ChunkSize * 2) + 17];
             new System.Random(42).NextBytes(data);
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, "12345"));
