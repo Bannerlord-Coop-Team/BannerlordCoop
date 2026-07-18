@@ -42,6 +42,8 @@ public sealed class MirrorAgent
     public Agent.EventControlFlag EventControlFlags { get; set; }
     public bool CrouchMode { get; set; }
     public Agent.GuardMode GuardMode { get; set; } = Agent.GuardMode.None;
+    public Agent.ActionCodeType Action0CodeType { get; set; } = Agent.ActionCodeType.Idle;
+    public Agent.ActionCodeType Action1CodeType { get; set; } = Agent.ActionCodeType.Idle;
     public int SetWeaponGuardCalls { get; set; }
     public int ResetGuardCalls { get; set; }
 }

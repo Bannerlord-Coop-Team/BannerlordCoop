@@ -532,10 +532,20 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_GetCurrentActionType(Agent __instance, ref Agent.ActionCodeType __result)
+    private static bool Agent_GetCurrentActionType(
+        Agent __instance,
+        int channelNo,
+        ref Agent.ActionCodeType __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = Agent.ActionCodeType.Idle;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            __result = m.Action0CodeType;
+        }
+        else
+        {
+            __result = m.Action1CodeType;
+        }
         return false;
     }
 

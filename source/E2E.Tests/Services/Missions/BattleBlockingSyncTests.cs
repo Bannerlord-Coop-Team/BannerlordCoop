@@ -178,6 +178,69 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Theory]
+    [InlineData(Agent.ActionCodeType.DefendForward1h, Agent.GuardMode.Down, 1)]
+    [InlineData(Agent.ActionCodeType.DefendUp1h, Agent.GuardMode.Up, 1)]
+    [InlineData(Agent.ActionCodeType.DefendRight1h, Agent.GuardMode.Right, 1)]
+    [InlineData(Agent.ActionCodeType.DefendLeft1h, Agent.GuardMode.Left, 1)]
+    [InlineData(Agent.ActionCodeType.DefendLeft1h, Agent.GuardMode.Left, 0)]
+    public void MountedPuppet_BlockOnlyGuard_DerivesDirectionFromActionType(
+        Agent.ActionCodeType actionCodeType,
+        Agent.GuardMode expectedGuardMode,
+        int actionChannel)
+    {
+        RunScenario("peer", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+
+            if (actionChannel == 0)
+            {
+                ownerMirror.Action0CodeType = actionCodeType;
+            }
+            else
+            {
+                ownerMirror.Action1CodeType = actionCodeType;
+            }
+            ownerMirror.MovementFlags = Agent.MovementControlFlag.DefendBlock;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(expectedGuardMode, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+
+            ownerMirror.MovementFlags = Agent.MovementControlFlag.None;
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.ResetGuardCalls);
+        });
+    }
+
+    [Theory]
+    [InlineData(Agent.ActionCodeType.DefendFist)]
+    [InlineData(Agent.ActionCodeType.DefendShield)]
+    [InlineData(Agent.ActionCodeType.ReadyRanged)]
+    [InlineData(Agent.ActionCodeType.Idle)]
+    public void DirectionlessActionType_DoesNotDeriveGuard(
+        Agent.ActionCodeType actionCodeType)
+    {
+        Assert.Equal(
+            Agent.GuardMode.None,
+            AgentActionData.GetGuardModeFromDefendActionTypes(
+                Agent.ActionCodeType.Idle,
+                actionCodeType));
+    }
+
+    [Theory]
     [InlineData("owner", 7)]
     [InlineData("other-host", 0)]
     public void PollActions_StampsEpochOnlyForBattleHost(

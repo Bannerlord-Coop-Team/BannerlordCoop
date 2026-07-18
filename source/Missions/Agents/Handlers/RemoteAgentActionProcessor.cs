@@ -656,6 +656,19 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         Agent.MovementControlFlag defendFlags = action.Data.DefendFlags;
         Agent.GuardMode guardMode = action.Data.GuardMode;
+        if (!AgentActionData.IsGuardMode(guardMode)
+            && (defendFlags & Agent.MovementControlFlag.DefendBlock) != 0)
+        {
+            Agent.GuardMode flagsGuardMode =
+                AgentActionData.GetGuardModeFromDefendFlags(defendFlags);
+            if (!AgentActionData.IsGuardMode(flagsGuardMode))
+            {
+                guardMode = AgentActionData.GetGuardModeFromDefendActionTypes(
+                    (Agent.ActionCodeType)action.Data.Action0CodeType,
+                    (Agent.ActionCodeType)action.Data.Action1CodeType);
+            }
+        }
+
         if (defendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(guardMode))
         {

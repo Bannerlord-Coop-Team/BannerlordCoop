@@ -81,6 +81,36 @@ namespace Missions.Agents.Packets
             return Agent.GuardMode.None;
         }
 
+        internal static Agent.GuardMode GetGuardModeFromDefendActionTypes(
+            Agent.ActionCodeType action0CodeType,
+            Agent.ActionCodeType action1CodeType)
+        {
+            Agent.GuardMode guardMode = GetGuardModeFromDefendActionType(action1CodeType);
+            if (IsGuardMode(guardMode))
+                return guardMode;
+
+            return GetGuardModeFromDefendActionType(action0CodeType);
+        }
+
+        private static Agent.GuardMode GetGuardModeFromDefendActionType(
+            Agent.ActionCodeType actionCodeType) =>
+            actionCodeType switch
+            {
+                Agent.ActionCodeType.DefendForward2h or
+                Agent.ActionCodeType.DefendForward1h or
+                Agent.ActionCodeType.DefendForwardStaff => Agent.GuardMode.Down,
+                Agent.ActionCodeType.DefendUp2h or
+                Agent.ActionCodeType.DefendUp1h or
+                Agent.ActionCodeType.DefendUpStaff => Agent.GuardMode.Up,
+                Agent.ActionCodeType.DefendRight2h or
+                Agent.ActionCodeType.DefendRight1h or
+                Agent.ActionCodeType.DefendRightStaff => Agent.GuardMode.Right,
+                Agent.ActionCodeType.DefendLeft2h or
+                Agent.ActionCodeType.DefendLeft1h or
+                Agent.ActionCodeType.DefendLeftStaff => Agent.GuardMode.Left,
+                _ => Agent.GuardMode.None
+            };
+
         private static Agent.UsageDirection GuardModeToUsageDirection(
             Agent.GuardMode guardMode) =>
             guardMode switch
