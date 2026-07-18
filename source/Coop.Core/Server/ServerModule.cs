@@ -97,6 +97,7 @@ public class ServerModule : CommonModule
                 context.Resolve<ISteamPublicLobbyApi>(),
                 context.Resolve<SessionAdvertisementConfig>().Visibility))
             .As<ISessionAdvertiser>()
+            .As<ISteamLobbyOwner>()
             .InstancePerLifetimeScope();
         builder.RegisterType<SteamGameServerNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
         builder.RegisterType<SteamTunnelHost>()

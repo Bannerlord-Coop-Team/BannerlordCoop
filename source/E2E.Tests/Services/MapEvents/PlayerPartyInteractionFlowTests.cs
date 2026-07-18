@@ -13,6 +13,7 @@ using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.PartyComponents.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.TroopRosters.Data;
@@ -1315,6 +1316,35 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void ServerAiPartyEncounter_StartsConversationForDefendingPlayer()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (_, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var aiPartyId = CreateMobilePartyBase();
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+
+            EncounterManager.StartPartyEncounter(aiParty, playerParty);
+
+            Assert.Null(aiParty.MapEvent);
+            Assert.Null(playerParty.MapEvent);
+        });
+
+        var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
+        Assert.Equal(aiPartyId, allowed.AttackerId);
+        Assert.Equal(playerPartyId, allowed.DefenderId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+    }
+
+    [Fact]
     public void ExistingBattleJoin_WithMissionMember_UsesExistingAllowPath()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
@@ -1367,10 +1397,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Server.SimulateMessage(client2.NetPeer, new NetworkMissionLeft("PlayerTwo", concludedBattleId));
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            Assert.True(InvokeEncounterPrefix("StartPartyEncounterPrefix", aiParty, responderParty));
             Assert.True(InvokeEncounterPrefix("Prefix", responderParty.MobileParty, settlement));
         });
         RequestInteraction(client2, responderPartyId, aiPartyId);

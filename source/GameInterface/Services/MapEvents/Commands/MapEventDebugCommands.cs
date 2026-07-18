@@ -1,6 +1,8 @@
 ﻿using Autofac;
+using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using System;
 using System.Collections;
@@ -104,6 +106,75 @@ public class MapEventDebugCommands
 
         return $"Started encounter with {nearest.Name} (StringId {nearest.StringId}, registry id {partyId}), " +
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
+    }
+
+    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
+    /// <summary>
+    /// Starts a server-authoritative bandit attack encounter against a connected player.
+    /// </summary>
+    [CommandLineArgumentFunction("start_nearest_bandit_attack", "coop.debug.mapevent")]
+    public static string StartNearestBanditAttack(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+        {
+            return "Unable to resolve PlayerManager";
+        }
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+        {
+            return $"No registered player has controller id {args[0]}.";
+        }
+
+        if (!playerManager.IsConnected(player))
+        {
+            return $"Player {args[0]} is not connected.";
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+        {
+            return $"Unable to resolve player party {player.MobilePartyId}.";
+        }
+
+        if (playerParty.MapEvent != null)
+        {
+            return $"Player {args[0]} is already in a map event.";
+        }
+
+        var playerPosition = playerParty.Position.ToVec2();
+        var banditParty = MobileParty.All
+            .Where(p => p.IsActive && p.IsBandit && p != playerParty
+                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0)
+            .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
+            .FirstOrDefault();
+
+        if (banditParty == null)
+        {
+            return "No active bandit/looter party found on the map.";
+        }
+
+        EncounterManager.StartPartyEncounter(banditParty.Party, playerParty.Party);
+
+        var partyId = objectManager.TryGetId(banditParty, out string registryId)
+            ? registryId
+            : banditParty.StringId;
+
+        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
+               $"against player {args[0]}.";
     }
 
     /// <summary>

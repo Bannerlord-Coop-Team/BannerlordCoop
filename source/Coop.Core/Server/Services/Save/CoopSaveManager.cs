@@ -2,6 +2,7 @@
 using GameInterface.CoopSessionData.Save.Data;
 using System;
 using System.IO;
+using TaleWorlds.Library;
 
 namespace Coop.Core.Server.Services.Save
 {
@@ -21,18 +22,28 @@ namespace Coop.Core.Server.Services.Save
 
         /// <summary>
         /// The session json (player→hero mappings + per-player session data) must persist next to
-        /// the campaign saves. The graphical host keeps its historical CWD-relative location (the
-        /// game bin's ./saves/). Headless and container hosts set BANNERLORD_USER_DIR — the
-        /// persistent data root, mounted as /data in Docker — and MUST store the session there:
-        /// written CWD-relative in a container it lands in the ephemeral layer, evaporates on
-        /// recreate, and returning players lose their heroes.
+        /// the campaign saves so a save transfers as one folder's &lt;name&gt;.sav + &lt;name&gt;.json pair.
+        /// The graphical host resolves the native save folder through the engine's platform helper
+        /// (Documents\Mount and Blade II Bannerlord\Game Saves — the same PlatformFileType.User +
+        /// "Game Saves" root FileDriver writes .sav files to). Headless and container hosts set
+        /// BANNERLORD_USER_DIR — the persistent data root, mounted as /data in Docker — and MUST
+        /// store the session there: written CWD-relative in a container it lands in the ephemeral
+        /// layer, evaporates on recreate, and returning players lose their heroes. Without either
+        /// (unit tests, engine not booted) the CWD-relative ./saves/ is used.
         /// </summary>
         private static string ResolveDefaultPath()
         {
             var userDir = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
-            return string.IsNullOrEmpty(userDir)
-                ? "./saves/"
-                : Path.Combine(userDir, "saves") + Path.DirectorySeparatorChar;
+            if (string.IsNullOrEmpty(userDir) == false)
+                return Path.Combine(userDir, "saves") + Path.DirectorySeparatorChar;
+
+            if (TaleWorlds.Library.Common.PlatformFileHelper is PlatformFileHelperPC fileHelper)
+            {
+                var nativeSaveDir = new PlatformDirectoryPath(PlatformFileType.User, "Game Saves" + Path.DirectorySeparatorChar);
+                return fileHelper.GetDirectoryFullPath(nativeSaveDir);
+            }
+
+            return "./saves/";
         }
 
         /// <summary>

@@ -52,6 +52,7 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             PartyMoveMode = party.PartyMoveMode,
             MoveTargetPartyId = moveTargetPartyId,
             IsInteractableAnchor = isInteractableAnchor,
+            IsCurrentlyAtSea = party.IsCurrentlyAtSea,
         };
         return true;
     }
