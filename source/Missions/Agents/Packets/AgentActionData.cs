@@ -66,6 +66,21 @@ namespace Missions.Agents.Packets
             || guardMode == Agent.GuardMode.Left
             || guardMode == Agent.GuardMode.Right;
 
+        internal static Agent.GuardMode GetGuardModeFromDefendFlags(
+            Agent.MovementControlFlag defendFlags)
+        {
+            if ((defendFlags & Agent.MovementControlFlag.DefendDown) != 0)
+                return Agent.GuardMode.Down;
+            if ((defendFlags & Agent.MovementControlFlag.DefendUp) != 0)
+                return Agent.GuardMode.Up;
+            if ((defendFlags & Agent.MovementControlFlag.DefendLeft) != 0)
+                return Agent.GuardMode.Left;
+            if ((defendFlags & Agent.MovementControlFlag.DefendRight) != 0)
+                return Agent.GuardMode.Right;
+
+            return Agent.GuardMode.None;
+        }
+
         private static Agent.UsageDirection GuardModeToUsageDirection(
             Agent.GuardMode guardMode) =>
             guardMode switch

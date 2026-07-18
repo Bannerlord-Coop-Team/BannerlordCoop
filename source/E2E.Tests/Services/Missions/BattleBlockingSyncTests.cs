@@ -132,6 +132,52 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Theory]
+    [InlineData(Agent.MovementControlFlag.DefendUp, Agent.GuardMode.Up)]
+    [InlineData(Agent.MovementControlFlag.DefendDown, Agent.GuardMode.Down)]
+    [InlineData(Agent.MovementControlFlag.DefendLeft, Agent.GuardMode.Left)]
+    [InlineData(Agent.MovementControlFlag.DefendRight, Agent.GuardMode.Right)]
+    public void MountedPuppet_FlagsOnlyGuard_ReassertsAfterMountStateArrives(
+        Agent.MovementControlFlag defendDirection,
+        Agent.GuardMode expectedGuardMode)
+    {
+        RunScenario("peer", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(owner);
+
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | defendDirection;
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+
+            context.Mock.SpawnMount(puppet);
+            context.Component.AgentActionHandler.ReassertRemoteDefendStates();
+
+            Assert.Equal(expectedGuardMode, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+
+            Agent.GuardMode explicitGuardMode = expectedGuardMode == Agent.GuardMode.Up
+                ? Agent.GuardMode.Down
+                : Agent.GuardMode.Up;
+            ownerMirror.GuardMode = explicitGuardMode;
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(explicitGuardMode, puppetMirror.GuardMode);
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+        });
+    }
+
+    [Theory]
     [InlineData("owner", 7)]
     [InlineData("other-host", 0)]
     public void PollActions_StampsEpochOnlyForBattleHost(
