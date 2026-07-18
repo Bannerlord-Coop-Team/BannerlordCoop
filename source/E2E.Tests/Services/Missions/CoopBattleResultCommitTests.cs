@@ -1,12 +1,8 @@
-using GameInterface.Services.MapEvents;
-using System;
-using System.Linq;
-using Common.Messaging;
+﻿using System.Linq;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.MockEngine;
-using GameInterface.Services.MapEvents.Messages;
 using Missions.Battles;
-using TaleWorlds.CampaignSystem.MapEvents;
+using Missions.Messages;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
@@ -14,89 +10,58 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>
-/// The fix for the live "lost coop battle leaves the players uncaptured with the encounter still open" bug. A
-/// live coop battle never resolves the campaign result on its own (the encounter doesn't tick), so on the host's
-/// mission end <see cref="CoopBattleController"/> commits the concluded <see cref="MissionResult"/>'s BattleState
-/// to the map event. That commit flows through the coop intercept to the server, which runs the (separately
-/// tested) capture + auto-finalize. This drives the host-side trigger and asserts the result is committed.
+/// Verifies that the battle controller reports resolved native mission results to the campaign server and ignores
+/// mission exits that did not resolve the battle.
 /// </summary>
 public class CoopBattleResultCommitTests : MissionTestEnvironment
 {
     public CoopBattleResultCommitTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void HostConcludesLostBattle_CommitsDefeatResult_ToCampaign()
+    public void ResolvedDefeat_ReportsResultToCampaignServer()
     {
         using var fixture = new MissionEngineFixture();
         var host = Clients.First();
         SetControllerId(host, "host");
 
-        BattleState committed = BattleState.None;
-
         host.Call(() =>
         {
-            // The host's mission concluded as a player DEFEAT — the AI (defender) won.
             var mock = fixture.CreateMission(host);
             mock.Shell.MissionResult = new MissionResult(BattleState.DefenderVictory, playerVictory: false, playerDefeated: true, enemyRetreated: false);
 
             var controller = host.Resolve<CoopBattleController>();
             controller.Session.TryBegin("mapEvent1");
-            host.Resolve<IBattleHostRegistry>().Set("mapEvent1", new BattleHostAssignment("host", Array.Empty<string>()));
-
-            // The intercept publishes before the native BattleState setter runs; give the (constructor-skipped)
-            // map event an empty sides array so the client-skipped OnBattleWon prefix doesn't deref a null _sides.
-            var mapEvent = host.CreateRegisteredObject<MapEvent>("mapEvent1");
-            mapEvent._sides = Array.Empty<MapEventSide>();
-
-            // Capture what the coop intercept forwards to the campaign sync.
-            host.Resolve<IMessageBroker>().Subscribe<MapEventBattleStateChangeAttempted>(p => committed = p.What.BattleState);
-
-            // The coop battle concluded on the host -> it commits the result to the campaign map event.
+            host.NetworkSentMessages.Clear();
             controller.ResultCommitter.CommitResolvedResult();
 
             GC.KeepAlive(controller);
         });
 
-        // The host committed the AI's victory, which the server applies (OnBattleWon -> capture) and auto-finalizes.
-        Assert.Equal(BattleState.DefenderVictory, committed);
+        var report = Assert.Single(host.NetworkSentMessages.GetMessages<NetworkBattleResultReady>());
+        Assert.Equal("mapEvent1", report.InstanceId);
+        Assert.Equal(BattleState.DefenderVictory, report.BattleState);
     }
 
-    /// <summary>
-    /// A host leaving a battle that OTHER players are still fighting (successor line non-empty) must NOT commit
-    /// its mission result: a host retreating after losing its own troops carries a RESOLVED defeat result, and
-    /// committing it made the server conclude the live battle under the successor — capturing the still-fighting
-    /// players and destroying the map event beneath their mission. The last player out commits instead.
-    /// </summary>
     [Fact]
-    public void HostLeavesWithSuccessorsStillFighting_DoesNotCommitTheResult()
+    public void UnresolvedMissionExit_DoesNotReportResult()
     {
         using var fixture = new MissionEngineFixture();
         var host = Clients.First();
         SetControllerId(host, "host");
 
-        BattleState committed = BattleState.None;
-
         host.Call(() =>
         {
-            // The retreating host's mission "concluded" as a player DEFEAT (its own troops were wiped before it
-            // fled) — a RESOLVED result that must still not be committed while a successor fights on.
             var mock = fixture.CreateMission(host);
-            mock.Shell.MissionResult = new MissionResult(BattleState.DefenderVictory, playerVictory: false, playerDefeated: true, enemyRetreated: false);
+            mock.Shell.MissionResult = new MissionResult();
 
             var controller = host.Resolve<CoopBattleController>();
             controller.Session.TryBegin("mapEvent1");
-            host.Resolve<IBattleHostRegistry>().Set("mapEvent1", new BattleHostAssignment("host", new[] { "successor" }));
-
-            var mapEvent = host.CreateRegisteredObject<MapEvent>("mapEvent1");
-            mapEvent._sides = Array.Empty<MapEventSide>();
-
-            host.Resolve<IMessageBroker>().Subscribe<MapEventBattleStateChangeAttempted>(p => committed = p.What.BattleState);
-
+            host.NetworkSentMessages.Clear();
             controller.ResultCommitter.CommitResolvedResult();
 
             GC.KeepAlive(controller);
         });
 
-        Assert.Equal(BattleState.None, committed);
+        Assert.Empty(host.NetworkSentMessages.GetMessages<NetworkBattleResultReady>());
     }
 }

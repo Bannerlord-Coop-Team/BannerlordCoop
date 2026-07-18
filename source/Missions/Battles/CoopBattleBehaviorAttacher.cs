@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.MapEvents;
 using Serilog;
 using System;
@@ -24,6 +24,9 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
     {
         var controller = controllerFactory();
         mission.AddMissionBehavior(controller);
-        Logger.Information("[BattleSync] Attached {Behavior} to mission '{Scene}'", controller.GetType().Name, mission.SceneName);
+        mission.AddMissionBehavior(new BattleResultReadyLogic(
+            controller.ResultCommitter,
+            controller.SiegeEngineStateReporter));
+        Logger.Information("[BattleSync] Attached coop battle behaviors to mission '{Scene}'", mission.SceneName);
     }
 }

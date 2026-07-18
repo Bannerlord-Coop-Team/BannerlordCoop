@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace GameInterface.Services.MapEvents.Messages.Start;
@@ -35,8 +35,15 @@ internal readonly struct NetworkRequestCreateMapEvent : ICommand
     public readonly bool ForceBlockadeSallyOutAttack;
     [ProtoMember(11)]
     public readonly bool ForceHideoutSendTroops;
+    [ProtoMember(12)]
+    public readonly string ExpectedMapEventId;
 
-    public NetworkRequestCreateMapEvent(string requestId, string attackerId, string defenderId, BattleCreationFlags flags)
+    public NetworkRequestCreateMapEvent(
+        string requestId,
+        string attackerId,
+        string defenderId,
+        BattleCreationFlags flags,
+        string expectedMapEventId)
     {
         RequestId = requestId;
         AttackerId = attackerId;
@@ -49,6 +56,7 @@ internal readonly struct NetworkRequestCreateMapEvent : ICommand
         ForceBlockadeAttack = flags.ForceBlockadeAttack;
         ForceBlockadeSallyOutAttack = flags.ForceBlockadeSallyOutAttack;
         ForceHideoutSendTroops = flags.ForceHideoutSendTroops;
+        ExpectedMapEventId = expectedMapEventId;
     }
 
     public BattleCreationFlags Flags => new BattleCreationFlags(

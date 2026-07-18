@@ -51,6 +51,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
 
         builder.RegisterType<MissionManager>().As<IMissionManager>().InstancePerLifetimeScope();
+        builder.RegisterType<BattleCompletionTracker>().As<IBattleCompletionTracker>().InstancePerDependency();
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();

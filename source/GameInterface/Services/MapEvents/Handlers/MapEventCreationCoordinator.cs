@@ -86,6 +86,11 @@ internal class MapEventCreationCoordinator : IHandler
         if (!objectManager.TryGetIdWithLogging(attacker, out var attackerId)) return null;
         if (!objectManager.TryGetIdWithLogging(defender, out var defenderId)) return null;
 
+        string expectedMapEventId = null;
+        var expectedMapEvent = attacker.MapEvent ?? defender.MapEvent;
+        if (expectedMapEvent != null && !objectManager.TryGetIdWithLogging(expectedMapEvent, out expectedMapEventId))
+            return null;
+
         var requestId = Guid.NewGuid().ToString();
         var pending = new PendingRequest();
         pendingRequests[requestId] = pending;
@@ -100,7 +105,12 @@ internal class MapEventCreationCoordinator : IHandler
                 requestId, attackerId, defenderId);
 
             // On a client, SendAll targets the server (its only connected peer).
-            network.SendAll(new NetworkRequestCreateMapEvent(requestId, attackerId, defenderId, flags));
+            network.SendAll(new NetworkRequestCreateMapEvent(
+                requestId,
+                attackerId,
+                defenderId,
+                flags,
+                expectedMapEventId));
 
             // Keep processing queued packet work while the game thread waits for the reply.
             if (!GameThread.WaitWhilePumping(() => pending.Completed.IsSet, deadline))
@@ -247,7 +257,7 @@ internal class MapEventCreationCoordinator : IHandler
         var attackerSide = attacker.MapEventSide;
         var defenderSide = defender.MapEventSide;
         if (attackerSide == null && defenderSide == null)
-            return false;
+            return !string.IsNullOrEmpty(request.ExpectedMapEventId);
 
         if (ReferenceEquals(attacker, defender) || request.Flags.IsForced) return true;
 
@@ -255,6 +265,7 @@ internal class MapEventCreationCoordinator : IHandler
         {
             var attackerEvent = attackerSide.MapEvent;
             if (IsActiveFieldBattle(attackerEvent) &&
+                IsExpectedMapEvent(request, attackerEvent) &&
                 ReferenceEquals(attackerEvent, defenderSide.MapEvent) &&
                 ReferenceEquals(attackerSide.OtherSide, defenderSide))
                 objectManager.TryGetIdWithLogging(attackerEvent, out mapEventId);
@@ -267,6 +278,7 @@ internal class MapEventCreationCoordinator : IHandler
         var joiningSide = occupiedSide?.OtherSide;
         var joiningMobileParty = joiningParty.MobileParty;
         if (!ReferenceEquals(joiningMobileParty, requestingParty) || !IsActiveFieldBattle(mapEvent) ||
+            !IsExpectedMapEvent(request, mapEvent) ||
             joiningSide == null || joiningMobileParty?.IsActive != true ||
             joiningMobileParty.CurrentSettlement != null || !CanJoinFieldBattle(joiningParty, joiningSide))
             return true;
@@ -274,6 +286,14 @@ internal class MapEventCreationCoordinator : IHandler
         joiningParty.MapEventSide = joiningSide;
         objectManager.TryGetIdWithLogging(mapEvent, out mapEventId);
         return true;
+    }
+
+    private bool IsExpectedMapEvent(NetworkRequestCreateMapEvent request, MapEvent mapEvent)
+    {
+        if (string.IsNullOrEmpty(request.ExpectedMapEventId))
+            return true;
+
+        return objectManager.TryGetId(mapEvent, out var mapEventId) && mapEventId == request.ExpectedMapEventId;
     }
 
     private static bool IsActiveFieldBattle(MapEvent mapEvent) =>

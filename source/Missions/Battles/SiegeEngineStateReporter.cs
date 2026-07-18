@@ -13,13 +13,12 @@ namespace Missions.Battles;
 
 /// <summary>
 /// [Host] Reports the surviving siege engine states to the server when the local siege mission ends.
-/// Engine damage persists whether the assault resolved or the attackers retreated, so this runs on
-/// every host mission end — before the result commit, so the server applies it while the siege event
-/// still exists. Same host + successor gates as <see cref="BattleResultCommitter"/>.
+/// Engine damage persists before a concluded result, with mission teardown as the retreat fallback.
 /// </summary>
 public interface ISiegeEngineStateReporter
 {
-    void ReportIfHost();
+    void ReportConcludedIfHost();
+    void ReportOnLeavingIfHost();
 }
 
 /// <inheritdoc cref="ISiegeEngineStateReporter"/>
@@ -31,6 +30,7 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
     private readonly IBattleSession session;
     private readonly IBattleHostRegistry hostRegistry;
     private readonly INetwork relayNetwork;
+    private bool hasReported;
 
     public SiegeEngineStateReporter(IObjectManager objectManager, IBattleSession session, IBattleHostRegistry hostRegistry, INetwork relayNetwork)
     {
@@ -40,14 +40,23 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
         this.relayNetwork = relayNetwork;
     }
 
-    public void ReportIfHost()
+    public void ReportConcludedIfHost()
     {
-        if (!session.IsLocalHost) return;
+        ReportIfHost(requireNoSuccessors: false);
+    }
 
-        // Leaving with successors still fighting is a retreat/handoff, not the battle's end — the last
-        // player out reports, matching BattleResultCommitter's commit gate.
+    public void ReportOnLeavingIfHost()
+    {
+        ReportIfHost(requireNoSuccessors: true);
+    }
+
+    private void ReportIfHost(bool requireNoSuccessors)
+    {
+        if (hasReported || !session.IsLocalHost) return;
+
+        // Leaving with successors still fighting is a retreat/handoff, not the battle's end.
         bool hasAssignment = hostRegistry.TryGet(session.InstanceId, out var assignment);
-        if (hasAssignment && assignment.SuccessorControllerIds.Count > 0) return;
+        if (requireNoSuccessors && hasAssignment && assignment.SuccessorControllerIds.Count > 0) return;
 
         if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent)) return;
         if (!mapEvent.IsSiegeAssault) return;
@@ -63,5 +72,6 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
             SiegeEngineStateConverter.ToEngineStates(attackerWeapons),
             SiegeEngineStateConverter.ToEngineStates(defenderWeapons),
             hasAssignment ? assignment.Epoch : 0));
+        hasReported = true;
     }
 }

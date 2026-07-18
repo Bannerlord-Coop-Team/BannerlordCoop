@@ -139,6 +139,11 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
 
+                if (mapEvent.BattleState != BattleState.None || mapEvent.IsFinalized)
+                {
+                    Logger.Warning("Ignoring join request: map event {MapEventId} is already concluded", data.MapEventId);
+                    return;
+                }
                 if (party.MapEventSide != null)
                 {
                     Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);

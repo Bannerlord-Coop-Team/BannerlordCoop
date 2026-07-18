@@ -218,7 +218,7 @@ internal class BattleHostHandler : IHandler
                 // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
                 if (TryAppendSuccessor(existing, requesterId, out var updated))
                 {
-                    hostRegistry.Set(mapEventId, updated);
+                    SetServerAssignment(mapEventId, updated);
                     Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
                         requesterId, mapEventId, string.Join(", ", updated.SuccessorControllerIds));
                     network.SendAll(ToMessage(mapEventId, updated));
@@ -234,7 +234,7 @@ internal class BattleHostHandler : IHandler
                 // battle, or one past the last generation if this map event was abandoned and re-entered.
                 var epoch = NextEpoch(mapEventId);
                 var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
-                hostRegistry.Set(mapEventId, assignment);
+                SetServerAssignment(mapEventId, assignment);
 
                 Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
                     requesterId, mapEventId, epoch);
@@ -706,7 +706,7 @@ internal class BattleHostHandler : IHandler
                 var newHost = successors[0];
                 successors.RemoveAt(0);
                 var promoted = new BattleHostAssignment(newHost, successors, NextEpoch(mapEventId, assignment.Epoch));
-                hostRegistry.Set(mapEventId, promoted);
+                SetServerAssignment(mapEventId, promoted);
 
                 Logger.Information("[BattleHost] Host {Old} left battle {MapEventId}; promoted {New} at epoch {Epoch} (successors: {Successors})",
                     controllerId, mapEventId, newHost, promoted.Epoch, string.Join(", ", successors));
@@ -722,7 +722,7 @@ internal class BattleHostHandler : IHandler
             {
                 // Successor-line cleanup: the host did not change, so the epoch is unchanged (BR-102).
                 var updated = new BattleHostAssignment(assignment.HostControllerId, successors, assignment.Epoch);
-                hostRegistry.Set(mapEventId, updated);
+                SetServerAssignment(mapEventId, updated);
 
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
                     controllerId, mapEventId, string.Join(", ", successors));
@@ -859,5 +859,11 @@ internal class BattleHostHandler : IHandler
             successors[i] = assignment.SuccessorControllerIds[i];
 
         return new NetworkBattleHostAssigned(mapEventId, assignment.HostControllerId, successors, assignment.Epoch);
+    }
+
+    private void SetServerAssignment(string mapEventId, BattleHostAssignment assignment)
+    {
+        hostRegistry.Set(mapEventId, assignment);
+        messageBroker.Publish(this, new BattleHostAssignmentChanged(mapEventId));
     }
 }

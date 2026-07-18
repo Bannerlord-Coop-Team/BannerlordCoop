@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Tests.Utils;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
@@ -24,7 +24,7 @@ namespace Coop.Tests.Server.Services.MapEvents;
 /// The full write-back needs a live siege mission/scene neither harness provides, so this drives
 /// the real handler with a mocked object manager: "refused" = the handler returned before the
 /// write-back's map-event lookup; "applied" = the lookup ran. The handler's stamping counterpart
-/// (<c>SiegeEngineStateReporter.ReportIfHost</c>) needs <c>Mission.Current</c> plus
+/// (<c>SiegeEngineStateReporter.ReportConcludedIfHost</c>) needs <c>Mission.Current</c> plus
 /// <c>MissionSiegeEnginesLogic</c> and stays covered by code review only.
 /// </para>
 /// </summary>

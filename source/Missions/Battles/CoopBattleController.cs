@@ -35,7 +35,7 @@ namespace Missions.Battles;
 /// <item><see cref="BattleDamageRouter"/> — puppet hits routed to and applied by the owner.</item>
 /// <item><see cref="BattleAuthorityMigrator"/> — player-party withdrawal and host migration.</item>
 /// <item><see cref="ReinforcementFielder"/> — the host fields new AI parties mid-battle.</item>
-/// <item><see cref="SupplyProgressReporter"/> / <see cref="BattleResultCommitter"/> — server ledger + result commit.</item>
+/// <item><see cref="SupplyProgressReporter"/> / <see cref="BattleResultCommitter"/> — server ledger + result report.</item>
 /// <item><see cref="BattleDeploymentCoordinator"/> — deployment activation ("any client" NPC release) and the
 /// own-party reveal gate.</item>
 /// </list>
@@ -51,8 +51,11 @@ public class CoopBattleController : CoopMissionController
     /// <summary>Deployment activation + reveal state (exposed for the join catch-up and tests).</summary>
     public IBattleDeploymentCoordinator Deployment { get; }
 
-    /// <summary>Commits a concluded battle's result to the campaign on mission end.</summary>
+    /// <summary>Reports a concluded battle's result to the campaign server.</summary>
     public IBattleResultCommitter ResultCommitter { get; }
+
+    /// <summary>Reports final siege engine state before the shared result is applied.</summary>
+    public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
 
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
@@ -67,7 +70,6 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeEngineDeploymentReplicator siegeEngineDeployment;
     private readonly ISiegeMachineStateReplicator siegeMachineState;
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
-    private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
     private readonly IBattleHostRegistry hostRegistryRef;
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
@@ -116,8 +118,8 @@ public class CoopBattleController : CoopMissionController
         hostRegistryRef = hostRegistry;
         Session = session;
         Deployment = deployment;
-        ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry);
-        siegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
+        ResultCommitter = new BattleResultCommitter(relayNetwork, session);
+        SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
 
         // Decode order clips during battle setup so the first issued order does not hitch.
         coopMissionComponent.AgentVoiceHandler.WarmUp();
@@ -331,11 +333,10 @@ public class CoopBattleController : CoopMissionController
     {
         damageRouter.FlushForMissionEnd();
 
-        // Report engine states before the commit, so the server applies them while the siege still exists.
-        siegeEngineStateReporter.ReportIfHost();
+        // Retreats have no result-ready callback, so report their siege state during teardown.
+        SiegeEngineStateReporter.ReportOnLeavingIfHost();
 
-        // Commit the concluded battle's result to the campaign BEFORE tearing the instance down, so the server
-        // captures losers / awards the win and finalizes the encounter.
+        // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
         ResultCommitter.CommitResolvedResult();
 
         lifecycle.Leave();
