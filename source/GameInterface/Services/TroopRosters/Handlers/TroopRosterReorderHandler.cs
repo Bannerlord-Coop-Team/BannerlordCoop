@@ -62,6 +62,9 @@ internal class TroopRosterReorderHandler : IHandler
             // Apply on the server
             ApplyReorder(data.OrderData.IndexCharacterIds, data.TroopRoster);
 
+            var compactId = Compact(troopRosterId, typeof(TroopRoster));
+            sendCoalescer?.FlushInstance(compactId, network);
+
             var message = new NetworkApplyTroopRosterOrder(troopRosterId, data.OrderData);
             network.SendAll(message);
         });
@@ -74,9 +77,6 @@ internal class TroopRosterReorderHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.TroopRosterId, out var troopRoster)) return;
-
-            var compactId = Compact(data.TroopRosterId, typeof(TroopRoster));
-            sendCoalescer?.FlushInstance(compactId, network);
 
             // Apply on clients
             using (new AllowedThread())
