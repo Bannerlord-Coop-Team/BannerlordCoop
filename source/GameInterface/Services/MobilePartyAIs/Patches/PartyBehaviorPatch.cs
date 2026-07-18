@@ -73,7 +73,6 @@ public static class PartyBehaviorPatch
 
     // Vanilla saves TargetPosition, TargetSettlement, and DefaultBehavior independently, while NavigationPath is discarded on load.
     // A save can therefore retain GoToSettlement intent with a current-position target after the in-memory path masked the mismatch.
-    // On same-map loads Campaign.CheckMapUpdate skips CheckAiForMapChangeAndUpdateIfNeeded, so vanilla does not normalize those fields.
     // MobilePartyAi.GetBehaviors seeds GoToSettlement from the saved TargetPosition and never replaces it with the settlement gate.
     // That current position feeds back every AI tick, and our behavior deduplication would preserve it forever.
     private static void RepairInvalidSettlementTarget(
