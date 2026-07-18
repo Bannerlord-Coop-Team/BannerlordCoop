@@ -320,6 +320,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private MissionEquipmentData PackMissionEquipmentData(MissionEquipment equipment)
     {
         var missionEquipmentData = new MissionEquipmentData(new());
+        if (equipment == null) return null;
+
         for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
         {
             var packedWeapon = PackMissionWeapon(equipment._weaponSlots[(int)equipmentIndex]);

@@ -419,6 +419,8 @@ public class PuppetSpawner : IPuppetSpawner
     private MissionEquipment ResolveMissionEquipment(MissionEquipmentData data)
     {
         var missionEquipment = new MissionEquipment();
+        if (data == null || data.WeaponSlots.Count == 0) return null;
+
         for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
         {
             missionEquipment._weaponSlots[(int)equipmentIndex] = ResolveMissionWeapon(data.WeaponSlots[(int)equipmentIndex]);
