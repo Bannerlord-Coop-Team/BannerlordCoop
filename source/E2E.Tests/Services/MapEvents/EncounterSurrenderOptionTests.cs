@@ -1,6 +1,5 @@
 using Common.Util;
 using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using HarmonyLib;
@@ -11,7 +10,6 @@ using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -219,7 +217,7 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
 
         if (withHealthyAllyOnSide)
         {
-            var allyPartyId = JoinNewServerPartyToDefenderSide(ctx.MapEventId);
+            var allyPartyId = JoinNewServerPartyToSide(ctx.MapEventId, BattleSideEnum.Defender);
             var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
             SeedPartyTroopOnAll(allyPartyId, troopId, 3);
         }
@@ -237,27 +235,6 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
         var (ctx, client) = SetupDefenderInBattle(withHealthyAllyOnSide);
         MakeMainPartyIncapacitated(client);
         return (ctx, client);
-    }
-
-    /// <summary>Creates a party on the server and joins it to the battle's defender side (the vanilla
-    /// reinforcement entry point — see <see cref="MapEventTestBase.JoinPartyToSide"/>), returning the
-    /// party's id for roster seeding.</summary>
-    private string JoinNewServerPartyToDefenderSide(string mapEventId)
-    {
-        string? allyPartyId = null;
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-
-            var ally = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            ally.Party.MapEventSide = mapEvent.DefenderSide;
-
-            Assert.True(Server.ObjectManager.TryGetId(ally, out allyPartyId));
-        }, MapEventDisabledMethods);
-
-        Assert.NotNull(allyPartyId);
-        return allyPartyId!;
     }
 
     /// <summary>Makes <paramref name="partyId"/> the client's <see cref="MobileParty.MainParty"/> and asserts
