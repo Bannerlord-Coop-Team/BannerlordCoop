@@ -11,10 +11,12 @@ namespace GameInterface.Serialization.Native
         {
             { typeof(Array), typeof(EnumerableBinaryPackage) },
             { typeof(List<>), typeof(EnumerableBinaryPackage) },
+            { typeof(HashSet<>), typeof(EnumerableBinaryPackage) },
 
             { typeof(Dictionary<,>), typeof(DictionaryBinaryPackage) },
             { typeof(KeyValuePair<,>), typeof(KeyValuePairBinaryPackage) },
             { typeof(ValueTuple<,>), typeof(ValueTupleBinaryPackage) },
+            { typeof(Tuple<uint, float>), typeof(UInt32FloatTupleBinaryPackage) },
 
             { typeof(MBReadOnlyList<>), typeof(MBReadOnlyListBinaryPackage) },
             { typeof(MBList<>), typeof(MBReadOnlyListBinaryPackage) },

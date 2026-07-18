@@ -70,6 +70,7 @@ public class TransferSaveState : ConnectionStateBase
                 coopSessionProvider.CoopSession?.CaravansPlayerData,
                 coopSessionProvider.CoopSession?.AlleyPlayerData,
                 coopSessionProvider.CoopSession?.InteractionsPlayerData,
+                coopSessionProvider.CoopSession?.TradePlayerData,
                 attachmentIdMapper.BuildServerMap());
 
             // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save

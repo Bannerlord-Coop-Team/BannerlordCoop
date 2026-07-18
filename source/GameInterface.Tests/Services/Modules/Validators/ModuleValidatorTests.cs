@@ -200,4 +200,48 @@ public class ModuleValidatorTests
         Assert.False(result);
         Assert.Equal("Server does not support module 'ModuleC'.", error);
     }
+
+    [Fact]
+    public void Validate_Succeeds_WhenOnlyClientHasStoryMode()
+    {
+        var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 352);
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version },
+            new ModuleInfo { Id = "StoryMode", IsOfficial = true, Version = version }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_Succeeds_WhenOnlyServerHasStoryMode()
+    {
+        var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 352);
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version },
+            new ModuleInfo { Id = "StoryMode", IsOfficial = true, Version = version }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
 }

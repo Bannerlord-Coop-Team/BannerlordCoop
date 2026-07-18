@@ -11,9 +11,19 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 internal readonly struct PartyBehaviorChangeAttempted : IEvent
 {
     public readonly MobileParty Party;
+    public readonly bool ForcePosition;
+    public readonly bool IsCurrentlyAtSea;
+    public readonly bool ResetMovementToHold;
 
-    public PartyBehaviorChangeAttempted(MobileParty party)
+    public PartyBehaviorChangeAttempted(
+        MobileParty party,
+        bool forcePosition = false,
+        bool isCurrentlyAtSea = false,
+        bool resetMovementToHold = false)
     {
         Party = party;
+        ForcePosition = forcePosition;
+        IsCurrentlyAtSea = isCurrentlyAtSea;
+        ResetMovementToHold = resetMovementToHold;
     }
 }

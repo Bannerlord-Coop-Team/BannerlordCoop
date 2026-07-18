@@ -63,6 +63,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             obj.StringId = id;
             obj._sides = new MapEventSide[2];
             obj.WonRounds = new MBList<BattleSideEnum>();
+            obj.RetreatingSide = BattleSideEnum.None;
+            obj.PursuitRoundNumber = 0;
         }
 
         initializationBarrier.Register(obj);
