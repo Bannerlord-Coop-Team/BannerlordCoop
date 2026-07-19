@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -99,11 +99,18 @@ internal class LocationConversationHandler : IHandler
         }
 
         var request = payload.What;
-        var npcKey = LocationConversationTracker.ComposeKey(request.LocationId, request.CharacterId);
+        if (!playerManager.TryGetPlayer(peer, out var player) || string.IsNullOrEmpty(player.CharacterObjectId))
+        {
+            Logger.Error("Could not resolve the player character for {Message}", nameof(NetworkRequestLocationConversation));
+            network.Send(peer, new NetworkLocationConversationDenied(request.Generation));
+            return;
+        }
 
-        // First approval wins; TryBeginEngagement refuses an NPC held by another player (or a second NPC
-        // for a player who already holds one).
-        if (tracker.TryBeginEngagement(peer, npcKey))
+        var engagerNpcKey = LocationConversationTracker.ComposeKey(request.LocationId, player.CharacterObjectId);
+        var targetNpcKey = LocationConversationTracker.ComposeKey(request.LocationId, request.CharacterId);
+
+        // Reserve both participants so crossed requests cannot approve two conversations at once.
+        if (tracker.TryBeginEngagement(peer, engagerNpcKey, targetNpcKey))
         {
             network.Send(peer, new NetworkAllowLocationConversation(request.Generation));
             StartPlayerWaitingInteraction(peer, request.CharacterId);
