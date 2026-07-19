@@ -141,12 +141,19 @@ internal class PartyDoneLogicHandler : IHandler
 
             var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.DonatedPrisonersRoster, objectManager);
             var recruitedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.RecruitedPrisonersRoster, objectManager);
-            var releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
-                message.LeftPrisonerRosterData,
-                message.RightPrisonerRosterData,
-                message.ReleaserPartyPosition,
-                out var leftPrisonerRosterData,
-                out var rightPrisonerRosterData);
+            var releasedPlayerCaptivityEvents = new List<PlayerCaptivityEndedByServer>();
+            var leftPrisonerRosterData = message.LeftPrisonerRosterData;
+            var rightPrisonerRosterData = message.RightPrisonerRosterData;
+            // SellPrisonersHandler owns ransom releases so the same player is not released twice.
+            if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
+            {
+                releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
+                    message.LeftPrisonerRosterData,
+                    message.RightPrisonerRosterData,
+                    message.ReleaserPartyPosition,
+                    out leftPrisonerRosterData,
+                    out rightPrisonerRosterData);
+            }
 
             var rosterDeltas = CreateRosterDeltas(
                 mainHero,

@@ -1,11 +1,21 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
+using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.PlayerCaptivityService.Commands;
@@ -149,6 +159,171 @@ Releases the given player hero from captivity.";
         }
     }
 
+    private const string RansomPlayerAtSettlementUsage =
+@"Usage:
+  coop.debug.player_captivity.ransom_player_at_settlement <heroId>
+
+Example:
+  coop.debug.player_captivity.ransom_player_at_settlement Player
+
+Ransoms the captive player hero for zero gold through their captor's settlement prisoner-sale path.";
+
+    [CommandLineArgumentFunction("ransom_player_at_settlement", "coop.debug.player_captivity")]
+    public static string RansomPlayerAtSettlement(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "ransom_player_at_settlement",
+            RansomPlayerAtSettlementUsage,
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(1, out error))
+            return error;
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to ransom hero: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to ransom hero: " + error;
+
+        if (!hero.IsPrisoner || hero.PartyBelongedToAsPrisoner == null)
+            return $"Hero '{GetHeroDisplayName(hero)}' is not a prisoner.";
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.Contains(hero))
+            return $"Hero '{GetHeroDisplayName(hero)}' is not a registered co-op player.";
+
+        var captorParty = hero.PartyBelongedToAsPrisoner;
+        var currentSettlement = captorParty.MobileParty?.CurrentSettlement;
+        if (currentSettlement == null)
+            return $"Captor for '{GetHeroDisplayName(hero)}' is not in a settlement.";
+
+        if (!ContainerProvider.TryResolve<IPrisonerSaleProcessor>(out var prisonerSaleProcessor))
+            return "Failed to ransom hero: could not resolve PrisonerSaleProcessor.";
+
+        var requestedPrisoners = new TroopRoster();
+        requestedPrisoners.AddToCounts(hero.CharacterObject, 1);
+        var seller = captorParty.LeaderHero;
+        var sellerGoldBefore = seller?.Gold ?? 0;
+
+        prisonerSaleProcessor.Sell(captorParty, requestedPrisoners);
+
+        var sellerGoldAfter = seller?.Gold ?? 0;
+        return
+            "Hero ransomed successfully.\n" +
+            $"Hero: {GetHeroDisplayName(hero)}\n" +
+            $"Settlement: {currentSettlement.Name} ({currentSettlement.StringId})\n" +
+            $"Seller gold change: {sellerGoldAfter - sellerGoldBefore}";
+    }
+
+    [CommandLineArgumentFunction("captivity_state", "coop.debug.player_captivity")]
+    public static string CaptivityState(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.player_captivity.captivity_state <heroId>";
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error))
+            return "Failed to inspect captivity: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error))
+            return "Failed to inspect captivity: " + error;
+
+        MobileParty playerParty = null;
+        if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+        {
+            var player = playerManager.Players.SingleOrDefault(candidate => candidate.HeroId == args[0]);
+            if (player != null)
+                objectManager.TryGetObject(player.MobilePartyId, out playerParty);
+        }
+
+        var result = new StringBuilder();
+        result.AppendLine("HeroId=" + hero.StringId);
+        result.AppendLine("IsPrisoner=" + hero.IsPrisoner);
+        result.AppendLine("CaptorPartyId=" + (hero.PartyBelongedToAsPrisoner?.MobileParty?.StringId ?? "none"));
+        result.AppendLine("PlayerPartyId=" + (playerParty?.StringId ?? "none"));
+        result.AppendLine("PlayerPartyActive=" + (playerParty?.IsActive.ToString() ?? "none"));
+        result.AppendLine("PlayerPartyLeaderHeroId=" + (playerParty?.LeaderHero?.StringId ?? "none"));
+        result.AppendLine("PlayerPartyMemberCount=" + (playerParty?.MemberRoster.TotalManCount.ToString(CultureInfo.InvariantCulture) ?? "none"));
+        result.AppendLine("PlayerPartyX=" + FormatCoordinate(playerParty?.Position.X));
+        result.AppendLine("PlayerPartyY=" + FormatCoordinate(playerParty?.Position.Y));
+        result.AppendLine("PlayerPartyIsOnLand=" + (playerParty?.Position.IsOnLand.ToString() ?? "none"));
+        result.AppendLine("PlayerPartySettlementId=" + (playerParty?.CurrentSettlement?.StringId ?? "none"));
+        return result.ToString();
+    }
+
+    [CommandLineArgumentFunction("party_fixture_state", "coop.debug.player_captivity")]
+    public static string PartyFixtureState(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.player_captivity.party_fixture_state <partyId>";
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error))
+            return "Failed to inspect party: " + error;
+
+        if (!TryResolveMobileParty(objectManager, args[0], out var party, out error))
+            return "Failed to inspect party: " + error;
+
+        var result = new StringBuilder();
+        result.AppendLine("PartyId=" + party.StringId);
+        result.AppendLine("IsActive=" + party.IsActive);
+        result.AppendLine("PositionX=" + FormatCoordinate(party.Position.X));
+        result.AppendLine("PositionY=" + FormatCoordinate(party.Position.Y));
+        result.AppendLine("IsOnLand=" + party.Position.IsOnLand);
+        result.AppendLine("SettlementId=" + (party.CurrentSettlement?.StringId ?? "none"));
+        result.AppendLine("LeaderHeroId=" + (party.LeaderHero?.StringId ?? "none"));
+        result.AppendLine("LeaderGold=" + (party.LeaderHero?.Gold.ToString(CultureInfo.InvariantCulture) ?? "none"));
+        result.AppendLine("PrisonerCount=" + party.PrisonRoster.TotalManCount.ToString(CultureInfo.InvariantCulture));
+        return result.ToString();
+    }
+
+    [CommandLineArgumentFunction("restore_party_fixture_state", "coop.debug.player_captivity")]
+    public static string RestorePartyFixtureState(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.player_captivity.restore_party_fixture_state <partyId> <settlementId|none> <x> <y> <isOnLand>";
+        var ctx = new CommandContext("restore_party_fixture_state", usage, args);
+        if (!ctx.RequireServer(out var error))
+            return error;
+        if (!ctx.RequireArgCount(5, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to restore party: " + error;
+        if (!TryResolveMobileParty(objectManager, args[0], out var party, out error))
+            return "Failed to restore party: " + error;
+        if (!float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
+            !float.TryParse(args[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var y) ||
+            !bool.TryParse(args[4], out var isOnLand))
+            return usage;
+
+        if (args[1] == "none")
+        {
+            if (party.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(party);
+
+            party.Position = new CampaignVec2(new Vec2(x, y), isOnLand);
+        }
+        else
+        {
+            var settlement = Settlement.Find(args[1]);
+            if (settlement == null)
+                return $"Failed to restore party: settlement '{args[1]}' not found.";
+
+            if (party.CurrentSettlement != settlement)
+            {
+                if (party.CurrentSettlement != null)
+                    LeaveSettlementAction.ApplyForParty(party);
+                EnterSettlementAction.ApplyForParty(party, settlement);
+            }
+        }
+
+        return "Restored party fixture state.\n" + PartyFixtureState(new List<string> { args[0] });
+    }
+
     private static bool TryGetRandomCaptor(out MobileParty newCaptor, out string error)
     {
         newCaptor = null;
@@ -184,6 +359,24 @@ Releases the given player hero from captivity.";
         error = "Could not find a valid captor party.";
         return false;
     }
+
+    private static bool TryResolveMobileParty(
+        IObjectManager objectManager,
+        string partyId,
+        out MobileParty party,
+        out string error)
+    {
+        if (objectManager.TryGetObject(partyId, out party))
+        {
+            error = null;
+            return true;
+        }
+
+        return CommandHelpers.TryGetMobileParty(partyId, out party, out error);
+    }
+
+    private static string FormatCoordinate(float? coordinate) =>
+        coordinate?.ToString("R", CultureInfo.InvariantCulture) ?? "none";
 
     private static string CaptureHero(Hero hero, MobileParty newCaptor)
     {
