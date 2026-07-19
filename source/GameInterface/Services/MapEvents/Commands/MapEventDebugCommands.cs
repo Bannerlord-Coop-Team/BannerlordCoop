@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
@@ -11,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -175,6 +177,95 @@ public class MapEventDebugCommands
 
         return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
                $"against player {args[0]}.";
+    }
+
+    // coop.debug.mapevent.test_peace_stops_pursuit PlayerOne
+    /// <summary>
+    /// Makes the nearest neutral AI party pursue a connected player, then makes peace.
+    /// </summary>
+    [CommandLineArgumentFunction("test_peace_stops_pursuit", "coop.debug.mapevent")]
+    public static string TestPeaceStopsPursuit(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.test_peace_stops_pursuit <controllerId>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+        {
+            return "Unable to resolve PlayerManager";
+        }
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+        {
+            return $"No registered player has controller id {args[0]}.";
+        }
+
+        if (!playerManager.IsConnected(player))
+        {
+            return $"Player {args[0]} is not connected.";
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+        {
+            return $"Unable to resolve player party {player.MobilePartyId}.";
+        }
+
+        if (playerParty.MapEvent != null)
+        {
+            return $"Player {args[0]} is already in a map event.";
+        }
+
+        var playerFaction = playerParty.MapFaction;
+        if (playerFaction == null)
+        {
+            return $"Player {args[0]} has no map faction.";
+        }
+
+        var playerPosition = playerParty.Position.ToVec2();
+        var neutralParty = MobileParty.All
+            .Where(p => p.IsActive && !p.IsBandit && !p.IsPlayerParty() && p != playerParty
+                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0
+                        && p.MapFaction != null && p.MapFaction != playerFaction
+                        && !FactionManager.IsAtWarAgainstFaction(p.MapFaction, playerFaction))
+            .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
+            .FirstOrDefault();
+
+        if (neutralParty == null)
+        {
+            return "No active neutral AI party found on the map.";
+        }
+
+        DeclareWarAction.ApplyByDefault(neutralParty.MapFaction, playerFaction);
+        if (!FactionManager.IsAtWarAgainstFaction(neutralParty.MapFaction, playerFaction))
+        {
+            return $"Unable to establish war between {neutralParty.MapFaction.Name} and {playerFaction.Name}.";
+        }
+
+        neutralParty.SetMoveGoAroundParty(playerParty, MobileParty.NavigationType.Default);
+        MakePeaceAction.Apply(neutralParty.MapFaction, playerFaction);
+
+        var partyId = objectManager.TryGetId(neutralParty, out string registryId)
+            ? registryId
+            : neutralParty.StringId;
+        var stopped = neutralParty.DefaultBehavior == AiBehavior.Hold &&
+                      neutralParty.PartyMoveMode == MoveModeType.Hold &&
+                      neutralParty.TargetParty == null;
+
+        return $"Peace pursuit test {(stopped ? "passed" : "failed")} for {neutralParty.Name} " +
+               $"(StringId {neutralParty.StringId}, registry id {partyId}): " +
+               $"behavior={neutralParty.DefaultBehavior}, moveMode={neutralParty.PartyMoveMode}, " +
+               $"target={(neutralParty.TargetParty == null ? "none" : neutralParty.TargetParty.StringId)}.";
     }
 
     /// <summary>
