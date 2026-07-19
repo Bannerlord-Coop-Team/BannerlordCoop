@@ -177,6 +177,7 @@ public class PuppetSpawner : IPuppetSpawner
         buildData.InitialDirection(Vec2.Forward);
         buildData.Equipment(data.SpawnEquipment); // Use calculated equipment from spawning client instead of character equipment (random per troop per client)
         buildData.BodyProperties(data.BodyProperties);
+        buildData.Banner(origin.Banner);
         buildData.TroopOrigin(origin);
         buildData.MissionEquipment(missionEquipment);
         buildData.Controller(isOwnHero ? AgentControllerType.Player
