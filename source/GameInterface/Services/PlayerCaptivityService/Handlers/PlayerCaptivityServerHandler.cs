@@ -445,17 +445,17 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
-        {
-            Logger.Error("Received {Message} without a registered player peer", nameof(NetworkPrisonerLiberationAttempted));
-            return;
-        }
-
-        string playerHeroId = player.HeroId;
         string prisonerId = payload.What.PrisonerId;
 
         GameThread.RunSafe(() =>
         {
+            if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
+            {
+                Logger.Error("Received {Message} without a registered player peer", nameof(NetworkPrisonerLiberationAttempted));
+                return;
+            }
+
+            string playerHeroId = player.HeroId;
             if (!objectManager.TryGetObjectWithLogging<Hero>(playerHeroId, out var playerHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(prisonerId, out var prisoner)) return;
             if (!prisoner.IsPrisoner) return;
