@@ -35,3 +35,22 @@ internal class PlayerLeaveSettlementPatch
         return false;
     }
 }
+
+[HarmonyPatch(
+    typeof(EncounterGameMenuBehavior),
+    nameof(EncounterGameMenuBehavior.break_in_leave_consequence))]
+internal class PlayerLeaveSiegeEncounterPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix()
+    {
+        if (!ShouldRequestLeave(MobileParty.MainParty)) return true;
+
+        return PlayerLeaveSettlementPatch.RequestLeave();
+    }
+
+    internal static bool ShouldRequestLeave(MobileParty party) =>
+        party != null &&
+        party.SiegeEvent == null &&
+        (party.Army == null || party.Army.LeaderParty == party);
+}
