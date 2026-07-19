@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Tests.Utils;
+using Coop.Tests;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
@@ -28,6 +29,7 @@ namespace Coop.Tests.Server.Services.MapEvents;
 /// <c>MissionSiegeEnginesLogic</c> and stays covered by code review only.
 /// </para>
 /// </summary>
+[Collection(ModInformationRoleCollection.Name)]
 public class SiegeEngineStateCommitHandlerTests : IDisposable
 {
     private const string MapEventId = "map-event-1";

@@ -18,7 +18,6 @@ namespace Coop.Tests.Server.Services.Instances;
 public class ServerMissionMembershipHandlerTests
 {
     private const string InstanceId = "battle-1";
-
     private static readonly ConstructorInfo PeerConstructor = typeof(NetPeer).GetConstructor(
         BindingFlags.NonPublic | BindingFlags.Instance,
         binder: null,

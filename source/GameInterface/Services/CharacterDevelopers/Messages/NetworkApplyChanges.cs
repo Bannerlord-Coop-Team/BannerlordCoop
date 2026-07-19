@@ -25,17 +25,13 @@ internal readonly struct NetworkApplyChanges : ICommand
     [ProtoMember(6)]
     public readonly List<int> SkillFocusLevels;
 
-    [ProtoMember(7)]
-    public readonly List<int> SkillOrgFocusAmounts;
-
     public NetworkApplyChanges(
         string heroDeveloperId,
         List<string> perkIds,
         List<string> attributeIds,
         List<int> attributeIncreases,
         List<string> skillIds,
-        List<int> skillFocusLevels,
-        List<int> skillOrgFocusAmounts)
+        List<int> skillFocusLevels)
     {
         HeroDeveloperId = heroDeveloperId;
         PerkIds = perkIds;
@@ -43,6 +39,5 @@ internal readonly struct NetworkApplyChanges : ICommand
         AttributeIncreases = attributeIncreases;
         SkillIds = skillIds;
         SkillFocusLevels = skillFocusLevels;
-        SkillOrgFocusAmounts = skillOrgFocusAmounts;
     }
 }
