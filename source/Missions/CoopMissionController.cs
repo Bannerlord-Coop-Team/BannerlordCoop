@@ -68,12 +68,12 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.MissileHandler.DrainPendingShots();
     }
 
-    public override void OnPreMissionTick(float dt)
+    public override void OnPreDisplayMissionTick(float dt)
     {
-        base.OnPreMissionTick(dt);
+        base.OnPreDisplayMissionTick(dt);
 
-        // Pre-tick runs after the previous agent tick completes and before the next native agent update.
-        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates();
+        // This runs after the previous native agent tick and immediately before the display snapshot.
+        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates(dt);
     }
 
     public virtual void Dispose()

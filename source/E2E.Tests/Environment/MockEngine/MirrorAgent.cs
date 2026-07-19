@@ -46,6 +46,14 @@ public sealed class MirrorAgent
     public Agent.ActionCodeType Action1CodeType { get; set; } = Agent.ActionCodeType.Idle;
     public Agent.UsageDirection Action0Direction { get; set; } = Agent.UsageDirection.None;
     public Agent.UsageDirection Action1Direction { get; set; } = Agent.UsageDirection.None;
+    public int Action0Index { get; set; } = -1;
+    public int Action1Index { get; set; } = -1;
+    public float Action0Progress { get; set; }
+    public float Action1Progress { get; set; }
+    public AnimFlags Action0Flags { get; set; }
+    public AnimFlags Action1Flags { get; set; }
+    public int SetActionChannelCalls { get; set; }
+    public int LastSetActionChannel { get; set; } = -1;
     public Agent.MovementControlFlag DefendMovementFlag { get; set; }
     public int SetWeaponGuardCalls { get; set; }
     public int ResetGuardCalls { get; set; }

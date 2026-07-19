@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -21,7 +22,7 @@ public interface IRemoteAgentActionProcessor : IDisposable
     int GetOutgoingBattleHostEpoch();
     void ClearForLocalAgent(Guid agentId, Agent agent);
     void ApplyRemoteGuardStates();
-    void ReassertRemoteDefendStates();
+    void ReassertRemoteDefendStates(float dt);
     void Receive(AgentActionPacket packet);
     void HandleBattleHostAssigned(NetworkBattleHostAssigned message);
 }
@@ -76,26 +77,24 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         WrongAuthority
     }
 
-    private readonly struct RemoteGuardState
+    private struct RemoteGuardState
     {
-        public readonly string ControllerId;
-        public readonly Agent.MovementControlFlag DefendFlags;
-        public readonly Agent.GuardMode GuardMode;
-        public readonly int BattleHostEpoch;
-        public readonly long Sequence;
+        public readonly RemoteAction Action;
+        public readonly int GuardActionChannel;
+        public readonly ActionIndexCache GuardAction;
+        public float GuardActionProgress;
 
         public RemoteGuardState(
-            string controllerId,
-            Agent.MovementControlFlag defendFlags,
-            Agent.GuardMode guardMode,
-            int battleHostEpoch,
-            long sequence)
+            RemoteAction action,
+            int guardActionChannel,
+            ActionIndexCache guardAction)
         {
-            ControllerId = controllerId;
-            DefendFlags = defendFlags;
-            GuardMode = guardMode;
-            BattleHostEpoch = battleHostEpoch;
-            Sequence = sequence;
+            Action = action;
+            GuardActionChannel = guardActionChannel;
+            GuardAction = guardAction;
+            GuardActionProgress = guardActionChannel == 0
+                ? action.Data.Action0Progress
+                : action.Data.Action1Progress;
         }
     }
 
@@ -214,17 +213,19 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (_disposed || Mission.Current == null) return;
 
         ApplyPendingRemoteActions();
-        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: false);
+        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: false, dt: 0f);
     }
 
-    public void ReassertRemoteDefendStates()
+    public void ReassertRemoteDefendStates(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
-        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: true);
+        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: true, dt);
     }
 
-    private void ApplyRetainedRemoteGuardStates(bool traceAfterNativeTick)
+    private void ApplyRetainedRemoteGuardStates(
+        bool traceAfterNativeTick,
+        float dt)
     {
         if (_disposed || Mission.Current == null) return;
         if (_retainedGuardAgentIds.Count == 0) return;
@@ -288,8 +289,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 RemoteGuardState guardState = state.RetainedGuard.Value;
                 if (!IsCurrentActionAuthority(
                     info,
-                    guardState.ControllerId,
-                    guardState.BattleHostEpoch))
+                    guardState.Action.ControllerId,
+                    guardState.Action.BattleHostEpoch))
                 {
                     ClearRemoteDefendState(agent);
                     (staleIds ??= new List<Guid>()).Add(agentId);
@@ -298,13 +299,19 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
                 AgentActionData.ApplyDefendMovementFlags(
                     agent,
-                    guardState.DefendFlags);
-                Agent.GuardMode guardMode = guardState.GuardMode;
+                    guardState.Action.Data.DefendFlags);
+                Agent.GuardMode guardMode = guardState.Action.Data.GuardMode;
                 if (AgentActionData.IsGuardMode(guardMode))
                 {
                     AgentActionData.ApplyGuardState(
                         agent,
                         guardMode);
+                }
+
+                if (traceAfterNativeTick)
+                {
+                    ReplayMountedGuardAction(agent, dt, ref guardState);
+                    state.RetainedGuard = guardState;
                 }
 
                 if (state.TraceAfterReassert)
@@ -665,9 +672,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         bool guardTransition;
         if (hadRetainedGuard)
         {
-            guardTransition = existingState.RetainedGuard.Value.DefendFlags
+            guardTransition = existingState.RetainedGuard.Value.Action.Data.DefendFlags
                 != action.Data.DefendFlags
-                || existingState.RetainedGuard.Value.GuardMode
+                || existingState.RetainedGuard.Value.Action.Data.GuardMode
                 != action.Data.GuardMode;
         }
         else
@@ -688,32 +695,43 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
 
         action.Data.Apply(agent);
+        int guardActionChannel = -1;
+        if (AgentActionData.IsDefendingAction(agent.GetCurrentActionType(1)))
+        {
+            guardActionChannel = 1;
+        }
+        else if (AgentActionData.IsDefendingAction(agent.GetCurrentActionType(0)))
+        {
+            guardActionChannel = 0;
+        }
+
+        ActionIndexCache guardAction = guardActionChannel >= 0
+            ? agent.GetCurrentAction(guardActionChannel)
+            : ActionIndexCache.act_none;
+        var appliedGuardState = new RemoteGuardState(
+            action,
+            guardActionChannel,
+            guardAction);
         RecordRemoteActionSequence(agentId, action);
         UpdateRemoteGuardState(
             agentId,
-            action,
+            appliedGuardState,
             agent,
             traceMountedPlayerGuard);
 
         if (traceMountedPlayerGuard)
         {
-            var traceState = new RemoteGuardState(
-                action.ControllerId,
-                action.Data.DefendFlags,
-                action.Data.GuardMode,
-                action.BattleHostEpoch,
-                action.Sequence);
             LogMountedGuardSnapshot(
                 "AFTER_REPLAY",
                 agentId,
-                traceState,
+                appliedGuardState,
                 agent);
 
             if (!retainsGuard)
             {
                 RemoteAgentActionState traceAgentState =
                     GetOrCreateAgentState(agentId);
-                traceAgentState.TraceState = traceState;
+                traceAgentState.TraceState = appliedGuardState;
                 traceAgentState.TraceAfterReassert = false;
                 traceAgentState.TraceAfterNativeTick = true;
                 _retainedGuardAgentIds.Add(agentId);
@@ -763,24 +781,18 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private void UpdateRemoteGuardState(
         Guid agentId,
-        RemoteAction action,
+        RemoteGuardState guardState,
         Agent agent,
         bool traceMountedPlayerGuard)
     {
-        Agent.MovementControlFlag defendFlags = action.Data.DefendFlags;
-        Agent.GuardMode guardMode = action.Data.GuardMode;
+        Agent.MovementControlFlag defendFlags = guardState.Action.Data.DefendFlags;
+        Agent.GuardMode guardMode = guardState.Action.Data.GuardMode;
 
         if (defendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(guardMode))
         {
             RemoteAgentActionState retainedState = GetOrCreateAgentState(agentId);
-            retainedState.RetainedGuard =
-                new RemoteGuardState(
-                    action.ControllerId,
-                    defendFlags,
-                    guardMode,
-                    action.BattleHostEpoch,
-                    action.Sequence);
+            retainedState.RetainedGuard = guardState;
             if (traceMountedPlayerGuard)
             {
                 retainedState.TraceState = retainedState.RetainedGuard;
@@ -809,6 +821,57 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (!preservePendingTrace)
             _retainedGuardAgentIds.Remove(agentId);
         ClearRemoteDefendState(agent);
+    }
+
+    private static void ReplayMountedGuardAction(
+        Agent agent,
+        float dt,
+        ref RemoteGuardState guardState)
+    {
+        int channel = guardState.GuardActionChannel;
+        if (!agent.HasMount
+            || agent.Controller != AgentControllerType.None
+            || channel < 0
+            || channel > 1
+            || guardState.GuardAction == ActionIndexCache.act_none)
+        {
+            return;
+        }
+
+        AgentActionData data = guardState.Action.Data;
+        AnimFlags flags = (AnimFlags)(channel == 0
+            ? data.Action0Flag
+            : data.Action1Flag);
+        float duration = MBActionSet.GetActionAnimationDuration(
+            agent.ActionSet,
+            in guardState.GuardAction);
+        if (dt > 0f && duration > 0f)
+        {
+            guardState.GuardActionProgress += dt / duration;
+            if ((flags & AnimFlags.anf_cyclic) != 0)
+            {
+                guardState.GuardActionProgress -=
+                    (float)Math.Floor(guardState.GuardActionProgress);
+            }
+            else
+            {
+                guardState.GuardActionProgress = Math.Min(
+                    guardState.GuardActionProgress,
+                    0.999f);
+            }
+        }
+
+        // Mounted native tick clears this to act_none; leave hit and attack reactions alone.
+        if (agent.GetCurrentAction(channel) != ActionIndexCache.act_none)
+            return;
+
+        agent.SetActionChannel(
+            channel,
+            guardState.GuardAction,
+            additionalFlags: flags,
+            blendInPeriod: 0f,
+            startProgress: guardState.GuardActionProgress,
+            forceFaceMorphRestart: false);
     }
 
     private static bool ShouldTraceMountedPlayerHero(Agent agent)
@@ -890,7 +953,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
         var snapshot = new
         {
-            Expected = new { Defend = expected.DefendFlags, Guard = expected.GuardMode },
+            Expected = new
+            {
+                Defend = expected.Action.Data.DefendFlags,
+                Guard = expected.Action.Data.GuardMode
+            },
             Actual = new
             {
                 Defend = AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
@@ -931,10 +998,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         Logger.Debug(
             "[AgentActionTrace] {Phase} controller {ControllerId}, agent {AgentId}, sequence {Sequence}, epoch {BattleHostEpoch}: {@Snapshot}",
             phase,
-            expected.ControllerId,
+            expected.Action.ControllerId,
             agentId,
-            expected.Sequence,
-            expected.BattleHostEpoch,
+            expected.Action.Sequence,
+            expected.Action.BattleHostEpoch,
             snapshot);
     }
 

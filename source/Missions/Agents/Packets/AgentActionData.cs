@@ -128,7 +128,7 @@ namespace Missions.Agents.Packets
                 agent.GetCurrentActionDirection(0));
         }
 
-        private static bool IsDefendingAction(Agent.ActionCodeType actionType)
+        internal static bool IsDefendingAction(Agent.ActionCodeType actionType)
         {
             return (actionType >= Agent.ActionCodeType.DefendAllBegin
                     && actionType < Agent.ActionCodeType.DefendAllEnd)

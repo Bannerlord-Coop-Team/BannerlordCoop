@@ -26,8 +26,8 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
     void CatchUpJoiner(string controllerId);
 
-    /// <summary>[Game thread] Reassert received puppet defend state from the mission pre-tick hook.</summary>
-    void ReassertRemoteDefendStates();
+    /// <summary>[Game thread] Reassert received puppet defend state immediately before the display snapshot.</summary>
+    void ReassertRemoteDefendStates(float dt = 0f);
 
     /// <summary>[Game thread] Apply queued remote actions and refresh their retained defend state.</summary>
     void ApplyRemoteGuardStates();
@@ -325,9 +325,9 @@ public class AgentActionHandler : IAgentActionHandler
         remoteActionProcessor.ApplyRemoteGuardStates();
     }
 
-    public void ReassertRemoteDefendStates()
+    public void ReassertRemoteDefendStates(float dt = 0f)
     {
-        remoteActionProcessor.ReassertRemoteDefendStates();
+        remoteActionProcessor.ReassertRemoteDefendStates(dt);
     }
 
     private void Handle_BattleHostAssigned(

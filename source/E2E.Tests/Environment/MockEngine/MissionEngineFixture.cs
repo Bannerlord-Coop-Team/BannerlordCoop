@@ -98,6 +98,8 @@ public sealed class MissionEngineFixture : IDisposable
         // headless and would poison the type for the whole process (a failed cctor is cached). Answer
         // "unresolved" (-1) instead so the cctor completes.
         Prefix(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName), nameof(MBAnimation_GetActionCodeWithName));
+        Prefix(typeof(Agent), "get_ActionSet", nameof(Agent_get_ActionSet));
+        Prefix(typeof(MBActionSet), nameof(MBActionSet.GetActionAnimationDuration), nameof(MBActionSet_GetActionAnimationDuration));
         // Standalone mount movement: a masterless horse's own AgentMountData capture/apply reads and writes
         // the movement natives, and the apply path's staleness guard compares agent.Mission to Mission.Current.
         Prefix(typeof(Agent), "get_Mission", nameof(Agent_get_Mission));
@@ -107,14 +109,15 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
-        // AgentMountData also snapshots action channel 1; report "no action" so capture works headless (the
-        // apply side's GetActionNameWithCode already returns null headless and skips SetActionChannel).
+        // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionDirection), nameof(Agent_GetCurrentActionDirection));
         Prefix(typeof(Agent), nameof(Agent.GetDefendMovementFlag), nameof(Agent_GetDefendMovementFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetCurrentActionProgress), nameof(Agent_SetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetActionChannel), nameof(Agent_SetActionChannel));
         Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
         Prefix(typeof(Agent), "set_MovementFlags", nameof(Agent_set_MovementFlags));
         Prefix(typeof(Agent), "get_EventControlFlags", nameof(Agent_get_EventControlFlags));
@@ -478,6 +481,19 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_get_ActionSet(Agent __instance, ref MBActionSet __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = MBActionSet.GetActionSetWithIndex(0);
+        return false;
+    }
+
+    private static bool MBActionSet_GetActionAnimationDuration(ref float __result)
+    {
+        __result = 1f;
+        return false;
+    }
+
     private static bool Agent_get_Mission(Agent __instance, ref Mission __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
@@ -527,10 +543,14 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_GetCurrentAction(Agent __instance, ref ActionIndexCache __result)
+    private static bool Agent_GetCurrentAction(
+        Agent __instance,
+        int channelNo,
+        ref ActionIndexCache __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = ActionIndexCache.act_none; // safe: the MBAnimation shim above lets the cctor complete
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = new ActionIndexCache(
+            channelNo == 0 ? m.Action0Index : m.Action1Index);
         return false;
     }
 
@@ -577,17 +597,64 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_GetCurrentAnimationFlag(Agent __instance, ref AnimFlags __result)
+    private static bool Agent_GetCurrentAnimationFlag(
+        Agent __instance,
+        int channelNo,
+        ref AnimFlags __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = 0;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Flags : m.Action1Flags;
         return false;
     }
 
-    private static bool Agent_GetCurrentActionProgress(Agent __instance, ref float __result)
+    private static bool Agent_GetCurrentActionProgress(
+        Agent __instance,
+        int channelNo,
+        ref float __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = 0f;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Progress : m.Action1Progress;
+        return false;
+    }
+
+    private static bool Agent_SetCurrentActionProgress(
+        Agent __instance,
+        int channelNo,
+        float progress)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+            m.Action0Progress = progress;
+        else
+            m.Action1Progress = progress;
+        return false;
+    }
+
+    private static bool Agent_SetActionChannel(
+        Agent __instance,
+        int channelNo,
+        ref ActionIndexCache actionIndexCache,
+        AnimFlags additionalFlags,
+        float startProgress,
+        ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            m.Action0Index = actionIndexCache.Index;
+            m.Action0Flags = additionalFlags;
+            m.Action0Progress = startProgress;
+        }
+        else
+        {
+            m.Action1Index = actionIndexCache.Index;
+            m.Action1Flags = additionalFlags;
+            m.Action1Progress = startProgress;
+        }
+
+        m.SetActionChannelCalls++;
+        m.LastSetActionChannel = channelNo;
+        __result = true;
         return false;
     }
 
