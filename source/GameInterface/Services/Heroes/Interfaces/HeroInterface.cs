@@ -60,7 +60,7 @@ internal class HeroInterface : IHeroInterface
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
-        return BinaryFormatterSerializer.Serialize(package);
+        return BinaryPackageSerializer.Serialize(package);
     }
 
     public Hero ServerUnpackHero(byte[] bytes)
@@ -86,7 +86,7 @@ internal class HeroInterface : IHeroInterface
             {
                 using (new AllowedThread())
                 {
-                    hero = BinaryFormatterSerializer
+                    hero = BinaryPackageSerializer
                         .Deserialize<HeroBinaryPackage>(bytes)
                         .Unpack<Hero>(binaryPackageFactory);
 

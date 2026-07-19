@@ -10,6 +10,7 @@ using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
 using Serilog;
@@ -86,6 +87,8 @@ internal class PartyDoneLogicHandler : IHandler
         var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightMemberRoster, obj.What.InitialRightMemberRoster);
         var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightPrisonerRoster, obj.What.InitialRightPrisonerRoster);
 
+        var rightMemberOrderData = troopRosterInterface.PackTroopRosterOrderData(obj.What.RightMemberRoster);
+
         var releaserPartyPosition = GetReleaserPartyPosition(obj.What.MainHero);
 
         var message = new NetworkCompleteDoneLogic(
@@ -106,7 +109,8 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.PartyMoraleChangeAmount,
             obj.What.DoNotApplyGoldTransactions,
             releaserPartyPosition,
-            obj.What.PartyScreenMode
+            obj.What.PartyScreenMode,
+            rightMemberOrderData
         );
 
         network.SendAll(message);
@@ -164,6 +168,8 @@ internal class PartyDoneLogicHandler : IHandler
             ApplyPartyRewardChanges(mainHero, message);
             ApplyUpgradedTroopHistory(mainHero, upgradedTroopHistory);
             ApplyPrisonerRecruitmentEffects(mainHero, message, recruitedPrisonersRoster);
+
+            ApplyRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData);
         });
     }
 
@@ -306,6 +312,11 @@ internal class PartyDoneLogicHandler : IHandler
         // Replace ApplyPrisonerRecruitmentEffects
         int prisonerRecruitmentMoraleEffect = Campaign.Current.Models.PrisonerRecruitmentCalculationModel.GetPrisonerRecruitmentMoraleEffect(mainHero.PartyBelongedTo.Party, characterObject, 1);
         mainHero.PartyBelongedTo.RecentEventsMorale += (float)prisonerRecruitmentMoraleEffect;
+    }
+
+    private void ApplyRosterOrder(TroopRoster roster, TroopRosterOrderData orderData)
+    {
+        messageBroker.Publish(this, new ApplyTroopRosterOrder(roster, orderData));
     }
 
     internal List<PlayerCaptivityEndedByServer> CreatePlayerCaptivityReleaseEvents(

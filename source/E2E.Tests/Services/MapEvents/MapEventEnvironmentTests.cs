@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -21,6 +22,47 @@ namespace E2E.Tests.Services.MapEvents;
 public class MapEventEnvironmentTests : MapEventTestBase
 {
     public MapEventEnvironmentTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void NewMapEvent_ClientReplicaStartsWithNoRetreatState()
+    {
+        var ctx = CreateServerMapEvent();
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+                Assert.Equal(BattleSideEnum.None, mapEvent.RetreatingSide);
+                Assert.Equal(0, mapEvent.PursuitRoundNumber);
+                Assert.False(mapEvent.EndedByRetreat);
+            });
+        }
+    }
+
+    [Fact]
+    public void ServerRetreatState_SyncsPursuitRound_ToAllClients()
+    {
+        var ctx = CreateServerMapEvent();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            mapEvent.RetreatingSide = BattleSideEnum.Defender;
+            mapEvent.PursuitRoundNumber = 2;
+        });
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+                Assert.Equal(BattleSideEnum.Defender, mapEvent.RetreatingSide);
+                Assert.Equal(2, mapEvent.PursuitRoundNumber);
+                Assert.False(mapEvent.EndedByRetreat);
+            });
+        }
+    }
 
     [Fact]
     public void ServerJoinParty_ToSide_SyncAllClients()

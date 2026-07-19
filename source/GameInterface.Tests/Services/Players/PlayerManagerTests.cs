@@ -78,6 +78,8 @@ public class PlayerManagerTests
 
         Assert.True(playerManager.TryGetPlayer(peer, out var resolvedPlayer));
         Assert.Same(player, resolvedPlayer);
+        Assert.True(playerManager.TryGetPeer(ControllerId, out var resolvedPeer));
+        Assert.Same(peer, resolvedPeer);
     }
 
     [Fact]
@@ -107,6 +109,7 @@ public class PlayerManagerTests
         playerManager.ClearPeer(peer);
 
         Assert.False(playerManager.TryGetPlayer(peer, out _));
+        Assert.False(playerManager.TryGetPeer(ControllerId, out _));
     }
 
     [Fact]
@@ -126,10 +129,17 @@ public class PlayerManagerTests
 
         Assert.True(playerManager.TryGetPlayer(secondPeer, out var resolvedPlayer));
         Assert.Same(player, resolvedPlayer);
+        Assert.True(playerManager.TryGetPeer(ControllerId, out var resolvedPeer));
+        Assert.Same(secondPeer, resolvedPeer);
 
         // The stale first peer is untouched by re-associating the controller under a new peer,
         // the reconnect handler is responsible for calling ClearPeer(firstPeer) itself on disconnect.
         Assert.True(playerManager.TryGetPlayer(firstPeer, out _));
+
+        playerManager.ClearPeer(firstPeer);
+
+        Assert.True(playerManager.TryGetPeer(ControllerId, out resolvedPeer));
+        Assert.Same(secondPeer, resolvedPeer);
     }
 
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>

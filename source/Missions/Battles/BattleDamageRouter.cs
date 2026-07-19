@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
@@ -204,9 +204,15 @@ public class BattleDamageRouter : IBattleDamageRouter
         }
 
         long shotSequence = 0;
+        WeaponComponentData attackerWeapon = null;
         if (payload.What.Blow.IsMissile)
         {
             int missileIndex = payload.What.Blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+            if (Mission.Current?._missilesDictionary.TryGetValue(missileIndex, out var missile) == true)
+                attackerWeapon = missile.Weapon.CurrentUsageItem;
+            else
+                Logger.Error("Failed to resolve routed missile weapon at source index {MissileIndex}", missileIndex);
+
             if (coopMissionComponent.MissileHandler.TryTakeLocalShot(missileIndex,
                 out Guid shotAgentId, out shotSequence))
             {
@@ -231,7 +237,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             {
                 network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId,
                     payload.What.Blow, payload.What.CollisionData,
-                    missileShotSequence: shotSequence));
+                    missileShotSequence: shotSequence, attackerWeapon: attackerWeapon));
                 return;
             }
 
@@ -240,7 +246,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             {
                 network.SendAll(new NetworkApplyBattleDamage(riderInfo.AgentId, attackerId,
                     payload.What.Blow, payload.What.CollisionData, isMount: true,
-                    missileShotSequence: shotSequence));
+                    missileShotSequence: shotSequence, attackerWeapon: attackerWeapon));
                 return;
             }
 
@@ -425,7 +431,8 @@ public class BattleDamageRouter : IBattleDamageRouter
 
         Logger.Information("[BattleSync] Applying routed blow to {Agent}: dmg={Damage}, missile={Missile}, health={Health}",
             victim.Name, blow.InflictedDamage, wasMissile, victim.Health);
-        victim.RegisterBlow(blow, in collisionData);
+        BattleSpawnGate.RunWithRoutedAttackerWeapon(damage.AttackerWeapon,
+            () => victim.RegisterBlow(blow, in collisionData));
 
         if (victim.Health > 0 && victim.Character is CharacterObject character && character.IsHero
             && character.HeroObject is Hero hero)
