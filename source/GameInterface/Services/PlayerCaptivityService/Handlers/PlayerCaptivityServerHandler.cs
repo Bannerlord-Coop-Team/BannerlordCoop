@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -20,6 +21,7 @@ using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -271,39 +273,141 @@ internal class PlayerCaptivityServerHandler : IHandler
 
     /// <summary>
     /// A client surrendered (its <see cref="TaleWorlds.CampaignSystem.Encounters.PlayerEncounter"/>
-    /// surrender is blocked locally). Resolve the battle on the server; the finalize path then
-    /// captures the player hero through <see cref="MapEvent.CaptureDefeatedPartyMembers"/>.
+    /// surrender is blocked locally). While healthy allies remain on the surrenderer's side, only the
+    /// surrendering party is captured (<see cref="TakePrisonerAction"/> — its postfix drives
+    /// <see cref="Handle_PrisonerTaken"/> for the companions/troops) and removed from the event, and the
+    /// battle continues without it. Only when no other party on the side can still fight does the whole
+    /// side surrender (<see cref="MapEvent.DoSurrender"/> — native semantics), which resolves the battle
+    /// and captures the player hero through the finalize path.
     /// </summary>
     private void Handle_NetworkPlayerSurrendered(MessagePayload<NetworkPlayerSurrendered> payload)
     {
         if (ModInformation.IsClient) return;
 
-        if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
-
-        PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
-            playerParty.StringId, payload.What.MapEventId);
-
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
-                if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.What.PlayerParty, out MobileParty playerParty)) return;
 
-                Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
-                    string.Join(",", playerPartyIds),
-                    surrenderedPartyId ?? "<none>",
-                    payload.What.MapEventId ?? "<none>");
-                PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
-                mapEvent.DoSurrender(playerParty.Party.Side);
-                messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
-            }
-            catch (Exception ex)
+            PlayerCaptivityLogger.Debug("Handle_NetworkPlayerSurrendered: applying surrender for party={PartyId} in mapEvent={MapEventId}",
+                playerParty.StringId, payload.What.MapEventId);
+
+            // While a live mission or an auto-resolve simulation owns this event, a surrender would
+            // conclude the battle under the players resolving it — refuse it until the claim releases
+            // (mission instance emptied / event finalized). The client menu already refuses the option
+            // while claimed (BattleModeEncounterOptionsPatch); this is the authoritative backstop for
+            // the race where the claim lands between the client's menu refresh and its click.
+            if (ServerBattleModeArbiter.IsClaimed(payload.What.MapEventId))
             {
-                Logger.Error(ex, "Failed to surrender");
+                Logger.Information("[PvPEncounterClose] Refused surrender of {PartyId} in {MapEventId}: the event is claimed by an active mission/simulation",
+                    playerParty.StringId, payload.What.MapEventId ?? "<none>");
+                return;
             }
-        }, blocking: true);
+
+            if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var surrenderedPartyId)) return;
+
+            // While OTHER parties on the surrenderer's side can still fight, DoSurrender below would end
+            // the battle for all of them (it marks the whole side surrendered and hands the other side
+            // the win). Capture just the surrendering party instead and let the battle continue.
+            var side = playerParty.Party.MapEventSide;
+            var hasHealthyAllies = side != null &&
+                side.Parties.Any(p => p.Party != playerParty.Party && p.Party?.NumberOfHealthyMembers > 0);
+            if (hasHealthyAllies)
+            {
+                ApplyPartialSurrender(mapEvent, playerParty, surrenderedPartyId);
+                return;
+            }
+
+            var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+
+            Logger.Information("[PvPEncounterClose] Server sending immediate surrender close: partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
+                string.Join(",", playerPartyIds),
+                surrenderedPartyId ?? "<none>",
+                payload.What.MapEventId ?? "<none>");
+            PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, surrenderedPartyId, payload.What.MapEventId);
+            mapEvent.DoSurrender(playerParty.Party.Side);
+            messageBroker.Publish(this, new MapEventConcluded(payload.What.MapEventId, playerPartyIds, surrenderedPartyId));
+        }, blocking: true, context: nameof(Handle_NetworkPlayerSurrendered));
+    }
+
+    /// <summary>
+    /// Surrenders ONLY <paramref name="playerParty"/> out of a battle its side keeps fighting: the party is
+    /// removed from the event (explicit broadcast — single-party removal does not auto-replicate; applying
+    /// it closes the surrenderer's own encounter menu, see <c>BattleJoinLeaveHandler.ApplyNetworkLeave</c>)
+    /// and its hero is captured by the opposing side's leader as a plain out-of-battle capture. The capture
+    /// runs with patches live, so its side effects replicate and its postfix-published
+    /// <see cref="PrisonerTaken"/> drives <see cref="Handle_PrisonerTaken"/> (park, companions, troop
+    /// transfer); the owning client then enters captivity from the synced state. No
+    /// <see cref="MapEventConcluded"/>: the event lives on for the allies.
+    /// </summary>
+    private void ApplyPartialSurrender(MapEvent mapEvent, MobileParty playerParty, string surrenderedPartyId)
+    {
+        if (!TryGetCaptorForPartialSurrender(mapEvent, playerParty.Party.Side, out var captorParty))
+        {
+            // No enemy party can hold prisoners — the battle is effectively decided and about to resolve
+            // through its own paths; a surrender into a spent side has nothing coherent to do.
+            Logger.Warning("Refused partial surrender of {PartyId}: no opposing party remains to take prisoners", surrenderedPartyId);
+            return;
+        }
+
+        if (!TryGetPlayerHeroOfParty(playerParty, out var playerHero))
+        {
+            Logger.Error("Refused partial surrender of {PartyId}: no registered player hero resolves for it", surrenderedPartyId);
+            return;
+        }
+
+        Logger.Information("Applying partial surrender: party={PartyId} captor={CaptorId} — healthy allies keep fighting the battle",
+            surrenderedPartyId, captorParty.MobileParty?.StringId ?? "<settlement>");
+
+        // Out of the battle first, so the capture below is a plain out-of-battle capture.
+        playerParty.Party.MapEventSide = null;
+        network.SendAll(new NetworkPartyLeftBattle(surrenderedPartyId));
+
+        TakePrisonerAction.Apply(captorParty, playerHero);
+    }
+
+    /// <summary>
+    /// Enemy party to hold a partial surrender's prisoners: the opposing side's leader while it can still
+    /// fight, else the side's first party with healthy members, else the leader regardless. False only when
+    /// no opposing party remains at all.
+    /// </summary>
+    private static bool TryGetCaptorForPartialSurrender(MapEvent mapEvent, BattleSideEnum surrenderingSide, out PartyBase captorParty)
+    {
+        captorParty = null;
+
+        var enemySide = mapEvent.GetMapEventSide(mapEvent.GetOtherSide(surrenderingSide));
+        if (enemySide == null) return false;
+
+        var leader = enemySide.LeaderParty;
+        if (leader != null && leader.NumberOfHealthyMembers > 0)
+        {
+            captorParty = leader;
+            return true;
+        }
+
+        captorParty = enemySide.Parties.FirstOrDefault(p => p.Party?.NumberOfHealthyMembers > 0)?.Party ?? leader;
+        return captorParty != null;
+    }
+
+    /// <summary>
+    /// Resolves the player hero registered for <paramref name="playerParty"/>. A player party's component
+    /// leader is not reliably set on the server, so the player registry is the source of truth (the inverse
+    /// of <see cref="TryGetPlayerParty"/>). The registry keys players by the MOBILE party's id, which is
+    /// distinct from the <see cref="PartyBase"/> id used on the battle-leave wire.
+    /// </summary>
+    private bool TryGetPlayerHeroOfParty(MobileParty playerParty, out Hero playerHero)
+    {
+        playerHero = null;
+
+        if (!objectManager.TryGetId(playerParty, out var mobilePartyId)) return false;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (player.MobilePartyId == mobilePartyId)
+                return objectManager.TryGetObject(player.HeroId, out playerHero);
+        }
+
+        return false;
     }
 
     /// <summary>
