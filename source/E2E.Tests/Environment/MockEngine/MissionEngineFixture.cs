@@ -33,6 +33,7 @@ public sealed class MissionEngineFixture : IDisposable
         // Mission statics / members
         Prefix(typeof(Mission), "get_Current", nameof(Mission_get_Current));
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
+        Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
         Prefix(typeof(Mission), "get_MainAgent", nameof(Mission_get_MainAgent));
         Prefix(typeof(Mission), "set_MainAgent", nameof(Mission_set_MainAgent));
@@ -184,6 +185,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out _)) return true;
         __result = 0f;
+        return false;
+    }
+
+    private static bool Mission_EndMission(Mission __instance)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        mock.EndMissionCalled = true;
         return false;
     }
 

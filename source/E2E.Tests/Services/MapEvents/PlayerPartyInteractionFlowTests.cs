@@ -5,6 +5,7 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -12,10 +13,12 @@ using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.PartyComponents.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
+using Missions.Messages;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -65,6 +68,26 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             s.Phase == PlayerPartyInteractionPhase.WaitingForProposal &&
             !s.IsInitiator &&
             s.Options.SequenceEqual(new[] { PlayerPartyInteractionOption.Leave }));
+    }
+
+    [Fact]
+    public void ClientRequest_InactivePlayerParty_DeniesWithoutStartingDialog()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            responderParty.MobileParty.IsActive = false;
+        });
+        Server.NetworkSentMessages.Clear();
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+
+        var denied = Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>().Single();
+        Assert.Equal(ConversationDeniedReason.PlayerUnavailable, denied.Reason);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
     }
 
     [Fact]
@@ -1313,11 +1336,41 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void ExistingBattleJoin_UsesExistingAllowPath()
+    public void ServerAiPartyEncounter_StartsConversationForDefendingPlayer()
     {
-        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (_, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var aiPartyId = CreateMobilePartyBase();
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+
+            EncounterManager.StartPartyEncounter(aiParty, playerParty);
+
+            Assert.Null(aiParty.MapEvent);
+            Assert.Null(playerParty.MapEvent);
+        });
+
+        var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
+        Assert.Equal(aiPartyId, allowed.AttackerId);
+        Assert.Equal(playerPartyId, allowed.DefenderId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+    }
+
+    [Fact]
+    public void ExistingBattleJoin_WithMissionMember_UsesExistingAllowPath()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         var mapEventSideId = CreateServerMapEventSide();
 
+        Server.SimulateMessage(client2.NetPeer, new NetworkMissionEntered("PlayerTwo", "live-battle"));
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEventSide>(mapEventSideId, out var side));
@@ -1333,6 +1386,45 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(responderPartyId, allowed.DefenderId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
+    }
+
+    [Fact]
+    public void PlayerAwaitingBattleMissionExit_BlocksEncountersUntilMissionLeft()
+    {
+        var (_, client2, _, responderPartyId) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        const string concludedBattleId = "concluded-battle";
+
+        Server.SimulateMessage(client2.NetPeer, new NetworkMissionEntered("PlayerTwo", "stale-battle"));
+        Server.SimulateMessage(client2.NetPeer, new NetworkMissionEntered("PlayerTwo", concludedBattleId));
+        Server.SimulateMessage(client2.NetPeer, new NetworkMissionLeft("PlayerTwo", "stale-battle"));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.False(InvokeEncounterPrefix("StartPartyEncounterPrefix", aiParty, responderParty));
+            Assert.False(InvokeEncounterPrefix("Prefix", responderParty.MobileParty, settlement));
+        });
+
+        RequestInteraction(client2, responderPartyId, aiPartyId);
+
+        var denied = Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>().Single();
+        Assert.Equal(ConversationDeniedReason.PlayerUnavailable, denied.Reason);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+
+        Server.NetworkSentMessages.Clear();
+        Server.SimulateMessage(client2.NetPeer, new NetworkMissionLeft("PlayerTwo", concludedBattleId));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(InvokeEncounterPrefix("Prefix", responderParty.MobileParty, settlement));
+        });
+        RequestInteraction(client2, responderPartyId, aiPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
     }
 
     private (EnvironmentInstance client1, EnvironmentInstance client2, string initiatorPartyId, string responderPartyId) CreateTwoPlayerParties()
@@ -1481,6 +1573,15 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 forcePlayerOutFromSettlement: false,
                 ConversationRestartSource.PlayerEncounter)),
             disabledMethods);
+    }
+
+    private static bool InvokeEncounterPrefix(string methodName, params object[] arguments)
+    {
+        var patchType = AccessTools.TypeByName("GameInterface.Services.MapEvents.Patches.EncounterManagerPatches");
+        var prefix = AccessTools.Method(patchType, methodName);
+        Assert.NotNull(prefix);
+
+        return (bool)prefix.Invoke(null, arguments)!;
     }
 
     private void PublishConversationRequest(

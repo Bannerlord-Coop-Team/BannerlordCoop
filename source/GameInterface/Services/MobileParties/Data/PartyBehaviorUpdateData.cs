@@ -64,6 +64,12 @@ public struct PartyBehaviorUpdateData
     [ProtoMember(17)]
     public bool IsInteractableAnchor { get; set; }
 
+    [ProtoMember(18)]
+    public bool IsCurrentlyAtSea { get; set; }
+
+    [ProtoMember(19)]
+    public bool ResetMovementToHold { get; set; }
+
     public PartyBehaviorUpdateData(
         string mobilePartyId,
         AiBehavior newAiBehavior,
@@ -91,5 +97,7 @@ public struct PartyBehaviorUpdateData
         PartyMoveMode = MoveModeType.Hold;
         MoveTargetPartyId = null;
         IsInteractableAnchor = false;
+        IsCurrentlyAtSea = false;
+        ResetMovementToHold = false;
     }
 }
