@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.ItemRosters.Messages;
+using GameInterface.Services.TownMarketDatas.Patches;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Roster;
@@ -75,6 +76,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             GameThread.Run(() =>
             {
                 using (new AllowedThread())
+                using (TownMarketDataPatches.SuppressReceivedRosterUpdate())
                 {
                     itemRoster?.AddToCounts(rosterElement, amount);
                 }

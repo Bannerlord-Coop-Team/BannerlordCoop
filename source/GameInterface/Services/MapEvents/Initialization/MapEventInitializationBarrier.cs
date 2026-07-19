@@ -5,7 +5,9 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
@@ -13,9 +15,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Initialization;
 
@@ -30,7 +35,7 @@ public interface IMapEventInitializationBarrier : IGameAbstraction
     void AttachClient(MapEventSide side, MapEventParty party, Action afterCommit = null);
     void TrackParty(MapEvent mapEvent, MapEventParty party);
     void DeferVisual(GauntletMapEventVisual visual, CampaignVec2 position);
-    void DestroyGraph(MapEvent mapEvent);
+    void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null);
 }
 
 internal sealed class MapEventInitializationBarrier : IMapEventInitializationBarrier, IDisposable
@@ -52,6 +57,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         this.objectManager = objectManager;
         messageBroker.Subscribe<NetworkMapEventPartyPending>(HandlePendingParty);
         messageBroker.Subscribe<NetworkMapEventInitialized>(HandleCommit);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
@@ -60,6 +66,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         disposed = true;
         messageBroker.Unsubscribe<NetworkMapEventPartyPending>(HandlePendingParty);
         messageBroker.Unsubscribe<NetworkMapEventInitialized>(HandleCommit);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         states.Clear();
     }
 
@@ -270,7 +277,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         using (new AllowedThread()) visual.OnMapEventEnd();
     }
 
-    public void DestroyGraph(MapEvent mapEvent)
+    public void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null)
     {
         if (mapEvent == null) return;
         if (!states.TryGetValue(mapEvent, out var state)) state = new State(mapEvent);
@@ -280,7 +287,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         {
             var party = mapEventParty.Party;
             if (party == null || (party._mapEventSide != null && party._mapEventSide.MapEvent != mapEvent)) continue;
-            if (party._mapEventSide?.MapEvent == mapEvent) party._mapEventSide = null;
+            if (party != preservedParty && party._mapEventSide?.MapEvent == mapEvent) party._mapEventSide = null;
             if (party.MobileParty != null) party.MobileParty.EventPositionAdder = Vec2.Zero;
             party.SetVisualAsDirty();
         }
@@ -288,6 +295,125 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         foreach (var visual in state.Owned.OfType<GauntletMapEventVisual>().ToArray()) EndVisual(visual);
         states.Remove(mapEvent);
         foreach (var instance in state.Owned) objectManager.Remove(instance);
+    }
+
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        if (ModInformation.IsServer || MissionState.Current != null || Mission.Current != null) return;
+
+        var party = MobileParty.MainParty?.Party;
+        var mapEvent = party?.MapEvent;
+        if (mapEvent == null || IsPending(mapEvent)) return;
+        if (Campaign.Current?.MapEventManager?.MapEvents.Contains(mapEvent) == true) return;
+
+        party._mapEventSide = null;
+        if (!CloseStaleDestroyedEncounter(mapEvent))
+            ClearEngageOrder(party.MobileParty);
+    }
+
+    private void ClearEngageOrder(MobileParty party)
+    {
+        if (party == null)
+            return;
+
+        party.SetMoveModeHold();
+        messageBroker.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
+    }
+
+    private bool CloseStaleDestroyedEncounter(MapEvent mapEvent)
+    {
+        if (PlayerCaptivity.IsCaptive)
+            return false;
+
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
+        {
+            ForceCloseCurrentEncounterMenu();
+            return false;
+        }
+
+        if (!References(encounter, mapEvent))
+            return false;
+
+        if (IsBattleResultEncounter(encounter))
+            return false;
+
+        PlayerEncounter.LeaveEncounter = true;
+        try
+        {
+            PlayerEncounter.Finish(true);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "[PvPEncounterClose] Deferred map event cleanup failed to finish stale encounter");
+        }
+        finally
+        {
+            Campaign.Current.PlayerEncounter = null;
+        }
+
+        ForceCloseCurrentEncounterMenu();
+        return true;
+    }
+
+    private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
+        encounter?._mapEvent == mapEvent ||
+        GetPlayerEncounterBattle() == mapEvent ||
+        GetPlayerEncounterEncounteredBattle() == mapEvent;
+
+    private static bool IsBattleResultEncounter(PlayerEncounter encounter)
+    {
+        switch (encounter.EncounterState)
+        {
+            case PlayerEncounterState.CaptureHeroes:
+            case PlayerEncounterState.FreeHeroes:
+            case PlayerEncounterState.LootParty:
+            case PlayerEncounterState.LootInventory:
+            case PlayerEncounterState.LootShips:
+            case PlayerEncounterState.End:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static MapEvent GetPlayerEncounterBattle()
+    {
+        try
+        {
+            return PlayerEncounter.Battle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static MapEvent GetPlayerEncounterEncounteredBattle()
+    {
+        try
+        {
+            return PlayerEncounter.EncounteredBattle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static void ForceCloseCurrentEncounterMenu()
+    {
+        try
+        {
+            GameMenu.ExitToLast();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[PvPEncounterClose] Deferred map event cleanup failed to exit current menu");
+        }
+
+        if (Campaign.Current?.MapStateData != null)
+            Campaign.Current.MapStateData.GameMenuId = null;
     }
 
     private static void PublishVisual(GauntletMapEventVisual visual, CampaignVec2 position)
