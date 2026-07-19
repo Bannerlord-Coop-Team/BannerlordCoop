@@ -112,6 +112,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionDirection), nameof(Agent_GetCurrentActionDirection));
+        Prefix(typeof(Agent), nameof(Agent.GetDefendMovementFlag), nameof(Agent_GetDefendMovementFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
         Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
@@ -564,6 +565,15 @@ public sealed class MissionEngineFixture : IDisposable
         {
             __result = m.Action1Direction;
         }
+        return false;
+    }
+
+    private static bool Agent_GetDefendMovementFlag(
+        Agent __instance,
+        ref Agent.MovementControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.DefendMovementFlag;
         return false;
     }
 

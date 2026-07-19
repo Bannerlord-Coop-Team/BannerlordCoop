@@ -1,10 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Packets;
 using Missions.Messages;
 using Missions.Services.Network;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -24,6 +26,8 @@ public interface IRemoteAgentActionProcessor : IDisposable
 
 public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<RemoteAgentActionProcessor>();
+
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleHostRegistry battleHostRegistry;
@@ -595,9 +599,35 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (removePendingBeforeApply)
             RemovePendingRemoteAction(agentId, action);
 
+        bool hadRetainedGuard = _agentStates.TryGetValue(
+            agentId,
+            out RemoteAgentActionState existingState)
+            && existingState.RetainedGuard.HasValue;
+
         action.Data.Apply(agent);
         RecordRemoteActionSequence(agentId, action);
         UpdateRemoteGuardState(agentId, action, agent);
+
+        if (agent.HasMount
+            && (hadRetainedGuard
+                || action.Data.DefendFlags != Agent.MovementControlFlag.None
+                || AgentActionData.IsGuardMode(action.Data.GuardMode)))
+        {
+            Logger.Debug(
+                "[AgentAction] Mounted guard apply {AgentId}: packet {DefendFlags}/{Guard}, "
+                + "result {MovementFlags}/{CurrentGuard}, action0 {Action0Type}/{Action0Direction}, "
+                + "action1 {Action1Type}/{Action1Direction}",
+                agentId,
+                action.Data.DefendFlags,
+                action.Data.GuardMode,
+                AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
+                agent.CurrentGuardMode,
+                agent.GetCurrentActionType(0),
+                agent.GetCurrentActionDirection(0),
+                agent.GetCurrentActionType(1),
+                agent.GetCurrentActionDirection(1));
+        }
+
         return RemoteActionApplyResult.Applied;
     }
 

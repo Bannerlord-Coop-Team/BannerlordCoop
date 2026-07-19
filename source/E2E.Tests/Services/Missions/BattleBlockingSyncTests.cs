@@ -86,8 +86,35 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void PollActions_MountedShieldDirection_SendsAndClearsEffectiveGuard()
+    [Theory]
+    [InlineData(
+        Agent.MovementControlFlag.DefendBlock,
+        Agent.ActionCodeType.DefendShield,
+        Agent.UsageDirection.DefendRight,
+        Agent.MovementControlFlag.None,
+        Agent.MovementControlFlag.DefendBlock,
+        Agent.GuardMode.Right)]
+    [InlineData(
+        Agent.MovementControlFlag.None,
+        Agent.ActionCodeType.Guard,
+        Agent.UsageDirection.DefendRight,
+        Agent.MovementControlFlag.DefendRight,
+        Agent.MovementControlFlag.DefendRight,
+        Agent.GuardMode.Right)]
+    [InlineData(
+        Agent.MovementControlFlag.None,
+        Agent.ActionCodeType.Guard,
+        Agent.UsageDirection.DefendAny,
+        Agent.MovementControlFlag.None,
+        Agent.MovementControlFlag.DefendBlock,
+        Agent.GuardMode.None)]
+    public void PollActions_MountedGuard_SendsAndClearsEffectiveDefendState(
+        Agent.MovementControlFlag movementFlags,
+        Agent.ActionCodeType actionType,
+        Agent.UsageDirection actionDirection,
+        Agent.MovementControlFlag nativeDefendFlag,
+        Agent.MovementControlFlag expectedDefendFlag,
+        Agent.GuardMode expectedGuardMode)
     {
         RunScenario("owner", context =>
         {
@@ -101,22 +128,30 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             context.Component.AgentActionHandler.PollActions();
             Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
 
-            mirror.MovementFlags = Agent.MovementControlFlag.DefendBlock;
-            mirror.Action1CodeType = Agent.ActionCodeType.DefendShield;
-            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            mirror.MovementFlags = movementFlags;
+            mirror.Action1CodeType = actionType;
+            mirror.Action1Direction = actionDirection;
+            mirror.DefendMovementFlag = nativeDefendFlag;
             context.Component.AgentActionHandler.PollActions();
 
             AgentActionPacket heldPacket = Assert.Single(
                 context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
-            Assert.Equal(Agent.GuardMode.Right, Assert.Single(heldPacket.Actions).GuardMode);
+            AgentActionData heldAction = Assert.Single(heldPacket.Actions);
+            Assert.Equal(expectedDefendFlag, heldAction.DefendFlags);
+            Assert.Equal(expectedGuardMode, heldAction.GuardMode);
 
             mirror.MovementFlags = Agent.MovementControlFlag.None;
+            mirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            mirror.Action1Direction = Agent.UsageDirection.None;
+            mirror.DefendMovementFlag = Agent.MovementControlFlag.None;
             context.Component.AgentActionHandler.PollActions();
 
             AgentActionPacket releasePacket = context.Network.NetworkSentPackets
                 .GetPackets<AgentActionPacket>()
                 .Last();
-            Assert.Equal(Agent.GuardMode.None, Assert.Single(releasePacket.Actions).GuardMode);
+            AgentActionData releaseAction = Assert.Single(releasePacket.Actions);
+            Assert.Equal(Agent.MovementControlFlag.None, releaseAction.DefendFlags);
+            Assert.Equal(Agent.GuardMode.None, releaseAction.GuardMode);
             Assert.Equal(2L, Assert.Single(releasePacket.Sequences));
         });
     }

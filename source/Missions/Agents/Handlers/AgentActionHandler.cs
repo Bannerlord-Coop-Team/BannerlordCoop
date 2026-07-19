@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
@@ -6,6 +7,7 @@ using GameInterface.Services.Entity;
 using LiteNetLib;
 using Missions.Agents.Packets;
 using Missions.Messages;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
@@ -42,6 +44,8 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AgentActionHandler>();
+
     // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
     private const int MaxAgentsPerActionPacket = 8;
 
@@ -113,8 +117,10 @@ public class AgentActionHandler : IAgentActionHandler
 
             int action0 = agent.GetCurrentAction(0).Index;
             int action1 = agent.GetCurrentAction(1).Index;
-            var defendFlags = AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
-            Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(agent);
+            var defendFlags = AgentActionData.GetEffectiveDefendMovementFlags(agent);
+            Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
+                agent,
+                defendFlags);
 
             _localAgentStates.TryGetValue(info.AgentId, out var state);
             bool hadState = state.HasObservation;
@@ -165,8 +171,26 @@ public class AgentActionHandler : IAgentActionHandler
             if (!broadcast)
                 continue;
 
+            if (agent.HasMount && (defendChanged || guardChanged))
+            {
+                Logger.Debug(
+                    "[AgentAction] Mounted guard send {AgentId}: raw {RawDefend}, effective {EffectiveDefend}, "
+                    + "guard {Guard}, current {CurrentGuard}, action0 {Action0Type}/{Action0Direction}, "
+                    + "action1 {Action1Type}/{Action1Direction}",
+                    info.AgentId,
+                    AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
+                    defendFlags,
+                    guardMode,
+                    agent.CurrentGuardMode,
+                    agent.GetCurrentActionType(0),
+                    agent.GetCurrentActionDirection(0),
+                    agent.GetCurrentActionType(1),
+                    agent.GetCurrentActionDirection(1));
+            }
+
             (ids ??= new List<Guid>()).Add(info.AgentId);
-            (actions ??= new List<AgentActionData>()).Add(new AgentActionData(agent));
+            (actions ??= new List<AgentActionData>()).Add(
+                new AgentActionData(agent, defendFlags, guardMode));
             (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
         }
 
@@ -196,14 +220,17 @@ public class AgentActionHandler : IAgentActionHandler
                 if (agent == null || agent.Mission == null || !agent.IsActive() || agent.Health <= 0 || agent.IsMount)
                     continue;
 
-                var defendFlags = AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
-                Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(agent);
+                var defendFlags = AgentActionData.GetEffectiveDefendMovementFlags(agent);
+                Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
+                    agent,
+                    defendFlags);
                 if (defendFlags == Agent.MovementControlFlag.None
                     && !AgentActionData.IsGuardMode(guardMode))
                     continue;
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);
-                (actions ??= new List<AgentActionData>()).Add(new AgentActionData(agent));
+                (actions ??= new List<AgentActionData>()).Add(
+                    new AgentActionData(agent, defendFlags, guardMode));
                 (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
             }
 
