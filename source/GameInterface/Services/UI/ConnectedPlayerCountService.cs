@@ -16,6 +16,9 @@ public interface IConnectedPlayerCountService : IGameAbstraction
 /// <inheritdoc cref="IConnectedPlayerCountService"/>
 public class ConnectedPlayerCountService : IConnectedPlayerCountService
 {
+    private const string CountSuffixStart = " (";
+    private const string CountSuffixEnd = " online)";
+
     public int ConnectedPlayers { get; private set; }
     public event Action ConnectedPlayersChanged;
 
@@ -30,6 +33,23 @@ public class ConnectedPlayerCountService : IConnectedPlayerCountService
 
     public string FormatEncyclopediaTitle(string baseTitle)
     {
-        return $"{baseTitle} ({ConnectedPlayers} online)";
+        string normalizedTitle = RemoveConnectedPlayerCount(baseTitle);
+        return $"{normalizedTitle} ({ConnectedPlayers} online)";
+    }
+
+    private static string RemoveConnectedPlayerCount(string title)
+    {
+        if (string.IsNullOrEmpty(title) || !title.EndsWith(CountSuffixEnd, StringComparison.Ordinal))
+            return title;
+
+        int suffixStart = title.LastIndexOf(CountSuffixStart, StringComparison.Ordinal);
+        if (suffixStart < 0) return title;
+
+        int countStart = suffixStart + CountSuffixStart.Length;
+        int countLength = title.Length - CountSuffixEnd.Length - countStart;
+        if (countLength <= 0 || !int.TryParse(title.Substring(countStart, countLength), out _))
+            return title;
+
+        return title.Substring(0, suffixStart);
     }
 }

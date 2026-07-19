@@ -29,4 +29,37 @@ public class ConnectedPlayerCountServiceTests
 
         Assert.Equal("Encyclopedia (3 online)", service.FormatEncyclopediaTitle("Encyclopedia"));
     }
+
+    [Fact]
+    public void FormatEncyclopediaTitle_WhenFormattedTitleIsReapplied_DoesNotAppendAgain()
+    {
+        var service = new ConnectedPlayerCountService();
+        service.UpdateConnectedPlayers(3);
+        var formattedTitle = service.FormatEncyclopediaTitle("Encyclopedia");
+
+        Assert.Equal(formattedTitle, service.FormatEncyclopediaTitle(formattedTitle));
+    }
+
+    [Fact]
+    public void FormatEncyclopediaTitle_WhenCountChanges_ReplacesPreviousCount()
+    {
+        var service = new ConnectedPlayerCountService();
+        service.UpdateConnectedPlayers(3);
+        var formattedTitle = service.FormatEncyclopediaTitle("Encyclopedia");
+
+        service.UpdateConnectedPlayers(4);
+
+        Assert.Equal("Encyclopedia (4 online)", service.FormatEncyclopediaTitle(formattedTitle));
+    }
+
+    [Fact]
+    public void FormatEncyclopediaTitle_PreservesParenthesesInBaseTitle()
+    {
+        var service = new ConnectedPlayerCountService();
+        service.UpdateConnectedPlayers(3);
+
+        Assert.Equal(
+            "Encyclopedia (Calradia) (3 online)",
+            service.FormatEncyclopediaTitle("Encyclopedia (Calradia)"));
+    }
 }
