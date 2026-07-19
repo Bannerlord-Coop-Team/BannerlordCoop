@@ -37,9 +37,11 @@ public class MobilePartySyncTests
 
         var registration = registry.Registrations[typeof(MobileParty)];
 
-        Assert.Equal(GameInterface.HARMONY_GAME_STARTED_CATEGORY, registration.PatchCategory);
-        Assert.Contains(registration.TargetMethods, method =>
+        Assert.Contains(registration.CategorizedTargetMethods[GameInterface.HARMONY_GAME_STARTED_CATEGORY], method =>
             method.DeclaringType == typeof(DefaultClanFinanceModel) &&
             method.Name == nameof(DefaultClanFinanceModel.ApplyMoraleEffect));
+        Assert.Contains(registration.TargetMethods, method =>
+            method.DeclaringType == typeof(MobilePartyAi) &&
+            method.Name == nameof(MobilePartyAi.GetFleeBehavior));
     }
 }

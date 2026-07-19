@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace GameInterface.AutoSync;
@@ -9,7 +10,7 @@ public class AutoSyncRegistryItem
     public HashSet<Debuggable<PropertyInfo>> Properties = new();
 
     public List<MethodInfo> TargetMethods = new();
-    public string PatchCategory { get; private set; }
+    public Dictionary<string, List<MethodInfo>> CategorizedTargetMethods = new();
 
     public bool Contains(FieldInfo field)
     {
@@ -35,11 +36,25 @@ public class AutoSyncRegistryItem
 
     public void AddTargetMethod(MethodInfo targetMethod, string patchCategory = null)
     {
-        if (PatchCategory != null && patchCategory != null && PatchCategory != patchCategory)
-            throw new System.ArgumentException("AutoSync targets for the same type cannot use different patch categories");
+        if (patchCategory == null)
+        {
+            TargetMethods.Add(targetMethod);
+            return;
+        }
 
-        PatchCategory ??= patchCategory;
-        TargetMethods.Add(targetMethod);
+        if (!CategorizedTargetMethods.TryGetValue(patchCategory, out var targetMethods))
+        {
+            targetMethods = new List<MethodInfo>();
+            CategorizedTargetMethods.Add(patchCategory, targetMethods);
+        }
+
+        targetMethods.Add(targetMethod);
+    }
+
+    public bool ContainsTargetMethod(MethodInfo targetMethod)
+    {
+        return TargetMethods.Contains(targetMethod) ||
+            CategorizedTargetMethods.Values.Any(methods => methods.Contains(targetMethod));
     }
 }
 

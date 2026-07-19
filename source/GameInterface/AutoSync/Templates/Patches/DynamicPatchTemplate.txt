@@ -24,12 +24,13 @@ namespace AutoSync;
 {{~ if PatchCategory ~}}
 [HarmonyPatchCategory("{{PatchCategory}}")]
 {{~ end ~}}
-public class {{DeclaringTypeName}}_DynamicPatches : GenericPatches<{{DeclaringTypeName}}_DynamicPatches, {{DeclaringType}}>
+public class {{PatchClassName}} : GenericPatches<{{PatchClassName}}, {{DeclaringType}}>
 {
-    private readonly static ILogger Logger = LogManager.GetLogger<{{DeclaringTypeName}}_DynamicPatches>();
+    private readonly static ILogger Logger = LogManager.GetLogger<{{PatchClassName}}>();
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
+        {{~ if IncludeDeclaredMethods ~}}
         foreach (var ctor in AccessTools.GetDeclaredConstructors(typeof({{DeclaringType}})))
         {
             yield return ctor;
@@ -39,6 +40,7 @@ public class {{DeclaringTypeName}}_DynamicPatches : GenericPatches<{{DeclaringTy
         {
             yield return method;
         }
+        {{~ end ~}}
         {{~ for targetMethod in TargetMethods ~}}
         yield return AccessTools.Method(typeof({{targetMethod.DeclaringType}}), "{{targetMethod.Name}}");
         {{~ end ~}}

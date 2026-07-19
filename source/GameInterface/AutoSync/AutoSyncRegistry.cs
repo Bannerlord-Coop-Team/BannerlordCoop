@@ -44,7 +44,7 @@ public class AutoSyncRegistry
             Registrations.Add(type, new AutoSyncRegistryItem());
         }
 
-        if (Registrations[type].TargetMethods.Contains(methodInfo))
+        if (Registrations[type].ContainsTargetMethod(methodInfo))
             return false;
 
         Registrations[type].AddTargetMethod(methodInfo, patchCategory);
