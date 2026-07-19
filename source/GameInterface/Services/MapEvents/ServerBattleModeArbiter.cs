@@ -39,6 +39,21 @@ internal static class ServerBattleModeArbiter
     /// </summary>
     public static bool TryClaimSimulation(string mapEventId) => TryClaim(mapEventId, Mode.Simulation, out _);
 
+    /// <summary>
+    /// True while either resolution mode owns the event. Read-only: lets side-effectful actions that would
+    /// conclude the battle under the mode's players (e.g. a menu surrender) be refused without disturbing
+    /// the claim.
+    /// </summary>
+    public static bool IsClaimed(string mapEventId)
+    {
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            return modes.ContainsKey(mapEventId);
+        }
+    }
+
     private static bool TryClaim(string mapEventId, Mode mode, out bool isNewClaim)
     {
         isNewClaim = false;

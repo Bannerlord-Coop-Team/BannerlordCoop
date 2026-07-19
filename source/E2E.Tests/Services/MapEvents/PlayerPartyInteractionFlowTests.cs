@@ -71,6 +71,26 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void ClientRequest_InactivePlayerParty_DeniesWithoutStartingDialog()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            responderParty.MobileParty.IsActive = false;
+        });
+        Server.NetworkSentMessages.Clear();
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+
+        var denied = Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>().Single();
+        Assert.Equal(ConversationDeniedReason.PlayerUnavailable, denied.Reason);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+    }
+
+    [Fact]
     public void OppositeDirectionInteractionRequest_ForReservedPair_IsIdempotent()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
@@ -1390,7 +1410,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         RequestInteraction(client2, responderPartyId, aiPartyId);
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        var denied = Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>().Single();
+        Assert.Equal(ConversationDeniedReason.PlayerUnavailable, denied.Reason);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
 
         Server.NetworkSentMessages.Clear();
