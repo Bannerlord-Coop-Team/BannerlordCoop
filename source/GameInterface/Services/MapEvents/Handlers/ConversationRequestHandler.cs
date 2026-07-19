@@ -218,6 +218,18 @@ internal class ConversationRequestHandler : IHandler
         var attackerInMapEvent = attacker.MapEvent != null;
         var defenderInMapEvent = defender.MapEvent != null;
 
+        // A concluded map event is finalized before every client has to leave its victory screen. Keep those
+        // remaining parties unavailable until their MissionLeft removes them from the mission membership.
+        if (Patches.EncounterManagerPatches.IsAwaitingMissionExit(attacker) ||
+            Patches.EncounterManagerPatches.IsAwaitingMissionExit(defender))
+        {
+            Logger.Information(
+                "[MissionExitGuard] Refused campaign interaction while a party is still leaving its mission. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
+            return false;
+        }
+
         if ((attackerIsPlayer && !attacker.MobileParty.IsActive) ||
             (defenderIsPlayer && !defender.MobileParty.IsActive))
         {
