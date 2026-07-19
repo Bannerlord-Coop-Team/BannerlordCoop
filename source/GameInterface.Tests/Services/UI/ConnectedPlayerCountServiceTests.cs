@@ -39,5 +39,4 @@ public class ConnectedPlayerCountServiceTests
 
         Assert.Equal(formattedTitle, service.FormatEncyclopediaTitle(formattedTitle));
     }
-
 }
