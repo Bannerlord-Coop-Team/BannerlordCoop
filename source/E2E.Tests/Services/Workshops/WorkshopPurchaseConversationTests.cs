@@ -91,6 +91,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
         var harmony = new Harmony("e2e.workshops.debug-owner-change");
         Workshop serverWorkshop = null;
         Hero serverOldOwner = null;
+        int originalCapital = 0;
 
         try
         {
@@ -100,6 +101,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(state.BuyerId, out var buyer));
 
                 serverOldOwner = serverWorkshop.Owner;
+                originalCapital = serverWorkshop.Capital;
                 expectedDispatchedWorkshop = serverWorkshop;
                 expectedDispatchedOldOwner = serverOldOwner;
                 observedOwnerChangeDispatches = 0;
@@ -136,6 +138,11 @@ public class WorkshopPurchaseConversationTests : IDisposable
         foreach (var environmentClient in Clients)
         {
             AssertWorkshopOwnedByBuyer(environmentClient, state, expectedBuyerGold: 1000, expectedSellerGold: 0);
+        }
+        AssertWorkshopCapital(Server, state, originalCapital);
+        foreach (var environmentClient in Clients)
+        {
+            AssertWorkshopCapital(environmentClient, state, originalCapital);
         }
 
         AssertClanWorkshopDataReadyForClanMenu(client, state);
@@ -438,6 +445,18 @@ public class WorkshopPurchaseConversationTests : IDisposable
             Assert.NotNull(workshopsBehavior.GetWarehouseRoster(workshop.Settlement));
             workshopsBehavior.GetWarehouseItemRosterWeight(workshop.Settlement);
             Assert.Single(workshopsBehavior._workshopData, data => data?.Workshop == workshop);
+        });
+    }
+
+    private static void AssertWorkshopCapital(
+        EnvironmentInstance instance,
+        PurchaseState state,
+        int expectedCapital)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
+            Assert.Equal(expectedCapital, workshop.Capital);
         });
     }
 
