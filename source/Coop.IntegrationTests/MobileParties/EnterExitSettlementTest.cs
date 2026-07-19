@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Settlements.Interfaces;
 using Moq;
@@ -94,6 +95,113 @@ namespace Coop.IntegrationTests.MobileParties
             });
 
             Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkRequestStartSettlementEncounter>());
+        }
+
+        [Fact]
+        public void EnterAttempts_WhileLeaveRequestPending_AreIgnored()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+            var router = client1.Resolve<TestNetworkRouter>();
+            router.IsMessageRoutingEnabled = false;
+
+            RunOnGameThread(() =>
+            {
+                client1.SimulateMessage(this, new EndSettlementEncounterAttempted(party));
+                client1.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement));
+                client1.SimulateMessage(this, new EndSettlementEncounterAttempted(party));
+            });
+
+            Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkRequestEndSettlementEncounter>());
+            Assert.Equal(0, client1.NetworkSentMessages.GetMessageCount<NetworkRequestStartSettlementEncounter>());
+        }
+
+        [Fact]
+        public void SuppressedLeave_AllowsNextLeaveRequest()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.Server.Resolve<IKingdomCreationSettlementTracker>()
+                .Track("party1", "settlement1");
+
+            RunOnGameThread(() =>
+            {
+                client1.SimulateMessage(this, new EndSettlementEncounterAttempted(party));
+                client1.SimulateMessage(this, new EndSettlementEncounterAttempted(party));
+            });
+
+            Assert.Equal(2, client1.NetworkSentMessages.GetMessageCount<NetworkRequestEndSettlementEncounter>());
+            Assert.Equal(
+                2,
+                TestEnvironment.Server.NetworkSentMessages
+                    .GetMessageCount<NetworkSettlementEncounterLeaveSuppressed>());
+            Assert.Equal(0, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkEndSettlementEncounter>());
+        }
+
+        [Fact]
+        public void SuppressedLeave_AppliesDeferredApprovedEnter()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+            client1.Resolve<TestNetworkRouter>().IsMessageRoutingEnabled = false;
+
+            RunOnGameThread(() =>
+            {
+                client1.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement));
+                client1.SimulateMessage(this, new EndSettlementEncounterAttempted(party));
+                client1.SimulateMessage(
+                    TestEnvironment.Server.NetPeer,
+                    new NetworkStartSettlementEncounter(
+                        new NetworkRequestStartSettlementEncounter("party1", "settlement1")));
+            });
+
+            client1.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.StartSettlementEncounter(party, settlement), Times.Never);
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(
+                    TestEnvironment.Server.NetPeer,
+                    new NetworkSettlementEncounterLeaveSuppressed("party1")));
+
+            client1.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.StartSettlementEncounter(party, settlement), Times.Once);
+        }
+
+        [Fact]
+        public void ConfirmedLeave_DiscardsDeferredApprovedEnter()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+            client1.Resolve<TestNetworkRouter>().IsMessageRoutingEnabled = false;
+
+            RunOnGameThread(() =>
+            {
+                client1.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement));
+                client1.SimulateMessage(this, new EndSettlementEncounterAttempted(party));
+                client1.SimulateMessage(
+                    TestEnvironment.Server.NetPeer,
+                    new NetworkStartSettlementEncounter(
+                        new NetworkRequestStartSettlementEncounter("party1", "settlement1")));
+                client1.SimulateMessage(
+                    TestEnvironment.Server.NetPeer,
+                    new NetworkEndSettlementEncounter("party1"));
+                client1.SimulateMessage(
+                    TestEnvironment.Server.NetPeer,
+                    new NetworkSettlementEncounterLeaveSuppressed("party1"));
+            });
+
+            client1.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.StartSettlementEncounter(party, settlement), Times.Never);
         }
 
         [Fact]

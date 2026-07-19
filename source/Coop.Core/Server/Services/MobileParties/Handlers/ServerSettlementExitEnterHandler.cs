@@ -122,6 +122,10 @@ public class ServerSettlementExitEnterHandler : IHandler
         objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
         if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
         {
+            if (obj.Who is NetPeer suppressedPeer)
+            {
+                network.Send(suppressedPeer, new NetworkSettlementEncounterLeaveSuppressed(payload.PartyId));
+            }
             return;
         }
 
@@ -129,7 +133,7 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         // The sending client is currently in a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
-        network.Send(peer, new NetworkEndSettlementEncounter());
+        network.Send(peer, new NetworkEndSettlementEncounter(payload.PartyId));
 
         network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
             Compact(payload.PartyId, typeof(MobileParty))));
