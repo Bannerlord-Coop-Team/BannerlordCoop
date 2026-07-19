@@ -54,6 +54,7 @@ public sealed class MirrorAgent
     public AnimFlags Action1Flags { get; set; }
     public int SetActionChannelCalls { get; set; }
     public int LastSetActionChannel { get; set; } = -1;
+    public float LastSetActionBlendInPeriod { get; set; }
     public Agent.MovementControlFlag DefendMovementFlag { get; set; }
     public int SetWeaponGuardCalls { get; set; }
     public int ResetGuardCalls { get; set; }

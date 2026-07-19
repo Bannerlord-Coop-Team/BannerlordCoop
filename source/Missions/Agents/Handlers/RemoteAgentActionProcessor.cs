@@ -865,11 +865,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (agent.GetCurrentAction(channel) != ActionIndexCache.act_none)
             return;
 
+        // Keep vanilla's blend-in so the rider does not snap into the guard pose.
         agent.SetActionChannel(
             channel,
             guardState.GuardAction,
             additionalFlags: flags,
-            blendInPeriod: 0f,
             startProgress: guardState.GuardActionProgress,
             forceFaceMorphRestart: false);
     }

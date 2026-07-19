@@ -440,7 +440,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [Theory]
     [InlineData(Agent.ActionCodeType.Guard)]
     [InlineData(Agent.ActionCodeType.DefendShield)]
-    public void MissionPreDisplayTick_MountedGuardDecay_ReplaysOnlyGuardChannel(
+    public void MissionPreDisplayTick_MountedGuardDecay_ReplaysWithVanillaBlendOnGuardChannel(
         Agent.ActionCodeType guardActionType)
     {
         var agentId = Guid.NewGuid();
@@ -490,14 +490,17 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.Action1Flags = 0;
             puppetMirror.SetActionChannelCalls = 0;
             puppetMirror.LastSetActionChannel = -1;
+            puppetMirror.LastSetActionBlendInPeriod = float.NaN;
 
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(202, puppetMirror.Action1Index);
             Assert.Equal(0.102f, puppetMirror.Action1Progress, precision: 3);
+            Assert.Equal(-0.2f, puppetMirror.LastSetActionBlendInPeriod);
 
             puppetMirror.Action1Index = -1;
             puppetMirror.Action1Progress = 0f;
+            puppetMirror.LastSetActionBlendInPeriod = float.NaN;
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(303, puppetMirror.Action0Index);
@@ -510,6 +513,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 puppetMirror.Action1Flags);
             Assert.Equal(2, puppetMirror.SetActionChannelCalls);
             Assert.Equal(1, puppetMirror.LastSetActionChannel);
+            Assert.Equal(-0.2f, puppetMirror.LastSetActionBlendInPeriod);
         });
     }
 

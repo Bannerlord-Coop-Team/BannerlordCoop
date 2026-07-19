@@ -643,6 +643,7 @@ public sealed class MissionEngineFixture : IDisposable
         int channelNo,
         ref ActionIndexCache actionIndexCache,
         AnimFlags additionalFlags,
+        float blendInPeriod,
         float startProgress,
         ref bool __result)
     {
@@ -662,6 +663,7 @@ public sealed class MissionEngineFixture : IDisposable
 
         m.SetActionChannelCalls++;
         m.LastSetActionChannel = channelNo;
+        m.LastSetActionBlendInPeriod = blendInPeriod;
         __result = true;
         return false;
     }
