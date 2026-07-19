@@ -202,6 +202,31 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Creates a new <see cref="MobileParty"/> on the server and joins it to the given side of an existing
+    /// map event through the vanilla reinforcement entry point (see <see cref="JoinPartyToSide"/> for why
+    /// the <see cref="PartyBase.MapEventSide"/> setter is the correct join path). Returns the MOBILE
+    /// PARTY's id — usable with <see cref="SeedPartyTroopOnAll"/> — unlike <see cref="JoinPartyToSide"/>,
+    /// which returns the <see cref="MapEventParty"/> id.
+    /// </summary>
+    protected string JoinNewServerPartyToSide(string mapEventId, BattleSideEnum side)
+    {
+        string? partyId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            party.Party.MapEventSide = mapEvent.GetMapEventSide(side);
+
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(partyId);
+        return partyId!;
+    }
+
+    /// <summary>
     /// Asserts that the <see cref="MapEventParty"/> with <paramref name="mapEventPartyId"/> is part of the
     /// side with <paramref name="mapEventSideId"/> on the supplied <paramref name="instance"/>.
     /// </summary>

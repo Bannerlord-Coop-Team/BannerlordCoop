@@ -223,13 +223,13 @@ internal class MapEventPatches
                 return true;
         }
 
-        // Skip if any parties are not set
-        if (__instance.InvolvedParties.Any(x => x?.MobileParty is null))
+        // A settlement PartyBase is a complete participant even though it has no MobileParty.
+        if (__instance.InvolvedParties.Any(x => x is null || (!x.IsMobile && !x.IsSettlement)))
             return false;
 
         // Don't update if a player is involved
         // Prevents server from instantly finishing the battle and waits for client finish request
-        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsControlledByThisInstance()))
+        if (__instance.InvolvedParties.Any(x => x.IsMobile && !x.MobileParty.IsControlledByThisInstance()))
             return false;
 
         return true;

@@ -10,7 +10,7 @@ public interface IConnectedPlayerCountService : IGameAbstraction
     int ConnectedPlayers { get; }
     event Action ConnectedPlayersChanged;
     void UpdateConnectedPlayers(int connectedPlayers);
-    string FormatEncyclopediaTitle(string baseTitle);
+    string FormatEncyclopediaTitle(string title);
 }
 
 /// <inheritdoc cref="IConnectedPlayerCountService"/>
@@ -28,8 +28,9 @@ public class ConnectedPlayerCountService : IConnectedPlayerCountService
         ConnectedPlayersChanged?.Invoke();
     }
 
-    public string FormatEncyclopediaTitle(string baseTitle)
+    public string FormatEncyclopediaTitle(string title)
     {
-        return $"{baseTitle} ({ConnectedPlayers} online)";
+        string suffix = $" ({ConnectedPlayers} online)";
+        return title.EndsWith(suffix, StringComparison.Ordinal) ? title : title + suffix;
     }
 }

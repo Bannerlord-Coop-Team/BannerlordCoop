@@ -1,5 +1,6 @@
 using Common.Logging;
 using Common.Network.Data;
+using GameInterface.Services.Missions;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -59,7 +60,7 @@ public interface IMissionManager
 }
 
 /// <inheritdoc cref="IMissionManager"/>
-public class MissionManager : IMissionManager
+public class MissionManager : IMissionManager, IMissionMembershipRegistry
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MissionManager>();
 
@@ -207,6 +208,17 @@ public class MissionManager : IMissionManager
             Logger.Information("Controller {Controller} disconnected from instance {Instance}", controllerId, instanceId);
             PruneIfEmpty(instanceId, remaining.Count);
             return true;
+        }
+    }
+
+    public bool IsControllerInMission(string controllerId)
+    {
+        if (controllerId == null)
+            return false;
+
+        lock (gate)
+        {
+            return byInstanceId.Values.Any(instance => instance.TryGetPeer(controllerId, out _));
         }
     }
 

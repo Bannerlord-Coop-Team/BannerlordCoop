@@ -6,6 +6,7 @@ using GameInterface.Services.CharacterDevelopers.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 
@@ -69,14 +70,12 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                 // Store skill ids and levels in lists for transmission over the network
                 var skillIds = new List<string>();
                 var skillFocusLevels = new List<int>();
-                var skillOrgFocusAmounts = new List<int>();
                 foreach (var skillVM in data.Skills)
                 {
                     if (!objectManager.TryGetId(skillVM.Skill, out var currentSkillId)) continue;
 
                     skillIds.Add(currentSkillId);
                     skillFocusLevels.Add(skillVM.CurrentFocusLevel);
-                    skillOrgFocusAmounts.Add(skillVM._orgFocusAmount);
                 }
 
                 // Send to server from client
@@ -86,8 +85,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                     attributeIds,
                     attributeIncreases,
                     skillIds,
-                    skillFocusLevels,
-                    skillOrgFocusAmounts
+                    skillFocusLevels
                 );
                 network.SendAll(message);
             });
@@ -103,7 +101,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
                 AddPerks(data.PerkIds, heroDeveloper);
                 AddAttributes(data.AttributeIds, data.AttributeIncreases, heroDeveloper);
-                AddFocuses(data.SkillIds, data.SkillFocusLevels, data.SkillOrgFocusAmounts, heroDeveloper);
+                AddFocuses(data.SkillIds, data.SkillFocusLevels, heroDeveloper);
             });
         }
 
@@ -135,23 +133,55 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             }
         }
 
-        private void AddFocuses(List<string> skillIds, List<int> skillFocusLevels, List<int> skillOrgFocusAmounts, HeroDeveloper heroDeveloper)
+        private void AddFocuses(List<string> skillIds, List<int> skillFocusLevels, HeroDeveloper heroDeveloper)
         {
-            if (skillIds == null) return;
+            if (skillIds == null || skillFocusLevels == null) return;
+
+            if (skillIds.Count != skillFocusLevels.Count)
+            {
+                Logger.Warning("Rejected focus changes with mismatched skill and focus counts");
+                return;
+            }
+
+            var focusChanges = new List<(SkillObject Skill, int Increase)>();
+            int requiredFocusPoints = 0;
+            int maxFocusPerSkill = Campaign.Current.Models.CharacterDevelopmentModel.MaxFocusPerSkill;
 
             for (int i = 0; i < skillIds.Count; i++)
             {
                 string skillId = skillIds[i];
 
-                if (!objectManager.TryGetObjectWithLogging<SkillObject>(skillId, out var currentSkill)) continue;
+                // Reject the whole request so focus changes are applied atomically.
+                if (!objectManager.TryGetObjectWithLogging<SkillObject>(skillId, out var currentSkill)) return;
 
-                for (int j = 0; j < skillFocusLevels[i] - skillOrgFocusAmounts[i]; j++)
+                int targetFocusLevel = skillFocusLevels[i];
+                int focusIncrease = targetFocusLevel - heroDeveloper.GetFocus(currentSkill);
+                if (focusIncrease <= 0) continue;
+
+                if (targetFocusLevel > maxFocusPerSkill)
                 {
-                    heroDeveloper.AddFocus(currentSkill, 1);
+                    Logger.Warning("Rejected focus target {TargetFocusLevel} for {SkillId}; maximum is {MaxFocusPerSkill}",
+                        targetFocusLevel, skillId, maxFocusPerSkill);
+                    return;
                 }
 
-                // Needed to calculate remaining skill points correctly
-                skillOrgFocusAmounts[i] = skillFocusLevels[i];
+                focusChanges.Add((currentSkill, focusIncrease));
+                requiredFocusPoints += focusIncrease * heroDeveloper.GetRequiredFocusPointsToAddFocus(currentSkill);
+            }
+
+            if (requiredFocusPoints > heroDeveloper.UnspentFocusPoints)
+            {
+                Logger.Warning("Rejected focus changes requiring {RequiredFocusPoints} points; only {UnspentFocusPoints} remain",
+                    requiredFocusPoints, heroDeveloper.UnspentFocusPoints);
+                return;
+            }
+
+            foreach (var focusChange in focusChanges)
+            {
+                for (int i = 0; i < focusChange.Increase; i++)
+                {
+                    heroDeveloper.AddFocus(focusChange.Skill, 1);
+                }
             }
         }
     }

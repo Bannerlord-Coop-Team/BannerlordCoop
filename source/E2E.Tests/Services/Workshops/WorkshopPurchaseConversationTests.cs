@@ -9,6 +9,11 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Workshops.Commands;
+using GameInterface.Services.Workshops.Interfaces;
+using HarmonyLib;
+using WarehouseOwnerChanged = GameInterface.Services.Workshops.Messages.ChangeWorkshopOwner;
+using WarehouseOwnerChangedEvent = GameInterface.Services.Workshops.Messages.WorkshopOwnerChanged;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -27,6 +32,9 @@ public class WorkshopPurchaseConversationTests : IDisposable
     private const string BuyerControllerId = "WorkshopBuyer";
     private const int WorkshopCapital = 1000;
     private const int WorkshopCost = 400;
+    private static Workshop expectedDispatchedWorkshop;
+    private static Hero expectedDispatchedOldOwner;
+    private static int observedOwnerChangeDispatches;
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -73,6 +81,72 @@ public class WorkshopPurchaseConversationTests : IDisposable
 
         AssertClanWorkshopDataReadyForClanMenu(client, state);
         Assert.Single(Server.NetworkSentMessages.GetMessages<RefreshWorkshopsList>());
+    }
+
+    [Fact]
+    public void DebugOwnerChange_ServerPreparesClientWarehouseDataForClanMenu()
+    {
+        var client = Clients.First();
+        var state = CreatePurchaseState(workshopOwnedByBuyer: false, buyerGold: 1000, sellerGold: 0);
+        var harmony = new Harmony("e2e.workshops.debug-owner-change");
+        Workshop serverWorkshop = null;
+        Hero serverOldOwner = null;
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out serverWorkshop));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(state.BuyerId, out var buyer));
+
+                serverOldOwner = serverWorkshop.Owner;
+                expectedDispatchedWorkshop = serverWorkshop;
+                expectedDispatchedOldOwner = serverOldOwner;
+                observedOwnerChangeDispatches = 0;
+                Server.Resolve<ISessionWorkshopPlayerDataInterface>().AddPlayerKeys(state.BuyerId);
+
+                harmony.Patch(
+                    AccessTools.Method(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWorkshopOwnerChanged)),
+                    prefix: new HarmonyMethod(typeof(WorkshopPurchaseConversationTests), nameof(ObserveOwnerChangeDispatch)));
+
+                WorkshopDebugCommand.ApplyOwnerChange(serverWorkshop, buyer);
+            });
+
+            Assert.Equal(1, observedOwnerChangeDispatches);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            expectedDispatchedWorkshop = null;
+            expectedDispatchedOldOwner = null;
+        }
+
+        Server.Call(() =>
+        {
+            // The E2E harness does not register campaign behavior events. Publish the patched
+            // behavior event separately after proving the action reached CampaignEventDispatcher.
+            var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
+            MessageBroker.Instance.Publish(
+                workshopsBehavior,
+                new WarehouseOwnerChangedEvent(serverWorkshop, serverOldOwner));
+        });
+
+        AssertWorkshopOwnedByBuyer(Server, state, expectedBuyerGold: 1000, expectedSellerGold: 0);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<WarehouseOwnerChanged>());
+        foreach (var environmentClient in Clients)
+        {
+            AssertWorkshopOwnedByBuyer(environmentClient, state, expectedBuyerGold: 1000, expectedSellerGold: 0);
+        }
+
+        AssertClanWorkshopDataReadyForClanMenu(client, state);
+    }
+
+    private static void ObserveOwnerChangeDispatch(Workshop workshop, Hero oldOwner)
+    {
+        if (workshop == expectedDispatchedWorkshop && oldOwner == expectedDispatchedOldOwner)
+        {
+            observedOwnerChangeDispatches++;
+        }
     }
 
     [Fact]

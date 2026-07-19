@@ -86,6 +86,37 @@ public class ServerBattleModeArbiterTests
         }
     }
 
+    // Surrender (and similar side-effectful actions) consult the claim read-only: IsClaimed reports either
+    // mode without disturbing it, and reports false before a claim exists and after it releases.
+    [Fact]
+    public void IsClaimed_ReflectsClaimLifecycle_WithoutDisturbingIt()
+    {
+        const string mapEventId = "is-claimed-lifecycle";
+
+        try
+        {
+            Assert.False(ServerBattleModeArbiter.IsClaimed(null));
+            Assert.False(ServerBattleModeArbiter.IsClaimed(mapEventId));
+
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId));
+            Assert.True(ServerBattleModeArbiter.IsClaimed(mapEventId));
+
+            // Reading did not disturb the claim: the opposing mode is still refused.
+            Assert.False(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
+
+            Assert.True(ServerBattleModeArbiter.ReleaseMission(mapEventId));
+            Assert.False(ServerBattleModeArbiter.IsClaimed(mapEventId));
+
+            // A simulation claim reports the same way.
+            Assert.True(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
+            Assert.True(ServerBattleModeArbiter.IsClaimed(mapEventId));
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+        }
+    }
+
     // The mutual exclusion is scoped per map event (BR-001 addresses "a map event"): two distinct events are
     // independent battles and can hold opposite modes at once, each still excluding its own opposite.
     [Fact]

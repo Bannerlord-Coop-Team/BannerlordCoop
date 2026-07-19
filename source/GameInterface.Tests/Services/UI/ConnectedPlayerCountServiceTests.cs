@@ -29,4 +29,14 @@ public class ConnectedPlayerCountServiceTests
 
         Assert.Equal("Encyclopedia (3 online)", service.FormatEncyclopediaTitle("Encyclopedia"));
     }
+
+    [Fact]
+    public void FormatEncyclopediaTitle_WhenFormattedTitleIsReapplied_DoesNotAppendAgain()
+    {
+        var service = new ConnectedPlayerCountService();
+        service.UpdateConnectedPlayers(3);
+        var formattedTitle = service.FormatEncyclopediaTitle("Encyclopedia");
+
+        Assert.Equal(formattedTitle, service.FormatEncyclopediaTitle(formattedTitle));
+    }
 }

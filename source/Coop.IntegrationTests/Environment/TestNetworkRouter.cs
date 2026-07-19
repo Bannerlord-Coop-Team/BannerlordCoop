@@ -11,6 +11,8 @@ namespace Coop.IntegrationTests.Environment;
 /// </summary>
 public class TestNetworkRouter
 {
+    public bool IsMessageRoutingEnabled { get; set; } = true;
+
     private ServerInstance Server;
     private List<ClientInstance> Clients = new List<ClientInstance>();
 
@@ -26,6 +28,8 @@ public class TestNetworkRouter
 
     public void Send(NetPeer sender, NetPeer receiver, IMessage message)
     {
+        if (!IsMessageRoutingEnabled) return;
+
         if (receiver == Server.NetPeer)
         {
             Server.SimulateMessage(sender, message);
@@ -39,6 +43,8 @@ public class TestNetworkRouter
     }
     public void SendAll(NetPeer sender, IMessage message)
     {
+        if (!IsMessageRoutingEnabled) return;
+
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients)
@@ -54,6 +60,8 @@ public class TestNetworkRouter
 
     public void SendAllBut(NetPeer sender, NetPeer ignored, IMessage message)
     {
+        if (!IsMessageRoutingEnabled) return;
+
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))

@@ -63,14 +63,42 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
-            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty))
+            {
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
+            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement))
+            {
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
 
             if (mobileParty.Party?.MapEventSide != null)
             {
                 Logger.Warning(
                     "Rejecting settlement entry for party {PartyId} because it is already in a map event",
                     payload.PartyId);
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
+
+            if (mobileParty.CurrentSettlement != null)
+            {
+                if (mobileParty.CurrentSettlement == settlement)
+                {
+                    network.Send(peer, new NetworkStartSettlementEncounter(payload));
+                }
+                else
+                {
+                    Logger.Warning(
+                        "Rejecting settlement entry for party {PartyId} because it is already in settlement {SettlementId}",
+                        payload.PartyId,
+                        objectManager.TryGetId(mobileParty.CurrentSettlement, out var currentSettlementId)
+                            ? currentSettlementId
+                            : mobileParty.CurrentSettlement.StringId);
+                    network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                }
                 return;
             }
 

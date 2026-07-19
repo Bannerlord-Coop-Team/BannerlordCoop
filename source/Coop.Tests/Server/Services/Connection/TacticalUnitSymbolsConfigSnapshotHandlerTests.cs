@@ -1,7 +1,8 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Connection.Handlers;
+using Coop.Tests;
 using Coop.Tests.Mocks;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
@@ -12,6 +13,7 @@ using Xunit;
 
 namespace Coop.Tests.Server.Services.Connection;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class TacticalUnitSymbolsConfigSnapshotHandlerTests
 {
     static TacticalUnitSymbolsConfigSnapshotHandlerTests()

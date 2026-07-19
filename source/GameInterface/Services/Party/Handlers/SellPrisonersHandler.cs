@@ -24,6 +24,7 @@ internal class SellPrisonersHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IPrisonerSaleValidator prisonerSaleValidator;
     private readonly ISendCoalescer sendCoalescer;
 
     public SellPrisonersHandler(
@@ -31,12 +32,14 @@ internal class SellPrisonersHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
+        IPrisonerSaleValidator prisonerSaleValidator,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
+        this.prisonerSaleValidator = prisonerSaleValidator;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<PrisonersSold>(Handle_PrisonersSold);
@@ -67,8 +70,11 @@ internal class SellPrisonersHandler : IHandler
 
             TroopRoster leftPrisonerRoster = new();
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
+            var validatedPrisonerRoster = prisonerSaleValidator.Validate(
+                leftPrisonerRoster,
+                sellingParty.PrisonRoster);
 
-            SellPrisonersAction.ApplyForSelectedPrisoners(sellingParty, null, leftPrisonerRoster);
+            SellPrisonersAction.ApplyForSelectedPrisoners(sellingParty, null, validatedPrisonerRoster);
 
             objectManager.TryGetId(sellingParty.PrisonRoster, out var rosterId);
             var compactId = Compact(rosterId, typeof(TroopRoster));

@@ -2,6 +2,7 @@
 using Common;
 using Common.Logging;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -9,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -72,7 +74,8 @@ public class SiegeDebugCommand
         else
         {
             besieger = MobileParty.AllLordParties
-                .Where(party => party.MapFaction?.IsAtWarWith(settlement.MapFaction) == true
+                .Where(party => !party.IsPlayerParty()
+                    && party.MapFaction?.IsAtWarWith(settlement.MapFaction) == true
                     && party.LeaderHero != null && party.CurrentSettlement == null
                     && party.MapEvent == null && party.BesiegerCamp == null && party.Army == null)
                 .OrderByDescending(party => party.Party.CalculateCurrentStrength())
@@ -89,6 +92,66 @@ public class SiegeDebugCommand
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
 
         return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}";
+    }
+
+    /// <summary>
+    /// Starts the wall assault for an existing AI-led siege. Server only; the resulting map event uses the
+    /// same authoritative action as campaign AI.
+    /// </summary>
+    [CommandLineArgumentFunction("assault", "coop.debug.siege")]
+    public static string StartAssault(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.assault <settlementId>";
+        }
+
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be used by the server";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var attacker = settlement.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        if (attacker == null)
+        {
+            return $"{settlement.Name} has no active siege leader";
+        }
+
+        if (attacker.IsPlayerParty())
+        {
+            return $"{settlement.Name} is player-led; this command only starts AI assaults";
+        }
+
+        if (attacker.MapEvent != null)
+        {
+            return $"{attacker.Name} is already in an active map event";
+        }
+
+        if (settlement.Party.MapEvent != null)
+        {
+            return $"{settlement.Name} already has an active map event";
+        }
+
+        StartBattleAction.ApplyStartAssaultAgainstWalls(attacker, settlement);
+
+        var mapEvent = settlement.Party.MapEvent;
+        if (mapEvent?.IsSiegeAssault != true)
+        {
+            return $"Failed to start an AI siege assault against {settlement.Name}";
+        }
+
+        var mapEventId = objectManager.TryGetId(mapEvent, out string id) ? id : mapEvent.StringId;
+        return $"Started AI siege assault by {attacker.Name} against {settlement.Name} (MapEvent {mapEventId})";
     }
 
     // coop.debug.siege.list

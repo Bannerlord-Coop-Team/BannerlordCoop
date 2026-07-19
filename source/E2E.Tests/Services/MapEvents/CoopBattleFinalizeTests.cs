@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -6,11 +6,14 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -20,6 +23,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -143,6 +147,50 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         // BattleConcludesWithVictory_StagesEachWinnersEncounterForBattleResults.
         AssertHasPlayerEncounter(Clients.First(), expected: false);
         AssertHasPlayerEncounter(Clients.Last(), expected: false);
+    }
+
+    [Fact]
+    public void ActiveMission_DestroyBeforeClose_PreservesMapEventUntilMissionExit()
+    {
+        var (ctx, _, _, successorPartyBaseId) = SetupTwoAlliedPlayersInBattle();
+        var successor = Clients.Last();
+        MapEvent destroyedMapEvent = null;
+        MockMission mission = null;
+        var holdRequests = 0;
+
+        successor.Resolve<IMessageBroker>().Subscribe<PartyBehaviorChangeAttempted>(_ => holdRequests++);
+
+        using (var fixture = new MissionEngineFixture())
+        {
+            successor.Call(() =>
+            {
+                mission = fixture.CreateMission(successor);
+                Assert.True(successor.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out destroyedMapEvent));
+            });
+
+            SetMockPlayerEncounter(successor, mapEventId: ctx.MapEventId);
+
+            successor.SimulateMessage(Server, new NetworkDestroyInstance<MapEvent>(ctx.MapEventId));
+            successor.SimulateMessage(Server, new NetworkClosePvpEncounter(
+                new[] { successorPartyBaseId }, mapEventId: ctx.MapEventId));
+
+            AssertMapEventRemoved(successor, ctx.MapEventId);
+            successor.Call(() =>
+            {
+                Assert.NotNull(Mission.Current);
+                Assert.False(mission.EndMissionCalled);
+                Assert.Same(destroyedMapEvent, MobileParty.MainParty.MapEvent);
+            });
+        }
+
+        successor.Call(() =>
+        {
+            successor.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            Assert.Null(MobileParty.MainParty.Party.MapEventSide);
+            Assert.Null(PlayerEncounter.Current);
+        });
+
+        Assert.Equal(1, holdRequests);
     }
 
     [Fact]
