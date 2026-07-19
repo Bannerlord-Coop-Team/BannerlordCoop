@@ -10,6 +10,7 @@ using Moq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 
 namespace Coop.IntegrationTests.MobileParties
 {
@@ -223,6 +224,34 @@ namespace Coop.IntegrationTests.MobileParties
                 .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
             Assert.Equal(1, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkStartSettlementEncounter>());
             Assert.Equal(0, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkPartyEnterSettlement>());
+        }
+
+        /// <summary>
+        /// Starting an encounter with a besieged settlement must leave the party outside until the player
+        /// chooses a valid siege action, matching vanilla's settlement-encounter flow.
+        /// </summary>
+        [Fact]
+        public void EnterSettlement_BesiegedSettlement_DoesNotApplyEntry()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            settlement.SiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement)));
+
+            client1.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.StartSettlementEncounter(party, settlement), Times.Once);
+            TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
+            foreach (var client in TestEnvironment.Clients.Where(client => client != client1))
+            {
+                client.Resolve<Mock<ISettlementInterface>>()
+                    .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
+            }
         }
 
         /// <summary>

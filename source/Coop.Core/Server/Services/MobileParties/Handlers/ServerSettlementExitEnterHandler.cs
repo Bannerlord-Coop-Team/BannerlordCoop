@@ -103,6 +103,10 @@ public class ServerSettlementExitEnterHandler : IHandler
             }
 
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
+
+            // Vanilla starts under-siege and under-raid encounters outside the settlement.
+            if (settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid)) return;
+
             network.SendAllBut(peer, new NetworkPartyEnterSettlement(
                 Compact(payload.SettlementId, typeof(Settlement)),
                 Compact(payload.PartyId, typeof(MobileParty))));
