@@ -1,4 +1,7 @@
 using Common.Messaging;
+#if DEBUG
+using GameInterface.Services.GameMenus.Patches;
+#endif
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -45,7 +48,11 @@ internal class PlayerLeaveSiegeEncounterPatch
     private static bool Prefix()
     {
         var party = MobileParty.MainParty;
-        if (!ShouldRequestLeave(party))
+        bool shouldRequestLeave = ShouldRequestLeave(party);
+#if DEBUG
+        SiegeEncounterMenuTrace.LogLeaveRoute(party, shouldRequestLeave);
+#endif
+        if (!shouldRequestLeave)
         {
             // Vanilla clears siege and army state after Finish returns. Hold first so ExitToLast
             // cannot recreate the encounter while that state is still active.
