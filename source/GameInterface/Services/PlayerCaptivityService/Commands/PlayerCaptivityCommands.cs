@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
 using Serilog;
@@ -470,6 +472,10 @@ Ransoms the captive player hero for zero gold through their captor's settlement 
             return "Failed to restore party: " + error;
         if (!TryResolveMobileParty(objectManager, args[0], out var party, out error))
             return "Failed to restore party: " + error;
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+            return "Failed to restore party: could not resolve Network.";
+        if (!objectManager.TryGetIdWithLogging(party, out var partyId))
+            return "Failed to restore party: the party is not registered.";
         if (!float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
             !float.TryParse(args[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var y) ||
             !bool.TryParse(args[4], out var isOnLand) ||
@@ -498,6 +504,7 @@ Ransoms the captive player hero for zero gold through their captor's settlement 
         }
 
         party.IsActive = isActive;
+        network.SendAll(new NetworkPlayerCaptivityReleasePositionSet(partyId, party.Position));
 
         return "Restored party fixture state.\n" + PartyFixtureState(new List<string> { args[0] });
     }
