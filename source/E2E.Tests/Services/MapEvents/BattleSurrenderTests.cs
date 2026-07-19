@@ -1,6 +1,9 @@
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
@@ -372,6 +375,99 @@ public class BattleSurrenderTests : MapEventTestBase
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
         foreach (var client in Clients)
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
+    }
+
+    /// <summary>
+    /// Partial surrender: while a healthy ally still fights on the surrenderer's side, the surrender must
+    /// capture ONLY the surrendering party — a whole-side <c>DoSurrender</c> would mark the side
+    /// surrendered and hand the other side the win, ending the battle for the healthy ally. The event
+    /// survives with the ally still on its side, the surrendered party leaves it everywhere, and its hero
+    /// becomes the enemy leader's prisoner.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-061")]
+    public void RecipientSurrender_WithHealthyAllyOnSide_CapturesOnlyTheSurrenderer()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+
+        // A healthy ally party fights on the recipient's (defender) side.
+        var allyPartyId = JoinNewServerPartyToSide(setup.ctx.MapEventId, BattleSideEnum.Defender);
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        SeedPartyTroopOnAll(allyPartyId, troopId, 3);
+
+        Server.NetworkSentMessages.Clear();
+
+        PublishRecipientSurrender(setup);
+        TestEnvironment.FlushCoalescer();
+
+        // The surrenderer's hero is the enemy (attacker) leader's prisoner everywhere...
+        AssertCaptivity(Server, setup.recipientHeroId, setup.initiatorPartyId);
+        foreach (var client in Clients)
+            AssertCaptivity(client, setup.recipientHeroId, setup.initiatorPartyId);
+
+        // ...and ONLY the surrenderer left the battle: the event survives with the ally still on its side.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(allyPartyId, out var ally));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.recipientPartyId, out var surrendered));
+
+            Assert.Same(mapEvent.DefenderSide, ally.Party.MapEventSide);
+            Assert.Null(surrendered.Party.MapEventSide);
+        });
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out _));
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(setup.recipientPartyId, out var surrendered));
+                Assert.Null(surrendered.Party.MapEventSide);
+            });
+        }
+
+        // No side-wide conclusion went out — only the surrenderer's own removal broadcast.
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+    }
+
+    /// <summary>
+    /// BR-001's exclusivity extended to surrender: while a live mission (or simulation) owns the map event,
+    /// a surrender request must not conclude the battle under the players resolving it — the server refuses
+    /// it authoritatively (<see cref="ServerBattleModeArbiter"/> backstop; the client menu refusal is
+    /// <c>BattleModeEncounterOptionsPatch</c>). Releasing the claim — the state a mission's end broadcast
+    /// leaves behind — re-admits the surrender, which then resolves normally.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-001")]
+    [Trait("Requirement", "BR-060")]
+    public void RecipientSurrender_WhileEventClaimed_IsRefusedUntilClaimReleases()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+
+        Server.Call(() => Assert.True(ServerBattleModeArbiter.TryClaimMission(setup.ctx.MapEventId)));
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+
+            PublishRecipientSurrender(setup);
+
+            // Refused: nobody was captured, the event survives everywhere, and no encounter close was sent.
+            AssertCaptivity(Server, setup.recipientHeroId, null);
+            Server.Call(() => Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out _)));
+            foreach (var client in Clients)
+                client.Call(() => Assert.True(client.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out _)));
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(setup.ctx.MapEventId));
+        }
+
+        // The released claim re-admits the surrender, which resolves the battle as usual.
+        PublishRecipientSurrender(setup);
+
+        AssertCaptivity(Server, setup.recipientHeroId, setup.initiatorPartyId);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
     }
 
     // ------------------------------------------------------------------

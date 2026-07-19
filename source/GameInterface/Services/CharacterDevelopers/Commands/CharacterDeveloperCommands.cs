@@ -36,6 +36,10 @@ internal class CharacterDeveloperCommands
 
                 heroData += " Total XP: " + hero.HeroDeveloper.TotalXp + "\n";
 
+                heroData += " Unspent Focus Points: " + hero.HeroDeveloper.UnspentFocusPoints + "\n";
+
+                heroData += " Unspent Attribute Points: " + hero.HeroDeveloper.UnspentAttributePoints + "\n";
+
                 heroData += " Attributes: {";
                 foreach (CharacterAttribute attribute in hero._characterAttributes._attributes.Keys)
                 {

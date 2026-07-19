@@ -1,5 +1,4 @@
-using System;
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -21,15 +20,15 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers;
 /// </summary>
 public class ClientSettlementExitEnterHandler : IHandler
 {
-    private static readonly TimeSpan RequestCooldown = TimeSpan.FromMilliseconds(500);
-
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
     private readonly IKingdomCreationSettlementTracker settlementTracker;
 
-    private DateTime lastRequestSentUtc = DateTime.MinValue;
+    private readonly object pendingEncounterLock = new object();
+    private string pendingPartyId;
+    private string pendingSettlementId;
 
     public ClientSettlementExitEnterHandler(
         IMessageBroker messageBroker,
@@ -47,6 +46,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkEndSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkStartSettlementEncounter>(Handle);
+        messageBroker.Subscribe<NetworkSettlementEncounterRejected>(Handle);
 
         messageBroker.Subscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Subscribe<NetworkPartyLeaveSettlement>(Handle);
@@ -58,6 +58,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         messageBroker.Unsubscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Unsubscribe<NetworkEndSettlementEncounter>(Handle);
         messageBroker.Unsubscribe<NetworkStartSettlementEncounter>(Handle);
+        messageBroker.Unsubscribe<NetworkSettlementEncounterRejected>(Handle);
 
         messageBroker.Unsubscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Unsubscribe<NetworkPartyLeaveSettlement>(Handle);
@@ -65,20 +66,19 @@ public class ClientSettlementExitEnterHandler : IHandler
 
     private void Handle(MessagePayload<StartSettlementEncounterAttempted> obj)
     {
-        // This only ever runs for the single party this client controls (the publisher gates on
-        // IsControlledByThisInstance). That party re-attempts the settlement encounter every campaign tick
-        // until its PlayerEncounter is set up, which on a client only happens once the server round-trip
-        // completes. Rate-limit the request so those per-tick re-attempts do not flood the server.
-        var now = DateTime.UtcNow;
-        if (now - lastRequestSentUtc < RequestCooldown)
-            return;
-
         var payload = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.Settlement, out var settlementId)) return;
 
-        lastRequestSentUtc = now;
+        lock (pendingEncounterLock)
+        {
+            if (pendingPartyId != null)
+                return;
+
+            pendingPartyId = partyId;
+            pendingSettlementId = settlementId;
+        }
 
         var message = new NetworkRequestStartSettlementEncounter(partyId, settlementId);
 
@@ -88,6 +88,8 @@ public class ClientSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<EndSettlementEncounterAttempted> obj)
     {
         var payload = obj.What;
+
+        ClearPendingEncounter();
 
         if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
 
@@ -106,6 +108,9 @@ public class ClientSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
 
+        if (!TryCompletePendingEncounter(payload.PartyId, payload.SettlementId))
+            return;
+
         // Client applies a replicated change: run it on the game thread inside an AllowedThread so the
         // patched action proceeds without being re-intercepted/re-broadcast.
         GameThread.RunSafe(() =>
@@ -121,6 +126,34 @@ public class ClientSettlementExitEnterHandler : IHandler
                     GameMenu.SwitchToMenu("raid_occupied");
             }
         });
+    }
+
+    private void Handle(MessagePayload<NetworkSettlementEncounterRejected> obj)
+    {
+        var payload = obj.What;
+        TryCompletePendingEncounter(payload.PartyId, payload.SettlementId);
+    }
+
+    private bool TryCompletePendingEncounter(string partyId, string settlementId)
+    {
+        lock (pendingEncounterLock)
+        {
+            if (pendingPartyId != partyId || pendingSettlementId != settlementId)
+                return false;
+
+            pendingPartyId = null;
+            pendingSettlementId = null;
+            return true;
+        }
+    }
+
+    private void ClearPendingEncounter()
+    {
+        lock (pendingEncounterLock)
+        {
+            pendingPartyId = null;
+            pendingSettlementId = null;
+        }
     }
 
     private static bool ShouldShowRaidOccupiedMenu(MobileParty party, Settlement settlement)
