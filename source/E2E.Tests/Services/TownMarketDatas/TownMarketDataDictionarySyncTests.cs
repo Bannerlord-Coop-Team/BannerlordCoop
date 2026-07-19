@@ -1,5 +1,6 @@
 ﻿using Common.Network;
 using Common.Network.Coalescing;
+using Common.Util;
 using E2E.Tests.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Roster;
@@ -129,6 +130,29 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
         Assert.Equal(3, expected.InStore);
         Assert.Equal(300, expected.InStoreValue);
         AssertClientsHave(categoryId, expected);
+    }
+
+    [Fact]
+    public void Client_AllowedThreadTownRosterUpdate_RecalculatesMarketData()
+    {
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject(MarketDataId, out TownMarketData marketData));
+            Assert.True(client.ObjectManager.TryGetObject(categoryId, out ItemCategory category));
+            Assert.True(client.ObjectManager.TryGetObject(itemId, out ItemObject item));
+            Assert.True(client.ObjectManager.TryGetObject(itemRosterId, out ItemRoster itemRoster));
+
+            using (new AllowedThread())
+            {
+                itemRoster.AddToCounts(new EquipmentElement(item), 2);
+            }
+
+            ItemData actual = marketData.GetCategoryData(category);
+            Assert.Equal(2, actual.InStore);
+            Assert.Equal(200, actual.InStoreValue);
+        });
     }
 
     [Fact]

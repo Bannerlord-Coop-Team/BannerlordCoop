@@ -1,6 +1,6 @@
 ﻿using Common;
-using Common.Util;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.TownMarketDatas.Patches;
@@ -9,8 +9,31 @@ namespace GameInterface.Services.TownMarketDatas.Patches;
 [HarmonyPatch(typeof(TownMarketData))]
 internal static class TownMarketDataPatches
 {
+    [ThreadStatic]
+    private static int receivedRosterUpdateDepth;
+
+    internal static IDisposable SuppressReceivedRosterUpdate() => new ReceivedRosterUpdateScope();
+
     [HarmonyPatch(nameof(TownMarketData.OnTownInventoryUpdated))]
     [HarmonyPrefix]
     private static bool OnTownInventoryUpdatedPrefix() =>
-        ModInformation.IsServer || !AllowedThread.IsThisThreadAllowed();
+        ModInformation.IsServer || receivedRosterUpdateDepth == 0;
+
+    private sealed class ReceivedRosterUpdateScope : IDisposable
+    {
+        private bool isDisposed;
+
+        public ReceivedRosterUpdateScope()
+        {
+            receivedRosterUpdateDepth++;
+        }
+
+        public void Dispose()
+        {
+            if (isDisposed) return;
+
+            receivedRosterUpdateDepth--;
+            isDisposed = true;
+        }
+    }
 }
