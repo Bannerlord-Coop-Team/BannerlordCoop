@@ -45,6 +45,8 @@ namespace GameInterface.Services.PlayerCaptivityService.Handlers;
 /// apply it and confirm with <see cref="NetworkPlayerCaptivityEnded"/>.</item>
 /// <item><see cref="NetworkEndCaptivityAttempted"/> — a client chose to release another hero;
 /// apply the release through the authoritative game action.</item>
+/// <item><see cref="NetworkPrisonerLiberationAttempted"/> — a client liberated a prisoner through
+/// the post-battle conversation; apply the vanilla relation reward for that client hero.</item>
 /// <item><see cref="CampaignTick"/> — keep captive players' parties glued to their captor
 /// (the server-side replacement for native <see cref="PlayerCaptivity"/>.Update).</item>
 /// </list>
@@ -52,6 +54,8 @@ namespace GameInterface.Services.PlayerCaptivityService.Handlers;
 /// </summary>
 internal class PlayerCaptivityServerHandler : IHandler
 {
+    private const int PrisonerLiberationRelationReward = 10;
+
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerCaptivityServerHandler>();
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -75,6 +79,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
         messageBroker.Subscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
         messageBroker.Subscribe<NetworkEndCaptivityAttempted>(Handle_NetworkEndCaptivityAttempted);
+        messageBroker.Subscribe<NetworkPrisonerLiberationAttempted>(Handle_NetworkPrisonerLiberationAttempted);
         messageBroker.Subscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -85,6 +90,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
         messageBroker.Unsubscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
         messageBroker.Unsubscribe<NetworkEndCaptivityAttempted>(Handle_NetworkEndCaptivityAttempted);
+        messageBroker.Unsubscribe<NetworkPrisonerLiberationAttempted>(Handle_NetworkPrisonerLiberationAttempted);
         messageBroker.Unsubscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -433,6 +439,37 @@ internal class PlayerCaptivityServerHandler : IHandler
 
             EndCaptivityAction.ApplyInternal(prisoner, data.Detail, facilitator, data.ShowNotification);
         }, context: nameof(Handle_NetworkEndCaptivityAttempted));
+    }
+
+    private void Handle_NetworkPrisonerLiberationAttempted(MessagePayload<NetworkPrisonerLiberationAttempted> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
+        {
+            Logger.Error("Received {Message} without a registered player peer", nameof(NetworkPrisonerLiberationAttempted));
+            return;
+        }
+
+        string playerHeroId = player.HeroId;
+        string prisonerId = payload.What.PrisonerId;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(playerHeroId, out var playerHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(prisonerId, out var prisoner)) return;
+            if (!prisoner.IsPrisoner) return;
+
+            PlayerCaptivityLogger.Debug(
+                "Handle_NetworkPrisonerLiberationAttempted (server): player={PlayerHeroId} prisoner={PrisonerId}",
+                playerHero.StringId,
+                prisoner.StringId);
+
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(
+                playerHero,
+                prisoner,
+                PrisonerLiberationRelationReward);
+        }, context: nameof(Handle_NetworkPrisonerLiberationAttempted));
     }
 
     /// <summary>
