@@ -1,6 +1,9 @@
 using Autofac;
 using Common;
 using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
@@ -103,6 +106,37 @@ internal class PartyCommands
             $"Movement order submitted for {party.StringId}.\n" +
             $"From: {current.X:R},{current.Y:R}\n" +
             $"Target: {target.X:R},{target.Y:R}";
+    }
+
+    /// <summary>
+    /// Restores a party to an exact campaign-map position and hold state after an automated live test.
+    /// </summary>
+    [CommandLineArgumentFunction("restore_position", "coop.debug.mobileparty")]
+    public static string RestorePositionCommand(List<string> strings)
+    {
+        if (!ModInformation.IsServer) return "Command can only be run on the server.";
+        if (strings.Count != 4 ||
+            !float.TryParse(strings[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionX) ||
+            !float.TryParse(strings[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionY) ||
+            !bool.TryParse(strings[3], out var isOnLand))
+            return "Usage: coop.debug.mobileparty.restore_position <partyId> <x> <y> <isOnLand>";
+
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found";
+
+        party.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(positionX, positionY), isOnLand);
+        party.SetMoveModeHold();
+        party.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(PartyCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea,
+                resetMovementToHold: true));
+
+        return $"Restored {party.StringId} to {party.Position.X:R},{party.Position.Y:R} in Hold mode.";
     }
 
     /// <summary>
