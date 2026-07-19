@@ -187,12 +187,12 @@ internal class PlayerEncounterPatches
     {
         if (ModInformation.IsServer) return;
 
+        // The server holds the AI party this player was conversing with; tell it the encounter is over.
+        MessageBroker.Instance.Publish(null, new ConversationEnded());
+
         // Skip our own server-approved restart: RestartPlayerEncounter calls Finish internally, and we run that
         // under an AllowedThread. Holding there would fight the restart we just asked the server to authorize.
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        // The server holds the AI party this player was conversing with; tell it the encounter is over.
-        MessageBroker.Instance.Publish(null, new ConversationEnded());
 
         var mainParty = MobileParty.MainParty;
 
