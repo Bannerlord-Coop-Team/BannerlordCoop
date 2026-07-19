@@ -37,15 +37,18 @@ internal class PrisonerSaleProcessor : IPrisonerSaleProcessor
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly IPrisonerSaleValidator prisonerSaleValidator;
+    private readonly IPlayerRansomReleaseSettlementProvider releaseSettlementProvider;
 
     public PrisonerSaleProcessor(
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
-        IPrisonerSaleValidator prisonerSaleValidator)
+        IPrisonerSaleValidator prisonerSaleValidator,
+        IPlayerRansomReleaseSettlementProvider releaseSettlementProvider)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.prisonerSaleValidator = prisonerSaleValidator;
+        this.releaseSettlementProvider = releaseSettlementProvider;
     }
 
     public void Sell(PartyBase sellingParty, TroopRoster requestedPrisoners)
@@ -56,7 +59,7 @@ internal class PrisonerSaleProcessor : IPrisonerSaleProcessor
         var validatedPrisoners = prisonerSaleValidator.Validate(
             requestedPrisoners,
             sellingParty.PrisonRoster);
-        var plan = CreateSalePlan(validatedPrisoners, GetReleasePosition(sellingParty));
+        var plan = CreateSalePlan(validatedPrisoners, sellingParty);
 
         if (plan.PrisonersForVanillaSale.Count > 0)
         {
@@ -74,7 +77,7 @@ internal class PrisonerSaleProcessor : IPrisonerSaleProcessor
 
     internal PrisonerSalePlan CreateSalePlan(
         TroopRoster validatedPrisoners,
-        CampaignVec2 releasePosition)
+        PartyBase sellingParty)
     {
         var prisonersForVanillaSale = new TroopRoster();
         var playerReleases = new List<PlayerCaptivityEndedByServer>();
@@ -84,11 +87,12 @@ internal class PrisonerSaleProcessor : IPrisonerSaleProcessor
             var hero = prisoner.Character?.HeroObject;
             if (hero != null && playerManager.Contains(hero))
             {
+                var releaseSettlement = releaseSettlementProvider.GetReleaseSettlement(sellingParty, hero);
                 playerReleases.Add(new PlayerCaptivityEndedByServer(
                     hero,
                     EndCaptivityDetail.Ransom,
                     null,
-                    releasePosition));
+                    releaseSettlement.GatePosition));
                 continue;
             }
 
@@ -102,11 +106,5 @@ internal class PrisonerSaleProcessor : IPrisonerSaleProcessor
         }
 
         return new PrisonerSalePlan(prisonersForVanillaSale, playerReleases);
-    }
-
-    private static CampaignVec2 GetReleasePosition(PartyBase sellingParty)
-    {
-        var currentSettlement = sellingParty.MobileParty?.CurrentSettlement;
-        return currentSettlement?.GatePosition ?? sellingParty.Position;
     }
 }

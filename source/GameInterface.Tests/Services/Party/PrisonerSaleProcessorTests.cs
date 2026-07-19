@@ -25,19 +25,25 @@ public class PrisonerSaleProcessorTests
 {
     private readonly Mock<IMessageBroker> messageBroker = new();
     private readonly Mock<IPlayerManager> playerManager = new();
+    private readonly FakePlayerRansomReleaseSettlementProvider releaseSettlementProvider = new();
     private readonly IPrisonerSaleValidator prisonerSaleValidator = new PassthroughPrisonerSaleValidator();
 
     [Fact]
-    public void Sell_PlayerPrisonerInSettlement_PublishesRansomReleaseAtGate()
+    public void Sell_PlayerPrisonerInSettlement_PublishesRansomReleaseAtSafeSettlementGate()
     {
         var playerHero = ObjectHelper.SkipConstructor<Hero>();
         var playerCharacter = ObjectHelper.SkipConstructor<CharacterObject>();
         var requestedPrisoners = Roster(Element(playerCharacter));
-        var gatePosition = Position(72.5f, 18.25f);
-        var sellingParty = MobilePartyAtSettlement(gatePosition);
+        var sellingParty = MobilePartyAtSettlement(Position(10f, 20f));
+        var safeSettlement = ObjectHelper.SkipConstructor<Settlement>();
+        var safeGatePosition = Position(72.5f, 18.25f);
+        safeSettlement.GatePosition = safeGatePosition;
         sellingParty.PrisonRoster = Roster(Element(playerCharacter));
         playerCharacter.HeroObject = playerHero;
         playerManager.Setup(p => p.Contains(playerHero)).Returns(true);
+        releaseSettlementProvider.ExpectedSellingParty = sellingParty;
+        releaseSettlementProvider.ExpectedPlayerHero = playerHero;
+        releaseSettlementProvider.ReleaseSettlement = safeSettlement;
 
         PlayerCaptivityEndedByServer release = default;
         messageBroker
@@ -51,7 +57,8 @@ public class PrisonerSaleProcessorTests
         Assert.Equal(EndCaptivityDetail.Ransom, release.Detail);
         Assert.Null(release.Facilitator);
         Assert.True(release.HasReleasePosition);
-        AssertPosition(gatePosition, release.ReleasePosition);
+        AssertPosition(safeGatePosition, release.ReleasePosition);
+        Assert.Equal(1, releaseSettlementProvider.CallCount);
         messageBroker.Verify(
             b => b.Publish(It.IsAny<object>(), It.IsAny<PlayerCaptivityEndedByServer>()),
             Times.Once);
@@ -67,11 +74,17 @@ public class PrisonerSaleProcessorTests
             Element(playerCharacter),
             Element(regularCharacter, 4, 2));
         playerCharacter.HeroObject = playerHero;
+        var sellingParty = ObjectHelper.SkipConstructor<PartyBase>();
+        var releaseSettlement = ObjectHelper.SkipConstructor<Settlement>();
         var releasePosition = Position(4f, 8f);
+        releaseSettlement.GatePosition = releasePosition;
         playerManager.Setup(p => p.Contains(playerHero)).Returns(true);
+        releaseSettlementProvider.ExpectedSellingParty = sellingParty;
+        releaseSettlementProvider.ExpectedPlayerHero = playerHero;
+        releaseSettlementProvider.ReleaseSettlement = releaseSettlement;
         var processor = CreateProcessor();
 
-        var plan = processor.CreateSalePlan(prisoners, releasePosition);
+        var plan = processor.CreateSalePlan(prisoners, sellingParty);
 
         var release = Assert.Single(plan.PlayerReleases);
         Assert.Same(playerHero, release.PrisonerHero);
@@ -122,7 +135,11 @@ public class PrisonerSaleProcessorTests
     }
 
     private PrisonerSaleProcessor CreateProcessor() =>
-        new(messageBroker.Object, playerManager.Object, prisonerSaleValidator);
+        new(
+            messageBroker.Object,
+            playerManager.Object,
+            prisonerSaleValidator,
+            releaseSettlementProvider);
 
     private static PartyBase MobilePartyAtSettlement(CampaignVec2 gatePosition)
     {
@@ -181,5 +198,24 @@ public class PrisonerSaleProcessorTests
     {
         public TroopRoster Validate(TroopRoster requestedRoster, TroopRoster availableRoster) =>
             requestedRoster;
+    }
+
+    private sealed class FakePlayerRansomReleaseSettlementProvider : IPlayerRansomReleaseSettlementProvider
+    {
+        public PartyBase ExpectedSellingParty { get; set; } = null!;
+
+        public Hero ExpectedPlayerHero { get; set; } = null!;
+
+        public Settlement ReleaseSettlement { get; set; } = null!;
+
+        public int CallCount { get; private set; }
+
+        public Settlement GetReleaseSettlement(PartyBase sellingParty, Hero playerHero)
+        {
+            Assert.Same(ExpectedSellingParty, sellingParty);
+            Assert.Same(ExpectedPlayerHero, playerHero);
+            CallCount++;
+            return ReleaseSettlement;
+        }
     }
 }

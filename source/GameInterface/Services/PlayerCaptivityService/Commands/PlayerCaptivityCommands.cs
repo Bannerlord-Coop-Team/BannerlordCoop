@@ -342,7 +342,7 @@ Releases the given player hero from captivity.";
 Example:
   coop.debug.player_captivity.ransom_player_at_settlement Player
 
-Ransoms the captive player hero for zero gold through their captor's settlement prisoner-sale path.";
+Ransoms the captive player hero for zero gold and releases them at a nearby neutral or allied settlement.";
 
     [CommandLineArgumentFunction("ransom_player_at_settlement", "coop.debug.player_captivity")]
     public static string RansomPlayerAtSettlement(List<string> args)
@@ -382,6 +382,15 @@ Ransoms the captive player hero for zero gold through their captor's settlement 
         if (!ContainerProvider.TryResolve<IPrisonerSaleProcessor>(out var prisonerSaleProcessor))
             return "Failed to ransom hero: could not resolve PrisonerSaleProcessor.";
 
+        if (!ContainerProvider.TryResolve<IPlayerRansomReleaseSettlementProvider>(out var releaseSettlementProvider))
+            return "Failed to ransom hero: could not resolve PlayerRansomReleaseSettlementProvider.";
+
+        var releaseSettlement = releaseSettlementProvider.GetReleaseSettlement(captorParty, hero);
+        var playerFaction = hero.MapFaction;
+        var releaseFaction = releaseSettlement.MapFaction;
+        var releaseSettlementHostile = playerFaction != null && releaseFaction != null &&
+            FactionManager.IsAtWarAgainstFaction(playerFaction, releaseFaction);
+
         var requestedPrisoners = new TroopRoster();
         requestedPrisoners.AddToCounts(hero.CharacterObject, 1);
         var seller = captorParty.LeaderHero;
@@ -393,7 +402,13 @@ Ransoms the captive player hero for zero gold through their captor's settlement 
         return
             "Hero ransomed successfully.\n" +
             $"Hero: {GetHeroDisplayName(hero)}\n" +
-            $"Settlement: {currentSettlement.Name} ({currentSettlement.StringId})\n" +
+            $"Ransom settlement: {currentSettlement.Name} ({currentSettlement.StringId})\n" +
+            $"Release settlement: {releaseSettlement.Name} ({releaseSettlement.StringId})\n" +
+            $"Player faction: {playerFaction?.StringId ?? "none"}\n" +
+            $"Release settlement faction: {releaseFaction?.StringId ?? "none"}\n" +
+            $"Release settlement hostile: {releaseSettlementHostile}\n" +
+            $"Release gate X: {releaseSettlement.GatePosition.X.ToString(CultureInfo.InvariantCulture)}\n" +
+            $"Release gate Y: {releaseSettlement.GatePosition.Y.ToString(CultureInfo.InvariantCulture)}\n" +
             $"Seller gold change: {sellerGoldAfter - sellerGoldBefore}";
     }
 
