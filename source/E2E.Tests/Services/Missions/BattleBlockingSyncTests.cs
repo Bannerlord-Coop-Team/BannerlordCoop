@@ -440,7 +440,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [Theory]
     [InlineData(Agent.ActionCodeType.Guard)]
     [InlineData(Agent.ActionCodeType.DefendShield)]
-    public void MissionPreDisplayTick_MountedGuardDecay_ReplaysWithVanillaBlendOnGuardChannel(
+    public void MissionPreDisplayTick_MountedGuardDecay_KeepsVanillaBlendOnGuardChannel(
         Agent.ActionCodeType guardActionType)
     {
         var agentId = Guid.NewGuid();
@@ -461,8 +461,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.Action0Flags = (AnimFlags)1;
             ownerMirror.Action1Index = 202;
             ownerMirror.Action1Progress = 0.002f;
-            ownerMirror.Action1Flags =
-                AnimFlags.amf_priority_defend | AnimFlags.anf_cyclic;
+            ownerMirror.Action1Flags = AnimFlags.amf_priority_defend;
             ownerMirror.Action1CodeType = guardActionType;
             ownerMirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
@@ -495,25 +494,44 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(202, puppetMirror.Action1Index);
-            Assert.Equal(0.102f, puppetMirror.Action1Progress, precision: 3);
+            Assert.Equal(0.002f, puppetMirror.Action1Progress, precision: 3);
+            Assert.Equal(
+                AnimFlags.amf_priority_defend | AnimFlags.anf_keep,
+                puppetMirror.Action1Flags);
             Assert.Equal(-0.2f, puppetMirror.LastSetActionBlendInPeriod);
 
-            puppetMirror.Action1Index = -1;
-            puppetMirror.Action1Progress = 0f;
-            puppetMirror.LastSetActionBlendInPeriod = float.NaN;
+            // Native now keeps and advances the guard instead of replacing it with act_none.
+            puppetMirror.Action1Progress = 0.25f;
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(303, puppetMirror.Action0Index);
             Assert.Equal(0.8f, puppetMirror.Action0Progress);
             Assert.Equal((AnimFlags)3, puppetMirror.Action0Flags);
             Assert.Equal(202, puppetMirror.Action1Index);
-            Assert.Equal(0.202f, puppetMirror.Action1Progress, precision: 3);
+            Assert.Equal(0.25f, puppetMirror.Action1Progress);
             Assert.Equal(
-                AnimFlags.amf_priority_defend | AnimFlags.anf_cyclic,
+                AnimFlags.amf_priority_defend | AnimFlags.anf_keep,
                 puppetMirror.Action1Flags);
-            Assert.Equal(2, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
             Assert.Equal(1, puppetMirror.LastSetActionChannel);
             Assert.Equal(-0.2f, puppetMirror.LastSetActionBlendInPeriod);
+
+            // Release packets carry act_none; explicitly replace the kept guard so it cannot stick.
+            ownerMirror.MovementFlags = Agent.MovementControlFlag.None;
+            ownerMirror.GuardMode = Agent.GuardMode.None;
+            ownerMirror.Action1Index = -1;
+            ownerMirror.Action1Progress = 0f;
+            ownerMirror.Action1Flags = 0;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(2, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(
+                Agent.MovementControlFlag.None,
+                AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
         });
     }
 

@@ -82,7 +82,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public readonly RemoteAction Action;
         public readonly int GuardActionChannel;
         public readonly ActionIndexCache GuardAction;
-        public float GuardActionProgress;
+        public readonly float GuardActionProgress;
 
         public RemoteGuardState(
             RemoteAction action,
@@ -204,7 +204,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
         using (new AllowedThread())
         {
-            ClearRemoteDefendState(agent);
+            ClearRemoteDefendState(agent, state.RetainedGuard);
         }
     }
 
@@ -213,19 +213,17 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (_disposed || Mission.Current == null) return;
 
         ApplyPendingRemoteActions();
-        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: false, dt: 0f);
+        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: false);
     }
 
-    public void ReassertRemoteDefendStates(float dt)
+    public void ReassertRemoteDefendStates(float _)
     {
         if (_disposed || Mission.Current == null) return;
 
-        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: true, dt);
+        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: true);
     }
 
-    private void ApplyRetainedRemoteGuardStates(
-        bool traceAfterNativeTick,
-        float dt)
+    private void ApplyRetainedRemoteGuardStates(bool traceAfterNativeTick)
     {
         if (_disposed || Mission.Current == null) return;
         if (_retainedGuardAgentIds.Count == 0) return;
@@ -292,7 +290,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     guardState.Action.ControllerId,
                     guardState.Action.BattleHostEpoch))
                 {
-                    ClearRemoteDefendState(agent);
+                    ClearRemoteDefendState(agent, guardState);
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
@@ -310,8 +308,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
                 if (traceAfterNativeTick)
                 {
-                    ReplayMountedGuardAction(agent, dt, ref guardState);
-                    state.RetainedGuard = guardState;
+                    ReplayMountedGuardAction(agent, guardState);
                 }
 
                 if (state.TraceAfterReassert)
@@ -804,8 +801,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
 
         bool preservePendingTrace = false;
+        RemoteGuardState? releasedGuard = null;
         if (_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
         {
+            releasedGuard = state.RetainedGuard;
             preservePendingTrace = !traceMountedPlayerGuard
                 && state.TraceAfterNativeTick
                 && state.TraceState.HasValue;
@@ -820,13 +819,12 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
         if (!preservePendingTrace)
             _retainedGuardAgentIds.Remove(agentId);
-        ClearRemoteDefendState(agent);
+        ClearRemoteDefendState(agent, releasedGuard);
     }
 
     private static void ReplayMountedGuardAction(
         Agent agent,
-        float dt,
-        ref RemoteGuardState guardState)
+        RemoteGuardState guardState)
     {
         int channel = guardState.GuardActionChannel;
         if (!agent.HasMount
@@ -842,35 +840,37 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         AnimFlags flags = (AnimFlags)(channel == 0
             ? data.Action0Flag
             : data.Action1Flag);
-        float duration = MBActionSet.GetActionAnimationDuration(
-            agent.ActionSet,
-            in guardState.GuardAction);
-        if (dt > 0f && duration > 0f)
-        {
-            guardState.GuardActionProgress += dt / duration;
-            if ((flags & AnimFlags.anf_cyclic) != 0)
-            {
-                guardState.GuardActionProgress -=
-                    (float)Math.Floor(guardState.GuardActionProgress);
-            }
-            else
-            {
-                guardState.GuardActionProgress = Math.Min(
-                    guardState.GuardActionProgress,
-                    0.999f);
-            }
-        }
 
-        // Mounted native tick clears this to act_none; leave hit and attack reactions alone.
+        // Mounted native tick clears this channel before its blend can become visible.
         if (agent.GetCurrentAction(channel) != ActionIndexCache.act_none)
             return;
 
-        // Keep vanilla's blend-in so the rider does not snap into the guard pose.
+        // Keep the authored action alive long enough for its normal blend-in to finish.
         agent.SetActionChannel(
             channel,
             guardState.GuardAction,
-            additionalFlags: flags,
+            additionalFlags: flags | AnimFlags.anf_keep,
             startProgress: guardState.GuardActionProgress,
+            forceFaceMorphRestart: false);
+    }
+
+    private static void ClearMountedGuardAction(
+        Agent agent,
+        RemoteGuardState? retainedGuard)
+    {
+        if (!retainedGuard.HasValue) return;
+
+        RemoteGuardState guardState = retainedGuard.Value;
+        int channel = guardState.GuardActionChannel;
+        if (channel < 0 || channel > 1) return;
+
+        if (agent.GetCurrentAction(channel) != guardState.GuardAction)
+            return;
+
+        agent.SetActionChannel(
+            channel,
+            ActionIndexCache.act_none,
+            ignorePriority: true,
             forceFaceMorphRestart: false);
     }
 
@@ -956,7 +956,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             Expected = new
             {
                 Defend = expected.Action.Data.DefendFlags,
-                Guard = expected.Action.Data.GuardMode
+                Guard = expected.Action.Data.GuardMode,
+                Channel = expected.GuardActionChannel,
+                Action = expected.GuardAction.Index,
+                Flags = expected.GuardActionChannel == 0
+                    ? expected.Action.Data.Action0Flag
+                    : expected.GuardActionChannel == 1
+                        ? expected.Action.Data.Action1Flag
+                        : 0UL
             },
             Actual = new
             {
@@ -979,6 +986,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 Stage = agent.GetCurrentActionStage(0),
                 Direction = agent.GetCurrentActionDirection(0),
                 Progress = agent.GetCurrentActionProgress(0),
+                Flags = (ulong)agent.GetCurrentAnimationFlag(0),
                 Weight = agent.GetActionChannelWeight(0),
                 CurrentWeight = agent.GetActionChannelCurrentActionWeight(0)
             },
@@ -989,6 +997,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 Stage = agent.GetCurrentActionStage(1),
                 Direction = agent.GetCurrentActionDirection(1),
                 Progress = agent.GetCurrentActionProgress(1),
+                Flags = (ulong)agent.GetCurrentAnimationFlag(1),
                 Weight = agent.GetActionChannelWeight(1),
                 CurrentWeight = agent.GetActionChannelCurrentActionWeight(1)
             },
@@ -1005,8 +1014,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             snapshot);
     }
 
-    private static void ClearRemoteDefendState(Agent agent)
+    private static void ClearRemoteDefendState(
+        Agent agent,
+        RemoteGuardState? retainedGuard = null)
     {
+        ClearMountedGuardAction(agent, retainedGuard);
         AgentActionData.ApplyDefendMovementFlags(
             agent,
             Agent.MovementControlFlag.None);
