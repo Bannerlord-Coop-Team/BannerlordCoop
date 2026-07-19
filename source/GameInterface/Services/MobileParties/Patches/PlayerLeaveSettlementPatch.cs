@@ -44,7 +44,14 @@ internal class PlayerLeaveSiegeEncounterPatch
     [HarmonyPrefix]
     private static bool Prefix()
     {
-        if (!ShouldRequestLeave(MobileParty.MainParty)) return true;
+        var party = MobileParty.MainParty;
+        if (!ShouldRequestLeave(party))
+        {
+            // Vanilla clears siege and army state after Finish returns. Hold first so ExitToLast
+            // cannot recreate the encounter while that state is still active.
+            party?.SetMoveModeHold();
+            return true;
+        }
 
         return PlayerLeaveSettlementPatch.RequestLeave();
     }
