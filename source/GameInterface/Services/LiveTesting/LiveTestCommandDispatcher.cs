@@ -8,6 +8,8 @@ namespace GameInterface.Services.LiveTesting;
 
 public interface ILiveTestCommandDispatcher
 {
+    bool EnsureReady();
+
     LiveTestCommandResult Execute(string command, List<string> arguments);
 }
 
@@ -16,6 +18,26 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
     private const string AllowedCommandPrefix = "coop.debug.";
 
     private static bool functionsCollected;
+
+    public bool EnsureReady()
+    {
+        ExceptionDispatchInfo exception = null;
+
+        GameThread.Run(() =>
+        {
+            try
+            {
+                EnsureFunctionsCollected();
+            }
+            catch (Exception e)
+            {
+                exception = ExceptionDispatchInfo.Capture(e);
+            }
+        }, blocking: true);
+
+        exception?.Throw();
+        return true;
+    }
 
     public LiveTestCommandResult Execute(string command, List<string> arguments)
     {
@@ -34,11 +56,7 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
         {
             try
             {
-                if (functionsCollected == false)
-                {
-                    CommandLineFunctionality.CollectCommandLineFunctions();
-                    functionsCollected = true;
-                }
+                EnsureFunctionsCollected();
 
                 string output = CommandLineFunctionality.CallFunction(command, arguments, out bool found);
                 result = new LiveTestCommandResult(found, output);
@@ -51,6 +69,14 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 
         exception?.Throw();
         return result;
+    }
+
+    private static void EnsureFunctionsCollected()
+    {
+        if (functionsCollected) return;
+
+        CommandLineFunctionality.CollectCommandLineFunctions();
+        functionsCollected = true;
     }
 }
 

@@ -10,14 +10,14 @@ public class LiveTestProtocolTests
     {
         LiveTestRequest expected = Request(
             "command",
-            "{\"name\":\"coop.debug.test.capture\",\"arguments\":[\"Danustica market\",\"quoted \\\"value\\\"\"]}");
+            "{\"name\":\"coop.debug.test.capture\",\"arguments\":[\"argument with spaces\",\"quoted \\\"value\\\"\"]}");
 
         string json = LiveTestProtocol.SerializeRequest(expected);
 
         Assert.True(LiveTestProtocol.TryDeserializeRequest(json, out var actual, out var error));
         Assert.Null(error);
         Assert.Equal(expected.Id, actual.Id);
-        Assert.Equal("Danustica market", actual.Parameters.GetProperty("arguments")[0].GetString());
+        Assert.Equal("argument with spaces", actual.Parameters.GetProperty("arguments")[0].GetString());
         Assert.Equal("quoted \"value\"", actual.Parameters.GetProperty("arguments")[1].GetString());
     }
 

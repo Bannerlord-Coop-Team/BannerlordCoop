@@ -24,14 +24,20 @@ public class LiveTestCommandDispatcherTests
     {
         var arguments = new List<string>
         {
-            "Danustica market",
-            "town_ES1",
+            "argument with spaces",
+            "identifier-42",
         };
 
         LiveTestCommandResult result = new LiveTestCommandDispatcher().Execute(DebugCommand, arguments);
 
         Assert.True(result.Found);
-        Assert.Equal("Danustica market|town_ES1", result.Output);
+        Assert.Equal("argument with spaces|identifier-42", result.Output);
+    }
+
+    [Fact]
+    public void EnsureReady_CollectsCommandFunctions()
+    {
+        Assert.True(new LiveTestCommandDispatcher().EnsureReady());
     }
 
     [Fact]

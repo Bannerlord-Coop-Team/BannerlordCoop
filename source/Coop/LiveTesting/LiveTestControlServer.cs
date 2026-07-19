@@ -20,7 +20,6 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ScreenSystem;
 
@@ -242,13 +241,9 @@ namespace Coop.LiveTesting
                 }
             }
 
-            const string readinessCommand = "coop.debug.gamethread.instrument";
-            bool commandRegistryReady = CommandLineFunctionality.HasFunctionForCommand(readinessCommand);
-            if (!commandRegistryReady)
-            {
-                CommandLineFunctionality.CollectCommandLineFunctions();
-                commandRegistryReady = CommandLineFunctionality.HasFunctionForCommand(readinessCommand);
-            }
+            bool commandRegistryReady =
+                ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher) &&
+                dispatcher.EnsureReady();
             string activeState = GameStateManager.Current?.ActiveState?.GetType().FullName;
             string topScreen = ScreenManager.TopScreen?.GetType().FullName;
             string activeMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;

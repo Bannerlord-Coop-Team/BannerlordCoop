@@ -49,16 +49,11 @@ namespace GameInterface.Services.Workshops.Commands
 
         internal static void ApplyOwnerChange(Workshop workshop, Hero newOwner)
         {
-            ApplyOwnerChange(workshop, newOwner, workshop.Capital);
-        }
-
-        internal static void ApplyOwnerChange(Workshop workshop, Hero newOwner, int capital)
-        {
             ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(
                 workshop,
                 newOwner,
                 workshop.WorkshopType,
-                capital,
+                1000,
                 0);
         }
 
@@ -101,12 +96,10 @@ namespace GameInterface.Services.Workshops.Commands
         [CommandLineArgumentFunction("set_workshop_owner", "coop.debug.workshop")]
         public static string SetWorkshopOwner(List<string> args)
         {
-            if (ModInformation.IsClient) return "Run coop.debug.workshop.set_workshop_owner on the server (host) only";
-
             // Expect three arguments: settlement name, workshop type, and new owner (hero ID or name)
-            if (args.Count != 3 && args.Count != 4)
+            if (args.Count != 3)
             {
-                return "Usage: coop.debug.workshop.set_workshop_owner <settlementName> <workshopType> <newOwnerId> [capital]";
+                return "Usage: coop.debug.workshop.set_workshop_owner <settlementName> <workshopType> <newOwnerId>";
             }
 
             string settlementName = args[0];
@@ -134,12 +127,6 @@ namespace GameInterface.Services.Workshops.Commands
                 return $"Workshop of type '{workshopType}' not found in settlement '{settlementName}'";
             }
 
-            int capital = workshop.Capital;
-            if (args.Count == 4 && !int.TryParse(args[3], out capital))
-            {
-                return $"Workshop capital must be an integer, received '{args[3]}'";
-            }
-
             // Find the new owner (Hero) by ID or name
             if (!TryGetObjectManager(out var objectManager))
             {
@@ -154,7 +141,7 @@ namespace GameInterface.Services.Workshops.Commands
 
             // Use the same action path as normal workshop purchases so ownership-dependent
             // campaign behavior and client warehouse data are updated too.
-            ApplyOwnerChange(workshop, newOwner, capital);
+            ApplyOwnerChange(workshop, newOwner);
 
             return $"Workshop owner has been changed to: {newOwner.Name} with the type {workshop.WorkshopType} and with a capital of {workshop.Capital}";
         }
@@ -283,23 +270,13 @@ namespace GameInterface.Services.Workshops.Commands
             {
                 return $"Settlement with id: '{strings[0]}' not found";
             }
-            if (!TryGetObjectManager(out var objectManager))
-            {
-                return "Unable to resolve ObjectManager";
-            }
 
             stringBuilder.AppendLine($"{settlement.Name}");
             foreach (var workshop in settlement.Town.Workshops)
             {
-                string ownerId = objectManager.TryGetId(workshop.Owner, out var registeredOwnerId)
-                    ? registeredOwnerId
-                    : workshop.Owner.StringId;
                 stringBuilder.AppendLine($"Name: {workshop.Name}");
                 stringBuilder.AppendLine($"Owner: {workshop.Owner.StringId} ({workshop.Owner.Name})");
-                stringBuilder.AppendLine($"OwnerId: {ownerId}");
                 stringBuilder.AppendLine($"Type: {workshop.WorkshopType}");
-                stringBuilder.AppendLine($"TypeId: {workshop.WorkshopType.StringId}");
-                stringBuilder.AppendLine($"Capital: {workshop.Capital}");
 
                 var workshopData = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>().GetDataOfWorkshop(workshop);
                 if (workshopData == null)
