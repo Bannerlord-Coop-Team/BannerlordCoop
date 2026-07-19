@@ -72,7 +72,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         base.OnPreMissionTick(dt);
 
-        // OnMissionTick runs after native Mission.Tick, so restore puppet defend input in the pre-tick hook.
+        // Pre-tick runs after the previous agent tick completes and before the next native agent update.
         coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates();
     }
 

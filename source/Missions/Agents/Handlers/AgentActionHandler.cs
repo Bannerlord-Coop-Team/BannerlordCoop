@@ -144,6 +144,12 @@ public class AgentActionHandler : IAgentActionHandler
                 guardChanged = AgentActionData.IsGuardMode(guardMode);
             }
 
+            bool wasGuarding = hadState
+                && (state.DefendFlags != Agent.MovementControlFlag.None
+                    || AgentActionData.IsGuardMode(state.GuardMode));
+            bool isGuarding = defendFlags != Agent.MovementControlFlag.None
+                || AgentActionData.IsGuardMode(guardMode);
+
             if (hadState && state.Action0 == action0 && state.Action1 == action1
                 && !defendChanged && !guardChanged)
                 continue;
@@ -171,27 +177,63 @@ public class AgentActionHandler : IAgentActionHandler
             if (!broadcast)
                 continue;
 
-            if (agent.HasMount && (defendChanged || guardChanged))
-            {
-                Logger.Debug(
-                    "[AgentAction] Mounted guard send {AgentId}: raw {RawDefend}, effective {EffectiveDefend}, "
-                    + "guard {Guard}, current {CurrentGuard}, action0 {Action0Type}/{Action0Direction}, "
-                    + "action1 {Action1Type}/{Action1Direction}",
-                    info.AgentId,
-                    AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
-                    defendFlags,
-                    guardMode,
-                    agent.CurrentGuardMode,
-                    agent.GetCurrentActionType(0),
-                    agent.GetCurrentActionDirection(0),
-                    agent.GetCurrentActionType(1),
-                    agent.GetCurrentActionDirection(1));
-            }
-
+            long sequence = NextActionSequence(info.AgentId);
             (ids ??= new List<Guid>()).Add(info.AgentId);
             (actions ??= new List<AgentActionData>()).Add(
                 new AgentActionData(agent, defendFlags, guardMode));
-            (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
+            (sequences ??= new List<long>()).Add(sequence);
+
+            if (defendChanged || guardChanged)
+            {
+                try
+                {
+                    if (!(wasGuarding || isGuarding)
+                        || agent != Mission.Current?.MainAgent
+                        || !agent.HasMount)
+                    {
+                        continue;
+                    }
+
+                    var snapshot = new
+                    {
+                        RawDefend = AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
+                        NativeDefend = AgentActionData.GetDefendMovementFlags(agent.GetDefendMovementFlag()),
+                        EffectiveDefend = defendFlags,
+                        Guard = guardMode,
+                        CurrentGuard = agent.CurrentGuardMode,
+                        ControllerType = agent.Controller,
+                        MountIndex = agent.MountAgent?.Index ?? -1,
+                        MainHand = agent.GetPrimaryWieldedItemIndex(),
+                        OffHand = agent.GetOffhandWieldedItemIndex(),
+                        Action0 = new
+                        {
+                            Index = action0,
+                            Type = agent.GetCurrentActionType(0),
+                            Stage = agent.GetCurrentActionStage(0),
+                            Direction = agent.GetCurrentActionDirection(0),
+                            Progress = agent.GetCurrentActionProgress(0)
+                        },
+                        Action1 = new
+                        {
+                            Index = action1,
+                            Type = agent.GetCurrentActionType(1),
+                            Stage = agent.GetCurrentActionStage(1),
+                            Direction = agent.GetCurrentActionDirection(1),
+                            Progress = agent.GetCurrentActionProgress(1)
+                        }
+                    };
+                    Logger.Debug(
+                        "[AgentActionTrace] SEND controller {ControllerId}, agent {AgentId}, sequence {Sequence}: {@Snapshot}",
+                        controllerIdProvider.ControllerId,
+                        info.AgentId,
+                        sequence,
+                        snapshot);
+                }
+                catch (Exception exception)
+                {
+                    Logger.Debug(exception, "[AgentActionTrace] SEND snapshot failed for {AgentId}", info.AgentId);
+                }
+            }
         }
 
         if (ids == null) return;

@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Packets;
 using Missions.Messages;
@@ -10,6 +11,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -55,6 +57,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public RemoteActionSequence? LastSequence;
         public Dictionary<string, RemoteAction> PendingByController;
         public MigratedActionAuthority? MigratedAuthority;
+        public RemoteGuardState? TraceState;
+        public bool TraceAfterReassert;
+        public bool TraceAfterNativeTick;
 
         public bool IsEmpty =>
             !RetainedGuard.HasValue
@@ -77,17 +82,20 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public readonly Agent.MovementControlFlag DefendFlags;
         public readonly Agent.GuardMode GuardMode;
         public readonly int BattleHostEpoch;
+        public readonly long Sequence;
 
         public RemoteGuardState(
             string controllerId,
             Agent.MovementControlFlag defendFlags,
             Agent.GuardMode guardMode,
-            int battleHostEpoch)
+            int battleHostEpoch,
+            long sequence)
         {
             ControllerId = controllerId;
             DefendFlags = defendFlags;
             GuardMode = guardMode;
             BattleHostEpoch = battleHostEpoch;
+            Sequence = sequence;
         }
     }
 
@@ -206,10 +214,17 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (_disposed || Mission.Current == null) return;
 
         ApplyPendingRemoteActions();
-        ReassertRemoteDefendStates();
+        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: false);
     }
 
     public void ReassertRemoteDefendStates()
+    {
+        if (_disposed || Mission.Current == null) return;
+
+        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: true);
+    }
+
+    private void ApplyRetainedRemoteGuardStates(bool traceAfterNativeTick)
     {
         if (_disposed || Mission.Current == null) return;
         if (_retainedGuardAgentIds.Count == 0) return;
@@ -221,15 +236,21 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             {
                 if (!_agentStates.TryGetValue(
                     agentId,
-                    out RemoteAgentActionState state)
-                    || !state.RetainedGuard.HasValue)
+                    out RemoteAgentActionState state))
                 {
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
 
-                RemoteGuardState guardState =
-                    state.RetainedGuard.Value;
+                bool hasRetainedGuard = state.RetainedGuard.HasValue;
+                bool hasPendingTrace = state.TraceAfterNativeTick
+                    && state.TraceState.HasValue;
+                if (!hasRetainedGuard && !hasPendingTrace)
+                {
+                    (staleIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
                 if (agentRegistry.IsLocallyControlled(agentId))
                     continue;
 
@@ -246,6 +267,25 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     continue;
                 }
 
+                if (traceAfterNativeTick && hasPendingTrace)
+                {
+                    LogMountedGuardSnapshot(
+                        "NEXT_PRE_TICK",
+                        agentId,
+                        state.TraceState.Value,
+                        agent);
+                    state.TraceState = null;
+                    state.TraceAfterNativeTick = false;
+                }
+
+                if (!hasRetainedGuard)
+                {
+                    if (traceAfterNativeTick)
+                        (staleIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
+                RemoteGuardState guardState = state.RetainedGuard.Value;
                 if (!IsCurrentActionAuthority(
                     info,
                     guardState.ControllerId,
@@ -266,6 +306,20 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                         agent,
                         guardMode);
                 }
+
+                if (state.TraceAfterReassert)
+                {
+                    RemoteGuardState traceState =
+                        state.TraceState ?? guardState;
+                    LogMountedGuardSnapshot(
+                        "AFTER_REASSERT",
+                        agentId,
+                        traceState,
+                        agent);
+                    state.TraceAfterReassert = false;
+                    state.TraceAfterNativeTick = true;
+                    state.TraceState = traceState;
+                }
             }
         }
 
@@ -277,6 +331,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 continue;
 
             state.RetainedGuard = null;
+            state.TraceState = null;
+            state.TraceAfterReassert = false;
+            state.TraceAfterNativeTick = false;
             RemoveAgentStateIfEmpty(agentId, state);
         }
     }
@@ -603,29 +660,64 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             agentId,
             out RemoteAgentActionState existingState)
             && existingState.RetainedGuard.HasValue;
+        bool retainsGuard = action.Data.DefendFlags != Agent.MovementControlFlag.None
+            || AgentActionData.IsGuardMode(action.Data.GuardMode);
+        bool guardTransition;
+        if (hadRetainedGuard)
+        {
+            guardTransition = existingState.RetainedGuard.Value.DefendFlags
+                != action.Data.DefendFlags
+                || existingState.RetainedGuard.Value.GuardMode
+                != action.Data.GuardMode;
+        }
+        else
+        {
+            guardTransition = retainsGuard;
+        }
+        bool traceMountedPlayerGuard = guardTransition
+            && ShouldTraceMountedPlayerHero(agent);
+
+        if (traceMountedPlayerGuard
+            && existingState?.TraceState.HasValue == true)
+        {
+            LogMountedGuardSnapshot(
+                "SUPERSEDED_BEFORE_NEXT_PRE_TICK",
+                agentId,
+                existingState.TraceState.Value,
+                agent);
+        }
 
         action.Data.Apply(agent);
         RecordRemoteActionSequence(agentId, action);
-        UpdateRemoteGuardState(agentId, action, agent);
+        UpdateRemoteGuardState(
+            agentId,
+            action,
+            agent,
+            traceMountedPlayerGuard);
 
-        if (agent.HasMount
-            && (hadRetainedGuard
-                || action.Data.DefendFlags != Agent.MovementControlFlag.None
-                || AgentActionData.IsGuardMode(action.Data.GuardMode)))
+        if (traceMountedPlayerGuard)
         {
-            Logger.Debug(
-                "[AgentAction] Mounted guard apply {AgentId}: packet {DefendFlags}/{Guard}, "
-                + "result {MovementFlags}/{CurrentGuard}, action0 {Action0Type}/{Action0Direction}, "
-                + "action1 {Action1Type}/{Action1Direction}",
-                agentId,
+            var traceState = new RemoteGuardState(
+                action.ControllerId,
                 action.Data.DefendFlags,
                 action.Data.GuardMode,
-                AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
-                agent.CurrentGuardMode,
-                agent.GetCurrentActionType(0),
-                agent.GetCurrentActionDirection(0),
-                agent.GetCurrentActionType(1),
-                agent.GetCurrentActionDirection(1));
+                action.BattleHostEpoch,
+                action.Sequence);
+            LogMountedGuardSnapshot(
+                "AFTER_REPLAY",
+                agentId,
+                traceState,
+                agent);
+
+            if (!retainsGuard)
+            {
+                RemoteAgentActionState traceAgentState =
+                    GetOrCreateAgentState(agentId);
+                traceAgentState.TraceState = traceState;
+                traceAgentState.TraceAfterReassert = false;
+                traceAgentState.TraceAfterNativeTick = true;
+                _retainedGuardAgentIds.Add(agentId);
+            }
         }
 
         return RemoteActionApplyResult.Applied;
@@ -672,7 +764,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private void UpdateRemoteGuardState(
         Guid agentId,
         RemoteAction action,
-        Agent agent)
+        Agent agent,
+        bool traceMountedPlayerGuard)
     {
         Agent.MovementControlFlag defendFlags = action.Data.DefendFlags;
         Agent.GuardMode guardMode = action.Data.GuardMode;
@@ -680,23 +773,169 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (defendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(guardMode))
         {
-            GetOrCreateAgentState(agentId).RetainedGuard =
+            RemoteAgentActionState retainedState = GetOrCreateAgentState(agentId);
+            retainedState.RetainedGuard =
                 new RemoteGuardState(
                     action.ControllerId,
                     defendFlags,
                     guardMode,
-                    action.BattleHostEpoch);
+                    action.BattleHostEpoch,
+                    action.Sequence);
+            if (traceMountedPlayerGuard)
+            {
+                retainedState.TraceState = retainedState.RetainedGuard;
+                retainedState.TraceAfterReassert = true;
+                retainedState.TraceAfterNativeTick = false;
+            }
             _retainedGuardAgentIds.Add(agentId);
             return;
         }
 
-        _retainedGuardAgentIds.Remove(agentId);
+        bool preservePendingTrace = false;
         if (_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
         {
+            preservePendingTrace = !traceMountedPlayerGuard
+                && state.TraceAfterNativeTick
+                && state.TraceState.HasValue;
             state.RetainedGuard = null;
+            if (!preservePendingTrace)
+            {
+                state.TraceState = null;
+                state.TraceAfterReassert = false;
+                state.TraceAfterNativeTick = false;
+            }
             RemoveAgentStateIfEmpty(agentId, state);
         }
+        if (!preservePendingTrace)
+            _retainedGuardAgentIds.Remove(agentId);
         ClearRemoteDefendState(agent);
+    }
+
+    private static bool ShouldTraceMountedPlayerHero(Agent agent)
+    {
+        try
+        {
+            return agent?.HasMount == true
+                && agent.Character is CharacterObject character
+                && character.HeroObject?.IsPlayerHero() == true;
+        }
+        catch (Exception exception)
+        {
+            Logger.Debug(
+                exception,
+                "[AgentActionTrace] Player rider filter failed");
+            return false;
+        }
+    }
+
+    private static void LogMountedGuardSnapshot(
+        string phase,
+        Guid agentId,
+        RemoteGuardState expected,
+        Agent agent)
+    {
+        try
+        {
+            LogMountedGuardSnapshotCore(phase, agentId, expected, agent);
+        }
+        catch (Exception exception)
+        {
+            Logger.Debug(
+                exception,
+                "[AgentActionTrace] {Phase} snapshot failed for {AgentId}",
+                phase,
+                agentId);
+        }
+    }
+
+    private static void LogMountedGuardSnapshotCore(
+        string phase,
+        Guid agentId,
+        RemoteGuardState expected,
+        Agent agent)
+    {
+        ActionIndexCache action0 = agent.GetCurrentAction(0);
+        ActionIndexCache action1 = agent.GetCurrentAction(1);
+        Agent mount = agent.MountAgent;
+
+        object skeleton0 = null;
+        object skeleton1 = null;
+        try
+        {
+            var visuals = agent.AgentVisuals;
+            var skeleton = visuals != null && visuals.IsValid()
+                ? visuals.GetSkeleton()
+                : null;
+            if (skeleton != null)
+            {
+                skeleton0 = new
+                {
+                    Action = skeleton.GetActionAtChannel(0).Index,
+                    Animation = skeleton.GetAnimationAtChannel(0),
+                    Parameter = skeleton.GetAnimationParameterAtChannel(0)
+                };
+                skeleton1 = new
+                {
+                    Action = skeleton.GetActionAtChannel(1).Index,
+                    Animation = skeleton.GetAnimationAtChannel(1),
+                    Parameter = skeleton.GetAnimationParameterAtChannel(1)
+                };
+            }
+        }
+        catch (Exception exception)
+        {
+            skeleton0 = exception.GetType().Name;
+            skeleton1 = exception.GetType().Name;
+        }
+
+        var snapshot = new
+        {
+            Expected = new { Defend = expected.DefendFlags, Guard = expected.GuardMode },
+            Actual = new
+            {
+                Defend = AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
+                NativeDefend = AgentActionData.GetDefendMovementFlags(agent.GetDefendMovementFlag()),
+                Guard = agent.CurrentGuardMode
+            },
+            Agent = new
+            {
+                Controller = agent.Controller,
+                MountIndex = mount?.Index ?? -1,
+                RiderLinked = ReferenceEquals(mount?.RiderAgent, agent),
+                MainHand = agent.GetPrimaryWieldedItemIndex(),
+                OffHand = agent.GetOffhandWieldedItemIndex()
+            },
+            Action0 = new
+            {
+                Index = action0.Index,
+                Type = agent.GetCurrentActionType(0),
+                Stage = agent.GetCurrentActionStage(0),
+                Direction = agent.GetCurrentActionDirection(0),
+                Progress = agent.GetCurrentActionProgress(0),
+                Weight = agent.GetActionChannelWeight(0),
+                CurrentWeight = agent.GetActionChannelCurrentActionWeight(0)
+            },
+            Action1 = new
+            {
+                Index = action1.Index,
+                Type = agent.GetCurrentActionType(1),
+                Stage = agent.GetCurrentActionStage(1),
+                Direction = agent.GetCurrentActionDirection(1),
+                Progress = agent.GetCurrentActionProgress(1),
+                Weight = agent.GetActionChannelWeight(1),
+                CurrentWeight = agent.GetActionChannelCurrentActionWeight(1)
+            },
+            Skeleton0 = skeleton0,
+            Skeleton1 = skeleton1
+        };
+        Logger.Debug(
+            "[AgentActionTrace] {Phase} controller {ControllerId}, agent {AgentId}, sequence {Sequence}, epoch {BattleHostEpoch}: {@Snapshot}",
+            phase,
+            expected.ControllerId,
+            agentId,
+            expected.Sequence,
+            expected.BattleHostEpoch,
+            snapshot);
     }
 
     private static void ClearRemoteDefendState(Agent agent)
