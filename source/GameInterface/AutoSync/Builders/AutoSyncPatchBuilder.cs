@@ -191,6 +191,7 @@ namespace GameInterface.AutoSync.Builders
                 Libraries = usings.Distinct(),
                 DeclaringType = AutoSyncUtils.GetSimpleTypeName(declaringType),
                 DeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(declaringType).Replace(".", "_"),
+                PatchCategory = dynamicRegistryItem.PatchCategory,
                 TargetMethods = dynamicRegistryItem.TargetMethods,
                 Prefixes = prefixes,
                 Transpilers = transpilers,

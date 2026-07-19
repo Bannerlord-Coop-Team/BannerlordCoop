@@ -1,6 +1,7 @@
 ﻿using GameInterface.AutoSync;
 using GameInterface.Services.MobileParties;
 using System.Linq;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit;
 
@@ -26,5 +27,19 @@ public class MobilePartySyncTests
             nameof(MobileParty.DefaultBehavior), nameof(MobileParty.ShortTermBehavior),
             nameof(MobileParty.DesiredAiNavigationType),
         }, registeredNames.Contains);
+    }
+
+    [Fact]
+    public void DefaultClanFinanceModelTarget_IsDeferredUntilGameStart()
+    {
+        var registry = new AutoSyncRegistry();
+        _ = new MobilePartySync(registry);
+
+        var registration = registry.Registrations[typeof(MobileParty)];
+
+        Assert.Equal(GameInterface.HARMONY_GAME_STARTED_CATEGORY, registration.PatchCategory);
+        Assert.Contains(registration.TargetMethods, method =>
+            method.DeclaringType == typeof(DefaultClanFinanceModel) &&
+            method.Name == nameof(DefaultClanFinanceModel.ApplyMoraleEffect));
     }
 }

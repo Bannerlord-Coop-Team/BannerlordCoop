@@ -9,6 +9,7 @@ public class AutoSyncRegistryItem
     public HashSet<Debuggable<PropertyInfo>> Properties = new();
 
     public List<MethodInfo> TargetMethods = new();
+    public string PatchCategory { get; private set; }
 
     public bool Contains(FieldInfo field)
     {
@@ -32,9 +33,13 @@ public class AutoSyncRegistryItem
         Properties.Add(new Debuggable<PropertyInfo>(property, debug, coalesce));
     }
 
-    public void AddTargetMethod(MethodInfo targetMethod)
+    public void AddTargetMethod(MethodInfo targetMethod, string patchCategory = null)
     {
-         TargetMethods.Add(targetMethod);
+        if (PatchCategory != null && patchCategory != null && PatchCategory != patchCategory)
+            throw new System.ArgumentException("AutoSync targets for the same type cannot use different patch categories");
+
+        PatchCategory ??= patchCategory;
+        TargetMethods.Add(targetMethod);
     }
 }
 
