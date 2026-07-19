@@ -3,6 +3,8 @@ using System.Linq;
 using Autofac;
 using Common;
 using Common.Messaging;
+using Common.PacketHandlers;
+using Common.Serialization;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
@@ -57,7 +59,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PollActions_DefendFlagsWithoutGuard_SendsActionPacket()
+    public void PollActions_DefendFlagsWithoutNativeGuard_SendsEffectiveGuard()
     {
         RunScenario("owner", context =>
         {
@@ -80,7 +82,71 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
             AgentActionData data = Assert.Single(packet.Actions);
             Assert.Equal(defendFlags, data.DefendFlags);
-            Assert.Equal(Agent.GuardMode.None, data.GuardMode);
+            Assert.Equal(Agent.GuardMode.Left, data.GuardMode);
+        });
+    }
+
+    [Fact]
+    public void PollActions_MountedShieldDirection_SendsAndClearsEffectiveGuard()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+
+            context.Component.AgentActionHandler.PollActions();
+            Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+
+            mirror.MovementFlags = Agent.MovementControlFlag.DefendBlock;
+            mirror.Action1CodeType = Agent.ActionCodeType.DefendShield;
+            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket heldPacket = Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal(Agent.GuardMode.Right, Assert.Single(heldPacket.Actions).GuardMode);
+
+            mirror.MovementFlags = Agent.MovementControlFlag.None;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket releasePacket = context.Network.NetworkSentPackets
+                .GetPackets<AgentActionPacket>()
+                .Last();
+            Assert.Equal(Agent.GuardMode.None, Assert.Single(releasePacket.Actions).GuardMode);
+            Assert.Equal(2L, Assert.Single(releasePacket.Sequences));
+        });
+    }
+
+    [Fact]
+    public void AgentActionPacket_RoundTripsEffectiveMountedGuard()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(owner);
+            ownerMirror.MovementFlags = Agent.MovementControlFlag.DefendBlock;
+            ownerMirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+
+            var original = new AgentActionPacket(
+                "owner",
+                new[] { agentId },
+                new[] { new AgentActionData(owner) },
+                new[] { 1L });
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+
+            byte[] wire = serializer.Serialize(original);
+            var result = Assert.IsType<AgentActionPacket>(
+                serializer.Deserialize<IPacket>(wire));
+
+            AgentActionData action = Assert.Single(result.Actions);
+            Assert.Equal(Agent.MovementControlFlag.DefendBlock, action.DefendFlags);
+            Assert.Equal(Agent.GuardMode.Left, action.GuardMode);
         });
     }
 
@@ -136,7 +202,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [InlineData(Agent.MovementControlFlag.DefendDown, Agent.GuardMode.Down)]
     [InlineData(Agent.MovementControlFlag.DefendLeft, Agent.GuardMode.Left)]
     [InlineData(Agent.MovementControlFlag.DefendRight, Agent.GuardMode.Right)]
-    public void MountedPuppet_FlagsOnlyGuard_ReassertsAfterMountStateArrives(
+    public void MountedPuppet_FlagsOnlyGuard_ReassertsAcrossMountStateArrival(
         Agent.MovementControlFlag defendDirection,
         Agent.GuardMode expectedGuardMode)
     {
@@ -157,13 +223,14 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ApplyOwnerAction(context.Component, 1L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
-            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(expectedGuardMode, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
 
             context.Mock.SpawnMount(puppet);
             context.Component.AgentActionHandler.ReassertRemoteDefendStates();
 
             Assert.Equal(expectedGuardMode, puppetMirror.GuardMode);
-            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
 
             Agent.GuardMode explicitGuardMode = expectedGuardMode == Agent.GuardMode.Up
                 ? Agent.GuardMode.Down
@@ -173,18 +240,18 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
             Assert.Equal(explicitGuardMode, puppetMirror.GuardMode);
-            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(3, puppetMirror.SetWeaponGuardCalls);
         });
     }
 
     [Theory]
-    [InlineData(Agent.ActionCodeType.DefendForward1h, Agent.GuardMode.Down, 1)]
-    [InlineData(Agent.ActionCodeType.DefendUp1h, Agent.GuardMode.Up, 1)]
-    [InlineData(Agent.ActionCodeType.DefendRight1h, Agent.GuardMode.Right, 1)]
-    [InlineData(Agent.ActionCodeType.DefendLeft1h, Agent.GuardMode.Left, 1)]
-    [InlineData(Agent.ActionCodeType.DefendLeft1h, Agent.GuardMode.Left, 0)]
-    public void MountedPuppet_BlockOnlyGuard_DerivesDirectionFromActionType(
-        Agent.ActionCodeType actionCodeType,
+    [InlineData(Agent.UsageDirection.DefendDown, Agent.GuardMode.Down, 1)]
+    [InlineData(Agent.UsageDirection.DefendUp, Agent.GuardMode.Up, 1)]
+    [InlineData(Agent.UsageDirection.DefendRight, Agent.GuardMode.Right, 1)]
+    [InlineData(Agent.UsageDirection.DefendLeft, Agent.GuardMode.Left, 1)]
+    [InlineData(Agent.UsageDirection.DefendLeft, Agent.GuardMode.Left, 0)]
+    public void MountedPuppet_BlockOnlyGuard_UsesExactActionDirection(
+        Agent.UsageDirection actionDirection,
         Agent.GuardMode expectedGuardMode,
         int actionChannel)
     {
@@ -202,11 +269,11 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             if (actionChannel == 0)
             {
-                ownerMirror.Action0CodeType = actionCodeType;
+                ownerMirror.Action0Direction = actionDirection;
             }
             else
             {
-                ownerMirror.Action1CodeType = actionCodeType;
+                ownerMirror.Action1Direction = actionDirection;
             }
             ownerMirror.MovementFlags = Agent.MovementControlFlag.DefendBlock;
 
@@ -226,18 +293,24 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(Agent.ActionCodeType.DefendFist)]
-    [InlineData(Agent.ActionCodeType.DefendShield)]
-    [InlineData(Agent.ActionCodeType.ReadyRanged)]
-    [InlineData(Agent.ActionCodeType.Idle)]
-    public void DirectionlessActionType_DoesNotDeriveGuard(
-        Agent.ActionCodeType actionCodeType)
+    [InlineData(Agent.UsageDirection.None)]
+    [InlineData(Agent.UsageDirection.AttackUp)]
+    [InlineData(Agent.UsageDirection.AttackRight)]
+    [InlineData(Agent.UsageDirection.DefendAny)]
+    public void DirectionlessAction_DoesNotDeriveGuard(
+        Agent.UsageDirection actionDirection)
     {
-        Assert.Equal(
-            Agent.GuardMode.None,
-            AgentActionData.GetGuardModeFromDefendActionTypes(
-                Agent.ActionCodeType.Idle,
-                actionCodeType));
+        RunScenario("owner", context =>
+        {
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            ownerMirror.MovementFlags = Agent.MovementControlFlag.DefendBlock;
+            ownerMirror.Action1Direction = actionDirection;
+
+            Assert.Equal(
+                Agent.GuardMode.None,
+                new AgentActionData(owner).GuardMode);
+        });
     }
 
     [Theory]

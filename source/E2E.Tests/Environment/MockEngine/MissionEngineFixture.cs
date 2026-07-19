@@ -111,6 +111,7 @@ public sealed class MissionEngineFixture : IDisposable
         // apply side's GetActionNameWithCode already returns null headless and skips SetActionChannel).
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionDirection), nameof(Agent_GetCurrentActionDirection));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
         Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
@@ -545,6 +546,23 @@ public sealed class MissionEngineFixture : IDisposable
         else
         {
             __result = m.Action1CodeType;
+        }
+        return false;
+    }
+
+    private static bool Agent_GetCurrentActionDirection(
+        Agent __instance,
+        int channelNo,
+        ref Agent.UsageDirection __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            __result = m.Action0Direction;
+        }
+        else
+        {
+            __result = m.Action1Direction;
         }
         return false;
     }

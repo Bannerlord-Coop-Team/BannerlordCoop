@@ -256,16 +256,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     agent,
                     guardState.DefendFlags);
                 Agent.GuardMode guardMode = guardState.GuardMode;
-                // A Controller.None mounted rider does not realize retained defend flags without a direct guard.
-                if (agent.HasMount && !AgentActionData.IsGuardMode(guardMode))
-                {
-                    Agent.GuardMode flagsGuardMode =
-                        AgentActionData.GetGuardModeFromDefendFlags(
-                            guardState.DefendFlags);
-                    if (AgentActionData.IsGuardMode(flagsGuardMode))
-                        guardMode = flagsGuardMode;
-                }
-
                 if (AgentActionData.IsGuardMode(guardMode))
                 {
                     AgentActionData.ApplyGuardState(
@@ -656,18 +646,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         Agent.MovementControlFlag defendFlags = action.Data.DefendFlags;
         Agent.GuardMode guardMode = action.Data.GuardMode;
-        if (!AgentActionData.IsGuardMode(guardMode)
-            && (defendFlags & Agent.MovementControlFlag.DefendBlock) != 0)
-        {
-            Agent.GuardMode flagsGuardMode =
-                AgentActionData.GetGuardModeFromDefendFlags(defendFlags);
-            if (!AgentActionData.IsGuardMode(flagsGuardMode))
-            {
-                guardMode = AgentActionData.GetGuardModeFromDefendActionTypes(
-                    (Agent.ActionCodeType)action.Data.Action0CodeType,
-                    (Agent.ActionCodeType)action.Data.Action1CodeType);
-            }
-        }
 
         if (defendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(guardMode))

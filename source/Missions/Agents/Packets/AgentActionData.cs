@@ -81,33 +81,39 @@ namespace Missions.Agents.Packets
             return Agent.GuardMode.None;
         }
 
-        internal static Agent.GuardMode GetGuardModeFromDefendActionTypes(
-            Agent.ActionCodeType action0CodeType,
-            Agent.ActionCodeType action1CodeType)
+        internal static Agent.GuardMode GetEffectiveGuardMode(Agent agent)
         {
-            Agent.GuardMode guardMode = GetGuardModeFromDefendActionType(action1CodeType);
+            Agent.GuardMode guardMode = agent.CurrentGuardMode;
             if (IsGuardMode(guardMode))
                 return guardMode;
 
-            return GetGuardModeFromDefendActionType(action0CodeType);
+            Agent.MovementControlFlag defendFlags =
+                GetDefendMovementFlags(agent.MovementFlags);
+            if (defendFlags == Agent.MovementControlFlag.None)
+                return Agent.GuardMode.None;
+
+            guardMode = GetGuardModeFromDefendFlags(defendFlags);
+            if (IsGuardMode(guardMode))
+                return guardMode;
+
+            // Mounted shields keep their exact direction on the defend action even when CurrentGuardMode is unset.
+            guardMode = GetGuardModeFromDefendDirection(
+                agent.GetCurrentActionDirection(1));
+            if (IsGuardMode(guardMode))
+                return guardMode;
+
+            return GetGuardModeFromDefendDirection(
+                agent.GetCurrentActionDirection(0));
         }
 
-        private static Agent.GuardMode GetGuardModeFromDefendActionType(
-            Agent.ActionCodeType actionCodeType) =>
-            actionCodeType switch
+        private static Agent.GuardMode GetGuardModeFromDefendDirection(
+            Agent.UsageDirection direction) =>
+            direction switch
             {
-                Agent.ActionCodeType.DefendForward2h or
-                Agent.ActionCodeType.DefendForward1h or
-                Agent.ActionCodeType.DefendForwardStaff => Agent.GuardMode.Down,
-                Agent.ActionCodeType.DefendUp2h or
-                Agent.ActionCodeType.DefendUp1h or
-                Agent.ActionCodeType.DefendUpStaff => Agent.GuardMode.Up,
-                Agent.ActionCodeType.DefendRight2h or
-                Agent.ActionCodeType.DefendRight1h or
-                Agent.ActionCodeType.DefendRightStaff => Agent.GuardMode.Right,
-                Agent.ActionCodeType.DefendLeft2h or
-                Agent.ActionCodeType.DefendLeft1h or
-                Agent.ActionCodeType.DefendLeftStaff => Agent.GuardMode.Left,
+                Agent.UsageDirection.DefendUp => Agent.GuardMode.Up,
+                Agent.UsageDirection.DefendDown => Agent.GuardMode.Down,
+                Agent.UsageDirection.DefendLeft => Agent.GuardMode.Left,
+                Agent.UsageDirection.DefendRight => Agent.GuardMode.Right,
                 _ => Agent.GuardMode.None
             };
 
@@ -132,19 +138,15 @@ namespace Missions.Agents.Packets
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
-            Agent.ActionCodeType actionTypeCh0 = agent.GetCurrentActionType(0);
-            Agent.ActionCodeType actionTypeCh1 = agent.GetCurrentActionType(1);
 
             MovementFlag = (uint)agent.MovementFlags;
             EventFlag = (uint)agent.EventControlFlags;
             CrouchMode = agent.CrouchMode;
-            GuardState = ToWireGuardState(agent.CurrentGuardMode);
+            GuardState = ToWireGuardState(GetEffectiveGuardMode(agent));
 
-            Action0CodeType = (int)actionTypeCh0;
             Action0Index = cache0.Index;
             Action0Progress = agent.GetCurrentActionProgress(0);
             Action0Flag = (ulong)agent.GetCurrentAnimationFlag(0);
-            Action1CodeType = (int)actionTypeCh1;
             Action1Index = cache1.Index;
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
@@ -200,22 +202,18 @@ namespace Missions.Agents.Packets
         [ProtoMember(3)]
         public int Action0Index { get; }
         [ProtoMember(4)]
-        public int Action0CodeType { get; }
-        [ProtoMember(5)]
         public float Action1Progress { get; }
-        [ProtoMember(6)]
+        [ProtoMember(5)]
         public ulong Action1Flag { get; }
-        [ProtoMember(7)]
+        [ProtoMember(6)]
         public int Action1Index { get; }
-        [ProtoMember(8)]
-        public int Action1CodeType { get; }
-        [ProtoMember(9)]
+        [ProtoMember(7)]
         public uint MovementFlag { get; }
-        [ProtoMember(10)]
+        [ProtoMember(8)]
         public uint EventFlag { get; }
-        [ProtoMember(11)]
+        [ProtoMember(9)]
         public bool CrouchMode { get; }
-        [ProtoMember(12)]
+        [ProtoMember(10)]
         public int GuardState { get; }
         internal Agent.MovementControlFlag DefendFlags =>
             GetDefendMovementFlags((Agent.MovementControlFlag)MovementFlag);

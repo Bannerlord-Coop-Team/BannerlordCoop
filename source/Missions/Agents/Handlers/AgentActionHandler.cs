@@ -114,7 +114,7 @@ public class AgentActionHandler : IAgentActionHandler
             int action0 = agent.GetCurrentAction(0).Index;
             int action1 = agent.GetCurrentAction(1).Index;
             var defendFlags = AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
-            Agent.GuardMode guardMode = agent.CurrentGuardMode;
+            Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(agent);
 
             _localAgentStates.TryGetValue(info.AgentId, out var state);
             bool hadState = state.HasObservation;
@@ -197,8 +197,9 @@ public class AgentActionHandler : IAgentActionHandler
                     continue;
 
                 var defendFlags = AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
+                Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(agent);
                 if (defendFlags == Agent.MovementControlFlag.None
-                    && !AgentActionData.IsGuardMode(agent.CurrentGuardMode))
+                    && !AgentActionData.IsGuardMode(guardMode))
                     continue;
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);
