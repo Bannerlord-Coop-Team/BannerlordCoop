@@ -105,6 +105,101 @@ a co-op registry id or a local StringId.";
         return CaptureHero(hero, newCaptor);
     }
 
+    private const string CapturePlayerFixtureUsage =
+@"Usage:
+  coop.debug.player_captivity.capture_player_fixture <heroId> <mobilePartyId>
+
+Example:
+  coop.debug.player_captivity.capture_player_fixture Hero_Player2863 MobileParty_Player
+
+Captures a registered co-op player through the real captivity path, then restores the regular troops
+that the captivity handler transfers out of the player's party. This is intended for automated tests.";
+
+    [CommandLineArgumentFunction("capture_player_fixture", "coop.debug.player_captivity")]
+    public static string CapturePlayerFixture(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "capture_player_fixture",
+            CapturePlayerFixtureUsage,
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(2, out error))
+            return error;
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
+            return error;
+
+        if (!ctx.TryGetArg(1, "mobilePartyId", out var captorPartyId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to capture hero fixture: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to capture hero fixture: " + error;
+
+        if (!objectManager.TryGetObject(captorPartyId, out MobileParty captorParty)
+            && !CommandHelpers.TryGetMobileParty(captorPartyId, out captorParty, out error))
+            return "Failed to capture hero fixture: " + error;
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return "Failed to capture hero fixture: could not resolve PlayerManager.";
+
+        var player = playerManager.Players.SingleOrDefault(candidate => candidate.HeroId == heroId);
+        if (player == null)
+            return $"Failed to capture hero fixture: hero '{GetHeroDisplayName(hero)}' is not a registered co-op player.";
+
+        if (!objectManager.TryGetObject(player.MobilePartyId, out MobileParty playerParty))
+            return $"Failed to capture hero fixture: player party '{player.MobilePartyId}' is not registered.";
+
+        if (hero.IsPrisoner)
+            return CaptureHero(hero, captorParty);
+
+        if (hero.PartyBelongedTo != playerParty)
+            return "Failed to capture hero fixture: the hero does not belong to the registered player party.";
+
+        if (captorParty == playerParty)
+            return "Failed to capture hero fixture: the player party cannot capture its own hero.";
+
+        if (!playerParty.IsActive)
+            return "Failed to capture hero fixture: the player party is not active.";
+
+        var regularTroops = SnapshotRegularTroops(playerParty.MemberRoster);
+        if (HasOtherHero(playerParty.MemberRoster, hero))
+            return "Failed to capture hero fixture: the player party contains another hero.";
+
+        var captureResult = CaptureHero(hero, captorParty);
+        if (!hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != captorParty.Party)
+            return captureResult;
+
+        if (playerParty.IsActive)
+            return captureResult + "\nFailed to restore fixture regular troops: the captivity handler did not park the player party.";
+
+        foreach (var troop in regularTroops)
+        {
+            captorParty.PrisonRoster.AddToCounts(
+                troop.Character,
+                -troop.Number,
+                false,
+                -troop.WoundedNumber,
+                0,
+                true);
+            playerParty.MemberRoster.AddToCounts(
+                troop.Character,
+                troop.Number,
+                false,
+                troop.WoundedNumber,
+                troop.Xp,
+                true);
+        }
+
+        return captureResult + "\nFixture regular troops restored: " +
+            regularTroops.Sum(troop => troop.Number).ToString(CultureInfo.InvariantCulture);
+    }
+
     private const string ReleasePlayerUsage =
 @"Usage:
   coop.debug.player_captivity.release_player <heroId>
@@ -277,6 +372,7 @@ Ransoms the captive player hero for zero gold through their captor's settlement 
         result.AppendLine("SettlementId=" + (party.CurrentSettlement?.StringId ?? "none"));
         result.AppendLine("LeaderHeroId=" + (party.LeaderHero?.StringId ?? "none"));
         result.AppendLine("LeaderGold=" + (party.LeaderHero?.Gold.ToString(CultureInfo.InvariantCulture) ?? "none"));
+        result.AppendLine("MemberCount=" + party.MemberRoster.TotalManCount.ToString(CultureInfo.InvariantCulture));
         result.AppendLine("PrisonerCount=" + party.PrisonRoster.TotalManCount.ToString(CultureInfo.InvariantCulture));
         return result.ToString();
     }
@@ -377,6 +473,31 @@ Ransoms the captive player hero for zero gold through their captor's settlement 
 
     private static string FormatCoordinate(float? coordinate) =>
         coordinate?.ToString("R", CultureInfo.InvariantCulture) ?? "none";
+
+    private static List<TroopRosterElement> SnapshotRegularTroops(TroopRoster roster)
+    {
+        var troops = new List<TroopRosterElement>();
+        for (var i = 0; i < roster.Count; i++)
+        {
+            var element = roster.GetElementCopyAtIndex(i);
+            if (element.Character?.IsHero == false && element.Number > 0)
+                troops.Add(element);
+        }
+
+        return troops;
+    }
+
+    private static bool HasOtherHero(TroopRoster roster, Hero playerHero)
+    {
+        for (var i = 0; i < roster.Count; i++)
+        {
+            var element = roster.GetElementCopyAtIndex(i);
+            if (element.Number > 0 && element.Character?.IsHero == true && element.Character.HeroObject != playerHero)
+                return true;
+        }
+
+        return false;
+    }
 
     private static string CaptureHero(Hero hero, MobileParty newCaptor)
     {
