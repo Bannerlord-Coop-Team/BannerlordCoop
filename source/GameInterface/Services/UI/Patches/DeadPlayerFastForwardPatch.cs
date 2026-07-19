@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using SandBox.ViewModelCollection;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -17,6 +18,8 @@ internal static class DeadPlayerFastForwardPatch
             return true;
 
         __instance.IsFastForwarding = false;
+        InformationManager.DisplayMessage(new InformationMessage(
+            "Fast forwarding is disabled during cooperative battles."));
         return false;
     }
 }
