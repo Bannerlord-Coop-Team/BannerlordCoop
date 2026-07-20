@@ -4,8 +4,10 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -29,6 +31,9 @@ internal class EncounterManagerPatches
     private static bool Prefix(MobileParty attackerParty, Settlement settlement)
     {
         if (IsPendingParty(attackerParty?.Party))
+            return false;
+
+        if (IsAwaitingMissionExit(attackerParty?.Party))
             return false;
 
         if (RaidAiInterventionSuppression.ShouldSuppressSettlementEncounter(attackerParty, settlement))
@@ -55,12 +60,41 @@ internal class EncounterManagerPatches
         if (IsPendingParty(attackerParty) || IsPendingParty(defenderParty))
             return false;
 
+        if (IsAwaitingMissionExit(attackerParty) || IsAwaitingMissionExit(defenderParty))
+            return false;
+
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (TryRequestActiveSlowRaidSettlementEncounter(attackerParty, defenderParty))
             return false;
 
-        return !RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty);
+        if (RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty))
+            return false;
+
+        if (ModInformation.IsServer && TryRequestServerPlayerConversation(attackerParty, defenderParty))
+            return false;
+
+        return true;
+    }
+
+    private static bool TryRequestServerPlayerConversation(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (attackerParty?.MapEvent != null || defenderParty?.MapEvent != null)
+            return false;
+
+        var attackerIsPlayer = attackerParty?.MobileParty?.IsPlayerParty() == true;
+        var defenderIsPlayer = defenderParty?.MobileParty?.IsPlayerParty() == true;
+        if (attackerIsPlayer == defenderIsPlayer)
+            return false;
+
+        // The dedicated server has no MainParty, so send fresh AI/player encounters to the player's conversation flow.
+        MessageBroker.Instance.Publish(null, new ConversationRequested(
+            defenderParty,
+            attackerParty,
+            forcePlayerOutFromSettlement: false,
+            ConversationRestartSource.EncounterManager,
+            armyTalkEncounter: true));
+        return true;
     }
 
     [HarmonyPrefix]
@@ -96,6 +130,18 @@ internal class EncounterManagerPatches
     internal static bool IsPendingParty(PartyBase party) =>
         PendingMapEventPartyMovementPatch.IsPending(party);
 
+    internal static bool IsAwaitingMissionExit(PartyBase party)
+    {
+        if (ModInformation.IsClient || party?.MapEvent != null || party?.MobileParty == null)
+            return false;
+
+        if (!PlayerManager.TryGetControlledObjectInfo(party.MobileParty, out var controlledObject))
+            return false;
+
+        return ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var membershipRegistry)
+            && membershipRegistry.IsControllerInMission(controlledObject.ObjectControllerId);
+    }
+
     // EncounterManager.RestartPlayerEncounter is private; patch by name. It is the path that opens the encounter
     // menu/conversation (it calls PlayerEncounter.Current.Init). Parameter order here is (attacker, defender).
     [HarmonyPatch("RestartPlayerEncounter")]
@@ -119,7 +165,7 @@ internal class EncounterManagerPatches
 
         // Client: gate the encounter restart behind server approval (rate-limited + validated in
         // ConversationRequestHandler). On approval the handler re-runs this exact method under an AllowedThread.
-        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager));
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager, false));
 
         return false;
     }
@@ -136,7 +182,7 @@ internal class EncounterManagerPatches
         if (defenderParty?.MapEvent?.IsActiveSlowVillageRaid() != true)
             return false;
 
-        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty.Party, false, ConversationRestartSource.EncounterManager));
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty.Party, false, ConversationRestartSource.EncounterManager, false));
         return true;
     }
 

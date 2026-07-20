@@ -1,4 +1,4 @@
-using GameInterface.Services.MapEvents;
+﻿using GameInterface.Services.MapEvents;
 using TaleWorlds.Core;
 
 namespace E2E.Tests.Services.Missions;
@@ -54,5 +54,24 @@ public class BattleSpawnGateTests : IDisposable
 
         Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
         Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker));
+    }
+
+    [Fact]
+    public void RoutedAttackerWeapon_IsScopedAndRestored()
+    {
+        var outerWeapon = new WeaponComponentData(null, WeaponClass.Arrow, default);
+        var innerWeapon = new WeaponComponentData(null, WeaponClass.Bolt, default);
+
+        Assert.Null(BattleSpawnGate.RoutedAttackerWeapon);
+
+        BattleSpawnGate.RunWithRoutedAttackerWeapon(outerWeapon, () =>
+        {
+            Assert.Same(outerWeapon, BattleSpawnGate.RoutedAttackerWeapon);
+            BattleSpawnGate.RunWithRoutedAttackerWeapon(innerWeapon,
+                () => Assert.Same(innerWeapon, BattleSpawnGate.RoutedAttackerWeapon));
+            Assert.Same(outerWeapon, BattleSpawnGate.RoutedAttackerWeapon);
+        });
+
+        Assert.Null(BattleSpawnGate.RoutedAttackerWeapon);
     }
 }

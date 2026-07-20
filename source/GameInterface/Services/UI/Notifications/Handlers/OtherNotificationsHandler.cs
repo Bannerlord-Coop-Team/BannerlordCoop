@@ -57,6 +57,9 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NotifyRelationsIncreasedWithNotables>(Handle_NotifyRelationsIncreasedWithNotables);
         messageBroker.Subscribe<NetworkNotifyRelationsIncreasedWithNotables>(Handle_NetworkNotifyRelationsIncreasedWithNotables);
 
+        messageBroker.Subscribe<NotifyMoraleLossDueToFunds>(Handle_NotifyMoraleLossDueToFunds);
+        messageBroker.Subscribe<NetworkNotifyMoraleLossDueToFunds>(Handle_NetworkNotifyMoraleLossDueToFunds);
+
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
@@ -85,6 +88,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyRelationsIncreasedWithNotables>(Handle_NotifyRelationsIncreasedWithNotables);
         messageBroker.Unsubscribe<NetworkNotifyRelationsIncreasedWithNotables>(Handle_NetworkNotifyRelationsIncreasedWithNotables);
+
+        messageBroker.Unsubscribe<NotifyMoraleLossDueToFunds>(Handle_NotifyMoraleLossDueToFunds);
+        messageBroker.Unsubscribe<NetworkNotifyMoraleLossDueToFunds>(Handle_NetworkNotifyMoraleLossDueToFunds);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -189,7 +195,11 @@ internal class OtherNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+            string mobilePartyId = null;
+            if (obj.What.MobileParty != null)
+            {
+                if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out mobilePartyId)) return;
+            }
             if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
 
             network.SendAll(new NetworkNotifyKingdomInfluenceChanged(heroId, mobilePartyId, clanId, obj.What.GainedInfluence, obj.What.Detail));
@@ -201,7 +211,11 @@ internal class OtherNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            MobileParty mobileParty = null;
+            if (obj.What.MobilePartyId != null)
+            {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out mobileParty)) return;
+            }
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
 
             if ((obj.What.Detail == GainKingdomInfluenceAction.InfluenceGainingReason.DonatePrisoners && mobileParty == MobileParty.MainParty) 
@@ -309,6 +323,29 @@ internal class OtherNotificationsHandler : IHandler
                     InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=0h5BrVdA}Your relation with notables in some of your settlements increased due to high loyalty", null).ToString()));
                 }
             }
+        });
+    }
+
+    private void Handle_NotifyMoraleLossDueToFunds(MessagePayload<NotifyMoraleLossDueToFunds> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+
+            network.SendAll(new NetworkNotifyMoraleLossDueToFunds(mobilePartyId, obj.What.MoraleChange));
+        });
+    }
+
+    private void Handle_NetworkNotifyMoraleLossDueToFunds(MessagePayload<NetworkNotifyMoraleLossDueToFunds> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
+            if (mobileParty != MobileParty.MainParty) return;
+
+            MBTextManager.SetTextVariable("reg1", MathF.Round(MathF.Abs(obj.What.MoraleChange), 1), 2);
+            MBInformationManager.AddQuickInformation(GameTexts.FindText("str_party_loses_moral_due_to_insufficent_funds", null), 0, null, null, "");
         });
     }
 

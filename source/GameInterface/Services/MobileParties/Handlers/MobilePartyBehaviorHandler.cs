@@ -74,6 +74,10 @@ internal class MobilePartyBehaviorHandler : IHandler
                 out PartyBehaviorUpdateData data))
             return;
 
+        data.ForcePosition = obj.What.ForcePosition;
+        data.IsCurrentlyAtSea = obj.What.IsCurrentlyAtSea;
+        data.ResetMovementToHold = obj.What.ResetMovementToHold;
+
         if (ModInformation.IsClient)
         {
             data.OriginControllerId = controllerIdProvider.ControllerId;
@@ -103,14 +107,36 @@ internal class MobilePartyBehaviorHandler : IHandler
             if (!TrySelectBehaviorUpdate(isSelfEcho, latestPredictions, ref data))
                 return;
 
+            List<MobileParty> attachedParties = null;
+            if (ModInformation.IsServer && data.ForcePosition)
+            {
+                attachedParties = ApplyServerForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+                if (data.ResetMovementToHold)
+                {
+                    party.SetMoveModeHold();
+                    party.ResetNavigationToHold();
+                }
+            }
+
+            IInteractablePoint interactablePoint = null;
             // AllowedThread keeps outbound movement patches quiet while the complete snapshot is replayed.
             using (new AllowedThread())
             {
-                if (!mobilePartyBehaviorSnapshot.TryApply(
+                if ((!ModInformation.IsServer || !data.ResetMovementToHold) &&
+                    !mobilePartyBehaviorSnapshot.TryApply(
                         party,
                         data,
-                        out IInteractablePoint interactablePoint))
+                        out interactablePoint))
                     return;
+
+                if (ModInformation.IsClient && data.ForcePosition)
+                    ApplyForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+
+                if (ModInformation.IsClient && data.ResetMovementToHold)
+                {
+                    party.SetMoveModeHold();
+                    party.ResetNavigationToHold();
+                }
 
                 if (MobilePartyAiConfig.DEBUG)
                 {
@@ -125,7 +151,7 @@ internal class MobilePartyBehaviorHandler : IHandler
                 if (ModInformation.IsClient)
                 {
                     // Moving parties already simulate the replicated target, so an in-flight snapshot is stale.
-                    if (ShouldApplyAuthoritativePosition(
+                    if (!data.ForcePosition && ShouldApplyAuthoritativePosition(
                             isSelfEcho,
                             data.ForcePosition,
                             party.PartyMoveMode == MoveModeType.Hold,
@@ -133,12 +159,60 @@ internal class MobilePartyBehaviorHandler : IHandler
                             data.PartyPosition))
                         party.Position = data.PartyPosition;
                 }
-                else
-                {
-                    PublishAuthoritativeBehavior(party, data);
-                }
+            }
+
+            if (ModInformation.IsServer)
+                PublishAuthoritativeBehavior(party, data);
+
+            if (attachedParties != null)
+            {
+                foreach (var attachedParty in attachedParties)
+                    PublishForcedPosition(attachedParty);
             }
         });
+    }
+
+    private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
+    {
+        party.Position = position;
+
+        if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
+            party.ChangeIsCurrentlyAtSeaCheat();
+    }
+
+    private static List<MobileParty> ApplyServerForcedPosition(
+        MobileParty party,
+        CampaignVec2 position,
+        bool isCurrentlyAtSea)
+    {
+        ApplyForcedPosition(party, position, isCurrentlyAtSea);
+
+        if (party.Army == null)
+            return null;
+
+        List<MobileParty> attachedParties = null;
+        foreach (var attachedParty in party.Army.LeaderParty.AttachedParties)
+        {
+            if (attachedParty == party)
+                continue;
+
+            attachedParty.Position = position;
+            attachedParties ??= new List<MobileParty>();
+            attachedParties.Add(attachedParty);
+        }
+
+        return attachedParties;
+    }
+
+    private void PublishForcedPosition(MobileParty party)
+    {
+        if (!mobilePartyBehaviorSnapshot.TryCreate(
+                party,
+                out PartyBehaviorUpdateData data))
+            return;
+
+        data.ForcePosition = true;
+        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
     }
 
     private void PublishAuthoritativeBehavior(MobileParty party, PartyBehaviorUpdateData request)
@@ -150,6 +224,7 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         authoritativeData.OriginControllerId = request.OriginControllerId;
         authoritativeData.ForcePosition = request.ForcePosition;
+        authoritativeData.ResetMovementToHold = request.ResetMovementToHold;
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref authoritativeData));
     }
 

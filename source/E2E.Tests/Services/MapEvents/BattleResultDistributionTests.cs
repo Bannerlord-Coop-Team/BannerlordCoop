@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -92,6 +93,46 @@ public class BattleResultDistributionTests : MapEventTestBase
             AssertRosterHolds(unpacked.LootedPrisoners, partyA, troopB, 1, notContaining: troopA);
             AssertRosterHolds(unpacked.LootedPrisoners, partyB, troopA, 1, notContaining: troopB);
         }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void SerializedEmptyLoot_PlayerDefeatEndsEncounterWithoutUnpackError()
+    {
+        var ctx = CreateServerMapEvent();
+        RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), ctx.AttackerPartyId);
+
+        var client = Clients.First();
+        SetMainPartyInBattle(client, ctx.AttackerPartyId);
+        SetMockPlayerEncounter(client);
+
+        var wireMessage = Server.EnsureSerializable(new NetworkCommitMapEventResults(
+            ctx.MapEventId,
+            BattleSideEnum.Defender,
+            new NetworkPlayerLootData(new(), new(), new())));
+
+        Assert.Null(wireMessage.PlayerLootData.LootedItems);
+        Assert.Null(wireMessage.PlayerLootData.LootedMembers);
+        Assert.Null(wireMessage.PlayerLootData.LootedPrisoners);
+
+        var unpackErrors = new List<string>();
+        void CaptureUnpackError(string message)
+        {
+            if (message.Contains(nameof(MapEventResultsInterface.UnpackPlayerLootData)))
+                unpackErrors.Add(message);
+        }
+
+        OutputSinkManager.AddLogCallback(CaptureUnpackError);
+        try
+        {
+            client.SimulateMessage(Server.NetPeer, wireMessage);
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(CaptureUnpackError);
+        }
+
+        Assert.Empty(unpackErrors);
+        AssertPlayerEncounterState(client, PlayerEncounterState.End);
     }
 
     /// <summary>

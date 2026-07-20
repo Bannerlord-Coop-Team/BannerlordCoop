@@ -30,7 +30,9 @@ public class CampaignTimeSyncHandler : IHandler
     private readonly IConnectionCollection connectionCollection;
     private readonly IConnectionMessageQueue connectionMessageQueue;
 
+    private readonly object publishGate = new object();
     private readonly Timer publishTimer;
+    private bool disposed;
 
     public CampaignTimeSyncHandler(
         INetwork network,
@@ -53,44 +55,48 @@ public class CampaignTimeSyncHandler : IHandler
 
     public void Dispose()
     {
-        publishTimer.Elapsed -= PublishCampaignTime;
-        publishTimer.Stop();
-        publishTimer.Dispose();
+        lock (publishGate)
+        {
+            if (disposed) return;
+
+            disposed = true;
+            publishTimer.Elapsed -= PublishCampaignTime;
+            publishTimer.Stop();
+            publishTimer.Dispose();
+        }
     }
 
     private void PublishCampaignTime(object sender, ElapsedEventArgs e)
     {
-        try
+        lock (publishGate)
         {
-            // No campaign loaded yet, nothing authoritative to broadcast.
-            if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
+            if (disposed) return;
 
-            foreach (var connection in connectionCollection)
-            {
-                int joinPacketsRemaining = connectionMessageQueue.TryGetCatchUpPacketsRemaining(
-                    connection.Peer,
-                    out int packetsRemaining)
-                    ? packetsRemaining
-                    : -1;
-
-                network.Send(
-                    connection.Peer,
-                    new CampaignTimePacket(currentTicks, joinPacketsRemaining));
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimePacket));
-        }
-        finally
-        {
             try
             {
-                publishTimer.Start();
+                // No campaign loaded yet, nothing authoritative to broadcast.
+                if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
+
+                foreach (var connection in connectionCollection)
+                {
+                    int joinPacketsRemaining = connectionMessageQueue.TryGetCatchUpPacketsRemaining(
+                        connection.Peer,
+                        out int packetsRemaining)
+                        ? packetsRemaining
+                        : -1;
+
+                    network.Send(
+                        connection.Peer,
+                        new CampaignTimePacket(currentTicks, joinPacketsRemaining));
+                }
             }
-            catch (ObjectDisposedException)
+            catch (Exception ex)
             {
-                // Disposed while this broadcast was in flight; no further ticks.
+                Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimePacket));
+            }
+            finally
+            {
+                if (!disposed) publishTimer.Start();
             }
         }
     }

@@ -1,4 +1,4 @@
-using Common.Serialization;
+﻿using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using ProtoBuf;
@@ -20,7 +20,7 @@ namespace GameInterface.Surrogates
 
             IBinaryPackage package = packageFactory.GetBinaryPackage(obj);
 
-            data = BinaryFormatterSerializer.Serialize(package);
+            data = BinaryPackageSerializer.Serialize(package);
         }
 
         private AttackCollisionData Deserialize()
@@ -29,7 +29,7 @@ namespace GameInterface.Surrogates
 
             if (ContainerProvider.TryResolve(out IBinaryPackageFactory packageFactory) == false) return default;
 
-            var package = BinaryFormatterSerializer.Deserialize<AttackCollisionDataBinaryPackage>(data);
+            var package = BinaryPackageSerializer.Deserialize<AttackCollisionDataBinaryPackage>(data);
 
             return package.Unpack<AttackCollisionData>(packageFactory);
         }

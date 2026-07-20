@@ -1,6 +1,9 @@
 ﻿using Autofac;
+using Common;
 using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using System;
 using System.Collections;
@@ -9,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -104,6 +108,282 @@ public class MapEventDebugCommands
 
         return $"Started encounter with {nearest.Name} (StringId {nearest.StringId}, registry id {partyId}), " +
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
+    }
+
+    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
+    /// <summary>
+    /// Starts a server-authoritative bandit attack encounter against a connected player.
+    /// </summary>
+    [CommandLineArgumentFunction("start_nearest_bandit_attack", "coop.debug.mapevent")]
+    public static string StartNearestBanditAttack(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+        {
+            return "Unable to resolve PlayerManager";
+        }
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+        {
+            return $"No registered player has controller id {args[0]}.";
+        }
+
+        if (!playerManager.IsConnected(player))
+        {
+            return $"Player {args[0]} is not connected.";
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+        {
+            return $"Unable to resolve player party {player.MobilePartyId}.";
+        }
+
+        if (playerParty.MapEvent != null)
+        {
+            return $"Player {args[0]} is already in a map event.";
+        }
+
+        var playerPosition = playerParty.Position.ToVec2();
+        var banditParty = MobileParty.All
+            .Where(p => p.IsActive && p.IsBandit && p != playerParty
+                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0)
+            .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
+            .FirstOrDefault();
+
+        if (banditParty == null)
+        {
+            return "No active bandit/looter party found on the map.";
+        }
+
+        EncounterManager.StartPartyEncounter(banditParty.Party, playerParty.Party);
+
+        var partyId = objectManager.TryGetId(banditParty, out string registryId)
+            ? registryId
+            : banditParty.StringId;
+
+        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
+               $"against player {args[0]}.";
+    }
+
+    // coop.debug.mapevent.peace_pursuit_fixture PlayerOne
+    /// <summary>
+    /// Finds a neutral AI party that can be used without changing its original movement state.
+    /// </summary>
+    [CommandLineArgumentFunction("peace_pursuit_fixture", "coop.debug.mapevent")]
+    public static string GetPeacePursuitFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.peace_pursuit_fixture <controllerId>";
+        }
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+        {
+            return error;
+        }
+
+        var neutralParty = FindPeacePursuitFixture(playerParty);
+        if (neutralParty == null)
+        {
+            return "No active neutral AI party already holding on the map.";
+        }
+
+        return FormatPeacePursuitState("Peace pursuit fixture", objectManager, neutralParty, playerParty);
+    }
+
+    // coop.debug.mapevent.peace_pursuit_state PlayerOne mobileParty_1
+    /// <summary>
+    /// Reports the pursuit-test party state on the current machine.
+    /// </summary>
+    [CommandLineArgumentFunction("peace_pursuit_state", "coop.debug.mapevent")]
+    public static string GetPeacePursuitState(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.mapevent.peace_pursuit_state <controllerId> <partyStringId>";
+        }
+
+        if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var playerParty, out var error))
+        {
+            return error;
+        }
+
+        var neutralParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[1]);
+        if (neutralParty == null)
+        {
+            return $"Party {args[1]} was not found.";
+        }
+
+        return FormatPeacePursuitState("Peace pursuit state", objectManager, neutralParty, playerParty);
+    }
+
+    // coop.debug.mapevent.test_peace_stops_pursuit PlayerOne mobileParty_1
+    /// <summary>
+    /// Makes a selected neutral AI party pursue a connected player, then makes peace.
+    /// </summary>
+    [CommandLineArgumentFunction("test_peace_stops_pursuit", "coop.debug.mapevent")]
+    public static string TestPeaceStopsPursuit(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.mapevent.test_peace_stops_pursuit <controllerId> <partyStringId>";
+        }
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+        {
+            return error;
+        }
+
+        var neutralParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[1]);
+        if (neutralParty == null)
+        {
+            return $"Party {args[1]} was not found.";
+        }
+
+        if (!IsPeacePursuitFixture(neutralParty, playerParty))
+        {
+            return $"Party {args[1]} is not a neutral AI party already holding on the map.";
+        }
+
+        DeclareWarAction.ApplyByDefault(neutralParty.MapFaction, playerParty.MapFaction);
+        if (!FactionManager.IsAtWarAgainstFaction(neutralParty.MapFaction, playerParty.MapFaction))
+        {
+            return $"Unable to establish war between {neutralParty.MapFaction.Name} and {playerParty.MapFaction.Name}.";
+        }
+
+        neutralParty.SetMoveGoAroundParty(playerParty, MobileParty.NavigationType.Default);
+        MakePeaceAction.Apply(neutralParty.MapFaction, playerParty.MapFaction);
+
+        var stopped = neutralParty.DefaultBehavior == AiBehavior.Hold &&
+                      neutralParty.PartyMoveMode == MoveModeType.Hold &&
+                      neutralParty.TargetParty == null &&
+                      !FactionManager.IsAtWarAgainstFaction(neutralParty.MapFaction, playerParty.MapFaction);
+
+        return FormatPeacePursuitState($"Peace pursuit test {(stopped ? "passed" : "failed")}",
+            objectManager,
+            neutralParty,
+            playerParty);
+    }
+
+    private static bool TryGetPlayerParty(
+        string controllerId,
+        bool requireReady,
+        out IObjectManager objectManager,
+        out MobileParty playerParty,
+        out string error)
+    {
+        objectManager = null;
+        playerParty = null;
+        error = null;
+
+        if (!TryGetObjectManager(out objectManager))
+        {
+            error = "Unable to resolve ObjectManager";
+            return false;
+        }
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+        {
+            error = "Unable to resolve PlayerManager";
+            return false;
+        }
+
+        if (!playerManager.TryGetPlayer(controllerId, out var player))
+        {
+            error = $"No registered player has controller id {controllerId}.";
+            return false;
+        }
+
+        if (requireReady && ModInformation.IsServer && !playerManager.IsConnected(player))
+        {
+            error = $"Player {controllerId} is not connected.";
+            return false;
+        }
+
+        if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out playerParty))
+        {
+            error = $"Unable to resolve player party {player.MobilePartyId}.";
+            return false;
+        }
+
+        if (requireReady && playerParty.MapEvent != null)
+        {
+            error = $"Player {controllerId} is already in a map event.";
+            return false;
+        }
+
+        if (playerParty.MapFaction == null)
+        {
+            error = $"Player {controllerId} has no map faction.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static MobileParty FindPeacePursuitFixture(MobileParty playerParty)
+    {
+        var playerPosition = playerParty.Position.ToVec2();
+        return MobileParty.All
+            .Where(p => IsPeacePursuitFixture(p, playerParty))
+            .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
+            .FirstOrDefault();
+    }
+
+    private static bool IsPeacePursuitFixture(MobileParty party, MobileParty playerParty)
+    {
+        return party.IsActive &&
+               !party.IsBandit &&
+               !party.IsPlayerParty() &&
+               party != playerParty &&
+               party.MapEvent == null &&
+               party.CurrentSettlement == null &&
+               party.MemberRoster.TotalManCount > 0 &&
+               party.MapFaction != null &&
+               party.MapFaction != playerParty.MapFaction &&
+               !FactionManager.IsAtWarAgainstFaction(party.MapFaction, playerParty.MapFaction) &&
+               party.DefaultBehavior == AiBehavior.Hold &&
+               party.PartyMoveMode == MoveModeType.Hold &&
+               party.TargetParty == null;
+    }
+
+    private static string FormatPeacePursuitState(
+        string prefix,
+        IObjectManager objectManager,
+        MobileParty party,
+        MobileParty playerParty)
+    {
+        var registryId = objectManager.TryGetId(party, out string partyId) ? partyId : "none";
+        var target = party.TargetParty == null ? "none" : party.TargetParty.StringId;
+        var atWar = FactionManager.IsAtWarAgainstFaction(party.MapFaction, playerParty.MapFaction);
+        var mapEvent = party.MapEvent == null ? "none" : party.MapEvent.ToString();
+
+        return $"{prefix}: party={party.StringId}, registryId={registryId}, behavior={party.DefaultBehavior}, " +
+               $"moveMode={party.PartyMoveMode}, target={target}, atWar={atWar}, mapEvent={mapEvent}.";
     }
 
     /// <summary>
