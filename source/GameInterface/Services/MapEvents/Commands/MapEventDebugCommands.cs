@@ -240,10 +240,11 @@ public class MapEventDebugCommands
         if (opposingParty == null)
             return $"Map event {args[0]} has no opposing leader party.";
 
+        PlayerEncounter.Start();
         if (side == BattleSideEnum.Attacker)
-            PlayerEncounter.RestartPlayerEncounter(opposingParty, MobileParty.MainParty.Party);
+            PlayerEncounter.Current.SetupFields(MobileParty.MainParty.Party, opposingParty);
         else
-            PlayerEncounter.RestartPlayerEncounter(MobileParty.MainParty.Party, opposingParty);
+            PlayerEncounter.Current.SetupFields(opposingParty, MobileParty.MainParty.Party);
         PlayerEncounter.JoinBattle(side);
 
         return $"Started the {side} join encounter for map event {args[0]}.";
