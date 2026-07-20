@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common;
-using GameInterface.Services.PlayerCaptivityService.Patches;
+using Common.Messaging;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Utils.Commands;
 using Serilog;
 using System;
@@ -193,7 +194,9 @@ Runs the client-side rescued-prisoner liberation consequence for the given hero.
 
         try
         {
-            LordConversationsCampaignBehaviorPatches.PublishPrisonerLiberationAttempted(behavior, hero);
+            MessageBroker.Instance.Publish(
+                behavior,
+                new PrisonerLiberationAttempted(hero));
             EndCaptivityAction.ApplyByReleasedAfterBattle(hero);
             return $"Liberated '{GetHeroDisplayName(hero)}' after battle.";
         }

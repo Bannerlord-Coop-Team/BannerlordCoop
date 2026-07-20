@@ -20,15 +20,8 @@ internal class LordConversationsCampaignBehaviorPatches
     {
         if (ModInformation.IsServer || Hero.OneToOneConversationHero == null) return;
 
-        PublishPrisonerLiberationAttempted(__instance, Hero.OneToOneConversationHero);
-    }
-
-    internal static void PublishPrisonerLiberationAttempted(
-        LordConversationsCampaignBehavior source,
-        Hero prisoner)
-    {
         MessageBroker.Instance.Publish(
-            source,
-            new PrisonerLiberationAttempted(prisoner));
+            __instance,
+            new PrisonerLiberationAttempted(Hero.OneToOneConversationHero));
     }
 }
