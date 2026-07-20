@@ -144,6 +144,9 @@ public class MissionModule : Module
         builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
+        builder.RegisterType<AgentVisualActionAccessor>()
+            .As<IAgentVisualActionAccessor>()
+            .InstancePerDependency();
         builder.RegisterType<RemoteAgentActionProcessor>()
             .As<IRemoteAgentActionProcessor>()
             .InstancePerDependency();

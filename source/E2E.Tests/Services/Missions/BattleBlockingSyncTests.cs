@@ -440,7 +440,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [Theory]
     [InlineData(Agent.ActionCodeType.Guard)]
     [InlineData(Agent.ActionCodeType.DefendShield)]
-    public void MissionPreDisplayTick_MountedGuardDecay_KeepsVanillaBlendOnGuardChannel(
+    public void MissionPreDisplayTick_MountedGuardDecay_UsesSkeletonActionOwnershipWithoutRestartingAgentAction(
         Agent.ActionCodeType guardActionType)
     {
         var agentId = Guid.NewGuid();
@@ -452,6 +452,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Agent puppet = SpawnRegisteredAgent(
                 context, "owner", agentId, AgentControllerType.None,
                 out MirrorAgent puppetMirror);
+            puppetMirror.UseVisualSkeleton = true;
+            puppetMirror.HideSkeletonAnimationIndex = true;
             Agent owner = SpawnAgent(context, AgentControllerType.Player, out MirrorAgent ownerMirror);
             context.Mock.SpawnMount(puppet);
             context.Mock.SpawnMount(owner);
@@ -493,30 +495,49 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             controller.OnPreDisplayMissionTick(0.1f);
 
-            Assert.Equal(202, puppetMirror.Action1Index);
-            Assert.Equal(0.002f, puppetMirror.Action1Progress, precision: 3);
-            Assert.Equal(
-                AnimFlags.amf_priority_defend | AnimFlags.anf_keep,
-                puppetMirror.Action1Flags);
-            Assert.Equal(-0.2f, puppetMirror.LastSetActionBlendInPeriod);
+            // Visual skeleton replay must not restart the Agent action channel.
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+            Assert.True(float.IsNaN(puppetMirror.LastSetActionBlendInPeriod));
+            Assert.Equal(1, puppetMirror.SetSkeletonActionChannelCalls);
+            Assert.Equal(1, puppetMirror.LastSetSkeletonActionChannel);
+            Assert.Equal(202, puppetMirror.SkeletonAction1Index);
+            Assert.Equal(0.002f, puppetMirror.LastSetSkeletonActionParameter);
 
-            // Native now keeps and advances the guard instead of replacing it with act_none.
-            puppetMirror.Action1Progress = 0.25f;
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(303, puppetMirror.Action0Index);
             Assert.Equal(0.8f, puppetMirror.Action0Progress);
             Assert.Equal((AnimFlags)3, puppetMirror.Action0Flags);
-            Assert.Equal(202, puppetMirror.Action1Index);
-            Assert.Equal(0.25f, puppetMirror.Action1Progress);
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.SetSkeletonActionChannelCalls);
             Assert.Equal(
-                AnimFlags.amf_priority_defend | AnimFlags.anf_keep,
-                puppetMirror.Action1Flags);
-            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
-            Assert.Equal(1, puppetMirror.LastSetActionChannel);
-            Assert.Equal(-0.2f, puppetMirror.LastSetActionBlendInPeriod);
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendLeft,
+                AgentActionData.GetDefendMovementFlags(
+                    puppetMirror.MovementFlags));
 
-            // Release packets carry act_none; explicitly replace the kept guard so it cannot stick.
+            // A new full snapshot resets the replay marker, but a different visual action still owns the channel.
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1Progress = 0f;
+            puppetMirror.Action1Flags = 0;
+            puppetMirror.SkeletonAction1Index = 303;
+            puppetMirror.SetActionChannelCalls = 0;
+            puppetMirror.LastSetActionChannel = -1;
+            puppetMirror.LastSetActionBlendInPeriod = float.NaN;
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.SetSkeletonActionChannelCalls);
+            Assert.Equal(303, puppetMirror.SkeletonAction1Index);
+
+            // Release recognizes the skeleton action even though no animation index was captured.
+            puppetMirror.SkeletonAction1Index = 202;
             ownerMirror.MovementFlags = Agent.MovementControlFlag.None;
             ownerMirror.GuardMode = Agent.GuardMode.None;
             ownerMirror.Action1Index = -1;
@@ -524,11 +545,15 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.Action1Flags = 0;
             ownerMirror.Action1CodeType = Agent.ActionCodeType.Idle;
 
-            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            ApplyOwnerAction(context.Component, 3L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
             Assert.Equal(-1, puppetMirror.Action1Index);
-            Assert.Equal(2, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.LastSetActionChannel);
+            Assert.Equal(0.4f, puppetMirror.LastSetActionBlendInPeriod);
+            Assert.Equal(-1, puppetMirror.SkeletonAction1Index);
+            Assert.Equal(1, puppetMirror.SetSkeletonActionChannelCalls);
             Assert.Equal(
                 Agent.MovementControlFlag.None,
                 AgentActionData.GetDefendMovementFlags(puppetMirror.MovementFlags));
