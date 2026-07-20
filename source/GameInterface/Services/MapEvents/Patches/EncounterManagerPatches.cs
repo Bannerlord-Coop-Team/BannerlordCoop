@@ -92,7 +92,8 @@ internal class EncounterManagerPatches
             defenderParty,
             attackerParty,
             forcePlayerOutFromSettlement: false,
-            ConversationRestartSource.EncounterManager));
+            ConversationRestartSource.EncounterManager,
+            armyTalkEncounter: true));
         return true;
     }
 
@@ -164,7 +165,7 @@ internal class EncounterManagerPatches
 
         // Client: gate the encounter restart behind server approval (rate-limited + validated in
         // ConversationRequestHandler). On approval the handler re-runs this exact method under an AllowedThread.
-        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager));
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement: false, ConversationRestartSource.EncounterManager, false));
 
         return false;
     }
@@ -181,7 +182,7 @@ internal class EncounterManagerPatches
         if (defenderParty?.MapEvent?.IsActiveSlowVillageRaid() != true)
             return false;
 
-        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty.Party, false, ConversationRestartSource.EncounterManager));
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty.Party, false, ConversationRestartSource.EncounterManager, false));
         return true;
     }
 
