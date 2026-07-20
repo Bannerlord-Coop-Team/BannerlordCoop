@@ -124,7 +124,11 @@ public class ServerSettlementExitEnterHandler : IHandler
         {
             if (obj.Who is NetPeer suppressedPeer)
             {
-                network.Send(suppressedPeer, new NetworkSettlementEncounterLeaveSuppressed(payload.PartyId));
+                network.Send(
+                    suppressedPeer,
+                    new NetworkSettlementEncounterLeaveResult(
+                        payload.PartyId,
+                        SettlementEncounterLeaveOutcome.Suppressed));
             }
             return;
         }
@@ -133,7 +137,11 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         // The sending client is currently in a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
-        network.Send(peer, new NetworkEndSettlementEncounter(payload.PartyId));
+        network.Send(
+            peer,
+            new NetworkSettlementEncounterLeaveResult(
+                payload.PartyId,
+                SettlementEncounterLeaveOutcome.Applied));
 
         network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
             Compact(payload.PartyId, typeof(MobileParty))));
