@@ -212,13 +212,14 @@ namespace GameInterface.AutoSync.Builders
             AutoSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_Handler.cs", handlerTemplate);
 
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(patchTemplate));
+            var categoryIndex = 0;
             foreach (var categorizedTargets in dynamicRegistryItem.CategorizedTargetMethods)
             {
                 var categoryPatchTemplate = TemplateParser.Parse("Patches.DynamicPatchTemplate", new
                 {
                     Libraries = usings.Distinct(),
                     DeclaringType = AutoSyncUtils.GetSimpleTypeName(declaringType),
-                    PatchClassName = $"{declaringTypeName}_{categorizedTargets.Key}_DynamicPatches",
+                    PatchClassName = $"{declaringTypeName}_Category{categoryIndex}_DynamicPatches",
                     PatchCategory = categorizedTargets.Key,
                     IncludeDeclaredMethods = false,
                     TargetMethods = categorizedTargets.Value,
@@ -226,8 +227,9 @@ namespace GameInterface.AutoSync.Builders
                     Transpilers = transpilers,
                 });
 
-                AutoSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_{categorizedTargets.Key}_DynamicPatches.cs", categoryPatchTemplate);
+                AutoSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_Category{categoryIndex}_DynamicPatches.cs", categoryPatchTemplate);
                 syntaxTrees.Add(CSharpSyntaxTree.ParseText(categoryPatchTemplate));
+                categoryIndex++;
             }
             syntaxTrees.AddRange(messages.Select(m => CSharpSyntaxTree.ParseText(m)));
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(handlerTemplate));
