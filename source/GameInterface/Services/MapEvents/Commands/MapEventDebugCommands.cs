@@ -194,6 +194,24 @@ public class MapEventDebugCommands
         return "Requested entry into the current battle.";
     }
 
+    [CommandLineArgumentFunction("finish_non_battle_encounter", "coop.debug.mapevent")]
+    public static string FinishNonBattleEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.finish_non_battle_encounter";
+
+        if (PlayerEncounter.Current == null)
+            return "No player encounter is active.";
+        if (PlayerEncounter.Battle != null || MobileParty.MainParty?.MapEvent != null)
+            return "Refusing to finish a battle encounter.";
+
+        PlayerEncounter.Finish();
+        return "Finished the current non-battle encounter.";
+    }
+
     [CommandLineArgumentFunction("join_existing", "coop.debug.mapevent")]
     public static string JoinExistingBattle(List<string> args)
     {
