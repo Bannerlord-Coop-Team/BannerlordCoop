@@ -157,6 +157,30 @@ public class MapEventDebugCommands
             return $"Player {args[0]} is already in a map event.";
         }
 
+        const int maximumFixtureTroops = 8;
+        var remainingFixtureTroops = maximumFixtureTroops;
+        var removedTroops = 0;
+        for (var index = playerParty.MemberRoster.Count - 1; index >= 0; index--)
+        {
+            var element = playerParty.MemberRoster.GetElementCopyAtIndex(index);
+            if (element.Character.IsHero)
+                continue;
+
+            var kept = Math.Min(element.Number, remainingFixtureTroops);
+            var removed = element.Number - kept;
+            if (removed > 0)
+            {
+                playerParty.MemberRoster.AddToCountsAtIndex(
+                    index,
+                    -removed,
+                    -Math.Min(element.WoundedNumber, removed),
+                    removeDepleted: false);
+                removedTroops += removed;
+            }
+            remainingFixtureTroops -= kept;
+        }
+        playerParty.MemberRoster.RemoveZeroCounts();
+
         if (playerParty.CurrentSettlement != null)
         {
             LeaveSettlementAction.ApplyForParty(playerParty);
@@ -181,7 +205,7 @@ public class MapEventDebugCommands
             : banditParty.StringId;
 
         return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
-               $"against player {args[0]}.";
+               $"against player {args[0]} after removing {removedTroops} excess fixture troops.";
     }
 
     [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
