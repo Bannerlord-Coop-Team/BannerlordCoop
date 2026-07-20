@@ -86,40 +86,83 @@ namespace Coop.IntegrationTests.MobileParties
             }
         }
 
-        /// <summary>
-        /// While the first settlement-encounter request is still in flight, the controlled party re-attempts the
-        /// encounter every campaign tick. Verify those rapid retries are rate-limited to a single network request
-        /// instead of flooding the server, and the entry is applied via ISettlementInterface exactly once.
-        /// </summary>
         [Fact]
-        public void RapidEnterAttempts_RateLimited_ToOneRequest()
+        public void EnterAttempts_WhileRequestPending_SendOneRequest()
         {
-            // Arrange
             var client1 = TestEnvironment.Clients.First();
-
             var party = ObjectHelper.SkipConstructor<MobileParty>();
             var settlement = ObjectHelper.SkipConstructor<Settlement>();
             TestEnvironment.RegisterObjectInNetwork(party, "party1");
             TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
-
             var message = new StartSettlementEncounterAttempted(party, settlement);
+            var router = client1.Resolve<TestNetworkRouter>();
+            router.IsMessageRoutingEnabled = false;
 
-            // Act - two attempts in immediate succession, well within the request cooldown
             RunOnGameThread(() =>
             {
                 client1.SimulateMessage(this, message);
                 client1.SimulateMessage(this, message);
             });
 
-            // Assert - only the first attempt reaches the server; the second is dropped by the rate limiter
             Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkRequestStartSettlementEncounter>());
+        }
 
-            // And the entry is applied via ISettlementInterface on the other clients exactly once
-            foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
-            {
-                client.Resolve<Mock<ISettlementInterface>>()
-                    .Verify(s => s.PartyEnterSettlement(party, settlement), Times.Once);
-            }
+        [Fact]
+        public void RejectedEnterAttempt_AllowsNextRequest()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+            var router = client1.Resolve<TestNetworkRouter>();
+            router.IsMessageRoutingEnabled = false;
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement)));
+
+            client1.SimulateMessage(
+                TestEnvironment.Server.NetPeer,
+                new NetworkSettlementEncounterRejected(
+                    new NetworkRequestStartSettlementEncounter("party1", "settlement1")));
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement)));
+
+            Assert.Equal(2, client1.NetworkSentMessages.GetMessageCount<NetworkRequestStartSettlementEncounter>());
+        }
+
+        [Fact]
+        public void StaleEnterResponse_DoesNotClearOrApplyPendingRequest()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var pendingSettlement = ObjectHelper.SkipConstructor<Settlement>();
+            var staleSettlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(pendingSettlement, "settlement1");
+            TestEnvironment.RegisterObjectInNetwork(staleSettlement, "settlement2");
+            var router = client1.Resolve<TestNetworkRouter>();
+            router.IsMessageRoutingEnabled = false;
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(
+                    this,
+                    new StartSettlementEncounterAttempted(party, pendingSettlement)));
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(
+                    TestEnvironment.Server.NetPeer,
+                    new NetworkStartSettlementEncounter(
+                        new NetworkRequestStartSettlementEncounter("party1", "settlement2"))));
+            RunOnGameThread(() =>
+                client1.SimulateMessage(
+                    this,
+                    new StartSettlementEncounterAttempted(party, staleSettlement)));
+
+            client1.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.StartSettlementEncounter(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
+            Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkRequestStartSettlementEncounter>());
         }
 
         [Fact]
@@ -140,7 +183,58 @@ namespace Coop.IntegrationTests.MobileParties
 
             TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>()
                 .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
-            Assert.Empty(TestEnvironment.Server.NetworkSentMessages.Messages);
+            Assert.Equal(
+                1,
+                TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkSettlementEncounterRejected>());
+            Assert.Equal(0, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkPartyEnterSettlement>());
+        }
+
+        [Fact]
+        public void EnterSettlement_PartyAlreadyInDifferentSettlement_IsRejected()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var currentSettlement = ObjectHelper.SkipConstructor<Settlement>();
+            var requestedSettlement = ObjectHelper.SkipConstructor<Settlement>();
+            party._currentSettlement = currentSettlement;
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(currentSettlement, "settlement1");
+            TestEnvironment.RegisterObjectInNetwork(requestedSettlement, "settlement2");
+            TestEnvironment.Server.NetworkSentMessages.Clear();
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(
+                    this,
+                    new StartSettlementEncounterAttempted(party, requestedSettlement)));
+
+            TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
+            Assert.Equal(
+                1,
+                TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkSettlementEncounterRejected>());
+            Assert.Equal(0, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkPartyEnterSettlement>());
+        }
+
+        [Fact]
+        public void EnterSettlement_PartyAlreadyInRequestedSettlement_AcknowledgesWithoutReapplyingEntry()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            party._currentSettlement = settlement;
+            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+            TestEnvironment.Server.NetworkSentMessages.Clear();
+
+            RunOnGameThread(() =>
+                client1.SimulateMessage(
+                    this,
+                    new StartSettlementEncounterAttempted(party, settlement)));
+
+            TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>()
+                .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
+            Assert.Equal(1, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkStartSettlementEncounter>());
+            Assert.Equal(0, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkPartyEnterSettlement>());
         }
 
         /// <summary>

@@ -51,6 +51,9 @@ public static class BattleSpawnGate
     [System.ThreadStatic]
     private static int _currentRoutedPlayerHitDamage;
 
+    [System.ThreadStatic]
+    private static WeaponComponentData _routedAttackerWeapon;
+
     /// <summary>
     /// Set around a puppet spawn (<c>CoopBattleController.SpawnPuppet</c>) so the spawn-capture patch does NOT
     /// re-capture and re-broadcast it — only locally owned native spawns should be captured. Thread-local: it
@@ -77,6 +80,23 @@ public static class BattleSpawnGate
     /// rider-keyed gating. Process-global like the rest of this gate: one live battle per game process.
     /// </summary>
     public static Func<Agent, bool?> MountAuthorityProbe { get; set; }
+
+    /// <summary>Temporarily exposes a routed missile's serialized weapon while vanilla calculates hit rewards.</summary>
+    public static void RunWithRoutedAttackerWeapon(WeaponComponentData attackerWeapon, Action applyBlow)
+    {
+        var previousWeapon = _routedAttackerWeapon;
+        _routedAttackerWeapon = attackerWeapon;
+        try
+        {
+            applyBlow();
+        }
+        finally
+        {
+            _routedAttackerWeapon = previousWeapon;
+        }
+    }
+
+    public static WeaponComponentData RoutedAttackerWeapon => _routedAttackerWeapon;
 
     /// <summary>Runs a replicated puppet death with the owner's kill-feed metadata available to UI patches.</summary>
     public static void RunWithReplicatedDeath(
@@ -318,6 +338,7 @@ public static class BattleSpawnGate
         }
 
         EndCombatLog();
+        _routedAttackerWeapon = null;
     }
 
     private static void RemoveExpiredRoutedPlayerHitNotifications()

@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Text;
@@ -34,6 +35,26 @@ namespace GameInterface.Services.Workshops.Commands
                 }
             }
             return null;
+        }
+
+        internal static Hero ResolveHero(string heroId, IObjectManager objectManager)
+        {
+            if (objectManager.TryGetObject<Hero>(heroId, out var registeredHero))
+            {
+                return registeredHero;
+            }
+
+            return Hero.FindFirst(hero => hero.StringId == heroId || hero.Name?.ToString() == heroId);
+        }
+
+        internal static void ApplyOwnerChange(Workshop workshop, Hero newOwner)
+        {
+            ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(
+                workshop,
+                newOwner,
+                workshop.WorkshopType,
+                1000,
+                0);
         }
 
         [CommandLineArgumentFunction("set_workshop_custom_name", "coop.debug.workshop")]
@@ -78,7 +99,7 @@ namespace GameInterface.Services.Workshops.Commands
             // Expect three arguments: settlement name, workshop type, and new owner (hero ID or name)
             if (args.Count != 3)
             {
-                return "Usage: coop.debug.workshop.set_owner <settlementName> <workshopType> <newOwnerId>";
+                return "Usage: coop.debug.workshop.set_workshop_owner <settlementName> <workshopType> <newOwnerId>";
             }
 
             string settlementName = args[0];
@@ -107,14 +128,20 @@ namespace GameInterface.Services.Workshops.Commands
             }
 
             // Find the new owner (Hero) by ID or name
-            Hero newOwner = Hero.FindFirst(h => h.StringId == newOwnerId || h.Name.ToString() == newOwnerId);
-            if (newOwner == null)
+            if (!TryGetObjectManager(out var objectManager))
             {
-                return $"Hero with ID or Name: '{newOwnerId}' not found";
+                return "Unable to resolve ObjectManager";
             }
 
-            // Use the existing Workshop method to change the owner
-            workshop.ChangeOwnerOfWorkshop(newOwner, workshop.WorkshopType, 1000);
+            Hero newOwner = ResolveHero(newOwnerId, objectManager);
+            if (newOwner == null)
+            {
+                return $"Hero with ID or Name: '{newOwnerId}' not found (use the registry id from coop.debug.alley.my_hero_id on the owning client)";
+            }
+
+            // Use the same action path as normal workshop purchases so ownership-dependent
+            // campaign behavior and client warehouse data are updated too.
+            ApplyOwnerChange(workshop, newOwner);
 
             return $"Workshop owner has been changed to: {newOwner.Name} with the type {workshop.WorkshopType} and with a capital of {workshop.Capital}";
         }

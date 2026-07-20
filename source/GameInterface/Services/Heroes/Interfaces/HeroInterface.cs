@@ -63,7 +63,7 @@ internal class HeroInterface : IHeroInterface
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
-        return BinaryFormatterSerializer.Serialize(package);
+        return BinaryPackageSerializer.Serialize(package);
     }
 
     public Hero ServerUnpackHero(byte[] bytes)
@@ -89,7 +89,7 @@ internal class HeroInterface : IHeroInterface
             {
                 using (new AllowedThread())
                 {
-                    hero = BinaryFormatterSerializer
+                    hero = BinaryPackageSerializer
                         .Deserialize<HeroBinaryPackage>(bytes)
                         .Unpack<Hero>(binaryPackageFactory);
 
@@ -167,6 +167,9 @@ internal class HeroInterface : IHeroInterface
 
     private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
     {
+        // Player birth dates come from a separate character-creation campaign, so rebase them to this campaign.
+        hero.SetBirthDay(CampaignTime.YearsFromNow(-hero._defaultAge));
+
         var party = hero.PartyBelongedTo;
 
         party.Anchor = new AnchorPoint(party);

@@ -62,7 +62,7 @@ public class NetworkAgentShootSerializationTests
     }
 
     [Fact]
-    public void NetworkApplyBattleDamage_RoundTripsMissileShotSequence()
+    public void NetworkApplyBattleDamage_RoundTripsMissileContext()
     {
         var blow = new Blow(17)
         {
@@ -71,13 +71,15 @@ public class NetworkAgentShootSerializationTests
         };
         blow.WeaponRecord._isMissile = true;
         blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = 42;
+        var attackerWeapon = new WeaponComponentData(null, WeaponClass.Arrow, default);
 
         var original = new NetworkApplyBattleDamage(
             Guid.NewGuid(),
             Guid.NewGuid(),
             blow,
             default,
-            missileShotSequence: 4_500_000_123L);
+            missileShotSequence: 4_500_000_123L,
+            attackerWeapon: attackerWeapon);
 
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(original, serializer);
@@ -88,5 +90,7 @@ public class NetworkAgentShootSerializationTests
         Assert.Equal(original.AttackerAgentId, result.AttackerAgentId);
         Assert.True(result.IsMissile);
         Assert.Equal(4_500_000_123L, result.MissileShotSequence);
+        Assert.NotNull(result.AttackerWeapon);
+        Assert.Equal(WeaponClass.Arrow, result.AttackerWeapon.WeaponClass);
     }
 }

@@ -51,6 +51,8 @@ public static class PartyBehaviorPatch
             return true;
         }
 
+        RepairInvalidSettlementTarget(__instance, newAiBehavior, interactablePoint, ref bestTargetPoint);
+
         __state = !BehaviorIsSame(__instance, newAiBehavior, interactablePoint, bestTargetPoint) &&
             __instance._mobileParty.IsControlledByThisInstance();
         if (!__state)
@@ -67,6 +69,42 @@ public static class PartyBehaviorPatch
         }
 
         return true;
+    }
+
+    // Vanilla saves TargetPosition, TargetSettlement, and DefaultBehavior independently, while NavigationPath is discarded on load.
+    // A save can therefore retain GoToSettlement intent with a current-position target after the in-memory path masked the mismatch.
+    // MobilePartyAi.GetBehaviors seeds GoToSettlement from the saved TargetPosition and never replaces it with the settlement gate.
+    // That current position feeds back every AI tick, and our behavior deduplication would preserve it forever.
+    private static void RepairInvalidSettlementTarget(
+        MobilePartyAi partyAi,
+        AiBehavior behavior,
+        IInteractablePoint interactable,
+        ref CampaignVec2 target)
+    {
+        var party = partyAi._mobileParty;
+        if (behavior != AiBehavior.GoToSettlement ||
+            target != party.Position ||
+            interactable is not PartyBase partyBase ||
+            !partyBase.IsSettlement)
+            return;
+
+        var settlement = partyBase.Settlement;
+        if (settlement == null || party.CurrentSettlement == settlement)
+            return;
+
+        var correctedTarget = party.IsTargetingPort && settlement.HasPort
+            ? settlement.PortPosition
+            : settlement.GatePosition;
+        if (!correctedTarget.IsValid() || correctedTarget == party.Position)
+            return;
+
+        Logger.Information(
+            "Repairing current-position settlement target for {PartyId}: {SettlementId} at {Target}",
+            party.StringId,
+            settlement.StringId,
+            correctedTarget);
+        party.TargetPosition = correctedTarget;
+        target = correctedTarget;
     }
 
     [HarmonyPostfix]

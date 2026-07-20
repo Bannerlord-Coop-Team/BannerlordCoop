@@ -47,7 +47,7 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
-        public void LobbyJoinRequest_PublishesResolvedJoinInfoAndLeavesLobby()
+        public void LobbyJoinRequest_PublishesResolvedJoinInfoAndRetainsMembership()
         {
             SetupLobby(42);
 
@@ -57,7 +57,9 @@ namespace Coop.Tests.Steam
             Assert.Equal("203.0.113.7", info.Address);
             Assert.Equal(4200, info.Port);
             Assert.Empty(failed);
-            Assert.Contains(42UL, api.LeftLobbies);
+            Assert.True(listener.IsInLobby);
+            Assert.Equal(42UL, listener.LobbyId);
+            Assert.DoesNotContain(42UL, api.LeftLobbies);
         }
 
         [Fact]
@@ -68,6 +70,41 @@ namespace Coop.Tests.Steam
             messageBroker.Publish(this, new JoinSteamLobby(42));
 
             Assert.Single(resolved);
+        }
+
+        [Fact]
+        public void JoinSessionLobby_RetainsMembershipWithoutResolvingAgain()
+        {
+            listener.JoinSessionLobby(42);
+
+            Assert.True(listener.IsInLobby);
+            Assert.Equal(42UL, listener.LobbyId);
+            Assert.Empty(resolved);
+            Assert.Empty(failed);
+        }
+
+        [Fact]
+        public void LeaveSessionLobby_LeavesActiveLobby()
+        {
+            listener.JoinSessionLobby(42);
+
+            listener.LeaveSessionLobby();
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
+        public void LeaveSessionLobby_WhileJoinInFlight_LeavesLateLobby()
+        {
+            api.CompleteOperationsImmediately = false;
+            listener.JoinSessionLobby(42);
+
+            listener.LeaveSessionLobby();
+            api.CompletePendingJoin();
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
         }
 
         [Fact]
@@ -168,8 +205,8 @@ namespace Coop.Tests.Steam
             Assert.Equal(api.LobbyOwner, info.HostSteamId);
             Assert.False(info.HasAddress);
             Assert.Empty(failed);
-            // The owner is only readable while a member, so the leave must come after the read.
-            Assert.Contains(42UL, api.LeftLobbies);
+            Assert.True(listener.IsInLobby);
+            Assert.DoesNotContain(42UL, api.LeftLobbies);
         }
 
         [Fact]

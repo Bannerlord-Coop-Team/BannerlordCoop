@@ -20,6 +20,9 @@ internal class BattleAgentLogicHitRewardPatch
     {
         if (ModInformation.IsServer) return true;
 
+        if (lastAttackerWeapon == null)
+            lastAttackerWeapon = BattleSpawnGate.RoutedAttackerWeapon;
+
         if (affectedAgent.Origin == null || affectorAgent == null || affectorAgent.Origin == null || affectorAgent.Team == null || !affectorAgent.Team.IsValid || affectedAgent.Team == null || !affectedAgent.Team.IsValid)
             return false;
 
