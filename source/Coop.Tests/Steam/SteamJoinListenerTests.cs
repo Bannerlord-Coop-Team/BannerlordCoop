@@ -253,6 +253,21 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void PromotedToLobbyOwnerAfterAdvertiserLeft_LeaveSessionLobbyStillLeaves()
+        {
+            SetupLobby(42);
+            api.RaiseLobbyJoinRequested(42);
+
+            // Server shutdown disconnects clients before withdrawing the lobby; Steam
+            // promotes this client to owner before its teardown runs on the game thread.
+            api.LobbyOwner = api.UserSteamId;
+            listener.LeaveSessionLobby();
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
         public void DirectOnlyLobby_ResolvesWithoutHostSteamId()
         {
             SetupLobby(42, version: SessionJoinInfo.MinTunnelVersion - 1);

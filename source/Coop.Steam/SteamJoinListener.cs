@@ -25,6 +25,7 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
     private bool leaveWhenJoinCompletes;
     private ulong joiningLobbyId;
     private ulong activeLobbyId;
+    private ulong activeLobbyAdvertiserId;
 
     public ulong LobbyId => activeLobbyId;
     public bool IsInLobby => activeLobbyId != 0;
@@ -137,6 +138,9 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
             }
 
             activeLobbyId = lobbyId;
+            // The owner at entry is the advertiser; ownership migrates to a remaining
+            // member if the advertiser leaves first (see LeaveActiveLobby).
+            activeLobbyAdvertiserId = lobbyApi.GetLobbyOwner(lobbyId);
             if (leaveWhenJoinCompletes)
             {
                 leaveWhenJoinCompletes = false;
@@ -207,14 +211,17 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
     /// lobby's owning account must keep it: Steam tracks membership per account, not per
     /// process, so when a dedicated server's operator connects from the same account the
     /// server advertises with, leaving would empty the lobby and Steam would destroy it,
-    /// delisting the server for everyone. Session tracking resets either way.
+    /// delisting the server for everyone. The advertiser is identified by the owner at
+    /// entry, not current ownership: when the advertiser withdraws first (server shutdown),
+    /// Steam promotes a remaining member, and the promoted client must still leave rather
+    /// than linger in the dead lobby. Session tracking resets either way.
     /// </summary>
     private void LeaveActiveLobby()
     {
         if (activeLobbyId == 0) return;
 
         ulong localSteamId = lobbyApi.LocalSteamId;
-        if (localSteamId != 0 && lobbyApi.GetLobbyOwner(activeLobbyId) == localSteamId)
+        if (localSteamId != 0 && activeLobbyAdvertiserId == localSteamId)
         {
             Logger.Information("Staying in own Steam lobby {LobbyId}; the advertisement needs this account's membership", activeLobbyId.ToString());
         }
@@ -224,6 +231,7 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
         }
 
         activeLobbyId = 0;
+        activeLobbyAdvertiserId = 0;
     }
 
     public static bool TryParseConnectLobby(string text, out ulong lobbyId)
