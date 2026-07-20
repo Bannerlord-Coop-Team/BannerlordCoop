@@ -61,6 +61,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Character", nameof(Agent_get_Character));
         Prefix(typeof(Agent), "get_Team", nameof(Agent_get_Team));
         Prefix(typeof(Agent), "get_Position", nameof(Agent_get_Position));
+        Prefix(typeof(Agent), "get_Equipment", nameof(Agent_get_Equipment));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
         // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
@@ -108,6 +109,13 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "set_LookDirection", nameof(Agent_set_LookDirection));
         Prefix(typeof(Agent), nameof(Agent.GetMovementDirection), nameof(Agent_GetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
+        Prefix(typeof(Agent), nameof(Agent.TeleportToPosition), nameof(Agent_TeleportToPosition));
+        Prefix(typeof(Agent), nameof(Agent.SetTargetPositionAndDirection), nameof(Agent_SetTargetPositionAndDirection));
+        Prefix(typeof(Agent), nameof(Agent.GetRealGlobalVelocity), nameof(Agent_GetRealGlobalVelocity));
+        Prefix(typeof(Agent), nameof(Agent.GetMaximumForwardUnlimitedSpeed), nameof(Agent_GetMaximumForwardUnlimitedSpeed));
+        Prefix(typeof(Agent), nameof(Agent.SetMaximumSpeedLimit), nameof(Agent_SetMaximumSpeedLimit));
+        Prefix(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(Agent_GetPrimaryWieldedItemIndex));
+        Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
         // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
@@ -324,6 +332,13 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_get_Equipment(Agent __instance, ref MissionEquipment __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = null;
+        return false;
+    }
+
     private static bool Agent_IsActive(Agent __instance, ref bool __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
@@ -534,6 +549,71 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.MovementDirection = __0;
+        return false;
+    }
+
+    private static bool Agent_TeleportToPosition(Agent __instance, Vec3 position)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+
+        m.Position = position;
+        m.TeleportToPositionCalls++;
+        if (m.MountAgent != null && AgentMirror.TryGet(m.MountAgent, out var mount))
+            mount.Position = position;
+        if (m.RiderAgent != null && AgentMirror.TryGet(m.RiderAgent, out var rider))
+        {
+            rider.Position = position;
+            rider.MovementDirection = rider.LookDirection.AsVec2;
+        }
+        return false;
+    }
+
+    private static bool Agent_SetTargetPositionAndDirection(
+        Agent __instance,
+        ref Vec2 targetPosition,
+        ref Vec3 targetDirection)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetTargetPositionAndDirectionCalls++;
+        m.LastTargetPosition = targetPosition;
+        m.LastTargetDirection = targetDirection;
+        return false;
+    }
+
+    private static bool Agent_GetRealGlobalVelocity(Agent __instance, ref Vec3 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.RealGlobalVelocity;
+        return false;
+    }
+
+    private static bool Agent_GetMaximumForwardUnlimitedSpeed(Agent __instance, ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MaximumForwardUnlimitedSpeed;
+        return false;
+    }
+
+    private static bool Agent_SetMaximumSpeedLimit(Agent __instance, float __0, bool __1)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.MaximumSpeedLimit = __0;
+        m.LastMaximumSpeedLimitIsMultiplier = __1;
+        m.SetMaximumSpeedLimitCalls++;
+        return false;
+    }
+
+    private static bool Agent_GetPrimaryWieldedItemIndex(Agent __instance, ref EquipmentIndex __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.PrimaryWieldedItemIndex;
+        return false;
+    }
+
+    private static bool Agent_GetOffhandWieldedItemIndex(Agent __instance, ref EquipmentIndex __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.OffhandWieldedItemIndex;
         return false;
     }
 

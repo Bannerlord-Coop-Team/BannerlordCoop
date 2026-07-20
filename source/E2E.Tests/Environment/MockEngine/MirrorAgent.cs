@@ -20,6 +20,17 @@ public sealed class MirrorAgent
     public bool WasKilled { get; set; }
     public int DeathAction { get; set; } = -1;
     public Vec3 Position { get; set; }
+    public int TeleportToPositionCalls { get; set; }
+    public int SetTargetPositionAndDirectionCalls { get; set; }
+    public Vec2 LastTargetPosition { get; set; }
+    public Vec3 LastTargetDirection { get; set; }
+    public Vec3 RealGlobalVelocity { get; set; }
+    public float MaximumForwardUnlimitedSpeed { get; set; } = 5f;
+    public float MaximumSpeedLimit { get; set; } = -1f;
+    public int SetMaximumSpeedLimitCalls { get; set; }
+    public bool LastMaximumSpeedLimitIsMultiplier { get; set; }
+    public EquipmentIndex PrimaryWieldedItemIndex { get; set; } = EquipmentIndex.None;
+    public EquipmentIndex OffhandWieldedItemIndex { get; set; } = EquipmentIndex.None;
     public BasicCharacterObject Character { get; set; }
     public Team Team { get; set; }
     public Formation Formation { get; set; }
