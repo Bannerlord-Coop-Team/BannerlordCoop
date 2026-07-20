@@ -10,6 +10,7 @@ using Missions.Messages;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -75,6 +76,39 @@ public class BattleResultReadyTests : MissionTestEnvironment
         SendResult(clients[0], mapEventId, BattleState.AttackerVictory);
 
         AssertMapEventPresent(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void HostResult_WaitsForAcceptedJoinerBeforeMissionEntry()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
+        var joinerPartyId = CreateRegisteredObject<MobileParty>();
+        var joinerHeroId = CreateRegisteredObject<Hero>();
+        string? joinerPartyBaseId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerPartyId, out var joinerParty));
+            Assert.True(Server.ObjectManager.TryGetId(joinerParty.Party, out joinerPartyBaseId));
+        });
+        RegisterAsPlayerParty("joining-player", joinerHeroId, joinerPartyId);
+
+        var clients = Clients.ToArray();
+        SetControllerId(clients[1], "joining-player");
+        RegisterPeer(clients[0], "host");
+        RegisterPeer(clients[1], "joining-player");
+        EnterBattleWithMembership(clients[0], "host", mapEventId);
+
+        clients[1].Call(() => clients[1].Resolve<INetwork>().SendAll(
+            new NetworkRequestJoinBattle(mapEventId, joinerPartyBaseId!, BattleSideEnum.Attacker)));
+
+        SendResult(clients[0], mapEventId, BattleState.AttackerVictory);
+        AssertMapEventPresent(mapEventId);
+
+        EnterBattleWithMembership(clients[1], "joining-player", mapEventId);
+        SendResult(clients[1], mapEventId, BattleState.AttackerVictory);
+
+        AssertMapEventRemoved(mapEventId);
     }
 
     [Fact]

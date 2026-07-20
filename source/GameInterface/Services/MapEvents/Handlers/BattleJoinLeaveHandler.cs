@@ -9,6 +9,8 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -33,6 +35,7 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IMapEventInitializationBarrier initializationBarrier;
 
@@ -40,12 +43,14 @@ internal class BattleJoinLeaveHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         IMapEventLogger mapEventLogger,
         IMapEventInitializationBarrier initializationBarrier)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.mapEventLogger = mapEventLogger;
         this.initializationBarrier = initializationBarrier;
 
@@ -164,6 +169,7 @@ internal class BattleJoinLeaveHandler : IHandler
                 // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
                 // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
                 party.MapEventSide = side;
+                PublishJoinAccepted(payload.Who as NetPeer, party, data.MapEventId);
                 if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
                     MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
 
@@ -194,20 +200,30 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        RemovePartyFromBattleAndBroadcast(payload.What.PartyId);
+        RemovePartyFromBattleAndBroadcast(payload.What.PartyId, payload.Who as NetPeer);
     }
 
     // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
     // collection sync), so remove authoritatively and broadcast the removal explicitly.
-    private void RemovePartyFromBattleAndBroadcast(string partyId)
+    private void RemovePartyFromBattleAndBroadcast(string partyId, NetPeer requestingPeer = null)
     {
         GameThread.RunSafe(
             () =>
             {
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
+                var mapEvent = party.MapEvent;
                 ApplyAuthoritativeLeave(party);
                 network.SendAll(new NetworkPartyLeftBattle(partyId));
+
+                if (mapEvent != null &&
+                    objectManager.TryGetId(mapEvent, out var mapEventId) &&
+                    TryGetRequestingPlayer(requestingPeer, party, out var controllerId))
+                {
+                    messageBroker.Publish(
+                        requestingPeer,
+                        new BattleJoinCancelled(mapEventId, controllerId));
+                }
             },
             blocking: true,
             context: nameof(RemovePartyFromBattleAndBroadcast));
@@ -234,6 +250,34 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         if (party.MapEventSide != null)
             party.MapEventSide = null;
+    }
+
+    private void PublishJoinAccepted(NetPeer requestingPeer, PartyBase party, string mapEventId)
+    {
+        if (!TryGetRequestingPlayer(requestingPeer, party, out var controllerId))
+            return;
+
+        messageBroker.Publish(
+            requestingPeer,
+            new BattleJoinAccepted(mapEventId, controllerId));
+    }
+
+    private bool TryGetRequestingPlayer(
+        NetPeer requestingPeer,
+        PartyBase party,
+        out string controllerId)
+    {
+        controllerId = null;
+        if (requestingPeer == null ||
+            !playerManager.TryGetPlayer(requestingPeer, out var player) ||
+            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) ||
+            !ReferenceEquals(playerParty.Party, party))
+        {
+            return false;
+        }
+
+        controllerId = player.ControllerId;
+        return true;
     }
 
     // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.

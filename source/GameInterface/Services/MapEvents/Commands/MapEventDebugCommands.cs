@@ -3,6 +3,7 @@ using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections;
@@ -175,6 +176,57 @@ public class MapEventDebugCommands
 
         return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
                $"against player {args[0]}.";
+    }
+
+    [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
+    public static string EnterCurrentBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.enter_current_battle";
+
+        if (PlayerEncounter.Current == null || PlayerEncounter.Battle == null)
+            return "No active battle encounter.";
+
+        MenuHelper.EncounterAttackConsequence(null);
+        return "Requested entry into the current battle.";
+    }
+
+    [CommandLineArgumentFunction("join_existing", "coop.debug.mapevent")]
+    public static string JoinExistingBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 2 ||
+            !Enum.TryParse(args[1], true, out BattleSideEnum side) ||
+            (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender))
+        {
+            return "Usage: coop.debug.mapevent.join_existing <mapEventId> <Attacker|Defender>";
+        }
+
+        if (PlayerEncounter.Current != null)
+            return "A player encounter is already active.";
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(args[0], out var mapEvent))
+            return $"Unable to resolve map event {args[0]}.";
+        if (mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None)
+            return $"Map event {args[0]} is already concluded.";
+
+        var opposingParty = mapEvent.GetLeaderParty(
+            side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
+        if (opposingParty == null)
+            return $"Map event {args[0]} has no opposing leader party.";
+
+        if (side == BattleSideEnum.Attacker)
+            EncounterManager.StartPartyEncounter(MobileParty.MainParty.Party, opposingParty);
+        else
+            EncounterManager.StartPartyEncounter(opposingParty, MobileParty.MainParty.Party);
+
+        return $"Started the {side} join encounter for map event {args[0]}.";
     }
 
     /// <summary>

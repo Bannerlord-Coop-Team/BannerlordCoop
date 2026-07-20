@@ -181,8 +181,21 @@ internal class MapEventCreationCoordinator : IHandler
             return;
         }
 
-        if (TryHandleExistingMapEventRequest(request, attacker, defender, requestingParty, out var existingMapEventId))
+        if (TryHandleExistingMapEventRequest(
+                request,
+                attacker,
+                defender,
+                requestingParty,
+                out var existingMapEventId,
+                out var joinedExistingBattle))
         {
+            if (joinedExistingBattle)
+            {
+                messageBroker.Publish(
+                    requestingPeer,
+                    new BattleJoinAccepted(existingMapEventId, player.ControllerId));
+            }
+
             SendCreatedReply(requestingPeer, request, existingMapEventId);
             return;
         }
@@ -251,9 +264,11 @@ internal class MapEventCreationCoordinator : IHandler
         PartyBase attacker,
         PartyBase defender,
         MobileParty requestingParty,
-        out string mapEventId)
+        out string mapEventId,
+        out bool joinedExistingBattle)
     {
         mapEventId = null;
+        joinedExistingBattle = false;
         var attackerSide = attacker.MapEventSide;
         var defenderSide = defender.MapEventSide;
         if (attackerSide == null && defenderSide == null)
@@ -284,7 +299,7 @@ internal class MapEventCreationCoordinator : IHandler
             return true;
 
         joiningParty.MapEventSide = joiningSide;
-        objectManager.TryGetIdWithLogging(mapEvent, out mapEventId);
+        joinedExistingBattle = objectManager.TryGetIdWithLogging(mapEvent, out mapEventId);
         return true;
     }
 
