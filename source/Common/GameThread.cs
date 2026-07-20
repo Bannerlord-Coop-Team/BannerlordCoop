@@ -326,4 +326,16 @@ public class GameThread : IUpdateable
     {
         m_GameLoopThreadId = Thread.CurrentThread.ManagedThreadId;
     }
+
+    /// <summary>
+    /// Clears the game-loop thread registration. A thread that was marked via
+    /// <see cref="MarkGameThread"/> must call this before it exits: .NET recycles managed thread
+    /// ids, so a registration left behind by a dead thread can silently promote an unrelated
+    /// future thread to "game thread", flipping <see cref="Run(Action, bool, string, string, string)"/>
+    /// from queueing to inline execution.
+    /// </summary>
+    public void UnmarkGameThread()
+    {
+        m_GameLoopThreadId = 0;
+    }
 }
