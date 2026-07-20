@@ -71,11 +71,15 @@ namespace Missions.Agents.Packets
             agent.MovementFlags = movementFlags | GetDefendMovementFlags(defendFlags);
         }
 
-        internal static void ApplyGuardState(Agent agent, Agent.GuardMode guardMode)
+        internal static void ApplyGuardState(
+            Agent agent,
+            Agent.GuardMode guardMode,
+            bool force = false)
         {
             if (IsGuardMode(guardMode))
             {
-                agent.SetWeaponGuard(GuardModeToUsageDirection(guardMode));
+                if (force || agent.CurrentGuardMode != guardMode)
+                    agent.SetWeaponGuard(GuardModeToUsageDirection(guardMode));
                 return;
             }
 
