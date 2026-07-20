@@ -6,6 +6,7 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -16,6 +17,7 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -159,6 +161,97 @@ Releases the given player hero from captivity.";
                 $"Failed to release hero '{GetHeroDisplayName(hero)}'",
                 ex);
         }
+    }
+
+    private const string LiberatePrisonerUsage =
+@"Usage:
+  coop.debug.player_captivity.liberate_prisoner <heroId>
+
+Example:
+  coop.debug.player_captivity.liberate_prisoner lord_1_29
+
+Runs the client-side rescued-prisoner liberation consequence for the given hero.";
+
+    [CommandLineArgumentFunction("liberate_prisoner", "coop.debug.player_captivity")]
+    public static string LiberatePrisoner(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run coop.debug.player_captivity.liberate_prisoner on a client.";
+
+        var ctx = new CommandContext(
+            "liberate_prisoner",
+            LiberatePrisonerUsage,
+            args);
+
+        if (!ctx.RequireArgCount(1, out var error))
+            return error;
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to liberate hero: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to liberate hero: " + error;
+
+        if (!hero.IsPrisoner)
+            return $"Hero '{GetHeroDisplayName(hero)}' is not a prisoner.";
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<LordConversationsCampaignBehavior>();
+        if (behavior == null)
+            return $"Unable to find {nameof(LordConversationsCampaignBehavior)}.";
+
+        try
+        {
+            MessageBroker.Instance.Publish(
+                behavior,
+                new PrisonerLiberationAttempted(hero));
+            EndCaptivityAction.ApplyByReleasedAfterBattle(hero);
+            return $"Liberated '{GetHeroDisplayName(hero)}' after battle.";
+        }
+        catch (Exception ex)
+        {
+            return CommandHelpers.FormatException(
+                $"Failed to liberate hero '{GetHeroDisplayName(hero)}'",
+                ex);
+        }
+    }
+
+    private const string PrisonerStatusUsage =
+@"Usage:
+  coop.debug.player_captivity.status <heroId>
+
+Example:
+  coop.debug.player_captivity.status lord_1_29
+
+Reports the hero's current captivity state on this process.";
+
+    [CommandLineArgumentFunction("status", "coop.debug.player_captivity")]
+    public static string PrisonerStatus(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "status",
+            PrisonerStatusUsage,
+            args);
+
+        if (!ctx.RequireArgCount(1, out var error))
+            return error;
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to inspect hero: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to inspect hero: " + error;
+
+        var captor = hero.PartyBelongedToAsPrisoner?.MobileParty?.StringId ?? "none";
+        return
+            $"Hero: {GetHeroDisplayName(hero)} ({hero.StringId})\n" +
+            $"IsPrisoner: {hero.IsPrisoner}\n" +
+            $"Captor: {captor}";
     }
 
     private const string DiscardPlayerFromPartyScreenUsage =
