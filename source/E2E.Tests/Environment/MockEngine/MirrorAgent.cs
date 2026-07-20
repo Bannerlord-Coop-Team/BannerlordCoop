@@ -55,17 +55,6 @@ public sealed class MirrorAgent
     public int SetActionChannelCalls { get; set; }
     public int LastSetActionChannel { get; set; } = -1;
     public float LastSetActionBlendInPeriod { get; set; }
-    public bool UseVisualSkeleton { get; set; }
-    public int SkeletonAction0Index { get; set; } = -1;
-    public int SkeletonAction1Index { get; set; } = -1;
-    public int SkeletonAnimation0Index { get; set; } = -1;
-    public int SkeletonAnimation1Index { get; set; } = -1;
-    public bool HideSkeletonAnimationIndex { get; set; }
-    public float SkeletonAction0Parameter { get; set; }
-    public float SkeletonAction1Parameter { get; set; }
-    public int SetSkeletonActionChannelCalls { get; set; }
-    public int LastSetSkeletonActionChannel { get; set; } = -1;
-    public float LastSetSkeletonActionParameter { get; set; }
     public Agent.MovementControlFlag DefendMovementFlag { get; set; }
     public int SetWeaponGuardCalls { get; set; }
     public int ResetGuardCalls { get; set; }

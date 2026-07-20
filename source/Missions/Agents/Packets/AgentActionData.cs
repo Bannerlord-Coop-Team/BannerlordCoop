@@ -42,7 +42,7 @@ namespace Missions.Agents.Packets
         {
             Agent.MovementControlFlag defendFlags =
                 GetDefendMovementFlags(agent.MovementFlags);
-            if (defendFlags != Agent.MovementControlFlag.None || !agent.HasMount)
+            if (defendFlags != Agent.MovementControlFlag.None)
                 return defendFlags;
 
             Agent.ActionCodeType action0Type = agent.GetCurrentActionType(0);
@@ -50,13 +50,16 @@ namespace Missions.Agents.Packets
             if (!IsDefendingAction(action0Type) && !IsDefendingAction(action1Type))
                 return Agent.MovementControlFlag.None;
 
-            // Mounted guards can outlive the frame's defend flags, so recompute them while the action is active.
+            // Guard actions can outlive the frame's defend flags, so recompute them while the action is active.
             defendFlags = GetDefendMovementFlags(agent.GetDefendMovementFlag());
             if (defendFlags != Agent.MovementControlFlag.None)
                 return defendFlags;
 
-            // Directionless guard actions still need held defend input on the puppet.
-            return Agent.MovementControlFlag.DefendBlock;
+            // Mounted directionless guards still need held defend input on the puppet. On foot, a lingering
+            // release animation must not synthesize a fresh block after native input has cleared.
+            return agent.HasMount
+                ? Agent.MovementControlFlag.DefendBlock
+                : Agent.MovementControlFlag.None;
         }
 
         internal static void ApplyDefendMovementFlags(

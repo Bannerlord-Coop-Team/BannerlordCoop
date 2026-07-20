@@ -653,18 +653,12 @@ public sealed class MissionEngineFixture : IDisposable
             m.Action0Index = actionIndexCache.Index;
             m.Action0Flags = additionalFlags;
             m.Action0Progress = startProgress;
-            m.SkeletonAction0Index = actionIndexCache.Index;
-            m.SkeletonAnimation0Index = actionIndexCache.Index;
-            m.SkeletonAction0Parameter = startProgress;
         }
         else
         {
             m.Action1Index = actionIndexCache.Index;
             m.Action1Flags = additionalFlags;
             m.Action1Progress = startProgress;
-            m.SkeletonAction1Index = actionIndexCache.Index;
-            m.SkeletonAnimation1Index = actionIndexCache.Index;
-            m.SkeletonAction1Parameter = startProgress;
         }
 
         m.SetActionChannelCalls++;

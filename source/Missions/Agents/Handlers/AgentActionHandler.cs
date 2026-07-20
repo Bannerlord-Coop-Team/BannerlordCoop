@@ -183,17 +183,11 @@ public class AgentActionHandler : IAgentActionHandler
                 new AgentActionData(agent, defendFlags, guardMode));
             (sequences ??= new List<long>()).Add(sequence);
 
-            if (defendChanged || guardChanged)
+            if ((wasGuarding || isGuarding)
+                && agent == Mission.Current?.MainAgent)
             {
                 try
                 {
-                    if (!(wasGuarding || isGuarding)
-                        || agent != Mission.Current?.MainAgent
-                        || !agent.HasMount)
-                    {
-                        continue;
-                    }
-
                     var snapshot = new
                     {
                         RawDefend = AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
