@@ -157,6 +157,11 @@ public class MapEventDebugCommands
             return $"Player {args[0]} is already in a map event.";
         }
 
+        if (playerParty.CurrentSettlement != null)
+        {
+            LeaveSettlementAction.ApplyForParty(playerParty);
+        }
+
         var playerPosition = playerParty.Position.ToVec2();
         var banditParty = MobileParty.All
             .Where(p => p.IsActive && p.IsBandit && p != playerParty
