@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
@@ -82,7 +82,7 @@ public class OverloadedPeerManagerTests
     public void LoadingPeer_DoesNotPauseTime()
     {
         // Arrange — a joining peer mid save-transfer: its queue is legitimately flooded by the
-        // multi-MB transfer save, and time is already locked for it by the loading-players pause.
+        // multi-MB transfer save and should not trigger normal live-peer backpressure.
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var manager = serverComponent.Container.Resolve<IOverloadedPeerManager>();
@@ -90,10 +90,6 @@ public class OverloadedPeerManagerTests
         var peer = AddConnectedPeer(connections);
         connections.ConnectionStates[peer].SetState<Coop.Core.Server.Connections.States.TransferSaveState>();
         peer.SetQueueLength(AbovePauseThreshold);
-
-        // Entering the transfer state pauses time itself (the loading lock); clear that recorded
-        // call so the assertion sees only what the overload manager does.
-        timeControlMock.Invocations.Clear();
 
         // Act
         manager.CheckForOverloadedPeers();
