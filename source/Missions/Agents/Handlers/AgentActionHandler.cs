@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
@@ -7,7 +6,6 @@ using GameInterface.Services.Entity;
 using LiteNetLib;
 using Missions.Agents.Packets;
 using Missions.Messages;
-using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
@@ -44,8 +42,6 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<AgentActionHandler>();
-
     // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
     private const int MaxAgentsPerActionPacket = 8;
 
@@ -144,12 +140,6 @@ public class AgentActionHandler : IAgentActionHandler
                 guardChanged = AgentActionData.IsGuardMode(guardMode);
             }
 
-            bool wasGuarding = hadState
-                && (state.DefendFlags != Agent.MovementControlFlag.None
-                    || AgentActionData.IsGuardMode(state.GuardMode));
-            bool isGuarding = defendFlags != Agent.MovementControlFlag.None
-                || AgentActionData.IsGuardMode(guardMode);
-
             if (hadState && state.Action0 == action0 && state.Action1 == action1
                 && !defendChanged && !guardChanged)
                 continue;
@@ -182,52 +172,6 @@ public class AgentActionHandler : IAgentActionHandler
             (actions ??= new List<AgentActionData>()).Add(
                 new AgentActionData(agent, defendFlags, guardMode));
             (sequences ??= new List<long>()).Add(sequence);
-
-            if ((wasGuarding || isGuarding)
-                && agent == Mission.Current?.MainAgent)
-            {
-                try
-                {
-                    var snapshot = new
-                    {
-                        RawDefend = AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
-                        NativeDefend = AgentActionData.GetDefendMovementFlags(agent.GetDefendMovementFlag()),
-                        EffectiveDefend = defendFlags,
-                        Guard = guardMode,
-                        CurrentGuard = agent.CurrentGuardMode,
-                        ControllerType = agent.Controller,
-                        MountIndex = agent.MountAgent?.Index ?? -1,
-                        MainHand = agent.GetPrimaryWieldedItemIndex(),
-                        OffHand = agent.GetOffhandWieldedItemIndex(),
-                        Action0 = new
-                        {
-                            Index = action0,
-                            Type = agent.GetCurrentActionType(0),
-                            Stage = agent.GetCurrentActionStage(0),
-                            Direction = agent.GetCurrentActionDirection(0),
-                            Progress = agent.GetCurrentActionProgress(0)
-                        },
-                        Action1 = new
-                        {
-                            Index = action1,
-                            Type = agent.GetCurrentActionType(1),
-                            Stage = agent.GetCurrentActionStage(1),
-                            Direction = agent.GetCurrentActionDirection(1),
-                            Progress = agent.GetCurrentActionProgress(1)
-                        }
-                    };
-                    Logger.Debug(
-                        "[AgentActionTrace] SEND controller {ControllerId}, agent {AgentId}, sequence {Sequence}: {@Snapshot}",
-                        controllerIdProvider.ControllerId,
-                        info.AgentId,
-                        sequence,
-                        snapshot);
-                }
-                catch (Exception exception)
-                {
-                    Logger.Debug(exception, "[AgentActionTrace] SEND snapshot failed for {AgentId}", info.AgentId);
-                }
-            }
         }
 
         if (ids == null) return;

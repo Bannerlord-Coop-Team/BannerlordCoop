@@ -1,17 +1,13 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Packets;
 using Missions.Messages;
 using Missions.Services.Network;
-using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -29,12 +25,13 @@ public interface IRemoteAgentActionProcessor : IDisposable
 
 public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<RemoteAgentActionProcessor>();
+    private const float RetainedGuardReleaseBlendPeriod = 0.4f;
 
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleHostRegistry battleHostRegistry;
     private readonly IMissionContext missionContext;
+    private readonly IAgentVisualActionAccessor agentVisualActionAccessor;
 
     // All receive-side state for one agent stays together so authority changes clear it atomically.
     private readonly Dictionary<Guid, RemoteAgentActionState> _agentStates =
@@ -58,10 +55,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public RemoteActionSequence? LastSequence;
         public Dictionary<string, RemoteAction> PendingByController;
         public MigratedActionAuthority? MigratedAuthority;
-        public RemoteGuardState? TraceState;
-        public bool TraceAfterReassert;
-        public bool TraceAfterNativeTick;
-        public bool TraceAfterDisplayReplay;
 
         public bool IsEmpty =>
             !RetainedGuard.HasValue
@@ -83,7 +76,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public readonly RemoteAction Action;
         public readonly int GuardActionChannel;
         public readonly ActionIndexCache GuardAction;
-        public readonly AnimFlags GuardActionFlags;
+        public readonly bool IsGuardActionCyclic;
         public float GuardActionProgress;
         public bool HasGuardCommand;
         public Agent.GuardMode LastCommandedGuardMode;
@@ -98,11 +91,13 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             Action = action;
             GuardActionChannel = guardActionChannel;
             GuardAction = guardAction;
-            GuardActionFlags = (AnimFlags)(guardActionChannel == 0
+            AnimFlags guardActionFlags = (AnimFlags)(guardActionChannel == 0
                 ? action.Data.Action0Flag
                 : guardActionChannel == 1
                     ? action.Data.Action1Flag
                     : 0UL);
+            IsGuardActionCyclic =
+                (guardActionFlags & AnimFlags.anf_cyclic) != 0;
             GuardActionProgress = guardActionChannel == 0
                 ? action.Data.Action0Progress
                 : action.Data.Action1Progress;
@@ -120,7 +115,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             Action = action;
             GuardActionChannel = retainedGuard.GuardActionChannel;
             GuardAction = retainedGuard.GuardAction;
-            GuardActionFlags = retainedGuard.GuardActionFlags;
+            IsGuardActionCyclic = retainedGuard.IsGuardActionCyclic;
             GuardActionProgress = retainedGuard.GuardActionProgress;
             HasGuardCommand = retainedGuard.HasGuardCommand;
             LastCommandedGuardMode = retainedGuard.LastCommandedGuardMode;
@@ -200,12 +195,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IBattleHostRegistry battleHostRegistry,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        IAgentVisualActionAccessor agentVisualActionAccessor)
     {
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.battleHostRegistry = battleHostRegistry;
         this.missionContext = missionContext;
+        this.agentVisualActionAccessor = agentVisualActionAccessor;
     }
 
     public int GetOutgoingBattleHostEpoch()
@@ -243,18 +240,18 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (_disposed || Mission.Current == null) return;
 
         ApplyPendingRemoteActions();
-        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: false, dt: 0f);
+        ApplyRetainedRemoteGuardStates(replayGuardAction: false, dt: 0f);
     }
 
     public void ReassertRemoteDefendStates(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
-        ApplyRetainedRemoteGuardStates(traceAfterNativeTick: true, dt: dt);
+        ApplyRetainedRemoteGuardStates(replayGuardAction: true, dt: dt);
     }
 
     private void ApplyRetainedRemoteGuardStates(
-        bool traceAfterNativeTick,
+        bool replayGuardAction,
         float dt)
     {
         if (_disposed || Mission.Current == null) return;
@@ -267,16 +264,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             {
                 if (!_agentStates.TryGetValue(
                     agentId,
-                    out RemoteAgentActionState state))
-                {
-                    (staleIds ??= new List<Guid>()).Add(agentId);
-                    continue;
-                }
-
-                bool hasRetainedGuard = state.RetainedGuard.HasValue;
-                bool hasPendingTrace = state.TraceAfterNativeTick
-                    && state.TraceState.HasValue;
-                if (!hasRetainedGuard && !hasPendingTrace)
+                    out RemoteAgentActionState state)
+                    || !state.RetainedGuard.HasValue)
                 {
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
@@ -295,35 +284,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
                 {
                     (staleIds ??= new List<Guid>()).Add(agentId);
-                    continue;
-                }
-
-                bool traceDisplayReplay = traceAfterNativeTick
-                    && hasPendingTrace
-                    && hasRetainedGuard
-                    && !state.TraceAfterDisplayReplay;
-                if (traceAfterNativeTick && hasPendingTrace)
-                {
-                    RemoteGuardState traceState = state.TraceState.Value;
-                    LogGuardSnapshot(
-                        state.TraceAfterDisplayReplay
-                            ? "AFTER_DISPLAY_NATIVE_TICK"
-                            : "NEXT_PRE_TICK",
-                        agentId,
-                        traceState,
-                        agent);
-                    state.TraceAfterNativeTick = false;
-                    if (!traceDisplayReplay)
-                    {
-                        state.TraceState = null;
-                        state.TraceAfterDisplayReplay = false;
-                    }
-                }
-
-                if (!hasRetainedGuard)
-                {
-                    if (traceAfterNativeTick)
-                        (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
 
@@ -350,46 +310,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
                 ApplyRetainedGuardCommand(agent, ref guardState);
 
-                bool guardReplayed = false;
-                if (traceAfterNativeTick)
+                if (replayGuardAction)
                 {
-                    guardReplayed = ReplayRetainedGuardAction(
+                    ReplayRetainedGuardAction(
                         agent,
                         dt,
                         ref guardState);
                 }
                 state.RetainedGuard = guardState;
-
-                if (traceDisplayReplay && guardReplayed)
-                {
-                    LogGuardSnapshot(
-                        "AFTER_DISPLAY_REPLAY",
-                        agentId,
-                        state.TraceState.Value,
-                        agent);
-                    state.TraceAfterNativeTick = true;
-                    state.TraceAfterDisplayReplay = true;
-                }
-                else if (traceDisplayReplay)
-                {
-                    state.TraceState = null;
-                    state.TraceAfterDisplayReplay = false;
-                }
-
-                if (state.TraceAfterReassert)
-                {
-                    RemoteGuardState traceState =
-                        state.TraceState ?? guardState;
-                    LogGuardSnapshot(
-                        "AFTER_REASSERT",
-                        agentId,
-                        traceState,
-                        agent);
-                    state.TraceAfterReassert = false;
-                    state.TraceAfterNativeTick = true;
-                    state.TraceAfterDisplayReplay = false;
-                    state.TraceState = traceState;
-                }
             }
         }
 
@@ -401,10 +329,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 continue;
 
             state.RetainedGuard = null;
-            state.TraceState = null;
-            state.TraceAfterReassert = false;
-            state.TraceAfterNativeTick = false;
-            state.TraceAfterDisplayReplay = false;
             RemoveAgentStateIfEmpty(agentId, state);
         }
     }
@@ -727,24 +651,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (removePendingBeforeApply)
             RemovePendingRemoteAction(agentId, action);
 
-        bool hadRetainedGuard = _agentStates.TryGetValue(
+        _agentStates.TryGetValue(
             agentId,
-            out RemoteAgentActionState existingState)
-            && existingState.RetainedGuard.HasValue;
+            out RemoteAgentActionState existingState);
         bool retainsGuard = action.Data.DefendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(action.Data.GuardMode);
-        bool tracePlayerGuard = (hadRetainedGuard || retainsGuard)
-            && ShouldTracePlayerHero(agent);
-
-        if (tracePlayerGuard
-            && existingState?.TraceState.HasValue == true)
-        {
-            LogGuardSnapshot(
-                "SUPERSEDED_BEFORE_NEXT_PRE_TICK",
-                agentId,
-                existingState.TraceState.Value,
-                agent);
-        }
 
         action.Data.Apply(agent);
         int guardActionChannel = -1;
@@ -784,28 +695,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         UpdateRemoteGuardState(
             agentId,
             appliedGuardState,
-            agent,
-            tracePlayerGuard);
-
-        if (tracePlayerGuard)
-        {
-            LogGuardSnapshot(
-                "AFTER_PACKET_APPLY",
-                agentId,
-                appliedGuardState,
-                agent);
-
-            if (!retainsGuard)
-            {
-                RemoteAgentActionState traceAgentState =
-                    GetOrCreateAgentState(agentId);
-                traceAgentState.TraceState = appliedGuardState;
-                traceAgentState.TraceAfterReassert = false;
-                traceAgentState.TraceAfterNativeTick = true;
-                traceAgentState.TraceAfterDisplayReplay = false;
-                _retainedGuardAgentIds.Add(agentId);
-            }
-        }
+            agent);
 
         return RemoteActionApplyResult.Applied;
     }
@@ -851,8 +741,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private void UpdateRemoteGuardState(
         Guid agentId,
         RemoteGuardState guardState,
-        Agent agent,
-        bool tracePlayerGuard)
+        Agent agent)
     {
         Agent.MovementControlFlag defendFlags = guardState.Action.Data.DefendFlags;
         Agent.GuardMode guardMode = guardState.Action.Data.GuardMode;
@@ -862,37 +751,18 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         {
             RemoteAgentActionState retainedState = GetOrCreateAgentState(agentId);
             retainedState.RetainedGuard = guardState;
-            if (tracePlayerGuard)
-            {
-                retainedState.TraceState = retainedState.RetainedGuard;
-                retainedState.TraceAfterReassert = true;
-                retainedState.TraceAfterNativeTick = false;
-                retainedState.TraceAfterDisplayReplay = false;
-            }
             _retainedGuardAgentIds.Add(agentId);
             return;
         }
 
-        bool preservePendingTrace = false;
         RemoteGuardState? releasedGuard = null;
         if (_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
         {
             releasedGuard = state.RetainedGuard;
-            preservePendingTrace = !tracePlayerGuard
-                && state.TraceAfterNativeTick
-                && state.TraceState.HasValue;
             state.RetainedGuard = null;
-            if (!preservePendingTrace)
-            {
-                state.TraceState = null;
-                state.TraceAfterReassert = false;
-                state.TraceAfterNativeTick = false;
-                state.TraceAfterDisplayReplay = false;
-            }
             RemoveAgentStateIfEmpty(agentId, state);
         }
-        if (!preservePendingTrace)
-            _retainedGuardAgentIds.Remove(agentId);
+        _retainedGuardAgentIds.Remove(agentId);
         ClearRemoteDefendState(agent, releasedGuard);
     }
 
@@ -946,7 +816,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         && actionType != Agent.ActionCodeType.Idle
         && !AgentActionData.IsDefendingAction(actionType);
 
-    private static bool ReplayRetainedGuardAction(
+    private void ReplayRetainedGuardAction(
         Agent agent,
         float dt,
         ref RemoteGuardState guardState)
@@ -955,10 +825,16 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (agent.Controller != AgentControllerType.None
             || channel < 0
             || channel > 1
-            || guardState.GuardAction == ActionIndexCache.act_none
-            || HasInterruptingGuardAction(agent))
+            || guardState.GuardAction == ActionIndexCache.act_none)
         {
-            return false;
+            return;
+        }
+
+        if (HasInterruptingGuardAction(agent))
+        {
+            // An interrupt on the other channel must not leave our presentation-only guard layered over it.
+            ClearRetainedGuardAction(agent, guardState);
+            return;
         }
 
         ActionIndexCache currentAction = agent.GetCurrentAction(channel);
@@ -969,7 +845,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 guardState.GuardActionProgress =
                     agent.GetCurrentActionProgress(channel);
             }
-            return false;
+            return;
         }
 
         float duration = MBActionSet.GetActionAnimationDuration(
@@ -978,7 +854,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (dt > 0f && duration > 0f)
         {
             guardState.GuardActionProgress += dt / duration;
-            if ((guardState.GuardActionFlags & AnimFlags.anf_cyclic) != 0)
+            if (guardState.IsGuardActionCyclic)
             {
                 guardState.GuardActionProgress -=
                     (float)Math.Floor(guardState.GuardActionProgress);
@@ -991,18 +867,16 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             }
         }
 
-        // Native can clear a puppet guard before display, so restore only its retained clip.
-        agent.SetActionChannel(
+        // Native can clear a puppet guard before display. Advance its visual clip and blend
+        // immediately before the display snapshot; the next native Agent tick can clear it again.
+        agentVisualActionAccessor.AdvanceActionIfAvailable(
+            agent,
             channel,
             guardState.GuardAction,
-            additionalFlags: guardState.GuardActionFlags,
-            blendInPeriod: 0f,
-            startProgress: guardState.GuardActionProgress,
-            forceFaceMorphRestart: false);
-        return true;
+            guardState.GuardActionProgress);
     }
 
-    private static void ClearRetainedGuardAction(
+    private void ClearRetainedGuardAction(
         Agent agent,
         RemoteGuardState? retainedGuard)
     {
@@ -1012,155 +886,31 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         int channel = guardState.GuardActionChannel;
         if (channel < 0 || channel > 1) return;
 
-        // Only clear the action this retained guard owns; leave reactions and attacks alone.
-        if (agent.GetCurrentAction(channel) != guardState.GuardAction)
+        ActionIndexCache currentAction = agent.GetCurrentAction(channel);
+        bool ownsAgentAction = currentAction == guardState.GuardAction;
+        if (!ownsAgentAction && currentAction != ActionIndexCache.act_none)
             return;
 
+        if (!ownsAgentAction
+            && !agentVisualActionAccessor.IsActionVisible(
+                agent,
+                channel,
+                guardState.GuardAction))
+        {
+            return;
+        }
+
+        // Only clear the action this retained guard owns; leave reactions and attacks alone.
         agent.SetActionChannel(
             channel,
             ActionIndexCache.act_none,
             ignorePriority: true,
+            additionalFlags: AnimFlags.anf_restart,
+            blendInPeriod: RetainedGuardReleaseBlendPeriod,
             forceFaceMorphRestart: false);
     }
 
-    private static bool ShouldTracePlayerHero(Agent agent)
-    {
-        try
-        {
-            return agent?.Character is CharacterObject character
-                && character.HeroObject?.IsPlayerHero() == true;
-        }
-        catch (Exception exception)
-        {
-            Logger.Debug(
-                exception,
-                "[AgentActionTrace] Player hero filter failed");
-            return false;
-        }
-    }
-
-    private static void LogGuardSnapshot(
-        string phase,
-        Guid agentId,
-        RemoteGuardState expected,
-        Agent agent)
-    {
-        try
-        {
-            LogGuardSnapshotCore(phase, agentId, expected, agent);
-        }
-        catch (Exception exception)
-        {
-            Logger.Debug(
-                exception,
-                "[AgentActionTrace] {Phase} snapshot failed for {AgentId}",
-                phase,
-                agentId);
-        }
-    }
-
-    private static void LogGuardSnapshotCore(
-        string phase,
-        Guid agentId,
-        RemoteGuardState expected,
-        Agent agent)
-    {
-        ActionIndexCache action0 = agent.GetCurrentAction(0);
-        ActionIndexCache action1 = agent.GetCurrentAction(1);
-        Agent mount = agent.MountAgent;
-
-        object skeleton0 = null;
-        object skeleton1 = null;
-        try
-        {
-            var visuals = agent.AgentVisuals;
-            var skeleton = !ReferenceEquals(visuals, null) && visuals.IsValid()
-                ? visuals.GetSkeleton()
-                : null;
-            if (!ReferenceEquals(skeleton, null))
-            {
-                skeleton0 = new
-                {
-                    Action = skeleton.GetActionAtChannel(0).Index,
-                    AnimationIndex = skeleton.GetAnimationIndexAtChannel(0),
-                    Animation = skeleton.GetAnimationAtChannel(0),
-                    Parameter = skeleton.GetAnimationParameterAtChannel(0)
-                };
-                skeleton1 = new
-                {
-                    Action = skeleton.GetActionAtChannel(1).Index,
-                    AnimationIndex = skeleton.GetAnimationIndexAtChannel(1),
-                    Animation = skeleton.GetAnimationAtChannel(1),
-                    Parameter = skeleton.GetAnimationParameterAtChannel(1)
-                };
-            }
-        }
-        catch (Exception exception)
-        {
-            skeleton0 = exception.GetType().Name;
-            skeleton1 = exception.GetType().Name;
-        }
-
-        var snapshot = new
-        {
-            Expected = new
-            {
-                Defend = expected.Action.Data.DefendFlags,
-                Guard = expected.Action.Data.GuardMode,
-                Channel = expected.GuardActionChannel,
-                Action = expected.GuardAction.Index,
-                Flags = (ulong)expected.GuardActionFlags
-            },
-            Actual = new
-            {
-                Defend = AgentActionData.GetDefendMovementFlags(agent.MovementFlags),
-                NativeDefend = AgentActionData.GetDefendMovementFlags(agent.GetDefendMovementFlag()),
-                Guard = agent.CurrentGuardMode
-            },
-            Agent = new
-            {
-                Controller = agent.Controller,
-                MountIndex = mount?.Index ?? -1,
-                RiderLinked = ReferenceEquals(mount?.RiderAgent, agent),
-                MainHand = agent.GetPrimaryWieldedItemIndex(),
-                OffHand = agent.GetOffhandWieldedItemIndex()
-            },
-            Action0 = new
-            {
-                Index = action0.Index,
-                Type = agent.GetCurrentActionType(0),
-                Stage = agent.GetCurrentActionStage(0),
-                Direction = agent.GetCurrentActionDirection(0),
-                Progress = agent.GetCurrentActionProgress(0),
-                Flags = (ulong)agent.GetCurrentAnimationFlag(0),
-                Weight = agent.GetActionChannelWeight(0),
-                CurrentWeight = agent.GetActionChannelCurrentActionWeight(0)
-            },
-            Action1 = new
-            {
-                Index = action1.Index,
-                Type = agent.GetCurrentActionType(1),
-                Stage = agent.GetCurrentActionStage(1),
-                Direction = agent.GetCurrentActionDirection(1),
-                Progress = agent.GetCurrentActionProgress(1),
-                Flags = (ulong)agent.GetCurrentAnimationFlag(1),
-                Weight = agent.GetActionChannelWeight(1),
-                CurrentWeight = agent.GetActionChannelCurrentActionWeight(1)
-            },
-            Skeleton0 = skeleton0,
-            Skeleton1 = skeleton1
-        };
-        Logger.Debug(
-            "[AgentActionTrace] {Phase} controller {ControllerId}, agent {AgentId}, sequence {Sequence}, epoch {BattleHostEpoch}: {@Snapshot}",
-            phase,
-            expected.Action.ControllerId,
-            agentId,
-            expected.Action.Sequence,
-            expected.Action.BattleHostEpoch,
-            snapshot);
-    }
-
-    private static void ClearRemoteDefendState(
+    private void ClearRemoteDefendState(
         Agent agent,
         RemoteGuardState? retainedGuard = null)
     {

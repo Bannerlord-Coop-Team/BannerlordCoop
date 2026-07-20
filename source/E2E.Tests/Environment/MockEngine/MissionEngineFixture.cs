@@ -733,12 +733,24 @@ public sealed class MissionEngineFixture : IDisposable
             m.Action0Index = actionIndexCache.Index;
             m.Action0Flags = additionalFlags;
             m.Action0Progress = startProgress;
+            if (m.HasVisualSkeleton)
+            {
+                m.SkeletonAction0Index = actionIndexCache.Index;
+                m.RawVisualAction0Index = -1;
+                m.RawVisualAction0Progress = 0f;
+            }
         }
         else
         {
             m.Action1Index = actionIndexCache.Index;
             m.Action1Flags = additionalFlags;
             m.Action1Progress = startProgress;
+            if (m.HasVisualSkeleton)
+            {
+                m.SkeletonAction1Index = actionIndexCache.Index;
+                m.RawVisualAction1Index = -1;
+                m.RawVisualAction1Progress = 0f;
+            }
         }
 
         m.SetActionChannelCalls++;
