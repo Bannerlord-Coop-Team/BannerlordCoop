@@ -163,7 +163,6 @@ public class ServerSettlementExitEnterHandler : IHandler
         {
             return;
         }
-
         network.SendAll(new NetworkPartyLeaveSettlement(
             Compact(mobilePartyId, typeof(MobileParty))));
 

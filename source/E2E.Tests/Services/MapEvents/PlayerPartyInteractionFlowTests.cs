@@ -1571,7 +1571,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 responderPartyId,
                 initiatorPartyId,
                 forcePlayerOutFromSettlement: false,
-                ConversationRestartSource.PlayerEncounter)),
+                ConversationRestartSource.PlayerEncounter,
+                false)),
             disabledMethods);
     }
 
@@ -1598,7 +1599,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 responderParty,
                 initiatorParty,
                 forcePlayerOutFromSettlement: false,
-                ConversationRestartSource.PlayerEncounter));
+                ConversationRestartSource.PlayerEncounter, 
+                armyTalkEncounter: true));
         });
     }
 
