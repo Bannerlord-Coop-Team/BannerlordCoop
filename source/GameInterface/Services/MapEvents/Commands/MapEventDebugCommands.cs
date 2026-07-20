@@ -12,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -168,7 +169,7 @@ public class MapEventDebugCommands
             return "No active bandit/looter party found on the map.";
         }
 
-        EncounterManager.StartPartyEncounter(banditParty.Party, playerParty.Party);
+        StartBattleAction.Apply(banditParty.Party, playerParty.Party);
 
         var partyId = objectManager.TryGetId(banditParty, out string registryId)
             ? registryId
