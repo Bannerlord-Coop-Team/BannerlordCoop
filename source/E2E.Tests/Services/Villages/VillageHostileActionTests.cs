@@ -2642,7 +2642,8 @@ public class VillageHostileActionTests : MapEventTestBase
             defenderPartyId,
             attackerPartyId,
             forcePlayerOutFromSettlement: false,
-            ConversationRestartSource.PlayerEncounter)));
+            ConversationRestartSource.PlayerEncounter,
+            false)));
     }
 
     private void RequestHostileAction(
