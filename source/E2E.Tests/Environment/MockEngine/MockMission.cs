@@ -20,6 +20,7 @@ public sealed class MockMission
     public Mission Shell { get; }
 
     public Agent MainAgent { get; set; }
+    public bool EndMissionCalled { get; set; }
 
     /// <summary>Per-side teams, returned by the <c>Mission.AttackerTeam</c>/<c>DefenderTeam</c> shims so the
     /// reinforcement spawn (which resolves the team by side) can field troops into them headless.</summary>

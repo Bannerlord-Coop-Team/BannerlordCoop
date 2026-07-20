@@ -79,11 +79,14 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         var lootedItems = new Dictionary<MapEventParty, ItemRoster>();
         var lootedMembers = new Dictionary<MapEventParty, TroopRoster>();
         var lootedPrisoners = new Dictionary<MapEventParty, TroopRoster>();
+        var networkLootedItems = networkPlayerLootData.LootedItems ?? new();
+        var networkLootedMembers = networkPlayerLootData.LootedMembers ?? new();
+        var networkLootedPrisoners = networkPlayerLootData.LootedPrisoners ?? new();
 
         GameThread.RunSafe(() =>
         {
             // Pack looted items
-            foreach (var playerLootedItems in networkPlayerLootData.LootedItems)
+            foreach (var playerLootedItems in networkLootedItems)
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedItems.Key, out var mapEventParty)) continue;
 
@@ -95,7 +98,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             }
 
             // Pack looted members (prisoners freed from defeated party)
-            foreach (var playerLootedMembers in networkPlayerLootData.LootedMembers)
+            foreach (var playerLootedMembers in networkLootedMembers)
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedMembers.Key, out var mapEventParty)) continue;
 
@@ -110,7 +113,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             }
 
             // Pack looted prisoners (troops taken prisoner from defeated party)
-            foreach (var playerLootedPrisoners in networkPlayerLootData.LootedPrisoners)
+            foreach (var playerLootedPrisoners in networkLootedPrisoners)
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedPrisoners.Key, out var mapEventParty)) continue;
 
