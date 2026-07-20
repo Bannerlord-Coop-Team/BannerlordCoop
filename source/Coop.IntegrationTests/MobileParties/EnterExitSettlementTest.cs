@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Settlements.Interfaces;
 using Moq;
@@ -13,6 +14,10 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.MobileParties
 {
+    // Shares the serialized game-thread collection: every test that marks a game thread must be
+    // serialized against the others, or two concurrently marked threads overwrite the single
+    // process-wide registration.
+    [Collection(KingdomSyncGameThreadCollection.Name)]
     public class EnterExitSettlementTest
     {
         internal TestEnvironment TestEnvironment { get; }
@@ -25,8 +30,8 @@ namespace Coop.IntegrationTests.MobileParties
         /// <summary>
         /// The enter/exit handlers marshal the ISettlementInterface call onto the game thread. The test
         /// environment never runs a game-loop pump, so run the simulation on a thread marked as the game
-        /// thread — <see cref="GameThread.Run"/> then executes inline. A dedicated thread is used so the
-        /// marking is never left on the test-runner thread (which xUnit reuses across tests).
+        /// thread — <see cref="GameThread.Run"/> then executes inline. A dedicated thread is used, and the
+        /// mark is cleared before the thread exits, so the registration never outlives the test.
         /// </summary>
         private static void RunOnGameThread(Action act)
         {
@@ -39,6 +44,13 @@ namespace Coop.IntegrationTests.MobileParties
                     act();
                 }
                 catch (Exception e) { captured = e; }
+                finally
+                {
+                    // The registration must not outlive this thread: managed thread ids are recycled,
+                    // so a stale mark would make an unrelated later test thread run GameThread actions
+                    // inline (observed as order-dependent CI failures in unrelated tests).
+                    GameThread.Instance.UnmarkGameThread();
+                }
             });
             thread.Start();
             thread.Join();
