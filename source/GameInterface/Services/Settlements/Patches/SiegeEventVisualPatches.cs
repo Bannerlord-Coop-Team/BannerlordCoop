@@ -1,23 +1,48 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.Settlements.Patches;
 
 /// <summary>
-/// Refreshes the settlement map visual when its SiegeEvent reference changes. Vanilla dirties the
-/// visual in SiegeEventManager.StartSiegeEvent, FinalizeSiegeEvent, and the siege tick, which never
-/// run on clients, so the synced setter apply is the only place a client learns the siege camp
-/// appeared or went away. The siege/civilian scene level mask is separate from the visual dirty flag;
-/// without recalculating it, siege-only slot parents can stay hidden even after preparation completes.
+/// Refreshes client settlement presentation when its synced SiegeEvent reference changes. Vanilla dirties the
+/// map visual and raises the nameplate events only in server-side siege lifecycle paths, so the client setter
+/// apply must recreate those presentation side effects.
 /// </summary>
 [HarmonyPatch(typeof(Settlement))]
 internal class SiegeEventVisualPatches
 {
     [HarmonyPatch(nameof(Settlement.SiegeEvent), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static void SetSiegeEventPrefix(Settlement __instance, out SiegeEvent __state)
+    {
+        __state = __instance.SiegeEvent;
+    }
+
+    [HarmonyPatch(nameof(Settlement.SiegeEvent), MethodType.Setter)]
     [HarmonyPostfix]
-    private static void SetSiegeEventPostfix(Settlement __instance)
+    private static void SetSiegeEventPostfix(Settlement __instance, SiegeEvent value, SiegeEvent __state)
     {
         __instance.Party?.SetLevelMaskIsDirty();
         __instance.Party?.SetVisualAsDirty();
+
+        if (ModInformation.IsServer || __state == value) return;
+
+        var nameplate = MapScreen.Instance?
+            .GetMapView<GauntletMapSettlementNameplateView>()?
+            ._dataSource?
+            .GetNameplateOfSettlement(__instance);
+
+        if (value == null)
+        {
+            nameplate?.OnSiegeEventEndedOnSettlement(__state);
+        }
+        else
+        {
+            nameplate?.OnSiegeEventStartedOnSettlement(value);
+        }
     }
 }
