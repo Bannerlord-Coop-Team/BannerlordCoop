@@ -45,4 +45,18 @@ internal class DefaultPartySizeLimitModelPatches
         // If not a player caravan, calculate using regular logic
         return true;
     }
+
+    [HarmonyPatch(nameof(DefaultPartySizeLimitModel.GetInitialPartySizeRatioForMobileParty))]
+    [HarmonyPrefix]
+    public static bool GetInitialPartySizeRatioForMobilePartyPrefix(ref float __result, MobileParty party, PartyTemplateObject partyTemplate)
+    {
+        // Override result if player caravan
+        if (party.IsCaravan && party.Owner != null && party.Owner.IsPlayerHero())
+        {
+            __result = 1f;
+            return false;
+        }
+
+        return true;
+    }
 }
