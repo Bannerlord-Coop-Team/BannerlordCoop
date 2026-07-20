@@ -10,7 +10,12 @@ public interface IAgentPositionInterpolator
     void SetRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection);
 
     /// <summary>Record the latest target frame the owner reported for a mounted rider puppet.</summary>
-    void SetMountedRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection, Vec3 mountSnapPosition);
+    void SetMountedRiderTarget(
+        Agent agent,
+        Vec3 targetPosition,
+        Vec2 riderMovementDirection,
+        Vec2 mountMovementDirection,
+        Vec3 mountSnapPosition);
 
     /// <summary>Record the latest target frame the owner reported for a mount puppet (wider tolerances).</summary>
     void SetMountTarget(Agent mountAgent, Vec3 targetPosition, Vec2 movementDirection);
@@ -45,6 +50,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     // Exponential ease rate for the mounted-puppet position follow: fraction MountedFollowRate*dt of the gap is
     // closed each frame, so it tracks the owner with a small lag and settles when the owner stops.
     private const float MountedFollowRate = 12f;
+    private const float MountedPositionEpsilon = 0.0001f;
 
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     // Reused scratch list so eviction doesn't allocate every tick.
@@ -54,19 +60,42 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     public void SetRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection)
     {
         if (agent == null) return;
-        _targets[agent] = new TargetFrame(targetPosition, movementDirection, hasMountSnapPosition: false, Vec3.Zero, elapsed);
+        _targets[agent] = new TargetFrame(
+            targetPosition,
+            movementDirection,
+            hasMountSnapPosition: false,
+            Vec3.Zero,
+            mountedRiderMovementDirection: Vec2.Zero,
+            updatedAt: elapsed);
     }
 
-    public void SetMountedRiderTarget(Agent agent, Vec3 targetPosition, Vec2 movementDirection, Vec3 mountSnapPosition)
+    public void SetMountedRiderTarget(
+        Agent agent,
+        Vec3 targetPosition,
+        Vec2 riderMovementDirection,
+        Vec2 mountMovementDirection,
+        Vec3 mountSnapPosition)
     {
         if (agent == null) return;
-        _targets[agent] = new TargetFrame(targetPosition, movementDirection, hasMountSnapPosition: true, mountSnapPosition, elapsed);
+        _targets[agent] = new TargetFrame(
+            targetPosition,
+            mountMovementDirection,
+            hasMountSnapPosition: true,
+            mountSnapPosition,
+            riderMovementDirection,
+            elapsed);
     }
 
     public void SetMountTarget(Agent mountAgent, Vec3 targetPosition, Vec2 movementDirection)
     {
         if (mountAgent == null) return;
-        _targets[mountAgent] = new TargetFrame(targetPosition, movementDirection, hasMountSnapPosition: false, Vec3.Zero, elapsed);
+        _targets[mountAgent] = new TargetFrame(
+            targetPosition,
+            movementDirection,
+            hasMountSnapPosition: false,
+            Vec3.Zero,
+            mountedRiderMovementDirection: Vec2.Zero,
+            updatedAt: elapsed);
     }
 
     public void Forget(Agent agent)
@@ -143,11 +172,20 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
         Vec3 mountTarget = target.HasMountSnapPosition ? target.MountSnapPosition : target.Position;
         Vec3 cur = mount.Position;
+        float distance = cur.Distance(mountTarget);
+        if (distance <= MountedPositionEpsilon)
+        {
+            return;
+        }
+
         float alpha = System.Math.Min(1f, MountedFollowRate * dt);
-        Vec3 next = cur.Distance(mountTarget) > MountSnapDistance ? mountTarget : cur + ((mountTarget - cur) * alpha);
+        Vec3 next = distance > MountSnapDistance ? mountTarget : cur + ((mountTarget - cur) * alpha);
 
         mount.TeleportToPosition(next);
         mount.SetMovementDirection(target.MovementDirection);
+        // Teleporting a horse rewrites its rider's movement direction from the rider look direction. Put the
+        // owner's direction back in the same frame so the puppet does not flip on every correction.
+        rider.SetMovementDirection(target.MountedRiderMovementDirection);
     }
 
     private static Vec3 ResolveDirection(Agent agent, TargetFrame target)
@@ -175,6 +213,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 target.MovementDirection,
                 hasMountSnapPosition: false,
                 Vec3.Zero,
+                target.MountedRiderMovementDirection,
                 target.UpdatedAt));
         }
         else
@@ -189,12 +228,19 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
     private struct TargetFrame
     {
-        public TargetFrame(Vec3 position, Vec2 movementDirection, bool hasMountSnapPosition, Vec3 mountSnapPosition, float updatedAt)
+        public TargetFrame(
+            Vec3 position,
+            Vec2 movementDirection,
+            bool hasMountSnapPosition,
+            Vec3 mountSnapPosition,
+            Vec2 mountedRiderMovementDirection,
+            float updatedAt)
         {
             Position = position;
             MovementDirection = movementDirection;
             HasMountSnapPosition = hasMountSnapPosition;
             MountSnapPosition = mountSnapPosition;
+            MountedRiderMovementDirection = mountedRiderMovementDirection;
             UpdatedAt = updatedAt;
         }
 
@@ -202,6 +248,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         public Vec2 MovementDirection { get; }
         public bool HasMountSnapPosition { get; }
         public Vec3 MountSnapPosition { get; }
+        public Vec2 MountedRiderMovementDirection { get; }
         public float UpdatedAt { get; }
     }
 }
