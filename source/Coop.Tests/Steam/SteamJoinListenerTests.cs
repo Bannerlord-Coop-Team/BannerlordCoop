@@ -223,6 +223,51 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void OwnLobby_LeaveSessionLobbyKeepsSteamMembership()
+        {
+            SetupLobby(42, address: null, serverSteamId: 76561198000000042);
+            api.UserSteamId = api.LobbyOwner;
+
+            api.RaiseLobbyJoinRequested(42);
+            listener.LeaveSessionLobby();
+
+            Assert.Single(resolved);
+            Assert.Empty(failed);
+            Assert.False(listener.IsInLobby);
+            // Leaving as the lobby's owning account would empty the lobby and Steam would
+            // destroy it, delisting the dedicated server this client just connected to.
+            Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
+        public void OwnLobby_StaysEvenWhenJoinInfoIsRejected()
+        {
+            api.UserSteamId = api.LobbyOwner;
+
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Empty(resolved);
+            Assert.Single(failed);
+            Assert.False(listener.IsInLobby);
+            Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
+        public void PromotedToLobbyOwnerAfterAdvertiserLeft_LeaveSessionLobbyStillLeaves()
+        {
+            SetupLobby(42);
+            api.RaiseLobbyJoinRequested(42);
+
+            // Server shutdown disconnects clients before withdrawing the lobby; Steam
+            // promotes this client to owner before its teardown runs on the game thread.
+            api.LobbyOwner = api.UserSteamId;
+            listener.LeaveSessionLobby();
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
         public void DirectOnlyLobby_ResolvesWithoutHostSteamId()
         {
             SetupLobby(42, version: SessionJoinInfo.MinTunnelVersion - 1);

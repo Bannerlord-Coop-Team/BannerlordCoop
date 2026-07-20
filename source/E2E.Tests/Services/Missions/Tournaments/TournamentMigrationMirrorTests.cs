@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using E2E.Tests.Environment.MockEngine;
 using Missions.Tournaments;
 using TaleWorlds.Core;
@@ -28,6 +28,8 @@ public class TournamentMigrationMirrorTests : MissionTestEnvironment
             Agent rider = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Agent mount = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
+            mountMirror.MaximumSpeedLimit = 0f;
 
             MethodInfo wakeTransferredAgent = typeof(CoopTournamentController).GetMethod(
                 "WakeTransferredAgent",
@@ -36,9 +38,10 @@ public class TournamentMigrationMirrorTests : MissionTestEnvironment
             wakeTransferredAgent.Invoke(controller, new object[] { rider });
 
             Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
-            Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
             Assert.Equal(AgentControllerType.AI, riderMirror.Controller);
             Assert.Equal(AgentControllerType.AI, mountMirror.Controller);
+            Assert.Equal(-1f, mountMirror.MaximumSpeedLimit);
+            Assert.Equal(1, mountMirror.SetMaximumSpeedLimitCalls);
         });
     }
 }

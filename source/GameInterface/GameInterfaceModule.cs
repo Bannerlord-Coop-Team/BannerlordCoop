@@ -15,6 +15,7 @@ using GameInterface.Services.LiveTesting;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
@@ -49,6 +50,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
+        builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<PrisonerSaleValidator>().As<IPrisonerSaleValidator>().InstancePerDependency();
