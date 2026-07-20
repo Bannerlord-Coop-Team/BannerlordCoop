@@ -14,6 +14,7 @@ using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -45,6 +46,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
+        builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().InstancePerLifetimeScope();

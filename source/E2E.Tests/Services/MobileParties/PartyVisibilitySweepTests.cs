@@ -2,6 +2,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.MobileParties;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
@@ -87,11 +88,76 @@ public class PartyVisibilitySweepTests : IDisposable
             nearParty._isVisible = true;
             farParty._isVisible = true;
 
-            PartyVisibilitySweep.RebuildAroundMainParty();
+            new PartyVisibilitySweep().RebuildAroundMainParty();
 
             Assert.True(mainParty.IsVisible);
             Assert.True(nearParty.IsVisible);
             Assert.False(farParty.IsVisible);
+        });
+    }
+
+    [Fact]
+    public void RebuildAroundMainParty_HidesAttachedFollowerSweptBeforeItsLeader()
+    {
+        // Arrange
+        string? mainPartyId = null;
+        string? leaderPartyId = null;
+        string? followerPartyId = null;
+
+        Server.Call(() =>
+        {
+            // The follower is created (and therefore enumerated) before its leader — the order in
+            // which a single in-order pass would copy the leader's stale pre-sweep visibility.
+            var followerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var leaderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var mainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+
+            Assert.True(Server.ObjectManager.TryGetId(followerParty, out followerPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(leaderParty, out leaderPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(mainParty, out mainPartyId));
+        });
+
+        // Act + Assert
+        Client.Call(() =>
+        {
+            EnsureMapVisibilityModel();
+
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(mainPartyId, out var mainParty));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(leaderPartyId, out var leaderParty));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(followerPartyId, out var followerParty));
+
+            // The scenario under test only exists while the campaign list enumerates the follower
+            // before its leader.
+            var mobileParties = Campaign.Current.MobileParties;
+            Assert.True(mobileParties.IndexOf(followerParty) < mobileParties.IndexOf(leaderParty));
+
+            // Wire the army relation directly, bypassing the Army constructor and coop army sync:
+            // the sweep only reads Army.LeaderParty and the leader's AttachedParties.
+            var army = (Army)FormatterServices.GetUninitializedObject(typeof(Army));
+            army.LeaderParty = leaderParty;
+            leaderParty._army = army;
+            followerParty._army = army;
+            leaderParty._attachedParties = new MBList<MobileParty> { followerParty };
+
+            mainParty._position = LandPosition(100f, 100f);
+            leaderParty._position = LandPosition(600f, 100f);   // distance 500, far outside seeing range 50
+            followerParty._position = LandPosition(600f, 100f);
+            mainParty.IsActive = true;
+            leaderParty.IsActive = true;
+            followerParty.IsActive = true;
+            Campaign.Current.MainParty = mainParty;
+
+            // A joining client loads the server's save, where every party was forced visible.
+            mainParty._isVisible = true;
+            leaderParty._isVisible = true;
+            followerParty._isVisible = true;
+
+            new PartyVisibilitySweep().RebuildAroundMainParty();
+
+            Assert.False(leaderParty.IsVisible);
+            // Attached parties copy their army leader's visibility, so the follower must be swept
+            // after the leader's own visibility was recomputed.
+            Assert.False(followerParty.IsVisible);
         });
     }
 

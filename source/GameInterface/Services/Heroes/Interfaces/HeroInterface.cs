@@ -40,16 +40,18 @@ internal class HeroInterface : IHeroInterface
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
+    private readonly IPartyVisibilitySweep partyVisibilitySweep;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IPartyVisibilitySweep partyVisibilitySweep)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.objectManager = objectManager;
+        this.partyVisibilitySweep = partyVisibilitySweep;
     }
 
     public byte[] PackageMainHero()
@@ -160,7 +162,7 @@ internal class HeroInterface : IHeroInterface
         // (Campaign.GameInitTick only runs for new campaigns), so distant parties and their battle
         // icons would stay revealed forever. Queued so it runs once the campaign state is entered
         // and the hero switched to above is the local main party.
-        GameThread.RunSafe(PartyVisibilitySweep.RebuildAroundMainParty);
+        GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
     }
 
     private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
