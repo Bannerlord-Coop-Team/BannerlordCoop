@@ -11,7 +11,6 @@ using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Instances;
-using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Time;
@@ -47,9 +46,6 @@ public class ServerModule : CommonModule
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
         builder.RegisterType<SendCoalescer>().As<ISendCoalescer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
-        builder.RegisterType<JoinCampaignBaselineSender>()
-            .As<IJoinCampaignBaselineSender>()
-            .InstancePerDependency();
 
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.

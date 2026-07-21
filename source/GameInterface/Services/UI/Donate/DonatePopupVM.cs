@@ -22,6 +22,7 @@ public class DonatePopupVM : ViewModel
     public string PayPalButtonText => "PayPal";
     public string BuyMeACoffeeButtonText => "Buy a Coffee";
     public string IfdianButtonText => "ifdian";
+    public string BoostyButtonText => "Boosty";
     public string CloseButtonText => "Close";
 
     public void ActionPayPal()
@@ -37,6 +38,11 @@ public class DonatePopupVM : ViewModel
     public void ActionIfdian()
     {
         System.Diagnostics.Process.Start("https://ifdian.net/a/BannerlordCoop");
+    }
+
+    public void ActionBoosty()
+    {
+        System.Diagnostics.Process.Start("https://boosty.to/bannerlordcoop/donate");
     }
 
     public void ActionClose()
