@@ -181,6 +181,36 @@ public class MapEventDebugCommands
                $"against player {args[0]}.";
     }
 
+    [CommandLineArgumentFunction("leave_settlement", "coop.debug.mapevent")]
+    public static string LeaveSettlement(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.leave_settlement <controllerId>";
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return "Unable to resolve PlayerManager";
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+            return $"No registered player has controller id {args[0]}.";
+
+        if (!playerManager.IsConnected(player))
+            return $"Player {args[0]} is not connected.";
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+            return $"Unable to resolve player party {player.MobilePartyId}.";
+
+        var settlement = playerParty.CurrentSettlement;
+        if (settlement == null)
+            return $"Player {args[0]} is already outside a settlement.";
+
+        LeaveSettlementAction.ApplyForParty(playerParty);
+        return $"Moved player {args[0]} out of {settlement.Name}.";
+    }
+
     [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
     public static string EnterCurrentBattle(List<string> args)
     {
