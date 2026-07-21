@@ -1,24 +1,190 @@
 ﻿using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Utils.Commands;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.InputSystem;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
 
 /// <summary>
-/// Battle-outcome test commands: kill one enemy, the whole enemy team, or the local player team in the current
-/// battle mission. Run the direct kill commands on the battle-authority client because it owns the AI/enemy
+/// Battle fixture commands for deployment, scoreboard inspection, mission exit, and combat outcomes. Run the
+/// direct kill commands on the battle-authority client because it owns the AI/enemy
 /// agents, so each kill goes through the coop death path: <c>Agent.Die</c>, the mission death callback,
 /// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.mapevent.kms</c>.
 /// </summary>
 internal class BattleTeamKillCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
+
+    private const string FinishDeploymentUsage =
+@"Usage:
+  coop.debug.mapevent.finish_deployment
+
+Finishes the current battle deployment through the native deployment handler.";
+
+    [CommandLineArgumentFunction("finish_deployment", "coop.debug.mapevent")]
+    public static string FinishDeployment(List<string> args)
+    {
+        var ctx = new CommandContext("finish_deployment", FinishDeploymentUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+            return "No active deployment.";
+        if (!deploymentController.TeamSetupOver)
+            return "Failed: deployment team setup is not complete.";
+
+        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+        if (deploymentHandler == null)
+            return "Failed: no deployment handler.";
+
+        deploymentHandler.FinishDeployment();
+        return "Finished the current deployment.";
+    }
+
+    private const string ToggleScoreboardUsage =
+@"Usage:
+  coop.debug.mapevent.toggle_scoreboard
+
+Holds or releases the configured scoreboard binding through the native input path.";
+
+    [CommandLineArgumentFunction("toggle_scoreboard", "coop.debug.mapevent")]
+    public static string ToggleScoreboard(List<string> args)
+    {
+        var ctx = new CommandContext("toggle_scoreboard", ToggleScoreboardUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var scoreboard = mission.GetMissionBehavior<MissionGauntletBattleScore>();
+        if (scoreboard?.DataSource == null)
+            return "Failed: no battle scoreboard UI.";
+
+        var scoreboardHold = mission.GetMissionBehavior<ScoreboardHoldBehavior>();
+        if (scoreboardHold == null)
+        {
+            var holdShow = HotKeyManager.GetCategory(ScoreboardHotKeyCategory.CategoryId)
+                ?.GetHotKey(ScoreboardHotKeyCategory.HoldShow);
+            var key = holdShow?.Keys.FirstOrDefault(candidate => candidate.IsKeyboardInput || candidate.IsMouseButtonInput);
+            if (key == null)
+                return "Failed: the scoreboard has no configured keyboard or mouse binding.";
+
+            mission.AddMissionBehavior(new ScoreboardHoldBehavior(key.InputKey));
+            Input.PressKey(key.InputKey);
+            return $"Holding the configured scoreboard binding ({key.InputKey}).";
+        }
+
+        mission.RemoveMissionBehavior(scoreboardHold);
+        return "Released the configured scoreboard binding.";
+    }
+
+    private const string ScoreboardStateUsage =
+@"Usage:
+  coop.debug.mapevent.scoreboard_state
+
+Lists the player parties and party rows currently loaded by the battle scoreboard.";
+
+    [CommandLineArgumentFunction("scoreboard_state", "coop.debug.mapevent")]
+    public static string ScoreboardState(List<string> args)
+    {
+        var ctx = new CommandContext("scoreboard_state", ScoreboardStateUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var scoreboard = mission.GetMissionBehavior<MissionGauntletBattleScore>();
+        var dataSource = scoreboard?.DataSource;
+        if (dataSource == null)
+            return "Failed: no battle scoreboard UI.";
+
+        var mapEvent = MobileParty.MainParty?.MapEvent;
+        if (mapEvent == null)
+            return "Failed: the main party has no current map event.";
+
+        var expectedParties = mapEvent.InvolvedParties
+            .Where(party => party != null)
+            .Distinct()
+            .ToArray();
+        var expectedPlayerParties = expectedParties
+            .Where(party => party.MobileParty?.IsPlayerParty() == true)
+            .ToArray();
+        if (expectedPlayerParties.Length == 0)
+            return "Failed: the current map event has no registered player parties.";
+        var scoreboardParties = dataSource.Attackers.Parties
+            .Concat(dataSource.Defenders.Parties)
+            .Select(party => party.BattleCombatant)
+            .OfType<PartyBase>()
+            .Distinct()
+            .ToArray();
+        var missingPlayerParties = expectedPlayerParties.Except(scoreboardParties).ToArray();
+
+        return $"Visible: {dataSource.ShowScoreboard}; " +
+               $"Expected player parties ({expectedPlayerParties.Length}): {FormatPartyNames(expectedPlayerParties)}; " +
+               $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
+               $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}";
+    }
+
+    private static string FormatPartyNames(IEnumerable<PartyBase> parties)
+    {
+        var names = parties.Select(party => party.Name?.ToString() ?? "<unnamed>").ToArray();
+        return names.Length == 0 ? "<none>" : string.Join(", ", names);
+    }
+
+    private sealed class ScoreboardHoldBehavior : MissionLogic
+    {
+        private readonly InputKey inputKey;
+
+        public ScoreboardHoldBehavior(InputKey inputKey)
+        {
+            this.inputKey = inputKey;
+        }
+
+        public override void OnMissionTick(float dt)
+        {
+            base.OnMissionTick(dt);
+            Input.PressKey(inputKey);
+        }
+    }
+
+    private const string LeaveBattleUsage =
+@"Usage:
+  coop.debug.mapevent.leave_battle
+
+Leaves the current battle through the native mission lifecycle.";
+
+    [CommandLineArgumentFunction("leave_battle", "coop.debug.mapevent")]
+    public static string LeaveBattle(List<string> args)
+    {
+        var ctx = new CommandContext("leave_battle", LeaveBattleUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        mission.EndMission();
+        return "Left the current battle mission.";
+    }
 
     private const string KillEnemyUsage =
 @"Usage:

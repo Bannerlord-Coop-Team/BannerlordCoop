@@ -4,6 +4,8 @@ using Common.Logging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -13,6 +15,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 using GameInterface.Services.SiegeEngines;
@@ -92,6 +95,96 @@ public class SiegeDebugCommand
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
 
         return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}";
+    }
+
+    /// <summary>
+    /// Joins every connected player party to an active siege on the authoritative server.
+    /// </summary>
+    [CommandLineArgumentFunction("join_players", "coop.debug.siege")]
+    public static string JoinPlayers(List<string> args)
+    {
+        if (args.Count != 2 || !int.TryParse(args[1], out int expectedPlayerCount) || expectedPlayerCount < 1)
+        {
+            return "Usage: coop.debug.siege.join_players <settlementId> <expectedPlayerCount>";
+        }
+
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be used by the server";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            || !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)
+            || !ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+        {
+            return "Unable to resolve siege fixture services";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var camp = settlement.SiegeEvent?.BesiegerCamp;
+        if (camp == null)
+        {
+            return $"{settlement.Name} is not under siege";
+        }
+
+        var connectedPlayers = playerManager.Players.Where(playerManager.IsConnected).ToArray();
+        if (connectedPlayers.Length != expectedPlayerCount)
+        {
+            return $"Expected {expectedPlayerCount} connected players, found {connectedPlayers.Length}";
+        }
+
+        var parties = new List<(string ControllerId, string PartyId, MobileParty Party)>();
+        foreach (var player in connectedPlayers)
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+            {
+                return $"Unable to resolve player party {player.MobilePartyId}";
+            }
+
+            if (!party.IsActive || party.MapEvent != null || party.BesiegerCamp != null || party.CurrentSettlement != null)
+            {
+                return $"Player {player.ControllerId} is not clean for the fixture: " +
+                    $"active={party.IsActive} mapEvent={party.MapEvent != null} " +
+                    $"besiegerCamp={party.BesiegerCamp != null} settlement={party.CurrentSettlement?.StringId ?? "none"}";
+            }
+
+            if (!settlement.SiegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Attacker))
+            {
+                return $"Player {player.ControllerId} cannot join the attacking side at {settlement.Name}";
+            }
+
+            parties.Add((player.ControllerId, player.MobilePartyId, party));
+        }
+
+        for (int i = 0; i < parties.Count; i++)
+        {
+            for (int j = i + 1; j < parties.Count; j++)
+            {
+                if (parties[i].Party.MapFaction.IsAtWarWith(parties[j].Party.MapFaction))
+                {
+                    return $"Players {parties[i].ControllerId} and {parties[j].ControllerId} cannot join the same siege side";
+                }
+            }
+        }
+
+        var joined = new List<string>();
+        foreach (var item in parties)
+        {
+            siegeEventInterface.JoinSiegeCamp(item.Party, settlement);
+            if (item.Party.BesiegerCamp != camp)
+            {
+                return $"Failed to join player {item.ControllerId} to the siege";
+            }
+
+            joined.Add($"{item.ControllerId}:{item.PartyId}");
+        }
+
+        return $"Joined {joined.Count} connected player parties to the siege of {settlement.Name}:\n" +
+            string.Join(Environment.NewLine, joined);
     }
 
     /// <summary>
@@ -357,9 +450,16 @@ public class SiegeDebugCommand
             }
             else if (missionObject is TaleWorlds.MountAndBlade.DeploymentPoint deploymentPoint)
             {
+                var variants = deploymentPoint._weapons?
+                    .Where(weapon => weapon != null)
+                    .ToArray() ?? Array.Empty<TaleWorlds.MountAndBlade.SynchedMissionObject>();
+                var deployedWeapon = deploymentPoint.DeployedWeapon;
                 lines.Add($"point   {deploymentPoint.Id.Id:D5} {deploymentPoint.Side,-16}" +
                     $" disabled={(deploymentPoint.IsDisabled ? 1 : 0)} deployed={(deploymentPoint.IsDeployed ? 1 : 0)}" +
-                    $" weapon={deploymentPoint.DeployedWeapon?.GetType().Name ?? "none"} deployable={deploymentPoint.DeployableWeapons.Count()}");
+                    $" weapon={deployedWeapon?.GetType().Name ?? "none"}" +
+                    $" weaponId={(deployedWeapon != null ? deployedWeapon.Id.Id.ToString("D5") : "none")}" +
+                    $" weaponVisible={(deployedWeapon?.GameEntity.IsVisibleIncludeParents() == true ? 1 : 0)}" +
+                    $" variants={variants.Length} variantsVisible={variants.Count(weapon => weapon.GameEntity.IsVisibleIncludeParents())}");
             }
         }
 
