@@ -641,6 +641,27 @@ public class MapEventDebugCommands
         }
     }
 
+    /// <summary>Closes the current encounter conversation so vanilla can advance to battle choices.</summary>
+    [CommandLineArgumentFunction("complete_encounter_meeting", "coop.debug.mapevent")]
+    public static string CompleteEncounterMeeting(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client at the encounter meeting.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.complete_encounter_meeting";
+
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "encounter_meeting")
+            return "The encounter meeting is not active.";
+
+        var conversationManager = Campaign.Current.ConversationManager;
+        if (!conversationManager.IsConversationInProgress)
+            return "The encounter conversation is not active.";
+
+        conversationManager.EndConversation();
+        return "Encounter meeting completed.";
+    }
+
     /// <summary>Runs the encounter menu's mission or simulation consequence for automated battle testing.</summary>
     [CommandLineArgumentFunction("choose_battle_mode", "coop.debug.mapevent")]
     public static string ChooseBattleMode(List<string> args)
