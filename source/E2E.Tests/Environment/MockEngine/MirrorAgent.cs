@@ -21,6 +21,17 @@ public sealed class MirrorAgent
     public bool IsAiPaused { get; set; }
     public int DeathAction { get; set; } = -1;
     public Vec3 Position { get; set; }
+    public int TeleportToPositionCalls { get; set; }
+    public int SetTargetPositionAndDirectionCalls { get; set; }
+    public Vec2 LastTargetPosition { get; set; }
+    public Vec3 LastTargetDirection { get; set; }
+    public Vec3 RealGlobalVelocity { get; set; }
+    public float MaximumForwardUnlimitedSpeed { get; set; } = 5f;
+    public float MaximumSpeedLimit { get; set; } = -1f;
+    public int SetMaximumSpeedLimitCalls { get; set; }
+    public bool LastMaximumSpeedLimitIsMultiplier { get; set; }
+    public EquipmentIndex PrimaryWieldedItemIndex { get; set; } = EquipmentIndex.None;
+    public EquipmentIndex OffhandWieldedItemIndex { get; set; } = EquipmentIndex.None;
     public BasicCharacterObject Character { get; set; }
     public Team Team { get; set; }
     public Formation Formation { get; set; }
@@ -35,10 +46,38 @@ public sealed class MirrorAgent
     /// <summary>The mission this agent was spawned into (its mock's shell) — read by the movement apply path's
     /// <c>agent.Mission != Mission.Current</c> staleness guard.</summary>
     public Mission Mission { get; set; }
-    // Movement state carried by AgentData (capture reads these, apply writes them back on the puppet).
+    // Networked movement and action state captured from the engine.
     public Vec3 LookDirection { get; set; }
     public Vec2 MovementDirection { get; set; }
     public Vec2 InputVector { get; set; }
+    public Agent.MovementControlFlag MovementFlags { get; set; }
+    public Agent.EventControlFlag EventControlFlags { get; set; }
+    public bool CrouchMode { get; set; }
+    public Agent.GuardMode GuardMode { get; set; } = Agent.GuardMode.None;
+    public Agent.ActionCodeType Action0CodeType { get; set; } = Agent.ActionCodeType.Idle;
+    public Agent.ActionCodeType Action1CodeType { get; set; } = Agent.ActionCodeType.Idle;
+    public Agent.UsageDirection Action0Direction { get; set; } = Agent.UsageDirection.None;
+    public Agent.UsageDirection Action1Direction { get; set; } = Agent.UsageDirection.None;
+    public int Action0Index { get; set; } = -1;
+    public int Action1Index { get; set; } = -1;
+    public float Action0Progress { get; set; }
+    public float Action1Progress { get; set; }
+    public AnimFlags Action0Flags { get; set; }
+    public AnimFlags Action1Flags { get; set; }
+    public int SetActionChannelCalls { get; set; }
+    public int LastSetActionChannel { get; set; } = -1;
+    public float LastSetActionBlendInPeriod { get; set; }
+    public bool HasVisualSkeleton { get; set; }
+    public int SkeletonAction0Index { get; set; } = -1;
+    public int SkeletonAction1Index { get; set; } = -1;
+    public int RawVisualAction0Index { get; set; } = -1;
+    public int RawVisualAction1Index { get; set; } = -1;
+    public float RawVisualAction0Progress { get; set; }
+    public float RawVisualAction1Progress { get; set; }
+    public int AdvanceRawVisualActionCalls { get; set; }
+    public Agent.MovementControlFlag DefendMovementFlag { get; set; }
+    public int SetWeaponGuardCalls { get; set; }
+    public int ResetGuardCalls { get; set; }
 }
 
 /// <summary>

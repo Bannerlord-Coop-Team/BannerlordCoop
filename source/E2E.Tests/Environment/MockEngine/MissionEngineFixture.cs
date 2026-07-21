@@ -38,13 +38,23 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_MainAgent", nameof(Mission_get_MainAgent));
         Prefix(typeof(Mission), "set_MainAgent", nameof(Mission_set_MainAgent));
         Prefix(typeof(Mission), nameof(Mission.FindAgentWithIndex), nameof(Mission_FindAgentWithIndex));
+        Prefix(typeof(Mission), "get_Teams", nameof(Mission_get_Teams));
         // Per-side teams — the reinforcement spawn resolves the side's team to field a new party into.
         Prefix(typeof(Mission), "get_AttackerTeam", nameof(Mission_get_AttackerTeam));
         Prefix(typeof(Mission), "get_DefenderTeam", nameof(Mission_get_DefenderTeam));
+        Prefix(typeof(Mission), "get_AttackerAllyTeam", nameof(Mission_get_AttackerAllyTeam));
+        Prefix(typeof(Mission), "get_DefenderAllyTeam", nameof(Mission_get_DefenderAllyTeam));
         Prefix(typeof(Mission), "get_PlayerEnemyTeam", nameof(Mission_get_PlayerEnemyTeam));
         // The non-host retreat despawn filters the retreater's troops by the player team's side.
         Prefix(typeof(Mission), "get_PlayerTeam", nameof(Mission_get_PlayerTeam));
+        Prefix(typeof(Mission), "set_PlayerTeam", nameof(Mission_set_PlayerTeam));
         Prefix(typeof(Team), "get_Side", nameof(Team_get_Side));
+        harmony.Patch(
+            AccessTools.Method(typeof(Mission.TeamCollection), nameof(Mission.TeamCollection.Add), new[]
+            {
+                typeof(BattleSideEnum), typeof(uint), typeof(uint), typeof(Banner), typeof(bool), typeof(bool), typeof(bool),
+            }),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(MissionTeamCollection_Add))));
         // GetMissionBehavior<T> walks the mission's behavior list, which a skip-ctor shell doesn't have (NRE).
         // The spawn-capture and deployment paths probe for DeploymentMissionController — answer "none" for mock
         // missions. Reference-type instantiations share one method body, so patching this one covers them all.
@@ -61,6 +71,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Character", nameof(Agent_get_Character));
         Prefix(typeof(Agent), "get_Team", nameof(Agent_get_Team));
         Prefix(typeof(Agent), "get_Position", nameof(Agent_get_Position));
+        Prefix(typeof(Agent), "get_Equipment", nameof(Agent_get_Equipment));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
         // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
@@ -99,6 +110,8 @@ public sealed class MissionEngineFixture : IDisposable
         // headless and would poison the type for the whole process (a failed cctor is cached). Answer
         // "unresolved" (-1) instead so the cctor completes.
         Prefix(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName), nameof(MBAnimation_GetActionCodeWithName));
+        Prefix(typeof(Agent), "get_ActionSet", nameof(Agent_get_ActionSet));
+        Prefix(typeof(MBActionSet), nameof(MBActionSet.GetActionAnimationDuration), nameof(MBActionSet_GetActionAnimationDuration));
         // Standalone mount movement: a masterless horse's own AgentMountData capture/apply reads and writes
         // the movement natives, and the apply path's staleness guard compares agent.Mission to Mission.Current.
         Prefix(typeof(Agent), "get_Mission", nameof(Agent_get_Mission));
@@ -106,13 +119,32 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "set_LookDirection", nameof(Agent_set_LookDirection));
         Prefix(typeof(Agent), nameof(Agent.GetMovementDirection), nameof(Agent_GetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
+        Prefix(typeof(Agent), nameof(Agent.TeleportToPosition), nameof(Agent_TeleportToPosition));
+        Prefix(typeof(Agent), nameof(Agent.SetTargetPositionAndDirection), nameof(Agent_SetTargetPositionAndDirection));
+        Prefix(typeof(Agent), nameof(Agent.GetRealGlobalVelocity), nameof(Agent_GetRealGlobalVelocity));
+        Prefix(typeof(Agent), nameof(Agent.GetMaximumForwardUnlimitedSpeed), nameof(Agent_GetMaximumForwardUnlimitedSpeed));
+        Prefix(typeof(Agent), nameof(Agent.SetMaximumSpeedLimit), nameof(Agent_SetMaximumSpeedLimit));
+        Prefix(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(Agent_GetPrimaryWieldedItemIndex));
+        Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
-        // AgentMountData also snapshots action channel 1; report "no action" so capture works headless (the
-        // apply side's GetActionNameWithCode already returns null headless and skips SetActionChannel).
+        // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionDirection), nameof(Agent_GetCurrentActionDirection));
+        Prefix(typeof(Agent), nameof(Agent.GetDefendMovementFlag), nameof(Agent_GetDefendMovementFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetCurrentActionProgress), nameof(Agent_SetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetActionChannel), nameof(Agent_SetActionChannel));
+        Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
+        Prefix(typeof(Agent), "set_MovementFlags", nameof(Agent_set_MovementFlags));
+        Prefix(typeof(Agent), "get_EventControlFlags", nameof(Agent_get_EventControlFlags));
+        Prefix(typeof(Agent), "set_EventControlFlags", nameof(Agent_set_EventControlFlags));
+        Prefix(typeof(Agent), "get_CrouchMode", nameof(Agent_get_CrouchMode));
+        Prefix(typeof(Agent), "get_CurrentGuardMode", nameof(Agent_get_CurrentGuardMode));
+        Prefix(typeof(Agent), nameof(Agent.SetWeaponGuard), nameof(Agent_SetWeaponGuard));
+        Prefix(typeof(Agent), nameof(Agent.ResetGuard), nameof(Agent_ResetGuard));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
@@ -216,6 +248,13 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Mission_get_Teams(Mission __instance, ref Mission.TeamCollection __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.Teams;
+        return false;
+    }
+
     private static bool Mission_get_AttackerTeam(Mission __instance, ref Team __result)
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
@@ -227,6 +266,20 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         __result = mock.DefenderTeam.Shell;
+        return false;
+    }
+
+    private static bool Mission_get_AttackerAllyTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.AttackerAllyTeam?.Shell;
+        return false;
+    }
+
+    private static bool Mission_get_DefenderAllyTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DefenderAllyTeam?.Shell;
         return false;
     }
 
@@ -243,6 +296,23 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         __result = mock.PlayerTeam?.Shell;
+        return false;
+    }
+
+    private static bool Mission_set_PlayerTeam(Mission __instance, Team value)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        mock.PlayerTeam = value != null && MockTeam.ForShell(value, out var team) ? team : null;
+        return false;
+    }
+
+    private static bool MissionTeamCollection_Add(
+        Mission.TeamCollection __instance,
+        BattleSideEnum __0,
+        ref Team __result)
+    {
+        if (!TryActiveMock(out var mock) || !ReferenceEquals(__instance, mock.Teams)) return true;
+        __result = mock.AddTeam(__0);
         return false;
     }
 
@@ -307,6 +377,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         __result = m.Position;
+        return false;
+    }
+
+    private static bool Agent_get_Equipment(Agent __instance, ref MissionEquipment __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = null;
         return false;
     }
 
@@ -477,6 +554,19 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_get_ActionSet(Agent __instance, ref MBActionSet __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = MBActionSet.GetActionSetWithIndex(0);
+        return false;
+    }
+
+    private static bool MBActionSet_GetActionAnimationDuration(ref float __result)
+    {
+        __result = 1f;
+        return false;
+    }
+
     private static bool Agent_get_Mission(Agent __instance, ref Mission __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
@@ -512,6 +602,71 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_TeleportToPosition(Agent __instance, Vec3 position)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+
+        m.Position = position;
+        m.TeleportToPositionCalls++;
+        if (m.MountAgent != null && AgentMirror.TryGet(m.MountAgent, out var mount))
+            mount.Position = position;
+        if (m.RiderAgent != null && AgentMirror.TryGet(m.RiderAgent, out var rider))
+        {
+            rider.Position = position;
+            rider.MovementDirection = rider.LookDirection.AsVec2;
+        }
+        return false;
+    }
+
+    private static bool Agent_SetTargetPositionAndDirection(
+        Agent __instance,
+        ref Vec2 targetPosition,
+        ref Vec3 targetDirection)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetTargetPositionAndDirectionCalls++;
+        m.LastTargetPosition = targetPosition;
+        m.LastTargetDirection = targetDirection;
+        return false;
+    }
+
+    private static bool Agent_GetRealGlobalVelocity(Agent __instance, ref Vec3 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.RealGlobalVelocity;
+        return false;
+    }
+
+    private static bool Agent_GetMaximumForwardUnlimitedSpeed(Agent __instance, ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MaximumForwardUnlimitedSpeed;
+        return false;
+    }
+
+    private static bool Agent_SetMaximumSpeedLimit(Agent __instance, float __0, bool __1)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.MaximumSpeedLimit = __0;
+        m.LastMaximumSpeedLimitIsMultiplier = __1;
+        m.SetMaximumSpeedLimitCalls++;
+        return false;
+    }
+
+    private static bool Agent_GetPrimaryWieldedItemIndex(Agent __instance, ref EquipmentIndex __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.PrimaryWieldedItemIndex;
+        return false;
+    }
+
+    private static bool Agent_GetOffhandWieldedItemIndex(Agent __instance, ref EquipmentIndex __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.OffhandWieldedItemIndex;
+        return false;
+    }
+
     private static bool Agent_get_MovementInputVector(Agent __instance, ref Vec2 __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
@@ -526,24 +681,196 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_GetCurrentAction(Agent __instance, ref ActionIndexCache __result)
+    private static bool Agent_GetCurrentAction(
+        Agent __instance,
+        int channelNo,
+        ref ActionIndexCache __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = ActionIndexCache.act_none; // safe: the MBAnimation shim above lets the cctor complete
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = new ActionIndexCache(
+            channelNo == 0 ? m.Action0Index : m.Action1Index);
         return false;
     }
 
-    private static bool Agent_GetCurrentAnimationFlag(Agent __instance, ref AnimFlags __result)
+    private static bool Agent_GetCurrentActionType(
+        Agent __instance,
+        int channelNo,
+        ref Agent.ActionCodeType __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = 0;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            __result = m.Action0CodeType;
+        }
+        else
+        {
+            __result = m.Action1CodeType;
+        }
         return false;
     }
 
-    private static bool Agent_GetCurrentActionProgress(Agent __instance, ref float __result)
+    private static bool Agent_GetCurrentActionDirection(
+        Agent __instance,
+        int channelNo,
+        ref Agent.UsageDirection __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = 0f;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            __result = m.Action0Direction;
+        }
+        else
+        {
+            __result = m.Action1Direction;
+        }
+        return false;
+    }
+
+    private static bool Agent_GetDefendMovementFlag(
+        Agent __instance,
+        ref Agent.MovementControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.DefendMovementFlag;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentAnimationFlag(
+        Agent __instance,
+        int channelNo,
+        ref AnimFlags __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Flags : m.Action1Flags;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentActionProgress(
+        Agent __instance,
+        int channelNo,
+        ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Progress : m.Action1Progress;
+        return false;
+    }
+
+    private static bool Agent_SetCurrentActionProgress(
+        Agent __instance,
+        int channelNo,
+        float progress)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+            m.Action0Progress = progress;
+        else
+            m.Action1Progress = progress;
+        return false;
+    }
+
+    private static bool Agent_SetActionChannel(
+        Agent __instance,
+        int channelNo,
+        ref ActionIndexCache actionIndexCache,
+        AnimFlags additionalFlags,
+        float blendInPeriod,
+        float startProgress,
+        ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            m.Action0Index = actionIndexCache.Index;
+            m.Action0Flags = additionalFlags;
+            m.Action0Progress = startProgress;
+            if (m.HasVisualSkeleton)
+            {
+                m.SkeletonAction0Index = actionIndexCache.Index;
+                m.RawVisualAction0Index = -1;
+                m.RawVisualAction0Progress = 0f;
+            }
+        }
+        else
+        {
+            m.Action1Index = actionIndexCache.Index;
+            m.Action1Flags = additionalFlags;
+            m.Action1Progress = startProgress;
+            if (m.HasVisualSkeleton)
+            {
+                m.SkeletonAction1Index = actionIndexCache.Index;
+                m.RawVisualAction1Index = -1;
+                m.RawVisualAction1Progress = 0f;
+            }
+        }
+
+        m.SetActionChannelCalls++;
+        m.LastSetActionChannel = channelNo;
+        m.LastSetActionBlendInPeriod = blendInPeriod;
+        __result = true;
+        return false;
+    }
+
+    private static bool Agent_get_MovementFlags(Agent __instance, ref Agent.MovementControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MovementFlags;
+        return false;
+    }
+
+    private static bool Agent_set_MovementFlags(Agent __instance, Agent.MovementControlFlag value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.MovementFlags = value;
+        return false;
+    }
+
+    private static bool Agent_get_EventControlFlags(Agent __instance, ref Agent.EventControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.EventControlFlags;
+        return false;
+    }
+
+    private static bool Agent_set_EventControlFlags(Agent __instance, Agent.EventControlFlag value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.EventControlFlags = value;
+        return false;
+    }
+
+    private static bool Agent_get_CrouchMode(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.CrouchMode;
+        return false;
+    }
+
+    private static bool Agent_get_CurrentGuardMode(Agent __instance, ref Agent.GuardMode __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.GuardMode;
+        return false;
+    }
+
+    private static bool Agent_SetWeaponGuard(Agent __instance, Agent.UsageDirection direction)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetWeaponGuardCalls++;
+        switch (direction)
+        {
+            case Agent.UsageDirection.AttackUp: m.GuardMode = Agent.GuardMode.Up; break;
+            case Agent.UsageDirection.AttackDown: m.GuardMode = Agent.GuardMode.Down; break;
+            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Left; break;
+            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Right; break;
+        }
+        return false;
+    }
+
+    private static bool Agent_ResetGuard(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ResetGuardCalls++;
+        m.GuardMode = Agent.GuardMode.None;
         return false;
     }
 

@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common;
 using GameInterface;
@@ -8,6 +8,7 @@ using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Players;
+using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 
 namespace Coop.Core.Client.States;
@@ -30,7 +31,8 @@ public class ClientContext
         IModuleInfoProvider moduleInfoProvider,
         IHeroInterface heroInterface,
         IRegistryManager registryManager,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IMapTimeTrackerInterface mapTimeTrackerInterface)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -43,6 +45,7 @@ public class ClientContext
         HeroInterface = heroInterface;
         RegistryManager = registryManager;
         PlayerManager = playerManager;
+        MapTimeTrackerInterface = mapTimeTrackerInterface;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -56,4 +59,5 @@ public class ClientContext
     public IHeroInterface HeroInterface { get; }
     public IRegistryManager RegistryManager { get; }
     public IPlayerManager PlayerManager { get; }
+    public IMapTimeTrackerInterface MapTimeTrackerInterface { get; }
 }
