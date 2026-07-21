@@ -75,6 +75,22 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
+        public void NetworkGameSaveDataProgress_UpdatesPacketsRemaining()
+        {
+            // Arrange
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
+
+            // Act
+            currentState.Handle_NetworkGameSaveDataProgress(
+                new MessagePayload<NetworkGameSaveDataProgress>(this, new NetworkGameSaveDataProgress(12345)));
+
+            // Assert
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Joining Coop Campaign",
+                "Waiting for host save data... 12,345 save packets remaining"), Times.Once);
+        }
+
+        [Fact]
         public void NetworkGameSaveDataReceived_NullSaveData_StaysWaiting()
         {
             // Arrange
