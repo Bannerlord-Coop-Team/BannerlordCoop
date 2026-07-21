@@ -1,4 +1,7 @@
 using Common.Messaging;
+#if DEBUG
+using GameInterface.Services.GameMenus.Patches;
+#endif
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -34,4 +37,34 @@ internal class PlayerLeaveSettlementPatch
 
         return false;
     }
+}
+
+[HarmonyPatch(
+    typeof(EncounterGameMenuBehavior),
+    nameof(EncounterGameMenuBehavior.break_in_leave_consequence))]
+internal class PlayerLeaveSiegeEncounterPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix()
+    {
+        var party = MobileParty.MainParty;
+        bool shouldRequestLeave = ShouldRequestLeave(party);
+#if DEBUG
+        SiegeEncounterMenuTrace.LogLeaveRoute(party, shouldRequestLeave);
+#endif
+        if (!shouldRequestLeave)
+        {
+            // Vanilla clears siege and army state after Finish returns. Hold first so ExitToLast
+            // cannot recreate the encounter while that state is still active.
+            party?.SetMoveModeHold();
+            return true;
+        }
+
+        return PlayerLeaveSettlementPatch.RequestLeave();
+    }
+
+    internal static bool ShouldRequestLeave(MobileParty party) =>
+        party != null &&
+        party.SiegeEvent == null &&
+        (party.Army == null || party.Army.LeaderParty == party);
 }

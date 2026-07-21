@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -365,10 +366,12 @@ public readonly struct NotifyClanChangedFaction : IEvent
 public readonly struct NotifyArmyCreated : IEvent
 {
     public readonly Army Army;
+    public readonly IMapPoint AiBehaviorObject;
 
-    public NotifyArmyCreated(Army army)
+    public NotifyArmyCreated(Army army, IMapPoint aiBehaviorObject)
     {
         Army = army;
+        AiBehaviorObject = aiBehaviorObject;
     }
 }
 
@@ -461,10 +464,12 @@ public readonly struct NotifyPartyAttachedAnotherParty : IEvent
 public readonly struct NotifyPartyRemovedFromArmy : IEvent
 {
     public readonly MobileParty MobileParty;
+    public readonly Army Army;
 
-    public NotifyPartyRemovedFromArmy(MobileParty mobileParty)
+    public NotifyPartyRemovedFromArmy(MobileParty mobileParty, Army army)
     {
         MobileParty = mobileParty;
+        Army = army;
     }
 }
 

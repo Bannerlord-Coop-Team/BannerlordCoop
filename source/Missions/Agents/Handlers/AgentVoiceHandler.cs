@@ -5,6 +5,8 @@ using Common.Util;
 using Missions.Agents.Messages;
 using Missions.Agents.Voice;
 using Serilog;
+using System;
+using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -26,6 +28,7 @@ public class AgentVoiceHandler : IAgentVoiceHandler
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IVanillaOrderVoiceService voiceService;
+    private readonly Queue<PendingLocalVoice> pendingLocalVoices = new Queue<PendingLocalVoice>();
     private bool disposed;
 
     public AgentVoiceHandler(
@@ -55,20 +58,22 @@ public class AgentVoiceHandler : IAgentVoiceHandler
             return;
         }
 
-        string sampleName = null;
         if (voiceService.TrySelectClip(
                 voice.Agent.GetAgentVoiceDefinition(),
                 voice.VoiceTypeId,
-                out var clip) &&
-            voiceService.TryPlay(voice.Agent, clip))
+                out var clip))
         {
-            sampleName = clip.SampleName;
             voice.Handled = true;
-            Logger.Debug("Playing local order voice sample {SampleName} for {VoiceTypeId}",
-                sampleName, voice.VoiceTypeId);
+            // Leave the Agent.MakeVoice prefix before creating the native sound event.
+            pendingLocalVoices.Enqueue(new PendingLocalVoice(
+                voice.Agent,
+                agentInfo.AgentId,
+                voice.VoiceTypeId,
+                clip));
+            return;
         }
 
-        network.SendAll(new NetworkAgentVoicePlayed(agentInfo.AgentId, voice.VoiceTypeId, sampleName));
+        network.SendAll(new NetworkAgentVoicePlayed(agentInfo.AgentId, voice.VoiceTypeId, null));
     }
 
     private void HandleNetworkVoice(MessagePayload<NetworkAgentVoicePlayed> payload)
@@ -122,6 +127,36 @@ public class AgentVoiceHandler : IAgentVoiceHandler
     public void PollVoices()
     {
         voiceService.Tick();
+
+        while (pendingLocalVoices.Count > 0)
+        {
+            PendingLocalVoice pending = pendingLocalVoices.Dequeue();
+            Agent agent = pending.Agent;
+            if (Mission.Current == null || agent == null || agent.Mission != Mission.Current || !agent.IsActive())
+                continue;
+
+            string sampleName = null;
+            if (voiceService.TryPlay(agent, pending.Clip))
+            {
+                sampleName = pending.Clip.SampleName;
+                Logger.Debug("Playing local order voice sample {SampleName} for {VoiceTypeId}",
+                    sampleName, pending.VoiceTypeId);
+            }
+            else
+            {
+                using (new AllowedThread())
+                {
+                    agent.MakeVoice(
+                        new SkinVoiceManager.SkinVoiceType(pending.VoiceTypeId),
+                        SkinVoiceManager.CombatVoiceNetworkPredictionType.NoPrediction);
+                }
+            }
+
+            network.SendAll(new NetworkAgentVoicePlayed(
+                pending.AgentId,
+                pending.VoiceTypeId,
+                sampleName));
+        }
     }
 
     public void WarmUp()
@@ -134,8 +169,29 @@ public class AgentVoiceHandler : IAgentVoiceHandler
         if (disposed) return;
         disposed = true;
 
+        pendingLocalVoices.Clear();
         messageBroker.Unsubscribe<AgentVoicePlayed>(HandleLocalVoice);
         messageBroker.Unsubscribe<NetworkAgentVoicePlayed>(HandleNetworkVoice);
         voiceService.Dispose();
+    }
+
+    private sealed class PendingLocalVoice
+    {
+        public Agent Agent { get; }
+        public Guid AgentId { get; }
+        public string VoiceTypeId { get; }
+        public VanillaOrderVoiceClip Clip { get; }
+
+        public PendingLocalVoice(
+            Agent agent,
+            Guid agentId,
+            string voiceTypeId,
+            VanillaOrderVoiceClip clip)
+        {
+            Agent = agent;
+            AgentId = agentId;
+            VoiceTypeId = voiceTypeId;
+            Clip = clip;
+        }
     }
 }
