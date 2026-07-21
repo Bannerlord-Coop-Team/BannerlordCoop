@@ -138,12 +138,13 @@ internal class BattleJoinLeaveHandler : IHandler
 
         var data = payload.What;
         var requestingPeer = payload.Who as NetPeer;
-        var reservedControllerId = ReserveJoin(requestingPeer, data.MapEventId);
 
         GameThread.RunSafe(
             () =>
             {
                 bool joined = false;
+                var reservationId = Guid.NewGuid();
+                var reservedControllerId = ReserveJoin(requestingPeer, data.MapEventId, reservationId);
                 try
                 {
                     if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
@@ -188,7 +189,7 @@ internal class BattleJoinLeaveHandler : IHandler
                 finally
                 {
                     if (!joined && reservedControllerId != null)
-                        PublishJoinCancelled(requestingPeer, data.MapEventId, reservedControllerId);
+                        PublishJoinCancelled(requestingPeer, data.MapEventId, reservedControllerId, reservationId);
                 }
             },
             blocking: true,
@@ -263,20 +264,25 @@ internal class BattleJoinLeaveHandler : IHandler
             party.MapEventSide = null;
     }
 
-    private string ReserveJoin(NetPeer requestingPeer, string mapEventId)
+    private string ReserveJoin(NetPeer requestingPeer, string mapEventId, Guid reservationId)
     {
         if (requestingPeer == null || !playerManager.TryGetPlayer(requestingPeer, out var player))
             return null;
 
-        messageBroker.Publish(requestingPeer, new BattleJoinAccepted(mapEventId, player.ControllerId));
+        messageBroker.Publish(requestingPeer,
+            new BattleJoinAccepted(mapEventId, player.ControllerId, reservationId));
         return player.ControllerId;
     }
 
-    private void PublishJoinCancelled(NetPeer requestingPeer, string mapEventId, string controllerId)
+    private void PublishJoinCancelled(
+        NetPeer requestingPeer,
+        string mapEventId,
+        string controllerId,
+        Guid reservationId)
     {
         messageBroker.Publish(
             requestingPeer,
-            new BattleJoinCancelled(mapEventId, controllerId));
+            new BattleJoinCancelled(mapEventId, controllerId, reservationId));
     }
 
     private bool TryGetRequestingPlayer(

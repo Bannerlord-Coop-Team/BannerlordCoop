@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using E2E.Tests.Environment.Instance;
@@ -183,16 +184,17 @@ public class BattleResultReadyTests : MissionTestEnvironment
         var host = Clients.First();
         RegisterPeer(host, "host");
         EnterBattleWithMembership(host, "host", mapEventId);
+        var reservationId = Guid.NewGuid();
 
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
             host.NetPeer,
-            new BattleJoinAccepted(mapEventId, "cancelled-joiner")));
+            new BattleJoinAccepted(mapEventId, "cancelled-joiner", reservationId)));
         SendResult(host, mapEventId, BattleState.AttackerVictory);
         AssertMapEventPresent(mapEventId);
 
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
             this,
-            new BattleJoinCancelled(mapEventId, "cancelled-joiner")), VictoryConclusionDisabledMethods());
+            new BattleJoinCancelled(mapEventId, "cancelled-joiner", reservationId)), VictoryConclusionDisabledMethods());
 
         AssertMapEventRemoved(mapEventId);
     }
@@ -205,23 +207,56 @@ public class BattleResultReadyTests : MissionTestEnvironment
         var host = Clients.First();
         RegisterPeer(host, "host");
         EnterBattleWithMembership(host, "host", mapEventId);
+        var firstReservationId = Guid.NewGuid();
+        var secondReservationId = Guid.NewGuid();
 
         Server.Call(() =>
         {
             var broker = Server.Resolve<IMessageBroker>();
-            broker.Publish(host.NetPeer, new BattleJoinAccepted(mapEventId, "joining-player"));
-            broker.Publish(host.NetPeer, new BattleJoinAccepted(mapEventId, "joining-player"));
+            broker.Publish(host.NetPeer,
+                new BattleJoinAccepted(mapEventId, "joining-player", firstReservationId));
+            broker.Publish(host.NetPeer,
+                new BattleJoinAccepted(mapEventId, "joining-player", secondReservationId));
         });
         SendResult(host, mapEventId, BattleState.AttackerVictory);
 
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
             this,
-            new BattleJoinCancelled(mapEventId, "joining-player")), VictoryConclusionDisabledMethods());
+            new BattleJoinCancelled(mapEventId, "joining-player", secondReservationId)), VictoryConclusionDisabledMethods());
         AssertMapEventPresent(mapEventId);
 
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
             this,
-            new BattleJoinCancelled(mapEventId, "joining-player")), VictoryConclusionDisabledMethods());
+            new BattleJoinCancelled(mapEventId, "joining-player", firstReservationId)), VictoryConclusionDisabledMethods());
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void DisconnectRemovesOnlyThatPeersReservation()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
+        var clients = Clients.ToArray();
+        RegisterPeer(clients[0], "host");
+        EnterBattleWithMembership(clients[0], "host", mapEventId);
+        var retainedReservationId = Guid.NewGuid();
+
+        Server.Call(() =>
+        {
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Publish(clients[0].NetPeer,
+                new BattleJoinAccepted(mapEventId, "joining-player", retainedReservationId));
+            broker.Publish(clients[1].NetPeer,
+                new BattleJoinAccepted(mapEventId, "joining-player", Guid.NewGuid()));
+            broker.Publish(this, new PlayerDisconnected(clients[1].NetPeer, default));
+        });
+        SendResult(clients[0], mapEventId, BattleState.AttackerVictory);
+        AssertMapEventPresent(mapEventId);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            this,
+            new BattleJoinCancelled(mapEventId, "joining-player", retainedReservationId)),
+            VictoryConclusionDisabledMethods());
         AssertMapEventRemoved(mapEventId);
     }
 
@@ -240,7 +275,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
             handler.JoinReservationTimeout = TimeSpan.Zero;
             Server.Resolve<IMessageBroker>().Publish(
                 host.NetPeer,
-                new BattleJoinAccepted(mapEventId, "stalled-joiner"));
+                new BattleJoinAccepted(mapEventId, "stalled-joiner", Guid.NewGuid()));
         });
         SendResult(host, mapEventId, BattleState.AttackerVictory);
         AssertMapEventPresent(mapEventId);

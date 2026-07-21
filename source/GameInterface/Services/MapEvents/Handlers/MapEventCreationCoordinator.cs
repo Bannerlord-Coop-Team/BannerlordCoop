@@ -156,21 +156,26 @@ internal class MapEventCreationCoordinator : IHandler
 
         var request = payload.What;
         var requestingPeer = payload.Who as NetPeer;
-        string reservedControllerId = null;
-        if (!string.IsNullOrEmpty(request.ExpectedMapEventId) &&
-            requestingPeer != null &&
-            playerManager.TryGetPlayer(requestingPeer, out var player))
-        {
-            reservedControllerId = player.ControllerId;
-            messageBroker.Publish(
-                requestingPeer,
-                new BattleJoinAccepted(request.ExpectedMapEventId, reservedControllerId));
-        }
 
         GameThread.RunSafe(
             () =>
             {
                 bool joined = false;
+                string reservedControllerId = null;
+                var reservationId = Guid.NewGuid();
+                if (!string.IsNullOrEmpty(request.ExpectedMapEventId) &&
+                    requestingPeer != null &&
+                    playerManager.TryGetPlayer(requestingPeer, out var player))
+                {
+                    reservedControllerId = player.ControllerId;
+                    messageBroker.Publish(
+                        requestingPeer,
+                        new BattleJoinAccepted(
+                            request.ExpectedMapEventId,
+                            reservedControllerId,
+                            reservationId));
+                }
+
                 try
                 {
                     joined = CreateAndReplyToMapEventRequest(payload);
@@ -181,7 +186,10 @@ internal class MapEventCreationCoordinator : IHandler
                     {
                         messageBroker.Publish(
                             requestingPeer,
-                            new BattleJoinCancelled(request.ExpectedMapEventId, reservedControllerId));
+                            new BattleJoinCancelled(
+                                request.ExpectedMapEventId,
+                                reservedControllerId,
+                                reservationId));
                     }
                 }
             },

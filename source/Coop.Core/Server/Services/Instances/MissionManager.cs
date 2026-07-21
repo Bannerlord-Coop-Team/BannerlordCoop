@@ -77,7 +77,7 @@ public interface IMissionManager
     bool TryBeginEmptyInstanceConclusion(string instanceId);
 
     /// <summary>Commits a successful conclusion or rolls its entry fence back after a failed apply.</summary>
-    void CompleteInstanceConclusion(string instanceId, bool succeeded);
+    bool CompleteInstanceConclusion(string instanceId, bool succeeded);
 }
 
 /// <inheritdoc cref="IMissionManager"/>
@@ -344,21 +344,21 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    public void CompleteInstanceConclusion(string instanceId, bool succeeded)
+    public bool CompleteInstanceConclusion(string instanceId, bool succeeded)
     {
         if (string.IsNullOrEmpty(instanceId))
-            return;
+            return false;
 
         lock (gate)
         {
             if (!concludingInstances.Remove(instanceId))
-                return;
+                return false;
 
             if (succeeded)
             {
                 concludedInstances.Add(instanceId);
                 pendingEmptyInstances.Remove(instanceId);
-                return;
+                return true;
             }
 
             if (pendingEmptyInstances.TryGetValue(instanceId, out var emptyInstance))
@@ -366,6 +366,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 byInstanceId[instanceId] = emptyInstance;
                 pendingEmptyInstances.Remove(instanceId);
             }
+
+            return true;
         }
     }
 

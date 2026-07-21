@@ -246,7 +246,8 @@ internal class BattleMissionStartHandler : IHandler
                 continue;
             }
 
-            messageBroker.Publish(peer, new BattleJoinAccepted(mapEventId, player.ControllerId));
+            messageBroker.Publish(peer,
+                new BattleJoinAccepted(mapEventId, player.ControllerId, Guid.NewGuid()));
         }
     }
 

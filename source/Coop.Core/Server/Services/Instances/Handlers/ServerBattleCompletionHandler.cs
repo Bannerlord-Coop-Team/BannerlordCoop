@@ -32,9 +32,11 @@ public class ServerBattleCompletionHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IBattleCompletionTracker completionTracker;
     private readonly object pendingJoinersGate = new object();
-    private readonly Dictionary<string, Dictionary<string, (NetPeer Peer, DateTime ExpiresUtc, int Count)>> pendingJoiners = new();
+    private readonly Dictionary<string, Dictionary<Guid, (string ControllerId, NetPeer Peer, DateTime ExpiresUtc)>> pendingJoiners = new();
+    private readonly Dictionary<string, DateTime> conclusionRetries = new();
 
     internal TimeSpan JoinReservationTimeout { get; set; } = TimeSpan.FromMinutes(2);
+    internal TimeSpan ConclusionRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 
     public ServerBattleCompletionHandler(
         IMessageBroker messageBroker,
@@ -134,7 +136,7 @@ public class ServerBattleCompletionHandler : IHandler
         var departure = payload.What;
         RunSerialized(() =>
         {
-            RemovePendingJoiner(departure.InstanceId, departure.ControllerId, removeAll: true);
+            RemovePendingJoiner(departure.InstanceId, departure.ControllerId, Guid.Empty);
             completionTracker.MemberDeparted(departure.InstanceId, departure.ControllerId);
             TryConcludeReportedBattle(departure.InstanceId);
         });
@@ -208,26 +210,29 @@ public class ServerBattleCompletionHandler : IHandler
         if (payload.Who is not NetPeer peer)
             return;
 
-        lock (pendingJoinersGate)
+        var reservation = payload.What;
+        RunSerialized(() =>
         {
-            if (missionManager.TryGetControllers(payload.What.InstanceId, out var members) &&
-                members.Contains(payload.What.ControllerId))
+            lock (pendingJoinersGate)
             {
-                return;
-            }
+                if (missionManager.TryGetControllers(reservation.InstanceId, out var members) &&
+                    members.Contains(reservation.ControllerId))
+                {
+                    return;
+                }
 
-            if (!pendingJoiners.TryGetValue(payload.What.InstanceId, out var joiners))
-            {
-                joiners = new Dictionary<string, (NetPeer, DateTime, int)>();
-                pendingJoiners[payload.What.InstanceId] = joiners;
-            }
+                if (!pendingJoiners.TryGetValue(reservation.InstanceId, out var joiners))
+                {
+                    joiners = new Dictionary<Guid, (string, NetPeer, DateTime)>();
+                    pendingJoiners[reservation.InstanceId] = joiners;
+                }
 
-            joiners.TryGetValue(payload.What.ControllerId, out var existing);
-            joiners[payload.What.ControllerId] = (
-                peer,
-                DateTime.UtcNow + JoinReservationTimeout,
-                existing.Count + 1);
-        }
+                joiners[reservation.ReservationId] = (
+                    reservation.ControllerId,
+                    peer,
+                    DateTime.UtcNow + JoinReservationTimeout);
+            }
+        });
     }
 
     private void Handle_BattleJoinCancelled(MessagePayload<BattleJoinCancelled> payload)
@@ -235,7 +240,10 @@ public class ServerBattleCompletionHandler : IHandler
         var cancellation = payload.What;
         RunSerialized(() =>
         {
-            RemovePendingJoiner(cancellation.InstanceId, cancellation.ControllerId, removeAll: false);
+            RemovePendingJoiner(
+                cancellation.InstanceId,
+                cancellation.ControllerId,
+                cancellation.ReservationId);
             TryConcludeReportedBattle(cancellation.InstanceId);
         });
     }
@@ -249,7 +257,7 @@ public class ServerBattleCompletionHandler : IHandler
                 entry.InstanceId,
                 entry.ControllerId,
                 entry.IsFirstMember);
-            RemovePendingJoiner(entry.InstanceId, entry.ControllerId, removeAll: true);
+            RemovePendingJoiner(entry.InstanceId, entry.ControllerId, Guid.Empty);
         });
     }
 
@@ -267,8 +275,8 @@ public class ServerBattleCompletionHandler : IHandler
                         .Where(joiner => ReferenceEquals(joiner.Value.Peer, peer))
                         .Select(joiner => joiner.Key)
                         .ToList();
-                    foreach (var controllerId in disconnected)
-                        entry.Value.Remove(controllerId);
+                    foreach (var reservationId in disconnected)
+                        entry.Value.Remove(reservationId);
                     if (disconnected.Count > 0)
                         changedInstances.Add(entry.Key);
                 }
@@ -291,6 +299,7 @@ public class ServerBattleCompletionHandler : IHandler
 
             lock (pendingJoinersGate)
                 pendingJoiners.Remove(mapEventId);
+            conclusionRetries.Remove(mapEventId);
             completionTracker.Clear(mapEventId);
         });
     }
@@ -300,14 +309,18 @@ public class ServerBattleCompletionHandler : IHandler
         var result = payload.What;
         RunSerialized(() =>
         {
-            missionManager.CompleteInstanceConclusion(result.MapEventId, result.Applied);
+            if (!missionManager.CompleteInstanceConclusion(result.MapEventId, result.Applied))
+                return;
+
             if (!result.Applied)
             {
+                conclusionRetries[result.MapEventId] = DateTime.UtcNow + ConclusionRetryDelay;
                 Logger.Warning("Battle conclusion for {Instance} was not applied; reopening it for retry",
                     result.MapEventId);
                 return;
             }
 
+            conclusionRetries.Remove(result.MapEventId);
             lock (pendingJoinersGate)
                 pendingJoiners.Remove(result.MapEventId);
         });
@@ -327,9 +340,10 @@ public class ServerBattleCompletionHandler : IHandler
                         .Where(joiner => now >= joiner.Value.ExpiresUtc)
                         .Select(joiner => joiner.Key)
                         .ToList();
-                    foreach (var controllerId in expired)
+                    foreach (var reservationId in expired)
                     {
-                        entry.Value.Remove(controllerId);
+                        var controllerId = entry.Value[reservationId].ControllerId;
+                        entry.Value.Remove(reservationId);
                         Logger.Warning("Battle join reservation for {Controller} in {Instance} expired after {Timeout}",
                             controllerId, entry.Key, JoinReservationTimeout);
                     }
@@ -343,23 +357,43 @@ public class ServerBattleCompletionHandler : IHandler
 
             foreach (var instanceId in changedInstances)
                 TryConcludeReportedBattle(instanceId);
+
+            var dueRetries = conclusionRetries
+                .Where(entry => now >= entry.Value)
+                .Select(entry => entry.Key)
+                .ToList();
+            foreach (var instanceId in dueRetries)
+            {
+                conclusionRetries.Remove(instanceId);
+                TryConcludeReportedBattle(instanceId);
+            }
         });
     }
 
-    private void RemovePendingJoiner(string instanceId, string controllerId, bool removeAll)
+    private void RemovePendingJoiner(string instanceId, string controllerId, Guid reservationId)
     {
         lock (pendingJoinersGate)
         {
             if (!pendingJoiners.TryGetValue(instanceId, out var joiners))
                 return;
 
-            if (!joiners.TryGetValue(controllerId, out var reservation))
-                return;
-
-            if (removeAll || reservation.Count == 1)
-                joiners.Remove(controllerId);
+            if (reservationId != Guid.Empty)
+            {
+                if (joiners.TryGetValue(reservationId, out var reservation) &&
+                    reservation.ControllerId == controllerId)
+                {
+                    joiners.Remove(reservationId);
+                }
+            }
             else
-                joiners[controllerId] = (reservation.Peer, reservation.ExpiresUtc, reservation.Count - 1);
+            {
+                var controllerReservations = joiners
+                    .Where(entry => entry.Value.ControllerId == controllerId)
+                    .Select(entry => entry.Key)
+                    .ToList();
+                foreach (var controllerReservationId in controllerReservations)
+                    joiners.Remove(controllerReservationId);
+            }
 
             if (joiners.Count == 0)
                 pendingJoiners.Remove(instanceId);
