@@ -148,7 +148,6 @@ public class CoopBattleController : CoopMissionController
         SiegeMissionAuthorityGate.IsAuthorityKnown = false;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
         BattleConclusionGate.IsInCoopBattleMission = false;
-        BattleConclusionGate.IsLocalBattleHost = false;
 
         base.Dispose();
     }
@@ -161,6 +160,8 @@ public class CoopBattleController : CoopMissionController
     public override void AfterStart()
     {
         base.AfterStart();
+
+        BattleConclusionGate.IsInCoopBattleMission = true;
 
         // BR-025: the deployment time limit begins when this player becomes mission-ready — right here.
         Deployment.OnMissionReady();
@@ -184,9 +185,8 @@ public class CoopBattleController : CoopMissionController
             SiegeMissionAuthorityGate.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
         }
 
-        // Only the battle host's mission conclusion may relay to the server (every coop battle mission).
+        // Route coop mission victories through the server's result-ready completion barrier.
         BattleConclusionGate.IsInCoopBattleMission = true;
-        BattleConclusionGate.IsLocalBattleHost = Session.IsLocalHost;
 
         // Register the buffered puppet batch before the one-shot end-condition gate so it can observe both
         // sides as fielded even when a queued terminal event removes every agent on one side this tick.

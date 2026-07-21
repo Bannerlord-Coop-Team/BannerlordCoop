@@ -28,6 +28,33 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-005")]
+    public void CoopMissionVictory_DoesNotSendLegacyImmediateConclusion()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "campaign-player");
+        var host = Clients.First();
+
+        host.Call(() =>
+        {
+            Assert.True(host.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            host.NetworkSentMessages.Clear();
+            bool wasInCoopBattleMission = BattleConclusionGate.IsInCoopBattleMission;
+            BattleConclusionGate.IsInCoopBattleMission = true;
+            try
+            {
+                mapEvent.BattleState = BattleState.DefenderVictory;
+            }
+            finally
+            {
+                BattleConclusionGate.IsInCoopBattleMission = wasInCoopBattleMission;
+            }
+        }, VictoryConclusionDisabledMethods());
+
+        Assert.Empty(host.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
+        AssertMapEventPresent(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
     public void SoleMissionMemberReportsDefeat_FinalizesBeforeMissionLeave()
     {
         var (mapEventId, _) = SetupCoopBattle("host", "campaign-player");
