@@ -141,34 +141,9 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId> [excludedPartyId]";
         }
 
-        if (!TryGetObjectManager(out var objectManager))
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
         {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
-        {
-            return "Unable to resolve PlayerManager";
-        }
-
-        if (!playerManager.TryGetPlayer(args[0], out var player))
-        {
-            return $"No registered player has controller id {args[0]}.";
-        }
-
-        if (!playerManager.IsConnected(player))
-        {
-            return $"Player {args[0]} is not connected.";
-        }
-
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
-        {
-            return $"Unable to resolve player party {player.MobilePartyId}.";
-        }
-
-        if (playerParty.MapEvent != null)
-        {
-            return $"Player {args[0]} is already in a map event.";
+            return error;
         }
 
         var excludedPartyId = args.Count == 2 ? args[1] : null;
@@ -216,30 +191,19 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.finish_player_encounter <controllerId>";
         }
 
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
-        {
-            return "Unable to resolve PlayerManager";
-        }
-
         if (!ContainerProvider.TryResolve<INetwork>(out var network))
         {
             return "Unable to resolve Network";
         }
 
-        if (!playerManager.TryGetPlayer(args[0], out var player) || !playerManager.IsConnected(player))
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
         {
-            return $"No connected player has controller id {args[0]}.";
+            return error;
         }
 
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty) ||
-            !objectManager.TryGetIdWithLogging(playerParty.Party, out var partyBaseId))
+        if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var partyBaseId))
         {
-            return $"Unable to resolve player party {player.MobilePartyId}.";
+            return $"Unable to resolve PartyBase for player {args[0]}.";
         }
 
         network.SendAll(new NetworkPartyLeftBattle(partyBaseId));
