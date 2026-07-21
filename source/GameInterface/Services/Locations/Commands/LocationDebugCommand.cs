@@ -1,5 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.Locations.Handlers;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
@@ -301,6 +303,83 @@ public class LocationDebugCommand
 
         return $"Populating '{args[0]}'";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("open_overlay_fixture", "coop.debug.location")]
+    public static string OpenOverlayFixture(List<string> args)
+    {
+        return SendOverlayFixture(args, SettlementOverlayFixtureOperation.Inject);
+    }
+
+    [CommandLineArgumentFunction("restore_overlay_fixture", "coop.debug.location")]
+    public static string RestoreOverlayFixture(List<string> args)
+    {
+        return SendOverlayFixture(args, SettlementOverlayFixtureOperation.Restore);
+    }
+
+    [CommandLineArgumentFunction("cleanup_overlay_fixture", "coop.debug.location")]
+    public static string CleanupOverlayFixture(List<string> args)
+    {
+        return SendOverlayFixture(args, SettlementOverlayFixtureOperation.Cleanup);
+    }
+
+    [CommandLineArgumentFunction("overlay_fixture_state", "coop.debug.location")]
+    public static string OverlayFixtureState(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.location.overlay_fixture_state";
+        }
+
+        if (!ContainerProvider.TryResolve<SettlementOverlayFixtureHandler>(out var fixtureHandler))
+        {
+            return $"Unable to resolve {nameof(SettlementOverlayFixtureHandler)}";
+        }
+
+        return fixtureHandler.DescribeState();
+    }
+
+    private static string SendOverlayFixture(
+        List<string> args,
+        SettlementOverlayFixtureOperation operation)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Command is only available to run on the server";
+        }
+
+        var requiresSettlement = operation == SettlementOverlayFixtureOperation.Inject;
+        var expectedArgumentCount = requiresSettlement ? 2 : 1;
+        if (args.Count != expectedArgumentCount)
+        {
+            var action = requiresSettlement ? "open" : operation.ToString().ToLowerInvariant();
+            var settlementArgument = requiresSettlement ? " <SettlementId>" : string.Empty;
+            return $"Usage: coop.debug.location.{action}_overlay_fixture <HeroId>{settlementArgument}";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return $"Unable to resolve {nameof(IObjectManager)}";
+        }
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+        {
+            return $"Unable to resolve {nameof(INetwork)}";
+        }
+        if (!objectManager.TryGetObject<Hero>(args[0], out var targetHero))
+        {
+            return $"Unable to find hero '{args[0]}'";
+        }
+
+        var settlementId = requiresSettlement ? args[1] : null;
+        if (requiresSettlement && Campaign.Current.Settlements.Any(item => item.StringId == settlementId) == false)
+        {
+            return $"Unable to find settlement '{settlementId}'";
+        }
+
+        network.SendAll(new NetworkSettlementOverlayFixture(args[0], settlementId, operation));
+        return $"Sent {operation} overlay fixture for '{targetHero.StringId}'";
+    }
+#endif
 
     private static bool TryResolveLocation(string locationId, out Location location, out string error)
     {
