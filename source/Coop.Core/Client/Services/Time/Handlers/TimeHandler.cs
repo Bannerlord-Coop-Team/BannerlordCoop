@@ -21,7 +21,6 @@ namespace Coop.Core.Client.Services.Time.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
         private readonly ITimeControlInterface timeControlInterface;
-        private TimeControlLockState timeControlLockState = TimeControlLockState.Unlocked;
         private MapEventFastForwardState mapEventState = MapEventFastForwardState.NotBlocked;
 
         public TimeHandler(IMessageBroker messageBroker, INetwork network, ITimeControlInterface timeControlInterface)
@@ -29,10 +28,8 @@ namespace Coop.Core.Client.Services.Time.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             this.timeControlInterface = timeControlInterface;
-            this.timeControlInterface.AddUnpausePolicy(TimeControlLockPolicy);
             messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
             messageBroker.Subscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
-            messageBroker.Subscribe<NetworkTimeControlLockChanged>(Handle_NetworkTimeControlLockChanged);
             messageBroker.Subscribe<NetworkMapEventLockChanged>(Handle_NetworkMapEventLockChanged);
         }
 
@@ -40,20 +37,12 @@ namespace Coop.Core.Client.Services.Time.Handlers
         {
             messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
             messageBroker.Unsubscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
-            messageBroker.Unsubscribe<NetworkTimeControlLockChanged>(Handle_NetworkTimeControlLockChanged);
             messageBroker.Unsubscribe<NetworkMapEventLockChanged>(Handle_NetworkMapEventLockChanged);
-            timeControlInterface.RemoveUnpausePolicy(TimeControlLockPolicy);
         }
 
         internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChangedAttempted> obj)
         {
             var newMode = obj.What.NewControlMode;
-
-            if (timeControlLockState.IsLocked && newMode != TimeControlEnum.Pause)
-            {
-                messageBroker.Publish(this, new SendInformationMessage(timeControlLockState.LoadingMessage));
-                return;
-            }
 
             if (mapEventState.IsBlocked && newMode == TimeControlEnum.Play_2x)
             {
@@ -89,46 +78,6 @@ namespace Coop.Core.Client.Services.Time.Handlers
             Logger.Verbose("Client requesting time change to {mode}", newMode);
 
             timeControlInterface.ClientSetTimeControl(newMode);
-        }
-
-        internal void Handle_NetworkTimeControlLockChanged(MessagePayload<NetworkTimeControlLockChanged> obj)
-        {
-            timeControlLockState = TimeControlLockState.FromNetworkMessage(obj.What);
-
-            if (timeControlLockState.IsLocked)
-            {
-                timeControlInterface.ClientSetTimeControl(TimeControlEnum.Pause);
-            }
-        }
-
-        private bool TimeControlLockPolicy()
-        {
-            return timeControlLockState.IsLocked == false;
-        }
-
-        private readonly struct TimeControlLockState
-        {
-            public static TimeControlLockState Unlocked => new TimeControlLockState(false, 0);
-
-            public bool IsLocked { get; }
-            public int LoadingPlayers { get; }
-            public string LoadingMessage => "Time controls disabled, " + LoadingPlayers + " player(s) are currently joining the game";
-
-            private TimeControlLockState(bool isLocked, int loadingPlayers)
-            {
-                IsLocked = isLocked;
-                LoadingPlayers = loadingPlayers;
-            }
-
-            public static TimeControlLockState FromNetworkMessage(NetworkTimeControlLockChanged message)
-            {
-                if (message.IsLocked == false)
-                {
-                    return Unlocked;
-                }
-
-                return new TimeControlLockState(true, message.LoadingPlayers);
-            }
         }
 
         private readonly struct MapEventFastForwardState

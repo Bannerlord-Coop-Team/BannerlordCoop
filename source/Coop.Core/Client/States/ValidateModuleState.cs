@@ -20,6 +20,8 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class ValidateModuleState : ClientStateBase
 {
+    private const string UnsupportedCoopModuleReason = "Server does not support module 'Coop'.";
+
     private static readonly ILogger Logger = LogManager.GetLogger<ValidateModuleState>();
 
     /// <summary>
@@ -125,7 +127,8 @@ public class ValidateModuleState : ClientStateBase
 
     internal void Handle_NetworkModuleVersionsValidated(MessagePayload<NetworkModuleVersionsValidated> obj)
     {
-        if (obj.What.Matches)
+        // Reaching this handshake proves both sides run Coop; only a version mismatch should block it.
+        if (obj.What.Matches || string.Equals(obj.What.Reason, UnsupportedCoopModuleReason, StringComparison.Ordinal))
         {
             network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
         }

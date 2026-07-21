@@ -150,6 +150,7 @@ internal class PartyDoneLogicHandler : IHandler
                 releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
                     message.LeftPrisonerRosterData,
                     message.RightPrisonerRosterData,
+                    leftParty != null || leftPrisonerRoster != null,
                     message.ReleaserPartyPosition,
                     out leftPrisonerRosterData,
                     out rightPrisonerRosterData);
@@ -329,12 +330,16 @@ internal class PartyDoneLogicHandler : IHandler
     internal List<PlayerCaptivityEndedByServer> CreatePlayerCaptivityReleaseEvents(
         TroopRosterData leftPrisonerRosterData,
         TroopRosterData rightPrisonerRosterData,
+        bool hasLeftPrisonerDestination,
         CampaignVec2 releaserPartyPosition,
         out TroopRosterData filteredLeftPrisonerRosterData,
         out TroopRosterData filteredRightPrisonerRosterData)
     {
         var releasedPlayerPrisoners = new List<Hero>();
-        var transferredPlayerPrisoners = GetTransferredPlayerPrisoners(leftPrisonerRosterData, rightPrisonerRosterData);
+        // The normal party screen's left prisoner roster is a dummy discard target, not a transfer destination.
+        var transferredPlayerPrisoners = hasLeftPrisonerDestination
+            ? GetTransferredPlayerPrisoners(leftPrisonerRosterData, rightPrisonerRosterData)
+            : GetTransferredPlayerPrisoners(rightPrisonerRosterData);
         filteredLeftPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(leftPrisonerRosterData, transferredPlayerPrisoners, releasedPlayerPrisoners);
         filteredRightPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(rightPrisonerRosterData, transferredPlayerPrisoners, releasedPlayerPrisoners);
 
