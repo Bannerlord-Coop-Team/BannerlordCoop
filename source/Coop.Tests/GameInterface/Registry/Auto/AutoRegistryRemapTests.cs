@@ -30,7 +30,11 @@ public class AutoRegistryRemapTests
         public override void RegisterAllObjects()
         {
             foreach (var (ownerId, instance) in ToRegister)
+            {
+                if (!IsCollectingIdRemaps && objectManager.Contains(instance)) continue;
+
                 RegisterExistingObject(ownerId, instance);
+            }
         }
     }
 
@@ -68,5 +72,20 @@ public class AutoRegistryRemapTests
 
         Assert.True(objectManager.TryGetObject<object>("Object_lord_1_8", out var found));
         Assert.Same(attachment, found);
+    }
+
+    [Fact]
+    public void CollectIdRemap_VisitsAlreadyRegisteredLiveObject()
+    {
+        var objectManager = new ObjectManager(Mock.Of<ILogger>());
+        var attachment = new object();
+        objectManager.AddExisting("Object_Created_2835", attachment);
+        var registry = new TestRegistry(objectManager);
+        registry.ToRegister.Add(("CharacterObject_1", attachment));
+        var map = new Dictionary<string, string>();
+
+        registry.CollectIdRemap(map);
+
+        Assert.Equal("Object_Created_2835", map["Object_CharacterObject_1"]);
     }
 }

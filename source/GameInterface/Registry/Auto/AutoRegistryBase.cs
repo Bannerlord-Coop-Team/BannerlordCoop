@@ -95,6 +95,8 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
     private IDictionary<string, string> idRemapCollector;
     private IDictionary<string, string> idRemapOverride;
 
+    protected bool IsCollectingIdRemaps => idRemapCollector != null;
+
     /// <summary>
     /// Runs <see cref="RegisterAllObjects"/> in "collect" mode: instead of registering each object, records into
     /// <paramref name="map"/> the owner-derived id this registry would mint mapped to the object's current server

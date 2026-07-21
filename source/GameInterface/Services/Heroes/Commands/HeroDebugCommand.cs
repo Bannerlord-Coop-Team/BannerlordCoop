@@ -124,6 +124,17 @@ public class HeroDebugCommand
             stringBuilder.AppendLine($"{field.Name} = {field.GetValue(hero)}");
         }
 
+        if (hero.CharacterObject == null)
+        {
+            stringBuilder.AppendLine("CharacterObjectId = null");
+        }
+        else
+        {
+            string characterObjectId = objectManager.TryGetId(hero.CharacterObject, out var id) ? id : "unregistered";
+            stringBuilder.AppendLine($"CharacterObjectId = {characterObjectId}");
+            stringBuilder.AppendLine($"CharacterObjectHeroId = {hero.CharacterObject.HeroObject?.StringId}");
+        }
+
         var results = stringBuilder.ToString();
 
         Logger.Debug("{Hero}", results);

@@ -10,6 +10,7 @@ using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.LiveTesting;
 using GameInterface.Services.MapEventParties;
@@ -51,6 +52,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
+        builder.RegisterType<CharacterObjectCreator>().As<ICharacterObjectCreator>().InstancePerDependency();
+        builder.RegisterType<HeroCharacterObjectRepairer>().As<IHeroCharacterObjectRepairer>().InstancePerDependency();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<PrisonerSaleValidator>().As<IPrisonerSaleValidator>().InstancePerDependency();

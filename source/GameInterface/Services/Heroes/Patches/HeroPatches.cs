@@ -33,5 +33,15 @@ namespace GameInterface.Services.Heroes.Patches
             __result = __instance.CompanionOf != null && __instance.CompanionOf.IsPlayerClan();
             return false;
         }
+
+        [HarmonyPatch("OnLoad")]
+        [HarmonyPostfix]
+        private static void OnLoadPostfix(Hero __instance)
+        {
+            if (__instance.CharacterObject != null) return;
+            if (!ContainerProvider.TryResolve<IHeroCharacterObjectRepairer>(out var repairer)) return;
+
+            repairer.TryRepair(__instance);
+        }
     }
 }

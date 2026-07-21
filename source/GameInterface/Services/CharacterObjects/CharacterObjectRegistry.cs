@@ -34,6 +34,8 @@ internal class CharacterObjectRegistry : AutoRegistryBase<CharacterObject>
 
         foreach (CharacterObject character in characterObjects)
         {
+            if (!IsCollectingIdRemaps && objectManager.Contains(character)) continue;
+
             RegisterExistingObject(character.StringId, character);
         }
     }
