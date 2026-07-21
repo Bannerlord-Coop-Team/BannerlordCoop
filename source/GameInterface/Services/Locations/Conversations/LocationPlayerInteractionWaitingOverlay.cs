@@ -1,4 +1,4 @@
-using TaleWorlds.Engine.GauntletUI;
+﻿using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
@@ -14,6 +14,11 @@ internal sealed class LocationPlayerInteractionWaitingOverlay : GlobalLayer
     private bool isShown;
 
     public static LocationPlayerInteractionWaitingOverlay Instance => instance ??= new LocationPlayerInteractionWaitingOverlay();
+
+#if DEBUG
+    internal bool IsShownForLiveTest => isShown;
+    internal string WaitingTextForLiveTest => dataSource?.WaitingText;
+#endif
 
     public void Show(string otherPlayerName)
     {
