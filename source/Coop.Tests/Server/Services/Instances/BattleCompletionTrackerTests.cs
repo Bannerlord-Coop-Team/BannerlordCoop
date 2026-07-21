@@ -182,4 +182,47 @@ public class BattleCompletionTrackerTests
 
         Assert.False(tracker.TryConcludeAbandoned("battle", out _, out _, out _));
     }
+
+    [Fact]
+    public void DepartedMemberWithoutAReport_DoesNotBlockAbandonedConclusion()
+    {
+        var tracker = new BattleCompletionTracker();
+
+        Assert.False(tracker.TryRecordResult(
+            "battle",
+            "host",
+            BattleState.AttackerVictory,
+            1,
+            new[] { "host", "departed" },
+            "host",
+            1,
+            out _,
+            canConclude: false));
+
+        tracker.MemberDeparted("battle", "departed");
+
+        Assert.True(tracker.TryConcludeAbandoned(
+            "battle", out var state, out _, out var memberCount));
+        Assert.Equal(BattleState.AttackerVictory, state);
+        Assert.Equal(1, memberCount);
+    }
+
+    [Fact]
+    public void DepartedMemberWithAReport_RemainsInAbandonedConsensus()
+    {
+        var tracker = new BattleCompletionTracker();
+        var members = new[] { "host", "departed" };
+
+        Assert.False(tracker.TryRecordResult(
+            "battle", "host", BattleState.DefenderVictory, 1, members, "host", 1, out _, canConclude: false));
+        Assert.False(tracker.TryRecordResult(
+            "battle", "departed", BattleState.DefenderVictory, 1, members, "host", 1, out _, canConclude: false));
+
+        tracker.MemberDeparted("battle", "departed");
+
+        Assert.True(tracker.TryConcludeAbandoned(
+            "battle", out var state, out _, out var memberCount));
+        Assert.Equal(BattleState.DefenderVictory, state);
+        Assert.Equal(2, memberCount);
+    }
 }

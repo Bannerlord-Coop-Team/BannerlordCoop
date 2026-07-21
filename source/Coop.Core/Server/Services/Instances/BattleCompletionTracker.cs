@@ -31,6 +31,7 @@ public interface IBattleCompletionTracker
         out int hostEpoch,
         out int memberCount);
 
+    void MemberDeparted(string instanceId, string controllerId);
     void ResetMember(string instanceId, string controllerId, bool isFirstMember);
     void Clear(string instanceId);
 }
@@ -80,7 +81,7 @@ public class BattleCompletionTracker : IBattleCompletionTracker
                 reports[instanceId] = instanceReports;
             }
 
-            var report = new BattleResultReport(battleState, reportEpoch);
+            var report = new BattleResultReport(controllerId, battleState, reportEpoch);
             instanceReports[controllerId] = report;
             RememberAuthoritativeReport(instanceId, controllerId, hostControllerId, hostEpoch, report);
 
@@ -169,9 +170,33 @@ public class BattleCompletionTracker : IBattleCompletionTracker
             if (isFirstMember)
                 ClearInternal(instanceId);
 
-            GetParticipants(instanceId).Add(controllerId);
+            if (participants.TryGetValue(instanceId, out var instanceParticipants))
+                instanceParticipants.Remove(controllerId);
             if (reports.TryGetValue(instanceId, out var instanceReports))
                 instanceReports.Remove(controllerId);
+            if (authoritativeReports.TryGetValue(instanceId, out var authoritativeReport) &&
+                authoritativeReport.ControllerId == controllerId)
+            {
+                authoritativeReports.Remove(instanceId);
+            }
+        }
+    }
+
+    public void MemberDeparted(string instanceId, string controllerId)
+    {
+        if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(controllerId))
+            return;
+
+        lock (gate)
+        {
+            if (reports.TryGetValue(instanceId, out var instanceReports) &&
+                instanceReports.ContainsKey(controllerId))
+            {
+                return;
+            }
+
+            if (participants.TryGetValue(instanceId, out var instanceParticipants))
+                instanceParticipants.Remove(controllerId);
         }
     }
 
@@ -249,11 +274,13 @@ public class BattleCompletionTracker : IBattleCompletionTracker
 
     private readonly struct BattleResultReport
     {
+        public string ControllerId { get; }
         public BattleState BattleState { get; }
         public int HostEpoch { get; }
 
-        public BattleResultReport(BattleState battleState, int hostEpoch)
+        public BattleResultReport(string controllerId, BattleState battleState, int hostEpoch)
         {
+            ControllerId = controllerId;
             BattleState = battleState;
             HostEpoch = hostEpoch;
         }

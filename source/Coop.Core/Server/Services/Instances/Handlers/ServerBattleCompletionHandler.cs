@@ -119,6 +119,7 @@ public class ServerBattleCompletionHandler : IHandler
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
         RemovePendingJoiner(payload.What.InstanceId, payload.What.ControllerId);
+        completionTracker.MemberDeparted(payload.What.InstanceId, payload.What.ControllerId);
         TryConcludeReportedBattle(payload.What.InstanceId);
     }
 
