@@ -145,4 +145,20 @@ public class GameThreadPumpTests
         Assert.False(allowedWhileDraining, "the drained action inherited the caller's AllowedThread allowance");
         Assert.True(callerAllowanceIntactAfter, "the caller's allowance was not restored after the pump");
     }
+
+    [Fact]
+    public void EnqueueSafe_OnTheGameLoopThread_RunsOnALaterPump()
+    {
+        using var ran = new ManualResetEventSlim(false);
+        bool ranInline = true;
+
+        GameThread.Run(() =>
+        {
+            GameThread.EnqueueSafe(() => ran.Set());
+            ranInline = ran.IsSet;
+        }, blocking: true);
+
+        Assert.False(ranInline);
+        Assert.True(ran.Wait(TimeSpan.FromSeconds(5)), "the deferred action was not drained by a later pump");
+    }
 }
