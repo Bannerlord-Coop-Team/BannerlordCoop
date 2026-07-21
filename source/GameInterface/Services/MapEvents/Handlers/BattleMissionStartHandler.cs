@@ -188,6 +188,9 @@ internal class BattleMissionStartHandler : IHandler
                     side.MakeReadyForMission(null);
                 }
 
+                operation = "reserve mission participants";
+                ReserveMissionParticipants(payload.What.MapEventId, mapEvent);
+
                 // Reply first so the requesting client's blocked consequence unblocks before the mission-open
                 // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
                 // flow, rather than re-entrantly during the blocking wait.
@@ -230,6 +233,21 @@ internal class BattleMissionStartHandler : IHandler
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
             }
         }, context: nameof(Handle_NetworkBattleStartRequest));
+    }
+
+    private void ReserveMissionParticipants(string mapEventId, MapEvent mapEvent)
+    {
+        foreach (var player in playerManager.Players)
+        {
+            if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
+                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
+                !ReferenceEquals(party.Party.MapEvent, mapEvent))
+            {
+                continue;
+            }
+
+            messageBroker.Publish(peer, new BattleJoinAccepted(mapEventId, player.ControllerId));
+        }
     }
 
     private static AtmosphereInfo GetAtmosphereOnCampaign(MapEvent mapEvent)

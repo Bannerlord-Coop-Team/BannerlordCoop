@@ -221,7 +221,6 @@ internal class BattleHostHandler : IHandler
                     SetServerAssignment(mapEventId, updated);
                     Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
                         requesterId, mapEventId, string.Join(", ", updated.SuccessorControllerIds));
-                    network.SendAll(ToMessage(mapEventId, updated));
                 }
                 else if (requester != null)
                 {
@@ -239,7 +238,6 @@ internal class BattleHostHandler : IHandler
                 Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
                     requesterId, mapEventId, epoch);
 
-                network.SendAll(ToMessage(mapEventId, assignment));
             }
 
             // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
@@ -711,8 +709,6 @@ internal class BattleHostHandler : IHandler
                 Logger.Information("[BattleHost] Host {Old} left battle {MapEventId}; promoted {New} at epoch {Epoch} (successors: {Successors})",
                     controllerId, mapEventId, newHost, promoted.Epoch, string.Join(", ", successors));
 
-                network.SendAll(ToMessage(mapEventId, promoted));
-
                 // The departed host can no longer ack a reserve flush: serve any return grant that was
                 // pending on it from the current ledger. AFTER the promotion, so the grant is scoped
                 // against the new assignment (a promoted returner is served its host scope).
@@ -727,7 +723,6 @@ internal class BattleHostHandler : IHandler
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
                     controllerId, mapEventId, string.Join(", ", successors));
 
-                network.SendAll(ToMessage(mapEventId, updated));
             }
         });
     }
@@ -870,6 +865,7 @@ internal class BattleHostHandler : IHandler
     private void SetServerAssignment(string mapEventId, BattleHostAssignment assignment)
     {
         hostRegistry.Set(mapEventId, assignment);
+        network.SendAll(ToMessage(mapEventId, assignment));
         messageBroker.Publish(this, new BattleHostAssignmentChanged(mapEventId));
     }
 }

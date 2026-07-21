@@ -128,10 +128,20 @@ public class BattleResultReadyTests : MissionTestEnvironment
         RegisterPeer(clients[0], "host");
         RegisterPeer(clients[1], "joining-player");
         EnterBattleWithMembership(clients[0], "host", mapEventId);
+        bool? reservationPrecededJoinCommit = null;
+        Server.Resolve<IMessageBroker>().Subscribe<BattleJoinAccepted>(payload =>
+        {
+            if (payload.What.ControllerId != "joining-player" || reservationPrecededJoinCommit != null)
+                return;
+
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(joinerPartyBaseId!, out var joinerParty));
+            reservationPrecededJoinCommit = joinerParty.MapEventSide == null;
+        });
 
         clients[1].Call(() => clients[1].Resolve<INetwork>().SendAll(
             new NetworkRequestJoinBattle(mapEventId, joinerPartyBaseId!, BattleSideEnum.Attacker)));
 
+        Assert.True(reservationPrecededJoinCommit);
         SendResult(clients[0], mapEventId, BattleState.AttackerVictory);
         AssertMapEventPresent(mapEventId);
 
@@ -233,7 +243,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
                 new NetworkMissionLeft("host", mapEventId));
             Server.SimulateMessage(
                 clients[1].NetPeer,
-                new NetworkBattleResultReady(mapEventId, BattleState.DefenderVictory, hostEpoch: 1));
+                new NetworkBattleResultReady(mapEventId, BattleState.DefenderVictory, hostEpoch: 2));
             Server.SimulateMessage(
                 clients[1].NetPeer,
                 new NetworkMissionLeft("successor", mapEventId));
@@ -244,7 +254,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-005")]
-    public void SuccessorResult_FinalizesWhenReporterBecomesHost()
+    public void SuccessorMustReportAgainAfterBecomingHost()
     {
         var (mapEventId, _) = SetupCoopBattle("host", "successor");
         var clients = Clients.ToArray();
@@ -262,6 +272,8 @@ public class BattleResultReadyTests : MissionTestEnvironment
                 new NetworkMissionLeft("host", mapEventId)),
             VictoryConclusionDisabledMethods());
 
+        AssertMapEventPresent(mapEventId);
+        SendResult(clients[1], mapEventId, BattleState.DefenderVictory);
         AssertMapEventRemoved(mapEventId);
     }
 

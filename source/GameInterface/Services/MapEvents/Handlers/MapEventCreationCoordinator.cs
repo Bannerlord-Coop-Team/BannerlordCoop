@@ -154,22 +154,51 @@ internal class MapEventCreationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
 
+        var request = payload.What;
+        var requestingPeer = payload.Who as NetPeer;
+        string reservedControllerId = null;
+        if (!string.IsNullOrEmpty(request.ExpectedMapEventId) &&
+            requestingPeer != null &&
+            playerManager.TryGetPlayer(requestingPeer, out var player))
+        {
+            reservedControllerId = player.ControllerId;
+            messageBroker.Publish(
+                requestingPeer,
+                new BattleJoinAccepted(request.ExpectedMapEventId, reservedControllerId));
+        }
+
         GameThread.RunSafe(
-            () => CreateAndReplyToMapEventRequest(payload),
+            () =>
+            {
+                bool joined = false;
+                try
+                {
+                    joined = CreateAndReplyToMapEventRequest(payload);
+                }
+                finally
+                {
+                    if (!joined && reservedControllerId != null)
+                    {
+                        messageBroker.Publish(
+                            requestingPeer,
+                            new BattleJoinCancelled(request.ExpectedMapEventId, reservedControllerId));
+                    }
+                }
+            },
             blocking: true,
             context: nameof(Handle_NetworkRequestCreateMapEvent));
     }
 
-    private void CreateAndReplyToMapEventRequest(MessagePayload<NetworkRequestCreateMapEvent> payload)
+    private bool CreateAndReplyToMapEventRequest(MessagePayload<NetworkRequestCreateMapEvent> payload)
     {
         var request = payload.What;
         if (!TryGetRequestingPeer(payload, request, out var requestingPeer))
-            return;
+            return false;
 
         if (!TryResolveRequestParties(request, out var attacker, out var defender))
         {
             SendCreatedReply(requestingPeer, request, null);
-            return;
+            return false;
         }
 
         if (!playerManager.TryGetPlayer(requestingPeer, out var player) ||
@@ -178,7 +207,7 @@ internal class MapEventCreationCoordinator : IHandler
              !ReferenceEquals(defender.MobileParty, requestingParty)))
         {
             SendCreatedReply(requestingPeer, request, null);
-            return;
+            return false;
         }
 
         if (TryHandleExistingMapEventRequest(
@@ -197,16 +226,17 @@ internal class MapEventCreationCoordinator : IHandler
             }
 
             SendCreatedReply(requestingPeer, request, existingMapEventId);
-            return;
+            return joinedExistingBattle;
         }
 
         if (!TryConsumeApprovedMapEventStart(request, attacker, defender))
         {
             SendCreatedReply(requestingPeer, request, null);
-            return;
+            return false;
         }
 
         SendCreatedReply(requestingPeer, request, CreateMapEvent(request, attacker, defender));
+        return false;
     }
 
     private void SendCreatedReply(NetPeer requestingPeer, NetworkRequestCreateMapEvent request, string mapEventId)

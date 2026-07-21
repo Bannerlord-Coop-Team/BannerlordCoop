@@ -1,5 +1,6 @@
 ﻿using Coop.Core.Server.Services.Instances;
 using LiteNetLib;
+using System;
 using System.Net;
 using System.Reflection;
 using Xunit;
@@ -41,6 +42,57 @@ public class MissionManagerTests
                 CreatePeer(1), "late", "battle", out _, out _)));
 
         Assert.False(entered);
+    }
+
+    [Fact]
+    public void NatOnlyShellDoesNotBlockEmptyConclusionClaim()
+    {
+        var manager = new MissionManager();
+        var netManager = new NetManager(null);
+        var local = new IPEndPoint(IPAddress.Loopback, 53001);
+        var remote = new IPEndPoint(IPAddress.Loopback, 53002);
+
+        manager.HandleIntroductionRequest(netManager.NatPunchModule, local, remote, "late%battle");
+
+        Assert.False(manager.TryGetControllers("battle", out _));
+        Assert.True(manager.TryClaimEmptyInstance("battle", () => { }));
+        Assert.False(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _, out _));
+    }
+
+    [Fact]
+    public void FailedConclusionRestoresNatOnlyShell()
+    {
+        var manager = new MissionManager();
+        var netManager = new NetManager(null);
+        var local = new IPEndPoint(IPAddress.Loopback, 53003);
+        var remote = new IPEndPoint(IPAddress.Loopback, 53004);
+
+        manager.HandleIntroductionRequest(netManager.NatPunchModule, local, remote, "late%battle");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            manager.TryClaimEmptyInstance("battle", () => throw new InvalidOperationException()));
+        Assert.True(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _, out _));
+    }
+
+    [Fact]
+    public void ActiveConclusionClaimFencesLaterEntry()
+    {
+        var manager = new MissionManager();
+
+        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _, out _));
+        Assert.True(manager.TryClaimActiveInstanceConclusion("battle", new[] { "host" }));
+        Assert.False(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _, out _));
+    }
+
+    [Fact]
+    public void ActiveConclusionClaimRejectsChangedMembership()
+    {
+        var manager = new MissionManager();
+
+        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _, out _));
+        Assert.True(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _, out _));
+
+        Assert.False(manager.TryClaimActiveInstanceConclusion("battle", new[] { "host" }));
     }
 
     private static NetPeer CreatePeer(int id)

@@ -59,6 +59,26 @@ public class HostElectionTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void InitialElection_QueuesAssignmentBeforeServerReconciliation()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        bool assignmentWasQueued = false;
+        Server.Resolve<IMessageBroker>().Subscribe<BattleHostAssignmentChanged>(payload =>
+        {
+            if (payload.What.MapEventId == mapEventId)
+            {
+                assignmentWasQueued = Server.NetworkSentMessages
+                    .GetMessages<NetworkBattleHostAssigned>()
+                    .Any(message => message.MapEventId == mapEventId);
+            }
+        });
+
+        EnterBattle(Clients.First(), mapEventId);
+
+        Assert.True(assignmentWasQueued);
+    }
+
+    [Fact]
     public void Election_AppendsSuccessors_InJoinOrder_AndIsIdempotent()
     {
         var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");

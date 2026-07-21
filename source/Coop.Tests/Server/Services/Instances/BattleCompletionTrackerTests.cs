@@ -80,7 +80,7 @@ public class BattleCompletionTrackerTests
     }
 
     [Fact]
-    public void HostDeparts_PromotedHostUsesRetainedCurrentMissionReport()
+    public void HostDeparts_PromotedHostMustReportAtNewEpoch()
     {
         var tracker = new BattleCompletionTracker();
         var members = new[] { "host", "successor" };
@@ -89,27 +89,33 @@ public class BattleCompletionTrackerTests
             "battle", "successor", BattleState.AttackerVictory, 1, members, "host", 1, out _));
 
         tracker.HostAssigned("battle", "successor", 2);
-        Assert.True(tracker.TryReconcile(
-            "battle", new[] { "successor" }, "successor", 2, out var state));
+        Assert.False(tracker.TryReconcile(
+            "battle", new[] { "successor" }, "successor", 2, out _));
+        Assert.True(tracker.TryRecordResult(
+            "battle", "successor", BattleState.AttackerVictory, 2,
+            new[] { "successor" }, "successor", 2, out var state));
         Assert.Equal(BattleState.AttackerVictory, state);
     }
 
     [Fact]
-    public void ReportsBeforeHostElection_AreRetainedForReconciliation()
+    public void ReportsBeforeHostElection_RequireCurrentEpochHostReport()
     {
         var tracker = new BattleCompletionTracker();
 
         Assert.False(tracker.TryRecordResult(
             "battle", "host", BattleState.AttackerVictory, 0, new[] { "host" }, null, 0, out _));
         tracker.HostAssigned("battle", "host", 1);
-        Assert.True(tracker.TryReconcile(
-            "battle", new[] { "host" }, "host", 1, out var state));
+        Assert.False(tracker.TryReconcile(
+            "battle", new[] { "host" }, "host", 1, out _));
+        Assert.True(tracker.TryRecordResult(
+            "battle", "host", BattleState.AttackerVictory, 1,
+            new[] { "host" }, "host", 1, out var state));
 
         Assert.Equal(BattleState.AttackerVictory, state);
     }
 
     [Fact]
-    public void PreElectionReport_ConcludesAfterEmptyInstanceHostAssignmentArrives()
+    public void PreElectionReport_DoesNotAuthorizeAbandonedConclusion()
     {
         var tracker = new BattleCompletionTracker();
 
@@ -119,10 +125,8 @@ public class BattleCompletionTrackerTests
 
         tracker.HostAssigned("battle", "host", 1);
 
-        Assert.True(tracker.TryConcludeAbandoned(
-            "battle", out var state, out var hostEpoch, out _));
-        Assert.Equal(BattleState.DefenderVictory, state);
-        Assert.Equal(1, hostEpoch);
+        Assert.False(tracker.TryConcludeAbandoned(
+            "battle", out _, out _, out _));
     }
 
     [Fact]

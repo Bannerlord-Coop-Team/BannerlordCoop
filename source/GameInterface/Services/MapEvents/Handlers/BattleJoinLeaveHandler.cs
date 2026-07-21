@@ -137,48 +137,59 @@ internal class BattleJoinLeaveHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var requestingPeer = payload.Who as NetPeer;
+        var reservedControllerId = ReserveJoin(requestingPeer, data.MapEventId);
 
         GameThread.RunSafe(
             () =>
             {
-                if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
-                if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+                bool joined = false;
+                try
+                {
+                    if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+                    if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
 
-                if (mapEvent.BattleState != BattleState.None || mapEvent.IsFinalized)
-                {
-                    Logger.Warning("Ignoring join request: map event {MapEventId} is already concluded", data.MapEventId);
-                    return;
-                }
-                if (party.MapEventSide != null)
-                {
-                    Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
-                    return;
-                }
-                if (mapEvent.IsActiveSlowVillageRaid() && data.Side == BattleSideEnum.Defender)
-                {
-                    Logger.Warning("Ignoring defender join request: map event {MapEventId} is an active slow village raid", data.MapEventId);
-                    return;
-                }
-                var side = mapEvent.GetMapEventSide(data.Side);
-                if (side == null)
-                {
-                    Logger.Warning("Ignoring join request: map event {MapEventId} has no side {Side}", data.MapEventId, data.Side);
-                    return;
-                }
+                    if (mapEvent.BattleState != BattleState.None || mapEvent.IsFinalized)
+                    {
+                        Logger.Warning("Ignoring join request: map event {MapEventId} is already concluded", data.MapEventId);
+                        return;
+                    }
+                    if (party.MapEventSide != null)
+                    {
+                        Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                        return;
+                    }
+                    if (mapEvent.IsActiveSlowVillageRaid() && data.Side == BattleSideEnum.Defender)
+                    {
+                        Logger.Warning("Ignoring defender join request: map event {MapEventId} is an active slow village raid", data.MapEventId);
+                        return;
+                    }
+                    var side = mapEvent.GetMapEventSide(data.Side);
+                    if (side == null)
+                    {
+                        Logger.Warning("Ignoring join request: map event {MapEventId} has no side {Side}", data.MapEventId, data.Side);
+                        return;
+                    }
 
-                // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
-                // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
-                party.MapEventSide = side;
-                PublishJoinAccepted(payload.Who as NetPeer, party, data.MapEventId);
-                if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
-                    MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
+                    // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+                    // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+                    party.MapEventSide = side;
+                    joined = PublishJoinAccepted(requestingPeer, party, data.MapEventId);
+                    if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
+                        MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
 
-                // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
-                // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
-                // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
-                // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
-                if (mapEvent.BattleObserver is ForwardingBattleObserver && !mapEvent.IsUnsupportedMultiPlayerHostileAction())
-                    network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
+                    // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
+                    // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
+                    // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
+                    // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
+                    if (mapEvent.BattleObserver is ForwardingBattleObserver && !mapEvent.IsUnsupportedMultiPlayerHostileAction())
+                        network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
+                }
+                finally
+                {
+                    if (!joined && reservedControllerId != null)
+                        PublishJoinCancelled(requestingPeer, data.MapEventId, reservedControllerId);
+                }
             },
             blocking: true,
             context: nameof(Handle_NetworkRequestJoinBattle));
@@ -252,14 +263,31 @@ internal class BattleJoinLeaveHandler : IHandler
             party.MapEventSide = null;
     }
 
-    private void PublishJoinAccepted(NetPeer requestingPeer, PartyBase party, string mapEventId)
+    private string ReserveJoin(NetPeer requestingPeer, string mapEventId)
+    {
+        if (requestingPeer == null || !playerManager.TryGetPlayer(requestingPeer, out var player))
+            return null;
+
+        messageBroker.Publish(requestingPeer, new BattleJoinAccepted(mapEventId, player.ControllerId));
+        return player.ControllerId;
+    }
+
+    private bool PublishJoinAccepted(NetPeer requestingPeer, PartyBase party, string mapEventId)
     {
         if (!TryGetRequestingPlayer(requestingPeer, party, out var controllerId))
-            return;
+            return false;
 
         messageBroker.Publish(
             requestingPeer,
             new BattleJoinAccepted(mapEventId, controllerId));
+        return true;
+    }
+
+    private void PublishJoinCancelled(NetPeer requestingPeer, string mapEventId, string controllerId)
+    {
+        messageBroker.Publish(
+            requestingPeer,
+            new BattleJoinCancelled(mapEventId, controllerId));
     }
 
     private bool TryGetRequestingPlayer(

@@ -65,6 +65,13 @@ public interface IMissionManager
     bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers);
 
     /// <summary>
+    /// Atomically fences entry when the current controllers still match the result decision's snapshot.
+    /// </summary>
+    bool TryClaimActiveInstanceConclusion(
+        string instanceId,
+        IReadOnlyCollection<string> expectedControllers);
+
+    /// <summary>
     /// Atomically claims an empty instance for result finalization and runs the conclusion while entry is fenced.
     /// A later stale entry remains rejected for the lifetime of this campaign session.
     /// </summary>
@@ -273,7 +280,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     {
         lock (gate)
         {
-            if (byInstanceId.TryGetValue(instanceId, out var instance) == false)
+            if (byInstanceId.TryGetValue(instanceId, out var instance) == false ||
+                instance.Controllers.Count == 0)
             {
                 controllers = Array.Empty<string>();
                 return false;
@@ -292,8 +300,15 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
-            if (byInstanceId.ContainsKey(instanceId) || !concludedInstances.Add(instanceId))
+            MissionInstance emptyInstance = null;
+            if ((byInstanceId.TryGetValue(instanceId, out var instance) && instance.Controllers.Count > 0) ||
+                !concludedInstances.Add(instanceId))
+            {
                 return false;
+            }
+
+            emptyInstance = instance;
+            byInstanceId.Remove(instanceId);
 
             try
             {
@@ -303,8 +318,36 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             catch
             {
                 concludedInstances.Remove(instanceId);
+                if (emptyInstance != null)
+                    byInstanceId[instanceId] = emptyInstance;
                 throw;
             }
+        }
+    }
+
+    public bool TryClaimActiveInstanceConclusion(
+        string instanceId,
+        IReadOnlyCollection<string> expectedControllers)
+    {
+        if (string.IsNullOrEmpty(instanceId) || expectedControllers == null || expectedControllers.Count == 0)
+            return false;
+
+        lock (gate)
+        {
+            if (!byInstanceId.TryGetValue(instanceId, out var instance) ||
+                concludedInstances.Contains(instanceId))
+            {
+                return false;
+            }
+
+            var currentControllers = instance.Controllers;
+            if (currentControllers.Count != expectedControllers.Count ||
+                currentControllers.Any(controllerId => !expectedControllers.Contains(controllerId)))
+            {
+                return false;
+            }
+
+            return concludedInstances.Add(instanceId);
         }
     }
 

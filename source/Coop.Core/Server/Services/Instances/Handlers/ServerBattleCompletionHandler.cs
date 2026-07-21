@@ -15,6 +15,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.Instances.Handlers;
@@ -83,91 +84,113 @@ public class ServerBattleCompletionHandler : IHandler
             return;
         }
 
-        TryRecordBattleResult(player.ControllerId, payload.What);
+        var controllerId = player.ControllerId;
+        var result = payload.What;
+        RunSerialized(() => TryRecordBattleResult(controllerId, result));
     }
 
     private void TryRecordBattleResult(string controllerId, NetworkBattleResultReady result)
     {
-        var instanceId = result.InstanceId;
-        if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
+        lock (pendingJoinersGate)
         {
-            Logger.Information("Ignoring battle result report from {Controller} for inactive instance {Instance}",
-                controllerId, instanceId);
-            return;
+            var instanceId = result.InstanceId;
+            if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
+            {
+                Logger.Information("Ignoring battle result report from {Controller} for inactive instance {Instance}",
+                    controllerId, instanceId);
+                return;
+            }
+
+            hostRegistry.TryGet(instanceId, out var assignment);
+            bool canConclude = !HasPendingJoiners(instanceId);
+
+            if (!completionTracker.TryRecordResult(
+                    instanceId,
+                    controllerId,
+                    result.BattleState,
+                    result.HostEpoch,
+                    currentMembers,
+                    assignment?.HostControllerId,
+                    assignment?.Epoch ?? 0,
+                    out var concludedState,
+                    canConclude))
+            {
+                return;
+            }
+
+            if (!missionManager.TryClaimActiveInstanceConclusion(instanceId, currentMembers))
+                return;
+
+            PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
         }
-
-        hostRegistry.TryGet(instanceId, out var assignment);
-        bool canConclude = !HasPendingJoiners(instanceId);
-
-        if (!completionTracker.TryRecordResult(
-                instanceId,
-                controllerId,
-                result.BattleState,
-                result.HostEpoch,
-                currentMembers,
-                assignment?.HostControllerId,
-                assignment?.Epoch ?? 0,
-                out var concludedState,
-                canConclude))
-        {
-            return;
-        }
-
-        PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
     }
 
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
-        RemovePendingJoiner(payload.What.InstanceId, payload.What.ControllerId);
-        completionTracker.MemberDeparted(payload.What.InstanceId, payload.What.ControllerId);
-        TryConcludeReportedBattle(payload.What.InstanceId);
+        var departure = payload.What;
+        RunSerialized(() =>
+        {
+            RemovePendingJoiner(departure.InstanceId, departure.ControllerId);
+            completionTracker.MemberDeparted(departure.InstanceId, departure.ControllerId);
+            TryConcludeReportedBattle(departure.InstanceId);
+        });
     }
 
     private void Handle_BattleHostAssignmentChanged(MessagePayload<BattleHostAssignmentChanged> payload)
     {
-        if (hostRegistry.TryGet(payload.What.MapEventId, out var assignment))
+        var mapEventId = payload.What.MapEventId;
+        RunSerialized(() =>
         {
-            completionTracker.HostAssigned(
-                payload.What.MapEventId,
-                assignment.HostControllerId,
-                assignment.Epoch);
-        }
+            if (hostRegistry.TryGet(mapEventId, out var assignment))
+            {
+                completionTracker.HostAssigned(
+                    mapEventId,
+                    assignment.HostControllerId,
+                    assignment.Epoch);
+            }
 
-        TryConcludeReportedBattle(payload.What.MapEventId);
+            TryConcludeReportedBattle(mapEventId);
+        });
     }
 
     private void TryConcludeReportedBattle(string instanceId)
     {
-        bool hasPendingJoiners = HasPendingJoiners(instanceId);
-        if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
+        lock (pendingJoinersGate)
         {
-            if (!hasPendingJoiners && completionTracker.TryConcludeAbandoned(
-                    instanceId,
-                    out var abandonedState,
-                    out var abandonedEpoch,
-                    out var abandonedMemberCount))
+            bool hasPendingJoiners = HasPendingJoiners(instanceId);
+            if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
             {
-                QueueAbandonedConclusion(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
+                if (!hasPendingJoiners && completionTracker.TryConcludeAbandoned(
+                        instanceId,
+                        out var abandonedState,
+                        out var abandonedEpoch,
+                        out var abandonedMemberCount))
+                {
+                    QueueAbandonedConclusion(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
+                }
+
+                return;
             }
 
-            return;
+            if (!hostRegistry.TryGet(instanceId, out var assignment))
+                return;
+
+            if (!completionTracker.TryReconcile(
+                    instanceId,
+                    currentMembers,
+                    assignment.HostControllerId,
+                    assignment.Epoch,
+                    out var concludedState,
+                    !hasPendingJoiners))
+            {
+                return;
+            }
+
+            if (!missionManager.TryClaimActiveInstanceConclusion(instanceId, currentMembers))
+                return;
+
+            PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
         }
-
-        if (!hostRegistry.TryGet(instanceId, out var assignment))
-            return;
-
-        if (!completionTracker.TryReconcile(
-                instanceId,
-                currentMembers,
-                assignment.HostControllerId,
-                assignment.Epoch,
-                out var concludedState,
-                !hasPendingJoiners))
-        {
-            return;
-        }
-
-        PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
     }
 
     private bool HasPendingJoiners(string instanceId)
@@ -183,6 +206,12 @@ public class ServerBattleCompletionHandler : IHandler
 
         lock (pendingJoinersGate)
         {
+            if (missionManager.TryGetControllers(payload.What.InstanceId, out var members) &&
+                members.Contains(payload.What.ControllerId))
+            {
+                return;
+            }
+
             if (!pendingJoiners.TryGetValue(payload.What.InstanceId, out var joiners))
             {
                 joiners = new Dictionary<string, (NetPeer, DateTime)>();
@@ -195,81 +224,100 @@ public class ServerBattleCompletionHandler : IHandler
 
     private void Handle_BattleJoinCancelled(MessagePayload<BattleJoinCancelled> payload)
     {
-        RemovePendingJoiner(payload.What.InstanceId, payload.What.ControllerId);
-        TryConcludeReportedBattle(payload.What.InstanceId);
+        var cancellation = payload.What;
+        RunSerialized(() =>
+        {
+            RemovePendingJoiner(cancellation.InstanceId, cancellation.ControllerId);
+            TryConcludeReportedBattle(cancellation.InstanceId);
+        });
     }
 
     private void Handle_MissionMemberEntered(MessagePayload<MissionMemberEntered> payload)
     {
-        RemovePendingJoiner(payload.What.InstanceId, payload.What.ControllerId);
-        completionTracker.ResetMember(
-            payload.What.InstanceId,
-            payload.What.ControllerId,
-            payload.What.IsFirstMember);
+        var entry = payload.What;
+        RunSerialized(() =>
+        {
+            completionTracker.ResetMember(
+                entry.InstanceId,
+                entry.ControllerId,
+                entry.IsFirstMember);
+            RemovePendingJoiner(entry.InstanceId, entry.ControllerId);
+        });
     }
 
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
-        List<string> changedInstances = new List<string>();
-        lock (pendingJoinersGate)
+        var peer = payload.What.PlayerId;
+        RunSerialized(() =>
         {
-            foreach (var entry in pendingJoiners)
+            List<string> changedInstances = new List<string>();
+            lock (pendingJoinersGate)
             {
-                var disconnected = entry.Value
-                    .Where(joiner => ReferenceEquals(joiner.Value.Peer, payload.What.PlayerId))
-                    .Select(joiner => joiner.Key)
-                    .ToList();
-                foreach (var controllerId in disconnected)
-                    entry.Value.Remove(controllerId);
-                if (disconnected.Count > 0)
-                    changedInstances.Add(entry.Key);
+                foreach (var entry in pendingJoiners)
+                {
+                    var disconnected = entry.Value
+                        .Where(joiner => ReferenceEquals(joiner.Value.Peer, peer))
+                        .Select(joiner => joiner.Key)
+                        .ToList();
+                    foreach (var controllerId in disconnected)
+                        entry.Value.Remove(controllerId);
+                    if (disconnected.Count > 0)
+                        changedInstances.Add(entry.Key);
+                }
+
+                RemoveEmptyPendingInstances();
             }
 
-            RemoveEmptyPendingInstances();
-        }
-
-        foreach (var instanceId in changedInstances)
-            TryConcludeReportedBattle(instanceId);
+            foreach (var instanceId in changedInstances)
+                TryConcludeReportedBattle(instanceId);
+        });
     }
 
     private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
     {
-        if (!objectManager.TryGetId(payload.What.MapEvent, out var mapEventId))
-            return;
+        var mapEvent = payload.What.MapEvent;
+        RunSerialized(() =>
+        {
+            if (!objectManager.TryGetId(mapEvent, out var mapEventId))
+                return;
 
-        lock (pendingJoinersGate)
-            pendingJoiners.Remove(mapEventId);
-        completionTracker.Clear(mapEventId);
+            lock (pendingJoinersGate)
+                pendingJoiners.Remove(mapEventId);
+            completionTracker.Clear(mapEventId);
+        });
     }
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
-        var now = DateTime.UtcNow;
-        var changedInstances = new HashSet<string>();
-        lock (pendingJoinersGate)
+        RunSerialized(() =>
         {
-            foreach (var entry in pendingJoiners)
+            var now = DateTime.UtcNow;
+            var changedInstances = new HashSet<string>();
+            lock (pendingJoinersGate)
             {
-                var expired = entry.Value
-                    .Where(joiner => now >= joiner.Value.ExpiresUtc)
-                    .Select(joiner => joiner.Key)
-                    .ToList();
-                foreach (var controllerId in expired)
+                foreach (var entry in pendingJoiners)
                 {
-                    entry.Value.Remove(controllerId);
-                    Logger.Warning("Battle join reservation for {Controller} in {Instance} expired after {Timeout}",
-                        controllerId, entry.Key, JoinReservationTimeout);
+                    var expired = entry.Value
+                        .Where(joiner => now >= joiner.Value.ExpiresUtc)
+                        .Select(joiner => joiner.Key)
+                        .ToList();
+                    foreach (var controllerId in expired)
+                    {
+                        entry.Value.Remove(controllerId);
+                        Logger.Warning("Battle join reservation for {Controller} in {Instance} expired after {Timeout}",
+                            controllerId, entry.Key, JoinReservationTimeout);
+                    }
+
+                    if (expired.Count > 0)
+                        changedInstances.Add(entry.Key);
                 }
 
-                if (expired.Count > 0)
-                    changedInstances.Add(entry.Key);
+                RemoveEmptyPendingInstances();
             }
 
-            RemoveEmptyPendingInstances();
-        }
-
-        foreach (var instanceId in changedInstances)
-            TryConcludeReportedBattle(instanceId);
+            foreach (var instanceId in changedInstances)
+                TryConcludeReportedBattle(instanceId);
+        });
     }
 
     private void RemovePendingJoiner(string instanceId, string controllerId)
@@ -311,13 +359,17 @@ public class ServerBattleCompletionHandler : IHandler
         BattleState concludedState,
         int hostEpoch)
     {
-        GameThread.RunSafe(() =>
+        RunSerialized(() =>
         {
             missionManager.TryClaimEmptyInstance(instanceId, () =>
             {
                 hostRegistry.Remove(instanceId);
                 PublishConclusion(instanceId, memberCount, concludedState, hostEpoch);
             });
-        }, context: nameof(QueueAbandonedConclusion));
+        });
     }
+
+    // Keep membership signals, host changes, and result decisions on one FIFO queue.
+    private static void RunSerialized(Action action, [CallerMemberName] string context = null)
+        => GameThread.RunSafe(action, context: context);
 }

@@ -44,7 +44,6 @@ public class BattleCompletionTracker : IBattleCompletionTracker
     private readonly Dictionary<string, Dictionary<string, BattleResultReport>> reports = new();
     private readonly Dictionary<string, HashSet<string>> participants = new();
     private readonly Dictionary<string, BattleResultReport> authoritativeReports = new();
-    private readonly HashSet<string> concludedInstances = new();
 
     public bool TryRecordResult(
         string instanceId,
@@ -67,9 +66,6 @@ public class BattleCompletionTracker : IBattleCompletionTracker
 
         lock (gate)
         {
-            if (concludedInstances.Contains(instanceId))
-                return false;
-
             var members = new HashSet<string>(currentMembers);
             if (!members.Contains(controllerId))
                 return false;
@@ -105,8 +101,7 @@ public class BattleCompletionTracker : IBattleCompletionTracker
 
         lock (gate)
         {
-            if (concludedInstances.Contains(instanceId) ||
-                !reports.TryGetValue(instanceId, out var instanceReports))
+            if (!reports.TryGetValue(instanceId, out var instanceReports))
             {
                 return false;
             }
@@ -135,8 +130,7 @@ public class BattleCompletionTracker : IBattleCompletionTracker
 
         lock (gate)
         {
-            if (concludedInstances.Contains(instanceId) ||
-                !reports.TryGetValue(instanceId, out var instanceReports) ||
+            if (!reports.TryGetValue(instanceId, out var instanceReports) ||
                 !participants.TryGetValue(instanceId, out var instanceParticipants) ||
                 instanceParticipants.Count == 0 ||
                 !authoritativeReports.TryGetValue(instanceId, out var authoritativeReport))
@@ -153,7 +147,6 @@ public class BattleCompletionTracker : IBattleCompletionTracker
                 }
             }
 
-            concludedInstances.Add(instanceId);
             concludedState = authoritativeReport.BattleState;
             hostEpoch = authoritativeReport.HostEpoch;
             memberCount = instanceParticipants.Count;
@@ -168,17 +161,13 @@ public class BattleCompletionTracker : IBattleCompletionTracker
 
         lock (gate)
         {
-            if (concludedInstances.Contains(instanceId) ||
-                !reports.TryGetValue(instanceId, out var instanceReports) ||
-                !instanceReports.TryGetValue(hostControllerId, out var report))
+            // A new hosting generation must report at its own epoch. Retained reports still count toward
+            // participant consensus, but cannot stand in for the new host's final state and siege snapshot.
+            if (authoritativeReports.TryGetValue(instanceId, out var report) &&
+                (report.ControllerId != hostControllerId || report.HostEpoch != hostEpoch))
             {
-                return;
+                authoritativeReports.Remove(instanceId);
             }
-
-            var authoritativeReport = new BattleResultReport(
-                hostControllerId, report.BattleState, hostEpoch);
-            instanceReports[hostControllerId] = authoritativeReport;
-            authoritativeReports[instanceId] = authoritativeReport;
         }
     }
 
@@ -255,7 +244,6 @@ public class BattleCompletionTracker : IBattleCompletionTracker
                 return false;
         }
 
-        concludedInstances.Add(instanceId);
         concludedState = hostReport.BattleState;
         return true;
     }
@@ -291,7 +279,6 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         reports.Remove(instanceId);
         participants.Remove(instanceId);
         authoritativeReports.Remove(instanceId);
-        concludedInstances.Remove(instanceId);
     }
 
     private readonly struct BattleResultReport
