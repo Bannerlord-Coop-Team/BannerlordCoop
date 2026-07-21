@@ -133,7 +133,7 @@ namespace Coop.Core
 
             AbandonAnyStartingSession();
 
-            // start-server.bat already launched this process with /server and its anonymous
+            // Already launched this process with /server and its anonymous
             // Steam game-server session owns the fixed Steam ports. Host here so the existing
             // server container advertises the lobby instead of spawning a second server that
             // competes for those ports.
