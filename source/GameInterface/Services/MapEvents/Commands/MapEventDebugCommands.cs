@@ -1,7 +1,15 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
@@ -27,6 +35,21 @@ namespace GameInterface.Services.Villages.Commands;
 public class MapEventDebugCommands
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
+    private static LateJoinModeFixture lateJoinModeFixture;
+
+    private sealed class LateJoinModeFixture
+    {
+        public string MapEventId { get; set; }
+        public string FirstPlayerPartyId { get; set; }
+        public string FirstPlayerMobilePartyId { get; set; }
+        public PartyBehaviorUpdateData FirstPlayerBehavior { get; set; }
+        public string JoiningPlayerPartyId { get; set; }
+        public string JoiningPlayerMobilePartyId { get; set; }
+        public PartyBehaviorUpdateData JoiningPlayerBehavior { get; set; }
+        public string AiPartyId { get; set; }
+        public string AiMobilePartyId { get; set; }
+        public PartyBehaviorUpdateData AiBehavior { get; set; }
+    }
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -177,6 +200,268 @@ public class MapEventDebugCommands
 
         return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
                $"against player {args[0]}.";
+    }
+
+    // coop.debug.mapevent.late_join_mode_fixture PlayerOne PlayerTwo
+    /// <summary>
+    /// Creates a server-authoritative battle, claims mission mode before the second player joins, then routes the
+    /// second player's join through the real request handler.
+    /// </summary>
+    [CommandLineArgumentFunction("late_join_mode_fixture", "coop.debug.mapevent")]
+    public static string StartLateJoinModeFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.mapevent.late_join_mode_fixture <firstControllerId> <joiningControllerId>";
+        }
+
+        if (lateJoinModeFixture != null)
+        {
+            return $"A late-join mode fixture is already active for map event {lateJoinModeFixture.MapEventId}.";
+        }
+
+        if (args[0] == args[1])
+        {
+            return "The fixture requires two different connected players.";
+        }
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var firstParty, out var error))
+        {
+            return error;
+        }
+
+        if (!TryGetPlayerParty(args[1], requireReady: true, out _, out var joiningParty, out error))
+        {
+            return error;
+        }
+
+        if (firstParty.CurrentSettlement != null || joiningParty.CurrentSettlement != null)
+        {
+            return "Both players must be on the campaign map, outside settlements.";
+        }
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPeer(args[1], out var joiningPeer))
+        {
+            return $"Unable to resolve the connected peer for {args[1]}.";
+        }
+
+        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
+            !ContainerProvider.TryResolve<INetwork>(out var network) ||
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+        {
+            return "Unable to resolve the late-join mode fixture services.";
+        }
+
+        if (!behaviorSnapshot.TryCreate(firstParty, out var firstPlayerBehavior) ||
+            !behaviorSnapshot.TryCreate(joiningParty, out var joiningPlayerBehavior))
+        {
+            return "Unable to capture both players' original movement state.";
+        }
+
+        var firstPosition = firstParty.Position.ToVec2();
+        MobileParty aiParty = null;
+        PartyBehaviorUpdateData aiBehavior = default;
+        foreach (var candidate in MobileParty.All
+                     .Where(p => p.IsActive && p.IsBandit && p.MapEvent == null &&
+                                 p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0)
+                     .OrderBy(p => p.Position.ToVec2().DistanceSquared(firstPosition)))
+        {
+            if (!behaviorSnapshot.TryCreate(candidate, out aiBehavior)) continue;
+
+            aiParty = candidate;
+            break;
+        }
+
+        if (aiParty == null)
+        {
+            return "No active bandit party with restorable movement state was found.";
+        }
+
+        if (!objectManager.TryGetId(firstParty.Party, out string firstPartyId) ||
+            !objectManager.TryGetId(firstParty, out string firstMobilePartyId) ||
+            !objectManager.TryGetId(joiningParty.Party, out string joiningPartyId) ||
+            !objectManager.TryGetId(joiningParty, out string joiningMobilePartyId) ||
+            !objectManager.TryGetId(aiParty.Party, out string aiPartyId) ||
+            !objectManager.TryGetId(aiParty, out string aiMobilePartyId))
+        {
+            return "Unable to resolve fixture party ids.";
+        }
+
+        var mapEvent = MapEventBattleFactory.CreateMapEvent(aiParty.Party, firstParty.Party, default);
+        if (mapEvent == null || !objectManager.TryGetId(mapEvent, out string mapEventId))
+        {
+            if (mapEvent != null)
+                firstParty.Party.MapEventSide = null;
+
+            RestorePartyBehavior(firstParty, firstPlayerBehavior, behaviorSnapshot);
+            RestorePartyBehavior(joiningParty, joiningPlayerBehavior, behaviorSnapshot);
+            RestorePartyBehavior(aiParty, aiBehavior, behaviorSnapshot);
+            return "Unable to create or resolve the fixture map event.";
+        }
+
+        lateJoinModeFixture = new LateJoinModeFixture
+        {
+            MapEventId = mapEventId,
+            FirstPlayerPartyId = firstPartyId,
+            FirstPlayerMobilePartyId = firstMobilePartyId,
+            FirstPlayerBehavior = firstPlayerBehavior,
+            JoiningPlayerPartyId = joiningPartyId,
+            JoiningPlayerMobilePartyId = joiningMobilePartyId,
+            JoiningPlayerBehavior = joiningPlayerBehavior,
+            AiPartyId = aiPartyId,
+            AiMobilePartyId = aiMobilePartyId,
+            AiBehavior = aiBehavior,
+        };
+
+        if (!ServerBattleModeArbiter.TryClaimMission(mapEventId))
+        {
+            CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
+            return $"Unable to claim mission mode for map event {mapEventId}.";
+        }
+
+        // PlayerTwo sees this before its party belongs to the battle and ignores it, reproducing the missed claim.
+        network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Mission));
+        messageBroker.Publish(joiningPeer, new NetworkRequestJoinBattle(
+            mapEventId,
+            joiningPartyId,
+            BattleSideEnum.Defender));
+
+        if (joiningParty.MapEvent != mapEvent)
+        {
+            CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
+            return $"Player {args[1]} did not join fixture map event {mapEventId}.";
+        }
+
+        return $"Late-join mode fixture active: mapEvent={mapEventId}, firstPlayer={args[0]}, " +
+               $"joiningPlayer={args[1]}, aiParty={aiParty.StringId}, mode=Mission.";
+    }
+
+    // coop.debug.mapevent.late_join_mode_state PlayerTwo
+    /// <summary>Reports a player's map-event membership and known authoritative battle mode.</summary>
+    [CommandLineArgumentFunction("late_join_mode_state", "coop.debug.mapevent")]
+    public static string GetLateJoinModeState(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.late_join_mode_state <controllerId>";
+        }
+
+        if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var playerParty, out var error))
+        {
+            return error;
+        }
+
+        var mapEvent = playerParty.MapEvent;
+        var mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out string resolvedId)
+            ? resolvedId
+            : "none";
+        var side = playerParty.MapEventSide?.MissionSide.ToString() ?? "none";
+        var mode = "Unclaimed";
+        if (mapEventId != "none")
+        {
+            if (ModInformation.IsServer && ServerBattleModeArbiter.TryGetMode(mapEventId, out var serverMode))
+                mode = serverMode.ToString();
+            else if (BattleModeRegistry.IsMission(mapEventId))
+                mode = BattleStartMode.Mission.ToString();
+            else if (BattleModeRegistry.IsSimulation(mapEventId))
+                mode = BattleStartMode.Simulation.ToString();
+        }
+
+        return $"Late-join mode state: controller={args[0]}, mapEvent={mapEventId}, side={side}, mode={mode}.";
+    }
+
+    // coop.debug.mapevent.late_join_mode_cleanup
+    /// <summary>Removes the fixture battle and restores the selected AI party's original movement state.</summary>
+    [CommandLineArgumentFunction("late_join_mode_cleanup", "coop.debug.mapevent")]
+    public static string CleanupLateJoinModeFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.mapevent.late_join_mode_cleanup";
+        }
+
+        if (lateJoinModeFixture == null)
+        {
+            return "No late-join mode fixture is active.";
+        }
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+        {
+            return "Unable to resolve the late-join mode cleanup services.";
+        }
+
+        var mapEventId = lateJoinModeFixture.MapEventId;
+        var restored = CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
+        return restored
+            ? $"Late-join mode fixture {mapEventId} cleaned up and AI movement restored."
+            : $"Late-join mode fixture {mapEventId} cleaned up, but AI movement could not be fully restored.";
+    }
+
+    private static bool CleanupLateJoinModeFixture(
+        IMessageBroker messageBroker,
+        IMobilePartyBehaviorSnapshot behaviorSnapshot,
+        IObjectManager objectManager)
+    {
+        var fixture = lateJoinModeFixture;
+        if (fixture == null) return true;
+
+        messageBroker.Publish(typeof(MapEventDebugCommands), new NetworkRequestLeaveBattle(fixture.JoiningPlayerPartyId));
+        messageBroker.Publish(typeof(MapEventDebugCommands), new NetworkRequestLeaveBattle(fixture.FirstPlayerPartyId));
+        messageBroker.Publish(typeof(MapEventDebugCommands), new NetworkRequestLeaveBattle(fixture.AiPartyId));
+        ServerBattleModeArbiter.Release(fixture.MapEventId);
+
+        var restored = RestorePartyBehavior(
+            fixture.FirstPlayerMobilePartyId,
+            fixture.FirstPlayerBehavior,
+            behaviorSnapshot,
+            objectManager);
+        restored = RestorePartyBehavior(
+            fixture.JoiningPlayerMobilePartyId,
+            fixture.JoiningPlayerBehavior,
+            behaviorSnapshot,
+            objectManager) && restored;
+        restored = RestorePartyBehavior(
+            fixture.AiMobilePartyId,
+            fixture.AiBehavior,
+            behaviorSnapshot,
+            objectManager) && restored;
+
+        lateJoinModeFixture = null;
+        return restored;
+    }
+
+    private static bool RestorePartyBehavior(
+        string mobilePartyId,
+        PartyBehaviorUpdateData behavior,
+        IMobilePartyBehaviorSnapshot behaviorSnapshot,
+        IObjectManager objectManager)
+    {
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(mobilePartyId, out var mobileParty))
+            return false;
+
+        return RestorePartyBehavior(mobileParty, behavior, behaviorSnapshot);
+    }
+
+    private static bool RestorePartyBehavior(
+        MobileParty mobileParty,
+        PartyBehaviorUpdateData behavior,
+        IMobilePartyBehaviorSnapshot behaviorSnapshot)
+    {
+        mobileParty.Position = behavior.PartyPosition;
+        return behaviorSnapshot.TryApply(mobileParty, behavior, out _);
     }
 
     // coop.debug.mapevent.peace_pursuit_fixture PlayerOne

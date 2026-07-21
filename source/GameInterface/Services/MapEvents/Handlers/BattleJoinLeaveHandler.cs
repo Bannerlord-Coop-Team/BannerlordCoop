@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -161,6 +162,11 @@ internal class BattleJoinLeaveHandler : IHandler
                 party.MapEventSide = side;
                 if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
                     MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
+
+                // The original mode broadcast predates this join. Replay it after the party add so the joining
+                // client applies membership first and rebuilds its encounter menu with the authoritative mode.
+                if (payload.Who is NetPeer requester && ServerBattleModeArbiter.TryGetMode(data.MapEventId, out var mode))
+                    network.Send(requester, new NetworkBattleModeSet(data.MapEventId, (int)mode));
 
                 // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
                 // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.

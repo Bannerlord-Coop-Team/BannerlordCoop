@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -110,6 +111,32 @@ public class ServerBattleModeArbiterTests
             // A simulation claim reports the same way.
             Assert.True(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
             Assert.True(ServerBattleModeArbiter.IsClaimed(mapEventId));
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+        }
+    }
+
+    [Fact]
+    public void TryGetMode_ReflectsClaimLifecycle_WithoutDisturbingIt()
+    {
+        const string mapEventId = "read-claim-mode";
+
+        try
+        {
+            Assert.False(ServerBattleModeArbiter.TryGetMode(null, out _));
+            Assert.False(ServerBattleModeArbiter.TryGetMode(mapEventId, out _));
+
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId));
+            Assert.True(ServerBattleModeArbiter.TryGetMode(mapEventId, out var missionMode));
+            Assert.Equal(BattleStartMode.Mission, missionMode);
+            Assert.False(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
+
+            Assert.True(ServerBattleModeArbiter.ReleaseMission(mapEventId));
+            Assert.True(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
+            Assert.True(ServerBattleModeArbiter.TryGetMode(mapEventId, out var simulationMode));
+            Assert.Equal(BattleStartMode.Simulation, simulationMode);
         }
         finally
         {
