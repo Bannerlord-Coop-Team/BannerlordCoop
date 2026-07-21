@@ -3,6 +3,7 @@ using Common;
 using Common.Logging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -25,6 +26,35 @@ namespace GameInterface.Services.SiegeEvents.Commands;
 public class SiegeDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeDebugCommand>();
+
+    [CommandLineArgumentFunction("leave_settlement", "coop.debug.siege")]
+    public static string LeaveSettlement(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.siege.leave_settlement";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        var party = MobileParty.MainParty;
+        if (party == null)
+        {
+            return "The local player party is unavailable";
+        }
+
+        if (party.CurrentSettlement == null)
+        {
+            return "The local player party is not in a settlement encounter";
+        }
+
+        var settlementName = party.CurrentSettlement.Name;
+        PlayerLeaveSettlementPatch.RequestLeave();
+        return $"Requested that the local player party leave {settlementName}";
+    }
 
     // coop.debug.siege.start
     /// <summary>
