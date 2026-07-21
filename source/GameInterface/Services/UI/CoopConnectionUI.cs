@@ -1,8 +1,4 @@
-﻿#if DEBUG
-using Common.Messaging;
-using Common.Network.Session;
-#endif
-using TaleWorlds.Engine.GauntletUI;
+﻿using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.ScreenSystem;
 
@@ -17,22 +13,10 @@ public class CoopConnectionUI : ScreenBase
     private GauntletMovieIdentifier _gauntletMovie;
     private bool _focusSteamLobbyHostSearchOnNextFrame;
 
-#if DEBUG
-    internal static ISteamLobbyBrowser DebugSteamLobbyBrowser { get; set; }
-    internal static CoopConnectMenuVM DebugDataSource { get; private set; }
-#endif
-
     protected override void OnInitialize()
     {
         base.OnInitialize();
-#if DEBUG
-        _dataSource = DebugSteamLobbyBrowser == null
-            ? new CoopConnectMenuVM()
-            : new CoopConnectMenuVM(DebugSteamLobbyBrowser, MessageBroker.Instance);
-        DebugDataSource = _dataSource;
-#else
         _dataSource = new CoopConnectMenuVM();
-#endif
         _gauntletLayer = new GauntletLayer("CoopConnectionUI", 100)
         {
             IsFocusLayer = true
@@ -74,13 +58,6 @@ public class CoopConnectionUI : ScreenBase
             _dataSource.SteamLobbiesTabActivated -= QueueSteamLobbyHostSearchFocus;
         }
         _dataSource?.Dispose();
-#if DEBUG
-        if (ReferenceEquals(DebugDataSource, _dataSource))
-        {
-            DebugDataSource = null;
-            DebugSteamLobbyBrowser = null;
-        }
-#endif
         base.OnFinalize();
         RemoveLayer(_gauntletLayer);
         _dataSource = null;
