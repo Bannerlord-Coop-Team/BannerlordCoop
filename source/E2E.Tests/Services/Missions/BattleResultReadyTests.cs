@@ -401,6 +401,38 @@ public class BattleResultReadyTests : MissionTestEnvironment
         }, VictoryConclusionDisabledMethods());
     }
 
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void MissingMapEvent_DoesNotRetryRejectedConclusion()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "campaign-player");
+        var host = Clients.First();
+        RegisterPeer(host, "host");
+        EnterBattleWithMembership(host, "host", mapEventId);
+
+        var publishedConclusions = 0;
+        Server.Call(() =>
+        {
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Subscribe<NetworkChangeBattleState>(_ => publishedConclusions++);
+            Server.Resolve<ServerBattleCompletionHandler>().ConclusionRetryDelay = TimeSpan.Zero;
+
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.Remove(mapEvent));
+        });
+
+        SendResult(host, mapEventId, BattleState.AttackerVictory);
+        Assert.Equal(1, publishedConclusions);
+
+        Server.Call(() =>
+        {
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Publish(this, new CampaignTick());
+            broker.Publish(this, new CampaignTick());
+        }, VictoryConclusionDisabledMethods());
+        Assert.Equal(1, publishedConclusions);
+    }
+
     private void RegisterPeer(EnvironmentInstance client, string controllerId)
     {
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));

@@ -16,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.Instances.Handlers;
@@ -314,6 +315,20 @@ public class ServerBattleCompletionHandler : IHandler
 
             if (!result.Applied)
             {
+                if (!objectManager.TryGetObject<MapEvent>(result.MapEventId, out var mapEvent) ||
+                    mapEvent.IsFinalized ||
+                    mapEvent.BattleState == BattleState.AttackerVictory ||
+                    mapEvent.BattleState == BattleState.DefenderVictory)
+                {
+                    conclusionRetries.Remove(result.MapEventId);
+                    lock (pendingJoinersGate)
+                        pendingJoiners.Remove(result.MapEventId);
+                    completionTracker.Clear(result.MapEventId);
+                    Logger.Warning("Battle conclusion for {Instance} was not applied because the map event is no longer active",
+                        result.MapEventId);
+                    return;
+                }
+
                 conclusionRetries[result.MapEventId] = DateTime.UtcNow + ConclusionRetryDelay;
                 Logger.Warning("Battle conclusion for {Instance} was not applied; reopening it for retry",
                     result.MapEventId);
