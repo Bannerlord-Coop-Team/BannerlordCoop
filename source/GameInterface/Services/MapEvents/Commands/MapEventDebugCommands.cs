@@ -675,7 +675,7 @@ public class MapEventDebugCommands
         if (mapEvent == null) return "<null>";
 
         var id = "<no id>";
-        if (objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
+        if (!mapEvent.IsFinalized && objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
             id = resolved;
 
         return $"id={id} finalized={mapEvent.IsFinalized} state={mapEvent.BattleState} winner={mapEvent.WinningSide}";
