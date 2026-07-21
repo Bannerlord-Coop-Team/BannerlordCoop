@@ -4,6 +4,9 @@ using Common.Logging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party.Commands;
+using GameInterface.Services.SiegeEvents.Interfaces;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -86,12 +89,66 @@ public class SiegeDebugCommand
             }
         }
 
+        var originalPosition = besieger.Position;
+
         // Put the besieger at the gate and commit its AI to the siege.
         besieger.Position = settlement.GatePosition;
         besieger.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
         Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besieger);
 
-        return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}";
+        return $"{besieger.Name} ({besieger.StringId}) is now besieging {settlement.Name}\n" +
+            $"Restore with: coop.debug.siege.stop {settlement.StringId} " +
+            $"{originalPosition.X:R} {originalPosition.Y:R} {originalPosition.IsOnLand}";
+    }
+
+    /// <summary>
+    /// Ends an AI-led siege through the normal authoritative leave path. Server only.
+    /// </summary>
+    [CommandLineArgumentFunction("stop", "coop.debug.siege")]
+    public static string StopSiege(List<string> args)
+    {
+        if (args.Count != 4)
+        {
+            return "Usage: coop.debug.siege.stop <settlementId> <originalX> <originalY> <originalIsOnLand>";
+        }
+
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be used by the server";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var leader = settlement.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        if (leader == null)
+        {
+            return $"{settlement.Name} has no active siege leader";
+        }
+
+        if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+        {
+            return "Unable to resolve SiegeEventInterface";
+        }
+
+        siegeEventInterface.BreakSiege(leader);
+
+        var restoreResult = PartyCommands.RestorePositionCommand(new List<string>
+        {
+            leader.StringId,
+            args[1],
+            args[2],
+            args[3],
+        });
+        return $"Stopped the siege of {settlement.Name} led by {leader.Name} ({leader.StringId})\n" +
+            restoreResult;
     }
 
     /// <summary>
@@ -181,6 +238,76 @@ public class SiegeDebugCommand
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Reports whether a settlement's replicated siege graph is ready for map visuals. Read-only.
+    /// </summary>
+    [CommandLineArgumentFunction("graph", "coop.debug.siege")]
+    public static string GraphState(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.graph <settlementId>";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var siegeEvent = settlement.SiegeEvent;
+        if (siegeEvent == null)
+        {
+            return $"{settlement.Name} ({settlement.StringId}): siege=False graphComplete=False";
+        }
+
+        var camp = siegeEvent.BesiegerCamp;
+        return $"{settlement.Name} ({settlement.StringId}): siege=True " +
+            $"camp={camp != null} leader={camp?.LeaderParty != null} " +
+            $"attackerContainer={camp?.SiegeEngines != null} " +
+            $"defenderContainer={settlement.SiegeEngines != null} " +
+            $"graphComplete={SiegeContainerLookup.IsGraphComplete(siegeEvent)}";
+    }
+
+    /// <summary>
+    /// Centers the client campaign camera on a settlement for visual inspection.
+    /// </summary>
+    [CommandLineArgumentFunction("focus", "coop.debug.siege")]
+    public static string FocusSettlement(List<string> args)
+    {
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.focus <settlementId>";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        if (MapScreen.Instance == null)
+        {
+            return "The campaign map screen is not active";
+        }
+
+        MapScreen.Instance.FastMoveCameraToPosition(settlement.Position);
+        return $"Centered the campaign camera on {settlement.Name} ({settlement.StringId})";
     }
 
     // coop.debug.siege.dump_party <heroName|main|partyId>
