@@ -158,7 +158,7 @@ jobs:
           for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll; do
             test -s "$binary/$required"
           done
-          cp deploy/start-client.bat deploy/start-server.bat 'deploy/Server Instructions.md' "$module/"
+          cp deploy/start-client.bat 'deploy/Server Instructions.md' "$module/"
           cp -R UIMovies/. "$module/GUI/Prefabs/"
 
           coop_version=$(sed -n 's/.*<CoopVersion>\([^<]*\)<\/CoopVersion>.*/\1/p' source/Directory.Build.props)

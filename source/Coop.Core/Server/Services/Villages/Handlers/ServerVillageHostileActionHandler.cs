@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -142,7 +142,9 @@ internal class ServerVillageHostileActionHandler : IHandler
             if (playerParty == raidingParty || playerParty.CurrentSettlement != settlement)
                 continue;
 
-            network.SendAll(new NetworkEndSettlementEncounter(player.MobilePartyId));
+            network.SendAll(new NetworkSettlementEncounterLeaveResult(
+                player.MobilePartyId,
+                SettlementEncounterLeaveOutcome.Applied));
             settlementInterface.PartyLeaveSettlement(playerParty);
         }
     }

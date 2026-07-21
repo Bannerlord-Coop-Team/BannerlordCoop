@@ -63,18 +63,50 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
-            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty))
+            {
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
+            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement))
+            {
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
 
             if (mobileParty.Party?.MapEventSide != null)
             {
                 Logger.Warning(
                     "Rejecting settlement entry for party {PartyId} because it is already in a map event",
                     payload.PartyId);
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
+
+            if (mobileParty.CurrentSettlement != null)
+            {
+                if (mobileParty.CurrentSettlement == settlement)
+                {
+                    network.Send(peer, new NetworkStartSettlementEncounter(payload));
+                }
+                else
+                {
+                    Logger.Warning(
+                        "Rejecting settlement entry for party {PartyId} because it is already in settlement {SettlementId}",
+                        payload.PartyId,
+                        objectManager.TryGetId(mobileParty.CurrentSettlement, out var currentSettlementId)
+                            ? currentSettlementId
+                            : mobileParty.CurrentSettlement.StringId);
+                    network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                }
                 return;
             }
 
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
+
+            // Vanilla starts under-siege and under-raid encounters outside the settlement.
+            if (settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid)) return;
+
             network.SendAllBut(peer, new NetworkPartyEnterSettlement(
                 Compact(payload.SettlementId, typeof(Settlement)),
                 Compact(payload.PartyId, typeof(MobileParty))));
@@ -90,6 +122,14 @@ public class ServerSettlementExitEnterHandler : IHandler
         objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
         if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
         {
+            if (obj.Who is NetPeer suppressedPeer)
+            {
+                network.Send(
+                    suppressedPeer,
+                    new NetworkSettlementEncounterLeaveResult(
+                        payload.PartyId,
+                        SettlementEncounterLeaveOutcome.Suppressed));
+            }
             return;
         }
 
@@ -97,7 +137,11 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         // The sending client is currently in a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
-        network.Send(peer, new NetworkEndSettlementEncounter());
+        network.Send(
+            peer,
+            new NetworkSettlementEncounterLeaveResult(
+                payload.PartyId,
+                SettlementEncounterLeaveOutcome.Applied));
 
         network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
             Compact(payload.PartyId, typeof(MobileParty))));
@@ -135,7 +179,6 @@ public class ServerSettlementExitEnterHandler : IHandler
         {
             return;
         }
-
         network.SendAll(new NetworkPartyLeaveSettlement(
             Compact(mobilePartyId, typeof(MobileParty))));
 

@@ -1,12 +1,16 @@
 using Autofac;
 using Common;
 using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -74,6 +78,66 @@ internal class PartyCommands
         return me.PartyBelongedTo != null
             ? "You are " + me.Name + " | hero id: " + me.StringId + " | party id: " + me.PartyBelongedTo.StringId
             : "You are " + me.Name + " | hero id: " + me.StringId + " | NO PARTY";
+    }
+
+    /// <summary>
+    /// Issues a local player-party point movement order so automated live tests can verify that a restored
+    /// party accepts client control and sends the normal behavior update to the server.
+    /// </summary>
+    [CommandLineArgumentFunction("move_offset", "coop.debug.mobileparty")]
+    public static string MoveOffsetCommand(List<string> strings)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (strings.Count != 2 ||
+            !float.TryParse(strings[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetX) ||
+            !float.TryParse(strings[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetY))
+            return "Usage: coop.debug.mobileparty.move_offset <offsetX> <offsetY>";
+
+        var party = Hero.MainHero?.PartyBelongedTo;
+        if (party == null) return "The local player hero has no party.";
+
+        var current = party.Position;
+        var target = new CampaignVec2(
+            new TaleWorlds.Library.Vec2(current.X + offsetX, current.Y + offsetY),
+            current.IsOnLand);
+        party.SetNavigationModePoint(target);
+        MessageBroker.Instance.Publish(typeof(PartyCommands), new PartyBehaviorChangeAttempted(party));
+
+        return
+            $"Movement order submitted for {party.StringId}.\n" +
+            $"From: {current.X:R},{current.Y:R}\n" +
+            $"Target: {target.X:R},{target.Y:R}";
+    }
+
+    /// <summary>
+    /// Restores a party to an exact campaign-map position and hold state after an automated live test.
+    /// </summary>
+    [CommandLineArgumentFunction("restore_position", "coop.debug.mobileparty")]
+    public static string RestorePositionCommand(List<string> strings)
+    {
+        if (!ModInformation.IsServer) return "Command can only be run on the server.";
+        if (strings.Count != 4 ||
+            !float.TryParse(strings[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionX) ||
+            !float.TryParse(strings[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionY) ||
+            !bool.TryParse(strings[3], out var isOnLand))
+            return "Usage: coop.debug.mobileparty.restore_position <partyId> <x> <y> <isOnLand>";
+
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found";
+
+        party.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(positionX, positionY), isOnLand);
+        party.SetMoveModeHold();
+        party.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(PartyCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea,
+                resetMovementToHold: true));
+
+        return $"Restored {party.StringId} to {party.Position.X:R},{party.Position.Y:R} in Hold mode.";
     }
 
     /// <summary>

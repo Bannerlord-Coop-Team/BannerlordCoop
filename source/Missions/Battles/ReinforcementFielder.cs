@@ -568,6 +568,7 @@ public class ReinforcementFielder : IReinforcementFielder
         var buildData = new AgentBuildData(character);
         buildData.Team(team);
         buildData.TroopOrigin(origin);
+        buildData.Banner(origin.Banner);
         buildData.Equipment(equipment);
         buildData.BodyProperties(character.GetBodyPropertiesMax());
         buildData.Controller(AgentControllerType.AI);
