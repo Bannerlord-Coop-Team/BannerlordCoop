@@ -4,6 +4,7 @@ using Common.Logging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections;
@@ -14,6 +15,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -177,6 +179,26 @@ public class MapEventDebugCommands
 
         return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
                $"against player {args[0]}.";
+    }
+
+    [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
+    public static string EnterCurrentBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.enter_current_battle";
+
+        if (PlayerEncounter.Current == null || PlayerEncounter.Battle == null)
+            return "No active battle encounter.";
+
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext == null)
+            return "No active encounter menu.";
+
+        MenuHelper.EncounterAttackConsequence(new MenuCallbackArgs(menuContext, null));
+        return "Requested entry into the current battle.";
     }
 
     // coop.debug.mapevent.peace_pursuit_fixture PlayerOne
