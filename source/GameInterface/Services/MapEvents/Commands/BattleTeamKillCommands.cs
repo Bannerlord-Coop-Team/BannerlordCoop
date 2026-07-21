@@ -51,6 +51,27 @@ Finishes the current battle deployment through the native deployment handler.";
         return "Finished the current deployment.";
     }
 
+    private const string LeaveBattleUsage =
+@"Usage:
+  coop.debug.mapevent.leave_battle
+
+Leaves the current battle through the native mission lifecycle.";
+
+    [CommandLineArgumentFunction("leave_battle", "coop.debug.mapevent")]
+    public static string LeaveBattle(List<string> args)
+    {
+        var ctx = new CommandContext("leave_battle", LeaveBattleUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        mission.EndMission();
+        return "Left the current battle mission.";
+    }
+
     private const string KillEnemyUsage =
 @"Usage:
   coop.debug.mapevent.kill_enemy
