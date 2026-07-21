@@ -236,8 +236,16 @@ public class MapEventDebugCommands
         if (args.Count != 0)
             return "Usage: coop.debug.mapevent.enter_current_battle";
 
-        if (PlayerEncounter.Current == null || PlayerEncounter.Battle == null)
-            return "No active battle encounter.";
+        if (PlayerEncounter.Current == null)
+            return "No active encounter.";
+
+        if (PlayerEncounter.Battle == null)
+        {
+            if (PlayerEncounter.StartBattle() == null)
+                return "Unable to start the current battle.";
+
+            GameMenu.SwitchToMenu("encounter");
+        }
 
         var menuContext = Campaign.Current?.CurrentMenuContext;
         if (menuContext == null)
