@@ -162,9 +162,13 @@ public class SiegeDebugCommand
         var reliefArmy = mapEvent?.InvolvedParties
             .Select(party => party.MobileParty?.Army)
             .FirstOrDefault(army => army?.LeaderParty.MapFaction == settlement.MapFaction);
+        int involvedReliefParties = reliefArmy == null
+            ? 0
+            : mapEvent.InvolvedParties.Count(party => party.MobileParty?.Army == reliefArmy);
         bool reliefEncounterActive = mapEvent != null && reliefArmy != null;
         return $"siege={siegeActive} playerBesieger={playerBesieger} " +
-            $"reliefArmyParties={reliefArmy?.Parties.Count ?? 0} reliefEncounter={reliefEncounterActive} " +
+            $"reliefArmyParties={involvedReliefParties} reliefArmyMembers={reliefArmy?.Parties.Count ?? 0} " +
+            $"reliefEncounter={reliefEncounterActive} " +
             $"playerMapEvent={mapEvent != null}";
     }
 
