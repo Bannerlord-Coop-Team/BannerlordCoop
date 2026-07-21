@@ -32,7 +32,7 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
             var controller = host.Resolve<CoopBattleController>();
             controller.Session.TryBegin("mapEvent1");
             host.NetworkSentMessages.Clear();
-            controller.ResultCommitter.CommitResolvedResult();
+            controller.ResultCommitter.ReportResolvedResult(mock.Shell.MissionResult);
 
             GC.KeepAlive(controller);
         });
@@ -58,7 +58,7 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
             var controller = host.Resolve<CoopBattleController>();
             controller.Session.TryBegin("mapEvent1");
             host.NetworkSentMessages.Clear();
-            controller.ResultCommitter.CommitResolvedResult();
+            controller.ResultCommitter.ReportResolvedResult(mock.Shell.MissionResult);
 
             GC.KeepAlive(controller);
         });

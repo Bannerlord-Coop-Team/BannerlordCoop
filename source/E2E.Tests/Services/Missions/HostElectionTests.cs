@@ -1,3 +1,5 @@
+﻿using Common.Messaging;
+using Missions.Messages;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -37,6 +39,23 @@ public class HostElectionTests : MissionTestEnvironment
         var clients = Clients.ToArray();
         AssertIsLocalHost(clients[0], mapEventId, true);  // ctrl-B joined first, so it is the host
         AssertIsLocalHost(clients[1], mapEventId, false); // ctrl-A is a successor
+    }
+
+    [Fact]
+    public void InitialElection_PublishesLocalAuthorityAcquired()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        var host = Clients.First();
+        int acquired = 0;
+        host.Resolve<IMessageBroker>().Subscribe<BattleHostAuthorityAcquired>(payload =>
+        {
+            if (payload.What.MapEventId == mapEventId)
+                acquired++;
+        });
+
+        EnterBattle(host, mapEventId);
+
+        Assert.Equal(1, acquired);
     }
 
     [Fact]

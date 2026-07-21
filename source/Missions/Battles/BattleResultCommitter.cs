@@ -3,7 +3,6 @@ using Common.Network;
 using Missions.Messages;
 using Serilog;
 using TaleWorlds.Core;
-using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -13,11 +12,6 @@ namespace Missions.Battles;
 /// </summary>
 public interface IBattleResultCommitter
 {
-    /// <summary>
-    /// Report the current mission result during mission teardown as a fallback for result-ready callbacks.
-    /// </summary>
-    void CommitResolvedResult();
-
     /// <summary>Report a resolved native mission result without waiting for the player to leave.</summary>
     void ReportResolvedResult(MissionResult result);
 }
@@ -34,11 +28,6 @@ public class BattleResultCommitter : IBattleResultCommitter
     {
         this.network = network;
         this.session = session;
-    }
-
-    public void CommitResolvedResult()
-    {
-        ReportResolvedResult(Mission.Current?.MissionResult);
     }
 
     public void ReportResolvedResult(MissionResult result)

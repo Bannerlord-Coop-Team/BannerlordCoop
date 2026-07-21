@@ -1,12 +1,15 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Services.Instances.Handlers;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using Missions.Messages;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -179,6 +182,62 @@ public class BattleResultReadyTests : MissionTestEnvironment
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
             this,
             new BattleJoinCancelled(mapEventId, "cancelled-joiner")), VictoryConclusionDisabledMethods());
+
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void HostResult_FinalizesWhenAcceptedJoinerReservationExpires()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
+        var host = Clients.First();
+        RegisterPeer(host, "host");
+        EnterBattleWithMembership(host, "host", mapEventId);
+
+        Server.Call(() =>
+        {
+            var handler = Server.Resolve<ServerBattleCompletionHandler>();
+            handler.JoinReservationTimeout = TimeSpan.Zero;
+            Server.Resolve<IMessageBroker>().Publish(
+                host.NetPeer,
+                new BattleJoinAccepted(mapEventId, "stalled-joiner"));
+        });
+        SendResult(host, mapEventId, BattleState.AttackerVictory);
+        AssertMapEventPresent(mapEventId);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick()),
+            VictoryConclusionDisabledMethods());
+
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void ResolvedMembersLeaveBeforePromotionReplay_FinalizesFromAgreedReports()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "successor");
+        var clients = Clients.ToArray();
+        RegisterPeer(clients[0], "host");
+        RegisterPeer(clients[1], "successor");
+        EnterBattleWithMembership(clients[0], "host", mapEventId);
+        EnterBattleWithMembership(clients[1], "successor", mapEventId);
+
+        Server.Call(() =>
+        {
+            Server.SimulateMessage(
+                clients[0].NetPeer,
+                new NetworkBattleResultReady(mapEventId, BattleState.DefenderVictory, hostEpoch: 1));
+            Server.SimulateMessage(
+                clients[0].NetPeer,
+                new NetworkMissionLeft("host", mapEventId));
+            Server.SimulateMessage(
+                clients[1].NetPeer,
+                new NetworkBattleResultReady(mapEventId, BattleState.DefenderVictory, hostEpoch: 1));
+            Server.SimulateMessage(
+                clients[1].NetPeer,
+                new NetworkMissionLeft("successor", mapEventId));
+        }, VictoryConclusionDisabledMethods());
 
         AssertMapEventRemoved(mapEventId);
     }

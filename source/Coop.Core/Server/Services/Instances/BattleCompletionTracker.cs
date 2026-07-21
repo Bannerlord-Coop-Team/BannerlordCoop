@@ -14,16 +14,25 @@ public interface IBattleCompletionTracker
         IReadOnlyCollection<string> currentMembers,
         string hostControllerId,
         int hostEpoch,
-        out BattleState concludedState);
+        out BattleState concludedState,
+        bool canConclude = true);
 
     bool TryReconcile(
         string instanceId,
         IReadOnlyCollection<string> currentMembers,
         string hostControllerId,
         int hostEpoch,
-        out BattleState concludedState);
+        out BattleState concludedState,
+        bool canConclude = true);
 
-    void RemoveMember(string instanceId, string controllerId, bool isInstanceEmpty);
+    bool TryConcludeAbandoned(
+        string instanceId,
+        out BattleState concludedState,
+        out int hostEpoch,
+        out int memberCount);
+
+    void ResetMember(string instanceId, string controllerId, bool isFirstMember);
+    void Clear(string instanceId);
 }
 
 /// <inheritdoc cref="IBattleCompletionTracker"/>
@@ -31,6 +40,8 @@ public class BattleCompletionTracker : IBattleCompletionTracker
 {
     private readonly object gate = new object();
     private readonly Dictionary<string, Dictionary<string, BattleResultReport>> reports = new();
+    private readonly Dictionary<string, HashSet<string>> participants = new();
+    private readonly Dictionary<string, BattleResultReport> authoritativeReports = new();
     private readonly HashSet<string> concludedInstances = new();
 
     public bool TryRecordResult(
@@ -41,11 +52,12 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         IReadOnlyCollection<string> currentMembers,
         string hostControllerId,
         int hostEpoch,
-        out BattleState concludedState)
+        out BattleState concludedState,
+        bool canConclude = true)
     {
         concludedState = BattleState.None;
         if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(controllerId) ||
-            string.IsNullOrEmpty(hostControllerId) || currentMembers == null ||
+            currentMembers == null ||
             (battleState != BattleState.AttackerVictory && battleState != BattleState.DefenderVictory))
         {
             return false;
@@ -60,16 +72,20 @@ public class BattleCompletionTracker : IBattleCompletionTracker
             if (!members.Contains(controllerId))
                 return false;
 
+            GetParticipants(instanceId).UnionWith(members);
+
             if (!reports.TryGetValue(instanceId, out var instanceReports))
             {
                 instanceReports = new Dictionary<string, BattleResultReport>();
                 reports[instanceId] = instanceReports;
             }
 
-            RemoveDepartedReports(instanceReports, members);
-            instanceReports[controllerId] = new BattleResultReport(battleState, reportEpoch);
+            var report = new BattleResultReport(battleState, reportEpoch);
+            instanceReports[controllerId] = report;
+            RememberAuthoritativeReport(instanceId, controllerId, hostControllerId, hostEpoch, report);
 
-            return TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, out concludedState);
+            return canConclude &&
+                TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, out concludedState);
         }
     }
 
@@ -78,10 +94,11 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         IReadOnlyCollection<string> currentMembers,
         string hostControllerId,
         int hostEpoch,
-        out BattleState concludedState)
+        out BattleState concludedState,
+        bool canConclude = true)
     {
         concludedState = BattleState.None;
-        if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(hostControllerId) || currentMembers == null)
+        if (string.IsNullOrEmpty(instanceId) || currentMembers == null)
             return false;
 
         lock (gate)
@@ -93,43 +110,78 @@ public class BattleCompletionTracker : IBattleCompletionTracker
             }
 
             var members = new HashSet<string>(currentMembers);
-            RemoveDepartedReports(instanceReports, members);
-            return TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, out concludedState);
+            GetParticipants(instanceId).UnionWith(members);
+            if (instanceReports.TryGetValue(hostControllerId ?? string.Empty, out var hostReport))
+                RememberAuthoritativeReport(instanceId, hostControllerId, hostControllerId, hostEpoch, hostReport);
+
+            return canConclude &&
+                TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, out concludedState);
         }
     }
 
-    public void RemoveMember(string instanceId, string controllerId, bool isInstanceEmpty)
+    public bool TryConcludeAbandoned(
+        string instanceId,
+        out BattleState concludedState,
+        out int hostEpoch,
+        out int memberCount)
     {
+        concludedState = BattleState.None;
+        hostEpoch = 0;
+        memberCount = 0;
         if (string.IsNullOrEmpty(instanceId))
+            return false;
+
+        lock (gate)
+        {
+            if (concludedInstances.Contains(instanceId) ||
+                !reports.TryGetValue(instanceId, out var instanceReports) ||
+                !participants.TryGetValue(instanceId, out var instanceParticipants) ||
+                instanceParticipants.Count == 0 ||
+                !authoritativeReports.TryGetValue(instanceId, out var authoritativeReport))
+            {
+                return false;
+            }
+
+            foreach (var controllerId in instanceParticipants)
+            {
+                if (!instanceReports.TryGetValue(controllerId, out var report) ||
+                    report.BattleState != authoritativeReport.BattleState)
+                {
+                    return false;
+                }
+            }
+
+            concludedInstances.Add(instanceId);
+            concludedState = authoritativeReport.BattleState;
+            hostEpoch = authoritativeReport.HostEpoch;
+            memberCount = instanceParticipants.Count;
+            return true;
+        }
+    }
+
+    public void ResetMember(string instanceId, string controllerId, bool isFirstMember)
+    {
+        if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(controllerId))
             return;
 
         lock (gate)
         {
-            if (isInstanceEmpty)
-            {
-                reports.Remove(instanceId);
-                concludedInstances.Remove(instanceId);
-                return;
-            }
+            if (isFirstMember)
+                ClearInternal(instanceId);
 
+            GetParticipants(instanceId).Add(controllerId);
             if (reports.TryGetValue(instanceId, out var instanceReports))
                 instanceReports.Remove(controllerId);
         }
     }
 
-    private static void RemoveDepartedReports(
-        Dictionary<string, BattleResultReport> instanceReports,
-        HashSet<string> currentMembers)
+    public void Clear(string instanceId)
     {
-        var departed = new List<string>();
-        foreach (var controllerId in instanceReports.Keys)
-        {
-            if (!currentMembers.Contains(controllerId))
-                departed.Add(controllerId);
-        }
+        if (string.IsNullOrEmpty(instanceId))
+            return;
 
-        foreach (var controllerId in departed)
-            instanceReports.Remove(controllerId);
+        lock (gate)
+            ClearInternal(instanceId);
     }
 
     private bool TryConclude(
@@ -141,7 +193,8 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         out BattleState concludedState)
     {
         concludedState = BattleState.None;
-        if (!currentMembers.Contains(hostControllerId) ||
+        if (string.IsNullOrEmpty(hostControllerId) ||
+            !currentMembers.Contains(hostControllerId) ||
             !instanceReports.TryGetValue(hostControllerId, out var hostReport) ||
             hostReport.HostEpoch != hostEpoch)
         {
@@ -158,6 +211,40 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         concludedInstances.Add(instanceId);
         concludedState = hostReport.BattleState;
         return true;
+    }
+
+    private HashSet<string> GetParticipants(string instanceId)
+    {
+        if (!participants.TryGetValue(instanceId, out var instanceParticipants))
+        {
+            instanceParticipants = new HashSet<string>();
+            participants[instanceId] = instanceParticipants;
+        }
+
+        return instanceParticipants;
+    }
+
+    private void RememberAuthoritativeReport(
+        string instanceId,
+        string controllerId,
+        string hostControllerId,
+        int hostEpoch,
+        BattleResultReport report)
+    {
+        if (!string.IsNullOrEmpty(hostControllerId) &&
+            controllerId == hostControllerId &&
+            report.HostEpoch == hostEpoch)
+        {
+            authoritativeReports[instanceId] = report;
+        }
+    }
+
+    private void ClearInternal(string instanceId)
+    {
+        reports.Remove(instanceId);
+        participants.Remove(instanceId);
+        authoritativeReports.Remove(instanceId);
+        concludedInstances.Remove(instanceId);
     }
 
     private readonly struct BattleResultReport

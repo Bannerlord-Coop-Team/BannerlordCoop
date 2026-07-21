@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network.Messages;
 using GameInterface.Services.MapEvents;
@@ -6,10 +7,12 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Core;
@@ -28,7 +31,9 @@ public class ServerBattleCompletionHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IBattleCompletionTracker completionTracker;
     private readonly object pendingJoinersGate = new object();
-    private readonly Dictionary<string, Dictionary<string, NetPeer>> pendingJoiners = new();
+    private readonly Dictionary<string, Dictionary<string, (NetPeer Peer, DateTime ExpiresUtc)>> pendingJoiners = new();
+
+    internal TimeSpan JoinReservationTimeout { get; set; } = TimeSpan.FromMinutes(2);
 
     public ServerBattleCompletionHandler(
         IMessageBroker messageBroker,
@@ -53,6 +58,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Subscribe<NetworkMissionEntered>(Handle_NetworkMissionEntered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     public void Dispose()
@@ -65,6 +71,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Unsubscribe<NetworkMissionEntered>(Handle_NetworkMissionEntered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
     private void Handle_NetworkBattleResultReady(MessagePayload<NetworkBattleResultReady> payload)
@@ -82,43 +89,37 @@ public class ServerBattleCompletionHandler : IHandler
     private void TryRecordBattleResult(string controllerId, NetworkBattleResultReady result)
     {
         var instanceId = result.InstanceId;
-        if (!missionManager.TryGetControllers(instanceId, out var currentMembers) ||
-            !hostRegistry.TryGet(instanceId, out var assignment))
+        if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
         {
             Logger.Information("Ignoring battle result report from {Controller} for inactive instance {Instance}",
                 controllerId, instanceId);
             return;
         }
 
-        var expectedReporters = IncludePendingJoiners(instanceId, currentMembers);
+        hostRegistry.TryGet(instanceId, out var assignment);
+        bool canConclude = !HasPendingJoiners(instanceId);
 
         if (!completionTracker.TryRecordResult(
                 instanceId,
                 controllerId,
                 result.BattleState,
                 result.HostEpoch,
-                expectedReporters,
-                assignment.HostControllerId,
-                assignment.Epoch,
-                out var concludedState))
+                currentMembers,
+                assignment?.HostControllerId,
+                assignment?.Epoch ?? 0,
+                out var concludedState,
+                canConclude))
         {
             return;
         }
 
-        PublishConclusion(instanceId, expectedReporters.Count, concludedState, assignment.Epoch);
+        PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
     }
 
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
-        completionTracker.RemoveMember(
-            payload.What.InstanceId,
-            payload.What.ControllerId,
-            payload.What.IsInstanceEmpty);
-
         RemovePendingJoiner(payload.What.InstanceId, payload.What.ControllerId);
-
-        if (!payload.What.IsInstanceEmpty)
-            TryConcludeReportedBattle(payload.What.InstanceId);
+        TryConcludeReportedBattle(payload.What.InstanceId);
     }
 
     private void Handle_BattleHostAssignmentChanged(MessagePayload<BattleHostAssignmentChanged> payload)
@@ -128,38 +129,42 @@ public class ServerBattleCompletionHandler : IHandler
 
     private void TryConcludeReportedBattle(string instanceId)
     {
-        if (!missionManager.TryGetControllers(instanceId, out var currentMembers) ||
-            !hostRegistry.TryGet(instanceId, out var assignment))
+        bool hasPendingJoiners = HasPendingJoiners(instanceId);
+        if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
         {
+            if (!hasPendingJoiners && completionTracker.TryConcludeAbandoned(
+                    instanceId,
+                    out var abandonedState,
+                    out var abandonedEpoch,
+                    out var abandonedMemberCount))
+            {
+                QueueAbandonedConclusion(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
+            }
+
             return;
         }
 
-        var expectedReporters = IncludePendingJoiners(instanceId, currentMembers);
+        if (!hostRegistry.TryGet(instanceId, out var assignment))
+            return;
+
         if (!completionTracker.TryReconcile(
                 instanceId,
-                expectedReporters,
+                currentMembers,
                 assignment.HostControllerId,
                 assignment.Epoch,
-                out var concludedState))
+                out var concludedState,
+                !hasPendingJoiners))
         {
             return;
         }
 
-        PublishConclusion(instanceId, expectedReporters.Count, concludedState, assignment.Epoch);
+        PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
     }
 
-    private IReadOnlyCollection<string> IncludePendingJoiners(
-        string instanceId,
-        IReadOnlyCollection<string> missionMembers)
+    private bool HasPendingJoiners(string instanceId)
     {
-        var expectedReporters = new HashSet<string>(missionMembers);
         lock (pendingJoinersGate)
-        {
-            if (pendingJoiners.TryGetValue(instanceId, out var joiners))
-                expectedReporters.UnionWith(joiners.Keys);
-        }
-
-        return expectedReporters;
+            return pendingJoiners.TryGetValue(instanceId, out var joiners) && joiners.Count > 0;
     }
 
     private void Handle_BattleJoinAccepted(MessagePayload<BattleJoinAccepted> payload)
@@ -171,11 +176,11 @@ public class ServerBattleCompletionHandler : IHandler
         {
             if (!pendingJoiners.TryGetValue(payload.What.InstanceId, out var joiners))
             {
-                joiners = new Dictionary<string, NetPeer>();
+                joiners = new Dictionary<string, (NetPeer, DateTime)>();
                 pendingJoiners[payload.What.InstanceId] = joiners;
             }
 
-            joiners[payload.What.ControllerId] = peer;
+            joiners[payload.What.ControllerId] = (peer, DateTime.UtcNow + JoinReservationTimeout);
         }
     }
 
@@ -188,6 +193,10 @@ public class ServerBattleCompletionHandler : IHandler
     private void Handle_NetworkMissionEntered(MessagePayload<NetworkMissionEntered> payload)
     {
         RemovePendingJoiner(payload.What.InstanceId, payload.What.ControllerId);
+
+        bool isFirstMember = missionManager.TryGetControllers(payload.What.InstanceId, out var members) &&
+            members.Count == 1;
+        completionTracker.ResetMember(payload.What.InstanceId, payload.What.ControllerId, isFirstMember);
     }
 
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
@@ -198,7 +207,7 @@ public class ServerBattleCompletionHandler : IHandler
             foreach (var entry in pendingJoiners)
             {
                 var disconnected = entry.Value
-                    .Where(joiner => ReferenceEquals(joiner.Value, payload.What.PlayerId))
+                    .Where(joiner => ReferenceEquals(joiner.Value.Peer, payload.What.PlayerId))
                     .Select(joiner => joiner.Key)
                     .ToList();
                 foreach (var controllerId in disconnected)
@@ -221,6 +230,37 @@ public class ServerBattleCompletionHandler : IHandler
 
         lock (pendingJoinersGate)
             pendingJoiners.Remove(mapEventId);
+        completionTracker.Clear(mapEventId);
+    }
+
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        var now = DateTime.UtcNow;
+        var changedInstances = new HashSet<string>();
+        lock (pendingJoinersGate)
+        {
+            foreach (var entry in pendingJoiners)
+            {
+                var expired = entry.Value
+                    .Where(joiner => now >= joiner.Value.ExpiresUtc)
+                    .Select(joiner => joiner.Key)
+                    .ToList();
+                foreach (var controllerId in expired)
+                {
+                    entry.Value.Remove(controllerId);
+                    Logger.Warning("Battle join reservation for {Controller} in {Instance} expired after {Timeout}",
+                        controllerId, entry.Key, JoinReservationTimeout);
+                }
+
+                if (expired.Count > 0)
+                    changedInstances.Add(entry.Key);
+            }
+
+            RemoveEmptyPendingInstances();
+        }
+
+        foreach (var instanceId in changedInstances)
+            TryConcludeReportedBattle(instanceId);
     }
 
     private void RemovePendingJoiner(string instanceId, string controllerId)
@@ -254,5 +294,21 @@ public class ServerBattleCompletionHandler : IHandler
         Logger.Information("All {Count} mission member(s) reported {State} for battle {Instance}; concluding at host epoch {Epoch}",
             memberCount, concludedState, instanceId, hostEpoch);
         messageBroker.Publish(this, new NetworkChangeBattleState(instanceId, concludedState, hostEpoch));
+    }
+
+    private void QueueAbandonedConclusion(
+        string instanceId,
+        int memberCount,
+        BattleState concludedState,
+        int hostEpoch)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (missionManager.TryGetControllers(instanceId, out _))
+                return;
+
+            hostRegistry.Remove(instanceId);
+            PublishConclusion(instanceId, memberCount, concludedState, hostEpoch);
+        }, context: nameof(QueueAbandonedConclusion));
     }
 }

@@ -741,6 +741,7 @@ internal class BattleHostHandler : IHandler
 
         // Capture the host we knew before applying the update, so we can detect a migration TO us.
         string previousHost = null;
+        bool wasLocalHost = false;
         if (hostRegistry.TryGet(message.MapEventId, out var previous))
         {
             // BR-102: assignments are ordered by their host epoch. One LOWER than what we already hold is a
@@ -754,6 +755,7 @@ internal class BattleHostHandler : IHandler
             }
 
             previousHost = previous.HostControllerId;
+            wasLocalHost = previous.HostControllerId == controllerIdProvider.ControllerId;
         }
 
         var assignment = new BattleHostAssignment(
@@ -761,6 +763,10 @@ internal class BattleHostHandler : IHandler
             message.SuccessorControllerIds ?? Array.Empty<string>(),
             message.Epoch);
         hostRegistry.Set(message.MapEventId, assignment);
+
+        bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
+        if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))
+            messageBroker.Publish(this, new BattleHostAuthorityAcquired(message.MapEventId));
 
         Logger.Information("[BattleHost] Battle {MapEventId} host is {Host}{IsMe} at epoch {Epoch} (successors: {Successors})",
             message.MapEventId,
@@ -773,7 +779,7 @@ internal class BattleHostHandler : IHandler
         // battle continues uninterrupted (the controller does the actual adoption with the live mission).
         if (previousHost != null
             && previousHost != message.HostControllerId
-            && message.HostControllerId == controllerIdProvider.ControllerId)
+            && isLocalHost)
         {
             Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
             messageBroker.Publish(this, new BattleHostMigrated(message.MapEventId, previousHost));

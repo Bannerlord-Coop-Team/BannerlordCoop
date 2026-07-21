@@ -333,11 +333,14 @@ public class CoopBattleController : CoopMissionController
     {
         damageRouter.FlushForMissionEnd();
 
-        // Retreats have no result-ready callback, so report their siege state during teardown.
-        SiegeEngineStateReporter.ReportOnLeavingIfHost();
+        var missionResult = Mission.Current?.MissionResult;
+        if (missionResult?.BattleResolved == true)
+            SiegeEngineStateReporter.ReportConcludedIfHost();
+        else
+            SiegeEngineStateReporter.ReportOnLeavingIfHost();
 
         // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
-        ResultCommitter.CommitResolvedResult();
+        ResultCommitter.ReportResolvedResult(missionResult);
 
         lifecycle.Leave();
     }

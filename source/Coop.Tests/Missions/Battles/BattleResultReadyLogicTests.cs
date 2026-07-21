@@ -83,10 +83,11 @@ public class BattleResultReadyLogicTests
             session.Object);
 
         logic.OnMissionResultReady(result);
-        messageBroker.Publish(this, new BattleHostMigrated("battle", "old-host"));
+        messageBroker.Publish(this, new BattleHostAuthorityAcquired("battle"));
         GameThread.Run(() => { }, blocking: true);
 
         siegeReporter.VerifyAll();
         resultCommitter.VerifyAll();
     }
+
 }

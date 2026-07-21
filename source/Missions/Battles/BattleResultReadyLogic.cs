@@ -26,7 +26,7 @@ public class BattleResultReadyLogic : MissionLogic
         this.messageBroker = messageBroker;
         this.session = session;
 
-        messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+        messageBroker.Subscribe<BattleHostAuthorityAcquired>(Handle_BattleHostAuthorityAcquired);
     }
 
     public override void OnMissionResultReady(MissionResult missionResult)
@@ -42,11 +42,11 @@ public class BattleResultReadyLogic : MissionLogic
 
     public override void OnEndMissionInternal()
     {
-        messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+        messageBroker.Unsubscribe<BattleHostAuthorityAcquired>(Handle_BattleHostAuthorityAcquired);
         base.OnEndMission();
     }
 
-    private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
+    private void Handle_BattleHostAuthorityAcquired(MessagePayload<BattleHostAuthorityAcquired> payload)
     {
         if (resolvedResult == null || payload.What.MapEventId != session.InstanceId)
             return;
@@ -58,6 +58,6 @@ public class BattleResultReadyLogic : MissionLogic
 
             siegeEngineStateReporter.ReportConcludedIfHost();
             resultCommitter.ReportResolvedResult(resolvedResult);
-        }, context: nameof(Handle_BattleHostMigrated));
+        }, context: nameof(Handle_BattleHostAuthorityAcquired));
     }
 }
