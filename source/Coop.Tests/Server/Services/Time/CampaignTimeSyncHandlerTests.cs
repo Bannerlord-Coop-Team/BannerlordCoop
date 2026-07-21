@@ -1,9 +1,12 @@
 ﻿using Common.Network;
 using Common.PacketHandlers;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Handlers;
+using Coop.Tests.Mocks;
 using GameInterface.Services.Time.Interfaces;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -19,9 +22,10 @@ public class CampaignTimeSyncHandlerTests
         using var releaseSend = new ManualResetEventSlim();
         using var disposeStarted = new ManualResetEventSlim();
 
+        var peer = new TestNetwork().CreatePeer();
         var network = new Mock<INetwork>();
         network
-            .Setup(n => n.SendAll(It.IsAny<IPacket>()))
+            .Setup(n => n.Send(peer, It.IsAny<IPacket>()))
             .Callback(() =>
             {
                 sendStarted.Set();
@@ -34,7 +38,18 @@ public class CampaignTimeSyncHandlerTests
             .Setup(m => m.TryGetCurrentTicks(out currentTicks))
             .Returns(true);
 
-        var handler = new CampaignTimeSyncHandler(network.Object, mapTimeTracker.Object);
+        var connection = new Mock<IConnectionLogic>();
+        connection.SetupGet(c => c.Peer).Returns(peer);
+        var connections = new Mock<IConnectionCollection>();
+        connections
+            .Setup(c => c.GetEnumerator())
+            .Returns(() => new List<IConnectionLogic> { connection.Object }.GetEnumerator());
+
+        var handler = new CampaignTimeSyncHandler(
+            network.Object,
+            mapTimeTracker.Object,
+            connections.Object,
+            new Mock<IConnectionMessageQueue>().Object);
 
         Assert.True(sendStarted.Wait(TimeSpan.FromSeconds(5)));
 

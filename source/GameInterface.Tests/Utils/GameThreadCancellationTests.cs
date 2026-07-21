@@ -115,6 +115,25 @@ public sealed class GameThreadCancellationTests
         Assert.True(newSessionActionRan);
     }
 
+    [Fact]
+    public void EnqueueSafe_SkipsWorkWhenItsSessionEndsBeforeDrain()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var gameThread = new GameThreadBlocker();
+        bool staleActionRan = false;
+
+        using (GameThread.ActivateCancellation(cancellation.Token))
+        {
+            GameThread.EnqueueSafe(() => staleActionRan = true);
+        }
+
+        cancellation.Cancel();
+        gameThread.Release();
+        DrainGameThread();
+
+        Assert.False(staleActionRan);
+    }
+
     private static void RunWithCancellation(CancellationToken cancellation, Action action, bool blocking = false)
     {
         using var scope = GameThread.ActivateCancellation(cancellation);

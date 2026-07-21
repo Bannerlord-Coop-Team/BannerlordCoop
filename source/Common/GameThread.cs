@@ -313,6 +313,9 @@ public class GameThread : IUpdateable
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
     {
+        CancellationToken cancellation = m_AmbientCancellation.Value;
+        if (cancellation.IsCancellationRequested) return;
+
         string label = context ?? BuildLabel(callerFile, callerMember);
         lock (Instance.m_QueueLock)
         {
@@ -326,7 +329,7 @@ public class GameThread : IUpdateable
                 {
                     Logger.Error(e, "Failed to run deferred action on the game thread: {Context}", context ?? "(none)");
                 }
-            }, null, label));
+            }, null, label, cancellation));
         }
     }
 
