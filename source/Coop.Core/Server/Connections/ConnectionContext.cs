@@ -1,8 +1,8 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
-using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -28,11 +28,11 @@ public class ConnectionContext
         IHeroInterface heroInterface,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
+        ITimeControlInterface timeControlInterface,
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
-        IExistingPlayerSender existingPlayerSender,
-        IJoinCampaignBaselineSender joinCampaignBaselineSender)
+        IExistingPlayerSender existingPlayerSender)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -43,11 +43,11 @@ public class ConnectionContext
         HeroInterface = heroInterface;
         CoopSessionProvider = coopSessionProvider;
         SaveInterface = saveInterface;
+        TimeControlInterface = timeControlInterface;
         ConnectionMessageQueue = connectionMessageQueue;
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
         ExistingPlayerSender = existingPlayerSender;
-        JoinCampaignBaselineSender = joinCampaignBaselineSender;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -59,9 +59,9 @@ public class ConnectionContext
     public IHeroInterface HeroInterface { get; }
     public ICoopSessionProvider CoopSessionProvider { get; }
     public ISaveInterface SaveInterface { get; }
+    public ITimeControlInterface TimeControlInterface { get; }
     public IConnectionMessageQueue ConnectionMessageQueue { get; }
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
-    public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
 }
