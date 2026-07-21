@@ -244,7 +244,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-005")]
-    public void SuccessorResult_FinalizesAfterPromotedHostReportsCurrentEpoch()
+    public void SuccessorResult_FinalizesWhenReporterBecomesHost()
     {
         var (mapEventId, _) = SetupCoopBattle("host", "successor");
         var clients = Clients.ToArray();
@@ -261,9 +261,6 @@ public class BattleResultReadyTests : MissionTestEnvironment
                 clients[0].NetPeer,
                 new NetworkMissionLeft("host", mapEventId)),
             VictoryConclusionDisabledMethods());
-
-        AssertMapEventPresent(mapEventId);
-        SendResult(clients[1], mapEventId, BattleState.DefenderVictory);
 
         AssertMapEventRemoved(mapEventId);
     }

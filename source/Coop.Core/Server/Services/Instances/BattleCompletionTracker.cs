@@ -31,6 +31,7 @@ public interface IBattleCompletionTracker
         out int hostEpoch,
         out int memberCount);
 
+    void HostAssigned(string instanceId, string hostControllerId, int hostEpoch);
     void MemberDeparted(string instanceId, string controllerId);
     void ResetMember(string instanceId, string controllerId, bool isFirstMember);
     void Clear(string instanceId);
@@ -157,6 +158,27 @@ public class BattleCompletionTracker : IBattleCompletionTracker
             hostEpoch = authoritativeReport.HostEpoch;
             memberCount = instanceParticipants.Count;
             return true;
+        }
+    }
+
+    public void HostAssigned(string instanceId, string hostControllerId, int hostEpoch)
+    {
+        if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(hostControllerId))
+            return;
+
+        lock (gate)
+        {
+            if (concludedInstances.Contains(instanceId) ||
+                !reports.TryGetValue(instanceId, out var instanceReports) ||
+                !instanceReports.TryGetValue(hostControllerId, out var report))
+            {
+                return;
+            }
+
+            var authoritativeReport = new BattleResultReport(
+                hostControllerId, report.BattleState, hostEpoch);
+            instanceReports[hostControllerId] = authoritativeReport;
+            authoritativeReports[instanceId] = authoritativeReport;
         }
     }
 

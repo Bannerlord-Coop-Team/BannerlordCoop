@@ -57,7 +57,18 @@ public class ServerMissionMembershipHandler : IHandler
         var peer = (NetPeer)payload.Who;
         var message = payload.What;
 
-        var others = missionManager.EnterMission(peer, message.ControllerId, message.InstanceId);
+        if (!missionManager.TryEnterMission(
+                peer,
+                message.ControllerId,
+                message.InstanceId,
+                out var others,
+                out var isFirstMember))
+        {
+            return;
+        }
+
+        messageBroker.Publish(this,
+            new MissionMemberEntered(message.ControllerId, message.InstanceId, isFirstMember));
 
         // Introduce the newcomer and each existing member to each other so BOTH sides send their join info
         // (replaces the direct PeerConnected trigger). The introduction travels over the campaign/relay

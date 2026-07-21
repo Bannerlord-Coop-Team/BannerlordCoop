@@ -55,7 +55,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Subscribe<BattleHostAssignmentChanged>(Handle_BattleHostAssignmentChanged);
         messageBroker.Subscribe<BattleJoinAccepted>(Handle_BattleJoinAccepted);
         messageBroker.Subscribe<BattleJoinCancelled>(Handle_BattleJoinCancelled);
-        messageBroker.Subscribe<NetworkMissionEntered>(Handle_NetworkMissionEntered);
+        messageBroker.Subscribe<MissionMemberEntered>(Handle_MissionMemberEntered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -68,7 +68,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Unsubscribe<BattleHostAssignmentChanged>(Handle_BattleHostAssignmentChanged);
         messageBroker.Unsubscribe<BattleJoinAccepted>(Handle_BattleJoinAccepted);
         messageBroker.Unsubscribe<BattleJoinCancelled>(Handle_BattleJoinCancelled);
-        messageBroker.Unsubscribe<NetworkMissionEntered>(Handle_NetworkMissionEntered);
+        messageBroker.Unsubscribe<MissionMemberEntered>(Handle_MissionMemberEntered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
@@ -125,6 +125,14 @@ public class ServerBattleCompletionHandler : IHandler
 
     private void Handle_BattleHostAssignmentChanged(MessagePayload<BattleHostAssignmentChanged> payload)
     {
+        if (hostRegistry.TryGet(payload.What.MapEventId, out var assignment))
+        {
+            completionTracker.HostAssigned(
+                payload.What.MapEventId,
+                assignment.HostControllerId,
+                assignment.Epoch);
+        }
+
         TryConcludeReportedBattle(payload.What.MapEventId);
     }
 
@@ -191,13 +199,13 @@ public class ServerBattleCompletionHandler : IHandler
         TryConcludeReportedBattle(payload.What.InstanceId);
     }
 
-    private void Handle_NetworkMissionEntered(MessagePayload<NetworkMissionEntered> payload)
+    private void Handle_MissionMemberEntered(MessagePayload<MissionMemberEntered> payload)
     {
         RemovePendingJoiner(payload.What.InstanceId, payload.What.ControllerId);
-
-        bool isFirstMember = missionManager.TryGetControllers(payload.What.InstanceId, out var members) &&
-            members.Count == 1;
-        completionTracker.ResetMember(payload.What.InstanceId, payload.What.ControllerId, isFirstMember);
+        completionTracker.ResetMember(
+            payload.What.InstanceId,
+            payload.What.ControllerId,
+            payload.What.IsFirstMember);
     }
 
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
@@ -305,11 +313,11 @@ public class ServerBattleCompletionHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (missionManager.TryGetControllers(instanceId, out _))
-                return;
-
-            hostRegistry.Remove(instanceId);
-            PublishConclusion(instanceId, memberCount, concludedState, hostEpoch);
+            missionManager.TryClaimEmptyInstance(instanceId, () =>
+            {
+                hostRegistry.Remove(instanceId);
+                PublishConclusion(instanceId, memberCount, concludedState, hostEpoch);
+            });
         }, context: nameof(QueueAbandonedConclusion));
     }
 }

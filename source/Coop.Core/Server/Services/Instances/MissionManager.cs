@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Network.Data;
 using GameInterface.Services.Missions;
 using LiteNetLib;
@@ -31,9 +31,15 @@ public interface IMissionManager
     /// Record that <paramref name="controllerId"/> has entered <paramref name="instanceId"/>, mapping it to
     /// the connection the announcement arrived on (<paramref name="peer"/>) so the relay fallback can reach
     /// it. Creates the instance if this is its first member. Driven by a client <c>MissionEntered</c>.
-    /// Returns the members already present (excluding the newcomer) so the caller can introduce them to it.
+    /// Returns false after result finalization claimed the empty instance. On success, returns whether this is
+    /// the first member and the members already present so the caller can publish post-entry state and introductions.
     /// </summary>
-    IReadOnlyList<(string controllerId, NetPeer peer)> EnterMission(NetPeer peer, string controllerId, string instanceId);
+    bool TryEnterMission(
+        NetPeer peer,
+        string controllerId,
+        string instanceId,
+        out IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers,
+        out bool isFirstMember);
 
     /// <summary>
     /// Record that <paramref name="controllerId"/> (on <paramref name="peer"/>) has left
@@ -57,6 +63,12 @@ public interface IMissionManager
     /// Returns false if the instance is unknown.
     /// </summary>
     bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers);
+
+    /// <summary>
+    /// Atomically claims an empty instance for result finalization and runs the conclusion while entry is fenced.
+    /// A later stale entry remains rejected for the lifetime of this campaign session.
+    /// </summary>
+    bool TryClaimEmptyInstance(string instanceId, Action conclusion);
 }
 
 /// <inheritdoc cref="IMissionManager"/>
@@ -66,6 +78,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
     private readonly object gate = new object();
     private readonly Dictionary<string, MissionInstance> byInstanceId = new Dictionary<string, MissionInstance>();
+    private readonly HashSet<string> concludedInstances = new HashSet<string>();
 
     public void HandleIntroductionRequest(
         NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -80,6 +93,12 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            if (concludedInstances.Contains(instanceId))
+            {
+                Logger.Information("Ignoring NAT introduction for concluded instance {Instance}", instanceId);
+                return;
+            }
+
             // Instance ids are derived client-side from (settlement, location), so co-located clients
             // independently arrive at the same id. The first punch for an id creates the instance; the
             // rest are introduced into it. No separate server-assignment round-trip is needed.
@@ -129,10 +148,24 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    public IReadOnlyList<(string controllerId, NetPeer peer)> EnterMission(NetPeer peer, string controllerId, string instanceId)
+    public bool TryEnterMission(
+        NetPeer peer,
+        string controllerId,
+        string instanceId,
+        out IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers,
+        out bool isFirstMember)
     {
         lock (gate)
         {
+            if (concludedInstances.Contains(instanceId))
+            {
+                existingMembers = Array.Empty<(string, NetPeer)>();
+                isFirstMember = false;
+                Logger.Information("Ignoring mission entry by {Controller} for concluded instance {Instance}",
+                    controllerId, instanceId);
+                return false;
+            }
+
             // Shares the instance dictionary with the NAT-punch flow, so the relay context and the punch
             // endpoints for one mission live in the SAME MissionInstance — provided both sides derive the
             // same instance id (see MissionEntered).
@@ -146,7 +179,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
             // Snapshot the members already present BEFORE adding the newcomer, so the caller can introduce
             // the newcomer and the existing members to each other.
-            var others = instance.Controllers
+            isFirstMember = instance.Controllers.Count == 0;
+            existingMembers = instance.Controllers
                 .Where(id => id != controllerId)
                 .Select(id => instance.TryGetPeer(id, out var existingPeer) ? (id, existingPeer) : default)
                 .Where(pair => pair.Item2 != null)
@@ -156,7 +190,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             Logger.Information("Controller {Controller} entered instance {Instance} on {Peer}",
                 controllerId, instanceId, peer);
 
-            return others;
+            return true;
         }
     }
 
@@ -248,6 +282,29 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             // MissionInstance.Controllers already returns a snapshot array — safe to hand out.
             controllers = instance.Controllers;
             return true;
+        }
+    }
+
+    public bool TryClaimEmptyInstance(string instanceId, Action conclusion)
+    {
+        if (string.IsNullOrEmpty(instanceId) || conclusion == null)
+            return false;
+
+        lock (gate)
+        {
+            if (byInstanceId.ContainsKey(instanceId) || !concludedInstances.Add(instanceId))
+                return false;
+
+            try
+            {
+                conclusion();
+                return true;
+            }
+            catch
+            {
+                concludedInstances.Remove(instanceId);
+                throw;
+            }
         }
     }
 
