@@ -58,6 +58,9 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(9)]
     public readonly AttachmentIdMap AttachmentIdMap;
 
+    [ProtoMember(10)]
+    public readonly int BattleSize;
+
     public GameSaveDataPacket(
         byte[] gameSaveData,
         string campaignID,
@@ -67,7 +70,8 @@ public readonly struct GameSaveDataPacket : IPacket
         AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
-        AttachmentIdMap attachmentIdMap)
+        AttachmentIdMap attachmentIdMap,
+        int battleSize)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -78,5 +82,6 @@ public readonly struct GameSaveDataPacket : IPacket
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
         AttachmentIdMap = attachmentIdMap;
+        BattleSize = battleSize;
     }
 }

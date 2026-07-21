@@ -33,6 +33,9 @@ public readonly struct SideReserve
 /// </summary>
 public interface IBattleTroopReserveBuilder : IGameAbstraction
 {
+    /// <summary>Freeze this battle's persistent initial-spawn entitlements from the current full party reserves.</summary>
+    void PreparePlan(MapEvent mapEvent, int battleSize);
+
     /// <summary>
     /// The reserves <paramref name="controllerId"/> currently owns. A party whose resolved owning controller
     /// is in <paramref name="absentControllers"/> (a member explicitly marked absent without withdrawing) is
@@ -42,12 +45,20 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
     IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost,
         IReadOnlyCollection<string> absentControllers = null);
 
+    /// <summary>Allocate a party added after plan preparation from unassigned slots. Returns the party's
+    /// persistent initial-spawn entitlement and reports whether this call added it to the frozen plan.</summary>
+    int GrantUnassignedInitialSpawns(MapEvent mapEvent, MapEventParty party, out bool isPostPlanAddition);
+
     /// <summary>Forget a controller's withdrawn parties: drop them from the ledger and the built-set so that,
     /// if it rejoins, its party is re-flattened fresh (supplied pointer reset) and re-spawns.</summary>
     void ForgetController(MapEvent mapEvent, string controllerId);
 
+    /// <summary>Re-flatten every live reserve with reset supplied pointers while preserving the battle's
+    /// frozen initial-spawn plan.</summary>
+    void RebuildMapEventReserves(MapEvent mapEvent);
+
     /// <summary>Forget EVERY reserve of a battle (its whole ledger entry + flatten cache). Called when a battle
-    /// ENDS — concluded (victory) or fully ABANDONED (host left with no successors) — so the server stops
+    /// ENDS — concluded (victory) or fully ABANDONED (the mission instance is empty) — so the server stops
     /// holding the battle's reserves and a later battle on the SAME map event re-flattens all parties fresh
     /// (otherwise the AI/enemy parties the host had been fielding keep their advanced supplied pointers and
     /// never re-spawn on a restart).</summary>
@@ -58,22 +69,110 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
 public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BattleTroopReserveBuilder>();
+    private const string UnownedAiAuthorityId = "\0unowned-ai";
+
+    private sealed class BattleSpawnPlan
+    {
+        public readonly int BattleSize;
+        public readonly Dictionary<string, int> InitialSpawns;
+        public int AssignedCount;
+
+        public BattleSpawnPlan(int battleSize, IReadOnlyDictionary<string, int> initialSpawns)
+        {
+            BattleSize = battleSize;
+            InitialSpawns = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var allocation in initialSpawns)
+            {
+                InitialSpawns[allocation.Key] = allocation.Value;
+                AssignedCount += allocation.Value;
+            }
+        }
+    }
 
     private readonly IBattleTroopLedger ledger;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly IBattleInitialSpawnAllocator initialSpawnAllocator;
 
     // Parties already flattened into the ledger (by object-manager id). Per-PARTY, not per-map-event, so a
     // party that joins AFTER the battle started (a mid-battle joiner) gets flattened on demand the next time
     // reserves are built — otherwise it would never be in the ledger and that player would own nothing.
     private readonly HashSet<string> builtParties = new HashSet<string>();
+    private readonly Dictionary<string, BattleSpawnPlan> spawnPlans = new Dictionary<string, BattleSpawnPlan>();
     private readonly object gate = new object();
 
-    public BattleTroopReserveBuilder(IBattleTroopLedger ledger, IObjectManager objectManager, IPlayerManager playerManager)
+    public BattleTroopReserveBuilder(
+        IBattleTroopLedger ledger,
+        IObjectManager objectManager,
+        IPlayerManager playerManager,
+        IBattleInitialSpawnAllocator initialSpawnAllocator)
     {
         this.ledger = ledger;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.initialSpawnAllocator = initialSpawnAllocator;
+    }
+
+    public void PreparePlan(MapEvent mapEvent, int battleSize)
+    {
+        if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId)) return;
+
+        lock (gate)
+        {
+            if (spawnPlans.ContainsKey(mapEventId))
+                return;
+
+            EnsureBuilt(mapEvent, mapEventId);
+
+            var parties = new List<BattleInitialSpawnParty>();
+            foreach (var party in EnumerateParties(mapEvent))
+            {
+                if (!objectManager.TryGetId(party, out var partyId)) continue;
+                if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out _)) continue;
+
+                bool isDirectPlayerParty = TryGetOwningPlayer(party, out var partyOwnerController);
+                TryGetArmyLeaderPlayer(party, out var armyLeaderController);
+                var owningController = ResolveOwningController(partyOwnerController, armyLeaderController);
+                // AI parties without a player owner share one allocation group. The elected battle host later
+                // fields that group, but the dedicated server itself never owns a party.
+                var authorityId = owningController ?? UnownedAiAuthorityId;
+                var side = party.Party?.Side ?? BattleSideEnum.None;
+                parties.Add(new BattleInitialSpawnParty(
+                    partyId, authorityId, side, entries.Count, isDirectPlayerParty));
+            }
+
+            int frozenBattleSize = Math.Max(0, battleSize);
+            var allocations = initialSpawnAllocator.Allocate(frozenBattleSize, parties);
+            var plan = new BattleSpawnPlan(frozenBattleSize, allocations);
+            spawnPlans[mapEventId] = plan;
+
+            Logger.Information("[TroopSupply] Prepared battle plan {MapEventId}: {Assigned}/{BattleSize} initial slots across {Parties} parties",
+                mapEventId, plan.AssignedCount, frozenBattleSize, parties.Count);
+        }
+    }
+
+    public int GrantUnassignedInitialSpawns(MapEvent mapEvent, MapEventParty party, out bool isPostPlanAddition)
+    {
+        isPostPlanAddition = false;
+        if (mapEvent == null || party == null) return 0;
+        if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return 0;
+        if (!objectManager.TryGetId(party, out var partyId)) return 0;
+
+        lock (gate)
+        {
+            if (!spawnPlans.TryGetValue(mapEventId, out var plan))
+                return 0;
+
+            EnsureBuilt(mapEvent, mapEventId);
+            if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out _))
+                return 0;
+
+            isPostPlanAddition = !plan.InitialSpawns.ContainsKey(partyId);
+            int granted = GetOrGrantInitialSpawns(plan, partyId, entries.Count);
+            Logger.Information("[TroopSupply] Party {PartyId} has {Entitlement} initial slots in battle {MapEventId}; post-plan addition={PostPlan}",
+                partyId, granted, mapEventId, isPostPlanAddition);
+            return granted;
+        }
     }
 
     public IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost,
@@ -106,8 +205,15 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
             var entriesArray = new TroopReserveEntry[entries.Count];
             for (int i = 0; i < entries.Count; i++) entriesArray[i] = entries[i];
+            var departedSeeds = ledger.GetDepartedSeeds(mapEventId, partyId).ToArray();
 
-            var reserve = new PartyReserve(partyId, supplied, entriesArray);
+            int initialSpawnCount = GetInitialSpawnCount(mapEventId, partyId, entriesArray.Length);
+            var reserve = new PartyReserve(
+                partyId,
+                supplied,
+                entriesArray,
+                initialSpawnCount,
+                departedSeeds);
             if ((party.Party?.Side ?? BattleSideEnum.None) == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else
@@ -145,6 +251,42 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         }
     }
 
+    public void RebuildMapEventReserves(MapEvent mapEvent)
+    {
+        if (mapEvent == null) return;
+        if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
+
+        lock (gate)
+        {
+            var livePartyIds = new HashSet<string>();
+            foreach (var party in EnumerateParties(mapEvent))
+            {
+                if (!objectManager.TryGetId(party, out var partyId)) continue;
+                livePartyIds.Add(partyId);
+                if (ledger.TryGetReserve(mapEventId, partyId, out _, out _))
+                {
+                    ledger.ResetSupplied(mapEventId, partyId);
+                    builtParties.Add(partyId);
+                }
+                else
+                {
+                    builtParties.Remove(partyId);
+                }
+            }
+
+            foreach (var partyId in ledger.GetParties(mapEventId))
+            {
+                if (livePartyIds.Contains(partyId)) continue;
+                ledger.RemoveParty(mapEventId, partyId);
+                builtParties.Remove(partyId);
+            }
+
+            EnsureBuilt(mapEvent, mapEventId);
+            Logger.Information("[TroopSupply] Reset ALL live reserves of battle {MapEventId} while preserving frozen troop identities, departures, and spawn plan ({Count} parties)",
+                mapEventId, livePartyIds.Count);
+        }
+    }
+
     public void ForgetMapEvent(MapEvent mapEvent)
     {
         if (mapEvent == null) return;
@@ -160,9 +302,35 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // Drop the whole battle's reserves in one shot — covers every party (including any no longer
             // enumerable) and leaves no empty per-battle entry behind, so a restart re-flattens fresh.
             ledger.Remove(mapEventId);
+            spawnPlans.Remove(mapEventId);
             Logger.Information("[TroopSupply] Forgot ALL reserves of battle {MapEventId} ({Count} flatten-cache entries cleared)",
                 mapEventId, forgotten);
         }
+    }
+
+    private int GetInitialSpawnCount(string mapEventId, string partyId, int capacity)
+    {
+        lock (gate)
+        {
+            if (!spawnPlans.TryGetValue(mapEventId, out var plan))
+                return 0;
+            if (!plan.InitialSpawns.TryGetValue(partyId, out var initialSpawnCount))
+                return 0;
+
+            return Math.Min(initialSpawnCount, Math.Max(0, capacity));
+        }
+    }
+
+    private static int GetOrGrantInitialSpawns(BattleSpawnPlan plan, string partyId, int capacity)
+    {
+        if (plan.InitialSpawns.TryGetValue(partyId, out var existing))
+            return Math.Min(existing, Math.Max(0, capacity));
+
+        int unassigned = Math.Max(0, plan.BattleSize - plan.AssignedCount);
+        int granted = Math.Min(Math.Max(0, capacity), unassigned);
+        plan.InitialSpawns[partyId] = granted;
+        plan.AssignedCount += granted;
+        return granted;
     }
 
     private static int CountEntries(List<PartyReserve> parties)

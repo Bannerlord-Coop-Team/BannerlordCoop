@@ -19,12 +19,16 @@ internal readonly struct NetworkStartAttackMission : ICommand
     [ProtoMember(4)]
     public readonly string InitiatingPartyId;
 
+    [ProtoMember(5)]
+    public readonly int BattleSize;
+
     public NetworkStartAttackMission(string mapEventId, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign,
-        string initiatingPartyId)
+        string initiatingPartyId, int battleSize)
     {
         MapEventId = mapEventId;
         RandomTerrainSeed = randomTerrainSeed;
         AtmosphereOnCampaign = atmosphereOnCampaign;
         InitiatingPartyId = initiatingPartyId;
+        BattleSize = battleSize;
     }
 }

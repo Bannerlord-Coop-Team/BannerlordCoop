@@ -13,7 +13,7 @@ using TaleWorlds.ScreenSystem;
 namespace GameInterface.Services.UI.Patches;
 
 /// <summary>
-/// Adds co-op client options as the third item in the campaign-map escape menu.
+/// Adds client co-op options or server options after Campaign Options in the campaign-map escape menu.
 /// </summary>
 [HarmonyPatch(typeof(MapScreen), "GetEscapeMenuItems")]
 internal class EscapeMenuCoopOptionsPatch
@@ -23,13 +23,13 @@ internal class EscapeMenuCoopOptionsPatch
     [HarmonyPostfix]
     static void AddCoopOptionsItem(List<EscapeMenuItemVM> __result)
     {
-        if (ModInformation.IsServer) return;
+        var itemText = ModInformation.IsServer ? "Server Options" : "Coop Options";
 
         int campaignOptionsIndex = __result.FindIndex(item => item.ActionText == CampaignOptionsText.ToString());
         if (campaignOptionsIndex < 0) return;
 
         __result.Insert(campaignOptionsIndex + 1, new EscapeMenuItemVM(
-            new TextObject("Coop Options"),
+            new TextObject(itemText),
             _ => ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopOptionsUI>()),
             identifier: null,
             getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject("")),

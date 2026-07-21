@@ -24,7 +24,7 @@ public class NetworkStartAttackMissionSerializationTest
                 TimeOfDay = 14.0f,
                 NightTimeFactor = 0.0f,
             },
-        }, "player-party-1");
+        }, "player-party-1", 725);
 
         byte[] bytes;
         using (var ms = new MemoryStream())
@@ -43,10 +43,9 @@ public class NetworkStartAttackMissionSerializationTest
 
         Assert.Equal(original.MapEventId, result.MapEventId);
         Assert.Equal(original.RandomTerrainSeed, result.RandomTerrainSeed);
+        Assert.Equal(original.InitiatingPartyId, result.InitiatingPartyId);
+        Assert.Equal(original.BattleSize, result.BattleSize);
         Assert.Equal(original.AtmosphereOnCampaign.TimeInfo.TimeOfDay, result.AtmosphereOnCampaign.TimeInfo.TimeOfDay);
         Assert.Equal(original.AtmosphereOnCampaign.TimeInfo.NightTimeFactor, result.AtmosphereOnCampaign.TimeInfo.NightTimeFactor);
-        Assert.Equal("player-party-1", result.InitiatingPartyId);
-        Assert.Equal("map-event-1", result.MapEventId);
-        Assert.Equal(4242, result.RandomTerrainSeed);
     }
 }

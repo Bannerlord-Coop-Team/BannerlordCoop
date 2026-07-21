@@ -6,6 +6,7 @@ using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.MapEvents.BattleSize;
 using LiteNetLib;
 using Moq;
 using System.Linq;
@@ -71,6 +72,8 @@ namespace Coop.Tests.Server.Connections.States
             string campaignId = "12345";
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, campaignId));
+            var battleSizeProvider = serverComponent.Container.Resolve<Mock<IServerBattleSizeProvider>>();
+            battleSizeProvider.SetupGet(m => m.BattleSize).Returns(800);
 
             // Act — entering the state packages the save and sends it to the joining peer.
             connectionLogic.SetState<TransferSaveState>();
@@ -82,6 +85,7 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(campaignId, packet.CampaignID);
             Assert.Equal(0, packet.ChunkIndex);
             Assert.Equal(1, packet.ChunkCount);
+            Assert.Equal(800, packet.BattleSize);
             serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
                 .Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
 
@@ -100,6 +104,8 @@ namespace Coop.Tests.Server.Connections.States
             new System.Random(42).NextBytes(data);
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, "12345"));
+            var battleSizeProvider = serverComponent.Container.Resolve<Mock<IServerBattleSizeProvider>>();
+            battleSizeProvider.SetupGet(m => m.BattleSize).Returns(800);
 
             // Act
             connectionLogic.SetState<TransferSaveState>();
@@ -111,7 +117,9 @@ namespace Coop.Tests.Server.Connections.States
             Assert.All(packets, x => Assert.Equal(packets.Length, x.ChunkCount));
             Assert.All(packets, x => Assert.True(x.ChunkData.Length <= GameSaveDataChunkPacket.ChunkSize));
             Assert.Equal("12345", packets[0].CampaignID);
+            Assert.Equal(800, packets[0].BattleSize);
             Assert.All(packets.Skip(1), x => Assert.Null(x.CampaignID));
+            Assert.All(packets.Skip(1), x => Assert.Equal(0, x.BattleSize));
         }
     }
 }

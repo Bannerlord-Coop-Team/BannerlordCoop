@@ -9,6 +9,7 @@ using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Missions;
 
 namespace E2E.Tests.Environment.MockEngine;
 
@@ -35,6 +36,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
+        Prefix(typeof(Mission), "get_Agents", nameof(Mission_get_Agents));
         Prefix(typeof(Mission), "get_MainAgent", nameof(Mission_get_MainAgent));
         Prefix(typeof(Mission), "set_MainAgent", nameof(Mission_set_MainAgent));
         Prefix(typeof(Mission), nameof(Mission.FindAgentWithIndex), nameof(Mission_FindAgentWithIndex));
@@ -217,6 +219,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         __result = mock.SpawnAgent(agentBuildData);
+        return false;
+    }
+
+    private static bool Mission_get_Agents(Mission __instance, ref AgentReadOnlyList __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = new AgentReadOnlyList(mock.Agents);
         return false;
     }
 

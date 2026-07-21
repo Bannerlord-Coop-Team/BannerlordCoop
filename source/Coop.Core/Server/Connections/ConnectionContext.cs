@@ -6,6 +6,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 
@@ -31,6 +32,7 @@ public class ConnectionContext
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
+        IServerBattleSizeProvider battleSizeProvider,
         IExistingPlayerSender existingPlayerSender,
         IJoinCampaignBaselineSender joinCampaignBaselineSender)
     {
@@ -46,6 +48,7 @@ public class ConnectionContext
         ConnectionMessageQueue = connectionMessageQueue;
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
+        BattleSizeProvider = battleSizeProvider;
         ExistingPlayerSender = existingPlayerSender;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
     }
@@ -62,6 +65,7 @@ public class ConnectionContext
     public IConnectionMessageQueue ConnectionMessageQueue { get; }
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
+    public IServerBattleSizeProvider BattleSizeProvider { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
 }

@@ -11,6 +11,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
@@ -109,6 +110,10 @@ internal abstract class TestComponentBase
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
+        var battleSizeProviderMock = new Mock<IServerBattleSizeProvider>();
+        battleSizeProviderMock.SetupGet(m => m.BattleSize).Returns(ServerBattleSizeProvider.DefaultBattleSize);
+        builder.RegisterInstance(battleSizeProviderMock).AsSelf().SingleInstance();
+        builder.RegisterInstance(battleSizeProviderMock.Object).As<IServerBattleSizeProvider>().SingleInstance();
         RegisterMock<IMapEventInitializationBarrier>(builder);
         RegisterMock<IConnectedPlayerCountService>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,

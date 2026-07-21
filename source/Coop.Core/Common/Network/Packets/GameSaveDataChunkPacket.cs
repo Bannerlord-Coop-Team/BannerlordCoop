@@ -65,6 +65,9 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     [ProtoMember(14)]
     public readonly AttachmentIdMap AttachmentIdMap;
 
+    [ProtoMember(15)]
+    public readonly int BattleSize;
+
     public GameSaveDataChunkPacket(
         int transferId,
         int chunkIndex,
@@ -79,7 +82,8 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
-        AttachmentIdMap attachmentIdMap)
+        AttachmentIdMap attachmentIdMap,
+        int battleSize)
     {
         TransferId = transferId;
         ChunkIndex = chunkIndex;
@@ -95,5 +99,6 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
         AttachmentIdMap = attachmentIdMap;
+        BattleSize = battleSize;
     }
 }

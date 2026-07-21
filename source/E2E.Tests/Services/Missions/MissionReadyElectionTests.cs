@@ -171,6 +171,9 @@ public class MissionReadyElectionTests : MissionTestEnvironment
             Assert.Equal(hostMepId, Assert.Single(hostAttacker.GetSuppliedByParty()).partyId);
             Assert.False(hostDefender.IsPopulated,
                 "the unowned enemy side must not be delivered (not even empty) before the election");
+            var hostEntry = hostAttacker.GetSizingSnapshot();
+            Assert.True(hostEntry.GrantGeneration > 0);
+            Assert.False(hostEntry.CompletesInitialSizing);
 
             MakeMissionReady(clients[0], mapEventId); // first mission-ready -> elected host
 
@@ -180,6 +183,12 @@ public class MissionReadyElectionTests : MissionTestEnvironment
             var granted = hostDefender.GetSuppliedByParty();
             Assert.Contains(granted, party => party.partyId == aiMepId);        // the unowned NPC party
             Assert.DoesNotContain(granted, party => party.partyId == otherMepId); // never another player's party
+            var hostAttackerFinal = hostAttacker.GetSizingSnapshot();
+            var hostDefenderFinal = hostDefender.GetSizingSnapshot();
+            Assert.Equal(hostAttackerFinal.GrantGeneration, hostDefenderFinal.GrantGeneration);
+            Assert.True(hostAttackerFinal.GrantGeneration > hostEntry.GrantGeneration);
+            Assert.True(hostAttackerFinal.CompletesInitialSizing);
+            Assert.True(hostDefenderFinal.CompletesInitialSizing);
         }
         finally
         {
@@ -200,6 +209,7 @@ public class MissionReadyElectionTests : MissionTestEnvironment
             Assert.Equal(otherMepId, Assert.Single(otherDefender.GetSuppliedByParty()).partyId);
             Assert.False(otherAttacker.IsPopulated,
                 "the enemy side must not be delivered before this client is mission-ready");
+            Assert.False(otherDefender.GetSizingSnapshot().CompletesInitialSizing);
 
             MakeMissionReady(clients[1], mapEventId); // ready but NOT host -> successor
 
@@ -211,9 +221,14 @@ public class MissionReadyElectionTests : MissionTestEnvironment
             Assert.Equal(0, otherAttacker.TotalTroops); // it owns nothing there — explicitly empty, not missing
             Assert.Equal(otherMepId, Assert.Single(otherDefender.GetSuppliedByParty()).partyId);
 
+            var otherDefenderFinal = otherDefender.GetSizingSnapshot();
+            var otherAttackerFinal = otherAttacker.GetSizingSnapshot();
             var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
-                otherDefender.IsPopulated, otherAttacker.IsPopulated,
-                otherDefender.TotalTroops, otherAttacker.TotalTroops);
+                otherDefenderFinal.IsPopulated, otherAttackerFinal.IsPopulated,
+                otherDefenderFinal.TotalTroops, otherAttackerFinal.TotalTroops,
+                otherDefenderFinal.InitialTroops, otherAttackerFinal.InitialTroops,
+                otherDefenderFinal.GrantGeneration, otherAttackerFinal.GrantGeneration,
+                otherDefenderFinal.CompletesInitialSizing, otherAttackerFinal.CompletesInitialSizing);
             Assert.True(sizing.Ready, "both reserves landed, so the spawn handler's sizing gate must open");
         }
         finally
@@ -248,7 +263,13 @@ public class MissionReadyElectionTests : MissionTestEnvironment
             .ToArray();
 
         Assert.Equal(2, refresh.Length);
-        Assert.NotEmpty(Assert.Single(refresh, message => message.Side == (int)BattleSideEnum.Attacker).Parties);
-        Assert.Empty(Assert.Single(refresh, message => message.Side == (int)BattleSideEnum.Defender).Parties);
+        var attacker = Assert.Single(refresh, message => message.Side == (int)BattleSideEnum.Attacker);
+        var defender = Assert.Single(refresh, message => message.Side == (int)BattleSideEnum.Defender);
+        Assert.NotEmpty(attacker.Parties);
+        Assert.Empty(defender.Parties);
+        Assert.True(attacker.GrantGeneration > 0);
+        Assert.Equal(attacker.GrantGeneration, defender.GrantGeneration);
+        Assert.True(attacker.CompletesInitialSizing);
+        Assert.True(defender.CompletesInitialSizing);
     }
 }

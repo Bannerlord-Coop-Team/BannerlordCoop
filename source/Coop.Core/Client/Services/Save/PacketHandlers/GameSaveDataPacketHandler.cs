@@ -6,6 +6,7 @@ using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Inventory.TradeSkills;
+using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
@@ -28,11 +29,16 @@ internal class GameSaveDataPacketHandler : IPacketHandler
     private readonly IPacketManager packetManager;
     private readonly IMessageBroker messageBroker;
     private PendingTransfer currentTransfer;
+    private readonly IServerBattleSizeProvider battleSizeProvider;
 
-    public GameSaveDataPacketHandler(IPacketManager packetManager, IMessageBroker messageBroker)
+    public GameSaveDataPacketHandler(
+        IPacketManager packetManager,
+        IMessageBroker messageBroker,
+        IServerBattleSizeProvider battleSizeProvider)
     {
         this.packetManager = packetManager;
         this.messageBroker = messageBroker;
+        this.battleSizeProvider = battleSizeProvider;
         packetManager.RegisterPacketHandler(this);
     }
 
@@ -99,6 +105,8 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             compressedSave.Length,
             saveData.Length);
 
+        battleSizeProvider.SetBattleSize(completedTransfer.BattleSize);
+
         messageBroker.Publish(this, new NetworkGameSaveDataReceived(
             saveData,
             completedTransfer.CampaignID,
@@ -129,6 +137,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             InteractionsPlayerData = firstChunk.InteractionsPlayerData;
             TradePlayerData = firstChunk.TradePlayerData;
             AttachmentIdMap = firstChunk.AttachmentIdMap;
+            BattleSize = firstChunk.BattleSize;
         }
 
         public int TransferId { get; }
@@ -142,6 +151,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public InteractionsPlayerData InteractionsPlayerData { get; }
         public TradePlayerData TradePlayerData { get; }
         public AttachmentIdMap AttachmentIdMap { get; }
+        public int BattleSize { get; }
 
         public bool TryAdd(GameSaveDataChunkPacket chunk)
         {

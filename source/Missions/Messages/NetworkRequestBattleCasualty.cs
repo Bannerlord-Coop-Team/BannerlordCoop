@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Missions.Messages;
@@ -9,11 +9,8 @@ namespace Missions.Messages;
 /// MapEventParty casualty sync. The host's own mission accounting is suppressed during a coop battle, so
 /// this is the single source of battle casualties.
 /// <para>
-/// The casualty is keyed by the troop's <em>character</em> (its coop object-manager id), not by a descriptor seed: the engine
-/// re-flattens parties during battle setup (minting fresh descriptors), so a seed the owner captured at spawn
-/// can be absent from the server roster — looking it up there threw KeyNotFoundException and silently dropped
-/// enemy casualties. The server instead resolves the character through the object manager and kills/wounds any
-/// live troop of it with a current descriptor (one of N identical troops is interchangeable for the head-count).
+/// The server prefers the exact reserve seed, then falls back to the troop's character id when descriptor churn
+/// means that seed no longer exists in its roster. The fallback still accounts one interchangeable troop.
 /// </para>
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
@@ -27,11 +24,19 @@ public class NetworkRequestBattleCasualty : IEvent
     /// <summary>True if the troop was wounded (fell unconscious) rather than killed outright.</summary>
     [ProtoMember(3)]
     public readonly bool Wounded;
+    /// <summary>The exact mission-reserve seed that left the battle.</summary>
+    [ProtoMember(4)]
+    public readonly int TroopSeed;
 
-    public NetworkRequestBattleCasualty(string mapEventPartyId, string troopCharacterId, bool wounded)
+    public NetworkRequestBattleCasualty(
+        string mapEventPartyId,
+        string troopCharacterId,
+        bool wounded,
+        int troopSeed)
     {
         MapEventPartyId = mapEventPartyId;
         TroopCharacterId = troopCharacterId;
         Wounded = wounded;
+        TroopSeed = troopSeed;
     }
 }

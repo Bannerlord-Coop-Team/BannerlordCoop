@@ -1,11 +1,16 @@
-<ListPanel DataSource="{SelectedTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+<ListPanel IsVisible="@IsKillFeedOptionsVisible" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
            LayoutImp.LayoutMethod="VerticalTopToBottom">
   <Children>
-    <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+    <ListPanel DataSource="{SelectedKillFeedTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                LayoutImp.LayoutMethod="VerticalTopToBottom">
-      <ItemTemplate>
-        <!-- COOP_OPTIONS_SECTION:Sections/KillFeedSection.xml -->
-      </ItemTemplate>
+      <Children>
+        <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                   LayoutImp.LayoutMethod="VerticalTopToBottom">
+          <ItemTemplate>
+            <!-- COOP_OPTIONS_SECTION:Sections/KillFeedSection.xml -->
+          </ItemTemplate>
+        </ListPanel>
+      </Children>
     </ListPanel>
   </Children>
 </ListPanel>

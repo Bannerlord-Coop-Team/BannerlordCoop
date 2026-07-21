@@ -121,7 +121,7 @@ public class PuppetDeathApplier : IPuppetDeathApplier
         // Deregister after the game-thread kill. Removing on the poll thread before the queued apply would
         // make the registry lookup fail and leave the puppet alive but unregistered.
         registry.RemoveAgent(death.AgentId);
-        casualties.Forget(death.AgentId);
+        casualties.MarkDeparted(death.AgentId);
         return true;
     }
 

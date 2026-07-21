@@ -24,8 +24,12 @@ internal record NetworkStartSiegeMission : ICommand
     [ProtoMember(6)]
     public string InitiatingPartyId { get; }
 
+    [ProtoMember(7)]
+    public int BattleSize { get; }
+
     public NetworkStartSiegeMission(string mapEventId, int wallLevel, float[] wallHitPointRatios,
-        SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines, string initiatingPartyId)
+        SiegeEngineState[] attackerEngines, SiegeEngineState[] defenderEngines, string initiatingPartyId,
+        int battleSize)
     {
         MapEventId = mapEventId;
         WallLevel = wallLevel;
@@ -33,6 +37,7 @@ internal record NetworkStartSiegeMission : ICommand
         AttackerEngines = attackerEngines;
         DefenderEngines = defenderEngines;
         InitiatingPartyId = initiatingPartyId;
+        BattleSize = battleSize;
     }
 }
 

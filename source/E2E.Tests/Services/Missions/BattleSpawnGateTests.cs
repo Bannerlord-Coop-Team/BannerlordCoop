@@ -19,38 +19,41 @@ public class BattleSpawnGateTests : IDisposable
 
         Assert.False(BattleSpawnGate.IsCoopBattleActive);
         Assert.Null(BattleSpawnGate.ActiveMapEventId);
+        Assert.Equal(0, BattleSpawnGate.BattleSize);
     }
 
     [Fact]
     public void BeginBattle_MarksActive_WithTheMapEvent()
     {
-        BattleSpawnGate.BeginBattle("mapEvent-1");
+        BattleSpawnGate.BeginBattle("mapEvent-1", 725);
 
         Assert.True(BattleSpawnGate.IsCoopBattleActive);
         Assert.Equal("mapEvent-1", BattleSpawnGate.ActiveMapEventId);
+        Assert.Equal(725, BattleSpawnGate.BattleSize);
     }
 
     [Fact]
     public void EndBattle_ClearsActiveBattle()
     {
-        BattleSpawnGate.BeginBattle("mapEvent-1");
+        BattleSpawnGate.BeginBattle("mapEvent-1", 1000);
 
         BattleSpawnGate.EndBattle();
 
         Assert.False(BattleSpawnGate.IsCoopBattleActive);
         Assert.Null(BattleSpawnGate.ActiveMapEventId);
+        Assert.Equal(0, BattleSpawnGate.BattleSize);
     }
 
     [Fact]
     public void MissingReserveAcceptance_IsPerSide_AndClearedForNextBattle()
     {
-        BattleSpawnGate.BeginBattle("mapEvent-1");
+        BattleSpawnGate.BeginBattle("mapEvent-1", 1000);
         BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Defender);
 
         Assert.True(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
         Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker));
 
-        BattleSpawnGate.BeginBattle("mapEvent-2");
+        BattleSpawnGate.BeginBattle("mapEvent-2", 1000);
 
         Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
         Assert.False(BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker));

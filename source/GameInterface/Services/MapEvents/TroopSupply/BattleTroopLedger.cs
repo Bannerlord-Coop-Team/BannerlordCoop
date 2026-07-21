@@ -1,4 +1,4 @@
-using GameInterface.Services;
+﻿using GameInterface.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +24,15 @@ public interface IBattleTroopLedger : IGameAbstraction
     /// <summary>Advance a party's supplied pointer (monotonic, clamped to the reserve size).</summary>
     void ReportSupplied(string mapEventId, string partyId, int suppliedCount);
 
+    /// <summary>Reset one party's supplied pointer while retaining its stable reserve identities and departures.</summary>
+    void ResetSupplied(string mapEventId, string partyId);
+
+    /// <summary>Remember one supplied troop that permanently left this mission without a roster casualty.</summary>
+    void ReportDeparted(string mapEventId, string partyId, int troopSeed);
+
+    /// <summary>Exact departed troop seeds that a future owner must not recover.</summary>
+    IReadOnlyList<int> GetDepartedSeeds(string mapEventId, string partyId);
+
     /// <summary>The party's not-yet-supplied troops, from the current pointer onward (for a new owner).</summary>
     IReadOnlyList<TroopReserveEntry> GetRemaining(string mapEventId, string partyId);
 
@@ -45,6 +54,7 @@ public class BattleTroopLedger : IBattleTroopLedger
     {
         public TroopReserveEntry[] Entries = Array.Empty<TroopReserveEntry>();
         public int Supplied;
+        public readonly HashSet<int> DepartedSeeds = new();
     }
 
     // mapEventId -> partyId -> reserve. Written from the server's battle-setup/supply handlers, read on
@@ -94,6 +104,45 @@ public class BattleTroopLedger : IBattleTroopLedger
             var clamped = Math.Min(reserve.Entries.Length, Math.Max(0, suppliedCount));
             if (clamped > reserve.Supplied)
                 reserve.Supplied = clamped;
+        }
+    }
+
+    public void ResetSupplied(string mapEventId, string partyId)
+    {
+        lock (gate)
+        {
+            if (battles.TryGetValue(mapEventId, out var parties)
+                && parties.TryGetValue(partyId, out var reserve))
+                reserve.Supplied = 0;
+        }
+    }
+
+    public void ReportDeparted(string mapEventId, string partyId, int troopSeed)
+    {
+        lock (gate)
+        {
+            if (!battles.TryGetValue(mapEventId, out var parties)
+                || !parties.TryGetValue(partyId, out var reserve))
+                return;
+
+            foreach (var entry in reserve.Entries)
+            {
+                if (entry.Seed != troopSeed) continue;
+                reserve.DepartedSeeds.Add(troopSeed);
+                return;
+            }
+        }
+    }
+
+    public IReadOnlyList<int> GetDepartedSeeds(string mapEventId, string partyId)
+    {
+        lock (gate)
+        {
+            if (!battles.TryGetValue(mapEventId, out var parties)
+                || !parties.TryGetValue(partyId, out var reserve))
+                return Array.Empty<int>();
+
+            return reserve.DepartedSeeds.ToArray();
         }
     }
 

@@ -213,7 +213,12 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
         string owner = session.OwnControllerId;
         var agentId = Guid.NewGuid();
-        coopMissionComponent.AgentRegistry.TryRegisterAgent(owner, agentId, agent);
+        if (!coopMissionComponent.AgentRegistry.TryRegisterAgent(owner, agentId, agent))
+        {
+            Logger.Warning("[BattleSync] Skipped own spawn broadcast for {Char}; the agent could not be registered locally",
+                characterId);
+            return;
+        }
 
         // A cavalry spawn's horse is already live and linked here (the engine spawns it inside the same
         // Mission.SpawnAgent call, from the rider's equipment). Register it with its OWN identity under us, so

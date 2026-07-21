@@ -21,6 +21,7 @@ internal class BattleAgentRoutedPatch
         if (!BattleSpawnConfig.Enabled) return;
         if (!BattleSpawnGate.IsCoopBattleActive) return;
         if (agentState != AgentState.Routed || affectedAgent == null) return;
+        if (BattleSpawnGate.IsAdministrativeRemoval(affectedAgent)) return;
 
         MessageBroker.Instance.Publish(affectedAgent, new BattleAgentRouted(affectedAgent));
     }

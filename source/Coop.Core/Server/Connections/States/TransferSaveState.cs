@@ -5,6 +5,7 @@ using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using Serilog;
@@ -29,7 +30,8 @@ public class TransferSaveState : ConnectionStateBase
         ISaveInterface saveInterface,
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
-        IAttachmentIdMapper attachmentIdMapper)
+        IAttachmentIdMapper attachmentIdMapper,
+        IServerBattleSizeProvider battleSizeProvider)
         : base(connectionLogic)
     {
         GameSaveDataPacket snapshot = default;
@@ -70,7 +72,8 @@ public class TransferSaveState : ConnectionStateBase
                 Clone(coopSessionProvider.CoopSession?.AlleyPlayerData),
                 Clone(coopSessionProvider.CoopSession?.InteractionsPlayerData),
                 Clone(coopSessionProvider.CoopSession?.TradePlayerData),
-                attachmentIdMapper.BuildServerMap());
+                attachmentIdMapper.BuildServerMap(),
+                battleSizeProvider.BattleSize);
 
             // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
             // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
@@ -124,7 +127,8 @@ public class TransferSaveState : ConnectionStateBase
                 chunkIndex == 0 ? snapshot.AlleyPlayerData : null,
                 chunkIndex == 0 ? snapshot.InteractionsPlayerData : null,
                 chunkIndex == 0 ? snapshot.TradePlayerData : null,
-                chunkIndex == 0 ? snapshot.AttachmentIdMap : null);
+                chunkIndex == 0 ? snapshot.AttachmentIdMap : null,
+                chunkIndex == 0 ? snapshot.BattleSize : 0);
 
             network.SendImmediate(ConnectionLogic.Peer, chunkPacket);
         }

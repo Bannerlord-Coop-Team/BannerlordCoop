@@ -14,8 +14,16 @@ public class NetworkBattleAgentRouted : IEvent
     [ProtoMember(1)]
     public readonly Guid AgentId;
 
-    public NetworkBattleAgentRouted(Guid agentId)
+    [ProtoMember(2)]
+    public readonly bool HideMount;
+
+    [ProtoMember(3)]
+    public readonly bool IsAdministrativeRemoval;
+
+    public NetworkBattleAgentRouted(Guid agentId, bool hideMount, bool isAdministrativeRemoval)
     {
         AgentId = agentId;
+        HideMount = hideMount;
+        IsAdministrativeRemoval = isAdministrativeRemoval;
     }
 }

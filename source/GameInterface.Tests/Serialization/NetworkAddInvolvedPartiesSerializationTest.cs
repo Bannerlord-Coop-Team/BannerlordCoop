@@ -32,7 +32,9 @@ public class NetworkAddInvolvedPartiesSerializationTest
             {
                 new CampaignVec2(new Vec2(12.5f, -3.25f), true),
                 new CampaignVec2(new Vec2(40f, 80.75f), false),
-            });
+            },
+            new[] { 125, 75 },
+            new[] { false, true });
 
         byte[] bytes;
         using (var ms = new MemoryStream())
@@ -51,6 +53,8 @@ public class NetworkAddInvolvedPartiesSerializationTest
 
         Assert.Equal(original.MapEventId, result.MapEventId);
         Assert.Equal(original.MapEventPartyIds, result.MapEventPartyIds);
+        Assert.Equal(original.InitialSpawnCounts, result.InitialSpawnCounts);
+        Assert.Equal(original.PostPlanAdditions, result.PostPlanAdditions);
 
         // Positions must stay index-aligned with the party ids so each party snaps to the
         // right place on the client.

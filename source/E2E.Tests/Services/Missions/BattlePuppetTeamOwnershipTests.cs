@@ -55,7 +55,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 host.Resolve<IBattleHostRegistry>().Set(
                     mapEventId,
                     new BattleHostAssignment("host", new[] { "enemy", "ally" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BattleSpawnGate.BeginBattle(mapEventId, 1000);
 
                 var mapEventParties = ownParty.MapEvent.AttackerSide.Parties;
                 var ownMapEventParty = mapEventParties.Single(party => party.Party == ownParty.Party);

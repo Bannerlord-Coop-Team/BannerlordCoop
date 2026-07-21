@@ -25,83 +25,130 @@
               </ItemTemplate>
             </ListPanel>
 
-            <ListPanel DataSource="{SelectedTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+            <ListPanel IsVisible="@IsKillFeedOptionsVisible" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                        LayoutImp.LayoutMethod="VerticalTopToBottom">
               <Children>
-                <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                <ListPanel DataSource="{SelectedKillFeedTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                            LayoutImp.LayoutMethod="VerticalTopToBottom">
-                  <ItemTemplate>
-                    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                  <Children>
+                    <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                                LayoutImp.LayoutMethod="VerticalTopToBottom">
-                      <Children>
-                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="48"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="36"
-                                    Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                    Text="@TitleText"/>
-                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
-                                    Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
-                                    Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                    Text="@DescriptionText"/>
-
-                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
-                                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                      <ItemTemplate>
+                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                   LayoutImp.LayoutMethod="VerticalTopToBottom">
                           <Children>
-                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
-                                        Brush="Clan.TabControl.Text" Brush.FontSize="28"
-                                        Brush.TextVerticalAlignment="Center" Text="@KillFeedColorRedText"/>
-                            <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
-                                             VerticalAlignment="Center" Parameter.ValueInt="@KillFeedColorRed" Parameter.MinValue="0" Parameter.MaxValue="255"/>
-                            <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
-                                                    VerticalAlignment="Center" MarginLeft="28"
-                                                    Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
-                                                    Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                                    IntText="@KillFeedColorRed" MaxInt="255" MinInt="0" EnableClamp="true"/>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                        Brush="Clan.TabControl.Text" Brush.FontSize="36"
+                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                        Text="@TitleText"/>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                        Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
+                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                        Text="@DescriptionText"/>
+
+                            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+                                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                              <Children>
+                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
+                                            Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                                            Brush.TextVerticalAlignment="Center" Text="@KillFeedColorRedText"/>
+                                <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
+                                                 VerticalAlignment="Center" Parameter.ValueInt="@KillFeedColorRed" Parameter.MinValue="0" Parameter.MaxValue="255"/>
+                                <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                                        VerticalAlignment="Center" MarginLeft="28"
+                                                        Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
+                                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                                        IntText="@KillFeedColorRed" MaxInt="255" MinInt="0" EnableClamp="true"/>
+                              </Children>
+                            </ListPanel>
+
+                            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+                                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                              <Children>
+                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
+                                            Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                                            Brush.TextVerticalAlignment="Center" Text="@KillFeedColorGreenText"/>
+                                <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
+                                                 VerticalAlignment="Center" Parameter.ValueInt="@KillFeedColorGreen" Parameter.MinValue="0" Parameter.MaxValue="255"/>
+                                <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                                        VerticalAlignment="Center" MarginLeft="28"
+                                                        Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
+                                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                                        IntText="@KillFeedColorGreen" MaxInt="255" MinInt="0" EnableClamp="true"/>
+                              </Children>
+                            </ListPanel>
+
+                            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+                                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                              <Children>
+                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
+                                            Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                                            Brush.TextVerticalAlignment="Center" Text="@KillFeedColorBlueText"/>
+                                <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
+                                                 VerticalAlignment="Center" Parameter.ValueInt="@KillFeedColorBlue" Parameter.MinValue="0" Parameter.MaxValue="255"/>
+                                <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                                        VerticalAlignment="Center" MarginLeft="28"
+                                                        Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
+                                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                                        IntText="@KillFeedColorBlue" MaxInt="255" MinInt="0" EnableClamp="true"/>
+                              </Children>
+                            </ListPanel>
+
+                            <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="72"
+                                       HorizontalAlignment="Center" LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                              <Children>
+                                <ColorButtonWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                                   VerticalAlignment="Center" Brush="Creation.ColorCard"
+                                                   ColorToApply="@KillFeedPreviewColorString" UpdateChildrenStates="true"/>
+                              </Children>
+                            </ListPanel>
                           </Children>
                         </ListPanel>
-
-                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
-                                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
-                          <Children>
-                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
-                                        Brush="Clan.TabControl.Text" Brush.FontSize="28"
-                                        Brush.TextVerticalAlignment="Center" Text="@KillFeedColorGreenText"/>
-                            <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
-                                             VerticalAlignment="Center" Parameter.ValueInt="@KillFeedColorGreen" Parameter.MinValue="0" Parameter.MaxValue="255"/>
-                            <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
-                                                    VerticalAlignment="Center" MarginLeft="28"
-                                                    Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
-                                                    Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                                    IntText="@KillFeedColorGreen" MaxInt="255" MinInt="0" EnableClamp="true"/>
-                          </Children>
-                        </ListPanel>
-
-                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
-                                   LayoutImp.LayoutMethod="HorizontalLeftToRight">
-                          <Children>
-                            <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="132" HeightSizePolicy="StretchToParent"
-                                        Brush="Clan.TabControl.Text" Brush.FontSize="28"
-                                        Brush.TextVerticalAlignment="Center" Text="@KillFeedColorBlueText"/>
-                            <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="420" HeightSizePolicy="Fixed" SuggestedHeight="46"
-                                             VerticalAlignment="Center" Parameter.ValueInt="@KillFeedColorBlue" Parameter.MinValue="0" Parameter.MaxValue="255"/>
-                            <IntegerInputTextWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="48"
-                                                    VerticalAlignment="Center" MarginLeft="28"
-                                                    Brush="ScoreboardPanels_2" Brush.AlphaFactor="0.75" Brush.FontSize="28"
-                                                    Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                                    IntText="@KillFeedColorBlue" MaxInt="255" MinInt="0" EnableClamp="true"/>
-                          </Children>
-                        </ListPanel>
-
-                        <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="72"
-                                   HorizontalAlignment="Center" LayoutImp.LayoutMethod="HorizontalLeftToRight">
-                          <Children>
-                            <ColorButtonWidget WidthSizePolicy="Fixed" SuggestedWidth="96" HeightSizePolicy="Fixed" SuggestedHeight="58"
-                                               VerticalAlignment="Center" Brush="Creation.ColorCard"
-                                               ColorToApply="@KillFeedPreviewColorString" UpdateChildrenStates="true"/>
-                          </Children>
-                        </ListPanel>
-                      </Children>
+                      </ItemTemplate>
                     </ListPanel>
-                  </ItemTemplate>
+                  </Children>
+                </ListPanel>
+              </Children>
+            </ListPanel>
+            <ListPanel IsVisible="@IsServerOptionsVisible" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                       LayoutImp.LayoutMethod="VerticalTopToBottom">
+              <Children>
+                <ListPanel DataSource="{SelectedServerOptionsTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                           LayoutImp.LayoutMethod="VerticalTopToBottom">
+                  <Children>
+                    <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                               LayoutImp.LayoutMethod="VerticalTopToBottom">
+                      <ItemTemplate>
+                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                   LayoutImp.LayoutMethod="VerticalTopToBottom">
+                          <Children>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                        Brush="Clan.TabControl.Text" Brush.FontSize="36"
+                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                        Text="@TitleText"/>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                                        Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
+                                        Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                        Text="@DescriptionText"/>
+
+                            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+                                       LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                              <Children>
+                                <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="640" HeightSizePolicy="Fixed" SuggestedHeight="46"
+                                                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                 Parameter.ValueInt="@BattleSizeIndex" Parameter.MinValue="0" Parameter.MaxValue="6"/>
+                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="120" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                                            VerticalAlignment="Center" MarginLeft="28"
+                                            Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@BattleSizeText"/>
+                              </Children>
+                            </ListPanel>
+                          </Children>
+                        </ListPanel>
+                      </ItemTemplate>
+                    </ListPanel>
+                  </Children>
                 </ListPanel>
               </Children>
             </ListPanel>

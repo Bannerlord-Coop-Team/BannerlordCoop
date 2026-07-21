@@ -59,6 +59,7 @@ internal class BattleAgentLogicHitRewardPatch
     [HarmonyPrefix]
     public static bool OnAgentRemovedPrefix(BattleAgentLogic __instance, Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
     {
+        if (BattleSpawnGate.IsAdministrativeRemoval(affectedAgent)) return false;
         if (affectorAgent == null && affectedAgent.IsMount && agentState == AgentState.Routed) return false;
 
         CharacterObject characterObject = (CharacterObject)affectedAgent.Character;

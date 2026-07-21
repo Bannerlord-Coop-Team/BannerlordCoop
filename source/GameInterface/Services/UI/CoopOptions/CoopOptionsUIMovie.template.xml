@@ -26,6 +26,7 @@
             </ListPanel>
 
             <!-- COOP_OPTIONS_PROVIDER:Providers/KillFeedTab/KillFeedTab.xml -->
+            <!-- COOP_OPTIONS_PROVIDER:Providers/ServerOptions/ServerOptionsTab.xml -->
 
             <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
                        HorizontalAlignment="Center" MarginTop="36"

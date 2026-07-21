@@ -27,6 +27,7 @@ public static class BattleSpawnGate
     private static readonly Queue<CombatLogContext> CombatLogContexts = new Queue<CombatLogContext>();
     private static readonly List<RoutedPlayerHitNotification> RoutedPlayerHitNotifications = new List<RoutedPlayerHitNotification>();
     private static string _activeMapEventId;
+    private static int _battleSize;
     private static bool _defenderReserveTimedOut;
     private static bool _attackerReserveTimedOut;
 
@@ -35,6 +36,12 @@ public static class BattleSpawnGate
 
     [System.ThreadStatic]
     private static Agent _replicatedDeathAgent;
+
+    [System.ThreadStatic]
+    private static Agent _administrativeRemovalAgent;
+
+    [System.ThreadStatic]
+    private static Agent _administrativeRemovalMount;
 
     [System.ThreadStatic]
     private static Agent _replicatedDeathAffector;
@@ -131,6 +138,30 @@ public static class BattleSpawnGate
     public static bool IsReplicatedDeath(Agent affectedAgent)
     {
         return ReferenceEquals(_replicatedDeathAgent, affectedAgent);
+    }
+
+    /// <summary>Removes an uncommitted duplicate without reporting a routed troop or rebroadcasting its removal.</summary>
+    public static void RunWithAdministrativeRemoval(Agent agent, Agent spawnMount, Action remove)
+    {
+        var previousAgent = _administrativeRemovalAgent;
+        var previousMount = _administrativeRemovalMount;
+        _administrativeRemovalAgent = agent;
+        _administrativeRemovalMount = spawnMount;
+        try
+        {
+            remove();
+        }
+        finally
+        {
+            _administrativeRemovalAgent = previousAgent;
+            _administrativeRemovalMount = previousMount;
+        }
+    }
+
+    public static bool IsAdministrativeRemoval(Agent agent)
+    {
+        return ReferenceEquals(_administrativeRemovalAgent, agent)
+            || ReferenceEquals(_administrativeRemovalMount, agent);
     }
 
     public static bool TryGetReplicatedDeath(
@@ -287,6 +318,12 @@ public static class BattleSpawnGate
         get { lock (Gate) { return _activeMapEventId; } }
     }
 
+    /// <summary>The server-authoritative human-agent budget frozen for the active battle.</summary>
+    public static int BattleSize
+    {
+        get { lock (Gate) { return _battleSize; } }
+    }
+
     /// <summary>
     /// Marks a side whose reserve never arrived before the spawn handler's explicit fallback deadline.
     /// Battle-end checks may treat that side as intentionally absent once deployment is active; an ordinary
@@ -313,11 +350,14 @@ public static class BattleSpawnGate
     }
 
     /// <summary>[Controller] Mark a coop battle active.</summary>
-    public static void BeginBattle(string mapEventId)
+    public static void BeginBattle(string mapEventId, int battleSize)
     {
+        if (battleSize <= 0) throw new ArgumentOutOfRangeException(nameof(battleSize));
+
         lock (Gate)
         {
             _activeMapEventId = mapEventId;
+            _battleSize = battleSize;
             _defenderReserveTimedOut = false;
             _attackerReserveTimedOut = false;
             CombatLogContexts.Clear();
@@ -331,6 +371,7 @@ public static class BattleSpawnGate
         lock (Gate)
         {
             _activeMapEventId = null;
+            _battleSize = 0;
             _defenderReserveTimedOut = false;
             _attackerReserveTimedOut = false;
             CombatLogContexts.Clear();

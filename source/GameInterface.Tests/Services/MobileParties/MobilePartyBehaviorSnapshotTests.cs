@@ -36,7 +36,8 @@ public class MobilePartyBehaviorSnapshotTests
     {
         var party = CreateParty();
         var removedMoveTarget = ObjectHelper.SkipConstructor<MobileParty>();
-        removedMoveTarget.Position = new CampaignVec2(new Vec2(30f, 40f), isOnLand: true);
+        var lastTargetPoint = new CampaignVec2(new Vec2(30f, 40f), isOnLand: true);
+        removedMoveTarget._position = lastTargetPoint;
         party.MoveTargetParty = removedMoveTarget;
 
         var objectManager = new Mock<IObjectManager>();
@@ -50,7 +51,7 @@ public class MobilePartyBehaviorSnapshotTests
         Assert.True(snapshot.TryCreate(party, out PartyBehaviorUpdateData data));
         Assert.Equal(MoveModeType.Point, data.PartyMoveMode);
         Assert.Null(data.MoveTargetPartyId);
-        Assert.Equal(removedMoveTarget.Position, data.MoveTargetPoint);
+        Assert.Equal(lastTargetPoint, data.MoveTargetPoint);
     }
 
     private static MobileParty CreateParty()

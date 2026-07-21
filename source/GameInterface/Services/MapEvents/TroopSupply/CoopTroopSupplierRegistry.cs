@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 
@@ -8,14 +8,28 @@ namespace GameInterface.Services.MapEvents.TroopSupply;
 /// Bridges the network handler (which receives a side's reserve from the server) to the
 /// <see cref="CoopTroopSupplier"/>s the injection patch installs into the mission. A reserve message can
 /// arrive before or after the mission (and thus the supplier) is built, so a reserve that arrives early is
-/// buffered (latest wins) and applied when the matching supplier registers. Static because the injection
-/// patch can't resolve DI services.
+/// buffered and applied when the matching supplier registers. A later full reserve replaces the earlier one,
+/// including its persistent initial entitlements. Static because the injection patch can't resolve DI services.
 /// </summary>
 public static class CoopTroopSupplierRegistry
 {
+    private sealed class PendingReserve
+    {
+        public readonly PartyReserve[] Parties;
+        public readonly long GrantGeneration;
+        public readonly bool CompletesInitialSizing;
+
+        public PendingReserve(PartyReserve[] parties, long grantGeneration, bool completesInitialSizing)
+        {
+            Parties = parties;
+            GrantGeneration = grantGeneration;
+            CompletesInitialSizing = completesInitialSizing;
+        }
+    }
+
     private static readonly object Gate = new object();
     private static readonly Dictionary<string, CoopTroopSupplier> Suppliers = new Dictionary<string, CoopTroopSupplier>();
-    private static readonly Dictionary<string, PartyReserve[]> Pending = new Dictionary<string, PartyReserve[]>();
+    private static readonly Dictionary<string, PendingReserve> Pending = new Dictionary<string, PendingReserve>();
 
     private static string Key(string mapEventId, BattleSideEnum side) => mapEventId + "|" + (int)side;
 
@@ -29,7 +43,7 @@ public static class CoopTroopSupplierRegistry
 
             if (Pending.TryGetValue(key, out var buffered))
             {
-                supplier.SetReserve(buffered);
+                supplier.SetReserve(buffered.Parties, buffered.GrantGeneration, buffered.CompletesInitialSizing);
                 Pending.Remove(key);
             }
         }
@@ -39,15 +53,23 @@ public static class CoopTroopSupplierRegistry
     /// exists. Returns the final local pointers of the parties the REPLACE dropped (the BR-033 flush payload;
     /// see <see cref="CoopTroopSupplier.SetReserve"/>) — empty when buffered: with no supplier, nothing was
     /// ever supplied locally, so there is nothing beyond the server's own ledger to flush.</summary>
-    public static IReadOnlyList<(string PartyId, int Supplied)> Feed(string mapEventId, BattleSideEnum side, PartyReserve[] reserve)
+    public static IReadOnlyList<(string PartyId, int Supplied)> Feed(
+        string mapEventId,
+        BattleSideEnum side,
+        PartyReserve[] reserve,
+        long grantGeneration = 0,
+        bool completesInitialSizing = true)
     {
         lock (Gate)
         {
             var key = Key(mapEventId, side);
             if (Suppliers.TryGetValue(key, out var supplier))
-                return supplier.SetReserve(reserve);
+                return supplier.SetReserve(reserve, grantGeneration, completesInitialSizing);
 
-            Pending[key] = reserve; // latest wins
+            Pending[key] = new PendingReserve(
+                reserve ?? Array.Empty<PartyReserve>(),
+                grantGeneration,
+                completesInitialSizing);
             return Array.Empty<(string, int)>();
         }
     }

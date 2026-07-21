@@ -19,11 +19,24 @@ public readonly struct NetworkAddInvolvedParties : ICommand
     /// </summary>
     [ProtoMember(3)]
     public readonly CampaignVec2[] Positions;
+    /// <summary>Server-granted initial slots, index-aligned with <see cref="MapEventPartyIds"/>.</summary>
+    [ProtoMember(4)]
+    public readonly int[] InitialSpawnCounts;
+    /// <summary>Whether each party was added to the frozen spawn plan by this broadcast.</summary>
+    [ProtoMember(5)]
+    public readonly bool[] PostPlanAdditions;
 
-    public NetworkAddInvolvedParties(string mapEventId, string[] mapEventPartyIds, CampaignVec2[] positions)
+    public NetworkAddInvolvedParties(
+        string mapEventId,
+        string[] mapEventPartyIds,
+        CampaignVec2[] positions,
+        int[] initialSpawnCounts,
+        bool[] postPlanAdditions)
     {
         MapEventId = mapEventId;
         MapEventPartyIds = mapEventPartyIds;
         Positions = positions;
+        InitialSpawnCounts = initialSpawnCounts;
+        PostPlanAdditions = postPlanAdditions;
     }
 }

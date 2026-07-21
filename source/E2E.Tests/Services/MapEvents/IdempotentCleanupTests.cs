@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common.Messaging;
@@ -118,7 +118,7 @@ public class IdempotentCleanupTests : MapEventTestBase
     [Trait("Requirement", "BR-091")]
     public void RepeatedMissionEndBattle_ClearsTheActiveBattleGate_Idempotently()
     {
-        BattleSpawnGate.BeginBattle("some-map-event-id");
+        BattleSpawnGate.BeginBattle("some-map-event-id", 1000);
         Assert.True(BattleSpawnGate.IsCoopBattleActive);
 
         // First teardown clears the gate.

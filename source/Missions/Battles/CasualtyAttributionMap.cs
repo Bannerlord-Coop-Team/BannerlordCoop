@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 
 namespace Missions.Battles;
@@ -36,12 +36,17 @@ public interface ICasualtyAttributionMap
     CasualtyAttribution GetOrDefault(Guid agentId);
 
     void Forget(Guid agentId);
+
+    void MarkDeparted(Guid agentId);
+
+    bool WasDeparted(int troopSeed);
 }
 
 /// <inheritdoc cref="ICasualtyAttributionMap"/>
 public class CasualtyAttributionMap : ICasualtyAttributionMap
 {
     private readonly ConcurrentDictionary<Guid, CasualtyAttribution> attributions = new();
+    private readonly ConcurrentDictionary<int, byte> departedSeeds = new();
 
     public void Record(Guid agentId, string mapEventPartyId, int troopSeed, string troopCharacterId)
         => attributions[agentId] = new CasualtyAttribution(mapEventPartyId, troopSeed, troopCharacterId);
@@ -50,4 +55,13 @@ public class CasualtyAttributionMap : ICasualtyAttributionMap
         => attributions.TryGetValue(agentId, out var attribution) ? attribution : default;
 
     public void Forget(Guid agentId) => attributions.TryRemove(agentId, out _);
+
+    public void MarkDeparted(Guid agentId)
+    {
+        if (!attributions.TryRemove(agentId, out var attribution)) return;
+        if (attribution.MapEventPartyId != null)
+            departedSeeds.TryAdd(attribution.TroopSeed, 0);
+    }
+
+    public bool WasDeparted(int troopSeed) => departedSeeds.ContainsKey(troopSeed);
 }

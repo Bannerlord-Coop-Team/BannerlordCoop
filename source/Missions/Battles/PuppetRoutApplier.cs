@@ -25,12 +25,18 @@ public interface IPuppetRoutApplier : IDisposable
 /// <inheritdoc cref="IPuppetRoutApplier"/>
 public class PuppetRoutApplier : IPuppetRoutApplier
 {
+    private sealed class PendingRout
+    {
+        public bool HideMount;
+        public bool IsAdministrativeRemoval;
+    }
+
     private static readonly ILogger Logger = LogManager.GetLogger<PuppetRoutApplier>();
 
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ICasualtyAttributionMap casualties;
-    private readonly HashSet<Guid> pendingRouts = new HashSet<Guid>();
+    private readonly Dictionary<Guid, PendingRout> pendingRouts = new Dictionary<Guid, PendingRout>();
 
     public PuppetRoutApplier(
         IMessageBroker messageBroker,
@@ -54,9 +60,24 @@ public class PuppetRoutApplier : IPuppetRoutApplier
     {
         GameThread.RunSafe(() =>
         {
-            if (!TryApplyRout(payload.What.AgentId))
+            if (!TryApplyRout(
+                    payload.What.AgentId,
+                    payload.What.HideMount,
+                    payload.What.IsAdministrativeRemoval))
             {
-                pendingRouts.Add(payload.What.AgentId);
+                if (pendingRouts.TryGetValue(payload.What.AgentId, out var pending))
+                {
+                    pending.HideMount |= payload.What.HideMount;
+                    pending.IsAdministrativeRemoval &= payload.What.IsAdministrativeRemoval;
+                }
+                else
+                {
+                    pendingRouts[payload.What.AgentId] = new PendingRout
+                    {
+                        HideMount = payload.What.HideMount,
+                        IsAdministrativeRemoval = payload.What.IsAdministrativeRemoval,
+                    };
+                }
                 Logger.Information("[DeathDiag] Deferring rout of {AgentId} until its puppet registers", payload.What.AgentId);
             }
         });
@@ -66,15 +87,15 @@ public class PuppetRoutApplier : IPuppetRoutApplier
     {
         if (pendingRouts.Count == 0) return;
 
-        var agentIds = new List<Guid>(pendingRouts);
-        foreach (var agentId in agentIds)
+        var routs = new List<KeyValuePair<Guid, PendingRout>>(pendingRouts);
+        foreach (var rout in routs)
         {
-            if (TryApplyRout(agentId))
-                pendingRouts.Remove(agentId);
+            if (TryApplyRout(rout.Key, rout.Value.HideMount, rout.Value.IsAdministrativeRemoval))
+                pendingRouts.Remove(rout.Key);
         }
     }
 
-    private bool TryApplyRout(Guid agentId)
+    private bool TryApplyRout(Guid agentId, bool hideMount, bool isAdministrativeRemoval)
     {
         var registry = coopMissionComponent.AgentRegistry;
         if (!registry.TryGetAgentInfo(agentId, out var info)) return false;
@@ -88,14 +109,20 @@ public class PuppetRoutApplier : IPuppetRoutApplier
         // FadeOut AVEs on a torn-down horse); a leftover riderless horse is handled by the mount sync.
         if (agent != null && agent.IsActive() && agent.Health > 0)
         {
-            bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
-            agent.FadeOut(true, hideMount);
+            bool hideActiveMount = hideMount
+                && agent.HasMount
+                && agent.MountAgent != null
+                && agent.MountAgent.IsActive();
+            agent.FadeOut(true, hideActiveMount);
         }
 
         // Deregister AFTER the despawn, inside this game-thread action — same ordering rationale as
         // PuppetDeathApplier.
         registry.RemoveAgent(agentId);
-        casualties.Forget(agentId);
+        if (isAdministrativeRemoval)
+            casualties.Forget(agentId);
+        else
+            casualties.MarkDeparted(agentId);
         return true;
     }
 }

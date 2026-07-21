@@ -1,4 +1,5 @@
-using GameInterface.Services.MapEvents.TroopSupply;
+﻿using GameInterface.Services.MapEvents.TroopSupply;
+using System.Linq;
 
 namespace E2E.Tests.Services.Missions;
 
@@ -103,6 +104,49 @@ public class BattleTroopLedgerTests
 
         Assert.True(ledger.TryGetReserve(Battle, Party, out _, out var supplied));
         Assert.Equal(0, supplied);
+    }
+
+    [Fact]
+    public void ReportDeparted_RetainsOnlySeedsFromThePartyReserve()
+    {
+        var ledger = new BattleTroopLedger();
+        ledger.SetReserve(Battle, Party, Reserve(3));
+
+        ledger.ReportDeparted(Battle, Party, 1001);
+        ledger.ReportDeparted(Battle, Party, 9999);
+
+        Assert.Equal(new[] { 1001 }, ledger.GetDepartedSeeds(Battle, Party));
+    }
+
+    [Fact]
+    public void ReplacingOrRemovingReserveClearsDepartedHistory()
+    {
+        var ledger = new BattleTroopLedger();
+        ledger.SetReserve(Battle, Party, Reserve(3));
+        ledger.ReportDeparted(Battle, Party, 1001);
+
+        ledger.SetReserve(Battle, Party, Reserve(3));
+        Assert.Empty(ledger.GetDepartedSeeds(Battle, Party));
+
+        ledger.ReportDeparted(Battle, Party, 1001);
+        ledger.RemoveParty(Battle, Party);
+        Assert.Empty(ledger.GetDepartedSeeds(Battle, Party));
+    }
+
+    [Fact]
+    public void ResetSupplied_PreservesStableReserveAndDepartedHistory()
+    {
+        var ledger = new BattleTroopLedger();
+        ledger.SetReserve(Battle, Party, Reserve(3));
+        ledger.ReportSupplied(Battle, Party, 2);
+        ledger.ReportDeparted(Battle, Party, 1001);
+
+        ledger.ResetSupplied(Battle, Party);
+
+        Assert.True(ledger.TryGetReserve(Battle, Party, out var entries, out var supplied));
+        Assert.Equal(0, supplied);
+        Assert.Equal(new[] { 1000, 1001, 1002 }, entries.Select(entry => entry.Seed));
+        Assert.Equal(new[] { 1001 }, ledger.GetDepartedSeeds(Battle, Party));
     }
 
     [Fact]

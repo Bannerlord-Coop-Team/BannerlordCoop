@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
@@ -8,6 +9,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 
 namespace Missions.Battles;
 
@@ -24,11 +26,16 @@ internal class BattleCasualtyHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly IBattleTroopLedger ledger;
 
-    public BattleCasualtyHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public BattleCasualtyHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        IBattleTroopLedger ledger)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.ledger = ledger;
 
         messageBroker.Subscribe<NetworkRequestBattleCasualty>(Handle_NetworkRequestBattleCasualty);
     }
@@ -63,26 +70,42 @@ internal class BattleCasualtyHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(msg.TroopCharacterId, out var troop))
                 return;
 
-            // Find a live troop of this character in the party's flattened battle roster and apply the casualty
-            // to its CURRENT descriptor. Matching by character rather than the owner's captured seed sidesteps
-            // the descriptor churn — the engine re-flattens parties during setup, minting fresh seeds — that
-            // otherwise threw KeyNotFoundException and dropped casualties. One of N identical troops is
-            // interchangeable here. Applying to the server roster runs the original (the prefix lets the server
-            // through), then we republish the attempt so MapEventPartyHandler broadcasts NetworkTroop* to clients.
+            // Prefer the exact reserve descriptor so identical troops keep one identity. If setup churned that
+            // descriptor, fall back to one live troop of the same character for equivalent roster accounting.
             var roster = mapEventParty.Troops;
             if (roster != null)
             {
+                UniqueTroopDescriptor selectedDescriptor = default;
+                bool found = false;
                 foreach (var element in roster)
                 {
-                    // Skip already killed or wounded troops
                     if (element.IsKilled || element.IsWounded) continue;
+                    if (element.Descriptor.UniqueSeed != msg.TroopSeed) continue;
                     if (element.Troop != troop) continue;
+                    selectedDescriptor = element.Descriptor;
+                    found = true;
+                    break;
+                }
 
+                if (!found)
+                {
+                    foreach (var element in roster)
+                    {
+                        if (element.IsKilled || element.IsWounded) continue;
+                        if (element.Troop != troop) continue;
+                        selectedDescriptor = element.Descriptor;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found)
+                {
                     if (msg.Wounded)
                     {
                         try
                         {
-                            mapEventParty.OnTroopWounded(element.Descriptor);
+                            mapEventParty.OnTroopWounded(selectedDescriptor);
                         }
                         catch (IndexOutOfRangeException e)
                         {
@@ -90,13 +113,13 @@ internal class BattleCasualtyHandler : IHandler
                                 msg.TroopCharacterId, msg.MapEventPartyId);
                             return;
                         }
-                        messageBroker.Publish(this, new OnTroopWoundedAttempted(mapEventParty, element.Descriptor.UniqueSeed));
+                        messageBroker.Publish(this, new OnTroopWoundedAttempted(mapEventParty, selectedDescriptor.UniqueSeed));
                     }
                     else
                     {
                         try
                         {
-                            mapEventParty.OnTroopKilled(element.Descriptor);
+                            mapEventParty.OnTroopKilled(selectedDescriptor);
                         }
                         catch (IndexOutOfRangeException e)
                         {
@@ -104,7 +127,17 @@ internal class BattleCasualtyHandler : IHandler
                                 msg.TroopCharacterId, msg.MapEventPartyId);
                             return;
                         }
-                        messageBroker.Publish(this, new OnTroopKilledAttempted(mapEventParty, element.Descriptor.UniqueSeed));
+                        messageBroker.Publish(this, new OnTroopKilledAttempted(mapEventParty, selectedDescriptor.UniqueSeed));
+                    }
+
+                    if (objectManager.TryGetId(mapEvent, out var mapEventId))
+                    {
+                        int departedSeed = SelectLedgerDepartureSeed(
+                            mapEventId,
+                            msg.MapEventPartyId,
+                            selectedDescriptor.UniqueSeed,
+                            msg.TroopSeed);
+                        ledger.ReportDeparted(mapEventId, msg.MapEventPartyId, departedSeed);
                     }
                     return;
                 }
@@ -113,5 +146,23 @@ internal class BattleCasualtyHandler : IHandler
             Logger.Warning("[BattleSync] Casualty for {Char} in party {Party} dropped: no live matching troop in the server roster",
                 msg.TroopCharacterId, msg.MapEventPartyId);
         });
+    }
+
+    private int SelectLedgerDepartureSeed(
+        string mapEventId,
+        string partyId,
+        int appliedSeed,
+        int reportedSeed)
+    {
+        if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out _))
+            return appliedSeed;
+
+        bool containsReported = false;
+        foreach (var entry in entries)
+        {
+            if (entry.Seed == appliedSeed) return appliedSeed;
+            if (entry.Seed == reportedSeed) containsReported = true;
+        }
+        return containsReported ? reportedSeed : appliedSeed;
     }
 }
