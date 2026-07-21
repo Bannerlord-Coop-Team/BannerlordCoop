@@ -16,7 +16,6 @@ namespace Common.PacketHandlers
         FieldAutoSync,
         PropertyAutoSync,
         SaveData,
-        SaveDataChunk,
         Relay,
         AgentAction,
         MountMovement,

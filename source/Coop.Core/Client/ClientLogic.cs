@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.LogicStates;
 using Coop.Core.Client.States;
 using GameInterface.Services.Players.Data;
@@ -80,7 +80,7 @@ public class ClientLogic : IClientLogic
             [typeof(CharacterCreationState)] = () => new CharacterCreationState(this, context.MessageBroker, context.Network, context.HeroInterface, context.RegistryManager, context.ControllerIdProvider, context.LoadingInterface, context.PlayerManager, context.GameStateInterface, context.CoopFinalizer),
             [typeof(ReceivingSavedDataState)] = () => new ReceivingSavedDataState(this, context.MessageBroker, context.LoadingInterface, context.GameStateInterface),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.RegistryManager, context.HeroInterface, context.ControllerIdProvider, context.PlayerManager, context.GameStateInterface, context.LoadingInterface),
-            [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker, context.Network, context.LoadingInterface, context.GameStateInterface, context.CoopFinalizer, context.MapTimeTrackerInterface),
+            [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker, context.Network, context.LoadingInterface, context.GameStateInterface, context.CoopFinalizer),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker, context.GameStateInterface, context.CoopFinalizer),
         };
 
