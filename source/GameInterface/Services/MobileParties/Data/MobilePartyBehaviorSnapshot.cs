@@ -32,23 +32,9 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
                 out string interactablePointId,
                 out bool isInteractableAnchor) ||
             !TryGetCompactId(party.TargetParty, out string targetPartyId) ||
-            !TryGetCompactId(party.TargetSettlement, out string targetSettlementId))
+            !TryGetCompactId(party.TargetSettlement, out string targetSettlementId) ||
+            !TryGetCompactId(party.MoveTargetParty, out string moveTargetPartyId))
             return false;
-
-        MoveModeType partyMoveMode = party.PartyMoveMode;
-        CampaignVec2 moveTargetPoint = party.MoveTargetPoint;
-        MobileParty moveTargetParty = party.MoveTargetParty;
-        if (!TryGetCompactId(moveTargetParty, out string moveTargetPartyId))
-        {
-            // A removed movement target cannot exist on clients, so preserve its last destination.
-            moveTargetPartyId = null;
-            if (partyMoveMode == MoveModeType.Party)
-            {
-                partyMoveMode = MoveModeType.Point;
-                moveTargetPoint = moveTargetParty.Position;
-            }
-        }
-
         data = new PartyBehaviorUpdateData(
             partyId,
             party.ShortTermBehavior,
@@ -61,9 +47,9 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         {
             TargetPartyId = targetPartyId,
             TargetSettlementId = targetSettlementId,
-            MoveTargetPoint = moveTargetPoint,
+            MoveTargetPoint = party.MoveTargetPoint,
             IsTargetingPort = party.IsTargetingPort,
-            PartyMoveMode = partyMoveMode,
+            PartyMoveMode = party.PartyMoveMode,
             MoveTargetPartyId = moveTargetPartyId,
             IsInteractableAnchor = isInteractableAnchor,
             IsCurrentlyAtSea = party.IsCurrentlyAtSea,
