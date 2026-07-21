@@ -1,4 +1,4 @@
-using GameInterface.Services.MapEvents;
+﻿using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
 using Moq;
@@ -9,22 +9,6 @@ namespace E2E.Tests.Services.MapEvents;
 
 public class BattleMissionStartRoutingTests
 {
-    [Fact]
-    public void SiegeStart_MatchesOnlyTheLocalBattleMapEventId()
-    {
-        // Identity-only test double: MapEvent's real constructor enters native campaign state, while this
-        // routing helper only passes the reference to IObjectManager and never reads MapEvent internals.
-#pragma warning disable SYSLIB0050
-        var battle = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
-#pragma warning restore SYSLIB0050
-        var objectManager = new Mock<IObjectManager>();
-        string actualId = "local-battle";
-        objectManager.Setup(m => m.TryGetId(battle, out actualId)).Returns(true);
-
-        Assert.True(BattleMissionStartHandler.MatchesMapEventId(objectManager.Object, battle, "local-battle"));
-        Assert.False(BattleMissionStartHandler.MatchesMapEventId(objectManager.Object, battle, "other-battle"));
-    }
-
     /// <summary>
     /// BR-104: a battle-scoped mission-start message must not affect the current mission when it carries a
     /// previous or unrelated battle's map-event id. The routing check that gates the mission open matches only
@@ -43,10 +27,13 @@ public class BattleMissionStartRoutingTests
         objectManager.Setup(m => m.TryGetId(currentBattle, out currentId)).Returns(true);
 
         // Only a message addressed to the current battle's own instance id is routed to it...
-        Assert.True(BattleMissionStartHandler.MatchesMapEventId(objectManager.Object, currentBattle, "current-battle"));
+        Assert.True(BattleMissionStartHandler.MatchesMapEventId(
+            objectManager.Object, currentBattle, "current-battle"));
         // ...a message carrying a previous or unrelated battle's id is dropped, so it cannot affect this mission.
-        Assert.False(BattleMissionStartHandler.MatchesMapEventId(objectManager.Object, currentBattle, "previous-battle"));
-        Assert.False(BattleMissionStartHandler.MatchesMapEventId(objectManager.Object, currentBattle, "unrelated-battle"));
+        Assert.False(BattleMissionStartHandler.MatchesMapEventId(
+            objectManager.Object, currentBattle, "previous-battle"));
+        Assert.False(BattleMissionStartHandler.MatchesMapEventId(
+            objectManager.Object, currentBattle, "unrelated-battle"));
     }
 
     [Fact]
