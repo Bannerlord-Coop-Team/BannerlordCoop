@@ -4,8 +4,11 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.InputSystem;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
@@ -19,6 +22,125 @@ namespace GameInterface.Services.MapEvents.Commands;
 internal class BattleTeamKillCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
+
+    private const string ClickDeploymentReadyUsage =
+@"Usage:
+  coop.debug.mapevent.click_deployment_ready
+
+Activates the deployment Ready button's native UI callback.";
+
+    [CommandLineArgumentFunction("click_deployment_ready", "coop.debug.mapevent")]
+    public static string ClickDeploymentReady(List<string> args)
+    {
+        var ctx = new CommandContext("click_deployment_ready", ClickDeploymentReadyUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+            return "No active deployment.";
+        if (!deploymentController.TeamSetupOver)
+            return "Failed: deployment team setup is not complete.";
+
+        var orderUi = mission.GetMissionBehavior<MissionGauntletSingleplayerOrderUIHandler>();
+        if (orderUi == null)
+            return "Failed: no deployment order UI.";
+
+        orderUi.OnBeginMission();
+        return "Clicked deployment Ready through the native UI callback.";
+    }
+
+    private const string PressScoreboardTabUsage =
+@"Usage:
+  coop.debug.mapevent.press_scoreboard_tab
+
+Presses or releases Tab through the native hold-to-show scoreboard input path.";
+
+    [CommandLineArgumentFunction("press_scoreboard_tab", "coop.debug.mapevent")]
+    public static string PressScoreboardTab(List<string> args)
+    {
+        var ctx = new CommandContext("press_scoreboard_tab", PressScoreboardTabUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var scoreboard = mission.GetMissionBehavior<MissionGauntletBattleScore>();
+        if (scoreboard?.DataSource == null)
+            return "Failed: no battle scoreboard UI.";
+
+        var tabHold = mission.GetMissionBehavior<ScoreboardTabHoldBehavior>();
+        if (tabHold == null)
+        {
+            mission.AddMissionBehavior(new ScoreboardTabHoldBehavior());
+            Input.PressKey(InputKey.Tab);
+            return "Pressed and holding Tab through the native scoreboard input path.";
+        }
+
+        mission.RemoveMissionBehavior(tabHold);
+        return "Released Tab through the native scoreboard input path.";
+    }
+
+    private const string ScoreboardStateUsage =
+@"Usage:
+  coop.debug.mapevent.scoreboard_state
+
+Lists the map-event parties and the party rows currently loaded by the battle scoreboard.";
+
+    [CommandLineArgumentFunction("scoreboard_state", "coop.debug.mapevent")]
+    public static string ScoreboardState(List<string> args)
+    {
+        var ctx = new CommandContext("scoreboard_state", ScoreboardStateUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var scoreboard = mission.GetMissionBehavior<MissionGauntletBattleScore>();
+        var dataSource = scoreboard?.DataSource;
+        if (dataSource == null)
+            return "Failed: no battle scoreboard UI.";
+
+        var expectedParties = MobileParty.MainParty?.MapEvent?.InvolvedParties
+            .Where(party => party != null)
+            .Distinct()
+            .ToArray() ?? Array.Empty<PartyBase>();
+        var scoreboardParties = dataSource.Attackers.Parties
+            .Concat(dataSource.Defenders.Parties)
+            .Select(party => party.BattleCombatant)
+            .OfType<PartyBase>()
+            .Distinct()
+            .ToArray();
+        var missingParties = expectedParties.Except(scoreboardParties).ToArray();
+
+        return $"Visible: {dataSource.ShowScoreboard}; " +
+               $"Expected parties ({expectedParties.Length}): {FormatPartyNames(expectedParties)}; " +
+               $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
+               $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}";
+    }
+
+    private static string FormatPartyNames(IEnumerable<PartyBase> parties)
+    {
+        var names = parties.Select(party => party.Name?.ToString() ?? "<unnamed>").ToArray();
+        return names.Length == 0 ? "<none>" : string.Join(", ", names);
+    }
+
+    private sealed class ScoreboardTabHoldBehavior : MissionLogic
+    {
+        public override void OnMissionTick(float dt)
+        {
+            base.OnMissionTick(dt);
+            Input.PressKey(InputKey.Tab);
+        }
+    }
 
     private const string FinishDeploymentUsage =
 @"Usage:
