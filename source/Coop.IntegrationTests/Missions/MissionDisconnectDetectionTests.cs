@@ -6,6 +6,7 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.Entity;
 using LiteNetLib;
 using Missions.Messages;
@@ -31,6 +32,7 @@ namespace Coop.IntegrationTests.Missions;
 /// drop (<see cref="LiteNetP2PClient.OnPeerDisconnected"/>) — the P2P link dying while the server link is intact
 /// — must NOT fabricate either mission-disconnect notification.
 /// </summary>
+[Collection(KingdomSyncGameThreadCollection.Name)]
 public class MissionDisconnectDetectionTests
 {
     private const string InstanceId = "battle-instance";
@@ -186,14 +188,20 @@ public class MissionDisconnectDetectionTests
 
     /// <summary>Simulates the server receiving a MissionEntered over the member's connection.</summary>
     private void Join(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.ControllerId, InstanceId));
+        GameThreadTestRunner.Run(() =>
+            TestEnvironment.Server.SimulateMessage(
+                member.Instance.NetPeer,
+                new NetworkMissionEntered(member.ControllerId, InstanceId)));
 
     /// <summary>
     /// Simulates the campaign server observing the member's connection drop ungracefully. Handle_PlayerDisconnected
     /// resolves the instance from the bare peer via <c>MissionManager.TryHandleDisconnect</c>.
     /// </summary>
     private void Disconnect(Member member) =>
-        TestEnvironment.Server.SimulateMessage(this, new PlayerDisconnected(member.Instance.NetPeer, default));
+        GameThreadTestRunner.Run(() =>
+            TestEnvironment.Server.SimulateMessage(
+                this,
+                new PlayerDisconnected(member.Instance.NetPeer, default)));
 
     private static readonly ConstructorInfo PeerConstructor = typeof(NetPeer).GetConstructor(
         BindingFlags.NonPublic | BindingFlags.Instance,

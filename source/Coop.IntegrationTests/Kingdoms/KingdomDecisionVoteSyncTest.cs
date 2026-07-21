@@ -1,5 +1,4 @@
-using Common;
-using Coop.Core.Server.Services.Kingdoms.Messages;
+﻿using Coop.Core.Server.Services.Kingdoms.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Kingdoms.Data;
@@ -16,30 +15,6 @@ namespace Coop.IntegrationTests.Kingdoms
     {
         internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
-        private static void RunOnGameThread(Action act)
-        {
-            Exception? captured = null;
-            var thread = new Thread(() =>
-            {
-                try
-                {
-                    GameThread.Instance.MarkGameThread();
-                    act();
-                }
-                catch (Exception e) { captured = e; }
-                finally
-                {
-                    // The registration must not outlive this thread: managed thread ids are recycled,
-                    // so a stale mark would make an unrelated later test thread run GameThread actions
-                    // inline (observed as order-dependent CI failures in unrelated tests).
-                    GameThread.Instance.UnmarkGameThread();
-                }
-            });
-            thread.Start();
-            thread.Join();
-            if (captured != null) throw captured;
-        }
-
         [Fact]
         public void ClientKingdomDecisionVoteRequested_Publishes_ServerCommand()
         {
@@ -47,7 +22,7 @@ namespace Coop.IntegrationTests.Kingdoms
             var server = TestEnvironment.Server;
             var voteData = new KingdomDecisionVoteData("kingdom1", 0, 1, (int)Supporter.SupportWeights.FullyPush, false);
 
-            RunOnGameThread(() =>
+            GameThreadTestRunner.Run(() =>
                 client1.SimulateMessage(this, new KingdomDecisionVoteRequested(voteData)));
 
             Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkRequestKingdomDecisionVote>());
@@ -61,7 +36,7 @@ namespace Coop.IntegrationTests.Kingdoms
             var server = TestEnvironment.Server;
             var voteData = new KingdomDecisionVoteData("kingdom1", 0, 1, (int)Supporter.SupportWeights.StronglyFavor, false);
 
-            RunOnGameThread(() =>
+            GameThreadTestRunner.Run(() =>
                 server.SimulateMessage(this, new KingdomDecisionVoteChanged("clan1", voteData)));
 
             Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeKingdomDecisionVote>());
@@ -78,7 +53,7 @@ namespace Coop.IntegrationTests.Kingdoms
             var server = TestEnvironment.Server;
             const string notificationText = "The Western Empire will declare war on the Northern Empire.";
 
-            RunOnGameThread(() =>
+            GameThreadTestRunner.Run(() =>
                 server.SimulateMessage(
                     this,
                     new KingdomDecisionResolved("kingdom1", 0, 1, true, "OutcomeKey", notificationText)));

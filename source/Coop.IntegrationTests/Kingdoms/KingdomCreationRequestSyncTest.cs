@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Kingdoms.Messages;
@@ -19,30 +19,6 @@ public class KingdomCreationRequestSyncTest
 {
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
-    private static void RunOnGameThread(Action act)
-    {
-        Exception? captured = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                GameThread.Instance.MarkGameThread();
-                act();
-            }
-            catch (Exception e) { captured = e; }
-            finally
-            {
-                // The registration must not outlive this thread: managed thread ids are recycled,
-                // so a stale mark would make an unrelated later test thread run GameThread actions
-                // inline (observed as order-dependent CI failures in unrelated tests).
-                GameThread.Instance.UnmarkGameThread();
-            }
-        });
-        thread.Start();
-        thread.Join();
-        if (captured != null) throw captured;
-    }
-
     [Fact]
     public void ClientKingdomCreationRequested_Publishes_ServerCommand()
     {
@@ -50,7 +26,7 @@ public class KingdomCreationRequestSyncTest
         var server = TestEnvironment.Server;
         client1.Resolve<IControllerIdProvider>().SetControllerId("player1");
 
-        RunOnGameThread(() =>
+        GameThreadTestRunner.Run(() =>
             client1.SimulateMessage(this, new KingdomCreationRequested("Real Kingdom", "empire")));
 
         Assert.Equal(1, client1.NetworkSentMessages.GetMessageCount<NetworkRequestCreateKingdom>());
@@ -83,7 +59,7 @@ public class KingdomCreationRequestSyncTest
 
         Assert.Null(party.CurrentSettlement);
 
-        RunOnGameThread(() =>
+        GameThreadTestRunner.Run(() =>
             server.SimulateMessage(
                 this,
                 new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
@@ -99,7 +75,7 @@ public class KingdomCreationRequestSyncTest
     {
         var server = TestEnvironment.Server;
 
-        RunOnGameThread(() =>
+        GameThreadTestRunner.Run(() =>
             server.SimulateMessage(this, new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire")));
 
         var serverCommand = Assert.Single(server.InternalMessages.GetMessages<CreateKingdom>());
@@ -113,7 +89,7 @@ public class KingdomCreationRequestSyncTest
     {
         var server = TestEnvironment.Server;
 
-        RunOnGameThread(() =>
+        GameThreadTestRunner.Run(() =>
             server.SimulateMessage(
                 this,
                 new PlayerKingdomCreated("player1", "Kingdom_Created_1", "Real Kingdom", "Clan_Player")));
@@ -147,7 +123,7 @@ public class KingdomCreationRequestSyncTest
         settlement._partiesCache = new MBList<MobileParty>();
         playerManager.AddPlayer(new Player("player1", "hero1", "party1", "clan1", "character1"));
 
-        RunOnGameThread(() =>
+        GameThreadTestRunner.Run(() =>
             server.SimulateMessage(
                 this,
                 new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
@@ -159,7 +135,7 @@ public class KingdomCreationRequestSyncTest
                 ?.SetValue(party, null);
         }
 
-        RunOnGameThread(() =>
+        GameThreadTestRunner.Run(() =>
             server.SimulateMessage(
                 this,
                 new PlayerKingdomCreated("player1", "Kingdom_Created_1", "Real Kingdom", "clan1")));
