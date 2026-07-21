@@ -85,65 +85,77 @@ internal class MapEventHandler : IHandler
         var sender = payload.Who as NetPeer;
         GameThread.Run(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
-                return;
-
-            mapEventLogger.DebugMapEvent(mapEvent,
-                "Applying network battle state change. BattleState={BattleState}",
-                battleState);
-
-            if (mapEvent.BattleState != BattleState.None)
+            bool applied = false;
+            bool publishConclusion = false;
+            MapEvent mapEvent = null;
+            string[] playerPartyIds = Array.Empty<string>();
+            try
             {
+                if (!objectManager.TryGetObjectWithLogging(mapEventId, out mapEvent))
+                    return;
+
                 mapEventLogger.DebugMapEvent(mapEvent,
-                    "Ignoring network battle state change because battle is already concluded. CurrentBattleState={CurrentBattleState}, IncomingBattleState={IncomingBattleState}",
-                    mapEvent.BattleState,
+                    "Applying network battle state change. BattleState={BattleState}",
                     battleState);
-                return;
-            }
+
+                if (mapEvent.BattleState != BattleState.None)
+                {
+                    applied = mapEvent.BattleState == battleState;
+                    mapEventLogger.DebugMapEvent(mapEvent,
+                        "Ignoring network battle state change because battle is already concluded. CurrentBattleState={CurrentBattleState}, IncomingBattleState={IncomingBattleState}",
+                        mapEvent.BattleState,
+                        battleState);
+                    return;
+                }
 
             // Only the elected battle host's conclusion is authoritative: a non-host's local mission can
             // conclude a victory the shared battle never reached (its enemies arrive as another client's
             // puppets). Applying it would run the full capture/finalize on a battle still being fought.
-            if ((battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
-                && hostRegistry.TryGet(mapEventId, out var hostAssignment))
-            {
-                if (sender != null
-                    && playerManager.TryGetPlayer(sender, out var sendingPlayer)
-                    && sendingPlayer.ControllerId != hostAssignment.HostControllerId)
+                if ((battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
+                    && hostRegistry.TryGet(mapEventId, out var hostAssignment))
                 {
-                    Logger.Information("Refused battle state {BattleState} for {MapEventId} from non-host {ControllerId}",
-                        battleState, mapEventId, sendingPlayer.ControllerId);
-                    return;
-                }
+                    if (sender != null
+                        && playerManager.TryGetPlayer(sender, out var sendingPlayer)
+                        && sendingPlayer.ControllerId != hostAssignment.HostControllerId)
+                    {
+                        Logger.Information("Refused battle state {BattleState} for {MapEventId} from non-host {ControllerId}",
+                            battleState, mapEventId, sendingPlayer.ControllerId);
+                        return;
+                    }
 
                 // BR-102: even the correct sender may hold stale authority — a report stamped with the epoch
                 // of an earlier hosting stint (in flight across a migration, or from a former host that has
                 // since been re-promoted) must not conclude the battle. Only a report stamped with the
                 // CURRENT assignment's epoch is honored.
-                if (payload.What.HostEpoch != hostAssignment.Epoch)
-                {
-                    Logger.Information("Refused battle state {BattleState} for {MapEventId}: stale host epoch {Stale} (current {Current})",
-                        battleState, mapEventId, payload.What.HostEpoch, hostAssignment.Epoch);
-                    return;
+                    if (payload.What.HostEpoch != hostAssignment.Epoch)
+                    {
+                        Logger.Information("Refused battle state {BattleState} for {MapEventId}: stale host epoch {Stale} (current {Current})",
+                            battleState, mapEventId, payload.What.HostEpoch, hostAssignment.Epoch);
+                        return;
+                    }
                 }
-            }
 
-            var playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+                playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+                publishConclusion = battleState == BattleState.AttackerVictory ||
+                    battleState == BattleState.DefenderVictory;
 
-            try
-            {
                 mapEvent.BattleState = battleState;
+                applied = mapEvent.BattleState == battleState;
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkChangeBattleState));
             }
+            finally
+            {
+                applied |= mapEvent?.BattleState == battleState;
+                // Victory finalization is separate from the native result commit, so run it even if a later
+                // callback in the BattleState setter threw after the state itself changed.
+                if (applied && publishConclusion)
+                    messageBroker.Publish(this, new MapEventConcluded(mapEventId, playerPartyIds));
 
-            // A concluded battle (a side won) auto-finalizes coop-side independently of the result-commit the
-            // native setter runs above, so the player no longer has to leave the post-battle menu. Hand off to
-            // BattleHandler for the server-authoritative teardown + the close instruction to every player.
-            if (battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
-                messageBroker.Publish(this, new MapEventConcluded(mapEventId, playerPartyIds));
+                messageBroker.Publish(this, new BattleStateChangeProcessed(mapEventId, battleState, applied));
+            }
         });
     }
 

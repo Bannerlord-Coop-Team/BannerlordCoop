@@ -1,4 +1,5 @@
-﻿using Common.Network.Session;
+﻿using Common;
+using Common.Network.Session;
 using Common.Tests.Utils;
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Services.Instances;
@@ -119,6 +120,7 @@ public class ServerMissionMembershipHandlerTests
             messageBroker, missionManager.Object, new TestNetwork());
 
         messageBroker.Publish(peer, new NetworkMissionEntered("first", InstanceId));
+        DrainGameThread();
 
         Assert.True(entered.HasValue);
         Assert.True(entered.Value.IsFirstMember);
@@ -153,8 +155,11 @@ public class ServerMissionMembershipHandlerTests
             messageBroker, missionManager.Object, network, tunnelHost);
 
         messageBroker.Publish(newcomer, new NetworkMissionEntered(newcomerControllerId, InstanceId));
+        DrainGameThread();
         return network;
     }
+
+    private static void DrainGameThread() => GameThread.Run(() => { }, blocking: true);
 
     private static NetPeer CreatePeer(IPEndPoint endpoint, int id)
         => (NetPeer)PeerConstructor.Invoke(new object[] { new NetManager(null), endpoint, id });

@@ -35,13 +35,10 @@ public class MissionManagerTests
     public void EmptyConclusionClaimRejectsReentrantEntry()
     {
         var manager = new MissionManager();
-        bool entered = true;
 
-        Assert.True(manager.TryClaimEmptyInstance("battle", () =>
-            entered = manager.TryEnterMission(
-                CreatePeer(1), "late", "battle", out _, out _)));
-
-        Assert.False(entered);
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+        Assert.False(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _, out _));
+        manager.CompleteInstanceConclusion("battle", succeeded: true);
     }
 
     [Fact]
@@ -55,7 +52,8 @@ public class MissionManagerTests
         manager.HandleIntroductionRequest(netManager.NatPunchModule, local, remote, "late%battle");
 
         Assert.False(manager.TryGetControllers("battle", out _));
-        Assert.True(manager.TryClaimEmptyInstance("battle", () => { }));
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+        manager.CompleteInstanceConclusion("battle", succeeded: true);
         Assert.False(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _, out _));
     }
 
@@ -69,8 +67,8 @@ public class MissionManagerTests
 
         manager.HandleIntroductionRequest(netManager.NatPunchModule, local, remote, "late%battle");
 
-        Assert.Throws<InvalidOperationException>(() =>
-            manager.TryClaimEmptyInstance("battle", () => throw new InvalidOperationException()));
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+        manager.CompleteInstanceConclusion("battle", succeeded: false);
         Assert.True(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _, out _));
     }
 
@@ -80,8 +78,22 @@ public class MissionManagerTests
         var manager = new MissionManager();
 
         Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _, out _));
-        Assert.True(manager.TryClaimActiveInstanceConclusion("battle", new[] { "host" }));
+        Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "host" }));
+        manager.CompleteInstanceConclusion("battle", succeeded: true);
         Assert.False(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _, out _));
+    }
+
+    [Fact]
+    public void FailedActiveConclusionReopensEntryAndRetry()
+    {
+        var manager = new MissionManager();
+
+        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _, out _));
+        Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "host" }));
+        manager.CompleteInstanceConclusion("battle", succeeded: false);
+
+        Assert.True(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _, out _));
+        Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "host", "late" }));
     }
 
     [Fact]
@@ -92,7 +104,7 @@ public class MissionManagerTests
         Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _, out _));
         Assert.True(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _, out _));
 
-        Assert.False(manager.TryClaimActiveInstanceConclusion("battle", new[] { "host" }));
+        Assert.False(manager.TryBeginActiveInstanceConclusion("battle", new[] { "host" }));
     }
 
     private static NetPeer CreatePeer(int id)

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
@@ -198,6 +199,34 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-005")]
+    public void CancellingDuplicateJoinKeepsExistingReservation()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
+        var host = Clients.First();
+        RegisterPeer(host, "host");
+        EnterBattleWithMembership(host, "host", mapEventId);
+
+        Server.Call(() =>
+        {
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Publish(host.NetPeer, new BattleJoinAccepted(mapEventId, "joining-player"));
+            broker.Publish(host.NetPeer, new BattleJoinAccepted(mapEventId, "joining-player"));
+        });
+        SendResult(host, mapEventId, BattleState.AttackerVictory);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            this,
+            new BattleJoinCancelled(mapEventId, "joining-player")), VictoryConclusionDisabledMethods());
+        AssertMapEventPresent(mapEventId);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            this,
+            new BattleJoinCancelled(mapEventId, "joining-player")), VictoryConclusionDisabledMethods());
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
     public void HostResult_FinalizesWhenAcceptedJoinerReservationExpires()
     {
         var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
@@ -302,6 +331,39 @@ public class BattleResultReadyTests : MissionTestEnvironment
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(joinerPartyId, out var joinerParty));
             Assert.Null(joinerParty.MapEventSide);
         });
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void RejectedBattleStateApplyRollsBackConclusionFence()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "late-player");
+        var clients = Clients.ToArray();
+        RegisterPeer(clients[0], "host");
+        EnterBattleWithMembership(clients[0], "host", mapEventId);
+
+        Server.Call(() =>
+        {
+            var missionManager = Server.Resolve<IMissionManager>();
+            Assert.True(missionManager.TryBeginActiveInstanceConclusion(mapEventId, new[] { "host" }));
+            Assert.True(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out var assignment));
+
+            Server.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkChangeBattleState(
+                    mapEventId,
+                    BattleState.AttackerVictory,
+                    assignment.Epoch - 1));
+
+            Assert.True(missionManager.TryEnterMission(
+                clients[1].NetPeer,
+                "late-player",
+                mapEventId,
+                out _,
+                out _));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.Equal(BattleState.None, mapEvent.BattleState);
+        }, VictoryConclusionDisabledMethods());
     }
 
     private void RegisterPeer(EnvironmentInstance client, string controllerId)

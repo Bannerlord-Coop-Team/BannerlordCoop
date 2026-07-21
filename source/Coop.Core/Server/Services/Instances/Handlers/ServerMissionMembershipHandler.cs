@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Network.Session;
@@ -56,33 +57,33 @@ public class ServerMissionMembershipHandler : IHandler
     {
         var peer = (NetPeer)payload.Who;
         var message = payload.What;
-
-        if (!missionManager.TryEnterMission(
-                peer,
-                message.ControllerId,
-                message.InstanceId,
-                out var others,
-                out var isFirstMember))
+        GameThread.RunSafe(() =>
         {
-            return;
-        }
+            if (!missionManager.TryEnterMission(
+                    peer,
+                    message.ControllerId,
+                    message.InstanceId,
+                    out var others,
+                    out var isFirstMember))
+            {
+                return;
+            }
 
-        messageBroker.Publish(this,
-            new MissionMemberEntered(message.ControllerId, message.InstanceId, isFirstMember));
+            messageBroker.Publish(this,
+                new MissionMemberEntered(message.ControllerId, message.InstanceId, isFirstMember));
 
-        // Introduce the newcomer and each existing member to each other so BOTH sides send their join info
-        // (replaces the direct PeerConnected trigger). The introduction travels over the campaign/relay
-        // connection; the join info itself still flows over the IBattleNetwork mesh.
-        var newcomerSteamId = ResolveSteamId(peer, message.ControllerId);
-        foreach (var (otherControllerId, otherPeer) in others)
-        {
-            var existingSteamId = ResolveSteamId(otherPeer, otherControllerId);
+            // Introduce the newcomer and each existing member to each other so BOTH sides send their join info.
+            var newcomerSteamId = ResolveSteamId(peer, message.ControllerId);
+            foreach (var (otherControllerId, otherPeer) in others)
+            {
+                var existingSteamId = ResolveSteamId(otherPeer, otherControllerId);
 
-            network.Send(otherPeer, new NetworkMissionPeerEntered(
-                message.ControllerId, message.InstanceId, newcomerSteamId));
-            network.Send(peer, new NetworkMissionPeerEntered(
-                otherControllerId, message.InstanceId, existingSteamId));
-        }
+                network.Send(otherPeer, new NetworkMissionPeerEntered(
+                    message.ControllerId, message.InstanceId, newcomerSteamId));
+                network.Send(peer, new NetworkMissionPeerEntered(
+                    otherControllerId, message.InstanceId, existingSteamId));
+            }
+        }, context: nameof(Handle_MissionEntered));
     }
 
     private ulong ResolveSteamId(NetPeer peer, string controllerId)
@@ -109,42 +110,40 @@ public class ServerMissionMembershipHandler : IHandler
     {
         var peer = (NetPeer)payload.Who;
         var message = payload.What;
-
-        var remaining = missionManager.LeaveMission(peer, message.ControllerId, message.InstanceId);
-
-        // Mirror the entry fan-out: tell the members still present that the controller is gone so they
-        // despawn its party.
-        foreach (var (_, otherPeer) in remaining)
+        GameThread.RunSafe(() =>
         {
-            network.Send(otherPeer, new MissionPeerLeft(message.ControllerId, message.InstanceId));
-        }
+            var remaining = missionManager.LeaveMission(peer, message.ControllerId, message.InstanceId);
 
-        // Local signal for battle host migration / successor cleanup (no-op for non-battle instances). A
-        // graceful leave is a retreat — the battle reserve forgets the party so a rejoin re-spawns.
-        messageBroker.Publish(this, new MissionMemberDeparted(
-            message.ControllerId,
-            message.InstanceId,
-            wasRetreat: true,
-            isInstanceEmpty: remaining.Count == 0));
+            // Mirror the entry fan-out: tell the members still present that the controller is gone.
+            foreach (var (_, otherPeer) in remaining)
+                network.Send(otherPeer, new MissionPeerLeft(message.ControllerId, message.InstanceId));
+
+            // A graceful leave is a retreat, so a rejoin must spawn fresh reserves.
+            messageBroker.Publish(this, new MissionMemberDeparted(
+                message.ControllerId,
+                message.InstanceId,
+                wasRetreat: true,
+                isInstanceEmpty: remaining.Count == 0));
+        }, context: nameof(Handle_MissionLeft));
     }
 
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
-        // PlayerDisconnected fires for every disconnect; only act on a peer that was in a mission instance.
-        if (missionManager.TryHandleDisconnect(payload.What.PlayerId, out var controllerId, out var instanceId, out var remaining) == false)
-            return;
-
-        foreach (var (_, otherPeer) in remaining)
+        var peer = payload.What.PlayerId;
+        GameThread.RunSafe(() =>
         {
-            network.Send(otherPeer, new MissionPeerDisconnected(controllerId, instanceId));
-        }
+            if (!missionManager.TryHandleDisconnect(peer, out var controllerId, out var instanceId, out var remaining))
+                return;
 
-        // Local signal for battle host migration / successor cleanup (no-op for non-battle instances). A drop
-        // withdraws the player's party like a retreat, so forget its reserve and re-spawn it fresh on rejoin.
-        messageBroker.Publish(this, new MissionMemberDeparted(
-            controllerId,
-            instanceId,
-            wasRetreat: true,
-            isInstanceEmpty: remaining.Count == 0));
+            foreach (var (_, otherPeer) in remaining)
+                network.Send(otherPeer, new MissionPeerDisconnected(controllerId, instanceId));
+
+            // A drop withdraws the player's party, so a rejoin must spawn fresh reserves.
+            messageBroker.Publish(this, new MissionMemberDeparted(
+                controllerId,
+                instanceId,
+                wasRetreat: true,
+                isInstanceEmpty: remaining.Count == 0));
+        }, context: nameof(Handle_PlayerDisconnected));
     }
 }

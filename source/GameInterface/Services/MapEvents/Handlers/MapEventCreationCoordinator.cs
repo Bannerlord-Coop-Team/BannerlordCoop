@@ -215,16 +215,9 @@ internal class MapEventCreationCoordinator : IHandler
                 attacker,
                 defender,
                 requestingParty,
-                out var existingMapEventId,
-                out var joinedExistingBattle))
+                  out var existingMapEventId,
+                  out var joinedExistingBattle))
         {
-            if (joinedExistingBattle)
-            {
-                messageBroker.Publish(
-                    requestingPeer,
-                    new BattleJoinAccepted(existingMapEventId, player.ControllerId));
-            }
-
             SendCreatedReply(requestingPeer, request, existingMapEventId);
             return joinedExistingBattle;
         }

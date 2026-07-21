@@ -67,15 +67,17 @@ public interface IMissionManager
     /// <summary>
     /// Atomically fences entry when the current controllers still match the result decision's snapshot.
     /// </summary>
-    bool TryClaimActiveInstanceConclusion(
+    bool TryBeginActiveInstanceConclusion(
         string instanceId,
         IReadOnlyCollection<string> expectedControllers);
 
     /// <summary>
-    /// Atomically claims an empty instance for result finalization and runs the conclusion while entry is fenced.
-    /// A later stale entry remains rejected for the lifetime of this campaign session.
+    /// Atomically begins finalizing an empty instance while entry is fenced.
     /// </summary>
-    bool TryClaimEmptyInstance(string instanceId, Action conclusion);
+    bool TryBeginEmptyInstanceConclusion(string instanceId);
+
+    /// <summary>Commits a successful conclusion or rolls its entry fence back after a failed apply.</summary>
+    void CompleteInstanceConclusion(string instanceId, bool succeeded);
 }
 
 /// <inheritdoc cref="IMissionManager"/>
@@ -85,6 +87,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
     private readonly object gate = new object();
     private readonly Dictionary<string, MissionInstance> byInstanceId = new Dictionary<string, MissionInstance>();
+    private readonly Dictionary<string, MissionInstance> pendingEmptyInstances = new Dictionary<string, MissionInstance>();
+    private readonly HashSet<string> concludingInstances = new HashSet<string>();
     private readonly HashSet<string> concludedInstances = new HashSet<string>();
 
     public void HandleIntroductionRequest(
@@ -100,7 +104,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
-            if (concludedInstances.Contains(instanceId))
+            if (IsConclusionFenced(instanceId))
             {
                 Logger.Information("Ignoring NAT introduction for concluded instance {Instance}", instanceId);
                 return;
@@ -164,7 +168,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     {
         lock (gate)
         {
-            if (concludedInstances.Contains(instanceId))
+            if (IsConclusionFenced(instanceId))
             {
                 existingMembers = Array.Empty<(string, NetPeer)>();
                 isFirstMember = false;
@@ -293,39 +297,28 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    public bool TryClaimEmptyInstance(string instanceId, Action conclusion)
+    public bool TryBeginEmptyInstanceConclusion(string instanceId)
     {
-        if (string.IsNullOrEmpty(instanceId) || conclusion == null)
+        if (string.IsNullOrEmpty(instanceId))
             return false;
 
         lock (gate)
         {
-            MissionInstance emptyInstance = null;
             if ((byInstanceId.TryGetValue(instanceId, out var instance) && instance.Controllers.Count > 0) ||
-                !concludedInstances.Add(instanceId))
+                IsConclusionFenced(instanceId))
             {
                 return false;
             }
 
-            emptyInstance = instance;
+            concludingInstances.Add(instanceId);
+            if (instance != null)
+                pendingEmptyInstances[instanceId] = instance;
             byInstanceId.Remove(instanceId);
-
-            try
-            {
-                conclusion();
-                return true;
-            }
-            catch
-            {
-                concludedInstances.Remove(instanceId);
-                if (emptyInstance != null)
-                    byInstanceId[instanceId] = emptyInstance;
-                throw;
-            }
+            return true;
         }
     }
 
-    public bool TryClaimActiveInstanceConclusion(
+    public bool TryBeginActiveInstanceConclusion(
         string instanceId,
         IReadOnlyCollection<string> expectedControllers)
     {
@@ -335,7 +328,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         lock (gate)
         {
             if (!byInstanceId.TryGetValue(instanceId, out var instance) ||
-                concludedInstances.Contains(instanceId))
+                IsConclusionFenced(instanceId))
             {
                 return false;
             }
@@ -347,9 +340,38 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 return false;
             }
 
-            return concludedInstances.Add(instanceId);
+            return concludingInstances.Add(instanceId);
         }
     }
+
+    public void CompleteInstanceConclusion(string instanceId, bool succeeded)
+    {
+        if (string.IsNullOrEmpty(instanceId))
+            return;
+
+        lock (gate)
+        {
+            if (!concludingInstances.Remove(instanceId))
+                return;
+
+            if (succeeded)
+            {
+                concludedInstances.Add(instanceId);
+                pendingEmptyInstances.Remove(instanceId);
+                return;
+            }
+
+            if (pendingEmptyInstances.TryGetValue(instanceId, out var emptyInstance))
+            {
+                byInstanceId[instanceId] = emptyInstance;
+                pendingEmptyInstances.Remove(instanceId);
+            }
+        }
+    }
+
+    // Caller holds gate when this is used from a mutation path.
+    private bool IsConclusionFenced(string instanceId) =>
+        concludingInstances.Contains(instanceId) || concludedInstances.Contains(instanceId);
 
     // Snapshot the (controllerId, peer) pairs still routed through the instance. Caller holds the lock.
     private static IReadOnlyList<(string controllerId, NetPeer peer)> Members(MissionInstance instance)

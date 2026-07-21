@@ -174,7 +174,7 @@ internal class BattleJoinLeaveHandler : IHandler
                     // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
                     // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
                     party.MapEventSide = side;
-                    joined = PublishJoinAccepted(requestingPeer, party, data.MapEventId);
+                    joined = TryGetRequestingPlayer(requestingPeer, party, out _);
                     if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
                         MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
 
@@ -270,17 +270,6 @@ internal class BattleJoinLeaveHandler : IHandler
 
         messageBroker.Publish(requestingPeer, new BattleJoinAccepted(mapEventId, player.ControllerId));
         return player.ControllerId;
-    }
-
-    private bool PublishJoinAccepted(NetPeer requestingPeer, PartyBase party, string mapEventId)
-    {
-        if (!TryGetRequestingPlayer(requestingPeer, party, out var controllerId))
-            return false;
-
-        messageBroker.Publish(
-            requestingPeer,
-            new BattleJoinAccepted(mapEventId, controllerId));
-        return true;
     }
 
     private void PublishJoinCancelled(NetPeer requestingPeer, string mapEventId, string controllerId)

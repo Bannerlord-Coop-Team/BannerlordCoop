@@ -32,7 +32,7 @@ public class ServerBattleCompletionHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IBattleCompletionTracker completionTracker;
     private readonly object pendingJoinersGate = new object();
-    private readonly Dictionary<string, Dictionary<string, (NetPeer Peer, DateTime ExpiresUtc)>> pendingJoiners = new();
+    private readonly Dictionary<string, Dictionary<string, (NetPeer Peer, DateTime ExpiresUtc, int Count)>> pendingJoiners = new();
 
     internal TimeSpan JoinReservationTimeout { get; set; } = TimeSpan.FromMinutes(2);
 
@@ -59,6 +59,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Subscribe<MissionMemberEntered>(Handle_MissionMemberEntered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Subscribe<BattleStateChangeProcessed>(Handle_BattleStateChangeProcessed);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -72,6 +73,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Unsubscribe<MissionMemberEntered>(Handle_MissionMemberEntered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Unsubscribe<BattleStateChangeProcessed>(Handle_BattleStateChangeProcessed);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -101,7 +103,9 @@ public class ServerBattleCompletionHandler : IHandler
                 return;
             }
 
-            hostRegistry.TryGet(instanceId, out var assignment);
+            if (!hostRegistry.TryGet(instanceId, out var assignment))
+                return;
+
             bool canConclude = !HasPendingJoiners(instanceId);
 
             if (!completionTracker.TryRecordResult(
@@ -110,15 +114,15 @@ public class ServerBattleCompletionHandler : IHandler
                     result.BattleState,
                     result.HostEpoch,
                     currentMembers,
-                    assignment?.HostControllerId,
-                    assignment?.Epoch ?? 0,
+                    assignment.HostControllerId,
+                    assignment.Epoch,
                     out var concludedState,
                     canConclude))
             {
                 return;
             }
 
-            if (!missionManager.TryClaimActiveInstanceConclusion(instanceId, currentMembers))
+            if (!missionManager.TryBeginActiveInstanceConclusion(instanceId, currentMembers))
                 return;
 
             PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
@@ -130,7 +134,7 @@ public class ServerBattleCompletionHandler : IHandler
         var departure = payload.What;
         RunSerialized(() =>
         {
-            RemovePendingJoiner(departure.InstanceId, departure.ControllerId);
+            RemovePendingJoiner(departure.InstanceId, departure.ControllerId, removeAll: true);
             completionTracker.MemberDeparted(departure.InstanceId, departure.ControllerId);
             TryConcludeReportedBattle(departure.InstanceId);
         });
@@ -186,7 +190,7 @@ public class ServerBattleCompletionHandler : IHandler
                 return;
             }
 
-            if (!missionManager.TryClaimActiveInstanceConclusion(instanceId, currentMembers))
+            if (!missionManager.TryBeginActiveInstanceConclusion(instanceId, currentMembers))
                 return;
 
             PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
@@ -214,11 +218,15 @@ public class ServerBattleCompletionHandler : IHandler
 
             if (!pendingJoiners.TryGetValue(payload.What.InstanceId, out var joiners))
             {
-                joiners = new Dictionary<string, (NetPeer, DateTime)>();
+                joiners = new Dictionary<string, (NetPeer, DateTime, int)>();
                 pendingJoiners[payload.What.InstanceId] = joiners;
             }
 
-            joiners[payload.What.ControllerId] = (peer, DateTime.UtcNow + JoinReservationTimeout);
+            joiners.TryGetValue(payload.What.ControllerId, out var existing);
+            joiners[payload.What.ControllerId] = (
+                peer,
+                DateTime.UtcNow + JoinReservationTimeout,
+                existing.Count + 1);
         }
     }
 
@@ -227,7 +235,7 @@ public class ServerBattleCompletionHandler : IHandler
         var cancellation = payload.What;
         RunSerialized(() =>
         {
-            RemovePendingJoiner(cancellation.InstanceId, cancellation.ControllerId);
+            RemovePendingJoiner(cancellation.InstanceId, cancellation.ControllerId, removeAll: false);
             TryConcludeReportedBattle(cancellation.InstanceId);
         });
     }
@@ -241,7 +249,7 @@ public class ServerBattleCompletionHandler : IHandler
                 entry.InstanceId,
                 entry.ControllerId,
                 entry.IsFirstMember);
-            RemovePendingJoiner(entry.InstanceId, entry.ControllerId);
+            RemovePendingJoiner(entry.InstanceId, entry.ControllerId, removeAll: true);
         });
     }
 
@@ -287,6 +295,24 @@ public class ServerBattleCompletionHandler : IHandler
         });
     }
 
+    private void Handle_BattleStateChangeProcessed(MessagePayload<BattleStateChangeProcessed> payload)
+    {
+        var result = payload.What;
+        RunSerialized(() =>
+        {
+            missionManager.CompleteInstanceConclusion(result.MapEventId, result.Applied);
+            if (!result.Applied)
+            {
+                Logger.Warning("Battle conclusion for {Instance} was not applied; reopening it for retry",
+                    result.MapEventId);
+                return;
+            }
+
+            lock (pendingJoinersGate)
+                pendingJoiners.Remove(result.MapEventId);
+        });
+    }
+
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         RunSerialized(() =>
@@ -320,14 +346,21 @@ public class ServerBattleCompletionHandler : IHandler
         });
     }
 
-    private void RemovePendingJoiner(string instanceId, string controllerId)
+    private void RemovePendingJoiner(string instanceId, string controllerId, bool removeAll)
     {
         lock (pendingJoinersGate)
         {
             if (!pendingJoiners.TryGetValue(instanceId, out var joiners))
                 return;
 
-            joiners.Remove(controllerId);
+            if (!joiners.TryGetValue(controllerId, out var reservation))
+                return;
+
+            if (removeAll || reservation.Count == 1)
+                joiners.Remove(controllerId);
+            else
+                joiners[controllerId] = (reservation.Peer, reservation.ExpiresUtc, reservation.Count - 1);
+
             if (joiners.Count == 0)
                 pendingJoiners.Remove(instanceId);
         }
@@ -345,9 +378,6 @@ public class ServerBattleCompletionHandler : IHandler
 
     private void PublishConclusion(string instanceId, int memberCount, BattleState concludedState, int hostEpoch)
     {
-        lock (pendingJoinersGate)
-            pendingJoiners.Remove(instanceId);
-
         Logger.Information("All {Count} mission member(s) reported {State} for battle {Instance}; concluding at host epoch {Epoch}",
             memberCount, concludedState, instanceId, hostEpoch);
         messageBroker.Publish(this, new NetworkChangeBattleState(instanceId, concludedState, hostEpoch));
@@ -361,11 +391,11 @@ public class ServerBattleCompletionHandler : IHandler
     {
         RunSerialized(() =>
         {
-            missionManager.TryClaimEmptyInstance(instanceId, () =>
-            {
-                hostRegistry.Remove(instanceId);
-                PublishConclusion(instanceId, memberCount, concludedState, hostEpoch);
-            });
+            if (!missionManager.TryBeginEmptyInstanceConclusion(instanceId))
+                return;
+
+            hostRegistry.Remove(instanceId);
+            PublishConclusion(instanceId, memberCount, concludedState, hostEpoch);
         });
     }
 
