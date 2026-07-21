@@ -48,11 +48,17 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             return false;
 
         MoveModeType partyMoveMode = party.PartyMoveMode;
-        if (!TryGetCompactId(party.MoveTargetParty, out string moveTargetPartyId))
+        CampaignVec2 moveTargetPoint = party.MoveTargetPoint;
+        MobileParty moveTargetParty = party.MoveTargetParty;
+        if (!TryGetCompactId(moveTargetParty, out string moveTargetPartyId))
         {
             // A removed movement target cannot exist on clients, so preserve its last destination.
             moveTargetPartyId = null;
-            if (partyMoveMode == MoveModeType.Party) partyMoveMode = MoveModeType.Point;
+            if (partyMoveMode == MoveModeType.Party)
+            {
+                partyMoveMode = MoveModeType.Point;
+                moveTargetPoint = moveTargetParty.Position;
+            }
         }
 
         data = new PartyBehaviorUpdateData(
@@ -67,7 +73,7 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         {
             TargetPartyId = targetPartyId,
             TargetSettlementId = targetSettlementId,
-            MoveTargetPoint = party.MoveTargetPoint,
+            MoveTargetPoint = moveTargetPoint,
             IsTargetingPort = party.IsTargetingPort,
             PartyMoveMode = partyMoveMode,
             MoveTargetPartyId = moveTargetPartyId,
