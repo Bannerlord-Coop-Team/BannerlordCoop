@@ -211,6 +211,22 @@ public class MapEventDebugCommands
         return $"Moved player {args[0]} out of {settlement.Name}.";
     }
 
+    [CommandLineArgumentFunction("finish_current_encounter", "coop.debug.mapevent")]
+    public static string FinishCurrentEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.finish_current_encounter";
+
+        if (PlayerEncounter.Current == null)
+            return "No active encounter.";
+
+        PlayerEncounter.Finish();
+        return "Finished the current local encounter.";
+    }
+
     [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
     public static string EnterCurrentBattle(List<string> args)
     {
