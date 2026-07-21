@@ -1,4 +1,4 @@
-﻿using Common.PacketHandlers;
+using Common.PacketHandlers;
 using LiteNetLib;
 using ProtoBuf;
 
@@ -25,13 +25,8 @@ public readonly struct CampaignTimePacket : IPacket
     [ProtoMember(1)]
     public readonly long ServerTicks;
 
-    /// <summary>Join backlog, or a negative value when this peer is not joining.</summary>
-    [ProtoMember(2)]
-    public readonly int JoinPacketsRemaining;
-
-    public CampaignTimePacket(long serverTicks, int joinPacketsRemaining)
+    public CampaignTimePacket(long serverTicks)
     {
         ServerTicks = serverTicks;
-        JoinPacketsRemaining = joinPacketsRemaining;
     }
 }
