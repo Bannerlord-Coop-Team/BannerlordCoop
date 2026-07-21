@@ -7,6 +7,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.InputSystem;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -79,7 +80,6 @@ Presses or releases Tab through the native hold-to-show scoreboard input path.";
         if (tabHold == null)
         {
             mission.AddMissionBehavior(new ScoreboardTabHoldBehavior());
-            Input.PressKey(InputKey.Tab);
             return "Pressed and holding Tab through the native scoreboard input path.";
         }
 
@@ -135,11 +135,65 @@ Lists the map-event parties and the party rows currently loaded by the battle sc
 
     private sealed class ScoreboardTabHoldBehavior : MissionLogic
     {
-        public override void OnMissionTick(float dt)
+        private IInputContext _originalInputContext;
+        private IInputContext _scoreboardInputContext;
+
+        public override void OnCreated()
         {
-            base.OnMissionTick(dt);
-            Input.PressKey(InputKey.Tab);
+            base.OnCreated();
+            _originalInputContext = Mission.InputManager;
+            _scoreboardInputContext = new ScoreboardTabInputContext(_originalInputContext);
+            Mission.InputManager = _scoreboardInputContext;
         }
+
+        public override void OnRemoveBehavior()
+        {
+            if (ReferenceEquals(Mission.InputManager, _scoreboardInputContext))
+                Mission.InputManager = _originalInputContext;
+
+            base.OnRemoveBehavior();
+        }
+    }
+
+    private sealed class ScoreboardTabInputContext : IInputContext
+    {
+        private readonly IInputContext _inner;
+
+        public ScoreboardTabInputContext(IInputContext inner)
+        {
+            _inner = inner;
+        }
+
+        public int GetPointerX() => _inner.GetPointerX();
+        public int GetPointerY() => _inner.GetPointerY();
+        public System.Numerics.Vector2 GetPointerPosition() => _inner.GetPointerPosition();
+        public bool IsGameKeyDown(int gameKey) => _inner.IsGameKeyDown(gameKey);
+        public bool IsGameKeyDownImmediate(int gameKey) => _inner.IsGameKeyDownImmediate(gameKey);
+        public bool IsGameKeyPressed(int gameKey) => _inner.IsGameKeyPressed(gameKey);
+        public bool IsGameKeyReleased(int gameKey) => _inner.IsGameKeyReleased(gameKey);
+        public float GetGameKeyAxis(string gameAxisKey) => _inner.GetGameKeyAxis(gameAxisKey);
+        public bool IsHotKeyDown(string hotKey) => hotKey == "HoldShow" || _inner.IsHotKeyDown(hotKey);
+        public bool IsHotKeyReleased(string hotKey) => _inner.IsHotKeyReleased(hotKey);
+        public bool IsHotKeyPressed(string hotKey) => _inner.IsHotKeyPressed(hotKey);
+        public bool IsHotKeyDoublePressed(string hotKey) => _inner.IsHotKeyDoublePressed(hotKey);
+        public Vec2 GetKeyState(InputKey key) => _inner.GetKeyState(key);
+        public bool IsKeyDown(InputKey key) => _inner.IsKeyDown(key);
+        public bool IsKeyPressed(InputKey key) => _inner.IsKeyPressed(key);
+        public bool IsKeyReleased(InputKey key) => _inner.IsKeyReleased(key);
+        public float GetMouseMoveX() => _inner.GetMouseMoveX();
+        public float GetMouseMoveY() => _inner.GetMouseMoveY();
+        public bool GetIsMouseActive() => _inner.GetIsMouseActive();
+        public Vec2 GetMousePositionPixel() => _inner.GetMousePositionPixel();
+        public float GetDeltaMouseScroll() => _inner.GetDeltaMouseScroll();
+        public bool GetIsControllerConnected() => _inner.GetIsControllerConnected();
+        public Vec2 GetMousePositionRanged() => _inner.GetMousePositionRanged();
+        public float GetMouseSensitivity() => _inner.GetMouseSensitivity();
+        public bool IsControlDown() => _inner.IsControlDown();
+        public bool IsShiftDown() => _inner.IsShiftDown();
+        public bool IsAltDown() => _inner.IsAltDown();
+        public Vec2 GetControllerRightStickState() => _inner.GetControllerRightStickState();
+        public Vec2 GetControllerLeftStickState() => _inner.GetControllerLeftStickState();
+        public InputKey[] GetClickKeys() => _inner.GetClickKeys();
     }
 
     private const string FinishDeploymentUsage =
