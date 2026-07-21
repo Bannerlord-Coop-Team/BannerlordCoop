@@ -89,5 +89,4 @@ public class BattleResultReadyLogicTests
         siegeReporter.VerifyAll();
         resultCommitter.VerifyAll();
     }
-
 }

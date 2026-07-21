@@ -237,7 +237,6 @@ internal class BattleHostHandler : IHandler
 
                 Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
                     requesterId, mapEventId, epoch);
-
             }
 
             // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
@@ -722,7 +721,6 @@ internal class BattleHostHandler : IHandler
 
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
                     controllerId, mapEventId, string.Join(", ", successors));
-
             }
         });
     }
