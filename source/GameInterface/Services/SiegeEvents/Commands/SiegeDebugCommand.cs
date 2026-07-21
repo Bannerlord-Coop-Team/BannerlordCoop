@@ -13,7 +13,6 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -134,7 +133,7 @@ public class SiegeDebugCommand
             army.AddPartyToMergedParties(defender);
         }
 
-        EncounterManager.StartPartyEncounter(armyLeader.Party, playerParty.Party);
+        StartBattleAction.Apply(armyLeader.Party, playerParty.Party);
 
         return $"Started {settlement.Name} siege relief: {army.Name} with {army.Parties.Count} parties is attacking " +
             $"{playerParty.Name}; connected friendly player parties joined the siege";
@@ -157,20 +156,16 @@ public class SiegeDebugCommand
             return "Unable to resolve the relief fixture";
         }
 
-        var reliefArmy = MobileParty.AllLordParties
-            .Where(party => party.Army?.LeaderParty == party)
-            .Select(party => party.Army)
-            .FirstOrDefault(army => army.AiBehaviorObject == settlement);
-
         bool siegeActive = settlement.SiegeEvent != null;
         bool playerBesieger = siegeActive && playerParty.BesiegerCamp == settlement.SiegeEvent.BesiegerCamp;
-        var encounter = PlayerEncounter.Current;
-        bool reliefEncounterActive = encounter != null && reliefArmy != null
-            && encounter._attackerParty == reliefArmy.LeaderParty.Party
-            && encounter._defenderParty == playerParty.Party;
+        var mapEvent = playerParty.MapEvent;
+        var reliefArmy = mapEvent?.InvolvedParties
+            .Select(party => party.MobileParty?.Army)
+            .FirstOrDefault(army => army?.LeaderParty.MapFaction == settlement.MapFaction);
+        bool reliefEncounterActive = mapEvent != null && reliefArmy != null;
         return $"siege={siegeActive} playerBesieger={playerBesieger} " +
             $"reliefArmyParties={reliefArmy?.Parties.Count ?? 0} reliefEncounter={reliefEncounterActive} " +
-            $"playerMapEvent={playerParty.MapEvent != null}";
+            $"playerMapEvent={mapEvent != null}";
     }
 
     // coop.debug.siege.start
