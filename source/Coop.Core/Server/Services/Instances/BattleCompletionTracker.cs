@@ -25,6 +25,15 @@ public interface IBattleCompletionTracker
         out BattleState concludedState,
         bool canConclude = true);
 
+    bool TryAcceptAuthoritativeResultForMember(
+        string instanceId,
+        string controllerId,
+        IReadOnlyCollection<string> currentMembers,
+        string hostControllerId,
+        int hostEpoch,
+        out BattleState concludedState,
+        bool canConclude = true);
+
     bool TryConcludeAbandoned(
         string instanceId,
         out BattleState concludedState,
@@ -113,6 +122,54 @@ public class BattleCompletionTracker : IBattleCompletionTracker
 
             return canConclude &&
                 TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, out concludedState);
+        }
+    }
+
+    public bool TryAcceptAuthoritativeResultForMember(
+        string instanceId,
+        string controllerId,
+        IReadOnlyCollection<string> currentMembers,
+        string hostControllerId,
+        int hostEpoch,
+        out BattleState concludedState,
+        bool canConclude = true)
+    {
+        concludedState = BattleState.None;
+        if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(controllerId) ||
+            currentMembers == null)
+        {
+            return false;
+        }
+
+        lock (gate)
+        {
+            var members = new HashSet<string>(currentMembers);
+            if (!members.Contains(controllerId) ||
+                !authoritativeReports.TryGetValue(instanceId, out var authoritativeReport) ||
+                authoritativeReport.ControllerId != hostControllerId ||
+                authoritativeReport.HostEpoch != hostEpoch)
+            {
+                return false;
+            }
+
+            GetParticipants(instanceId).UnionWith(members);
+            if (!reports.TryGetValue(instanceId, out var instanceReports))
+            {
+                instanceReports = new Dictionary<string, BattleResultReport>();
+                reports[instanceId] = instanceReports;
+            }
+
+            instanceReports[controllerId] = new BattleResultReport(
+                controllerId,
+                authoritativeReport.BattleState,
+                authoritativeReport.HostEpoch);
+            return canConclude && TryConclude(
+                instanceId,
+                instanceReports,
+                members,
+                hostControllerId,
+                hostEpoch,
+                out concludedState);
         }
     }
 

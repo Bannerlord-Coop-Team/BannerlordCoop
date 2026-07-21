@@ -112,7 +112,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-005")]
-    public void HostResult_WaitsForAcceptedJoinerBeforeMissionEntry()
+    public void HostResult_FinalizesWhenAcceptedJoinerEntersResolvedBattle()
     {
         var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
         var joinerPartyId = CreateRegisteredObject<MobileParty>();
@@ -147,8 +147,12 @@ public class BattleResultReadyTests : MissionTestEnvironment
         SendResult(clients[0], mapEventId, BattleState.AttackerVictory);
         AssertMapEventPresent(mapEventId);
 
-        EnterBattleWithMembership(clients[1], "joining-player", mapEventId);
-        SendResult(clients[1], mapEventId, BattleState.AttackerVictory);
+        EnterBattle(clients[1], mapEventId);
+        Server.Call(
+            () => Server.SimulateMessage(
+                clients[1].NetPeer,
+                new NetworkMissionEntered("joining-player", mapEventId)),
+            VictoryConclusionDisabledMethods());
 
         AssertMapEventRemoved(mapEventId);
     }

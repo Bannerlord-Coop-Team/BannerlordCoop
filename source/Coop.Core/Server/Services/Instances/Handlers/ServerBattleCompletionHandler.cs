@@ -259,6 +259,24 @@ public class ServerBattleCompletionHandler : IHandler
                 entry.ControllerId,
                 entry.IsFirstMember);
             RemovePendingJoiner(entry.InstanceId, entry.ControllerId, Guid.Empty);
+
+            if (entry.IsFirstMember ||
+                !missionManager.TryGetControllers(entry.InstanceId, out var currentMembers) ||
+                !hostRegistry.TryGet(entry.InstanceId, out var assignment) ||
+                !completionTracker.TryAcceptAuthoritativeResultForMember(
+                    entry.InstanceId,
+                    entry.ControllerId,
+                    currentMembers,
+                    assignment.HostControllerId,
+                    assignment.Epoch,
+                    out var concludedState,
+                    canConclude: !HasPendingJoiners(entry.InstanceId)) ||
+                !missionManager.TryBeginActiveInstanceConclusion(entry.InstanceId, currentMembers))
+            {
+                return;
+            }
+
+            PublishConclusion(entry.InstanceId, currentMembers.Count, concludedState, assignment.Epoch);
         });
     }
 
@@ -427,7 +445,7 @@ public class ServerBattleCompletionHandler : IHandler
 
     private void PublishConclusion(string instanceId, int memberCount, BattleState concludedState, int hostEpoch)
     {
-        Logger.Information("All {Count} mission member(s) reported {State} for battle {Instance}; concluding at host epoch {Epoch}",
+        Logger.Information("All {Count} mission member(s) reconciled {State} for battle {Instance}; concluding at host epoch {Epoch}",
             memberCount, concludedState, instanceId, hostEpoch);
         messageBroker.Publish(this, new NetworkChangeBattleState(instanceId, concludedState, hostEpoch));
     }
