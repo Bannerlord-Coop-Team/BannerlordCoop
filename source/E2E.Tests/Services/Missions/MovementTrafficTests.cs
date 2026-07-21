@@ -19,13 +19,13 @@ using AgentData = Missions.Agents.Packets.AgentData;
 
 namespace E2E.Tests.Services.Missions;
 
-/// <summary>Regression coverage for bounded movement traffic and delivery selection.</summary>
+/// <summary>Regression coverage for movement traffic and delivery selection.</summary>
 public class MovementTrafficTests : MissionTestEnvironment
 {
     public MovementTrafficTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void PollMovement_UsesTwentyHertzCadenceAndThreeAgentBatches()
+    public void PollMovement_UsesFortyHertzCadenceAndThreeAgentBatches()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -47,18 +47,25 @@ public class MovementTrafficTests : MissionTestEnvironment
                 .Select(packet => packet.AgentIds.Length));
 
             network.NetworkSentPackets.Packets.Clear();
-            component.AgentMovementHandler.PollMovement(0.049f);
+            component.AgentMovementHandler.PollMovement(0.024f);
             Assert.Empty(network.NetworkSentPackets.GetPackets<MovementPacket>());
 
             component.AgentMovementHandler.PollMovement(0.002f);
             Assert.Equal(new[] { 3, 1 }, network.NetworkSentPackets
                 .GetPackets<MovementPacket>()
                 .Select(packet => packet.AgentIds.Length));
+
+            network.NetworkSentPackets.Packets.Clear();
+            for (int i = 0; i < 6; i++)
+                component.AgentMovementHandler.PollMovement(1f / 60f);
+            Assert.Equal(16, network.NetworkSentPackets
+                .GetPackets<MovementPacket>()
+                .Sum(packet => packet.AgentIds.Length));
         });
     }
 
     [Fact]
-    public void PollMovement_BoundsAndRotatesLargeArmiesWhileAlwaysSendingMainAgent()
+    public void PollMovement_SendsEveryEligibleAgent()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -78,30 +85,21 @@ public class MovementTrafficTests : MissionTestEnvironment
                 Guid agentId = Guid.NewGuid();
                 Assert.True(registry.TryRegisterAgent("peer", agentId, agent));
                 agentIds.Add(agentId);
-                if (i == 124) mock.MainAgent = agent;
             }
 
             component.AgentMovementHandler.PollMovement(0f);
-            Guid[] firstPoll = network.NetworkSentPackets
+            MovementPacket[] packets = network.NetworkSentPackets
                 .GetPackets<MovementPacket>()
-                .SelectMany(packet => packet.AgentIds)
                 .ToArray();
-            Assert.Equal(120, firstPoll.Length);
-            Assert.Equal(firstPoll.Length, firstPoll.Distinct().Count());
-            Assert.Contains(agentIds[124], firstPoll);
-            Assert.All(agentIds.Skip(119).Take(5), id => Assert.DoesNotContain(id, firstPoll));
+            Assert.Equal((agentIds.Count + 2) / 3, packets.Length);
+            Assert.All(packets, packet => Assert.InRange(packet.AgentIds.Length, 1, 3));
 
-            network.NetworkSentPackets.Packets.Clear();
-            component.AgentMovementHandler.PollMovement(0.05f);
-            Guid[] secondPoll = network.NetworkSentPackets
-                .GetPackets<MovementPacket>()
+            Guid[] sentAgents = packets
                 .SelectMany(packet => packet.AgentIds)
                 .ToArray();
-            Assert.Equal(120, secondPoll.Length);
-            Assert.Equal(secondPoll.Length, secondPoll.Distinct().Count());
-            Assert.Contains(agentIds[124], secondPoll);
-            Assert.All(agentIds.Skip(119).Take(5), id => Assert.Contains(id, secondPoll));
-            Assert.Equal(agentIds.Count, firstPoll.Concat(secondPoll).Distinct().Count());
+            Assert.Equal(agentIds.Count, sentAgents.Length);
+            Assert.Equal(sentAgents.Length, sentAgents.Distinct().Count());
+            Assert.All(agentIds, id => Assert.Contains(id, sentAgents));
         });
     }
 

@@ -39,11 +39,9 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // Movement is strictly droppable, so keep even mounted snapshots below the 1 KB unreliable ceiling.
     private const int MaxAgentsPerMovementPacket = 3;
-    // Two 1,000-agent rotations fit inside the interpolator's one-second expiry window.
-    private const int MaxAgentsPerMovementPoll = 120;
 
-    // Twenty updates per second keeps movement smooth without saturating battle meshes.
-    private const float MovementPollingIntervalSeconds = 0.05f;
+    // Forty updates per second keeps locally authoritative agents responsive.
+    private const float MovementPollingIntervalSeconds = 0.025f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -70,7 +68,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     // guards against a second call (the GC finalizer, or the DI scope also disposing this transient handler).
     private bool _disposed;
     private float movementPollElapsed = MovementPollingIntervalSeconds;
-    private int nextMovementAgentIndex;
 
     public AgentMovementHandler(
         IBattleNetwork client,
@@ -131,18 +128,19 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public PacketType PacketType => PacketType.Movement;
 
-    // Broadcast a fair slice of locally authoritative agents, always including the local main agent.
+    // Broadcast every locally authoritative agent.
     public void PollMovement(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
         movementPollElapsed += dt;
         if (movementPollElapsed < MovementPollingIntervalSeconds) return;
-        movementPollElapsed = 0f;
+        movementPollElapsed %= MovementPollingIntervalSeconds;
 
-        var candidates = new List<CoopAgentInfo>();
-        CoopAgentInfo mainAgentInfo = null;
-        Agent mainAgent = Mission.Current.MainAgent;
+        var ids = new List<Guid>();
+        var data = new List<AgentData>();
+        List<Guid> mountIds = null;
+        List<AgentMountData> mountData = null;
 
         foreach (var agentInfo in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
         {
@@ -154,19 +152,6 @@ public class AgentMovementHandler : IAgentMovementHandler
             EnsureLocallyDrivenMountController(agent);
             if (!ShouldBroadcastMovement(agent)) continue;
 
-            candidates.Add(agentInfo);
-            if (ReferenceEquals(agent, mainAgent)) mainAgentInfo = agentInfo;
-        }
-
-        IReadOnlyList<CoopAgentInfo> selectedAgents = SelectMovementAgents(candidates, mainAgentInfo);
-        var ids = new List<Guid>();
-        var data = new List<AgentData>();
-        List<Guid> mountIds = null;
-        List<AgentMountData> mountData = null;
-
-        foreach (var agentInfo in selectedAgents)
-        {
-            Agent agent = agentInfo.Agent;
             if (agent.IsMount)
             {
                 (mountIds ??= new List<Guid>()).Add(agentInfo.AgentId);
@@ -200,30 +185,6 @@ public class AgentMovementHandler : IAgentMovementHandler
             mountData.CopyTo(start, dataChunk, 0, count);
             client.SendAll(new MountMovementPacket(idChunk, dataChunk));
         }
-    }
-
-    private IReadOnlyList<CoopAgentInfo> SelectMovementAgents(
-        List<CoopAgentInfo> candidates,
-        CoopAgentInfo mainAgentInfo)
-    {
-        if (candidates.Count == 0) return Array.Empty<CoopAgentInfo>();
-        if (candidates.Count <= MaxAgentsPerMovementPoll) return candidates;
-
-        var selected = new List<CoopAgentInfo>(MaxAgentsPerMovementPoll);
-        if (mainAgentInfo != null) selected.Add(mainAgentInfo);
-
-        int start = nextMovementAgentIndex % candidates.Count;
-        int scanned = 0;
-        while (selected.Count < MaxAgentsPerMovementPoll && scanned < candidates.Count)
-        {
-            CoopAgentInfo candidate = candidates[(start + scanned) % candidates.Count];
-            scanned++;
-            if (ReferenceEquals(candidate, mainAgentInfo)) continue;
-            selected.Add(candidate);
-        }
-
-        nextMovementAgentIndex = (start + scanned) % candidates.Count;
-        return selected;
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
