@@ -17,7 +17,7 @@ namespace E2E.Tests.Services.Missions;
 
 /// <summary>
 /// The host fields a NEW NPC party that joins a live coop battle through our own spawn path: on the
-/// involved-parties broadcast, <c>CoopBattleController.Handle_ReinforcementPartiesAdded</c> spawns the AI
+/// involved-parties broadcast, <c>ReinforcementFielder.Handle_ReinforcementPartiesAdded</c> spawns the AI
 /// party's troops into the mission. Runs headless against the <see cref="MissionEngineFixture"/> mock mission
 /// (extended here with per-side teams). Also verifies the gating: it only fields a new AI party when the local
 /// client is the host AND the battle is activated, queues parties that arrive before activation, and never

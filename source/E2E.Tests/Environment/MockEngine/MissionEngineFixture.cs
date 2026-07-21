@@ -56,8 +56,8 @@ public sealed class MissionEngineFixture : IDisposable
             }),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(MissionTeamCollection_Add))));
         // GetMissionBehavior<T> walks the mission's behavior list, which a skip-ctor shell doesn't have (NRE).
-        // The spawn-capture and deployment paths probe for DeploymentMissionController — answer "none" for mock
-        // missions. Reference-type instantiations share one method body, so patching this one covers them all.
+        // Tests opt into a deployment-controller shell when they need to exercise pre-commit behavior.
+        // Reference-type instantiations share one method body, so patching this one covers them all.
         harmony.Patch(
             AccessTools.Method(typeof(Mission), nameof(Mission.GetMissionBehavior)).MakeGenericMethod(typeof(DeploymentMissionController)),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Mission_GetMissionBehavior))));
@@ -222,8 +222,8 @@ public sealed class MissionEngineFixture : IDisposable
 
     private static bool Mission_GetMissionBehavior(Mission __instance, ref DeploymentMissionController __result)
     {
-        if (!MockMission.ForShell(__instance, out _)) return true;
-        __result = null;
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DeploymentInProgress ? mock.DeploymentController : null;
         return false;
     }
 

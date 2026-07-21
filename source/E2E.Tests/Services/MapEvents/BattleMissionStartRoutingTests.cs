@@ -18,7 +18,7 @@ public class BattleMissionStartRoutingTests
     [Trait("Requirement", "BR-104")]
     public void MissionStartRouting_ForeignOrPreviousMapEventId_DoesNotMatchCurrentBattle()
     {
-        // The local player's current battle. As above, the routing helper only reads its id via IObjectManager.
+        // The local player's current battle. The routing helper only reads its id via IObjectManager.
 #pragma warning disable SYSLIB0050
         var currentBattle = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
 #pragma warning restore SYSLIB0050

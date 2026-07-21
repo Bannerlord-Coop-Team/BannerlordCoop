@@ -17,7 +17,7 @@ internal static class BattleDebugCommands
     [CommandLineArgumentFunction("finish_deployment", "coop.debug.battle")]
     public static string FinishDeployment(List<string> args)
     {
-        if (!ModInformation.IsClient)
+        if (ModInformation.IsServer)
         {
             return "Run this command on a client";
         }

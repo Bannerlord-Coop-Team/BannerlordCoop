@@ -8,6 +8,7 @@ using Missions;
 using Missions.Battles;
 using Missions.Data;
 using Missions.Messages;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -118,5 +119,78 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             harmony.UnpatchAll(harmonyId);
             BattleSpawnGate.EndBattle();
         }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-023")]
+    public void Deployment_RemoteNpcDrainsWhileOwnTroopRemainsBufferedUntilCommit()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (_, partyIds) = SetupCoopBattle("local", "enemy", "remote");
+        var client = Clients.First();
+        var ownAgentId = Guid.NewGuid();
+        var remoteAgentId = Guid.NewGuid();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            mission.PlayerTeam = mission.AttackerTeam;
+            mission.DeploymentInProgress = true;
+
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var ownParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var remoteParty));
+
+            var ownMapEventParty = ownParty.MapEvent.AttackerSide.Parties
+                .Single(party => party.Party == ownParty.Party);
+            var remoteMapEventParty = ownParty.MapEvent.AttackerSide.Parties
+                .Single(party => party.Party == remoteParty.Party);
+            Assert.True(client.ObjectManager.TryGetId(ownMapEventParty, out var ownMapEventPartyId));
+            Assert.True(client.ObjectManager.TryGetId(remoteMapEventParty, out var remoteMapEventPartyId));
+
+            var session = new Mock<IBattleSession>();
+            session.Setup(s => s.IsOwn(It.IsAny<string>()))
+                .Returns((string controllerId) => controllerId == "local");
+            var deployment = new Mock<IBattleDeploymentCoordinator>();
+            deployment.SetupGet(d => d.IsCommitted).Returns(false);
+
+            using var spawner = new PuppetSpawner(
+                client.Resolve<IMessageBroker>(),
+                client.ObjectManager,
+                client.Resolve<GameInterface.Services.Players.IPlayerManager>(),
+                client.Resolve<ICoopMissionComponent>(),
+                session.Object,
+                new CasualtyAttributionMap(),
+                deployment.Object,
+                Mock.Of<IAgentFormationAssigner>());
+
+            var equipment = new Equipment();
+            var missionEquipment = new MissionEquipmentData(new());
+            var ownRecord = new BattleAgentSpawnData(
+                ownAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
+                "local", ownMapEventPartyId, 1, equipment, new BodyProperties(), missionEquipment);
+            var remoteRecord = new BattleAgentSpawnData(
+                remoteAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
+                "host", remoteMapEventPartyId, 2, equipment, new BodyProperties(), missionEquipment);
+
+            client.Resolve<IMessageBroker>().Publish(
+                this, new NetworkSpawnBattleAgents(new[] { ownRecord, remoteRecord }));
+
+            var registry = client.Resolve<INetworkAgentRegistry>();
+            Assert.False(registry.TryGetAgentInfo(ownAgentId, out _));
+            Assert.False(registry.TryGetAgentInfo(remoteAgentId, out _));
+
+            mission.AddTeam(BattleSideEnum.Attacker);
+            mission.AddTeam(BattleSideEnum.Attacker);
+            spawner.DrainPendingPuppets();
+
+            Assert.False(registry.TryGetAgentInfo(ownAgentId, out _));
+            Assert.True(registry.TryGetAgentInfo(remoteAgentId, out _));
+
+            deployment.SetupGet(d => d.IsCommitted).Returns(true);
+            spawner.DrainPendingPuppets();
+
+            Assert.True(registry.TryGetAgentInfo(ownAgentId, out _));
+        });
     }
 }

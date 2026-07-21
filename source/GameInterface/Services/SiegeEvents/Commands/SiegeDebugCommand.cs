@@ -33,7 +33,7 @@ public class SiegeDebugCommand
     [CommandLineArgumentFunction("start_army_relief", "coop.debug.siege")]
     public static string StartArmyRelief(List<string> args)
     {
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
         {
             return "This command can only be used by the server";
         }

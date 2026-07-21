@@ -46,7 +46,7 @@ public class MapEventDebugCommands
     [CommandLineArgumentFunction("start_attack_mission", "coop.debug.mapevent")]
     public static string StartAttackMission(List<string> args)
     {
-        if (!ModInformation.IsClient)
+        if (ModInformation.IsServer)
         {
             return "Run this command on a client";
         }
@@ -57,10 +57,6 @@ public class MapEventDebugCommands
         }
 
         var mapEvent = MobileParty.MainParty?.MapEvent;
-        if (mapEvent == null && PlayerEncounter.Current != null)
-        {
-            mapEvent = PlayerEncounter.StartBattle();
-        }
         if (mapEvent == null)
         {
             return "The main party has no battle encounter";
