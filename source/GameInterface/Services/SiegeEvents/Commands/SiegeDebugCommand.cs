@@ -217,6 +217,88 @@ public class SiegeDebugCommand
             string.Join(Environment.NewLine, joined);
     }
 
+    [CommandLineArgumentFunction("stage_machines", "coop.debug.siege")]
+    public static string StageMachines(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.stage_machines <settlementId>";
+        }
+
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be used by the server";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            || !ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+        {
+            return "Unable to resolve siege fixture services";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var siegeEvent = settlement.SiegeEvent;
+        if (siegeEvent?.BesiegerCamp == null)
+        {
+            return $"{settlement.Name} is not under siege";
+        }
+
+        var attacker = siegeEvent.GetSiegeEventSide(BattleSideEnum.Attacker);
+        if (!attacker.SiegeEngines.SiegePreparations.IsConstructed)
+        {
+            attacker.SiegeEngines.SiegePreparations.SetProgress(1f);
+            siegeEvent.CreateSiegeObject(attacker.SiegeEngines.SiegePreparations, attacker);
+        }
+
+        var machines = new[]
+        {
+            (Side: BattleSideEnum.Attacker, Type: DefaultSiegeEngineTypes.Ram, Index: 0),
+            (Side: BattleSideEnum.Attacker, Type: DefaultSiegeEngineTypes.Onager, Index: 0),
+            (Side: BattleSideEnum.Defender, Type: DefaultSiegeEngineTypes.Ballista, Index: 0),
+        };
+        var staged = new List<string>();
+        foreach (var machine in machines)
+        {
+            siegeEventInterface.DeploySiegeEngine(siegeEvent, machine.Side, machine.Type, machine.Index);
+            var side = siegeEvent.GetSiegeEventSide(machine.Side);
+            var slots = machine.Type.IsRanged
+                ? side.SiegeEngines.DeployedRangedSiegeEngines
+                : side.SiegeEngines.DeployedMeleeSiegeEngines;
+            var progress = machine.Index < slots.Length ? slots[machine.Index] : null;
+            if (progress?.SiegeEngine != machine.Type)
+            {
+                return $"Failed to stage {machine.Type.StringId} for {machine.Side}";
+            }
+
+            bool needsSiegeObject = !progress.IsConstructed
+                || (machine.Type.IsRanged && progress.RangedSiegeEngine == null);
+            if (!progress.IsConstructed)
+            {
+                progress.SetProgress(1f);
+            }
+            if (progress.IsBeingRedeployed)
+            {
+                progress.SetRedeploymentProgress(1f);
+            }
+            if (needsSiegeObject)
+            {
+                siegeEvent.CreateSiegeObject(progress, side);
+            }
+            if (!progress.IsActive)
+            {
+                return $"Failed to activate {machine.Type.StringId} for {machine.Side}";
+            }
+
+            staged.Add($"{machine.Side}:{machine.Type.StringId}[{machine.Index}]");
+        }
+
+        return $"Staged {staged.Count} constructed siege engines at {settlement.Name}: {string.Join(", ", staged)}";
+    }
+
     /// <summary>
     /// Starts the wall assault for an existing AI-led siege. Server only; the resulting map event uses the
     /// same authoritative action as campaign AI.
@@ -484,9 +566,13 @@ public class SiegeDebugCommand
                     .Where(weapon => weapon != null)
                     .ToArray() ?? Array.Empty<TaleWorlds.MountAndBlade.SynchedMissionObject>();
                 var deployedWeapon = deploymentPoint.DeployedWeapon;
+                var deployedWeaponType = deployedWeapon == null
+                    ? "none"
+                    : TaleWorlds.MountAndBlade.Missions.MissionSiegeWeaponsController.GetWeaponType(deployedWeapon)?.Name
+                        ?? deployedWeapon.GetType().Name;
                 lines.Add($"point   {deploymentPoint.Id.Id:D5} {deploymentPoint.Side,-16}" +
                     $" disabled={(deploymentPoint.IsDisabled ? 1 : 0)} deployed={(deploymentPoint.IsDeployed ? 1 : 0)}" +
-                    $" weapon={deployedWeapon?.GetType().Name ?? "none"}" +
+                    $" weapon={deployedWeaponType}" +
                     $" weaponId={(deployedWeapon != null ? deployedWeapon.Id.Id.ToString("D5") : "none")}" +
                     $" weaponVisible={(deployedWeapon?.GameEntity.IsVisibleIncludeParents() == true ? 1 : 0)}" +
                     $" variants={variants.Length} variantsVisible={variants.Count(weapon => weapon.GameEntity.IsVisibleIncludeParents())}");
