@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.Instance;
@@ -20,7 +20,8 @@ namespace E2E.Tests.Services.Missions;
 /// involved-parties broadcast, <c>CoopBattleController.Handle_ReinforcementPartiesAdded</c> spawns the AI
 /// party's troops into the mission. Runs headless against the <see cref="MissionEngineFixture"/> mock mission
 /// (extended here with per-side teams). Also verifies the gating: it only fields a new AI party when the local
-/// client is the host AND the battle is activated, and never re-fields the same party.
+/// client is the host AND the battle is activated, queues parties that arrive before activation, and never
+/// re-fields the same party.
 /// </summary>
 public class BattleReinforcementSpawnTests : MissionTestEnvironment
 {
@@ -92,7 +93,7 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void HostNotActivated_NewAiParty_IsNotFielded()
+    public void PartyAddedBeforeActivation_IsFieldedAfterActivation()
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, _) = SetupCoopBattle("host", "client");
@@ -112,7 +113,12 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
         host.Call(() =>
         {
             PublishInvolvedPartiesAdded(host, mapEventId, aiMapEventPartyId);
-            Assert.Empty(mock.Agents);          // a reinforcement before the battle is live is ignored
+            Assert.Empty(mock.Agents);
+
+            controller.OnDeploymentFinished();
+            controller.OnMissionTick(0f);
+
+            Assert.True(mock.Agents.Count > 0, "the queued AI party should be fielded after activation");
         });
 
         GC.KeepAlive(controller);
