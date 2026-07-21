@@ -163,7 +163,29 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-005")]
-    public void SuccessorResult_FinalizesAfterHostDepartsAndIsPromoted()
+    public void HostResult_FinalizesWhenAcceptedJoinerIsCancelled()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
+        var host = Clients.First();
+        RegisterPeer(host, "host");
+        EnterBattleWithMembership(host, "host", mapEventId);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            host.NetPeer,
+            new BattleJoinAccepted(mapEventId, "cancelled-joiner")));
+        SendResult(host, mapEventId, BattleState.AttackerVictory);
+        AssertMapEventPresent(mapEventId);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            this,
+            new BattleJoinCancelled(mapEventId, "cancelled-joiner")), VictoryConclusionDisabledMethods());
+
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void SuccessorResult_FinalizesAfterPromotedHostReportsCurrentEpoch()
     {
         var (mapEventId, _) = SetupCoopBattle("host", "successor");
         var clients = Clients.ToArray();
@@ -180,6 +202,9 @@ public class BattleResultReadyTests : MissionTestEnvironment
                 clients[0].NetPeer,
                 new NetworkMissionLeft("host", mapEventId)),
             VictoryConclusionDisabledMethods());
+
+        AssertMapEventPresent(mapEventId);
+        SendResult(clients[1], mapEventId, BattleState.DefenderVictory);
 
         AssertMapEventRemoved(mapEventId);
     }
@@ -228,8 +253,12 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     private void SendResult(EnvironmentInstance client, string mapEventId, BattleState state)
     {
-        client.Call(() => client.Resolve<INetwork>().SendAll(
-            new NetworkBattleResultReady(mapEventId, state)), VictoryConclusionDisabledMethods());
+        client.Call(() =>
+        {
+            Assert.True(client.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out var assignment));
+            client.Resolve<INetwork>().SendAll(
+                new NetworkBattleResultReady(mapEventId, state, assignment.Epoch));
+        }, VictoryConclusionDisabledMethods());
     }
 
     private void AssertMapEventPresent(string mapEventId)

@@ -40,6 +40,7 @@ public class CoopBattleResultCommitTests : MissionTestEnvironment
         var report = Assert.Single(host.NetworkSentMessages.GetMessages<NetworkBattleResultReady>());
         Assert.Equal("mapEvent1", report.InstanceId);
         Assert.Equal(BattleState.DefenderVictory, report.BattleState);
+        Assert.Equal(0, report.HostEpoch);
     }
 
     [Fact]

@@ -30,7 +30,7 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
     private readonly IBattleSession session;
     private readonly IBattleHostRegistry hostRegistry;
     private readonly INetwork relayNetwork;
-    private bool hasReported;
+    private int reportedEpoch = -1;
 
     public SiegeEngineStateReporter(IObjectManager objectManager, IBattleSession session, IBattleHostRegistry hostRegistry, INetwork relayNetwork)
     {
@@ -52,10 +52,12 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
 
     private void ReportIfHost(bool requireNoSuccessors)
     {
-        if (hasReported || !session.IsLocalHost) return;
+        if (!session.IsLocalHost) return;
 
         // Leaving with successors still fighting is a retreat/handoff, not the battle's end.
         bool hasAssignment = hostRegistry.TryGet(session.InstanceId, out var assignment);
+        int hostEpoch = hasAssignment ? assignment.Epoch : 0;
+        if (reportedEpoch == hostEpoch) return;
         if (requireNoSuccessors && hasAssignment && assignment.SuccessorControllerIds.Count > 0) return;
 
         if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent)) return;
@@ -71,7 +73,7 @@ public class SiegeEngineStateReporter : ISiegeEngineStateReporter
         relayNetwork.SendAll(new NetworkSiegeEngineStatesReport(session.InstanceId,
             SiegeEngineStateConverter.ToEngineStates(attackerWeapons),
             SiegeEngineStateConverter.ToEngineStates(defenderWeapons),
-            hasAssignment ? assignment.Epoch : 0));
-        hasReported = true;
+            hostEpoch));
+        reportedEpoch = hostEpoch;
     }
 }

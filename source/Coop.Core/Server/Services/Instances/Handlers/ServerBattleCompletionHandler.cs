@@ -96,8 +96,10 @@ public class ServerBattleCompletionHandler : IHandler
                 instanceId,
                 controllerId,
                 result.BattleState,
+                result.HostEpoch,
                 expectedReporters,
                 assignment.HostControllerId,
+                assignment.Epoch,
                 out var concludedState))
         {
             return;
@@ -137,6 +139,7 @@ public class ServerBattleCompletionHandler : IHandler
                 instanceId,
                 expectedReporters,
                 assignment.HostControllerId,
+                assignment.Epoch,
                 out var concludedState))
         {
             return;

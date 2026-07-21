@@ -15,10 +15,13 @@ public readonly struct NetworkBattleResultReady : ICommand
     public readonly string InstanceId;
     [ProtoMember(2)]
     public readonly BattleState BattleState;
+    [ProtoMember(3)]
+    public readonly int HostEpoch;
 
-    public NetworkBattleResultReady(string instanceId, BattleState battleState)
+    public NetworkBattleResultReady(string instanceId, BattleState battleState, int hostEpoch)
     {
         InstanceId = instanceId;
         BattleState = battleState;
+        HostEpoch = hostEpoch;
     }
 }

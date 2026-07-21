@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -171,7 +171,10 @@ internal class BattleMissionStartHandler : IHandler
                 if (isNewMissionClaim)
                 {
                     operation = "remove wounded non-initiating players";
-                    if (!RemoveWoundedNonInitiatorParties(mapEvent, payload.What.AttackerPartyId))
+                    if (!RemoveWoundedNonInitiatorParties(
+                            payload.What.MapEventId,
+                            mapEvent,
+                            payload.What.AttackerPartyId))
                     {
                         ServerBattleModeArbiter.Release(payload.What.MapEventId);
                         network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
@@ -264,7 +267,10 @@ internal class BattleMissionStartHandler : IHandler
         MapEventHostileActionConsequences.Apply(mapEvent, attackerMobileParty.Party, "attack");
     }
 
-    private bool RemoveWoundedNonInitiatorParties(MapEvent mapEvent, string initiatingPartyId)
+    private bool RemoveWoundedNonInitiatorParties(
+        string mapEventId,
+        MapEvent mapEvent,
+        string initiatingPartyId)
     {
         foreach (var player in playerManager.Players)
         {
@@ -277,6 +283,7 @@ internal class BattleMissionStartHandler : IHandler
                 continue;
 
             mobileParty.Party.MapEventSide = null;
+            messageBroker.Publish(this, new BattleJoinCancelled(mapEventId, player.ControllerId));
 
             if (mapEvent.IsFinalized)
                 return false;

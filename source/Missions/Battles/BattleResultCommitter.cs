@@ -60,6 +60,6 @@ public class BattleResultCommitter : IBattleResultCommitter
 
         Logger.Information("[BattleSync] Reporting resolved mission result {State} for instance {Instance}",
             result.BattleState, session.InstanceId);
-        network.SendAll(new NetworkBattleResultReady(session.InstanceId, result.BattleState));
+        network.SendAll(new NetworkBattleResultReady(session.InstanceId, result.BattleState, session.HostEpoch));
     }
 }

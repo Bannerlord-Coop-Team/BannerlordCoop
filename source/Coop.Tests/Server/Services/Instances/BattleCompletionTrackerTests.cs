@@ -16,8 +16,10 @@ public class BattleCompletionTrackerTests
             "battle",
             "host",
             BattleState.DefenderVictory,
+            1,
             new[] { "host" },
             "host",
+            1,
             out var state);
 
         Assert.True(concluded);
@@ -31,10 +33,10 @@ public class BattleCompletionTrackerTests
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
-            "battle", "host", BattleState.AttackerVictory, members, "host", out _));
+            "battle", "host", BattleState.AttackerVictory, 1, members, "host", 1, out _));
 
         Assert.True(tracker.TryRecordResult(
-            "battle", "successor", BattleState.AttackerVictory, members, "host", out var state));
+            "battle", "successor", BattleState.AttackerVictory, 1, members, "host", 1, out var state));
         Assert.Equal(BattleState.AttackerVictory, state);
     }
 
@@ -45,9 +47,9 @@ public class BattleCompletionTrackerTests
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
-            "battle", "host", BattleState.AttackerVictory, members, "host", out _));
+            "battle", "host", BattleState.AttackerVictory, 1, members, "host", 1, out _));
         Assert.False(tracker.TryRecordResult(
-            "battle", "successor", BattleState.DefenderVictory, members, "host", out _));
+            "battle", "successor", BattleState.DefenderVictory, 1, members, "host", 1, out _));
     }
 
     [Fact]
@@ -57,10 +59,10 @@ public class BattleCompletionTrackerTests
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
-            "battle", "successor", BattleState.AttackerVictory, members, "host", out _));
+            "battle", "successor", BattleState.AttackerVictory, 1, members, "host", 1, out _));
         tracker.RemoveMember("battle", "successor", isInstanceEmpty: false);
         Assert.False(tracker.TryRecordResult(
-            "battle", "host", BattleState.AttackerVictory, members, "host", out _));
+            "battle", "host", BattleState.AttackerVictory, 1, members, "host", 1, out _));
     }
 
     [Fact]
@@ -70,28 +72,66 @@ public class BattleCompletionTrackerTests
         var members = new[] { "host", "loading" };
 
         Assert.False(tracker.TryRecordResult(
-            "battle", "host", BattleState.DefenderVictory, members, "host", out _));
+            "battle", "host", BattleState.DefenderVictory, 1, members, "host", 1, out _));
 
         tracker.RemoveMember("battle", "loading", isInstanceEmpty: false);
 
         Assert.True(tracker.TryReconcile(
-            "battle", new[] { "host" }, "host", out var state));
+            "battle", new[] { "host" }, "host", 1, out var state));
         Assert.Equal(BattleState.DefenderVictory, state);
     }
 
     [Fact]
-    public void HostDeparts_PromotedMembersExistingReportConcludesBattle()
+    public void HostDeparts_PromotedHostMustReportInNewEpoch()
     {
         var tracker = new BattleCompletionTracker();
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
-            "battle", "successor", BattleState.AttackerVictory, members, "host", out _));
+            "battle", "successor", BattleState.AttackerVictory, 1, members, "host", 1, out _));
 
         tracker.RemoveMember("battle", "host", isInstanceEmpty: false);
 
-        Assert.True(tracker.TryReconcile(
-            "battle", new[] { "successor" }, "successor", out var state));
+        Assert.False(tracker.TryReconcile(
+            "battle", new[] { "successor" }, "successor", 2, out _));
+        Assert.True(tracker.TryRecordResult(
+            "battle",
+            "successor",
+            BattleState.AttackerVictory,
+            2,
+            new[] { "successor" },
+            "successor",
+            2,
+            out var state));
         Assert.Equal(BattleState.AttackerVictory, state);
+    }
+
+    [Fact]
+    public void ReportDuringHostPromotion_IsRetainedUntilCurrentHostReports()
+    {
+        var tracker = new BattleCompletionTracker();
+
+        Assert.False(tracker.TryRecordResult(
+            "battle",
+            "successor",
+            BattleState.DefenderVictory,
+            1,
+            new[] { "successor" },
+            "departed-host",
+            1,
+            out _));
+        Assert.False(tracker.TryReconcile(
+            "battle", new[] { "successor" }, "successor", 2, out _));
+        Assert.True(tracker.TryRecordResult(
+            "battle",
+            "successor",
+            BattleState.DefenderVictory,
+            2,
+            new[] { "successor" },
+            "successor",
+            2,
+            out var state));
+
+        Assert.Equal(BattleState.DefenderVictory, state);
     }
 }

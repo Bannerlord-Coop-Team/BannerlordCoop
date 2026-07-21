@@ -1833,6 +1833,8 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         Assert.NotNull(woundedPartyId);
+        BattleJoinCancelled? cancelled = null;
+        Server.Resolve<IMessageBroker>().Subscribe<BattleJoinCancelled>(payload => cancelled = payload.What);
         Server.NetworkSentMessages.Clear();
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
@@ -1843,6 +1845,9 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
         Assert.Equal(woundedPartyId, left.PartyId);
+        Assert.True(cancelled.HasValue);
+        Assert.Equal(hostileAction.MapEventId, cancelled.Value.InstanceId);
+        Assert.Equal("PlayerTwo", cancelled.Value.ControllerId);
 
         AssertHostileActionJoinerLeft(Server, hostileAction.MapEventId, hostileAction.AttackerPartyId, woundedPartyId!);
         foreach (var syncedClient in Clients)
