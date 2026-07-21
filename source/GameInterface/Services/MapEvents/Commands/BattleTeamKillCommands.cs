@@ -8,6 +8,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.InputSystem;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -59,7 +60,7 @@ Finishes the current battle deployment through the native deployment handler.";
 @"Usage:
   coop.debug.mapevent.toggle_scoreboard
 
-Holds or releases the configured scoreboard binding through the native input path.";
+Holds or releases the native scoreboard input without requiring window focus.";
 
     [CommandLineArgumentFunction("toggle_scoreboard", "coop.debug.mapevent")]
     public static string ToggleScoreboard(List<string> args)
@@ -76,22 +77,16 @@ Holds or releases the configured scoreboard binding through the native input pat
         if (scoreboard?.DataSource == null)
             return "Failed: no battle scoreboard UI.";
 
-        var scoreboardHold = mission.GetMissionBehavior<ScoreboardHoldBehavior>();
-        if (scoreboardHold == null)
+        if (mission.InputManager is ScoreboardInputContext scoreboardInput)
         {
-            var holdShow = HotKeyManager.GetCategory(ScoreboardHotKeyCategory.CategoryId)
-                ?.GetHotKey(ScoreboardHotKeyCategory.HoldShow);
-            var key = holdShow?.Keys.FirstOrDefault(candidate => candidate.IsKeyboardInput || candidate.IsMouseButtonInput);
-            if (key == null)
-                return "Failed: the scoreboard has no configured keyboard or mouse binding.";
-
-            mission.AddMissionBehavior(new ScoreboardHoldBehavior(key.InputKey));
-            Input.PressKey(key.InputKey);
-            return $"Holding the configured scoreboard binding ({key.InputKey}).";
+            mission.InputManager = scoreboardInput.Inner;
+            return "Released the native scoreboard input.";
         }
+        if (mission.InputManager == null)
+            return "Failed: no mission input context.";
 
-        mission.RemoveMissionBehavior(scoreboardHold);
-        return "Released the configured scoreboard binding.";
+        mission.InputManager = new ScoreboardInputContext(mission.InputManager);
+        return "Holding the native scoreboard input.";
     }
 
     private const string ScoreboardStateUsage =
@@ -149,20 +144,46 @@ Lists the player parties and party rows currently loaded by the battle scoreboar
         return names.Length == 0 ? "<none>" : string.Join(", ", names);
     }
 
-    private sealed class ScoreboardHoldBehavior : MissionLogic
+    private sealed class ScoreboardInputContext : IInputContext
     {
-        private readonly InputKey inputKey;
+        public IInputContext Inner { get; }
 
-        public ScoreboardHoldBehavior(InputKey inputKey)
+        public ScoreboardInputContext(IInputContext inner)
         {
-            this.inputKey = inputKey;
+            Inner = inner;
         }
 
-        public override void OnMissionTick(float dt)
-        {
-            base.OnMissionTick(dt);
-            Input.PressKey(inputKey);
-        }
+        public int GetPointerX() => Inner.GetPointerX();
+        public int GetPointerY() => Inner.GetPointerY();
+        public System.Numerics.Vector2 GetPointerPosition() => Inner.GetPointerPosition();
+        public bool IsGameKeyDown(int gameKey) => Inner.IsGameKeyDown(gameKey);
+        public bool IsGameKeyDownImmediate(int gameKey) => Inner.IsGameKeyDownImmediate(gameKey);
+        public bool IsGameKeyPressed(int gameKey) => Inner.IsGameKeyPressed(gameKey);
+        public bool IsGameKeyReleased(int gameKey) => Inner.IsGameKeyReleased(gameKey);
+        public float GetGameKeyAxis(string gameAxisKey) => Inner.GetGameKeyAxis(gameAxisKey);
+        public bool IsHotKeyDown(string hotKey) =>
+            hotKey == ScoreboardHotKeyCategory.HoldShow || Inner.IsHotKeyDown(hotKey);
+        public bool IsHotKeyReleased(string hotKey) => Inner.IsHotKeyReleased(hotKey);
+        public bool IsHotKeyPressed(string hotKey) => Inner.IsHotKeyPressed(hotKey);
+        public bool IsHotKeyDoublePressed(string hotKey) => Inner.IsHotKeyDoublePressed(hotKey);
+        public Vec2 GetKeyState(InputKey key) => Inner.GetKeyState(key);
+        public bool IsKeyDown(InputKey key) => Inner.IsKeyDown(key);
+        public bool IsKeyPressed(InputKey key) => Inner.IsKeyPressed(key);
+        public bool IsKeyReleased(InputKey key) => Inner.IsKeyReleased(key);
+        public float GetMouseMoveX() => Inner.GetMouseMoveX();
+        public float GetMouseMoveY() => Inner.GetMouseMoveY();
+        public bool GetIsMouseActive() => Inner.GetIsMouseActive();
+        public Vec2 GetMousePositionPixel() => Inner.GetMousePositionPixel();
+        public float GetDeltaMouseScroll() => Inner.GetDeltaMouseScroll();
+        public bool GetIsControllerConnected() => Inner.GetIsControllerConnected();
+        public Vec2 GetMousePositionRanged() => Inner.GetMousePositionRanged();
+        public float GetMouseSensitivity() => Inner.GetMouseSensitivity();
+        public bool IsControlDown() => Inner.IsControlDown();
+        public bool IsShiftDown() => Inner.IsShiftDown();
+        public bool IsAltDown() => Inner.IsAltDown();
+        public Vec2 GetControllerRightStickState() => Inner.GetControllerRightStickState();
+        public Vec2 GetControllerLeftStickState() => Inner.GetControllerLeftStickState();
+        public InputKey[] GetClickKeys() => Inner.GetClickKeys();
     }
 
     private const string LeaveBattleUsage =
