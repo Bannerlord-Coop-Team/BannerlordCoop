@@ -12,6 +12,8 @@ public interface ISteamLobbyApi : IDisposable
     bool IsOverlayEnabled { get; }
     /// <summary>Display name for the local Steam user that creates and owns the lobby.</summary>
     string LocalPersonaName { get; }
+    /// <summary>Steam id of the local user's account, or 0 when it cannot be read.</summary>
+    ulong LocalSteamId { get; }
 
     void CreateFriendsOnlyLobby(int maxMembers, Action<ulong, bool> onCompleted);
     void JoinLobby(ulong lobbyId, Action<ulong, bool> onCompleted);

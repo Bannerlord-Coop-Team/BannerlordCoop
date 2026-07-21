@@ -47,7 +47,7 @@ internal class PlayerEncounterPatches
         // Client: gate the encounter restart behind server approval. The send is rate-limited in
         // ConversationRequestHandler (max 1 request / 500ms) so a retried restart does not spam the server. On
         // approval the handler re-runs RestartPlayerEncounter under an AllowedThread; rejected requests never re-run it.
-        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement, ConversationRestartSource.PlayerEncounter));
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement, ConversationRestartSource.PlayerEncounter, false));
 
         return false;
     }
