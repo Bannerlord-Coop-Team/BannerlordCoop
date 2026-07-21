@@ -20,6 +20,37 @@ internal class BattleTeamKillCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
 
+    private const string FinishDeploymentUsage =
+@"Usage:
+  coop.debug.mapevent.finish_deployment
+
+Finishes the current battle deployment through the native deployment handler.";
+
+    [CommandLineArgumentFunction("finish_deployment", "coop.debug.mapevent")]
+    public static string FinishDeployment(List<string> args)
+    {
+        var ctx = new CommandContext("finish_deployment", FinishDeploymentUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+            return "No active deployment.";
+        if (!deploymentController.TeamSetupOver)
+            return "Failed: deployment team setup is not complete.";
+
+        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+        if (deploymentHandler == null)
+            return "Failed: no deployment handler.";
+
+        deploymentHandler.FinishDeployment();
+        return "Finished the current deployment.";
+    }
+
     private const string KillEnemyUsage =
 @"Usage:
   coop.debug.mapevent.kill_enemy
