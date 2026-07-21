@@ -10,7 +10,6 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading;
 
 namespace Coop.Core.Server.Connections;
 
@@ -26,8 +25,8 @@ namespace Coop.Core.Server.Connections;
 /// are already in the save the peer is about to load.</item>
 /// <item><b>Queueing</b> (on <see cref="BeginQueueing"/>, just after the save snapshot): broadcasts are
 /// held FIFO — they are not in the save.</item>
-/// <item><b>Open</b> (after the join barrier): held packets are replayed FIFO, a reliable tail marker
-/// is appended, and the peer goes live (a peer with no channel is live).</item>
+/// <item><b>Open</b> (on <see cref="PlayerCampaignEntered"/>): held packets are replayed FIFO, the
+/// channel is dropped, and the peer goes live (a peer with no channel is live).</item>
 /// </list>
 /// The drop/queue cut is clean: the save runs in a blocking <c>GameThread.Run</c> on the network
 /// thread, so the poller is parked and nothing races the snapshot. Replay-before-live is held by the
@@ -50,18 +49,6 @@ public interface IConnectionMessageQueue
     /// cut cleanly separates "in the save" (dropped) from "after the save" (queued for replay).
     /// </summary>
     void BeginQueueing(NetPeer peer);
-
-    /// <summary>Replays held packets while keeping later broadcasts queued.</summary>
-    void Flush(NetPeer peer);
-
-    /// <summary>Gets the gate and reliable-channel backlog while catch-up is active.</summary>
-    bool TryGetCatchUpPacketsRemaining(NetPeer peer, out int packetsRemaining);
-
-    /// <summary>Replays held packets, appends a reliable marker, and opens the peer atomically.</summary>
-    void OpenWithTail(NetPeer peer, IMessage tailMarker);
-
-    /// <summary>Stops progress tracking after the client applies the ordered join tail.</summary>
-    void CompleteCatchUp(NetPeer peer);
 }
 
 /// <inheritdoc cref="IConnectionMessageQueue"/>
@@ -77,9 +64,8 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     private sealed class PeerChannel
     {
         public readonly object Gate = new object();
-        public volatile Phase Phase = Phase.Dropping;
+        public Phase Phase = Phase.Dropping;
         public readonly Queue<IPacket> Pending = new Queue<IPacket>();
-        public int PendingCount;
     }
 
     private static readonly ILogger Logger = LogManager.GetLogger<ConnectionMessageQueue>();
@@ -97,12 +83,14 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         this.messageBroker = messageBroker;
 
         messageBroker.Subscribe<PlayerConnected>(Handle_PlayerConnected);
+        messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerConnected>(Handle_PlayerConnected);
+        messageBroker.Unsubscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
@@ -119,7 +107,6 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
             {
                 case Phase.Queueing:
                     channel.Pending.Enqueue(packet);
-                    Interlocked.Increment(ref channel.PendingCount);
                     return true;
                 case Phase.Dropping:
                     // Already in the save the peer is about to load; discard.
@@ -160,13 +147,18 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         channels.TryAdd(payload.What.PlayerPeer, new PeerChannel());
     }
 
+    private void Handle_PlayerCampaignEntered(MessagePayload<PlayerCampaignEntered> payload)
+    {
+        Flush(payload.What.playerId);
+    }
+
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
         // Idempotent: a peer that never connected, or a double disconnect, removes nothing.
         channels.TryRemove(payload.What.PlayerId, out _);
     }
 
-    public void Flush(NetPeer peer)
+    private void Flush(NetPeer peer)
     {
         if (channels.TryGetValue(peer, out var channel) == false) return;
 
@@ -174,68 +166,24 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         lock (channel.Gate)
         {
             replayed = channel.Pending.Count;
-            Drain(peer, channel);
-        }
 
-        Logger.Debug("Flushed {Count} queued packets to peer {Peer} while joining", replayed, peer.Id);
-    }
+            // Replay under the gate so a broadcast racing the campaign-entered signal either lands in
+            // Pending before this drain (and is replayed in order) or sees Open afterwards and goes
+            // live strictly after the replay. SendImmediate bypasses the queue (Send now routes back
+            // through it), so the replay cannot re-enter this gate and re-queue itself.
+            while (channel.Pending.Count > 0)
+            {
+                network.Value.SendImmediate(peer, channel.Pending.Dequeue());
+            }
 
-    public bool TryGetCatchUpPacketsRemaining(NetPeer peer, out int packetsRemaining)
-    {
-        packetsRemaining = 0;
-        if (channels.TryGetValue(peer, out var channel) == false) return false;
-
-        if (channel.Phase == Phase.Dropping) return false;
-
-        packetsRemaining = Volatile.Read(ref channel.PendingCount) +
-                           peer.GetPacketsCountInReliableQueue(0, true) +
-                           peer.GetPacketsCountInReliableQueue(0, false);
-        return true;
-    }
-
-    public void OpenWithTail(NetPeer peer, IMessage tailMarker)
-    {
-        if (tailMarker == null) throw new ArgumentNullException(nameof(tailMarker));
-
-        if (channels.TryGetValue(peer, out var channel) == false)
-        {
-            network.Value.SendImmediate(peer, tailMarker);
-            return;
-        }
-
-        int replayed;
-        lock (channel.Gate)
-        {
-            replayed = channel.Pending.Count;
-            Drain(peer, channel);
-
-            // A racing broadcast is either drained before this marker or observes Open and is sent
-            // after it. The client can therefore use the marker as the reliable world-stream barrier.
-            network.Value.SendImmediate(peer, tailMarker);
             channel.Phase = Phase.Open;
         }
 
-        Logger.Debug("Opened peer {Peer} after {Count} queued packets and the join tail marker", peer.Id, replayed);
-    }
+        // Open already makes the channel behave as live; removal is just cleanup so steady-state
+        // broadcasts skip the lookup. A concurrent broadcast that still holds the channel reference
+        // observed Open above and was sent live.
+        channels.TryRemove(peer, out _);
 
-    public void CompleteCatchUp(NetPeer peer)
-    {
-        if (channels.TryGetValue(peer, out var channel) == false) return;
-
-        lock (channel.Gate)
-        {
-            if (channel.Phase != Phase.Open) return;
-            channels.TryRemove(peer, out _);
-        }
-    }
-
-    private void Drain(NetPeer peer, PeerChannel channel)
-    {
-        while (channel.Pending.Count > 0)
-        {
-            var packet = channel.Pending.Dequeue();
-            Interlocked.Decrement(ref channel.PendingCount);
-            network.Value.SendImmediate(peer, packet);
-        }
+        Logger.Debug("Flushed {Count} queued packets to peer {Peer} on campaign entry", replayed, peer.Id);
     }
 }
