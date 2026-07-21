@@ -177,7 +177,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null) return;
-        if (!objectManager.TryGetIdWithLogging(partyVisual, out string visualId))
+        if (!objectManager.TryGetIdWithLogging(partyVisual, out string partyVisualId))
+            return;
+        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId))
             return;
         objectManager.Remove(partyVisual);
 
@@ -186,7 +188,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty").Invoke(MobilePartyVisualManager.Current, new object[] { party });
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(visualId));
+        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
     }
 
     /// <summary>
