@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace GameInterface.AutoSync;
@@ -9,6 +10,7 @@ public class AutoSyncRegistryItem
     public HashSet<Debuggable<PropertyInfo>> Properties = new();
 
     public List<MethodInfo> TargetMethods = new();
+    public Dictionary<string, List<MethodInfo>> CategorizedTargetMethods = new();
 
     public bool Contains(FieldInfo field)
     {
@@ -32,9 +34,27 @@ public class AutoSyncRegistryItem
         Properties.Add(new Debuggable<PropertyInfo>(property, debug, coalesce));
     }
 
-    public void AddTargetMethod(MethodInfo targetMethod)
+    public void AddTargetMethod(MethodInfo targetMethod, string patchCategory = null)
     {
-         TargetMethods.Add(targetMethod);
+        if (patchCategory == null)
+        {
+            TargetMethods.Add(targetMethod);
+            return;
+        }
+
+        if (!CategorizedTargetMethods.TryGetValue(patchCategory, out var targetMethods))
+        {
+            targetMethods = new List<MethodInfo>();
+            CategorizedTargetMethods.Add(patchCategory, targetMethods);
+        }
+
+        targetMethods.Add(targetMethod);
+    }
+
+    public bool ContainsTargetMethod(MethodInfo targetMethod)
+    {
+        return TargetMethods.Contains(targetMethod) ||
+            CategorizedTargetMethods.Values.Any(methods => methods.Contains(targetMethod));
     }
 }
 

@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Util;
 using Serilog;
 using System;
@@ -18,12 +18,10 @@ public class GameThread : IUpdateable
     private static readonly Lazy<GameThread> m_Instance =
         new Lazy<GameThread>(() => new GameThread());
 
-    private readonly Queue<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> m_Queue =
-        new Queue<(Action, EventWaitHandle, string, CancellationToken)>();
+    private readonly Queue<(Action Act, EventWaitHandle Wait, string Label)> m_Queue =
+        new Queue<(Action, EventWaitHandle, string)>();
 
     private readonly object m_QueueLock = new object();
-    private static readonly AsyncLocal<CancellationToken> m_AmbientCancellation =
-        new AsyncLocal<CancellationToken>();
     private int m_GameLoopThreadId;
 
     public int QueueLength
@@ -92,8 +90,8 @@ public class GameThread : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
-        List<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> toBeRun =
-            new List<(Action, EventWaitHandle, string, CancellationToken)>();
+        List<(Action Act, EventWaitHandle Wait, string Label)> toBeRun =
+            new List<(Action, EventWaitHandle, string)>();
 
         int backlog;
         lock (Instance.m_QueueLock)
@@ -107,35 +105,21 @@ public class GameThread : IUpdateable
 
         if (!Instrument)
         {
-            foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
+            foreach ((Action Act, EventWaitHandle Wait, string Label) task in toBeRun)
             {
-                RunQueuedTask(task);
+                task.Act?.Invoke();
+                task.Wait?.Set();
             }
             return;
         }
 
         long frameStart = Stopwatch.GetTimestamp();
-        foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
+        foreach ((Action Act, EventWaitHandle Wait, string Label) task in toBeRun)
         {
-            if (task.Cancellation.IsCancellationRequested)
-            {
-                task.Wait?.Set();
-                continue;
-            }
-
             long actionStart = Stopwatch.GetTimestamp();
-            try
-            {
-                using (ActivateCancellation(task.Cancellation))
-                {
-                    task.Act?.Invoke();
-                }
-            }
-            finally
-            {
-                task.Wait?.Set();
-            }
+            task.Act?.Invoke();
             long actionTicks = Stopwatch.GetTimestamp() - actionStart;
+            task.Wait?.Set();
 
             string label = task.Label ?? "(unlabeled)";
             m_PerLabel.TryGetValue(label, out (long Ticks, int Count) agg);
@@ -224,17 +208,6 @@ public class GameThread : IUpdateable
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
     {
-        CancellationToken cancellation = m_AmbientCancellation.Value;
-        if (cancellation.IsCancellationRequested)
-        {
-            if (blocking)
-            {
-                throw new OperationCanceledException(
-                    $"The game-thread session ended before the blocking {nameof(Run)} action was queued.");
-            }
-            return;
-        }
-
         if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
         {
             action();
@@ -248,27 +221,15 @@ public class GameThread : IUpdateable
             string resolved = label ?? BuildLabel(callerFile, callerMember);
             lock (Instance.m_QueueLock)
             {
-                Instance.m_Queue.Enqueue((action, ewh, resolved, cancellation));
+                Instance.m_Queue.Enqueue((action, ewh, resolved));
             }
 
-            if (ewh == null) return;
-
-            int waitResult = !cancellation.CanBeCanceled
-                ? (ewh.WaitOne(BlockingTimeout) ? 0 : WaitHandle.WaitTimeout)
-                : WaitHandle.WaitAny(
-                    new[] { ewh, cancellation.WaitHandle },
-                    BlockingTimeout);
-            if (waitResult == WaitHandle.WaitTimeout)
+            if (ewh != null && ewh.WaitOne(BlockingTimeout) == false)
             {
                 throw new TimeoutException(
                     $"A blocking {nameof(Run)} action was not processed by the game loop " +
                     $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
                     $"{nameof(GameThread)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
-            }
-            if (waitResult == 1)
-            {
-                throw new OperationCanceledException(
-                    $"The game-thread session ended before the blocking {nameof(Run)} action completed.");
             }
         }
     }
@@ -376,42 +337,5 @@ public class GameThread : IUpdateable
     public void UnmarkGameThread()
     {
         m_GameLoopThreadId = 0;
-    }
-
-    public static IDisposable ActivateCancellation(CancellationToken cancellation) =>
-        new CancellationScope(cancellation);
-
-    private static void RunQueuedTask(
-        (Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task)
-    {
-        try
-        {
-            if (task.Cancellation.IsCancellationRequested) return;
-
-            using (ActivateCancellation(task.Cancellation))
-            {
-                task.Act?.Invoke();
-            }
-        }
-        finally
-        {
-            task.Wait?.Set();
-        }
-    }
-
-    private sealed class CancellationScope : IDisposable
-    {
-        private readonly CancellationToken previous;
-
-        public CancellationScope(CancellationToken cancellation)
-        {
-            previous = m_AmbientCancellation.Value;
-            m_AmbientCancellation.Value = cancellation;
-        }
-
-        public void Dispose()
-        {
-            m_AmbientCancellation.Value = previous;
-        }
     }
 }

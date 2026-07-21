@@ -9,7 +9,7 @@ namespace Coop.Core.Server.Connections;
 public interface IConnectionState : IState, IDisposable
 {
     /// <summary>
-    /// Whether this connection is loading game state.
+    /// Whether this connection is loading game state and time must stay paused for it.
     /// </summary>
     bool IsLoading { get; }
 

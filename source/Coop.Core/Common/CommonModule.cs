@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
@@ -9,7 +8,6 @@ using Coop.Core.Common.Configuration;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
-using System.Threading;
 
 namespace Coop.Core.Common;
 
@@ -39,7 +37,6 @@ public abstract class CommonModule : Module
         #endregion
 
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
-        builder.Register(_ => new CancellationTokenSource()).InstancePerLifetimeScope();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 
         builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().InstancePerLifetimeScope();
