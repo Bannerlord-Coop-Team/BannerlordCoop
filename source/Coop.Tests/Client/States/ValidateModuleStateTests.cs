@@ -70,6 +70,23 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
+        public void NetworkModuleVersionsValidated_UnsupportedCoop_ContinuesValidation()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(false, "Server does not support module 'Coop'."));
+
+            // Act
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            // Assert
+            Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer).OfType<NetworkClientValidate>());
+            Assert.Empty(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Fact]
         public void NetworkClientValidated_Transitions_ReceivingSavedDataState()
         {
             // Arrange

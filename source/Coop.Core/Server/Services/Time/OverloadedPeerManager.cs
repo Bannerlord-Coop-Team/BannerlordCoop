@@ -70,9 +70,9 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
     private List<NetPeer> GetPeersAboveThreshold(int threshold)
     {
-        // Loading peers are excluded: the multi-MB transfer save legitimately floods their queue,
-        // and time is already locked for them by TimeHandler's loading-players pause. Counting them
-        // here would guarantee a redundant "catching up" pause on every join.
+        // Loading peers are excluded: their bulk save and held world stream are expected join traffic.
+        // Once the held stream is released the connection enters CampaignState and normal overload
+        // backpressure applies if its reliable world channel cannot keep up.
         return connectionCollection
             .Where(logic => logic.IsLoading == false)
             .Select(logic => logic.Peer)

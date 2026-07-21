@@ -1,10 +1,11 @@
-using Common;
+﻿using Common;
 using Common.PacketHandlers;
 using Common.Util;
 using LiteNetLib;
 using Missions.Agents.Packets;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
+using AgentControllerType = TaleWorlds.Core.AgentControllerType;
 
 namespace Missions.Agents.Handlers;
 
@@ -69,6 +70,17 @@ public class MountMovementApplier : IPacketHandler
                     // freshly adopted horse to a stale snapshot.
                     if (agentRegistry.IsLocallyControlled(horse))
                         continue;
+
+                    // The standalone stream is masterless-only. A stale loose-horse packet can arrive after
+                    // a rider packet remounts it; drop the direct target so the two interpolators cannot fight.
+                    if (horse.RiderAgent is Agent rider && rider.IsActive())
+                    {
+                        interpolator.Forget(horse);
+                        continue;
+                    }
+
+                    if (horse.Controller != AgentControllerType.None)
+                        horse.Controller = AgentControllerType.None;
 
                     data.ApplyMount(horse);
                     interpolator.SetMountTarget(horse, data.MountPosition, data.MountMovementDirection);

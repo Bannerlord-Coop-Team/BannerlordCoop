@@ -62,8 +62,18 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
+
+        coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
         coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
+    }
+
+    public override void OnPreDisplayMissionTick(float dt)
+    {
+        base.OnPreDisplayMissionTick(dt);
+
+        // This runs after the previous native agent tick and immediately before the display snapshot.
+        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates(dt);
     }
 
     public virtual void Dispose()
@@ -76,7 +86,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         // Server-mediated replacement for PeerConnected: a controller entered our instance (the notification
         // arrived over the campaign/relay connection), so send it our join info over the mesh.
-        SendJoinInfo(payload.What.ControllerId);
+        string controllerId = payload.What.ControllerId;
+        SendJoinInfo(controllerId);
+        coopMissionComponent.AgentActionHandler.CatchUpJoiner(controllerId);
     }
 
     private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)

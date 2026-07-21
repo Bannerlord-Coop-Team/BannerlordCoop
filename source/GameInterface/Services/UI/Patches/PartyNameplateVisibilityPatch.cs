@@ -1,7 +1,7 @@
 ﻿using Common;
+using GameInterface.Services.MobileParties;
 using HarmonyLib;
 using SandBox.ViewModelCollection.Nameplate;
-using System.Diagnostics;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
@@ -23,7 +23,7 @@ internal class PartyNameplateVisibilityPatch
     private static void CacheViewingDistance()
     {
         hasViewingDistance = false;
-        if (ModInformation.IsServer || Debugger.IsAttached) return;
+        if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible) return;
 
         var mainParty = MobileParty.MainParty;
         if (mainParty == null) return;

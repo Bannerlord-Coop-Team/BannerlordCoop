@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
@@ -8,8 +7,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
-using Serilog;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using static GameInterface.Services.ObjectManager.ObjectManager;
@@ -18,13 +15,11 @@ namespace GameInterface.Services.Party.Handlers;
 
 internal class SellPrisonersHandler : IHandler
 {
-    private static readonly ILogger logger = LogManager.GetLogger<SellPrisonersHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
-    private readonly IPrisonerSaleValidator prisonerSaleValidator;
+    private readonly IPrisonerSaleProcessor prisonerSaleProcessor;
     private readonly ISendCoalescer sendCoalescer;
 
     public SellPrisonersHandler(
@@ -32,14 +27,14 @@ internal class SellPrisonersHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
-        IPrisonerSaleValidator prisonerSaleValidator,
+        IPrisonerSaleProcessor prisonerSaleProcessor,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
-        this.prisonerSaleValidator = prisonerSaleValidator;
+        this.prisonerSaleProcessor = prisonerSaleProcessor;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<PrisonersSold>(Handle_PrisonersSold);
@@ -70,11 +65,7 @@ internal class SellPrisonersHandler : IHandler
 
             TroopRoster leftPrisonerRoster = new();
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
-            var validatedPrisonerRoster = prisonerSaleValidator.Validate(
-                leftPrisonerRoster,
-                sellingParty.PrisonRoster);
-
-            SellPrisonersAction.ApplyForSelectedPrisoners(sellingParty, null, validatedPrisonerRoster);
+            prisonerSaleProcessor.Sell(sellingParty, leftPrisonerRoster);
 
             objectManager.TryGetId(sellingParty.PrisonRoster, out var rosterId);
             var compactId = Compact(rosterId, typeof(TroopRoster));

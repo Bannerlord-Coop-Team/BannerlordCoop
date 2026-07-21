@@ -71,22 +71,6 @@ The exact router steps depend on your router model.
 
 ---
 
-### 5. Start the Server
-
-Navigate to the mod folder:
-
-```text
-Modules/Coop
-```
-
-Run:
-
-```text
-start-server
-```
-
-This will start the Coop server.
-
 ---
 
 ### 5. Connecting

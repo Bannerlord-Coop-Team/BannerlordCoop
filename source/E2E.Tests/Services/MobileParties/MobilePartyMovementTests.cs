@@ -2,10 +2,12 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using SandBox;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -329,6 +331,54 @@ public class MobilePartyMovementTests : SyncTestBase
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var clientParty));
             AssertPartyMovementValues(client, clientParty);
+        }
+    }
+
+    [Fact]
+    public void Peace_HoldsAiPartyWithLongRangePursuit()
+    {
+        var pursuingClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var targetClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        TestEnvironment.Server.Call(() =>
+        {
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var pursuingParty));
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var targetParty));
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<Clan>(pursuingClanId, out var pursuingClan));
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<Clan>(targetClanId, out var targetClan));
+
+            pursuingParty.ActualClan = pursuingClan;
+            targetParty.ActualClan = targetClan;
+            VillageHostileFactionStanceHelper.ApplyWarStance(pursuingClan, targetClan);
+            pursuingParty.SetMoveGoAroundParty(targetParty, MobileParty.NavigationType.Default);
+
+            Assert.True(FactionManager.IsAtWarAgainstFaction(pursuingClan, targetClan));
+            Assert.Equal(AiBehavior.GoAroundParty, pursuingParty.DefaultBehavior);
+            Assert.Equal(targetParty, pursuingParty.TargetParty);
+
+            MakePeaceAction.Apply(pursuingClan, targetClan);
+
+            Assert.False(FactionManager.IsAtWarAgainstFaction(pursuingClan, targetClan));
+            Assert.Equal(AiBehavior.Hold, pursuingParty.DefaultBehavior);
+            Assert.Equal(AiBehavior.Hold, pursuingParty.ShortTermBehavior);
+            Assert.Equal(MoveModeType.Hold, pursuingParty.PartyMoveMode);
+            Assert.Null(pursuingParty.TargetParty);
+            Assert.Null(pursuingParty.MoveTargetParty);
+
+            TestEnvironment.FlushCoalescer();
+        });
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var pursuingParty));
+                Assert.Equal(AiBehavior.Hold, pursuingParty.DefaultBehavior);
+                Assert.Equal(AiBehavior.Hold, pursuingParty.ShortTermBehavior);
+                Assert.Equal(MoveModeType.Hold, pursuingParty.PartyMoveMode);
+                Assert.Null(pursuingParty.TargetParty);
+                Assert.Null(pursuingParty.MoveTargetParty);
+            });
         }
     }
 

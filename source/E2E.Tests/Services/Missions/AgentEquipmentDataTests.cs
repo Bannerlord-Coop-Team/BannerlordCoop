@@ -1,4 +1,5 @@
 using Missions.Agents.Packets;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -26,6 +27,27 @@ public class AgentEquipmentDataTests
         Assert.True(HasSafeWeaponSlots(equipment));
     }
 
+    [Fact]
+    public void InvalidWeaponUsageIndex_IsNotSafeForNativeWieldChange()
+    {
+        var equipment = new MissionEquipment();
+        SetWeaponSlots(equipment, (int)EquipmentIndex.NumAllWeaponSlots);
+        equipment[EquipmentIndex.Weapon0] = CreateWeapon(weaponCount: 1, currentUsageIndex: 1);
+
+        Assert.False(HasSafeWeaponSlots(equipment));
+    }
+
+    [Fact]
+    public void IncomingWeaponUsageIndex_IsClampedToDestinationWeapon()
+    {
+        var equipment = new MissionEquipment();
+        SetWeaponSlots(equipment, (int)EquipmentIndex.NumAllWeaponSlots);
+        equipment[EquipmentIndex.Weapon0] = CreateWeapon(weaponCount: 2, currentUsageIndex: 0);
+
+        Assert.Equal(1, GetSafeUsageIndex(equipment, EquipmentIndex.Weapon0, 1));
+        Assert.Equal(0, GetSafeUsageIndex(equipment, EquipmentIndex.Weapon0, 2));
+    }
+
     private static void SetWeaponSlots(MissionEquipment equipment, int count)
     {
         typeof(MissionEquipment)
@@ -38,5 +60,27 @@ public class AgentEquipmentDataTests
         return (bool)typeof(AgentEquipmentData)
             .GetMethod("HasSafeWeaponSlots", BindingFlags.Static | BindingFlags.NonPublic)
             .Invoke(null, new object[] { equipment });
+    }
+
+    private static int GetSafeUsageIndex(
+        MissionEquipment equipment,
+        EquipmentIndex index,
+        int usageIndex)
+    {
+        return (int)typeof(AgentEquipmentData)
+            .GetMethod("GetSafeUsageIndex", BindingFlags.Static | BindingFlags.NonPublic)
+            .Invoke(null, new object[] { equipment, index, usageIndex });
+    }
+
+    private static MissionWeapon CreateWeapon(int weaponCount, int currentUsageIndex)
+    {
+        var weapon = new MissionWeapon(new ItemObject(), null, null);
+        object boxed = weapon;
+        typeof(MissionWeapon)
+            .GetField("_weapons", BindingFlags.Instance | BindingFlags.NonPublic)
+            .SetValue(boxed, new List<WeaponComponentData>(new WeaponComponentData[weaponCount]));
+        weapon = (MissionWeapon)boxed;
+        weapon.CurrentUsageIndex = currentUsageIndex;
+        return weapon;
     }
 }

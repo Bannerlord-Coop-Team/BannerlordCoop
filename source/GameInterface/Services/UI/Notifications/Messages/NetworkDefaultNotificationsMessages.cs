@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using System;
@@ -483,10 +484,13 @@ internal readonly struct NetworkNotifyArmyCreated : ICommand
 {
     [ProtoMember(1)]
     public readonly string ArmyId;
+    [ProtoMember(2)]
+    public readonly string AiBehaviorObjectId;
 
-    public NetworkNotifyArmyCreated(string armyId)
+    public NetworkNotifyArmyCreated(string armyId, string aiBehaviorObjectId)
     {
         ArmyId = armyId;
+        AiBehaviorObjectId = aiBehaviorObjectId;
     }
 }
 
@@ -613,10 +617,13 @@ internal readonly struct NetworkNotifyPartyRemovedFromArmy : ICommand
 {
     [ProtoMember(1)]
     public readonly string MobilePartyId;
+    [ProtoMember(2)]
+    public readonly string ArmyId;
 
-    public NetworkNotifyPartyRemovedFromArmy(string mobilePartyId)
+    public NetworkNotifyPartyRemovedFromArmy(string mobilePartyId, string armyId)
     {
         MobilePartyId = mobilePartyId;
+        ArmyId = armyId;
     }
 }
 

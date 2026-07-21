@@ -1,4 +1,4 @@
-using Common.PacketHandlers;
+﻿using Common.PacketHandlers;
 using LiteNetLib;
 using ProtoBuf;
 using System;
@@ -6,11 +6,9 @@ using System;
 namespace Missions.Agents.Packets
 {
     /// <summary>
-    /// A batch of DISCRETE action changes (attacks, blocks, jumps, kicks, gestures, mount/sit...) for the agents
-    /// the sender owns, sent ON CHANGE rather than polled. Unlike movement (continuous, unreliable, smoothed),
-    /// actions are events: they must not be dropped or reordered, so this is <see cref="DeliveryMethod.ReliableOrdered"/>.
-    /// The receiver applies each entry ONCE and lets the engine advance the animation; locomotion (walk/run/idle)
-    /// is NOT carried here — it is reproduced from the synced movement input.
+    /// A batch of DISCRETE action and guard-state changes for the agents the sender owns, sent ON CHANGE rather
+    /// than polled. The receiver applies each action once and retains guard state for per-frame puppet input.
+    /// These transitions must not be dropped or reordered, so this is <see cref="DeliveryMethod.ReliableOrdered"/>.
     /// </summary>
     [ProtoContract]
     public readonly struct AgentActionPacket : IPacket
@@ -23,11 +21,25 @@ namespace Missions.Agents.Packets
         public Guid[] AgentIds { get; }
         [ProtoMember(2)]
         public AgentActionData[] Actions { get; }
+        [ProtoMember(3)]
+        public string ControllerId { get; }
+        [ProtoMember(4)]
+        public long[] Sequences { get; }
+        [ProtoMember(5)]
+        public int BattleHostEpoch { get; }
 
-        public AgentActionPacket(Guid[] agentIds, AgentActionData[] actions)
+        public AgentActionPacket(
+            string controllerId,
+            Guid[] agentIds,
+            AgentActionData[] actions,
+            long[] sequences,
+            int battleHostEpoch = 0)
         {
+            ControllerId = controllerId;
             AgentIds = agentIds;
             Actions = actions;
+            Sequences = sequences;
+            BattleHostEpoch = battleHostEpoch;
         }
     }
 }

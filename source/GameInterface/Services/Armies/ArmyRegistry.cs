@@ -3,7 +3,7 @@ using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using SandBox.View.Map;
+using SandBox.GauntletUI;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +14,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
-using static TaleWorlds.CampaignSystem.CampaignTime;
 
 namespace GameInterface.Services.Armies;
 
@@ -52,7 +51,8 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
     {
         AccessTools.Field(typeof(Army), nameof(Army._parties)).SetValue(obj, new MBList<MobileParty>());
         obj.Cohesion = 100f;
-
+        obj._armyGatheringStartTime = 0f;
+        obj._creationTime = CampaignTime.Now;
         // The client Army is created via SkipConstructor, so the periodic tick events
         // (_hourlyTickEvent / _tickEvent) are never initialized. Native methods such as
         // DisperseInternal dereference them, so initialize them the same way the
@@ -100,6 +100,11 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
                 obj._hourlyTickEvent?.DeletePeriodicEvent();
                 obj._tickEvent?.DeletePeriodicEvent();
                 obj._armyIsDispersing = false;
+                // KingdomArmyVm.RefreshArmyList in DisbandCurrentArmy() is too early, call it when the army is destroyed
+                if (ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen)
+                {
+                    kingdomScreen.DataSource?.Army?.RefreshArmyList();
+                }
             }
         });
     }

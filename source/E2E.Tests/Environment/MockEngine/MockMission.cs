@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Common.Util;
 using TaleWorlds.Core;
@@ -26,6 +26,9 @@ public sealed class MockMission
     /// reinforcement spawn (which resolves the team by side) can field troops into them headless.</summary>
     public MockTeam AttackerTeam { get; } = new MockTeam(BattleSideEnum.Attacker);
     public MockTeam DefenderTeam { get; } = new MockTeam(BattleSideEnum.Defender);
+    public MockTeam AttackerAllyTeam => attackerAllyTeam;
+    public MockTeam DefenderAllyTeam => defenderAllyTeam;
+    public Mission.TeamCollection Teams { get; }
 
     /// <summary>The local player's team, returned by the <c>Mission.PlayerTeam</c> shim (the non-host retreat
     /// despawn filters by its side). Null until a test assigns one of the side teams.</summary>
@@ -33,6 +36,8 @@ public sealed class MockMission
 
     private readonly Dictionary<int, Agent> agentsByIndex = new();
     private int nextIndex;
+    private MockTeam attackerAllyTeam;
+    private MockTeam defenderAllyTeam;
 
     // Mirror of Mission._missilesDictionary keys. Mission.OnAgentHit indexes that dictionary for missile blows
     // (the lookup that threw KeyNotFound when an unsynced projectile's index was applied on the owner). The
@@ -47,7 +52,30 @@ public sealed class MockMission
     public MockMission()
     {
         Shell = ObjectHelper.SkipConstructor<Mission>();
+        Teams = new Mission.TeamCollection(Shell);
         ByShell.AddOrUpdate(Shell, this);
+    }
+
+    public Team AddTeam(BattleSideEnum side)
+    {
+        if (side == BattleSideEnum.Attacker)
+            return AddTeam(AttackerTeam, ref attackerAllyTeam);
+        if (side == BattleSideEnum.Defender)
+            return AddTeam(DefenderTeam, ref defenderAllyTeam);
+        return null;
+    }
+
+    private Team AddTeam(MockTeam mainTeam, ref MockTeam allyTeam)
+    {
+        var team = mainTeam;
+        if (Teams.Contains(mainTeam.Shell))
+        {
+            allyTeam ??= new MockTeam(mainTeam.Side);
+            team = allyTeam;
+        }
+        if (!Teams.Contains(team.Shell))
+            ((List<Team>)Teams).Add(team.Shell);
+        return team.Shell;
     }
 
     /// <summary>Resolve the mock that owns a given Mission shell (used by the Mission member shims).</summary>

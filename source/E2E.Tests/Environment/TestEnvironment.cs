@@ -7,9 +7,11 @@ using Coop.Core.Client;
 using Coop.Core.Server;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
+using E2E.Tests.Environment.MockEngine;
 using GameInterface;
 using GameInterface.Policies;
 using Missions;
+using Missions.Agents.Handlers;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -106,6 +108,9 @@ public class TestEnvironment
         }
 
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
+        builder.RegisterType<MockAgentVisualActionAccessor>()
+            .As<IAgentVisualActionAccessor>()
+            .InstancePerDependency();
 
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

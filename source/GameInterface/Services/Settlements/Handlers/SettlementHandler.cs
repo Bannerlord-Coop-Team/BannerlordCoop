@@ -173,7 +173,7 @@ public class SettlementHandler : IHandler
 
         if (objectManager.TryGetObject<MobileParty>(obj.MobilePartyId, out var mobileParty) == false)
         {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            Logger.Error("Unable to find MobileParty ({MobilePartyId})", obj.MobilePartyId);
             return;
         }
 

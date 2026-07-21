@@ -468,6 +468,8 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             // Our local copy of another owner's masterless horse.
             var puppetHorse = mock.SpawnMount();
             Assert.True(registry.TryRegisterAgent("owner", horseId, puppetHorse));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetMirror));
+            puppetMirror.Controller = AgentControllerType.AI;
 
             // The owner's copy of that horse, with live movement state — the source of the packet.
             var remoteHorse = mock.SpawnMount();
@@ -482,7 +484,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
             // The packet's movement input landed on the puppet horse (position itself is reconciled per-frame
             // by the interpolator, which this packet also fed).
-            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetMirror));
+            Assert.Equal(AgentControllerType.None, puppetMirror.Controller);
             Assert.Equal(remoteMirror.LookDirection, puppetMirror.LookDirection);
             Assert.Equal(remoteMirror.MovementDirection, puppetMirror.MovementDirection);
             Assert.Equal(remoteMirror.InputVector, puppetMirror.InputVector);

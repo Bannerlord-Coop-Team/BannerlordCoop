@@ -3,6 +3,9 @@ using Common.Logging;
 using Coop.Core;
 using Coop.Core.Common.Session;
 using Coop.Lib.NoHarmony;
+#if DEBUG
+using Coop.LiveTesting;
+#endif
 using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -38,6 +41,11 @@ namespace Coop
         public static InitialStateOption JoinCoopGame;
 
         private static ILogger Logger;
+
+#if DEBUG
+        private string activeLogFilePath;
+        private LiveTestControlServer liveTestControlServer;
+#endif
 
         public CoopMod()
         {
@@ -172,6 +180,10 @@ namespace Coop
             if (!TryClaimExclusive(filePath))
                 filePath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
 
+#if DEBUG
+            activeLogFilePath = System.IO.Path.GetFullPath(filePath);
+#endif
+
             PruneProcessSuffixedLogs(filePostfix);
 
             try
@@ -266,6 +278,13 @@ namespace Coop
 
             Updateables.Add(GameThread.Instance);
 
+#if DEBUG
+            if (isAutoConnect)
+            {
+                liveTestControlServer = new LiveTestControlServer(isServer, activeLogFilePath);
+                liveTestControlServer.Start();
+            }
+#endif
 
             // Skip startup splash screen
 #if DEBUG
@@ -355,6 +374,15 @@ namespace Coop
             {
                 Coop.Dispose();
             }
+        }
+
+        protected override void OnSubModuleUnloaded()
+        {
+#if DEBUG
+            liveTestControlServer?.Dispose();
+            liveTestControlServer = null;
+#endif
+            base.OnSubModuleUnloaded();
         }
 
         private bool m_IsFirstTick = true;

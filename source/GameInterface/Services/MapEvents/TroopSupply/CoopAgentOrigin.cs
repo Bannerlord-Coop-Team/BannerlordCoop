@@ -101,9 +101,27 @@ public class CoopAgentOrigin : IAgentOriginBase
     {
         get
         {
-            if (_banner != null) return _banner;
-            if (_party?.MapFaction != null) return _party.MapFaction.Banner;
-            return _party?.LeaderHero?.ClanBanner;
+            Banner result;
+            if ((result = _banner) == null)
+            {
+                if (Party == null)
+                {
+                    if (!_troop.IsHero)
+                    {
+                        return null;
+                    }
+                    return _troop.HeroObject.MapFaction.Banner;
+                }
+                else
+                {
+                    if (Party.LeaderHero == null)
+                    {
+                        return Party.MapFaction.Banner;
+                    }
+                    result = Party.LeaderHero.ClanBanner;
+                }
+            }
+            return result;
         }
     }
 

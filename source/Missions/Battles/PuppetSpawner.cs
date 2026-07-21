@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
+using Missions.Data;
 using GameInterface.Services.Players;
 using Missions.Messages;
 using Serilog;
@@ -168,14 +169,17 @@ public class PuppetSpawner : IPuppetSpawner
 
         var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed));
 
+        var missionEquipment = ResolveMissionEquipment(data.MissionEquipmentData);
+
         var buildData = new AgentBuildData(character);
-        buildData.BodyProperties(character.GetBodyPropertiesMax());
         buildData.InitialPosition(data.Position);
         buildData.Team(team);
         buildData.InitialDirection(Vec2.Forward);
         buildData.Equipment(data.SpawnEquipment); // Use calculated equipment from spawning client instead of character equipment (random per troop per client)
         buildData.BodyProperties(data.BodyProperties);
+        buildData.Banner(origin.Banner);
         buildData.TroopOrigin(origin);
+        buildData.MissionEquipment(missionEquipment);
         buildData.Controller(isOwnHero ? AgentControllerType.Player
             : isOwnAgent ? AgentControllerType.AI
             : AgentControllerType.None);
@@ -383,13 +387,8 @@ public class PuppetSpawner : IPuppetSpawner
         return null;
     }
 
-    // The team a puppet joins. A puppet is ANOTHER owner's troop, so it must NOT land on our local PlayerTeam — the
-    // Order-of-Battle deployment lets the local player arrange/command EVERY formation on PlayerTeam, so a puppet
-    // there becomes deployable by us (the "non-host can deploy the host hero and NPC heroes" bug). Each client only
-    // spawns its OWN party into PlayerTeam (the rest arrive here as puppets), so keeping puppets off PlayerTeam means
-    // the local player only ever commands its own party. We put a puppet on a NON-player team for its side: the
-    // side's main team if that isn't ours, otherwise the side's ally team. Returns null only while the side's main
-    // team doesn't exist yet (mission still loading) so the caller buffers and retries.
+    // Another owner's puppet must stay off PlayerTeam because every formation there is locally commandable.
+    // Use the side's non-player team; missing main or ally teams are buffered until initialization completes.
     private Team ResolvePuppetTeam(BattleAgentSpawnData data)
     {
         var mainTeam = BattleTeams.Resolve(data.Side);
@@ -409,7 +408,28 @@ public class PuppetSpawner : IPuppetSpawner
             : Mission.Current.DefenderAllyTeam;
         if (allyTeam != null && allyTeam != playerTeam) return allyTeam;
 
-        // No separate ally team on our side yet (only our own party present) — fall back to the main team.
-        return mainTeam;
+        // Never put another player's party on the local command team.
+        return null;
+    }
+
+    private MissionEquipment ResolveMissionEquipment(MissionEquipmentData data)
+    {
+        var missionEquipment = new MissionEquipment();
+        if (data == null || data.WeaponSlots.Count == 0) return null;
+
+        for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
+        {
+            missionEquipment._weaponSlots[(int)equipmentIndex] = ResolveMissionWeapon(data.WeaponSlots[(int)equipmentIndex]);
+        }
+        return missionEquipment;
+    }
+
+    private MissionWeapon ResolveMissionWeapon(MissionWeaponData data)
+    {
+        // Items can be null
+        objectManager.TryGetObject<ItemObject>(data.ItemObjectId, out var item);
+
+        var missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, null);
+        return missionWeapon;
     }
 }

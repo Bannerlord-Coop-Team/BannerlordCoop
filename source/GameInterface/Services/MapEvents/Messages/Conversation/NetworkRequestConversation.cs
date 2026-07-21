@@ -19,12 +19,15 @@ internal readonly struct NetworkRequestConversation : ICommand
     public readonly bool ForcePlayerOutFromSettlement;
     [ProtoMember(4)]
     public readonly ConversationRestartSource Source;
+    [ProtoMember(5)]
+    public readonly bool ArmyTalkEncounter;
 
-    public NetworkRequestConversation(string defenderId, string attackerId, bool forcePlayerOutFromSettlement, ConversationRestartSource source)
+    public NetworkRequestConversation(string defenderId, string attackerId, bool forcePlayerOutFromSettlement, ConversationRestartSource source, bool armyTalkEncounter)
     {
         DefenderId = defenderId;
         AttackerId = attackerId;
         ForcePlayerOutFromSettlement = forcePlayerOutFromSettlement;
         Source = source;
+        ArmyTalkEncounter = armyTalkEncounter;
     }
 }

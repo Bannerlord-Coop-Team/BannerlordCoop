@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using AgentControllerType = TaleWorlds.Core.AgentControllerType;
 
 namespace Missions.Agents.Handlers;
 
@@ -160,6 +161,8 @@ public class AgentMovementHandler : IAgentMovementHandler
             // building the snapshot calls into the agent (GetCurrentActionType, etc.), which throws an
             // AccessViolationException on a freed agent. Mirrors the IsActive() guard on the apply path.
             if (agent == null || agent.Mission == null || !agent.IsActive()) continue;
+
+            EnsureLocallyDrivenMountController(agent);
             if (!ShouldBroadcastMovement(agent)) continue;
 
             if (agent.IsMount)
@@ -232,6 +235,11 @@ public class AgentMovementHandler : IAgentMovementHandler
                         continue;
 
                     SyncMountState(agent, data);
+
+                    // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
+                    if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
+                        puppetMount.Controller = AgentControllerType.None;
+
                     data.Apply(agent);
 
                     // Position is reconciled per-frame by the interpolator (smoother than a per-packet
@@ -246,6 +254,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                             agent,
                             data.Position,
                             data.MovementDirection,
+                            data.MountData.MountMovementDirection,
                             data.MountData.MountPosition);
                     }
                     else
@@ -271,9 +280,11 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             // Owner dismounted: get the puppet off the horse. Remember the horse for a possible re-mount, and
             // stop interpolating it (its target is no longer being reported).
-            _dismountedHorses[agent] = agent.MountAgent;
-            _interpolator.Forget(agent.MountAgent);
+            Agent horse = agent.MountAgent;
+            _dismountedHorses[agent] = horse;
+            _interpolator.Forget(horse);
             agent.MountAgent = null;
+            RestoreLocallyControlledMount(horse);
         }
         else if (ownerMounted && !agent.HasMount)
         {
@@ -294,10 +305,37 @@ public class AgentMovementHandler : IAgentMovementHandler
             if (reported != null && !ReferenceEquals(reported, agent.MountAgent)
                 && reported.IsActive() && reported.RiderAgent == null)
             {
-                _interpolator.Forget(agent.MountAgent);
+                Agent previous = agent.MountAgent;
+                _interpolator.Forget(previous);
                 agent.MountAgent = reported;
+                RestoreLocallyControlledMount(previous);
             }
         }
+    }
+
+    // A locally driven rider needs a live horse controller; so does a locally authoritative loose horse.
+    // Do not wake a locally owned horse while another controller's active rider is driving it remotely.
+    private void EnsureLocallyDrivenMountController(Agent agent)
+    {
+        Agent mount = agent.IsMount ? agent : agent.MountAgent;
+        if (mount == null || !mount.IsActive() || mount.Mission != Mission.Current) return;
+        if (mount.RiderAgent is Agent rider && rider.IsActive()
+            && !agentRegistry.IsLocallyControlled(rider)) return;
+        if (mount.Controller != AgentControllerType.AI)
+        {
+            mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+            mount.Controller = AgentControllerType.AI;
+        }
+    }
+
+    private void RestoreLocallyControlledMount(Agent mount)
+    {
+        if (mount == null || !mount.IsActive() || mount.Mission != Mission.Current) return;
+        if (agentRegistry.TryGetAgentInfo(mount, out _)
+            && !agentRegistry.IsLocallyControlled(mount)) return;
+        mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+        if (mount.Controller != AgentControllerType.AI)
+            mount.Controller = AgentControllerType.AI;
     }
 
     /// <summary>

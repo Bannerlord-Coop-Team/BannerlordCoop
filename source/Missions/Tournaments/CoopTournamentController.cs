@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -1616,6 +1616,7 @@ public class CoopTournamentController : CoopMissionController
         if (agent.MountAgent != null)
         {
             coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent.MountAgent);
+            agent.MountAgent.SetMaximumSpeedLimit(-1f, isMultiplier: false);
             agent.MountAgent.Controller = AgentControllerType.AI;
         }
         agent.Controller = AgentControllerType.AI;

@@ -62,6 +62,22 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
 
     public string LocalPersonaName => SteamFriends.GetPersonaName() ?? string.Empty;
 
+    public ulong LocalSteamId
+    {
+        get
+        {
+            try
+            {
+                return SteamUser.GetSteamID().m_SteamID;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to query the local Steam id");
+                return 0;
+            }
+        }
+    }
+
     private void OnGameLobbyJoinRequested(GameLobbyJoinRequested_t callback)
     {
         try

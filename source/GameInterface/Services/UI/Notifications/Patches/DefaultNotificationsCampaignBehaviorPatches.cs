@@ -253,7 +253,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return;
 
-        var message = new NotifyArmyCreated(army);
+        var message = new NotifyArmyCreated(army, army.AiBehaviorObject);
         MessageBroker.Instance.Publish(__instance, message);
     }
 
@@ -315,7 +315,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return;
 
-        var message = new NotifyPartyRemovedFromArmy(party);
+        var message = new NotifyPartyRemovedFromArmy(party, party.Army);
         MessageBroker.Instance.Publish(__instance, message);
     }
 

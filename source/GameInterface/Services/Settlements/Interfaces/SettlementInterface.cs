@@ -112,6 +112,10 @@ internal class SettlementInterface : ISettlementInterface
         if (leftSettlement != null)
             mainParty.Position = leftSettlement.GatePosition;
 
+        // ExitToLast returns to the map inside Finish. Hold first so the still-active target cannot
+        // immediately start another encounter before Finish returns to this method.
+        mainParty.SetMoveModeHold();
+
         try
         {
             if (PlayerEncounter.Current == null && mainParty.CurrentSettlement != null)
@@ -124,8 +128,8 @@ internal class SettlementInterface : ISettlementInterface
             Campaign.Current.PlayerEncounter = null;
         }
 
-        // Hold AFTER finishing: Finish -> LeaveSettlementAction resets party behavior, which would
-        // otherwise clobber the hold and let the party walk straight back into the settlement.
+        // Hold again because Finish calls LeaveSettlementAction, which resets party behavior and would
+        // otherwise let the party walk straight back into the settlement.
         mainParty.SetMoveModeHold();
 
         Campaign.Current.SaveHandler?.SignalAutoSave();

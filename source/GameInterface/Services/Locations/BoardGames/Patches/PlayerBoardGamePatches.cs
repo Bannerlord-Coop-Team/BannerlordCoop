@@ -3,7 +3,9 @@ using HarmonyLib;
 using SandBox.BoardGames;
 using SandBox.BoardGames.MissionLogics;
 using SandBox.BoardGames.Pawns;
+using SandBox.CampaignBehaviors;
 using SandBox.Conversation;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.MissionViews;
 
@@ -12,6 +14,22 @@ namespace GameInterface.Services.Locations.BoardGames.Patches;
 [HarmonyPatch]
 internal static class PlayerBoardGamePatches
 {
+    [HarmonyPatch(typeof(BoardGameCampaignBehavior), "conversation_lord_talk_game_on_condition")]
+    [HarmonyPostfix]
+    private static void LordTalkGameConditionPostfix(BoardGameCampaignBehavior __instance, ref bool __result)
+    {
+        if (__result || !IsTavernBoardGameOpponent(
+                CharacterObject.OneToOneConversationCharacter?.Occupation,
+                CampaignMission.Current?.Location?.StringId) ||
+            !MissionBoardGameLogic.IsBoardGameAvailable()) return;
+
+        __instance.InitializeConversationVars();
+        __result = true;
+    }
+
+    internal static bool IsTavernBoardGameOpponent(Occupation? occupation, string locationId)
+        => occupation == Occupation.Lord && locationId == "tavern";
+
     [HarmonyPatch(typeof(MissionBoardGameLogic), nameof(MissionBoardGameLogic.DetectOpposingAgent))]
     [HarmonyPrefix]
     private static bool DetectOpposingAgentPrefix(MissionBoardGameLogic __instance)

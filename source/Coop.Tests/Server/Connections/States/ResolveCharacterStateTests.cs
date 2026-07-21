@@ -88,7 +88,9 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
-            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) };
+            // Community (non-official) modules — official modules are exempt from module
+            // matching, so they would not exercise the comparison at all.
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", false, false, new ApplicationVersion()) };
 
             serverComponent.Container
                 .Resolve<Mock<IModuleInfoProvider>>()
@@ -114,16 +116,19 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
+            // Community (non-official) modules — official modules are exempt from module
+            // matching (a dedicated server's official module set differs from a client's),
+            // so only community modules can produce a mismatch.
             serverComponent.Container
                 .Resolve<Mock<IModuleInfoProvider>>()
                 .Setup(mip => mip.GetModuleInfos())
                 .Returns(
-                    new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) }
+                    new List<ModuleInfo> { new ModuleInfo("1", false, false, new ApplicationVersion()) }
                 );
 
             // Act
             var payload = new MessagePayload<NetworkModuleVersionsValidate>(
-                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", true, false, new ApplicationVersion())}));
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", false, false, new ApplicationVersion())}));
             currentState.Handle_ModuleVersionsValidate(payload);
 
             // Assert

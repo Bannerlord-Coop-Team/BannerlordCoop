@@ -1,0 +1,558 @@
+﻿using System;
+using System.Linq;
+using System.Reflection;
+using Common.PacketHandlers;
+using Common.Serialization;
+using E2E.Tests.Environment.MockEngine;
+using Missions;
+using Missions.Agents;
+using Missions.Agents.Packets;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using Xunit;
+using Xunit.Abstractions;
+using AgentData = Missions.Agents.Packets.AgentData;
+
+namespace E2E.Tests.Services.Missions;
+
+public class MountedPuppetMovementTests : MissionTestEnvironment
+{
+    public MountedPuppetMovementTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void MovementPacket_DisablesPuppetHorseAi_AndRestoresTheOwnerDirectionsAfterTeleport()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var riderId = Guid.NewGuid();
+            var horseId = Guid.NewGuid();
+
+            Agent puppetRider = SpawnRider(mock);
+            Agent puppetHorse = mock.SpawnMount(puppetRider);
+            Assert.True(AgentMirror.TryGet(puppetRider, out var puppetRiderMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            puppetHorseMirror.Controller = AgentControllerType.AI;
+            Assert.True(registry.TryRegisterAgent("owner", riderId, puppetRider));
+            Assert.True(registry.TryRegisterAgent("owner", horseId, puppetHorse));
+
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceHorseMirror.Position = new Vec3(1f, 0f, 0f);
+            sourceHorseMirror.MovementDirection = new Vec2(0f, 1f);
+            sourceHorseMirror.LookDirection = new Vec3(0f, 1f, 0f);
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(3f, 4f, 12f);
+
+            AgentData data = CreateMountedData(
+                riderPosition: new Vec3(1f, 0f, 1f),
+                riderDirection: new Vec2(1f, 0f),
+                ownerSpeed: 2f,
+                mountData: new AgentMountData(sourceHorse, horseId),
+                riderLookDirection: new Vec3(-1f, 0f, 0f));
+
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(new[] { riderId }, new[] { data }));
+
+            Assert.Equal(AgentControllerType.None, puppetHorseMirror.Controller);
+            Assert.Equal(5f, puppetHorseMirror.MaximumSpeedLimit);
+            Assert.False(puppetHorseMirror.LastMaximumSpeedLimitIsMultiplier);
+            Assert.Equal(1, puppetHorseMirror.SetMaximumSpeedLimitCalls);
+
+            component.AgentMovementHandler.Interpolator.Tick(1f / 60f);
+
+            Assert.Equal(data.MovementDirection, puppetRiderMirror.MovementDirection);
+            Assert.Equal(sourceHorseMirror.MovementDirection, puppetHorseMirror.MovementDirection);
+            Assert.Equal(1, puppetHorseMirror.TeleportToPositionCalls);
+            Assert.InRange(puppetHorseMirror.Position.X, 0.19f, 0.21f);
+        });
+    }
+
+    [Fact]
+    public void ApplyMount_CapsAStationaryPuppetAtZeroUsingHorizontalSpeed()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(0f, 0f, 3f);
+            puppetHorseMirror.Controller = AgentControllerType.None;
+
+            new AgentMountData(sourceHorse).ApplyMount(puppetHorse);
+
+            Assert.Equal(0f, puppetHorseMirror.MaximumSpeedLimit);
+            Assert.False(puppetHorseMirror.LastMaximumSpeedLimitIsMultiplier);
+            Assert.Equal(1, puppetHorseMirror.SetMaximumSpeedLimitCalls);
+        });
+    }
+
+    [Fact]
+    public void MountMovementPacket_RoundTripsHorizontalMountSpeed()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(3f, 4f, 12f);
+            var horseId = Guid.NewGuid();
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+
+            byte[] wire = serializer.Serialize(
+                new MountMovementPacket(
+                    new[] { horseId },
+                    new[] { new AgentMountData(sourceHorse, horseId) }));
+            var result = Assert.IsType<MountMovementPacket>(serializer.Deserialize<IPacket>(wire));
+
+            Assert.Equal(5f, Assert.Single(result.Mounts).MountSpeed);
+        });
+    }
+
+    [Fact]
+    public void MovementPacket_DoesNotChangeALocallyControlledHorse()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var riderId = Guid.NewGuid();
+            var horseId = Guid.NewGuid();
+
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            horseMirror.Controller = AgentControllerType.AI;
+            Assert.True(registry.TryRegisterAgent("peer", riderId, rider));
+            Assert.True(registry.TryRegisterAgent("peer", horseId, horse));
+
+            Agent sourceHorse = mock.SpawnMount();
+            AgentData data = CreateMountedData(
+                riderPosition: new Vec3(1f, 0f, 1f),
+                riderDirection: new Vec2(1f, 0f),
+                ownerSpeed: 2f,
+                mountData: new AgentMountData(sourceHorse, horseId));
+
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(new[] { riderId }, new[] { data }));
+
+            Assert.Equal(AgentControllerType.AI, horseMirror.Controller);
+            Assert.Equal(-1f, horseMirror.MaximumSpeedLimit);
+            Assert.Equal(0, horseMirror.SetMaximumSpeedLimitCalls);
+            Assert.Equal(0, horseMirror.TeleportToPositionCalls);
+        });
+    }
+
+    [Fact]
+    public void MountedFollow_CatchesUpThenStopsAtThePositionEpsilon()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+
+            var target = new Vec3(0.02f, 0f, 0f);
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetMountedRiderTarget(rider, target, Vec2.Forward, Vec2.Forward, target);
+
+            for (int i = 0; i < 60; i++)
+                interpolator.Tick(1f / 60f);
+
+            int settledCallCount = horseMirror.TeleportToPositionCalls;
+            Assert.True(settledCallCount > 0);
+            Assert.InRange(horseMirror.Position.Distance(target), 0f, 0.0001f);
+
+            for (int i = 0; i < 120; i++)
+                interpolator.Tick(1f / 60f);
+
+            Assert.Equal(settledCallCount, horseMirror.TeleportToPositionCalls);
+        });
+    }
+
+    [Fact]
+    public void RemoteDismount_RestoresALocallyAuthoritativeHorseController()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var riderId = Guid.NewGuid();
+            var horseId = Guid.NewGuid();
+
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            horseMirror.Controller = AgentControllerType.None;
+            horseMirror.MaximumSpeedLimit = 0f;
+            Assert.True(registry.TryRegisterAgent("owner", riderId, rider));
+            Assert.True(registry.TryRegisterAgent("peer", horseId, horse));
+
+            AgentData data = CreateAgentData(
+                riderPosition: Vec3.Zero,
+                riderDirection: Vec2.Forward,
+                ownerSpeed: 0f,
+                mountData: null);
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(new[] { riderId }, new[] { data }));
+
+            Assert.Null(rider.MountAgent);
+            Assert.Null(horse.RiderAgent);
+            Assert.Equal(AgentControllerType.AI, horseMirror.Controller);
+            Assert.Equal(-1f, horseMirror.MaximumSpeedLimit);
+            Assert.Equal(1, horseMirror.SetMaximumSpeedLimitCalls);
+        });
+    }
+
+    [Fact]
+    public void RemoteDismount_RestoresAnUnregisteredHorseController()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var riderId = Guid.NewGuid();
+
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            horseMirror.Controller = AgentControllerType.None;
+            horseMirror.MaximumSpeedLimit = 0f;
+            Assert.True(registry.TryRegisterAgent("owner", riderId, rider));
+
+            AgentData data = CreateAgentData(
+                riderPosition: Vec3.Zero,
+                riderDirection: Vec2.Forward,
+                ownerSpeed: 0f,
+                mountData: null);
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(new[] { riderId }, new[] { data }));
+
+            Assert.Null(rider.MountAgent);
+            Assert.Null(horse.RiderAgent);
+            Assert.Equal(AgentControllerType.AI, horseMirror.Controller);
+            Assert.Equal(-1f, horseMirror.MaximumSpeedLimit);
+            Assert.Equal(1, horseMirror.SetMaximumSpeedLimitCalls);
+        });
+    }
+
+    [Fact]
+    public void RemoteHorseSwitch_RestoresTheOldLocalHorse_AndPuppetsTheNewHorse()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var riderId = Guid.NewGuid();
+            var oldHorseId = Guid.NewGuid();
+            var newHorseId = Guid.NewGuid();
+
+            Agent rider = SpawnRider(mock);
+            Agent oldHorse = mock.SpawnMount(rider);
+            Agent newHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(oldHorse, out var oldHorseMirror));
+            Assert.True(AgentMirror.TryGet(newHorse, out var newHorseMirror));
+            oldHorseMirror.Controller = AgentControllerType.None;
+            oldHorseMirror.MaximumSpeedLimit = 0f;
+            newHorseMirror.Controller = AgentControllerType.AI;
+            Assert.True(registry.TryRegisterAgent("owner", riderId, rider));
+            Assert.True(registry.TryRegisterAgent("peer", oldHorseId, oldHorse));
+            Assert.True(registry.TryRegisterAgent("owner", newHorseId, newHorse));
+
+            AgentData data = CreateAgentData(
+                riderPosition: Vec3.Zero,
+                riderDirection: new Vec2(1f, 0f),
+                ownerSpeed: 0f,
+                mountData: new AgentMountData(newHorse, newHorseId));
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(new[] { riderId }, new[] { data }));
+
+            Assert.Same(newHorse, rider.MountAgent);
+            Assert.Null(oldHorse.RiderAgent);
+            Assert.Equal(AgentControllerType.AI, oldHorseMirror.Controller);
+            Assert.Equal(-1f, oldHorseMirror.MaximumSpeedLimit);
+            Assert.Equal(1, oldHorseMirror.SetMaximumSpeedLimitCalls);
+            Assert.Equal(AgentControllerType.None, newHorseMirror.Controller);
+        });
+    }
+
+    [Fact]
+    public void MovementPolling_RestoresAiOnlyWhenTheLocalHorseIsLocallyDriven()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+
+            Agent remoteRider = SpawnRider(mock);
+            Agent localHorse = mock.SpawnMount(remoteRider);
+            Assert.True(AgentMirror.TryGet(remoteRider, out var remoteRiderMirror));
+            Assert.True(AgentMirror.TryGet(localHorse, out var localHorseMirror));
+            localHorseMirror.Controller = AgentControllerType.None;
+            localHorseMirror.MaximumSpeedLimit = 0f;
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), remoteRider));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), localHorse));
+
+            component.AgentMovementHandler.PollMovement(0.02f);
+            Assert.Equal(AgentControllerType.None, localHorseMirror.Controller);
+            Assert.Equal(0f, localHorseMirror.MaximumSpeedLimit);
+            Assert.Equal(0, localHorseMirror.SetMaximumSpeedLimitCalls);
+
+            remoteRiderMirror.IsActive = false;
+            component.AgentMovementHandler.PollMovement(0.02f);
+            Assert.Equal(AgentControllerType.AI, localHorseMirror.Controller);
+            Assert.Equal(-1f, localHorseMirror.MaximumSpeedLimit);
+            Assert.Equal(1, localHorseMirror.SetMaximumSpeedLimitCalls);
+
+            remoteRiderMirror.IsActive = true;
+            localHorseMirror.Controller = AgentControllerType.None;
+            localHorseMirror.MaximumSpeedLimit = 0f;
+            localHorseMirror.SetMaximumSpeedLimitCalls = 0;
+            remoteRider.MountAgent = null;
+            component.AgentMovementHandler.PollMovement(0.02f);
+            Assert.Equal(AgentControllerType.AI, localHorseMirror.Controller);
+            Assert.Equal(-1f, localHorseMirror.MaximumSpeedLimit);
+            Assert.Equal(1, localHorseMirror.SetMaximumSpeedLimitCalls);
+
+            Agent localRider = SpawnRider(mock);
+            Agent remoteHorse = mock.SpawnMount(localRider);
+            Assert.True(AgentMirror.TryGet(remoteHorse, out var remoteHorseMirror));
+            remoteHorseMirror.Controller = AgentControllerType.None;
+            remoteHorseMirror.MaximumSpeedLimit = 0f;
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), localRider));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), remoteHorse));
+
+            component.AgentMovementHandler.PollMovement(0.02f);
+            Assert.Equal(AgentControllerType.AI, remoteHorseMirror.Controller);
+            Assert.Equal(-1f, remoteHorseMirror.MaximumSpeedLimit);
+            Assert.Equal(1, remoteHorseMirror.SetMaximumSpeedLimitCalls);
+
+            remoteHorseMirror.Controller = AgentControllerType.None;
+            remoteHorseMirror.MaximumSpeedLimit = 0f;
+            remoteHorseMirror.SetMaximumSpeedLimitCalls = 0;
+            remoteHorseMirror.IsActive = false;
+            component.AgentMovementHandler.PollMovement(0.02f);
+            Assert.Equal(AgentControllerType.None, remoteHorseMirror.Controller);
+            Assert.Equal(0f, remoteHorseMirror.MaximumSpeedLimit);
+            Assert.Equal(0, remoteHorseMirror.SetMaximumSpeedLimitCalls);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StaleMasterlessPacket_DoesNotAddADirectTargetAfterRemount(bool masterlessPacketArrivesLast)
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var riderId = Guid.NewGuid();
+            var horseId = Guid.NewGuid();
+
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            Assert.True(registry.TryRegisterAgent("owner", riderId, rider));
+            Assert.True(registry.TryRegisterAgent("owner", horseId, horse));
+
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceHorseMirror.Position = new Vec3(1f, 0f, 0f);
+            sourceHorseMirror.MovementDirection = new Vec2(0f, 1f);
+            var mountData = new AgentMountData(sourceHorse, horseId);
+            var mountPacket = new MountMovementPacket(new[] { horseId }, new[] { mountData });
+            var riderData = CreateAgentData(
+                riderPosition: new Vec3(1f, 0f, 1f),
+                riderDirection: new Vec2(1f, 0f),
+                ownerSpeed: 2f,
+                mountData: mountData);
+            var riderPacket = new MovementPacket(new[] { riderId }, new[] { riderData });
+
+            if (!masterlessPacketArrivesLast)
+                component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, mountPacket);
+            component.AgentMovementHandler.HandlePacket(null, riderPacket);
+            if (masterlessPacketArrivesLast)
+                component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, mountPacket);
+
+            Assert.Same(horse, rider.MountAgent);
+            component.AgentMovementHandler.Interpolator.Tick(1f / 60f);
+
+            Assert.Equal(0, horseMirror.SetTargetPositionAndDirectionCalls);
+            Assert.Equal(1, horseMirror.TeleportToPositionCalls);
+        });
+    }
+
+    [Fact]
+    public void MasterlessPacket_AppliesTheOwnersMovingSpeedLimit()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var horseId = Guid.NewGuid();
+
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            puppetHorseMirror.Controller = AgentControllerType.AI;
+            Assert.True(registry.TryRegisterAgent("owner", horseId, puppetHorse));
+
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(0.6f, 0.8f, 5f);
+            component.AgentMovementHandler.MountMovementApplier.HandlePacket(
+                null,
+                new MountMovementPacket(
+                    new[] { horseId },
+                    new[] { new AgentMountData(sourceHorse, horseId) }));
+
+            Assert.Equal(AgentControllerType.None, puppetHorseMirror.Controller);
+            Assert.Equal(1f, puppetHorseMirror.MaximumSpeedLimit);
+            Assert.False(puppetHorseMirror.LastMaximumSpeedLimitIsMultiplier);
+            Assert.Equal(1, puppetHorseMirror.SetMaximumSpeedLimitCalls);
+        });
+    }
+
+    [Fact]
+    public void MasterlessPacket_DoesNotChangeALocallyControlledHorse()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var horseId = Guid.NewGuid();
+
+            Agent horse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            horseMirror.Controller = AgentControllerType.AI;
+            horseMirror.MovementDirection = Vec2.Forward;
+            Assert.True(registry.TryRegisterAgent("peer", horseId, horse));
+
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceHorseMirror.MovementDirection = new Vec2(1f, 0f);
+            component.AgentMovementHandler.MountMovementApplier.HandlePacket(
+                null,
+                new MountMovementPacket(
+                    new[] { horseId },
+                    new[] { new AgentMountData(sourceHorse, horseId) }));
+            component.AgentMovementHandler.Interpolator.Tick(1f / 60f);
+
+            Assert.Equal(AgentControllerType.AI, horseMirror.Controller);
+            Assert.Equal(-1f, horseMirror.MaximumSpeedLimit);
+            Assert.Equal(0, horseMirror.SetMaximumSpeedLimitCalls);
+            Assert.Equal(Vec2.Forward, horseMirror.MovementDirection);
+            Assert.Equal(0, horseMirror.SetTargetPositionAndDirectionCalls);
+            Assert.Equal(0, horseMirror.TeleportToPositionCalls);
+        });
+    }
+
+    private static Agent SpawnRider(MockMission mock)
+    {
+        return mock.SpawnAgent(
+            new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None));
+    }
+
+    private static AgentData CreateMountedData(
+        Vec3 riderPosition,
+        Vec2 riderDirection,
+        float ownerSpeed,
+        AgentMountData mountData,
+        Vec3? riderLookDirection = null)
+    {
+        return CreateAgentData(riderPosition, riderDirection, ownerSpeed, mountData, riderLookDirection);
+    }
+
+    private static AgentData CreateAgentData(
+        Vec3 riderPosition,
+        Vec2 riderDirection,
+        float ownerSpeed,
+        AgentMountData mountData,
+        Vec3? riderLookDirection = null)
+    {
+        object boxed = default(AgentData);
+        SetBackingField(boxed, nameof(AgentData.Position), riderPosition);
+        SetBackingField(boxed, nameof(AgentData.MovementDirection), riderDirection);
+        SetBackingField(
+            boxed,
+            nameof(AgentData.LookDirection),
+            riderLookDirection ?? new Vec3(riderDirection.X, riderDirection.Y, 0f));
+        SetBackingField(boxed, nameof(AgentData.InputVector), riderDirection);
+        SetBackingField(boxed, nameof(AgentData.MountData), mountData);
+        SetBackingField(boxed, nameof(AgentData.Speed), ownerSpeed);
+        return (AgentData)boxed;
+    }
+
+    private static void SetBackingField(object boxed, string propertyName, object value)
+    {
+        FieldInfo field = typeof(AgentData).GetField(
+            $"<{propertyName}>k__BackingField",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (field == null) throw new MissingFieldException(typeof(AgentData).FullName, propertyName);
+        field.SetValue(boxed, value);
+    }
+}
