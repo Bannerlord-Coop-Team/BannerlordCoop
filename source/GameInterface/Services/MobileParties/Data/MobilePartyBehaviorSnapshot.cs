@@ -19,6 +19,7 @@ public interface IMobilePartyBehaviorSnapshot
 {
     bool TryCreate(MobileParty party, out PartyBehaviorUpdateData data);
     bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state);
+    bool CanApply(MobileParty party, PartyBehaviorUpdateData data);
     bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable);
     bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply);
 }
@@ -114,6 +115,9 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         ApplyBehavior(resolved, resetPath: false);
         return true;
     }
+
+    public bool CanApply(MobileParty party, PartyBehaviorUpdateData data) =>
+        TryPrepare(party, data, null, null, out _);
 
     public bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply)
     {

@@ -3,6 +3,9 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Utils.Commands;
 using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
@@ -20,6 +23,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -28,6 +32,8 @@ namespace GameInterface.Services.PlayerCaptivityService.Commands;
 internal class PlayerCaptivityCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<PlayerCaptivityCommands>();
+
+    private static LiveTestFixtureSnapshot liveTestFixtureSnapshot;
 
     private const string RandomCapturePlayerUsage =
 @"Usage:
@@ -162,6 +168,170 @@ Releases the given player hero from captivity.";
                 $"Failed to release hero '{GetHeroDisplayName(hero)}'",
                 ex);
         }
+    }
+
+    private const string PrepareVisualTestFixtureUsage =
+@"Usage:
+  coop.debug.player_captivity.prepare_visual_test_fixture <heroId> <captorPartyId>
+
+Snapshots the player's party, removes its non-hero members, and moves it beside the captor. Server only.";
+
+    [CommandLineArgumentFunction("prepare_visual_test_fixture", "coop.debug.player_captivity")]
+    public static string PrepareVisualTestFixture(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "prepare_visual_test_fixture",
+            PrepareVisualTestFixtureUsage,
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(2, out error))
+            return error;
+
+        if (liveTestFixtureSnapshot != null)
+            return "A visual test fixture is already prepared.";
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error) ||
+            !ctx.TryGetArg(1, "captorPartyId", out var captorPartyId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to prepare visual test fixture: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to prepare visual test fixture: " + error;
+
+        if (!objectManager.TryGetObject(captorPartyId, out MobileParty captorParty) &&
+            !CommandHelpers.TryGetMobileParty(captorPartyId, out captorParty, out error))
+            return "Failed to prepare visual test fixture: " + error;
+
+        var playerParty = hero.PartyBelongedTo;
+        if (playerParty == null || playerParty == captorParty)
+            return "Failed to prepare visual test fixture: player and captor parties must be distinct.";
+
+        if (hero.IsPrisoner || playerParty.PrisonRoster.TotalManCount != 0)
+            return "Failed to prepare visual test fixture: player must be free and their prison roster empty.";
+
+        if (!playerParty.IsActive ||
+            playerParty.LeaderHero != hero ||
+            playerParty.MemberRoster.GetTroopCount(hero.CharacterObject) != 1)
+            return "Failed to prepare visual test fixture: player must lead an active party containing them exactly once.";
+
+        if (playerParty.IsCurrentlyAtSea != captorParty.IsCurrentlyAtSea ||
+            playerParty.Position.IsOnLand != captorParty.Position.IsOnLand)
+            return "Failed to prepare visual test fixture: player and captor parties must use the same navigation layer.";
+
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+            !behaviorSnapshot.TryCreate(playerParty, out var behavior))
+            return "Failed to prepare visual test fixture: unable to snapshot player party behavior.";
+
+        var snapshot = new LiveTestFixtureSnapshot(
+            playerParty,
+            hero.CharacterObject,
+            playerParty.MemberRoster.GetTroopRoster().ToArray(),
+            behavior);
+        liveTestFixtureSnapshot = snapshot;
+
+        foreach (var element in snapshot.MemberRoster.Where(element => element.Character != snapshot.PlayerCharacter))
+        {
+            playerParty.MemberRoster.AddToCounts(
+                element.Character,
+                -element.Number,
+                false,
+                -element.WoundedNumber,
+                -element.Xp);
+        }
+
+        playerParty.Position = new CampaignVec2(
+            new TaleWorlds.Library.Vec2(captorParty.Position.X + 1f, captorParty.Position.Y),
+            captorParty.Position.IsOnLand);
+        playerParty.SetMoveModeHold();
+        playerParty.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(PlayerCaptivityCommands),
+            new PartyBehaviorChangeAttempted(
+                playerParty,
+                forcePosition: true,
+                isCurrentlyAtSea: playerParty.IsCurrentlyAtSea,
+                resetMovementToHold: true));
+
+        return
+            "Visual test fixture prepared.\n" +
+            $"Player party: {playerParty.StringId}\n" +
+            $"Original member count: {snapshot.MemberRoster.Sum(element => element.Number)}\n" +
+            $"Prepared position: {playerParty.Position.X:R},{playerParty.Position.Y:R}";
+    }
+
+    [CommandLineArgumentFunction("restore_visual_test_fixture", "coop.debug.player_captivity")]
+    public static string RestoreVisualTestFixture(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "restore_visual_test_fixture",
+            "Usage: coop.debug.player_captivity.restore_visual_test_fixture",
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(0, out error))
+            return error;
+
+        var snapshot = liveTestFixtureSnapshot;
+        if (snapshot == null)
+            return "No visual test fixture is prepared.";
+
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            return "Failed to restore visual test fixture: unable to resolve party behavior snapshot service.";
+
+        var playerParty = snapshot.PlayerParty;
+        var playerHero = snapshot.PlayerCharacter.HeroObject;
+        if (playerHero == null ||
+            playerHero.IsPrisoner ||
+            !playerParty.IsActive ||
+            playerHero.PartyBelongedTo != playerParty ||
+            playerParty.LeaderHero != playerHero)
+            return "Failed to restore visual test fixture: player must be free in their active party.";
+
+        if (!behaviorSnapshot.CanApply(playerParty, snapshot.Behavior))
+            return "Failed to restore visual test fixture: unable to resolve the party behavior snapshot.";
+
+        foreach (var element in playerParty.MemberRoster.GetTroopRoster()
+                     .Where(element => element.Character != snapshot.PlayerCharacter)
+                     .ToArray())
+        {
+            playerParty.MemberRoster.AddToCounts(
+                element.Character,
+                -element.Number,
+                false,
+                -element.WoundedNumber,
+                -element.Xp);
+        }
+
+        foreach (var element in snapshot.MemberRoster.Where(element => element.Character != snapshot.PlayerCharacter))
+            playerParty.MemberRoster.Add(element);
+
+        playerParty.Position = snapshot.Behavior.PartyPosition;
+        playerParty.IsCurrentlyAtSea = snapshot.Behavior.IsCurrentlyAtSea;
+        if (!behaviorSnapshot.TryApply(playerParty, snapshot.Behavior, out _))
+            return "Failed to restore visual test fixture: unable to apply the party behavior snapshot.";
+
+        MessageBroker.Instance.Publish(
+            typeof(PlayerCaptivityCommands),
+            new PartyBehaviorChangeAttempted(
+                playerParty,
+                forcePosition: true,
+                isCurrentlyAtSea: playerParty.IsCurrentlyAtSea,
+                resetMovementToHold: false));
+
+        liveTestFixtureSnapshot = null;
+        return
+            "Visual test fixture restored.\n" +
+            $"Player party: {playerParty.StringId}\n" +
+            $"Member count: {playerParty.MemberRoster.TotalManCount}\n" +
+            $"Position: {playerParty.Position.X:R},{playerParty.Position.Y:R}\n" +
+            $"Move mode: {playerParty.PartyMoveMode}";
     }
 
     private const string LiberatePrisonerUsage =
@@ -500,5 +670,25 @@ Reports captivity and registered party state without mutating it.";
             return name;
 
         return hero.StringId ?? "unknown";
+    }
+
+    private sealed class LiveTestFixtureSnapshot
+    {
+        public readonly MobileParty PlayerParty;
+        public readonly CharacterObject PlayerCharacter;
+        public readonly TroopRosterElement[] MemberRoster;
+        public readonly PartyBehaviorUpdateData Behavior;
+
+        public LiveTestFixtureSnapshot(
+            MobileParty playerParty,
+            CharacterObject playerCharacter,
+            TroopRosterElement[] memberRoster,
+            PartyBehaviorUpdateData behavior)
+        {
+            PlayerParty = playerParty;
+            PlayerCharacter = playerCharacter;
+            MemberRoster = memberRoster;
+            Behavior = behavior;
+        }
     }
 }
