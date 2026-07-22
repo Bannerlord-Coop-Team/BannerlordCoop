@@ -61,6 +61,9 @@ public static class SlowRaidMissionDebugCommands
             StartBattleAction.ApplyStartRaid(raider, settlement);
 
             mapEvent = settlement.Party.MapEvent;
+            var detachedDefenders = mapEvent == null
+                ? 0
+                : RaidDebugFixture.DetachNonSettlementDefenders(mapEvent);
             if (mapEvent == null || !ReferenceEquals(raider.MapEvent, mapEvent) || !mapEvent.IsActiveSlowVillageRaid())
             {
                 mapEvent?.FinalizeEvent();
@@ -84,6 +87,7 @@ public static class SlowRaidMissionDebugCommands
             return $"created=true; controller={args[0]}; settlement={args[1]}; mapEvent={mapEventId}; " +
                    $"raider={raiderId}; raiderStringId={raider.StringId}; activeSlow=true; instanceOccupied=false; " +
                    $"hitPoints={Format(settlement.SettlementHitPoints)}; defendersStaged={defenderSnapshot.Sum(element => element.Number)}; " +
+                   $"insideDefendersDetached={detachedDefenders}; " +
                    $"next=On Player 1 attack {raider.StringId} at {settlement.StringId} and open the deployment screen.";
         }
         catch
