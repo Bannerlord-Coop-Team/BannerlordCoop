@@ -14,6 +14,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
+    [Collection(CampaignHideoutsTestCollection.Name)]
     public class BanditPartyComponentSerializationTest
     {
         readonly IContainer container;
@@ -46,53 +47,55 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void BanditPartyComponent_Full_Serialization()
         {
-            Hideout hideout = (Hideout)FormatterServices.GetUninitializedObject(typeof(Hideout));
+            var campaign = Campaign.Current;
+            Assert.NotNull(campaign);
+            var previousHideouts = campaign._hideouts;
+            try
+            {
+                Hideout hideout = (Hideout)FormatterServices.GetUninitializedObject(typeof(Hideout));
+                campaign._hideouts = new MBList<Hideout> { new Hideout(), hideout };
 
-            // TODO make atomic to not interfere with other tests that use Hideout.All
-            MBList<Hideout> allhideouts = Campaign.Current?._hideouts ?? new MBList<Hideout>();
+                MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+                PartyBase party = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
+                Clan clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
 
-            allhideouts.Add(hideout);
+                mobileParty.StringId = "MyMobileParty";
+                clan.StringId = "myClan";
 
-            Assert.NotNull(Campaign.Current);
+                party.MobileParty = mobileParty;
+                mobileParty.Party = party;
+                mobileParty._actualClan = clan;
 
-            Campaign.Current!._hideouts = allhideouts;
+                BanditPartyComponent item = (BanditPartyComponent)FormatterServices.GetUninitializedObject(typeof(BanditPartyComponent));
+                item.Hideout = hideout;
+                item.IsBossParty = true;
+                item.MobileParty = mobileParty;
 
-            MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
-            PartyBase party = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
-            Clan clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
+                var factory = container.Resolve<IBinaryPackageFactory>();
+                BanditPartyComponentBinaryPackage package = new BanditPartyComponentBinaryPackage(item, factory);
 
-            mobileParty.StringId = "MyMobileParty";
-            clan.StringId = "myClan";
+                package.Pack();
 
-            party.MobileParty = mobileParty;
-            mobileParty.Party = party;
-            mobileParty._actualClan = clan;
+                byte[] bytes = BinaryPackageSerializer.Serialize(package);
 
-            BanditPartyComponent item = (BanditPartyComponent)FormatterServices.GetUninitializedObject(typeof(BanditPartyComponent));
-            item.Hideout = hideout;
-            item.IsBossParty = true;
-            item.MobileParty = mobileParty;
+                Assert.NotEmpty(bytes);
 
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BanditPartyComponentBinaryPackage package = new BanditPartyComponentBinaryPackage(item, factory);
+                object obj = BinaryPackageSerializer.Deserialize(bytes);
 
-            package.Pack();
+                Assert.IsType<BanditPartyComponentBinaryPackage>(obj);
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+                BanditPartyComponentBinaryPackage returnedPackage = (BanditPartyComponentBinaryPackage)obj;
 
-            Assert.NotEmpty(bytes);
+                var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+                BanditPartyComponent newBanditPartyComponent = returnedPackage.Unpack<BanditPartyComponent>(deserializeFactory);
 
-            object obj = BinaryPackageSerializer.Deserialize(bytes);
-
-            Assert.IsType<BanditPartyComponentBinaryPackage>(obj);
-
-            BanditPartyComponentBinaryPackage returnedPackage = (BanditPartyComponentBinaryPackage)obj;
-
-            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
-            BanditPartyComponent newBanditPartyComponent = returnedPackage.Unpack<BanditPartyComponent>(deserializeFactory);
-
-            Assert.Equal(item.IsBossParty, newBanditPartyComponent.IsBossParty);
-            Assert.NotNull(newBanditPartyComponent.Hideout);
+                Assert.Equal(item.IsBossParty, newBanditPartyComponent.IsBossParty);
+                Assert.Same(hideout, newBanditPartyComponent.Hideout);
+            }
+            finally
+            {
+                campaign._hideouts = previousHideouts;
+            }
         }
     }
 }
