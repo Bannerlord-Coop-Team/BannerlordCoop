@@ -14,6 +14,7 @@ using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -463,6 +464,7 @@ internal class BattleMissionStartHandler : IHandler
                 return;
             }
 
+            InitializePlayerEncounter(battle);
             MissionInitializerRecord rec2 = missionInitializerResolver.Create(battle, randomTerrainSeed, atmosphereOnCampaign);
 
             // Engage the spawn gate BEFORE OpenBattleMission builds the mission — the deployment controller
@@ -503,6 +505,31 @@ internal class BattleMissionStartHandler : IHandler
         {
             UnwindSpawnGateAfterFailedOpen(spawnGateEngaged);
         }
+    }
+
+    internal static void InitializePlayerEncounter(MapEvent battle)
+    {
+        if (PlayerEncounter.Battle == battle)
+            return;
+
+        PlayerEncounter.Start();
+        var encounter = PlayerEncounter.Current;
+        var playerSide = battle.PlayerSide;
+        var opponentSide = playerSide.GetOppositeSide();
+        var opponentParty = playerSide == BattleSideEnum.Attacker
+            ? battle.DefenderSide.LeaderParty
+            : battle.AttackerSide.LeaderParty;
+
+        // The server already assigned map-event membership; restore this client's joined-battle context.
+        encounter._attackerParty = playerSide == BattleSideEnum.Attacker ? PartyBase.MainParty : opponentParty;
+        encounter._defenderParty = playerSide == BattleSideEnum.Defender ? PartyBase.MainParty : opponentParty;
+        encounter._encounteredParty = opponentParty;
+        encounter._mapEvent = battle;
+        encounter.PlayerSide = playerSide;
+        encounter.OpponentSide = opponentSide;
+        encounter.EncounterSettlementAux = battle.MapEventSettlement;
+        encounter.PlayerPartyInitialStrength = PartyBase.MainParty.CalculateCurrentStrength();
+        encounter.IsJoinedBattle = true;
     }
 
     internal static void UnwindSpawnGateAfterFailedOpen(bool spawnGateEngaged)
