@@ -171,6 +171,23 @@ public class MapEventDebugCommands
         deploymentHandler.FinishDeployment();
         return $"deploymentFinished=true; missionMode={mission.Mode}; mainAgent={Agent.Main != null}";
     }
+
+    [CommandLineArgumentFunction("exit_battle", "coop.debug.mapevent")]
+    public static string ExitBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on Player 1.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.exit_battle";
+
+        var mission = Mission.Current;
+        if (mission == null)
+            return "No active battle mission.";
+
+        mission.EndMission();
+        return "battleExitRequested=true";
+    }
 #endif
 
     // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
