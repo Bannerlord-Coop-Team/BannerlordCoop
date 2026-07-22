@@ -39,6 +39,7 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
         lobbyApi.ConnectStringReceived += OnConnectStringReceived;
 
         messageBroker.Subscribe<JoinSteamLobby>(Handle);
+        messageBroker.Subscribe<SessionJoinAbandoned>(Handle);
     }
 
     /// <summary>
@@ -64,6 +65,13 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
         OnLobbyJoinRequested(payload.What.LobbyId);
     }
 
+    private void Handle(MessagePayload<SessionJoinAbandoned> payload)
+    {
+        // Keeping the membership would hold one of the host's lobby slots and make the
+        // next join request for the same lobby a no-op; give it up so retries start fresh.
+        LeaveSessionLobby();
+    }
+
     private void OnConnectStringReceived(string connectString)
     {
         if (!TryParseConnectLobby(connectString, out var lobbyId)) return;
@@ -83,7 +91,19 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
 
     private void BeginLobbyJoin(ulong lobbyId, bool resolveJoinInfo)
     {
-        if (lobbyId == 0 || activeLobbyId == lobbyId) return;
+        if (lobbyId == 0) return;
+
+        if (activeLobbyId == lobbyId)
+        {
+            // Still a member from an earlier attempt whose join never produced a session
+            // (e.g. an abandoned password prompt). The lobby data is readable while a
+            // member, so restart the attempt from the resolve step instead of no-oping.
+            if (resolveJoinInfo)
+            {
+                ResolveJoinInfo(lobbyId);
+            }
+            return;
+        }
 
         // A second JoinLobby would silently unregister the first pending call result.
         if (joinInFlight)
@@ -256,6 +276,7 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
     {
         LeaveSessionLobby();
         messageBroker.Unsubscribe<JoinSteamLobby>(Handle);
+        messageBroker.Unsubscribe<SessionJoinAbandoned>(Handle);
         lobbyApi.LobbyJoinRequested -= OnLobbyJoinRequested;
         lobbyApi.ConnectStringReceived -= OnConnectStringReceived;
     }

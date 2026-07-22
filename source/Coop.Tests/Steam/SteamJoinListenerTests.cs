@@ -108,6 +108,39 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void AbandonedJoin_LeavesLobbyAndAllowsRejoin()
+        {
+            SetupLobby(42);
+            api.RaiseLobbyJoinRequested(42);
+
+            // Canceling the password prompt abandons the attempt without a session.
+            messageBroker.Publish(this, new SessionJoinAbandoned());
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
+
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Equal(2, resolved.Count);
+            Assert.True(listener.IsInLobby);
+            Assert.Empty(failed);
+        }
+
+        [Fact]
+        public void RejoinRequestWhileStillMember_ResolvesAgain()
+        {
+            SetupLobby(42);
+
+            api.RaiseLobbyJoinRequested(42);
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Equal(2, resolved.Count);
+            Assert.Empty(failed);
+            Assert.True(listener.IsInLobby);
+            Assert.DoesNotContain(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
         public void ConnectString_JoinsReferencedLobby()
         {
             SetupLobby(42);
