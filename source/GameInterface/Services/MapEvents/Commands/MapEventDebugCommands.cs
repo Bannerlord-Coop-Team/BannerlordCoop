@@ -12,6 +12,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
 using Serilog;
 using System;
 using System.Collections;
@@ -25,6 +26,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
@@ -46,9 +48,11 @@ public class MapEventDebugCommands
         public string JoiningPlayerPartyId { get; set; }
         public string JoiningPlayerMobilePartyId { get; set; }
         public PartyBehaviorUpdateData JoiningPlayerBehavior { get; set; }
-        public string AiPartyId { get; set; }
-        public string AiMobilePartyId { get; set; }
-        public PartyBehaviorUpdateData AiBehavior { get; set; }
+        public string VillageSettlementId { get; set; }
+        public float VillageSettlementHitPoints { get; set; }
+        public string MilitiaMobilePartyId { get; set; }
+        public PartyBehaviorUpdateData MilitiaBehavior { get; set; }
+        public bool AllowRaidAiIntervention { get; set; }
     }
 
     /// <summary>
@@ -253,7 +257,8 @@ public class MapEventDebugCommands
 
         if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
             !ContainerProvider.TryResolve<INetwork>(out var network) ||
-            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+            !ContainerProvider.TryResolve<RaidAiInterventionConfigHandler>(out var raidConfigHandler))
         {
             return "Unable to resolve the late-join mode fixture services.";
         }
@@ -265,43 +270,57 @@ public class MapEventDebugCommands
         }
 
         var firstPosition = firstParty.Position.ToVec2();
-        MobileParty aiParty = null;
-        PartyBehaviorUpdateData aiBehavior = default;
-        foreach (var candidate in MobileParty.All
-                     .Where(p => p.IsActive && p.IsBandit && p.MapEvent == null &&
-                                 p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0)
-                     .OrderBy(p => p.Position.ToVec2().DistanceSquared(firstPosition)))
-        {
-            if (!behaviorSnapshot.TryCreate(candidate, out aiBehavior)) continue;
+        var firstFaction = firstParty.MapFaction?.MapFaction ?? firstParty.MapFaction;
+        var joiningFaction = joiningParty.MapFaction?.MapFaction ?? joiningParty.MapFaction;
+        var village = Settlement.All
+            .Where(s => s.IsVillage && s.Village.VillageState == Village.VillageStates.Normal &&
+                        s.Party.MapEvent == null && s.MilitiaPartyComponent?.MobileParty?.IsActive == true &&
+                        s.MilitiaPartyComponent.MobileParty.MapEvent == null &&
+                        s.MilitiaPartyComponent.MobileParty.MemberRoster.TotalManCount > 0 &&
+                        VillageHostileFactionStanceHelper.HasWarStance(
+                            firstFaction, s.MapFaction?.MapFaction ?? s.MapFaction) &&
+                        VillageHostileFactionStanceHelper.HasWarStance(
+                            joiningFaction, s.MapFaction?.MapFaction ?? s.MapFaction))
+            .OrderBy(s => s.Position.ToVec2().DistanceSquared(firstPosition))
+            .FirstOrDefault();
 
-            aiParty = candidate;
-            break;
+        if (village == null)
+        {
+            return "No hostile normal village with an active militia party was found for both players.";
         }
 
-        if (aiParty == null)
+        var militiaParty = village.MilitiaPartyComponent.MobileParty;
+        if (!behaviorSnapshot.TryCreate(militiaParty, out var militiaBehavior))
         {
-            return "No active bandit party with restorable movement state was found.";
+            return $"Unable to capture the militia movement state for {village.Name}.";
         }
 
         if (!objectManager.TryGetId(firstParty.Party, out string firstPartyId) ||
             !objectManager.TryGetId(firstParty, out string firstMobilePartyId) ||
             !objectManager.TryGetId(joiningParty.Party, out string joiningPartyId) ||
             !objectManager.TryGetId(joiningParty, out string joiningMobilePartyId) ||
-            !objectManager.TryGetId(aiParty.Party, out string aiPartyId) ||
-            !objectManager.TryGetId(aiParty, out string aiMobilePartyId))
+            !objectManager.TryGetId(village, out string villageSettlementId) ||
+            !objectManager.TryGetId(militiaParty, out string militiaMobilePartyId))
         {
             return "Unable to resolve fixture party ids.";
         }
 
-        var mapEvent = MapEventBattleFactory.CreateMapEvent(aiParty.Party, firstParty.Party, default);
+        var originalVillageHitPoints = village.SettlementHitPoints;
+        var originalAllowRaidAiIntervention = MapEventConfig.AllowRaidAiIntervention;
+        raidConfigHandler.SetAndBroadcast(true);
+        var mapEvent = MapEventBattleFactory.CreateMapEvent(firstParty.Party, village.Party, default);
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out string mapEventId))
         {
-            if (mapEvent != null)
-                firstParty.Party.MapEventSide = null;
+            if (mapEvent != null && !mapEvent.IsFinalized)
+                mapEvent.FinalizeEvent();
 
             RestorePartyBehavior(firstParty, firstPlayerBehavior, behaviorSnapshot);
             RestorePartyBehavior(joiningParty, joiningPlayerBehavior, behaviorSnapshot);
-            RestorePartyBehavior(aiParty, aiBehavior, behaviorSnapshot);
+            RestorePartyBehavior(militiaParty, militiaBehavior, behaviorSnapshot);
+            if (village.Village.VillageState != Village.VillageStates.Normal)
+                ChangeVillageStateAction.ApplyBySettingToNormal(village);
+            village.SettlementHitPoints = originalVillageHitPoints;
+            raidConfigHandler.SetAndBroadcast(originalAllowRaidAiIntervention);
             return "Unable to create or resolve the fixture map event.";
         }
 
@@ -314,10 +333,23 @@ public class MapEventDebugCommands
             JoiningPlayerPartyId = joiningPartyId,
             JoiningPlayerMobilePartyId = joiningMobilePartyId,
             JoiningPlayerBehavior = joiningPlayerBehavior,
-            AiPartyId = aiPartyId,
-            AiMobilePartyId = aiMobilePartyId,
-            AiBehavior = aiBehavior,
+            VillageSettlementId = villageSettlementId,
+            VillageSettlementHitPoints = originalVillageHitPoints,
+            MilitiaMobilePartyId = militiaMobilePartyId,
+            MilitiaBehavior = militiaBehavior,
+            AllowRaidAiIntervention = originalAllowRaidAiIntervention,
         };
+
+        var hasVillageMilitiaResistance = mapEvent.EventType == MapEvent.BattleTypes.Raid &&
+                                           mapEvent.MapEventSettlement == village &&
+                                           mapEvent.DefenderSide?.Parties.Any(
+                                               p => p.Party == militiaParty.Party) == true &&
+                                           !mapEvent.IsActiveSlowVillageRaid();
+        if (!hasVillageMilitiaResistance)
+        {
+            CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
+            return $"Village raid fixture {mapEventId} did not create active militia resistance.";
+        }
 
         if (!ServerBattleModeArbiter.TryClaimMission(mapEventId))
         {
@@ -330,7 +362,7 @@ public class MapEventDebugCommands
         messageBroker.Publish(joiningPeer, new NetworkRequestJoinBattle(
             mapEventId,
             joiningPartyId,
-            BattleSideEnum.Defender));
+            BattleSideEnum.Attacker));
 
         if (joiningParty.MapEvent != mapEvent)
         {
@@ -338,8 +370,9 @@ public class MapEventDebugCommands
             return $"Player {args[1]} did not join fixture map event {mapEventId}.";
         }
 
-        return $"Late-join mode fixture active: mapEvent={mapEventId}, firstPlayer={args[0]}, " +
-               $"joiningPlayer={args[1]}, aiParty={aiParty.StringId}, mode=Mission.";
+        return $"Late-join raid fixture active: mapEvent={mapEventId}, eventType={mapEvent.EventType}, " +
+               $"village={village.Name} ({village.StringId}), militiaParty={militiaParty.Name}, " +
+               $"firstPlayer={args[0]}, joiningPlayer={args[1]}, side=Attacker, mode=Mission.";
     }
 
     // coop.debug.mapevent.late_join_mode_state PlayerTwo
@@ -361,6 +394,11 @@ public class MapEventDebugCommands
         var mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out string resolvedId)
             ? resolvedId
             : "none";
+        var eventType = mapEvent?.EventType.ToString() ?? "none";
+        var village = mapEvent?.MapEventSettlement;
+        var villageName = village != null ? $"{village.Name} ({village.StringId})" : "none";
+        var militiaResistance = mapEvent?.DefenderSide?.Parties.Any(
+            p => p.Party?.MobileParty?.IsMilitia == true) == true;
         var side = playerParty.MapEventSide?.MissionSide.ToString() ?? "none";
         var mode = "Unclaimed";
         if (mapEventId != "none")
@@ -373,11 +411,12 @@ public class MapEventDebugCommands
                 mode = BattleStartMode.Simulation.ToString();
         }
 
-        return $"Late-join mode state: controller={args[0]}, mapEvent={mapEventId}, side={side}, mode={mode}.";
+        return $"Late-join mode state: controller={args[0]}, mapEvent={mapEventId}, eventType={eventType}, " +
+               $"village={villageName}, militiaResistance={militiaResistance}, side={side}, mode={mode}.";
     }
 
     // coop.debug.mapevent.late_join_mode_cleanup
-    /// <summary>Removes the fixture battle and restores the selected AI party's original movement state.</summary>
+    /// <summary>Removes the fixture raid and restores the village, militia, parties, and raid config.</summary>
     [CommandLineArgumentFunction("late_join_mode_cleanup", "coop.debug.mapevent")]
     public static string CleanupLateJoinModeFixture(List<string> args)
     {
@@ -406,8 +445,8 @@ public class MapEventDebugCommands
         var mapEventId = lateJoinModeFixture.MapEventId;
         var restored = CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
         return restored
-            ? $"Late-join mode fixture {mapEventId} cleaned up and AI movement restored."
-            : $"Late-join mode fixture {mapEventId} cleaned up, but AI movement could not be fully restored.";
+            ? $"Late-join raid fixture {mapEventId} cleaned up and village raid state restored."
+            : $"Late-join raid fixture {mapEventId} cleaned up, but its original state could not be fully restored.";
     }
 
     private static bool CleanupLateJoinModeFixture(
@@ -420,7 +459,8 @@ public class MapEventDebugCommands
 
         messageBroker.Publish(typeof(MapEventDebugCommands), new NetworkRequestLeaveBattle(fixture.JoiningPlayerPartyId));
         messageBroker.Publish(typeof(MapEventDebugCommands), new NetworkRequestLeaveBattle(fixture.FirstPlayerPartyId));
-        messageBroker.Publish(typeof(MapEventDebugCommands), new NetworkRequestLeaveBattle(fixture.AiPartyId));
+        if (objectManager.TryGetObject<MapEvent>(fixture.MapEventId, out var mapEvent) && !mapEvent.IsFinalized)
+            mapEvent.FinalizeEvent();
         ServerBattleModeArbiter.Release(fixture.MapEventId);
 
         var restored = RestorePartyBehavior(
@@ -434,13 +474,42 @@ public class MapEventDebugCommands
             behaviorSnapshot,
             objectManager) && restored;
         restored = RestorePartyBehavior(
-            fixture.AiMobilePartyId,
-            fixture.AiBehavior,
+            fixture.MilitiaMobilePartyId,
+            fixture.MilitiaBehavior,
             behaviorSnapshot,
             objectManager) && restored;
+        restored = RestoreVillage(
+            fixture.VillageSettlementId,
+            fixture.VillageSettlementHitPoints,
+            objectManager) && restored;
+
+        if (ContainerProvider.TryResolve<RaidAiInterventionConfigHandler>(out var raidConfigHandler))
+        {
+            MapEventConfig.AllowRaidAiIntervention = fixture.AllowRaidAiIntervention;
+            raidConfigHandler.SetAndBroadcast(fixture.AllowRaidAiIntervention);
+        }
+        else
+        {
+            restored = false;
+        }
 
         lateJoinModeFixture = null;
         return restored;
+    }
+
+    private static bool RestoreVillage(
+        string settlementId,
+        float settlementHitPoints,
+        IObjectManager objectManager)
+    {
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementId, out var settlement))
+            return false;
+
+        if (settlement.Village.VillageState != Village.VillageStates.Normal)
+            ChangeVillageStateAction.ApplyBySettingToNormal(settlement);
+        settlement.SettlementHitPoints = settlementHitPoints;
+        return settlement.Village.VillageState == Village.VillageStates.Normal &&
+               settlement.SettlementHitPoints == settlementHitPoints;
     }
 
     private static bool RestorePartyBehavior(
