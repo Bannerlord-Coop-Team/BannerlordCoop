@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.PacketHandlers;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network.Packets;
@@ -47,9 +47,6 @@ public class CampaignTimePacketHandler : IPacketHandler
         var timePacket = (CampaignTimePacket)packet;
         UpdateOneWayLatencyEstimate(peer);
         mapTimeTrackerInterface.SyncCampaignTime(timePacket.ServerTicks, oneWayLatencySeconds);
-        messageBroker.Publish(
-            this,
-            new CampaignTimeSampleReceived(timePacket.JoinPacketsRemaining));
     }
 
     private void Handle_NetworkConnected(MessagePayload<NetworkConnected> obj)
