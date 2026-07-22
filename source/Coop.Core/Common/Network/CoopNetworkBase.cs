@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
@@ -26,25 +25,20 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     protected readonly ICommonSerializer serializer;
 
     private readonly Poller poller;
-    private readonly CancellationTokenSource sessionCancellation;
-    private int pollerStarted;
 
     // Profiles outbound packets; dumps per-type counts and byte totals every 10 seconds (server only).
     private readonly PacketProfiler packetProfiler = new PacketProfiler(TimeSpan.FromSeconds(10));
 
-    // Guard against repeated container and explicit disposal.
-    private int disposed;
+    private CancellationTokenSource CancellationTokenSource;
+    // Guard against double-dispose: finalizer calls Dispose() after explicit Dispose() on reconnect
+    private bool _disposed = false;
 
     protected readonly NetManager netManager;
 
-    protected CoopNetworkBase(
-        INetworkConfig configuration,
-        ICommonSerializer serializer,
-        CancellationTokenSource sessionCancellation)
+    protected CoopNetworkBase(INetworkConfig configuration, ICommonSerializer serializer)
     {
         Config = configuration;
         this.serializer = serializer;
-        this.sessionCancellation = sessionCancellation;
 
         netManager = new NetManager(this)
         {
@@ -63,49 +57,31 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         // surface it (plus ping) in every profile dump to make congestion visible in the log.
         packetProfiler.ExtraStatsProvider = DescribePeerQueues;
 
-        poller = new Poller(UpdateWithinSession, Config.NetworkPollInterval);
+        CancellationTokenSource = new CancellationTokenSource();
+        poller = new Poller(Update, Config.NetworkPollInterval);
+        poller.Start();
     }
 
-    private void UpdateWithinSession(TimeSpan frameTime)
+    ~CoopNetworkBase()
     {
-        using (GameThread.ActivateCancellation(sessionCancellation.Token))
-        {
-            if (sessionCancellation.IsCancellationRequested) return;
-
-            try
-            {
-                Update(frameTime);
-            }
-            catch (OperationCanceledException) when (sessionCancellation.IsCancellationRequested)
-            {
-                // Teardown woke a blocking game-thread marshal in this callback.
-            }
-        }
-    }
-
-    protected void StartNetworkPoller()
-    {
-        if (Interlocked.CompareExchange(ref pollerStarted, 1, 0) == 0)
-        {
-            poller.Start();
-        }
+        Dispose();
     }
 
     public virtual void Dispose()
     {
-        if (Volatile.Read(ref disposed) != 0) return;
-        if (poller.IsPollingThread)
-        {
-            throw new InvalidOperationException(
-                "The network must be disposed after its poll callback returns.");
-        }
-        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        // Prevent ObjectDisposedException if GC finalizer runs after explicit Dispose on reconnect
+        if (_disposed) return;
+        _disposed = true;
 
-        // Wake blocking game-thread marshals before waiting for the poll callback to return.
-        sessionCancellation.Cancel();
-        poller.StopAndWait(Timeout.InfiniteTimeSpan);
-        packetProfiler.Dispose();
         netManager.Stop();
+
+        packetProfiler.Dispose();
+
+        CancellationTokenSource.Cancel();
+        CancellationTokenSource.Dispose();
+
+        // Tell GC not to run the finalizer — Dispose() already cleaned up, avoids double-call
+        GC.SuppressFinalize(this);
     }
 
     public virtual void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)
@@ -134,19 +110,15 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     }
 
     /// <summary>
-    /// Sends a packet straight to the peer, bypassing any per-peer send gating. Queued replay
-    /// <see cref="MessagePacket"/>s retain normal aggregation; non-message packets such as the
-    /// transfer save are sent directly.
+    /// Sends straight to the peer, bypassing any per-peer send gating (the server's connection queue)
+    /// and message aggregation. For connection-level traffic that must reach a peer regardless of its
+    /// load state — the transfer save and the join handshake — and for the queue's own replay.
     /// </summary>
     public void SendImmediate(NetPeer netPeer, IPacket packet)
     {
-        SendInternal(netPeer, packet);
+        SendInternal(netPeer, packet, immediate: true);
     }
 
-    /// <summary>
-    /// Sends connection-level message traffic straight to the peer and flushes any earlier aggregated
-    /// replay first, so handshake messages remain exact reliable-ordered barriers.
-    /// </summary>
     public void SendImmediate(NetPeer netPeer, IMessage message)
     {
         SendInternal(netPeer, MessagePacket.Create(message, serializer), immediate: true);
@@ -160,11 +132,9 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
         return "peer queues: " + string.Join(", ", peers.Select(peer =>
         {
-            var worldQueued = peer.GetPacketsCountInReliableQueue(0, true) +
-                              peer.GetPacketsCountInReliableQueue(0, false);
-            var bulkQueued = peer.GetPacketsCountInReliableQueue(BulkChannel, true) +
-                             peer.GetPacketsCountInReliableQueue(BulkChannel, false);
-            return $"{peer.Id}@{peer.Address} worldQueue={worldQueued} bulkQueue={bulkQueued} ping={peer.Ping}ms";
+            var queued = peer.GetPacketsCountInReliableQueue(0, true) +
+                         peer.GetPacketsCountInReliableQueue(0, false);
+            return $"{peer.Id}@{peer.Address} queue={queued} ping={peer.Ping}ms";
         }));
     }
 
@@ -223,7 +193,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     /// </summary>
     public const byte BulkChannel = 1;
 
-    private static byte GetChannel(IPacket packet) => packet is GameSaveDataPacket or GameSaveDataChunkPacket ? BulkChannel : (byte)0;
+    private static byte GetChannel(IPacket packet) => packet is GameSaveDataPacket ? BulkChannel : (byte)0;
 
     #region Message aggregation
 

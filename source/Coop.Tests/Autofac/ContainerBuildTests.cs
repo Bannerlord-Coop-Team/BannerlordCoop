@@ -18,7 +18,7 @@ namespace Coop.Tests.Autofac
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ClientModule>();
             builder.RegisterModule<GameInterfaceModule>();
-            using var container = builder.Build();
+            var container = builder.Build();
 
             Assert.NotNull(container);
 
@@ -35,7 +35,7 @@ namespace Coop.Tests.Autofac
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
-            using var container = builder.Build();
+            var container = builder.Build();
 
             Assert.NotNull(container);
 
