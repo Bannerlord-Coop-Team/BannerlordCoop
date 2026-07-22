@@ -49,11 +49,29 @@ internal class DisableManagingOtherOptionsOnClients
 }
 
 [HarmonyPatch(typeof(GenericOptionDataVM))]
-internal class DisableResetToDefaultOnClients
+internal class DisableResetToDefaultGenericOptionsOnClients
 {
     [HarmonyPatch(nameof(GenericOptionDataVM.ResetToDefault))]
     [HarmonyPrefix]
     public static bool ResetToDefaultPrefix(GenericOptionDataVM __instance)
+    {
+        var optionType = __instance.Option.GetOptionType();
+
+        if (ModInformation.IsClient && optionType is ManagedOptions.ManagedOptionsType.PlayerReceivedDamageDifficulty)
+        {
+            return false;
+        }
+
+        return true;
+    }
+}
+
+[HarmonyPatch(typeof(StringOptionDataVM))]
+internal class DisableResetToDefaultStringOptionsOnClients
+{
+    [HarmonyPatch(nameof(StringOptionDataVM.ResetData))]
+    [HarmonyPrefix]
+    public static bool ResetDataPrefix(StringOptionDataVM __instance)
     {
         var optionType = __instance.Option.GetOptionType();
 
