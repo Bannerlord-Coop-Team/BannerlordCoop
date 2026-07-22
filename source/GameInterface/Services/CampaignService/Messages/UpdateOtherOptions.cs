@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.CampaignService.Data;
 using ProtoBuf;
 
 namespace GameInterface.Services.CampaignService.Messages;
@@ -9,11 +10,10 @@ public readonly struct UpdateOtherOptions : IEvent { }
 internal readonly struct NetworkUpdateOtherOptions : ICommand
 {
     [ProtoMember(1)]
-    public readonly int PlayerReceivedDamageDifficulty;
+    public readonly ServerOptions ServerOptions;
 
-    public NetworkUpdateOtherOptions(
-        int playerReceivedDamageDifficulty)
+    public NetworkUpdateOtherOptions(ServerOptions serverOptions)
     {
-        PlayerReceivedDamageDifficulty = playerReceivedDamageDifficulty;
+        ServerOptions = serverOptions;
     }
 }

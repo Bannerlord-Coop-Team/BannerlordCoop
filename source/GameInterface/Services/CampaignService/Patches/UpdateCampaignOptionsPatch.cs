@@ -4,6 +4,7 @@ using GameInterface.Services.CampaignService.Messages;
 using HarmonyLib;
 using SandBox.View.Map;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.ViewModelCollection.GameOptions;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
@@ -24,12 +25,12 @@ internal class UpdateCampaignOptionsPatch
     }
 }
 
-[HarmonyPatch(typeof(ManagedOptions))]
-internal class UpdateOtherOptionsPatch
+[HarmonyPatch(typeof(OptionsVM))]
+internal class ApplyChangedOptionsPatch
 {
-    [HarmonyPatch(nameof(ManagedOptions.SetConfig))]
+    [HarmonyPatch(nameof(OptionsVM.ApplyChangedOptions))]
     [HarmonyPostfix]
-    public static void SetConfigPostfix()
+    public static void ApplyChangedOptionsPostfix()
     {
         if (ModInformation.IsClient) return;
 
