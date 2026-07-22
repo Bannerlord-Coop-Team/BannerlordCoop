@@ -80,7 +80,7 @@ public class BattleCompletionTrackerTests
     }
 
     [Fact]
-    public void MemberEnteringResolvedBattle_AcceptsCurrentHostResult()
+    public void MemberEnteringResolvedBattle_MustReportResult()
     {
         var tracker = new BattleCompletionTracker();
 
@@ -95,47 +95,13 @@ public class BattleCompletionTrackerTests
             out _,
             canConclude: false));
 
-        Assert.True(tracker.TryAcceptAuthoritativeResultForMember(
-            "battle",
-            "joiner",
-            new[] { "host", "joiner" },
-            "host",
-            1,
-            out var state));
+        Assert.False(tracker.TryReconcile(
+            "battle", new[] { "host", "joiner" }, "host", 1, out _));
+
+        Assert.True(tracker.TryRecordResult(
+            "battle", "joiner", BattleState.DefenderVictory, 1,
+            new[] { "host", "joiner" }, "host", 1, out var state));
         Assert.Equal(BattleState.DefenderVictory, state);
-    }
-
-    [Fact]
-    public void MemberEnteringResolvedBattle_WaitsForOtherPendingJoiners()
-    {
-        var tracker = new BattleCompletionTracker();
-
-        Assert.False(tracker.TryRecordResult(
-            "battle",
-            "host",
-            BattleState.AttackerVictory,
-            1,
-            new[] { "host" },
-            "host",
-            1,
-            out _,
-            canConclude: false));
-        Assert.False(tracker.TryAcceptAuthoritativeResultForMember(
-            "battle",
-            "first-joiner",
-            new[] { "host", "first-joiner" },
-            "host",
-            1,
-            out _,
-            canConclude: false));
-
-        Assert.True(tracker.TryReconcile(
-            "battle",
-            new[] { "host", "first-joiner" },
-            "host",
-            1,
-            out var state));
-        Assert.Equal(BattleState.AttackerVictory, state);
     }
 
     [Fact]

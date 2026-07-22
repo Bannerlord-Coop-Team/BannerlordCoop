@@ -259,24 +259,7 @@ public class ServerBattleCompletionHandler : IHandler
                 entry.ControllerId,
                 entry.IsFirstMember);
             RemovePendingJoiner(entry.InstanceId, entry.ControllerId, Guid.Empty);
-
-            if (entry.IsFirstMember ||
-                !missionManager.TryGetControllers(entry.InstanceId, out var currentMembers) ||
-                !hostRegistry.TryGet(entry.InstanceId, out var assignment) ||
-                !completionTracker.TryAcceptAuthoritativeResultForMember(
-                    entry.InstanceId,
-                    entry.ControllerId,
-                    currentMembers,
-                    assignment.HostControllerId,
-                    assignment.Epoch,
-                    out var concludedState,
-                    canConclude: !HasPendingJoiners(entry.InstanceId)) ||
-                !missionManager.TryBeginActiveInstanceConclusion(entry.InstanceId, currentMembers))
-            {
-                return;
-            }
-
-            PublishConclusion(entry.InstanceId, currentMembers.Count, concludedState, assignment.Epoch);
+            // Keep campaign objects alive until the entrant's loaded mission reports its own result.
         });
     }
 
