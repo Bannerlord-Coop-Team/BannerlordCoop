@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -21,6 +22,8 @@ namespace Coop.Core.Server.Services.Instances.Commands;
 
 public static class SlowRaidMissionDebugCommands
 {
+    private static readonly Dictionary<string, RaidFixture> activeFixtures = new();
+
     [CommandLineArgumentFunction("opposing_raid_setup", "coop.debug.mapevent")]
     public static string Setup(List<string> args)
     {
@@ -44,31 +47,51 @@ public static class SlowRaidMissionDebugCommands
                 out var raider, out error))
             return error;
 
-        raider.Position = settlement.GatePosition;
-        raider.SetMoveModeHold();
-        StartBattleAction.ApplyStartRaid(raider, settlement);
+        var defenderRoster = settlement.Party.MemberRoster;
+        var defenderSnapshot = defenderRoster.GetTroopRoster().ToArray();
 
-        var mapEvent = settlement.Party.MapEvent;
-        if (mapEvent == null || !ReferenceEquals(raider.MapEvent, mapEvent) || !mapEvent.IsActiveSlowVillageRaid())
+        // An unopposed village is required until the player joins the raid as its defender.
+        defenderRoster.Clear();
+
+        MapEvent mapEvent = null;
+        try
+        {
+            raider.Position = settlement.GatePosition;
+            raider.SetMoveModeHold();
+            StartBattleAction.ApplyStartRaid(raider, settlement);
+
+            mapEvent = settlement.Party.MapEvent;
+            if (mapEvent == null || !ReferenceEquals(raider.MapEvent, mapEvent) || !mapEvent.IsActiveSlowVillageRaid())
+            {
+                mapEvent?.FinalizeEvent();
+                RestoreDefenders(settlement, defenderSnapshot);
+                return "Unable to create an active slow raid with the selected AI lord.";
+            }
+
+            if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId) ||
+                !objectManager.TryGetIdWithLogging(raider, out var raiderId))
+            {
+                mapEvent.FinalizeEvent();
+                RestoreDefenders(settlement, defenderSnapshot);
+                return "Created raid objects were not registered.";
+            }
+
+            activeFixtures[mapEventId] = new RaidFixture(settlement, defenderSnapshot);
+
+            playerParty.Position = settlement.GatePosition + new Vec2(1.5f, 0f);
+            playerParty.SetMoveModeHold();
+
+            return $"created=true; controller={args[0]}; settlement={args[1]}; mapEvent={mapEventId}; " +
+                   $"raider={raiderId}; raiderStringId={raider.StringId}; activeSlow=true; instanceOccupied=false; " +
+                   $"hitPoints={Format(settlement.SettlementHitPoints)}; defendersStaged={defenderSnapshot.Sum(element => element.Number)}; " +
+                   $"next=On Player 1 attack {raider.StringId} at {settlement.StringId} and open the deployment screen.";
+        }
+        catch
         {
             mapEvent?.FinalizeEvent();
-            return "Unable to create an active slow raid with the selected AI lord.";
+            RestoreDefenders(settlement, defenderSnapshot);
+            throw;
         }
-
-        if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId) ||
-            !objectManager.TryGetIdWithLogging(raider, out var raiderId))
-        {
-            mapEvent.FinalizeEvent();
-            return "Created raid objects were not registered.";
-        }
-
-        playerParty.Position = settlement.GatePosition + new Vec2(1.5f, 0f);
-        playerParty.SetMoveModeHold();
-
-        return $"created=true; controller={args[0]}; settlement={args[1]}; mapEvent={mapEventId}; " +
-               $"raider={raiderId}; raiderStringId={raider.StringId}; activeSlow=true; instanceOccupied=false; " +
-               $"hitPoints={Format(settlement.SettlementHitPoints)}; " +
-               $"next=On Player 1 attack {raider.StringId} at {settlement.StringId} and open the deployment screen.";
     }
 
     [CommandLineArgumentFunction("opposing_raid_state", "coop.debug.mapevent")]
@@ -107,16 +130,33 @@ public static class SlowRaidMissionDebugCommands
         if (args.Count != 1)
             return "Usage: coop.debug.mapevent.opposing_raid_cleanup <mapEventId>";
 
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !objectManager.TryGetObjectWithLogging<MapEvent>(args[0], out var mapEvent))
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve opposing raid fixture services.";
+
+        activeFixtures.TryGetValue(args[0], out var fixture);
+        objectManager.TryGetObject(args[0], out MapEvent mapEvent);
+
+        if (mapEvent == null && fixture == null)
             return $"Unable to resolve map event {args[0]}.";
 
         if (ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var membershipRegistry) &&
             membershipRegistry.IsInstanceOccupied(args[0]))
             return "Exit the battle mission before cleaning up the raid.";
 
-        mapEvent.FinalizeEvent();
-        return $"cleaned=true; mapEvent={args[0]}";
+        try
+        {
+            mapEvent?.FinalizeEvent();
+        }
+        finally
+        {
+            if (fixture != null)
+            {
+                RestoreDefenders(fixture.Settlement, fixture.DefenderRoster);
+                activeFixtures.Remove(args[0]);
+            }
+        }
+
+        return $"cleaned=true; mapEvent={args[0]}; defendersRestored={fixture != null}";
     }
 
     [CommandLineArgumentFunction("opposing_raid_camera", "coop.debug.mapevent")]
@@ -220,5 +260,25 @@ public static class SlowRaidMissionDebugCommands
     }
 
     private static string Format(float value) => value.ToString("R", CultureInfo.InvariantCulture);
+
+    private static void RestoreDefenders(Settlement settlement, IReadOnlyList<TroopRosterElement> defenderRoster)
+    {
+        var roster = settlement.Party.MemberRoster;
+        roster.Clear();
+        foreach (var element in defenderRoster)
+            roster.Add(element);
+    }
+
+    private sealed class RaidFixture
+    {
+        public Settlement Settlement { get; }
+        public IReadOnlyList<TroopRosterElement> DefenderRoster { get; }
+
+        public RaidFixture(Settlement settlement, IReadOnlyList<TroopRosterElement> defenderRoster)
+        {
+            Settlement = settlement;
+            DefenderRoster = defenderRoster;
+        }
+    }
 }
 #endif
