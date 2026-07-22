@@ -5,6 +5,7 @@ using HarmonyLib;
 using SandBox.View.Map.Visuals;
 using Serilog;
 using System.Collections.Concurrent;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
