@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Util;
 using Serilog;
 using System;
@@ -253,17 +253,22 @@ public class GameThread : IUpdateable
         [CallerMemberName] string callerMember = null)
     {
         string label = context ?? BuildLabel(callerFile, callerMember);
-        Run(() =>
+        Run(WrapSafe(action, context), blocking, label);
+    }
+
+    /// <summary>
+    /// Queues an action for a later <see cref="Update"/> even when called from the game-loop thread.
+    /// Use this when running inline would mutate state currently being iterated by the engine.
+    /// </summary>
+    public static void EnqueueSafe(Action action, string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
+    {
+        string label = context ?? BuildLabel(callerFile, callerMember);
+        lock (Instance.m_QueueLock)
         {
-            try
-            {
-                action();
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
-            }
-        }, blocking, label);
+            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label));
+        }
     }
 
     /// <summary>
@@ -349,6 +354,18 @@ public class GameThread : IUpdateable
         }
         return $"{Path.GetFileNameWithoutExtension(callerFile)}.{callerMember}";
     }
+
+    private static Action WrapSafe(Action action, string context) => () =>
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
+        }
+    };
 
     public void MarkGameThread()
     {

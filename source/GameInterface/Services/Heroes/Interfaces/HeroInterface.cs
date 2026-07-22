@@ -137,15 +137,17 @@ internal class HeroInterface : IHeroInterface
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
         }
 
-        if (playerParty.CurrentSettlement != null)
+        if (playerParty.CurrentSettlement != null || playerParty.BesiegerCamp != null)
         {
             // Queued so it runs after the campaign state is entered; the headless server's save
-            // carries no player encounter or menu state for this hero.
+            // carries no player encounter, menu, or player-siege state for this hero. Covers both
+            // a party reloaded inside a settlement and one besieging a settlement, which would
+            // otherwise sit at the siege camp with no menu (soft lock).
             GameThread.RunSafe(() =>
             {
                 if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
                 {
-                    siegeEventInterface.RestoreReloadedPlayerInSettlement();
+                    siegeEventInterface.RestoreReloadedPlayer();
                 }
             });
         }

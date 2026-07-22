@@ -1,9 +1,11 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
+using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -32,6 +34,7 @@ public class BattleDeploymentTimeLimitWiringTests
     // preserving the intent of the pre-existing cases); flip to false to emulate the limit expiring while
     // reserves are still inside the spawn handler's hold.
     private bool teamSetupOver = true;
+    private readonly Queue<Action> deferredActions = new();
 
     private int nativeFinishInvocations; // every seam call, including the no-op retries while teams aren't set up
     private int nativeFinishCommits;     // seam calls that actually committed the deployment (reported Finished)
@@ -46,10 +49,18 @@ public class BattleDeploymentTimeLimitWiringTests
             messageBroker.Object,
             session.Object,
             new BattleDeploymentTimer(Limit),
-            FakeNativeFinish);
+            FakeNativeFinish,
+            deferredActions.Enqueue);
     }
 
     private void AsHost() => session.SetupGet(s => s.IsLocalHost).Returns(true);
+
+    private void TickAndRunDeferredFinish(float dt)
+    {
+        sut.Tick(dt);
+        if (deferredActions.Count > 0)
+            deferredActions.Dequeue()();
+    }
 
     // Emulates the native FinishDeployment seam. When the teams are set up it runs the fan-out reaching
     // CoopBattleController.OnDeploymentFinished (calling OnLocalDeploymentFinished() and revealing the withheld
@@ -75,7 +86,7 @@ public class BattleDeploymentTimeLimitWiringTests
         AsHost();
         sut.OnMissionReady();
 
-        sut.Tick(Limit);
+        TickAndRunDeferredFinish(Limit);
 
         Assert.Equal(1, nativeFinishInvocations);
         // The mesh announce goes out — the same NetworkBattleDeploymentFinished a manual finish sends, so
@@ -96,7 +107,7 @@ public class BattleDeploymentTimeLimitWiringTests
         // finish from ANY client — BR-024) and reveals its own troops (BR-023); it activates nothing itself.
         sut.OnMissionReady();
 
-        sut.Tick(Limit);
+        TickAndRunDeferredFinish(Limit);
 
         Assert.Equal(1, nativeFinishInvocations);
         network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Once);
@@ -122,7 +133,7 @@ public class BattleDeploymentTimeLimitWiringTests
 
     [Fact]
     [Trait("Requirement", "BR-025")]
-    public void Expiry_FiresAtMostOnce_AcrossFurtherTicks()
+    public void Expiry_DefersAndQueuesAtMostOneFinish_AcrossFurtherTicks()
     {
         sut.OnMissionReady();
 
@@ -130,7 +141,27 @@ public class BattleDeploymentTimeLimitWiringTests
         sut.Tick(Limit);
         sut.Tick(Limit);
 
+        Assert.Equal(0, nativeFinishInvocations);
+        Assert.Single(deferredActions);
+
+        deferredActions.Dequeue()();
+
         Assert.Equal(1, nativeFinishInvocations);
+        network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-025")]
+    public void ManualFinishWhileAutoFinishIsQueued_CancelsTheDeferredFinish()
+    {
+        sut.OnMissionReady();
+        sut.Tick(Limit);
+        Assert.Single(deferredActions);
+
+        Assert.True(sut.OnLocalDeploymentFinished());
+        deferredActions.Dequeue()();
+
+        Assert.Equal(0, nativeFinishInvocations);
         network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Once);
     }
 
@@ -140,7 +171,7 @@ public class BattleDeploymentTimeLimitWiringTests
     {
         AsHost();
         sut.OnMissionReady();
-        sut.Tick(Limit);
+        TickAndRunDeferredFinish(Limit);
         Assert.Equal(1, revealRequests);
 
         // A stray manual finish landing after the auto-finish (e.g. an in-flight button click): the
@@ -179,13 +210,13 @@ public class BattleDeploymentTimeLimitWiringTests
         sut.OnMissionReady();
 
         teamSetupOver = false;
-        sut.Tick(Limit); // limit reached, but reserves still spawning → Retry (no-op)
-        sut.Tick(1f);    // still spawning → Retry (no-op)
+        TickAndRunDeferredFinish(Limit); // limit reached, but reserves still spawning → Retry (no-op)
+        TickAndRunDeferredFinish(1f);    // still spawning → Retry (no-op)
         Assert.Equal(0, nativeFinishCommits);
         network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Never);
 
         teamSetupOver = true; // the spawn hold elapsed; the teams are set up
-        sut.Tick(1f);         // now the finish commits through the same path as a manual Start Battle
+        TickAndRunDeferredFinish(1f); // now the finish commits through the same path as a manual Start Battle
         Assert.Equal(1, nativeFinishCommits);
         network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Once);
         network.Verify(n => n.SendAll(It.IsAny<NetworkBattleActivated>()), Times.Once);

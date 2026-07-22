@@ -2,6 +2,7 @@
 using Common;
 using Common.Logging;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
@@ -40,6 +41,47 @@ public class MapEventDebugCommands
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out objectManager);
+    }
+
+    /// <summary>
+    /// Starts the current battle through the normal client/server mission-start gate.
+    /// </summary>
+    [CommandLineArgumentFunction("start_attack_mission", "coop.debug.mapevent")]
+    public static string StartAttackMission(List<string> args)
+    {
+        if (ModInformation.IsServer)
+        {
+            return "Run this command on a client";
+        }
+
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.mapevent.start_attack_mission";
+        }
+
+        var mainParty = MobileParty.MainParty;
+        var mapEvent = mainParty?.MapEvent;
+        if (mapEvent == null)
+        {
+            return "The main party has no replicated map event";
+        }
+
+        if (!TryGetObjectManager(out var objectManager)
+            || !objectManager.TryGetId(mapEvent, out var mapEventId)
+            || !objectManager.TryGetId(mainParty, out var partyId))
+        {
+            return "Unable to resolve the current battle ids";
+        }
+
+        var coordinator = BattleStartCoordinator.Instance;
+        if (coordinator == null)
+        {
+            return "Battle start coordinator is unavailable";
+        }
+
+        return coordinator.RequestBlocking(BattleStartMode.Mission, mapEventId, partyId)
+            ? $"Starting attack mission for {mapEventId}"
+            : $"Server rejected attack mission for {mapEventId}";
     }
 
     // coop.debug.mapevent.start_looter

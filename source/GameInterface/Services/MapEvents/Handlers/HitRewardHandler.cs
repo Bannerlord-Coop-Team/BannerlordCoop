@@ -228,7 +228,7 @@ public class HitRewardHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            Mission mission = Mission.Current;
+            var mission = Mission.Current;
             if (mission == null) return;
 
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
@@ -241,7 +241,7 @@ public class HitRewardHandler : IHandler
             BattleObserverMissionLogic battleObserverMissionLogic = mission.GetMissionBehavior<BattleObserverMissionLogic>();
             if ((battleObserverMissionLogic?.BattleObserver) == null) return;
 
-            TroopUpgradeTracker troopUpgradeTracker = MapEvent.PlayerMapEvent.TroopUpgradeTracker;
+            TroopUpgradeTracker troopUpgradeTracker = mapEvent.TroopUpgradeTracker;
             if (affectorCharacter.IsHero)
             {
                 Hero heroObject = affectorCharacter.HeroObject;

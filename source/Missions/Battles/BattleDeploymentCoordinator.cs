@@ -82,10 +82,12 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     // the timer only disarms on a terminal outcome — see BR-025 retry semantics in Tick.
     private readonly IBattleDeploymentTimer deploymentTimer;
     private readonly Func<DeploymentAutoFinishResult> finishNativeDeployment;
+    private readonly Action<Action> enqueueDeferred;
 
     // BR-025: logged once when the limit first expires, so the per-tick retry loop (while reserves are still
     // spawning) does not spam the log until the finish actually commits.
     private bool autoFinishRequested;
+    private bool autoFinishPending;
 
     // Requirement #4 "hidden everywhere until deployed": own-party spawns are withheld from peers until the
     // local deployment commit (spawned locally so they can be placed, but not replicated); this latch is the
@@ -102,13 +104,16 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
         IMessageBroker messageBroker,
         IBattleSession session,
         IBattleDeploymentTimer deploymentTimer = null,
-        Func<DeploymentAutoFinishResult> finishNativeDeployment = null)
+        Func<DeploymentAutoFinishResult> finishNativeDeployment = null,
+        Action<Action> enqueueDeferred = null)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
         this.deploymentTimer = deploymentTimer ?? new BattleDeploymentTimer();
         this.finishNativeDeployment = finishNativeDeployment ?? FinishNativeDeployment;
+        this.enqueueDeferred = enqueueDeferred
+            ?? (action => GameThread.EnqueueSafe(action, context: "BattleDeploymentCoordinator.AutoFinishDeployment"));
 
         // Clients announce when they finish deploying; the host releases the NPC AI on the first announcement
         // from any client and broadcasts that the battle is live (so a migrated host knows to release the NPCs
@@ -119,6 +124,7 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
 
     public void Dispose()
     {
+        autoFinishPending = false;
         messageBroker.Unsubscribe<NetworkBattleDeploymentFinished>(Handle_NetworkBattleDeploymentFinished);
         messageBroker.Unsubscribe<NetworkBattleActivated>(Handle_NetworkBattleActivated);
     }
@@ -138,6 +144,7 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
         // The deployment finished (manually, or via this very gate's expiry) — the time limit no longer
         // applies (BR-025). Disarming here also covers the native auto-finish paths (e.g. a leaderless
         // rejoiner skipping the Order of Battle), which reach us through the same behavior fan-out.
+        autoFinishPending = false;
         deploymentTimer.OnDeploymentFinished();
 
         // Announce it to the battle mesh so the host releases the NPC AI on the first finish from ANY client.
@@ -190,7 +197,7 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     // The seam's outcome feeds straight back to the timer, which disarms only on a terminal (non-Retry) result.
     public void Tick(float dt)
     {
-        if (!deploymentTimer.Tick(dt)) return;
+        if (autoFinishPending || !deploymentTimer.Tick(dt)) return;
 
         if (!autoFinishRequested)
         {
@@ -198,6 +205,17 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
             Logger.Information("[BattleSync] Deployment time limit expired — auto-finishing the local deployment (BR-025)");
         }
 
+        // Native finish removes both deployment behaviors. Defer it until Mission.OnTick has finished
+        // reverse-indexing MissionBehaviors, otherwise the shortened list makes its next index invalid.
+        autoFinishPending = true;
+        enqueueDeferred(FinishDeferredDeployment);
+    }
+
+    private void FinishDeferredDeployment()
+    {
+        if (!autoFinishPending) return;
+
+        autoFinishPending = false;
         DeploymentAutoFinishResult result = finishNativeDeployment();
         deploymentTimer.OnAutoFinishResult(result);
     }
