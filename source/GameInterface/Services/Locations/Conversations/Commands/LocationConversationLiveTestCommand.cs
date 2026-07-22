@@ -92,6 +92,7 @@ public static class LocationConversationLiveTestCommand
 {
     private const string SyntheticLocationId = "Location_live_test";
     private static bool fixtureSnapshotActive;
+    private static bool fixtureOriginalEncounterActive;
     private static Settlement fixtureOriginalSettlement;
     private static CampaignVec2 fixtureOriginalPosition;
 
@@ -137,7 +138,6 @@ public static class LocationConversationLiveTestCommand
         if (ModInformation.IsServer) return "Command is only available to run on a client";
         if (Campaign.Current == null || MobileParty.MainParty == null) return "Campaign is not ready";
         if (Mission.Current != null) return $"A mission is already active: {Mission.Current.SceneName}";
-        if (PlayerEncounter.Current != null) return "A player encounter is already active";
         if (fixtureSnapshotActive) return "A real tavern fixture snapshot is already active";
         if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
             return $"Unable to resolve {nameof(ISettlementInterface)}";
@@ -149,6 +149,13 @@ public static class LocationConversationLiveTestCommand
         if (tavern == null) return $"Settlement '{args[0]}' has no tavern location";
 
         var mainParty = MobileParty.MainParty;
+        if (PlayerEncounter.Current != null &&
+            (mainParty.CurrentSettlement == null || PlayerEncounter.EncounterSettlement != mainParty.CurrentSettlement))
+        {
+            return "The active player encounter is not the main party's current settlement encounter";
+        }
+
+        fixtureOriginalEncounterActive = PlayerEncounter.Current != null;
         fixtureOriginalSettlement = mainParty.CurrentSettlement;
         fixtureOriginalPosition = mainParty.Position;
         fixtureSnapshotActive = true;
@@ -157,16 +164,23 @@ public static class LocationConversationLiveTestCommand
         {
             using (new AllowedThread())
             {
-                if (mainParty.CurrentSettlement != null && mainParty.CurrentSettlement != settlement)
+                if (PlayerEncounter.Current != null)
+                    PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+
+                // StartSettlementEncounter enters the settlement as part of vanilla PlayerEncounter.Init.
+                // Leave any existing membership first so that entry events are not applied twice.
+                if (mainParty.CurrentSettlement != null)
                     settlementInterface.PartyLeaveSettlement(mainParty);
 
                 settlementInterface.StartSettlementEncounter(mainParty, settlement);
                 if (PlayerEncounter.Current == null)
                     return $"Unable to start settlement encounter for '{args[0]}'";
 
-                // Vanilla creates the TownEncounter before applying settlement entry. The allowed-thread scope
-                // keeps this disposable DEBUG fixture local to the client instead of mutating the server save.
-                PlayerEncounter.EnterSettlement();
+                // The allowed-thread scope keeps this disposable DEBUG fixture local to the client instead of
+                // mutating the server save. Current Bannerlord creates the TownEncounter during Init; retain the
+                // fallback for versions where that initialization is deferred.
+                if (PlayerEncounter.LocationEncounter == null)
+                    PlayerEncounter.EnterSettlement();
                 var encounter = PlayerEncounter.LocationEncounter;
                 if (encounter == null) return $"Unable to create location encounter for '{args[0]}'";
 
@@ -393,7 +407,9 @@ public static class LocationConversationLiveTestCommand
                $"mainAgentUsingObject={mainAgent?.IsUsingGameObject ?? false};" +
                $"remotePlayerAgents={string.Join(",", remoteAgents.Select(agent => $"{((CharacterObject)agent.Character).StringId}@{agent.Position}:distance={(mainAgent == null ? -1f : agent.GetDistanceTo(mainAgent))}"))};" +
                $"playerEncounterActive={PlayerEncounter.Current != null};" +
+               $"playerEncounterSettlement={PlayerEncounter.EncounterSettlement?.StringId ?? "<none>"};" +
                $"fixtureSnapshotActive={fixtureSnapshotActive};" +
+               $"fixtureOriginalEncounterActive={fixtureOriginalEncounterActive};" +
                $"fixtureOriginalSettlement={fixtureOriginalSettlement?.StringId ?? "none"};" +
                $"partyPosition={(mainParty == null ? "none" : $"{mainParty.Position.X:R},{mainParty.Position.Y:R}")};" +
                $"trackerEmpty={trackerState}";
@@ -480,15 +496,27 @@ public static class LocationConversationLiveTestCommand
                 PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
 
             var mainParty = MobileParty.MainParty;
-            if (mainParty.CurrentSettlement != null && mainParty.CurrentSettlement != fixtureOriginalSettlement)
-                settlementInterface.PartyLeaveSettlement(mainParty);
-            if (fixtureOriginalSettlement != null && mainParty.CurrentSettlement != fixtureOriginalSettlement)
-                settlementInterface.PartyEnterSettlement(mainParty, fixtureOriginalSettlement);
+            if (fixtureOriginalEncounterActive)
+            {
+                // Vanilla encounter initialization applies settlement entry. Clear the disposable fixture's
+                // membership first, then recreate the original settlement encounter exactly once.
+                if (mainParty.CurrentSettlement != null)
+                    settlementInterface.PartyLeaveSettlement(mainParty);
+                settlementInterface.StartSettlementEncounter(mainParty, fixtureOriginalSettlement);
+            }
+            else
+            {
+                if (mainParty.CurrentSettlement != null && mainParty.CurrentSettlement != fixtureOriginalSettlement)
+                    settlementInterface.PartyLeaveSettlement(mainParty);
+                if (fixtureOriginalSettlement != null && mainParty.CurrentSettlement != fixtureOriginalSettlement)
+                    settlementInterface.PartyEnterSettlement(mainParty, fixtureOriginalSettlement);
+            }
 
             mainParty.Position = fixtureOriginalPosition;
         }
 
         fixtureSnapshotActive = false;
+        fixtureOriginalEncounterActive = false;
         fixtureOriginalSettlement = null;
         fixtureOriginalPosition = default;
     }
