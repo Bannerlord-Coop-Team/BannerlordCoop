@@ -1,11 +1,9 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using Helpers;
 using Serilog;
 using System;
 using System.Collections;
@@ -16,12 +14,10 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -113,132 +109,6 @@ public class MapEventDebugCommands
         return $"Started encounter with {nearest.Name} (StringId {nearest.StringId}, registry id {partyId}), " +
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
     }
-
-#if DEBUG
-    [CommandLineArgumentFunction("opposing_raid_attack", "coop.debug.mapevent")]
-    public static string AttackOpposingRaider(List<string> args)
-    {
-        if (ModInformation.IsServer)
-            return "Run this command on Player 1.";
-
-        if (args.Count != 1)
-            return "Usage: coop.debug.mapevent.opposing_raid_attack <raiderPartyId>";
-
-        if (!TryGetObjectManager(out var objectManager) ||
-            !objectManager.TryGetObjectWithLogging<MobileParty>(args[0], out var raider))
-            return $"Unable to resolve raider party {args[0]}.";
-
-        var playerParty = MobileParty.MainParty;
-        var raid = raider.MapEvent;
-        if (playerParty == null || raid == null || !raid.IsActiveSlowVillageRaid() ||
-            !ReferenceEquals(raid.AttackerSide?.LeaderParty?.MobileParty, raider))
-            return "The selected party is not leading an active slow village raid.";
-
-        if (MissionState.Current != null || PlayerEncounter.Current != null || playerParty.MapEvent != null)
-            return "Player 1 must be free on the campaign map with no active mission or encounter.";
-
-        // Keep the natural local join state used by mission setup; the server rejects this defender join.
-        PlayerEncounter.Start();
-        PlayerEncounter.Current.SetupFields(raider.Party, playerParty.Party);
-        PlayerEncounter.JoinBattle(BattleSideEnum.Defender);
-        GameMenu.ActivateGameMenu("encounter");
-
-        MenuHelper.EncounterAttackConsequence(null);
-        objectManager.TryGetId(raid, out var mapEventId);
-        return $"attack=true; raider={args[0]}; mapEvent={mapEventId}; deploymentRequested=true";
-    }
-
-    [CommandLineArgumentFunction("finish_deployment", "coop.debug.mapevent")]
-    public static string FinishDeployment(List<string> args)
-    {
-        if (ModInformation.IsServer)
-            return "Run this command on Player 1.";
-
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.finish_deployment";
-
-        var mission = Mission.Current;
-        var deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
-        if (deploymentController == null)
-            return "No active deployment phase.";
-
-        if (!deploymentController.TeamSetupOver)
-            return "Deployment teams are not ready.";
-
-        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
-        if (deploymentHandler == null)
-            return "No deployment handler is attached.";
-
-        deploymentHandler.FinishDeployment();
-        return $"deploymentFinished=true; missionMode={mission.Mode}; mainAgent={Agent.Main != null}";
-    }
-
-    [CommandLineArgumentFunction("deployment_state", "coop.debug.mapevent")]
-    public static string GetDeploymentState(List<string> args)
-    {
-        if (ModInformation.IsServer)
-            return "Run this command on Player 1.";
-
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.deployment_state";
-
-        var mission = Mission.Current;
-        var deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
-        if (deploymentController == null)
-            return "deploymentActive=false";
-
-        return $"deploymentActive=true; teamSetupOver={deploymentController.TeamSetupOver}; " +
-               $"missionMode={mission.Mode}; mainAgent={Agent.Main != null}";
-    }
-
-    [CommandLineArgumentFunction("deployment_evidence_marker", "coop.debug.mapevent")]
-    public static string ShowDeploymentEvidenceMarker(List<string> args)
-    {
-        if (ModInformation.IsServer)
-            return "Run this command on Player 1.";
-
-        if (args.Count != 1 || (args[0] != "show" && args[0] != "hide"))
-            return "Usage: coop.debug.mapevent.deployment_evidence_marker <show|hide>";
-
-        if (args[0] == "hide")
-        {
-            InformationManager.HideInquiry();
-            return "deploymentEvidenceMarkerHidden=true";
-        }
-
-        var deploymentController = Mission.Current?.GetMissionBehavior<DeploymentMissionController>();
-        if (deploymentController == null)
-            return "No active deployment phase.";
-
-        InformationManager.ShowInquiry(new InquiryData(
-            "Issue #2159 live test",
-            "Five in-game days elapsed. Player 1 remains in the same deployment while the active raid is held.",
-            false,
-            false,
-            string.Empty,
-            string.Empty,
-            null,
-            null), false);
-        return "deploymentEvidenceMarkerShown=true";
-    }
-
-    [CommandLineArgumentFunction("exit_battle", "coop.debug.mapevent")]
-    public static string ExitBattle(List<string> args)
-    {
-        if (ModInformation.IsServer)
-            return "Run this command on Player 1.";
-
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.exit_battle";
-
-        var mission = Mission.Current;
-        if (mission == null)
-            return "No active battle mission.";
-
-        mission.EndMission();
-        return "battleExitRequested=true";
-    }
-#endif
 
     // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
     /// <summary>

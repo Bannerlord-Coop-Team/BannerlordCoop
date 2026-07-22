@@ -784,11 +784,6 @@ internal class BattleHostHandler : IHandler
     // cross-battle request electing a non-participant. Server-authoritative.
     private bool IsRequesterInBattle(MapEvent mapEvent, string requesterId)
     {
-#if DEBUG
-        if (RaidDebugFixture.TryGetMissionParticipant(mapEvent, requesterId, out _))
-            return true;
-#endif
-
         foreach (var player in playerManager.Players)
         {
             if (player.ControllerId != requesterId)
