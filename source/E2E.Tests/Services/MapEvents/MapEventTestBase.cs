@@ -410,6 +410,21 @@ public abstract class MapEventTestBase : IDisposable
     /// </remarks>
     protected void DefeatPlayerByBattleStateSync(string playerHeroId, string playerPartyId, string captorPartyId)
     {
+        var mapEventId = CreateBattleStateDefeatMapEvent(playerHeroId, playerPartyId, captorPartyId);
+
+        CommitBattleStateDefeat(mapEventId);
+    }
+
+    /// <summary>
+    /// First half of <see cref="DefeatPlayerByBattleStateSync"/>: builds the synced battle the player is
+    /// about to lose (captor attacking, player party defending) and returns its id without committing a
+    /// result. Split out so a test can adjust world state that must exist during the commit but not during
+    /// <see cref="MapEvent.Initialize"/> — e.g. a besieger camp, whose presence makes Initialize walk the
+    /// siege graph's involved parties, which the headless siege fixture (disabled side initializers)
+    /// cannot satisfy.
+    /// </summary>
+    protected string CreateBattleStateDefeatMapEvent(string playerHeroId, string playerPartyId, string captorPartyId)
+    {
         string? mapEventId = null;
 
         Server.Call(() =>
@@ -425,7 +440,7 @@ public abstract class MapEventTestBase : IDisposable
             }
 
             // attacker = captor (winner), defender = player party (loser). Construction replicates the
-            // MapEvent (and its sides) to the clients, so the client below can resolve and finish it.
+            // MapEvent (and its sides) to the clients, so the committing client can resolve and finish it.
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             mapEvent.Initialize(captorParty.Party, playerParty.Party);
@@ -434,7 +449,16 @@ public abstract class MapEventTestBase : IDisposable
         }, MapEventDisabledMethods);
 
         Assert.NotNull(mapEventId);
+        return mapEventId!;
+    }
 
+    /// <summary>
+    /// Second half of <see cref="DefeatPlayerByBattleStateSync"/>: a client commits the captor's victory
+    /// for a battle built by <see cref="CreateBattleStateDefeatMapEvent"/>, which the server applies
+    /// authoritatively — capturing the defeated player there.
+    /// </summary>
+    protected void CommitBattleStateDefeat(string mapEventId)
+    {
         var disabledMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
@@ -450,7 +474,7 @@ public abstract class MapEventTestBase : IDisposable
         var client = Clients.First();
         client.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var clientMapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var clientMapEvent));
             clientMapEvent.BattleState = BattleState.AttackerVictory;
         }, disabledMethods);
     }
