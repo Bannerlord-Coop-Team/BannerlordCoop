@@ -22,6 +22,7 @@ internal class MapEventSideDataHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IMapEventInitializationBarrier initializationBarrier;
+    private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
 
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDataHandler>();
 
@@ -29,12 +30,14 @@ internal class MapEventSideDataHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IMapEventInitializationBarrier initializationBarrier)
+        IMapEventInitializationBarrier initializationBarrier,
+        IEncounterMenuConditionRefresher encounterMenuConditionRefresher)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.initializationBarrier = initializationBarrier;
+        this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
 
         messageBroker.Subscribe<MapEventPartyRemoved>(Handle);
         messageBroker.Subscribe<NetworkRemoveMapEventParty>(Handle);
@@ -169,19 +172,13 @@ internal class MapEventSideDataHandler : IHandler
         });
     }
 
-    private static void AfterClientPartyAttached(MapEvent mapEvent)
+    private void AfterClientPartyAttached(MapEvent mapEvent)
     {
         if (ModInformation.IsServer)
             return;
 
         SwitchRaiderToEncounterIfNeeded(mapEvent);
-
-        var menuContext = Campaign.Current?.CurrentMenuContext;
-        if (menuContext?.GameMenu?.StringId != "encounter" || MobileParty.MainParty?.MapEvent != mapEvent)
-            return;
-
-        // Encounter option conditions can depend on the party that was just attached to this side.
-        Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menuContext);
+        encounterMenuConditionRefresher.RefreshForMapEvent(mapEvent);
     }
 
     private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
