@@ -284,7 +284,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             int granted = GetOrGrantInitialSpawns(plan, partyPlan);
             if (granted == 0 && partyPlan.Capacity > 0 && partyPlan.IsDirectPlayerParty
                 && plan.AssignedCount >= plan.BattleSize
-                && !plan.PriorityTransfers.Values.Any(transfer => transfer.DonorPartyId == partyId))
+                && (wasForgotten
+                    || !plan.PriorityTransfers.Values.Any(transfer => transfer.DonorPartyId == partyId)))
             {
                 QueueWaitingPlayerParty(plan, partyId);
             }

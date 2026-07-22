@@ -187,7 +187,7 @@ public class BattlePrioritySlotServerFlowTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void LoadingDisconnectBeforeMissionEntry_ReassignsPositivePostPlanEntitlementToQueuedPlayer()
+    public void LoadingDisconnectBeforeMissionEntry_ReassignsEntitlementAndReconnectReceivesNextFreedSlot()
     {
         var (mapEventId, _) = SetupCoopBattle(HostController, DonorController);
         var clients = Clients.ToArray();
@@ -301,6 +301,46 @@ public class BattlePrioritySlotServerFlowTests : MissionTestEnvironment
                 party => Server.ObjectManager.TryGetId(party, out var partyId)
                     && partyId == disconnectingPartyId);
         });
+
+        Server.NetworkSentMessages.Clear();
+        disconnectingClient.Call(() => disconnectingClient.Resolve<INetwork>().SendAll(
+            new NetworkRequestBattleReserves(mapEventId, WaitingController)));
+
+        var reconnectWait = Server.NetworkSentMessages
+            .GetMessages<NetworkBattlePriorityWaitQueued>()
+            .First(message => message.WaitingPartyId == disconnectingPartyId);
+        Assert.True(reconnectWait.ResetExistingState);
+        Assert.Equal(0, GetInitialSpawnCount(
+            scenario,
+            WaitingController,
+            disconnectingPartyId));
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            this,
+            new NetworkBattlePrioritySlotConsumed(
+                mapEventId,
+                assignment.TransferId,
+                queuedPartyId)));
+
+        var reconnectScenario = new PriorityScenario(
+            mapEventId,
+            queuedPartyId,
+            disconnectingPartyId);
+        Server.NetworkSentMessages.Clear();
+        PublishFreedSlot(reconnectScenario, troopSeed: 194901);
+
+        var reconnectAssignment = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkBattlePrioritySlotAssigned>());
+        Assert.Equal(queuedPartyId, reconnectAssignment.DonorPartyId);
+        Assert.Equal(disconnectingPartyId, reconnectAssignment.WaitingPartyId);
+        Assert.Equal(1, GetInitialSpawnCount(
+            reconnectScenario,
+            WaitingController,
+            disconnectingPartyId));
+        Assert.Equal(0, GetInitialSpawnCount(
+            reconnectScenario,
+            NextWaitingController,
+            queuedPartyId));
     }
 
     [Fact]
