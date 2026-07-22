@@ -173,6 +173,24 @@ public class MapEventDebugCommands
         return $"deploymentFinished=true; missionMode={mission.Mode}; mainAgent={Agent.Main != null}";
     }
 
+    [CommandLineArgumentFunction("deployment_state", "coop.debug.mapevent")]
+    public static string GetDeploymentState(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on Player 1.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.deployment_state";
+
+        var mission = Mission.Current;
+        var deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+            return "deploymentActive=false";
+
+        return $"deploymentActive=true; teamSetupOver={deploymentController.TeamSetupOver}; " +
+               $"missionMode={mission.Mode}; mainAgent={Agent.Main != null}";
+    }
+
     [CommandLineArgumentFunction("deployment_evidence_marker", "coop.debug.mapevent")]
     public static string ShowDeploymentEvidenceMarker(List<string> args)
     {
