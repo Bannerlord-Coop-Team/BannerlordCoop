@@ -496,6 +496,10 @@ public class MapEventDebugCommands
         if (mission == null)
             return "No mission is active.";
 
+        var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController?.TeamSetupOver != true)
+            return "Local deployment is not ready.";
+
         var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
         if (deploymentHandler == null)
             return "The field battle is already active.";
