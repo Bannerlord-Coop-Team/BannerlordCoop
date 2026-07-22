@@ -179,16 +179,29 @@ public class MapEventDebugCommands
         if (ModInformation.IsServer)
             return "Run this command on Player 1.";
 
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.deployment_evidence_marker";
+        if (args.Count != 1 || (args[0] != "show" && args[0] != "hide"))
+            return "Usage: coop.debug.mapevent.deployment_evidence_marker <show|hide>";
+
+        if (args[0] == "hide")
+        {
+            InformationManager.HideInquiry();
+            return "deploymentEvidenceMarkerHidden=true";
+        }
 
         var deploymentController = Mission.Current?.GetMissionBehavior<DeploymentMissionController>();
         if (deploymentController == null)
             return "No active deployment phase.";
 
-        InformationManager.DisplayMessage(new InformationMessage(
-            "Five in-game days elapsed; deployment and raid remain active."));
-        return "deploymentEvidenceMarker=true";
+        InformationManager.ShowInquiry(new InquiryData(
+            "Issue #2159 live test",
+            "Five in-game days elapsed. Player 1 remains in the same deployment while the active raid is held.",
+            false,
+            false,
+            string.Empty,
+            string.Empty,
+            null,
+            null), false);
+        return "deploymentEvidenceMarkerShown=true";
     }
 
     [CommandLineArgumentFunction("exit_battle", "coop.debug.mapevent")]
