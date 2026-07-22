@@ -405,6 +405,8 @@ public class ReinforcementFielder : IReinforcementFielder
 
     private void FieldMigrationReserves()
     {
+        if (BattleSpawnGate.HasPendingPrioritySpawn) return;
+
         if (recoveryParties[(int)BattleSideEnum.Defender].Count == 0
             && recoveryParties[(int)BattleSideEnum.Attacker].Count == 0)
             return;

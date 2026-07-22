@@ -1915,6 +1915,92 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
         GC.KeepAlive(controller);
     }
 
+    [Fact]
+    public void MigrationRecovery_WaitsForPendingPriorityPlayer()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "client");
+        var reinforcementCharacterId = CreateRegisteredObject<CharacterObject>();
+        var authority = Clients.First();
+        CoopBattleController controller = null;
+        MockMission mock = null;
+
+        authority.Call(() =>
+        {
+            mock = fixture.CreateMission(authority);
+            controller = authority.Resolve<CoopBattleController>();
+        });
+        EnterBattle(authority, mapEventId);
+        var aiMapEventPartyId = AddAiReinforcementParty(
+            mapEventId, reinforcementCharacterId, authority);
+        SetFlattenedRoster(
+            authority, aiMapEventPartyId, reinforcementCharacterId, 194900);
+
+        authority.Call(() =>
+        {
+            controller.OnDeploymentFinished();
+            BattleSpawnGate.BeginBattle(mapEventId, 1000);
+
+            var defenderSupplier = RegisterEmptySupplier(authority, mapEventId);
+            var attackerSupplier = new CoopTroopSupplier(
+                mapEventId, BattleSideEnum.Attacker, authority.ObjectManager);
+            attackerSupplier.SetReserve(Array.Empty<PartyReserve>());
+            CoopTroopSupplierRegistry.Register(attackerSupplier);
+
+            var spawnLogic = CreateSpawnLogic(mapEventId, authority, defenderSupplier);
+            int spawnAttempts = 0;
+            Agent SpawnAgent(Mission _, AgentBuildData buildData)
+            {
+                spawnAttempts++;
+                return mock.SpawnAgent(buildData);
+            }
+
+            using var migrationBroker = new MessageBroker();
+            using var fielder = CreateFielder(
+                authority,
+                controller,
+                spawnLogic.Logic,
+                agentSpawner: SpawnAgent,
+                messageBroker: migrationBroker);
+            try
+            {
+                migrationBroker.Publish(authority, new BattleHostMigrated(mapEventId, "departed-host"));
+                defenderSupplier.SetReserve(new[]
+                {
+                    new PartyReserve(
+                        aiMapEventPartyId,
+                        suppliedCount: 0,
+                        new[] { Entries(reinforcementCharacterId)[0] },
+                        initialSpawnCount: 1),
+                });
+                attackerSupplier.SetReserve(Array.Empty<PartyReserve>());
+                BattleSpawnGate.QueuePrioritySpawn(mapEventId, "waiting-party");
+
+                fielder.Tick();
+
+                Assert.Equal(0, spawnAttempts);
+                Assert.Equal(0, Assert.Single(defenderSupplier.GetSuppliedByParty()).supplied);
+                Assert.Empty(GetSpawnedSeeds(mock));
+
+                Assert.True(BattleSpawnGate.CancelUnassignedPrioritySpawn(
+                    mapEventId,
+                    "waiting-party"));
+                fielder.Tick();
+
+                Assert.Equal(1, spawnAttempts);
+                Assert.Equal(1, Assert.Single(defenderSupplier.GetSuppliedByParty()).supplied);
+                Assert.Equal(new[] { 194900 }, GetSpawnedSeeds(mock));
+            }
+            finally
+            {
+                CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+                BattleSpawnGate.EndBattle();
+            }
+        });
+
+        GC.KeepAlive(controller);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]

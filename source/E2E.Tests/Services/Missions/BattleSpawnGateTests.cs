@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Patches;
 using TaleWorlds.Core;
 
 namespace E2E.Tests.Services.Missions;
@@ -49,6 +50,24 @@ public class BattleSpawnGateTests : IDisposable
         BattleSpawnGate.BeginBattle("mapEvent-1", 1000);
 
         Assert.True(BattleSpawnGate.HasPendingPrioritySpawn);
+    }
+
+    [Fact]
+    public void PendingPrioritySpawn_PreventsSideDepletionUntilTheWaitClears()
+    {
+        BattleSpawnGate.QueuePrioritySpawn("mapEvent-1", "waiting-party");
+        BattleSpawnGate.BeginBattle("mapEvent-1", 1000);
+
+        Assert.False(CoopBattleDepletionPatch.DetermineSideDepleted(
+            hadAgents: true,
+            side: BattleSideEnum.Defender));
+
+        Assert.True(BattleSpawnGate.CancelUnassignedPrioritySpawn(
+            "mapEvent-1",
+            "waiting-party"));
+        Assert.True(CoopBattleDepletionPatch.DetermineSideDepleted(
+            hadAgents: true,
+            side: BattleSideEnum.Defender));
     }
 
     [Fact]

@@ -96,8 +96,8 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
     bool TryTransferInitialSpawnOnDeparture(MapEvent mapEvent, string donorPartyId,
         out BattleInitialSpawnTransfer transfer, out BattleInitialSpawnTransfer settledTransfer);
 
-    /// <summary>Retain every remaining initial entitlement of a party leaving the map event so future player
-    /// joiners can claim those already-vacant slots even when no waiter exists at departure time.</summary>
+    /// <summary>Retain every remaining initial entitlement of a party unavailable for initial spawning so future
+    /// player joiners can claim those already-vacant slots even when no waiter exists at departure time.</summary>
     int RetainInitialSpawnVacancies(MapEvent mapEvent, string donorPartyId);
 
     /// <summary>Move one retained vacancy to the first live player party waiting for capacity.</summary>

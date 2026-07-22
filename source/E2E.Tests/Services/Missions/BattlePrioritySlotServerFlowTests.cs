@@ -187,6 +187,123 @@ public class BattlePrioritySlotServerFlowTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void LoadingDisconnectBeforeMissionEntry_ReassignsPositivePostPlanEntitlementToQueuedPlayer()
+    {
+        var (mapEventId, _) = SetupCoopBattle(HostController, DonorController);
+        var clients = Clients.ToArray();
+        var disconnectingClient = clients[2];
+        SetControllerId(disconnectingClient, WaitingController);
+
+        var disconnectingHeroId = CreateRegisteredObject<Hero>();
+        var disconnectingMobilePartyId = CreateRegisteredObject<MobileParty>();
+        RegisterAsPlayerParty(
+            WaitingController,
+            disconnectingHeroId,
+            disconnectingMobilePartyId);
+
+        var queuedHeroId = CreateRegisteredObject<Hero>();
+        var queuedMobilePartyId = CreateRegisteredObject<MobileParty>();
+        RegisterAsPlayerParty(
+            NextWaitingController,
+            queuedHeroId,
+            queuedMobilePartyId);
+
+        string disconnectingPartyId = null;
+        string queuedPartyId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                disconnectingMobilePartyId, out var disconnectingParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                queuedMobilePartyId, out var queuedParty));
+            var initialTroop = Server.CreateRegisteredObject<CharacterObject>(
+                "loading_disconnect_initial_troop");
+            var disconnectingTroop = Server.CreateRegisteredObject<CharacterObject>(
+                "loading_disconnect_positive_troop");
+            var queuedTroop = Server.CreateRegisteredObject<CharacterObject>(
+                "loading_disconnect_queued_troop");
+
+            foreach (var party in mapEvent.AttackerSide.Parties.Concat(mapEvent.DefenderSide.Parties))
+            {
+                party.Party.MemberRoster.Clear();
+                party.Party.MemberRoster.AddToCounts(initialTroop, 1);
+                party.Update();
+            }
+
+            var reserveBuilder = Server.Resolve<IBattleTroopReserveBuilder>();
+            reserveBuilder.PreparePlan(mapEvent, battleSize: 3);
+
+            disconnectingParty.Party.MemberRoster.AddToCounts(disconnectingTroop, 1);
+            disconnectingParty.Party.MapEventSide = mapEvent.AttackerSide;
+            var disconnectingMapEventParty = mapEvent.AttackerSide.Parties.Single(
+                party => party.Party == disconnectingParty.Party);
+            disconnectingMapEventParty.Update();
+            Assert.Equal(1, reserveBuilder.GrantUnassignedInitialSpawns(
+                mapEvent,
+                disconnectingMapEventParty,
+                out _,
+                out var disconnectingWaits));
+            Assert.False(disconnectingWaits);
+
+            queuedParty.Party.MemberRoster.AddToCounts(queuedTroop, 1);
+            queuedParty.Party.MapEventSide = mapEvent.AttackerSide;
+            var queuedMapEventParty = mapEvent.AttackerSide.Parties.Single(
+                party => party.Party == queuedParty.Party);
+            queuedMapEventParty.Update();
+            Assert.Equal(0, reserveBuilder.GrantUnassignedInitialSpawns(
+                mapEvent,
+                queuedMapEventParty,
+                out _,
+                out var queuedWaits));
+            Assert.True(queuedWaits);
+
+            Assert.True(Server.ObjectManager.TryGetId(
+                disconnectingMapEventParty, out disconnectingPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(
+                queuedMapEventParty, out queuedPartyId));
+        });
+
+        EnterBattle(clients[0], mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(
+            WaitingController,
+            disconnectingClient.NetPeer));
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            this,
+            new PlayerDisconnected(disconnectingClient.NetPeer, default)));
+
+        var sent = Server.NetworkSentMessages.Messages;
+        int assignmentIndex = IndexOf<NetworkBattlePrioritySlotAssigned>(sent);
+        Assert.True(assignmentIndex > 0);
+        Assert.Contains(sent.Take(assignmentIndex), message => message is NetworkBattleTroopReserve);
+        var assignment = Assert.IsType<NetworkBattlePrioritySlotAssigned>(sent[assignmentIndex]);
+        Assert.Equal(disconnectingPartyId, assignment.DonorPartyId);
+        Assert.Equal(queuedPartyId, assignment.WaitingPartyId);
+
+        var scenario = new PriorityScenario(mapEventId, disconnectingPartyId, queuedPartyId);
+        Assert.Equal(0, GetInitialSpawnCount(
+            scenario,
+            WaitingController,
+            disconnectingPartyId));
+        Assert.Equal(1, GetInitialSpawnCount(
+            scenario,
+            NextWaitingController,
+            queuedPartyId));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.Contains(
+                mapEvent.AttackerSide.Parties.Concat(mapEvent.DefenderSide.Parties),
+                party => Server.ObjectManager.TryGetId(party, out var partyId)
+                    && partyId == disconnectingPartyId);
+        });
+    }
+
+    [Fact]
     public void LoadingDisconnectBeforeReserveRequest_CancelsThenReconnectRequeuesTheWait()
     {
         var scenario = CreateFullBattleWithWaitingPlayer();

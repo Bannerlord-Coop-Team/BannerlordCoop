@@ -1299,6 +1299,22 @@ internal class BattleHostHandler : IHandler
                 mapEvent,
                 message.ControllerId);
             HandleDepartedPriorityPlayer(message.MapEventId, mapEvent, message.ControllerId);
+
+            if (!TryGetControllerMapEventParty(
+                    mapEvent,
+                    message.ControllerId,
+                    out var disconnectedParty)
+                || !objectManager.TryGetId(disconnectedParty, out var disconnectedPartyId))
+            {
+                return;
+            }
+
+            int retained = reserveBuilder.RetainInitialSpawnVacancies(
+                mapEvent,
+                disconnectedPartyId);
+            int transferred = DrainRetainedPrioritySlots(message.MapEventId, mapEvent);
+            Logger.Information("[BattleHost] Retained {Retained} initial slot(s) and transferred {Transferred} after loading controller {Controller} disconnected from {MapEventId}",
+                retained, transferred, message.ControllerId, message.MapEventId);
         });
     }
 
