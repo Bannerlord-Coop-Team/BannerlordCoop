@@ -105,10 +105,10 @@ internal class BattleJoinLeaveHandler : IHandler
                     }
                 }
 
-                // The involved-party snapshot can finish one frame before the encounter menu activates.
-                GameThread.EnqueueSafe(
+                // Map-event commit assigns PartyBase.MapEventSide after the involved-party snapshot.
+                initializationBarrier.RunAfterCommit(mapEvent, () => GameThread.EnqueueSafe(
                     () => RefreshCurrentEncounterMenu(mapEvent),
-                    context: nameof(Handle_NetworkAddInvolvedParties));
+                    context: nameof(Handle_NetworkAddInvolvedParties)));
             }
             catch (Exception e)
             {
@@ -123,7 +123,7 @@ internal class BattleJoinLeaveHandler : IHandler
         if (menuContext?.GameMenu?.StringId != "encounter" ||
             (PlayerEncounter.Battle != mapEvent && MobileParty.MainParty?.MapEvent != mapEvent)) return;
 
-        menuContext.Refresh();
+        menuContext.Handler?.OnMenuRefresh();
     }
 
     /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
