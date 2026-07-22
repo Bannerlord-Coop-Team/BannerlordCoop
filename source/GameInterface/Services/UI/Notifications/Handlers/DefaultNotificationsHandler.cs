@@ -6,13 +6,16 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
+using Helpers;
 using SandBox.CampaignBehaviors;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -810,8 +813,12 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
-
-            network.SendAll(new NetworkNotifyArmyCreated(armyId));
+            string aiBehaviorObjectId = null;
+            if (obj.What.AiBehaviorObject != null)
+            {
+                if (!objectManager.TryGetIdWithLogging(obj.What.AiBehaviorObject, out aiBehaviorObjectId)) return;
+            }
+            network.SendAll(new NetworkNotifyArmyCreated(armyId, aiBehaviorObjectId));
         });
     }
 
@@ -821,11 +828,30 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Army>(obj.What.ArmyId, out var army)) return;
-
-            notificationsBehavior.OnArmyCreated(army);
+            IMapPoint aiBehaviorObject = null;
+            if (obj.What.AiBehaviorObjectId != null)
+            {
+                if (!objectManager.TryGetObjectWithLogging<IMapPoint>(obj.What.AiBehaviorObjectId, out aiBehaviorObject)) return;
+            }
+            OnArmyCreated(army, aiBehaviorObject);
         });
     }
-
+    private void OnArmyCreated(Army army, IMapPoint aiBehaviorObject)
+    {
+        if ((army.Kingdom == MobileParty.MainParty.MapFaction && MobileParty.MainParty.Army == null))
+        {
+            TextObject textObject = new TextObject("{=VEHPTzhO}{LEADER.NAME} is gathering an army near {SETTLEMENT}.");
+            string settlementName = army.AiBehaviorObject?.Name?.ToString();
+            if (string.IsNullOrEmpty(settlementName))
+            {
+                Settlement fallbackSettlement = SettlementHelper.FindNearestSettlementToPoint(army.LeaderParty.Position, null);
+                settlementName = fallbackSettlement?.Name?.ToString() ?? string.Empty;
+            }
+            textObject.SetTextVariable("SETTLEMENT", settlementName);
+            StringHelpers.SetCharacterProperties("LEADER", army.LeaderParty.LeaderHero.CharacterObject, textObject);
+            MBInformationManager.AddQuickInformation(textObject, 0, army.LeaderParty.LeaderHero.CharacterObject);
+        }
+    }
     private void Handle_NotifySiegeBombardmentHit(MessagePayload<NotifySiegeBombardmentHit> obj)
     {
         GameThread.RunSafe(() =>
@@ -948,8 +974,9 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
 
-            network.SendAll(new NetworkNotifyPartyRemovedFromArmy(mobilePartyId));
+            network.SendAll(new NetworkNotifyPartyRemovedFromArmy(mobilePartyId, armyId));
         });
     }
 
@@ -959,9 +986,26 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Army>(obj.What.ArmyId, out var army)) return;
 
-            notificationsBehavior.OnPartyRemovedFromArmy(mobileParty);
+            OnPartyRemovedFromArmy(notificationsBehavior, mobileParty, army);
         });
+    }
+    private void OnPartyRemovedFromArmy(DefaultNotificationsCampaignBehavior __instance, MobileParty party, Army army)
+    {
+        // MobileParty.MainParty.Army can already be null before this get reached
+        // so check if its the MainParty
+        if (army == MobileParty.MainParty.Army || party == MobileParty.MainParty) 
+        {
+            TextObject textObject = new TextObject("{=ApG1xg7O}{PARTY_NAME} has left {ARMY_NAME}.", null);
+            textObject.SetTextVariable("PARTY_NAME", party.Name);
+            textObject.SetTextVariable("ARMY_NAME", army.Name);
+            InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
+        }
+        if (party == MobileParty.MainParty)
+        {
+            __instance.CheckFoodNotifications();
+        }
     }
 
     private void Handle_ArmyDispersed(MessagePayload<ArmyDispersed> obj)

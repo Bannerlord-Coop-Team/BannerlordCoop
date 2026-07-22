@@ -1476,7 +1476,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void ClientKingdomCreationRequest_SuppressesAccidentalSettlementLeaveConsequence()
+    public void ClientKingdomCreationRequest_ServerSuppressesAccidentalSettlementLeaveConsequence()
     {
         var player = CreateSyncedPlayerContext();
         var client = Clients.First();
@@ -1497,9 +1497,14 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
         client.SimulateMessage(this, new EndSettlementEncounterAttempted(GetObject<MobileParty>(client, player.PartyId)));
 
-        Assert.DoesNotContain(
+        var leaveRequest = Assert.Single(
             client.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>(),
             message => message.PartyId == player.PartyId);
+        Assert.Equal(player.PartyId, leaveRequest.PartyId);
+        var leaveResult = Assert.Single(
+            client.InternalMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
+            message => message.PartyId == player.PartyId);
+        Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, leaveResult.Outcome);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
             message => message.PartyId == player.PartyId);
@@ -1526,7 +1531,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
 
         Assert.DoesNotContain(
-            Server.NetworkSentMessages.GetMessages<NetworkEndSettlementEncounter>(),
+            Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
             message => true);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
@@ -1574,7 +1579,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(
             this,
             new NetworkPlayerKingdomCreated(ControllerId, kingdomId, KingdomName, player.ClanId, player.PartyId, settlementId));
-        client.SimulateMessage(this, new NetworkEndSettlementEncounter());
+        client.SimulateMessage(
+            this,
+            new NetworkSettlementEncounterLeaveResult(
+                player.PartyId,
+                SettlementEncounterLeaveOutcome.Suppressed));
 
         client.Call(() =>
         {

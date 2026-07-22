@@ -5,6 +5,7 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
@@ -39,16 +40,18 @@ internal class HeroInterface : IHeroInterface
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
+    private readonly IPartyVisibilitySweep partyVisibilitySweep;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IPartyVisibilitySweep partyVisibilitySweep)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.objectManager = objectManager;
+        this.partyVisibilitySweep = partyVisibilitySweep;
     }
 
     public byte[] PackageMainHero()
@@ -134,15 +137,17 @@ internal class HeroInterface : IHeroInterface
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
         }
 
-        if (playerParty.CurrentSettlement != null)
+        if (playerParty.CurrentSettlement != null || playerParty.BesiegerCamp != null)
         {
             // Queued so it runs after the campaign state is entered; the headless server's save
-            // carries no player encounter or menu state for this hero.
+            // carries no player encounter, menu, or player-siege state for this hero. Covers both
+            // a party reloaded inside a settlement and one besieging a settlement, which would
+            // otherwise sit at the siege camp with no menu (soft lock).
             GameThread.RunSafe(() =>
             {
                 if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
                 {
-                    siegeEventInterface.RestoreReloadedPlayerInSettlement();
+                    siegeEventInterface.RestoreReloadedPlayer();
                 }
             });
         }
@@ -153,18 +158,40 @@ internal class HeroInterface : IHeroInterface
             playerHero.PartyBelongedTo = null;
             messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
         }
+
+        // The transferred host save carries the server's always-visible party state
+        // (PartyVisibilityServerPatches) and the native load path never rebuilds fog of war
+        // (Campaign.GameInitTick only runs for new campaigns), so distant parties and their battle
+        // icons would stay revealed forever. Queued so it runs once the campaign state is entered
+        // and the hero switched to above is the local main party.
+        GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
     }
 
     private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
     {
+        // Player birth dates come from a separate character-creation campaign, so rebase them to this campaign.
+        hero.SetBirthDay(CampaignTime.YearsFromNow(-hero._defaultAge));
+
         var party = hero.PartyBelongedTo;
 
         party.Anchor = new AnchorPoint(party);
 
         party.Party.OnFinishLoadState();
-        party.IsVisible = true;
 
         party.CheckPositionsForMapChangeAndUpdateIfNeeded();
+
+        // On the server this write is coerced to always-visible by PartyVisibilityOnServerPatch;
+        // on clients it computes the real fog-of-war state so a remote player's new party is not
+        // permanently revealed wherever it spawned (the native per-tick sweep only re-evaluates
+        // parties near the local main party).
+        if (MobileParty.MainParty != null)
+        {
+            party.Party.UpdateVisibilityAndInspected(MobileParty.MainParty.Position);
+        }
+        else
+        {
+            party.IsVisible = true;
+        }
 
         // Headless hosts run without the SandBox.View layer, so the visual manager is null there
         // and party visuals are optional (same contract as PartyBaseExtensions.GetPartyVisual).

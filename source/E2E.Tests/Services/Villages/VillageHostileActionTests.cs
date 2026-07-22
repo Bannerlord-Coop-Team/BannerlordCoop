@@ -177,10 +177,16 @@ public class VillageHostileActionTests : MapEventTestBase
         RequestHostileAction(requester, VillageHostileAction.Raid, raiderMobilePartyId, target.SettlementId);
 
         Assert.All(
-            requester.InternalMessages.GetMessages<NetworkEndSettlementEncounter>(),
-            message => Assert.Equal(otherMobilePartyId, message.PartyId));
-        var endEncounter = Assert.Single(otherClient.InternalMessages.GetMessages<NetworkEndSettlementEncounter>());
-        Assert.Equal(otherMobilePartyId, endEncounter.PartyId);
+            requester.InternalMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
+            message =>
+            {
+                Assert.Equal(otherMobilePartyId, message.PartyId);
+                Assert.Equal(SettlementEncounterLeaveOutcome.Applied, message.Outcome);
+            });
+        var leaveResult = Assert.Single(
+            otherClient.InternalMessages.GetMessages<NetworkSettlementEncounterLeaveResult>());
+        Assert.Equal(otherMobilePartyId, leaveResult.PartyId);
+        Assert.Equal(SettlementEncounterLeaveOutcome.Applied, leaveResult.Outcome);
         var compactOtherMobilePartyId = ObjectManager.Compact(otherMobilePartyId, typeof(MobileParty));
         Assert.All(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
@@ -2636,7 +2642,8 @@ public class VillageHostileActionTests : MapEventTestBase
             defenderPartyId,
             attackerPartyId,
             forcePlayerOutFromSettlement: false,
-            ConversationRestartSource.PlayerEncounter)));
+            ConversationRestartSource.PlayerEncounter,
+            false)));
     }
 
     private void RequestHostileAction(
