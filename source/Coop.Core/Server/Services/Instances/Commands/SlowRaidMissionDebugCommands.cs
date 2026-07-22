@@ -2,6 +2,7 @@
 using Common;
 using GameInterface;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -79,10 +80,10 @@ public static class SlowRaidMissionDebugCommands
                 return "Created raid objects were not registered.";
             }
 
-            activeFixtures[mapEventId] = new RaidFixture(settlement, defenderSnapshot);
-
             playerParty.Position = settlement.GatePosition + new Vec2(1.5f, 0f);
             playerParty.SetMoveModeHold();
+            RaidDebugFixture.RegisterMissionParticipant(mapEvent, args[0], playerParty);
+            activeFixtures[mapEventId] = new RaidFixture(mapEvent, settlement, defenderSnapshot);
 
             return $"created=true; controller={args[0]}; settlement={args[1]}; mapEvent={mapEventId}; " +
                    $"raider={raiderId}; raiderStringId={raider.StringId}; activeSlow=true; instanceOccupied=false; " +
@@ -92,6 +93,7 @@ public static class SlowRaidMissionDebugCommands
         }
         catch
         {
+            RaidDebugFixture.UnregisterMissionParticipant(mapEvent);
             mapEvent?.FinalizeEvent();
             RestoreDefenders(settlement, defenderSnapshot);
             throw;
@@ -134,7 +136,8 @@ public static class SlowRaidMissionDebugCommands
         if (args.Count != 1)
             return "Usage: coop.debug.mapevent.opposing_raid_cleanup <mapEventId>";
 
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !ContainerProvider.TryResolve<IBattleTroopReserveBuilder>(out var reserveBuilder))
             return "Unable to resolve opposing raid fixture services.";
 
         activeFixtures.TryGetValue(args[0], out var fixture);
@@ -147,12 +150,15 @@ public static class SlowRaidMissionDebugCommands
             membershipRegistry.IsInstanceOccupied(args[0]))
             return "Exit the battle mission before cleaning up the raid.";
 
+        var fixtureMapEvent = mapEvent ?? fixture?.MapEvent;
         try
         {
+            reserveBuilder.ForgetMapEvent(fixtureMapEvent);
             mapEvent?.FinalizeEvent();
         }
         finally
         {
+            RaidDebugFixture.UnregisterMissionParticipant(fixtureMapEvent);
             if (fixture != null)
             {
                 RestoreDefenders(fixture.Settlement, fixture.DefenderRoster);
@@ -275,11 +281,13 @@ public static class SlowRaidMissionDebugCommands
 
     private sealed class RaidFixture
     {
+        public MapEvent MapEvent { get; }
         public Settlement Settlement { get; }
         public IReadOnlyList<TroopRosterElement> DefenderRoster { get; }
 
-        public RaidFixture(Settlement settlement, IReadOnlyList<TroopRosterElement> defenderRoster)
+        public RaidFixture(MapEvent mapEvent, Settlement settlement, IReadOnlyList<TroopRosterElement> defenderRoster)
         {
+            MapEvent = mapEvent;
             Settlement = settlement;
             DefenderRoster = defenderRoster;
         }

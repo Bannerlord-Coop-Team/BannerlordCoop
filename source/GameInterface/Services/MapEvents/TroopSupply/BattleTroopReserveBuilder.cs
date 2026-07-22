@@ -114,6 +114,10 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 defender.Add(reserve);
         }
 
+#if DEBUG
+        AddDebugMissionParticipantReserve(mapEvent, mapEventId, controllerId, defender);
+#endif
+
         Logger.Information("[TroopSupply] Owned reserves for {Controller} (isHost={IsHost}): Attacker={AtkParties}p/{AtkEntries}e, Defender={DefParties}p/{DefEntries}e",
             controllerId, isHost, attacker.Count, CountEntries(attacker), defender.Count, CountEntries(defender));
 
@@ -156,6 +160,12 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             foreach (var party in EnumerateParties(mapEvent))
                 if (objectManager.TryGetId(party, out var partyId) && builtParties.Remove(partyId))
                     forgotten++;
+
+#if DEBUG
+            if (RaidDebugFixture.TryGetMissionReserveParty(mapEvent, out var participant) &&
+                objectManager.TryGetId(participant, out var participantId) && builtParties.Remove(participantId))
+                forgotten++;
+#endif
 
             // Drop the whole battle's reserves in one shot — covers every party (including any no longer
             // enumerable) and leaves no empty per-battle entry behind, so a restart re-flattens fresh.
@@ -231,6 +241,37 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         }
         return entries;
     }
+
+#if DEBUG
+    private void AddDebugMissionParticipantReserve(
+        MapEvent mapEvent,
+        string mapEventId,
+        string controllerId,
+        List<PartyReserve> defender)
+    {
+        if (!RaidDebugFixture.TryGetMissionReserveParty(mapEvent, controllerId, out var participant) ||
+            !objectManager.TryGetId(participant, out var partyId))
+            return;
+
+        lock (gate)
+        {
+            if (builtParties.Add(partyId))
+            {
+                var entries = FlattenParty(participant);
+                ledger.SetReserve(mapEventId, partyId, entries);
+                Logger.Information("[TroopSupply] Built DEBUG slow-raid reserve: party {PartyId} side Defender -> {Count} troops",
+                    partyId, entries.Count);
+            }
+        }
+
+        if (!ledger.TryGetReserve(mapEventId, partyId, out var reserveEntries, out var supplied))
+            return;
+
+        var entriesArray = new TroopReserveEntry[reserveEntries.Count];
+        for (int i = 0; i < reserveEntries.Count; i++) entriesArray[i] = reserveEntries[i];
+        defender.Add(new PartyReserve(partyId, supplied, entriesArray));
+    }
+#endif
 
     /// <summary>
     /// The controller that owns a party's reserve, or null if no present player does (so the host fields it).
