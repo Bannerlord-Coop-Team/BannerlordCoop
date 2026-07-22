@@ -45,6 +45,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IMissionContext missionContext;
+    private readonly IReinforcementFielder reinforcementFielder;
 
     // Hosts whose own party withdrew — read when the promotion lands so the adoption knows to leave those
     // troops to the despawn instead of adopting them. Only touched from broker handlers,
@@ -62,7 +63,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        IReinforcementFielder reinforcementFielder)
     {
         this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
@@ -74,6 +76,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
         this.missionContext = missionContext;
+        this.reinforcementFielder = reinforcementFielder;
 
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -112,6 +115,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (session.IsHostController(controllerId)) return;
         if (!session.IsLocalHost) return;
 
+        reinforcementFielder.PrepareForReserveOwnershipExpansion();
         AdoptAgentsFrom(controllerId, "player disconnect", withdrawOwnParty: false);
     }
 

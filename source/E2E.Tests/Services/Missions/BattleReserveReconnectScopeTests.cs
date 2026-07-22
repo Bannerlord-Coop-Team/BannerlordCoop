@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Handlers;
@@ -271,6 +272,93 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             var returnerDefender = LatestSideParties(returnerFeeds, BattleSideEnum.Defender);
             Assert.NotNull(returnerDefender);
             Assert.Contains(returningMepId, returnerDefender);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-031")]
+    public void ConnectedPlayerDisconnectingBeforeMissionEntry_FallsIntoTheCurrentHostsReserveScope()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "loading-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var loading = clients[1];
+
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
+            var loadingMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
+
+            // The second player is connected and registered in the MapEvent but has not entered the mission.
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("loading-ctrl", loading.NetPeer));
+            EnterBattle(host, mapEventId);
+            AssertHost(Server, mapEventId, "host-ctrl");
+
+            var initialHostParties = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+                .Where(message => message.MapEventId == mapEventId)
+                .SelectMany(message => message.Parties)
+                .Select(party => party.PartyId);
+            Assert.DoesNotContain(loadingMepId, initialHostParties);
+
+            int feedBaseline = FeedBaseline(host, mapEventId);
+            int expansionBaseline = host.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>()
+                .Count(message => message.MapEventId == mapEventId);
+
+            // The real disconnect event cannot produce MissionMemberDeparted because this player never joined
+            // the mission. The MapEvent disconnect signal must still transfer its reserve to the current host.
+            Server.SimulateMessage(this, new PlayerDisconnected(loading.NetPeer, default));
+
+            var expansions = host.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>()
+                .Where(message => message.MapEventId == mapEventId)
+                .Skip(expansionBaseline)
+                .ToArray();
+            Assert.Single(expansions);
+
+            var feeds = FeedsSince(host, mapEventId, feedBaseline);
+            var defenderParties = LatestSideParties(feeds, BattleSideEnum.Defender);
+            Assert.NotNull(defenderParties);
+            Assert.Contains(loadingMepId, defenderParties);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-031")]
+    public void PlayerDisconnectingBeforeAnyMissionExists_IsInheritedWhenAHostLaterEnters()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("future-host-ctrl", "offline-ctrl");
+        var clients = Clients.ToArray();
+        var futureHost = clients[0];
+        var offline = clients[1];
+
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
+            var offlineMepId = GetMapEventPartyId(mapEventId, partyIds[1]);
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("offline-ctrl", offline.NetPeer));
+
+            Server.SimulateMessage(this, new PlayerDisconnected(offline.NetPeer, default));
+
+            Assert.DoesNotContain(
+                futureHost.InternalMessages.GetMessages<NetworkBattleReserveOwnershipExpanded>(),
+                message => message.MapEventId == mapEventId);
+
+            EnterBattle(futureHost, mapEventId);
+
+            var inherited = futureHost.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+                .Where(message => message.MapEventId == mapEventId)
+                .SelectMany(message => message.Parties)
+                .LastOrDefault(party => party.PartyId == offlineMepId);
+            Assert.NotNull(inherited);
         }
         finally
         {

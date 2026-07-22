@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Serilog;
@@ -25,6 +26,9 @@ namespace Missions.Battles;
 /// </summary>
 public interface IReinforcementFielder : IDisposable
 {
+    /// <summary>[Network thread] Snapshot the current reserves before this host receives newly-owned parties.</summary>
+    void PrepareForReserveOwnershipExpansion();
+
     /// <summary>[Game thread] Field queued migration reserves as battle capacity becomes available.</summary>
     void Tick();
 }
@@ -106,12 +110,14 @@ public class ReinforcementFielder : IReinforcementFielder
         // [Host] A new AI party joining the live battle is fielded through our own spawn path (reinforcements).
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
         messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+        messageBroker.Subscribe<NetworkBattleReserveOwnershipExpanded>(Handle_ReserveOwnershipExpanded);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+        messageBroker.Unsubscribe<NetworkBattleReserveOwnershipExpanded>(Handle_ReserveOwnershipExpanded);
     }
 
     public void Tick()
@@ -135,6 +141,17 @@ public class ReinforcementFielder : IReinforcementFielder
     private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
     {
         if (payload.What.MapEventId != session.InstanceId) return;
+        PrepareForReserveOwnershipExpansion();
+    }
+
+    private void Handle_ReserveOwnershipExpanded(MessagePayload<NetworkBattleReserveOwnershipExpanded> payload)
+    {
+        if (payload.What.MapEventId != session.InstanceId) return;
+        PrepareForReserveOwnershipExpansion();
+    }
+
+    public void PrepareForReserveOwnershipExpansion()
+    {
         if (!TryGetSuppliers(out var defenderSupplier, out var attackerSupplier)) return;
 
         var knownPartyIds = new HashSet<string>();
@@ -147,7 +164,12 @@ public class ReinforcementFielder : IReinforcementFielder
             knownPartyIds);
 
         lock (migrationGate)
-            pendingMigration = snapshot;
+        {
+            // A host-migration signal and the server's ownership-expansion signal can describe the same
+            // refresh. Keep the earlier snapshot until both side replies have arrived.
+            if (pendingMigration == null)
+                pendingMigration = snapshot;
+        }
     }
 
     private static void AddPartyIds(CoopTroopSupplier supplier, HashSet<string> partyIds)

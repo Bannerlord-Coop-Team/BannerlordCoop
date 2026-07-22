@@ -136,6 +136,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<NetworkRequestBattleHost>(Handle_NetworkRequestBattleHost);
         messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Subscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
+        messageBroker.Subscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -148,6 +149,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestBattleHost>(Handle_NetworkRequestBattleHost);
         messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Unsubscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
+        messageBroker.Unsubscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
@@ -672,6 +674,7 @@ internal class BattleHostHandler : IHandler
             // first-ready host's reserve build never saw the drop, so it never inherited that still-registered
             // party.
             objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent);
+            bool newlyAbsent = false;
             if (payload.What.WasRetreat)
             {
                 if (mapEvent != null)
@@ -679,7 +682,7 @@ internal class BattleHostHandler : IHandler
             }
             else
             {
-                MarkAbsent(mapEventId, controllerId);
+                newlyAbsent = MarkAbsent(mapEventId, controllerId);
             }
 
             // If the departed member had a return grant pending (it re-entered and dropped AGAIN before the
@@ -757,9 +760,30 @@ internal class BattleHostHandler : IHandler
                 network.SendAll(ToMessage(mapEventId, updated));
             }
 
-            if (!payload.What.WasRetreat && mapEvent != null && assignment.HostControllerId != controllerId)
+            if (newlyAbsent && mapEvent != null && assignment.HostControllerId != controllerId)
                 RefreshHostAfterMemberDrop(mapEventId, mapEvent, assignment.HostControllerId, controllerId);
         });
+    }
+
+    // The party-visibility handler still has the peer-to-player mapping when a disconnect begins. This signal
+    // covers a player whose party is in the MapEvent but who dropped before joining the mission instance.
+    private void Handle_PlayerDisconnectedFromMapEvent(MessagePayload<PlayerDisconnectedFromMapEvent> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var controllerId = payload.What.ControllerId;
+        var mapEvent = payload.What.MapEvent;
+        if (mapEvent == null || !objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
+        bool hasAssignment = hostRegistry.TryGet(mapEventId, out var assignment);
+        if (!battleRuntimeStates.ContainsKey(mapEventId) && !hasAssignment) return;
+
+        MarkDeparted(mapEventId, controllerId);
+        bool newlyAbsent = MarkAbsent(mapEventId, controllerId);
+        CancelPendingReturns(mapEventId, controllerId);
+        if (!newlyAbsent || !hasAssignment) return;
+        if (assignment.HostControllerId == controllerId) return;
+
+        RefreshHostAfterMemberDrop(mapEventId, mapEvent, assignment.HostControllerId, controllerId);
     }
 
     /// <summary>[Client] Store the server's host assignment for this battle.</summary>
@@ -853,13 +877,15 @@ internal class BattleHostHandler : IHandler
 
     // [Server, game thread] A member was marked absent without withdrawing: its parties fall into the host's
     // reserve scope until it returns (see HandleControllerReturn).
-    private void MarkAbsent(string mapEventId, string controllerId)
+    private bool MarkAbsent(string mapEventId, string controllerId)
     {
-        if (string.IsNullOrEmpty(controllerId)) return;
+        if (string.IsNullOrEmpty(controllerId)) return false;
 
-        if (GetOrCreateRuntimeState(mapEventId).AbsentControllers.Add(controllerId))
+        bool added = GetOrCreateRuntimeState(mapEventId).AbsentControllers.Add(controllerId);
+        if (added)
             Logger.Information("[BattleHost] {Controller} was marked absent from battle {MapEventId}; its parties fall to the host's reserve scope until it returns",
                 controllerId, mapEventId);
+        return added;
     }
 
     private void MarkPresent(string mapEventId, string controllerId)
@@ -900,6 +926,7 @@ internal class BattleHostHandler : IHandler
         }
 
         var host = runtimeState.HostEndpoint;
+        network.Send(host.Peer, new NetworkBattleReserveOwnershipExpanded(mapEventId));
         var refresh = BuildOwnedReserves(mapEventId, mapEvent, hostControllerId, includeEmptySides: true);
         SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: false);
         Logger.Information("[BattleHost] Pushed {Dropped}'s remaining reserves to host {Host} in {MapEventId}",
