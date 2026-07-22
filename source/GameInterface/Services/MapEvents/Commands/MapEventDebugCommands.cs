@@ -146,6 +146,31 @@ public class MapEventDebugCommands
         objectManager.TryGetId(raid, out var mapEventId);
         return $"attack=true; raider={args[0]}; mapEvent={mapEventId}; deploymentRequested=true";
     }
+
+    [CommandLineArgumentFunction("finish_deployment", "coop.debug.mapevent")]
+    public static string FinishDeployment(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on Player 1.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.finish_deployment";
+
+        var mission = Mission.Current;
+        var deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+            return "No active deployment phase.";
+
+        if (!deploymentController.TeamSetupOver)
+            return "Deployment teams are not ready.";
+
+        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+        if (deploymentHandler == null)
+            return "No deployment handler is attached.";
+
+        deploymentHandler.FinishDeployment();
+        return $"deploymentFinished=true; missionMode={mission.Mode}; mainAgent={Agent.Main != null}";
+    }
 #endif
 
     // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
