@@ -22,7 +22,7 @@ internal class DisablePartyCampaignBehaviorPatch
         AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.HourlyTick)),
         AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnMobilePartyDestroyed)),
         AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnHeroTeleportationRequested)),
-        AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnHeroPrisonerTaken)),
+        //AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnHeroPrisonerTaken)),
         AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnPartyDisbanded)),
         //AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.OnSessionLaunched)), Needed on client to load dialogue for interacting with disbanding parties
         AccessTools.Method(typeof(DisbandPartyCampaignBehavior), nameof(DisbandPartyCampaignBehavior.DailyTickParty)),

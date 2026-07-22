@@ -2,6 +2,7 @@ using Common;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -25,9 +26,12 @@ internal class PlayerDebugCommands
 
         var players = playerManager.Players;
 
+        var active_players = playerManager.Players.Where(playerManager.IsConnected).ToList();
+
         var sb = new StringBuilder();
         sb.AppendLine($"Side: {(ModInformation.IsServer ? "Server" : "Client")}  LocalControllerId: {localId ?? "<unknown>"}");
         sb.AppendLine($"Registered players: {players.Count} (expected: one per client, host excluded)");
+        sb.AppendLine($"Active players: {active_players.Count} (expected: one per client, host excluded)");
 
         // PlayerObjects (the hero/party/clan -> controller table) is not enumerable, so report it indirectly:
         // each player contributes its resolvable, registered hero/party/clan. The total should be 3x the
