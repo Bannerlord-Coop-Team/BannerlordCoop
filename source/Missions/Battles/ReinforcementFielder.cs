@@ -606,15 +606,10 @@ public class ReinforcementFielder : IReinforcementFielder
     }
 
     // BR-110: render slots a reinforcement origin consumes when spawned — a mounted troop spawns a rider and a
-    // horse (2), everyone else 1. Mirrors the equipment selection SpawnReinforcementTroop uses.
+    // horse (2), everyone else 1. The shared budget reads the same equipment SpawnReinforcementTroop spawns
+    // from; a null origin keeps its historical rider-only cost (call sites never pass one).
     private int SlotsForOrigin(CoopAgentOrigin origin)
-    {
-        var character = origin?.Troop as CharacterObject;
-        var equipment = character == null
-            ? null
-            : (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
-        return agentBudget.SlotsForEquipment(equipment);
-    }
+        => origin == null ? 1 : agentBudget.SlotsForOrigin(origin);
 
     // [Host, game thread] Field reinforcement troops withheld at the engine agent limit (BR-110) as removals
     // free capacity.

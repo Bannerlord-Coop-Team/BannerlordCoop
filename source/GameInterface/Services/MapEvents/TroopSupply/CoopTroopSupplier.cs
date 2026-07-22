@@ -308,13 +308,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private int SlotsForOrigin(IAgentOriginBase origin)
     {
         if (origin == null) return 0;
-        if (agentBudget == null) return 1;
-
-        var character = origin.Troop as CharacterObject;
-        var equipment = character == null
-            ? null
-            : (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
-        return agentBudget.SlotsForEquipment(equipment);
+        return agentBudget == null ? 1 : agentBudget.SlotsForOrigin(origin);
     }
 
     public IAgentOriginBase SupplyOneTroop()

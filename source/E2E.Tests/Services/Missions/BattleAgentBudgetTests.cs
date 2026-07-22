@@ -71,4 +71,13 @@ public class BattleAgentBudgetTests
         equipment[EquipmentIndex.Horse] = new EquipmentElement(new ItemObject());
         Assert.Equal(1, budget.SlotsForEquipment(equipment));
     }
+
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void SlotsForOrigin_NullOrigin_SpawnsNothingAndCostsNothing()
+    {
+        // (Mounted/unmounted origin costing is covered through the drip-clamp tests in
+        // BattleAgentRenderCapTests, which need the harness's registered CharacterObjects.)
+        Assert.Equal(0, budget.SlotsForOrigin(null));
+    }
 }

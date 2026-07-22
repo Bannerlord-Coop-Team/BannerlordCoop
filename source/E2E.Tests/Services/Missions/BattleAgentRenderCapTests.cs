@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.Instance;
@@ -15,9 +16,11 @@ using Missions.Battles;
 using Missions.Data;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
@@ -532,11 +535,21 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         });
     }
 
+    /// <summary>Reserved-troop origins over <paramref name="character"/> — the FIFO list the native drip
+    /// clamp walks; only the troop (and its equipment) matters to slot costing.</summary>
+    private static List<IAgentOriginBase> ReservedOrigins(CharacterObject character, int count)
+    {
+        var origins = new List<IAgentOriginBase>(count);
+        for (int i = 0; i < count; i++)
+            origins.Add(new SimpleAgentOrigin(character, -1, null, default));
+        return origins;
+    }
+
     /// <summary>
     /// BR-110 native drip gate (MissionSpawnCapacityPatch): the reserved wave spawns over ticks via the native
     /// per-side SpawnTroops; each drip is clamped to the LIVE remaining capacity so a wave reserved earlier
-    /// cannot spend slots that other paths have since consumed. Null mission/budget and non-positive drips pass
-    /// through untouched.
+    /// cannot spend slots that other paths have since consumed. Unmounted reserved troops cost one slot each;
+    /// null mission/budget and non-positive drips pass through untouched.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-110")]
@@ -544,22 +557,156 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
     {
         using var fixture = new MissionEngineFixture();
         var budget = new BattleAgentBudget();
+        var characterId = CreateRegisteredObject<CharacterObject>();
         var client = Clients.First();
 
         client.Call(() =>
         {
-            var mock = new MockMission();
+            // Unmounted troops — one render slot each (the harness's CharacterObjectBuilder fills the Horse
+            // slot with a placeholder, which would otherwise read as a mount).
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            character.Equipment[EquipmentIndex.Horse] = default;
 
-            Assert.Equal(300, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300)); // empty — unclamped
+            var mock = fixture.CreateMission(client);
+            var reserved = ReservedOrigins(character, 300);
+
+            Assert.Equal(300, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300, reserved, true, true)); // empty — unclamped
 
             FloodToLiveCount(mock, EngineAgentLimit - 5);
-            Assert.Equal(5, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300));    // only 5 slots free
+            Assert.Equal(5, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300, reserved, true, true));    // only 5 slots free
 
             FloodToLiveCount(mock, EngineAgentLimit);
-            Assert.Equal(0, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300));    // at the limit
+            Assert.Equal(0, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300, reserved, true, true));    // at the limit
 
-            Assert.Equal(50, MissionSpawnCapacityPatch.ClampSpawnNumber(null, budget, 50));          // no mission — passthrough
-            Assert.Equal(-1, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, -1));    // non-positive — passthrough
+            Assert.Equal(50, MissionSpawnCapacityPatch.ClampSpawnNumber(null, budget, 50, reserved, true, true));          // no mission — passthrough
+            Assert.Equal(-1, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, -1, reserved, true, true));    // non-positive — passthrough
+        });
+    }
+
+    /// <summary>
+    /// The drip clamp is by RENDER SLOTS, not troop count: a mounted reserved origin spawns rider AND horse in
+    /// one call — two slots — so with a single slot free the drip spawns NOTHING (a troop-count clamp would
+    /// return 1 and take the mission to 2001). With two slots free the pair fits.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void NativeDrip_MountedReservedTroop_WithOneSlotFree_SpawnsNothing()
+    {
+        using var fixture = new MissionEngineFixture();
+        var budget = new BattleAgentBudget();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            character.Equipment[EquipmentIndex.Horse] = new EquipmentElement(new ItemObject { ItemComponent = new HorseComponent() });
+
+            var mock = fixture.CreateMission(client);
+            var reserved = ReservedOrigins(character, 10);
+
+            FloodToLiveCount(mock, EngineAgentLimit - 1);   // one slot free — not enough for rider + horse
+            Assert.Equal(0, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 1, reserved, true, false));
+
+            DeactivateAgents(mock, 1);                      // two slots free — the pair fits
+            Assert.Equal(1, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 1, reserved, true, false));
+
+            DeactivateAgents(mock, 3);                      // five free: two mounted troops (4 slots) fit, a third needs one more
+            Assert.Equal(2, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 10, reserved, true, false));
+        });
+    }
+
+    /// <summary>
+    /// The drip charges each reserved troop its own cost IN ORDER and stops at the first that does not fit —
+    /// it never skips a mounted troop to spawn a cheaper one queued behind it (the reserve spawns FIFO).
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void NativeDrip_MixedReserve_StopsAtFirstTroopThatDoesNotFit()
+    {
+        using var fixture = new MissionEngineFixture();
+        var budget = new BattleAgentBudget();
+        var footId = CreateRegisteredObject<CharacterObject>();
+        var cavalryId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(footId, out var foot));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(cavalryId, out var cavalry));
+            // The client-side copies of both characters resolve to ONE shared equipment roster (registry
+            // replication interns them), so give the foot its own unmounted roster before mounting the cavalry.
+            foot._equipmentRoster = new MBEquipmentRoster
+            {
+                _equipments = new MBList<Equipment> { new Equipment(Equipment.EquipmentType.Battle) },
+            };
+            cavalry.Equipment[EquipmentIndex.Horse] = new EquipmentElement(new ItemObject { ItemComponent = new HorseComponent() });
+            Assert.Equal(1, budget.SlotsForOrigin(new SimpleAgentOrigin(foot, -1, null, default)));    // arrange: foot = 1 slot
+            Assert.Equal(2, budget.SlotsForOrigin(new SimpleAgentOrigin(cavalry, -1, null, default))); // arrange: cavalry = 2 slots
+
+            var mock = fixture.CreateMission(client);
+            var reserved = new List<IAgentOriginBase>
+            {
+                new SimpleAgentOrigin(foot, -1, null, default),
+                new SimpleAgentOrigin(cavalry, -1, null, default),
+                new SimpleAgentOrigin(foot, -1, null, default),
+                new SimpleAgentOrigin(foot, -1, null, default),
+            };
+
+            FloodToLiveCount(mock, EngineAgentLimit - 2);   // two free: foot fits (1), the cavalry behind it needs 2 more
+            Assert.Equal(1, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 4, reserved, true, false));
+
+            DeactivateAgents(mock, 2);                      // four free: foot(1) + cavalry(2) + foot(1) fit, the last foot does not
+            Assert.Equal(3, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 4, reserved, true, false));
+        });
+    }
+
+    /// <summary>
+    /// A side spawning WITHOUT horses (siege assaults dismount everyone) mints no mounts — a mounted troop's
+    /// drip costs one slot, so the dismounted wave is not over-withheld.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void NativeDrip_SpawnWithoutHorses_MountedTroopCostsOneSlot()
+    {
+        using var fixture = new MissionEngineFixture();
+        var budget = new BattleAgentBudget();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            character.Equipment[EquipmentIndex.Horse] = new EquipmentElement(new ItemObject { ItemComponent = new HorseComponent() });
+
+            var mock = fixture.CreateMission(client);
+            var reserved = ReservedOrigins(character, 5);
+
+            FloodToLiveCount(mock, EngineAgentLimit - 2);   // two slots free — two dismounted riders fit
+            Assert.Equal(2, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 5, reserved, spawnWithHorses: false, forceSpawnPlayerMounted: false));
+        });
+    }
+
+    /// <summary>
+    /// A request past the end of the reserve tops up from the supplier — those origins are unknown at clamp
+    /// time, so each is charged the mounted worst case (2 slots) and the top-up can never overshoot. (Both
+    /// native call sites request within the reserve; this pins the conservative fallback.)
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void NativeDrip_RequestBeyondReserve_ChargesWorstCaseForUnknownTroops()
+    {
+        using var fixture = new MissionEngineFixture();
+        var budget = new BattleAgentBudget();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            FloodToLiveCount(mock, EngineAgentLimit - 10);  // ten slots free / 2 per unknown troop
+
+            Assert.Equal(5, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 10, new List<IAgentOriginBase>(), true, false));
+            Assert.Equal(5, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 10, null, true, false));
         });
     }
 }

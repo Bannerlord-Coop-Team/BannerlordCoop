@@ -1,4 +1,5 @@
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -30,6 +31,11 @@ public interface IBattleAgentBudget
     /// <summary>Render slots one spawn consumes: 2 when the equipment mounts a horse (the engine spawns the
     /// rider and its mount together in a single <see cref="Mission.SpawnAgent"/> call), else 1.</summary>
     int SlotsForEquipment(Equipment equipment);
+
+    /// <summary>Render slots spawning <paramref name="origin"/> consumes — <see cref="SlotsForEquipment"/> of
+    /// the equipment the origin's troop fights in (a hero's battle equipment, a regular's character
+    /// equipment). A null origin spawns nothing and costs 0.</summary>
+    int SlotsForOrigin(IAgentOriginBase origin);
 }
 
 /// <inheritdoc cref="IBattleAgentBudget"/>
@@ -76,5 +82,18 @@ public class BattleAgentBudget : IBattleAgentBudget
         // Horse-slot item is a ridable mount.)
         var horse = equipment?.Horse.Item;
         return horse != null && horse.HasHorseComponent ? 2 : 1;
+    }
+
+    /// <inheritdoc/>
+    public int SlotsForOrigin(IAgentOriginBase origin)
+    {
+        if (origin == null) return 0;
+
+        // A troop outside the campaign type system resolves no equipment and costs the rider-only minimum.
+        var character = origin.Troop as CharacterObject;
+        var equipment = character == null
+            ? null
+            : (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
+        return SlotsForEquipment(equipment);
     }
 }
