@@ -53,6 +53,14 @@ public class MapEventDebugCommands
         public string MilitiaMobilePartyId { get; set; }
         public PartyBehaviorUpdateData MilitiaBehavior { get; set; }
         public bool AllowRaidAiIntervention { get; set; }
+        public List<FactionStanceSnapshot> FactionStances { get; set; }
+    }
+
+    private sealed class FactionStanceSnapshot
+    {
+        public IFaction PlayerFaction { get; set; }
+        public IFaction VillageFaction { get; set; }
+        public StanceType StanceType { get; set; }
     }
 
     /// <summary>
@@ -277,16 +285,14 @@ public class MapEventDebugCommands
                         s.Party.MapEvent == null && s.MilitiaPartyComponent?.MobileParty?.IsActive == true &&
                         s.MilitiaPartyComponent.MobileParty.MapEvent == null &&
                         s.MilitiaPartyComponent.MobileParty.MemberRoster.TotalManCount > 0 &&
-                        VillageHostileFactionStanceHelper.HasWarStance(
-                            firstFaction, s.MapFaction?.MapFaction ?? s.MapFaction) &&
-                        VillageHostileFactionStanceHelper.HasWarStance(
-                            joiningFaction, s.MapFaction?.MapFaction ?? s.MapFaction))
+                        firstFaction != (s.MapFaction?.MapFaction ?? s.MapFaction) &&
+                        joiningFaction != (s.MapFaction?.MapFaction ?? s.MapFaction))
             .OrderBy(s => s.Position.ToVec2().DistanceSquared(firstPosition))
             .FirstOrDefault();
 
         if (village == null)
         {
-            return "No hostile normal village with an active militia party was found for both players.";
+            return "No normal village with an active militia party was found for both players.";
         }
 
         var militiaParty = village.MilitiaPartyComponent.MobileParty;
@@ -307,6 +313,15 @@ public class MapEventDebugCommands
 
         var originalVillageHitPoints = village.SettlementHitPoints;
         var originalAllowRaidAiIntervention = MapEventConfig.AllowRaidAiIntervention;
+        var factionStances = new List<FactionStanceSnapshot>();
+        var villageFaction = village.MapFaction?.MapFaction ?? village.MapFaction;
+        if (!TryApplyTemporaryWarStance(firstFaction, villageFaction, factionStances) ||
+            !TryApplyTemporaryWarStance(joiningFaction, villageFaction, factionStances))
+        {
+            RestoreFactionStances(factionStances);
+            return $"Unable to establish temporary hostility against {village.Name}.";
+        }
+
         raidConfigHandler.SetAndBroadcast(true);
         var mapEvent = MapEventBattleFactory.CreateMapEvent(firstParty.Party, village.Party, default);
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out string mapEventId))
@@ -321,6 +336,7 @@ public class MapEventDebugCommands
                 ChangeVillageStateAction.ApplyBySettingToNormal(village);
             village.SettlementHitPoints = originalVillageHitPoints;
             raidConfigHandler.SetAndBroadcast(originalAllowRaidAiIntervention);
+            RestoreFactionStances(factionStances);
             return "Unable to create or resolve the fixture map event.";
         }
 
@@ -338,6 +354,7 @@ public class MapEventDebugCommands
             MilitiaMobilePartyId = militiaMobilePartyId,
             MilitiaBehavior = militiaBehavior,
             AllowRaidAiIntervention = originalAllowRaidAiIntervention,
+            FactionStances = factionStances,
         };
 
         var hasVillageMilitiaResistance = mapEvent.EventType == MapEvent.BattleTypes.Raid &&
@@ -482,6 +499,7 @@ public class MapEventDebugCommands
             fixture.VillageSettlementId,
             fixture.VillageSettlementHitPoints,
             objectManager) && restored;
+        restored = RestoreFactionStances(fixture.FactionStances) && restored;
 
         if (ContainerProvider.TryResolve<RaidAiInterventionConfigHandler>(out var raidConfigHandler))
         {
@@ -510,6 +528,50 @@ public class MapEventDebugCommands
         settlement.SettlementHitPoints = settlementHitPoints;
         return settlement.Village.VillageState == Village.VillageStates.Normal &&
                settlement.SettlementHitPoints == settlementHitPoints;
+    }
+
+    private static bool TryApplyTemporaryWarStance(
+        IFaction playerFaction,
+        IFaction villageFaction,
+        List<FactionStanceSnapshot> snapshots)
+    {
+        if (playerFaction == null || villageFaction == null || playerFaction == villageFaction)
+            return false;
+
+        if (snapshots.Any(snapshot => snapshot.PlayerFaction == playerFaction &&
+                                      snapshot.VillageFaction == villageFaction))
+            return true;
+
+        var stanceLink = FactionManager.Instance.GetStanceLinkInternal(playerFaction, villageFaction);
+        snapshots.Add(new FactionStanceSnapshot
+        {
+            PlayerFaction = playerFaction,
+            VillageFaction = villageFaction,
+            StanceType = stanceLink.StanceType,
+        });
+        VillageHostileFactionStanceHelper.ApplyWarStance(playerFaction, villageFaction);
+        return VillageHostileFactionStanceHelper.HasWarStance(playerFaction, villageFaction);
+    }
+
+    private static bool RestoreFactionStances(List<FactionStanceSnapshot> snapshots)
+    {
+        var restored = true;
+        foreach (var snapshot in snapshots)
+        {
+            FactionManager.SetStance(snapshot.PlayerFaction, snapshot.VillageFaction, snapshot.StanceType);
+            var stanceLink = FactionManager.Instance.GetStanceLinkInternal(
+                snapshot.PlayerFaction,
+                snapshot.VillageFaction);
+            stanceLink.StanceType = snapshot.StanceType;
+            snapshot.PlayerFaction.UpdateFactionsAtWarWith();
+            snapshot.VillageFaction.UpdateFactionsAtWarWith();
+
+            var shouldBeAtWar = snapshot.StanceType == StanceType.War;
+            restored = VillageHostileFactionStanceHelper.HasWarStance(
+                snapshot.PlayerFaction,
+                snapshot.VillageFaction) == shouldBeAtWar && restored;
+        }
+        return restored;
     }
 
     private static bool RestorePartyBehavior(
