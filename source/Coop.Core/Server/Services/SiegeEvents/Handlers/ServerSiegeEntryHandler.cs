@@ -221,13 +221,13 @@ internal class ServerSiegeEntryHandler : IHandler
             if (party.BesiegerCamp == null)
             {
                 Logger.Error("Party {PartyId} tried to leave a siege camp it is not in", obj.PartyId);
-                network.Send(peer, new NetworkBreakSiegeApproved(false));
+                network.Send(peer, new NetworkBreakSiegeApproved(false, obj.FinishLocalMenus));
                 return;
             }
 
             siegeEventInterface.BreakSiege(party);
 
-            network.Send(peer, new NetworkBreakSiegeApproved(true));
+            network.Send(peer, new NetworkBreakSiegeApproved(true, obj.FinishLocalMenus));
         });
     }
 
