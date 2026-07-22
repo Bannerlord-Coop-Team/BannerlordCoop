@@ -3,6 +3,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MapEvents;
@@ -10,9 +11,11 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
+using ProtoBuf;
 using Serilog;
 using System;
 using System.Collections;
@@ -42,9 +45,11 @@ public class MapEventDebugCommands
     private sealed class LateJoinModeFixture
     {
         public string MapEventId { get; set; }
+        public string FirstControllerId { get; set; }
         public string FirstPlayerPartyId { get; set; }
         public string FirstPlayerMobilePartyId { get; set; }
         public PartyBehaviorUpdateData FirstPlayerBehavior { get; set; }
+        public string JoiningControllerId { get; set; }
         public string JoiningPlayerPartyId { get; set; }
         public string JoiningPlayerMobilePartyId { get; set; }
         public PartyBehaviorUpdateData JoiningPlayerBehavior { get; set; }
@@ -54,6 +59,7 @@ public class MapEventDebugCommands
         public PartyBehaviorUpdateData MilitiaBehavior { get; set; }
         public bool AllowRaidAiIntervention { get; set; }
         public List<FactionStanceSnapshot> FactionStances { get; set; }
+        public bool JoiningPartyJoined { get; set; }
     }
 
     private sealed class FactionStanceSnapshot
@@ -258,13 +264,13 @@ public class MapEventDebugCommands
         }
 
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
-            !playerManager.TryGetPeer(args[1], out var joiningPeer))
+            !playerManager.TryGetPeer(args[0], out var firstPeer) ||
+            !playerManager.TryGetPeer(args[1], out _))
         {
-            return $"Unable to resolve the connected peer for {args[1]}.";
+            return "Unable to resolve both connected player peers.";
         }
 
         if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
-            !ContainerProvider.TryResolve<INetwork>(out var network) ||
             !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
             !ContainerProvider.TryResolve<RaidAiInterventionConfigHandler>(out var raidConfigHandler))
         {
@@ -343,9 +349,11 @@ public class MapEventDebugCommands
         lateJoinModeFixture = new LateJoinModeFixture
         {
             MapEventId = mapEventId,
+            FirstControllerId = args[0],
             FirstPlayerPartyId = firstPartyId,
             FirstPlayerMobilePartyId = firstMobilePartyId,
             FirstPlayerBehavior = firstPlayerBehavior,
+            JoiningControllerId = args[1],
             JoiningPlayerPartyId = joiningPartyId,
             JoiningPlayerMobilePartyId = joiningMobilePartyId,
             JoiningPlayerBehavior = joiningPlayerBehavior,
@@ -368,29 +376,147 @@ public class MapEventDebugCommands
             return $"Village raid fixture {mapEventId} did not create active militia resistance.";
         }
 
-        if (!ServerBattleModeArbiter.TryClaimMission(mapEventId))
+        // Route the first player's Attack through the real server handler. The resulting mission-start and mode
+        // broadcasts reach PlayerTwo before its party belongs to the event, reproducing the missed-claim timing.
+        messageBroker.Publish(firstPeer, new NetworkBattleStartRequest(
+            Guid.NewGuid().ToString(),
+            (int)BattleStartMode.Mission,
+            mapEventId,
+            firstMobilePartyId));
+
+        return $"Late-join raid fixture created and first mission requested: mapEvent={mapEventId}, eventType={mapEvent.EventType}, " +
+               $"village={village.Name} ({village.StringId}), militiaParty={militiaParty.Name}, " +
+               $"firstPlayer={args[0]}, joiningPlayer={args[1]}, firstSide=Attacker.";
+    }
+
+    // coop.debug.mapevent.late_join_mode_join
+    /// <summary>Routes the waiting player's attacker-side join after the first player has entered the mission.</summary>
+    [CommandLineArgumentFunction("late_join_mode_join", "coop.debug.mapevent")]
+    public static string JoinLateJoinModeFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.late_join_mode_join";
+
+        var fixture = lateJoinModeFixture;
+        if (fixture == null)
+            return "No late-join mode fixture is active.";
+        if (fixture.JoiningPartyJoined)
+            return $"Player {fixture.JoiningControllerId} already joined fixture map event {fixture.MapEventId}.";
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership) ||
+            !playerManager.TryGetPeer(fixture.JoiningControllerId, out var joiningPeer))
         {
-            CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
-            return $"Unable to claim mission mode for map event {mapEventId}.";
+            return "Unable to resolve the late-join fixture services.";
         }
 
-        // PlayerTwo sees this before its party belongs to the battle and ignores it, reproducing the missed claim.
-        network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Mission));
+        if (!missionMembership.IsControllerInMission(fixture.FirstControllerId))
+            return $"Player {fixture.FirstControllerId} has not entered the field battle mission.";
+        if (missionMembership.IsControllerInMission(fixture.JoiningControllerId))
+            return $"Player {fixture.JoiningControllerId} is already in a mission.";
+        if (!ServerBattleModeArbiter.TryGetMode(fixture.MapEventId, out var mode) ||
+            mode != BattleStartMode.Mission)
+        {
+            return $"Fixture map event {fixture.MapEventId} is not claimed for Mission mode.";
+        }
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(fixture.MapEventId, out var mapEvent) ||
+            !objectManager.TryGetObjectWithLogging<PartyBase>(fixture.JoiningPlayerPartyId, out var joiningParty))
+        {
+            return "Unable to resolve the fixture map event or joining party.";
+        }
+
         messageBroker.Publish(joiningPeer, new NetworkRequestJoinBattle(
-            mapEventId,
-            joiningPartyId,
+            fixture.MapEventId,
+            fixture.JoiningPlayerPartyId,
             BattleSideEnum.Attacker));
 
         if (joiningParty.MapEvent != mapEvent)
+            return $"Player {fixture.JoiningControllerId} did not join fixture map event {fixture.MapEventId}.";
+
+        fixture.JoiningPartyJoined = true;
+        return $"Late join accepted: mapEvent={fixture.MapEventId}, joiningPlayer={fixture.JoiningControllerId}, " +
+               "side=Attacker, replayedMode=Mission, firstPlayerInMission=True, joiningPlayerInMission=False.";
+    }
+
+    // coop.debug.mapevent.late_join_mode_enter
+    /// <summary>Routes the late joiner's Attack request through the real mission-start handler.</summary>
+    [CommandLineArgumentFunction("late_join_mode_enter", "coop.debug.mapevent")]
+    public static string EnterLateJoinModeFixtureMission(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.late_join_mode_enter";
+
+        var fixture = lateJoinModeFixture;
+        if (fixture == null)
+            return "No late-join mode fixture is active.";
+        if (!fixture.JoiningPartyJoined)
+            return $"Player {fixture.JoiningControllerId} has not joined fixture map event {fixture.MapEventId}.";
+
+        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership) ||
+            !playerManager.TryGetPeer(fixture.JoiningControllerId, out var joiningPeer))
         {
-            CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
-            return $"Player {args[1]} did not join fixture map event {mapEventId}.";
+            return "Unable to resolve the late-join mission-entry services.";
         }
 
-        return $"Late-join raid fixture active: mapEvent={mapEventId}, eventType={mapEvent.EventType}, " +
-               $"village={village.Name} ({village.StringId}), militiaParty={militiaParty.Name}, " +
-               $"firstPlayer={args[0]}, joiningPlayer={args[1]}, side=Attacker, mode=Mission.";
+        if (!missionMembership.IsControllerInMission(fixture.FirstControllerId))
+            return $"Player {fixture.FirstControllerId} is no longer in the field battle mission.";
+        if (missionMembership.IsControllerInMission(fixture.JoiningControllerId))
+            return $"Player {fixture.JoiningControllerId} already entered the field battle mission.";
+
+        messageBroker.Publish(joiningPeer, new NetworkBattleStartRequest(
+            Guid.NewGuid().ToString(),
+            (int)BattleStartMode.Mission,
+            fixture.MapEventId,
+            fixture.JoiningPlayerMobilePartyId));
+
+        return $"Late joiner mission requested: mapEvent={fixture.MapEventId}, " +
+               $"joiningPlayer={fixture.JoiningControllerId}, mode=Mission.";
     }
+
+#if DEBUG
+    // coop.debug.mapevent.late_join_mode_exit_missions
+    /// <summary>Asks every fixture mission member to return to campaign before authoritative cleanup.</summary>
+    [CommandLineArgumentFunction("late_join_mode_exit_missions", "coop.debug.mapevent")]
+    public static string ExitLateJoinModeFixtureMissions(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.late_join_mode_exit_missions";
+
+        var fixture = lateJoinModeFixture;
+        if (fixture == null)
+            return "No late-join mode fixture is active.";
+
+        if (!ContainerProvider.TryResolve<INetwork>(out var network) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership))
+        {
+            return "Unable to resolve the late-join mission-exit services.";
+        }
+
+        var requested = 0;
+        foreach (var controllerId in new[] { fixture.FirstControllerId, fixture.JoiningControllerId })
+        {
+            if (!missionMembership.IsControllerInMission(controllerId) ||
+                !playerManager.TryGetPeer(controllerId, out var peer))
+                continue;
+
+            network.Send(peer, new NetworkEndLateJoinModeFixtureMission(fixture.MapEventId));
+            requested++;
+        }
+
+        return $"Late-join fixture mission exit requested for {requested} player(s).";
+    }
+#endif
 
     // coop.debug.mapevent.late_join_mode_state PlayerTwo
     /// <summary>Reports a player's map-event membership and known authoritative battle mode.</summary>
@@ -428,8 +554,17 @@ public class MapEventDebugCommands
                 mode = BattleStartMode.Simulation.ToString();
         }
 
+        var missionActive = ModInformation.IsServer
+            ? ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var missionMembership) &&
+              missionMembership.IsControllerInMission(args[0])
+            : MissionState.Current != null || Mission.Current != null;
+        var missionAgents = ModInformation.IsClient && Mission.Current != null
+            ? Mission.Current.Agents.Count
+            : 0;
+
         return $"Late-join mode state: controller={args[0]}, mapEvent={mapEventId}, eventType={eventType}, " +
-               $"village={villageName}, militiaResistance={militiaResistance}, side={side}, mode={mode}.";
+               $"village={villageName}, militiaResistance={militiaResistance}, side={side}, mode={mode}, " +
+               $"missionActive={missionActive}, missionAgents={missionAgents}.";
     }
 
     // coop.debug.mapevent.late_join_mode_cleanup
@@ -1340,3 +1475,55 @@ public class MapEventDebugCommands
         return genericTypeName + "<" + string.Join(", ", genericArguments) + ">";
     }
 }
+
+#if DEBUG
+/// <summary>[Server -&gt; Client] Ends a live-test fixture mission without resolving its campaign battle.</summary>
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkEndLateJoinModeFixtureMission : IEvent
+{
+    [ProtoMember(1)]
+    public readonly string MapEventId;
+
+    public NetworkEndLateJoinModeFixtureMission(string mapEventId)
+    {
+        MapEventId = mapEventId;
+    }
+}
+
+/// <summary>Applies the server's live-test fixture mission-exit request on participating clients.</summary>
+internal sealed class LateJoinModeFixtureMissionExitHandler : IHandler
+{
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+
+    public LateJoinModeFixtureMissionExitHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    {
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        messageBroker.Subscribe<NetworkEndLateJoinModeFixtureMission>(Handle);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<NetworkEndLateJoinModeFixtureMission>(Handle);
+    }
+
+    private void Handle(MessagePayload<NetworkEndLateJoinModeFixtureMission> payload)
+    {
+        if (ModInformation.IsServer)
+            return;
+
+        var mapEventId = payload.What.MapEventId;
+        GameThread.RunSafe(() =>
+        {
+            var mapEvent = MobileParty.MainParty?.MapEvent;
+            if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var localMapEventId) ||
+                localMapEventId != mapEventId)
+                return;
+
+            var mission = Mission.Current ?? MissionState.Current?.CurrentMission;
+            mission?.EndMission();
+        }, context: nameof(NetworkEndLateJoinModeFixtureMission));
+    }
+}
+#endif
