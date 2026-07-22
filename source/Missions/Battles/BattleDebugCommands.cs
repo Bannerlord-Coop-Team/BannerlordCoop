@@ -9,6 +9,7 @@ using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace Missions.Battles;
 
+/// <summary>Reports and controls state needed to verify co-op battle synchronization.</summary>
 internal static class BattleDebugCommands
 {
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
@@ -54,7 +55,7 @@ internal static class BattleDebugCommands
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
         var playerTeam = mission?.PlayerTeam;
-        if (mission == null || controller == null || playerTeam == null)
+        if (mission == null || controller == null)
         {
             return "No active coop battle mission";
         }
@@ -65,12 +66,19 @@ internal static class BattleDebugCommands
             observedMission = mission;
         }
 
-        var enemySide = playerTeam.Side == BattleSideEnum.Attacker
-            ? BattleSideEnum.Defender
-            : BattleSideEnum.Attacker;
-        var enemies = mission.Agents
-            .Where(agent => agent.IsActive() && agent.IsHuman && agent.Team?.Side == enemySide)
-            .ToList();
+        var enemies = new List<Agent>();
+        int enemyParties = 0;
+        if (playerTeam != null)
+        {
+            var enemySide = playerTeam.Side == BattleSideEnum.Attacker
+                ? BattleSideEnum.Defender
+                : BattleSideEnum.Attacker;
+            enemies.AddRange(mission.Agents
+                .Where(agent => agent.IsActive() && agent.IsHuman && agent.Team?.Side == enemySide));
+            enemyParties = playerTeam.Side == BattleSideEnum.Attacker
+                ? MobileParty.MainParty?.MapEvent?.DefenderSide?.Parties?.Count ?? 0
+                : MobileParty.MainParty?.MapEvent?.AttackerSide?.Parties?.Count ?? 0;
+        }
 
         int moved = 0;
         foreach (var enemy in enemies)
@@ -83,14 +91,13 @@ internal static class BattleDebugCommands
             EnemyPositions[enemy.Index] = enemy.Position;
         }
 
-        int enemyParties = playerTeam.Side == BattleSideEnum.Attacker
-            ? MobileParty.MainParty?.MapEvent?.DefenderSide?.Parties?.Count ?? 0
-            : MobileParty.MainParty?.MapEvent?.AttackerSide?.Parties?.Count ?? 0;
         bool deploymentReady = mission.GetMissionBehavior<DeploymentMissionController>()?.TeamSetupOver == true;
+        int activeAgents = mission.Agents.Count(agent => agent.IsActive());
 
-        return $"host={controller.Session.IsLocalHost} activated={controller.Deployment.IsActivated} " +
-            $"committed={controller.Deployment.IsCommitted} deploymentReady={deploymentReady} " +
-            $"playerSide={playerTeam.Side} enemyParties={enemyParties} enemyActive={enemies.Count} " +
+        return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
+            $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
+            $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
+            $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
             $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyMovedSinceLast={moved}";
     }
 }

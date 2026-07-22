@@ -42,7 +42,7 @@ public class MapEventDebugCommands
         return container.TryResolve(out objectManager);
     }
 
-    /// <summary>Starts the current field battle through the normal client/server mission-start gate.</summary>
+    /// <summary>Starts the current battle through the normal client/server mission-start gate.</summary>
     [CommandLineArgumentFunction("start_attack_mission", "coop.debug.mapevent")]
     public static string StartAttackMission(List<string> args)
     {
@@ -56,15 +56,16 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.start_attack_mission";
         }
 
-        var mapEvent = MobileParty.MainParty?.MapEvent;
+        var mainParty = MobileParty.MainParty;
+        var mapEvent = mainParty?.MapEvent;
         if (mapEvent == null)
         {
-            return "The main party has no battle encounter";
+            return "The main party has no replicated map event";
         }
 
         if (!TryGetObjectManager(out var objectManager)
             || !objectManager.TryGetId(mapEvent, out var mapEventId)
-            || !objectManager.TryGetId(MobileParty.MainParty, out var partyId))
+            || !objectManager.TryGetId(mainParty, out var partyId))
         {
             return "Unable to resolve the current battle ids";
         }
