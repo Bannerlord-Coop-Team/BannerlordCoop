@@ -22,14 +22,13 @@ namespace Missions.Battles;
 /// <summary>
 /// Peer-side spawn application for a coop battle: spawns the agents other owners replicate over the mesh
 /// (<see cref="NetworkSpawnBattleAgents"/>) as local puppets driven by their owner's movement. Spawns that
-/// arrive before their team exists are buffered and drained on tick, so an agent is never built team-less
-/// (which later NREs the scoreboard). During local deployment, only this client's own withheld records wait
-/// for commit; remote NPCs are visible and frozen per BR-023.
+/// arrive before their team or explicit party identity exists are buffered and drained on tick. During local
+/// deployment, only this client's own withheld records wait for commit; remote NPCs are visible and frozen.
 /// </summary>
 public interface IPuppetSpawner : IDisposable
 {
     /// <summary>
-    /// [Game thread] Drain puppets whose teams now exist, retaining only locally owned records until commit.
+    /// [Game thread] Drain puppets whose teams and party identities now exist, retaining local records until commit.
     /// </summary>
     void DrainPendingPuppets();
 }
@@ -48,10 +47,8 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
 
-    // Puppet spawns from the host's catch-up burst can arrive while THIS client's mission is still loading
-    // (before MissionCombatantsLogic creates the teams). An agent built with a null team later NREs the
-    // scoreboard (BattleObserverMissionLogic.SetObserver reads agent.Team.Side from its build cache), so buffer
-    // such spawns and drain them on tick once the teams exist.
+    // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
+    // agents without that identity later break team ownership and scoreboard attribution.
     private readonly object pendingPuppetLock = new object();
     private readonly List<BattleAgentSpawnData> pendingPuppets = new List<BattleAgentSpawnData>();
     private readonly object withdrawnControllerLock = new object();
@@ -107,8 +104,7 @@ public class PuppetSpawner : IPuppetSpawner
 
         // Spawn on the game thread, but do NOT block the network (receive) thread: while the mission is still
         // loading the game loop isn't draining the GameThread queue, so a blocking wait here deadlocks the
-        // receive thread. If the mission's teams don't exist yet (a catch-up burst arriving mid-load), buffer
-        // and retry on tick — an agent built before its team exists is team-less and later NREs the scoreboard.
+        // receive thread. Buffer missing mission identity and local pre-commit records for the tick drain.
         GameThread.RunSafe(() =>
         {
             if (!TrySpawnPuppetNow(data))
@@ -116,8 +112,7 @@ public class PuppetSpawner : IPuppetSpawner
         });
     }
 
-    // [Game thread] Spawn one puppet. Returns false (caller buffers) when the mission's teams aren't created
-    // yet, so the agent is never built team-less.
+    // [Game thread] Spawn one puppet. Returns false when a required team or explicit party identity is pending.
     private bool TrySpawnPuppetNow(BattleAgentSpawnData data)
     {
         var registry = coopMissionComponent.AgentRegistry;
@@ -152,6 +147,10 @@ public class PuppetSpawner : IPuppetSpawner
 
         if (party == null)
         {
+            // World-state registration and mission-mesh spawns use different channels. An explicit party id
+            // can therefore arrive first; retain it until the game-thread registry apply catches up.
+            if (!string.IsNullOrEmpty(data.MapEventPartyId)) return false;
+
             // An unattributed spawn record must still produce a body — a puppet that never spawns is an
             // invisible enemy (and re-buffering forever spams the log every tick). Fall back to any
             // involved party on the agent's side; only the scoreboard attribution degrades.

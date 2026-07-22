@@ -42,7 +42,9 @@ public class MapEventDebugCommands
         return container.TryResolve(out objectManager);
     }
 
-    /// <summary>Starts the current battle through the normal client/server mission-start gate.</summary>
+    /// <summary>
+    /// Starts the current battle through the normal client/server mission-start gate.
+    /// </summary>
     [CommandLineArgumentFunction("start_attack_mission", "coop.debug.mapevent")]
     public static string StartAttackMission(List<string> args)
     {

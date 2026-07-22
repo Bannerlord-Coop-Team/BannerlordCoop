@@ -1,5 +1,4 @@
-﻿using Common;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -9,40 +8,11 @@ using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace Missions.Battles;
 
-/// <summary>Reports and controls state needed to verify co-op battle synchronization.</summary>
+/// <summary>Reports state needed to verify co-op battle synchronization.</summary>
 internal static class BattleDebugCommands
 {
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
     private static Mission observedMission;
-
-    [CommandLineArgumentFunction("finish_deployment", "coop.debug.battle")]
-    public static string FinishDeployment(List<string> args)
-    {
-        if (ModInformation.IsServer)
-        {
-            return "Run this command on a client";
-        }
-
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.battle.finish_deployment";
-        }
-
-        var deployment = Mission.Current?.GetMissionBehavior<DeploymentMissionController>();
-        var handler = Mission.Current?.GetMissionBehavior<DeploymentHandler>();
-        if (deployment == null || handler == null)
-        {
-            return "No active battle deployment";
-        }
-
-        if (!deployment.TeamSetupOver)
-        {
-            return "Battle teams are still being set up";
-        }
-
-        handler.FinishDeployment();
-        return "Finished local battle deployment";
-    }
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
     public static string State(List<string> args)

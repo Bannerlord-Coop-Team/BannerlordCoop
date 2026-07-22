@@ -64,6 +64,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
 
             Assert.Same(clientBattle, MobileParty.MainParty.MapEvent);
             Assert.NotSame(clientBattle, PlayerEncounter.Battle);
+            var expectedInitialStrength = localParty.Party.CalculateCurrentStrength();
 
             using var messageBroker = new MessageBroker();
             using var handler = new BattleMissionStartHandler(
@@ -93,7 +94,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 Assert.Same(localSide == BattleSideEnum.Attacker ? clientBattle.DefenderSide.LeaderParty : clientBattle.AttackerSide.LeaderParty,
                     PlayerEncounter.EncounteredParty);
                 Assert.Same(clientBattle.MapEventSettlement, PlayerEncounter.Current.EncounterSettlementAux);
-                Assert.Equal(localParty.Party.CalculateCurrentStrength(), PlayerEncounter.Current.PlayerPartyInitialStrength);
+                Assert.Equal(expectedInitialStrength, PlayerEncounter.Current.PlayerPartyInitialStrength);
                 Assert.True(PlayerEncounter.Current.PlayerPartyInitialStrength > 0);
                 Assert.True(PlayerEncounter.Current.IsJoinedBattle);
                 if (staleEncounter != null)

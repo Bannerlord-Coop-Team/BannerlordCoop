@@ -93,7 +93,7 @@ Holds or releases the native scoreboard input without requiring window focus.";
 @"Usage:
   coop.debug.mapevent.scoreboard_state
 
-Lists the player parties and party rows currently loaded by the battle scoreboard.";
+Lists the map-event parties and party rows currently loaded by the battle scoreboard.";
 
     [CommandLineArgumentFunction("scoreboard_state", "coop.debug.mapevent")]
     public static string ScoreboardState(List<string> args)
@@ -130,11 +130,14 @@ Lists the player parties and party rows currently loaded by the battle scoreboar
             .OfType<PartyBase>()
             .Distinct()
             .ToArray();
+        var missingParties = expectedParties.Except(scoreboardParties).ToArray();
         var missingPlayerParties = expectedPlayerParties.Except(scoreboardParties).ToArray();
 
         return $"Visible: {dataSource.ShowScoreboard}; " +
+               $"Expected parties ({expectedParties.Length}): {FormatPartyNames(expectedParties)}; " +
                $"Expected player parties ({expectedPlayerParties.Length}): {FormatPartyNames(expectedPlayerParties)}; " +
                $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
+               $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}; " +
                $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}";
     }
 

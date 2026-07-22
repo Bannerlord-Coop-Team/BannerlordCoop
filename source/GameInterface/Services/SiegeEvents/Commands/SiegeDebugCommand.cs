@@ -6,6 +6,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System;
@@ -17,11 +18,10 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using static TaleWorlds.Library.CommandLineFunctionality;
-
-using GameInterface.Services.SiegeEngines;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
+using static TaleWorlds.Library.CommandLineFunctionality;
+
 namespace GameInterface.Services.SiegeEvents.Commands;
 
 public class SiegeDebugCommand
