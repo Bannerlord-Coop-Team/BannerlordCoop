@@ -91,6 +91,9 @@ internal static class LocationConversationLiveTestProbe
 public static class LocationConversationLiveTestCommand
 {
     private const string SyntheticLocationId = "Location_live_test";
+    private static bool fixtureSnapshotActive;
+    private static Settlement fixtureOriginalSettlement;
+    private static CampaignVec2 fixtureOriginalPosition;
 
     [CommandLineArgumentFunction("players", "coop.debug.location_conversation")]
     public static string Players(List<string> args)
@@ -134,6 +137,8 @@ public static class LocationConversationLiveTestCommand
         if (ModInformation.IsServer) return "Command is only available to run on a client";
         if (Campaign.Current == null || MobileParty.MainParty == null) return "Campaign is not ready";
         if (Mission.Current != null) return $"A mission is already active: {Mission.Current.SceneName}";
+        if (PlayerEncounter.Current != null) return "A player encounter is already active";
+        if (fixtureSnapshotActive) return "A real tavern fixture snapshot is already active";
         if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
             return $"Unable to resolve {nameof(ISettlementInterface)}";
 
@@ -143,23 +148,18 @@ public static class LocationConversationLiveTestCommand
         var tavern = settlement.LocationComplex?.GetLocationWithId("tavern");
         if (tavern == null) return $"Settlement '{args[0]}' has no tavern location";
 
-        var encounterStartAttempted = false;
+        var mainParty = MobileParty.MainParty;
+        fixtureOriginalSettlement = mainParty.CurrentSettlement;
+        fixtureOriginalPosition = mainParty.Position;
+        fixtureSnapshotActive = true;
         var missionOpened = false;
         try
         {
             using (new AllowedThread())
             {
-                if (PlayerEncounter.Current != null)
-                {
-                    PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
-                    Campaign.Current.PlayerEncounter = null;
-                }
-
-                var mainParty = MobileParty.MainParty;
                 if (mainParty.CurrentSettlement != null && mainParty.CurrentSettlement != settlement)
                     settlementInterface.PartyLeaveSettlement(mainParty);
 
-                encounterStartAttempted = true;
                 settlementInterface.StartSettlementEncounter(mainParty, settlement);
                 if (PlayerEncounter.Current == null)
                     return $"Unable to start settlement encounter for '{args[0]}'";
@@ -182,11 +182,8 @@ public static class LocationConversationLiveTestCommand
         }
         finally
         {
-            if (encounterStartAttempted && !missionOpened)
-            {
-                using (new AllowedThread())
-                    settlementInterface.EndSettlementEncounter();
-            }
+            if (!missionOpened && fixtureSnapshotActive)
+                RestoreFixtureInternal(settlementInterface);
         }
 
         LocationConversationLiveTestProbe.ResetForRealInteraction();
@@ -283,6 +280,22 @@ public static class LocationConversationLiveTestCommand
         return "Finished local settlement encounter";
     }
 
+    [CommandLineArgumentFunction("restore_fixture", "coop.debug.location_conversation")]
+    public static string RestoreFixture(List<string> args)
+    {
+        if (args.Count != 0) return "Usage: coop.debug.location_conversation.restore_fixture";
+        if (ModInformation.IsServer) return "Command is only available to run on a client";
+        if (Mission.Current != null) return "Wait for the tavern mission to finish first";
+        if (!fixtureSnapshotActive) return "No real tavern fixture snapshot is active";
+        if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
+            return $"Unable to resolve {nameof(ISettlementInterface)}";
+
+        var originalSettlementId = fixtureOriginalSettlement?.StringId ?? "none";
+        RestoreFixtureInternal(settlementInterface);
+        return $"Restored original local fixture;settlement={originalSettlementId};" +
+               $"position={MobileParty.MainParty.Position.X:R},{MobileParty.MainParty.Position.Y:R}";
+    }
+
     [CommandLineArgumentFunction("disable", "coop.debug.location_conversation")]
     public static string Disable(List<string> args)
     {
@@ -355,6 +368,7 @@ public static class LocationConversationLiveTestCommand
         var conversationManager = Campaign.Current?.ConversationManager;
         var location = CampaignMission.Current?.Location;
         var mainAgent = Agent.Main;
+        var mainParty = MobileParty.MainParty;
         var remoteAgents = GetRemotePlayerAgents(playerManager).ToArray();
 
         return $"enabled={LocationConversationLiveTestProbe.Enabled};" +
@@ -371,13 +385,17 @@ public static class LocationConversationLiveTestCommand
                $"missionActive={mission != null};" +
                $"missionScene={mission?.SceneName ?? "<none>"};" +
                $"missionMode={mission?.Mode.ToString() ?? "<none>"};" +
-               $"settlement={Settlement.CurrentSettlement?.StringId ?? "<none>"};" +
+               $"settlement={mainParty?.CurrentSettlement?.StringId ?? "<none>"};" +
                $"location={location?.StringId ?? "<none>"};" +
                $"conversationInProgress={conversationManager?.IsConversationInProgress ?? false};" +
                $"mainAgentActive={mainAgent?.IsActive() ?? false};" +
                $"mainAgentController={mainAgent?.Controller.ToString() ?? "<none>"};" +
                $"mainAgentUsingObject={mainAgent?.IsUsingGameObject ?? false};" +
                $"remotePlayerAgents={string.Join(",", remoteAgents.Select(agent => $"{((CharacterObject)agent.Character).StringId}@{agent.Position}:distance={(mainAgent == null ? -1f : agent.GetDistanceTo(mainAgent))}"))};" +
+               $"playerEncounterActive={PlayerEncounter.Current != null};" +
+               $"fixtureSnapshotActive={fixtureSnapshotActive};" +
+               $"fixtureOriginalSettlement={fixtureOriginalSettlement?.StringId ?? "none"};" +
+               $"partyPosition={(mainParty == null ? "none" : $"{mainParty.Position.X:R},{mainParty.Position.Y:R}")};" +
                $"trackerEmpty={trackerState}";
     }
 
@@ -452,6 +470,27 @@ public static class LocationConversationLiveTestCommand
 
         targetAgent = matches[0];
         return true;
+    }
+
+    private static void RestoreFixtureInternal(ISettlementInterface settlementInterface)
+    {
+        using (new AllowedThread())
+        {
+            if (PlayerEncounter.Current != null)
+                PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+
+            var mainParty = MobileParty.MainParty;
+            if (mainParty.CurrentSettlement != null && mainParty.CurrentSettlement != fixtureOriginalSettlement)
+                settlementInterface.PartyLeaveSettlement(mainParty);
+            if (fixtureOriginalSettlement != null && mainParty.CurrentSettlement != fixtureOriginalSettlement)
+                settlementInterface.PartyEnterSettlement(mainParty, fixtureOriginalSettlement);
+
+            mainParty.Position = fixtureOriginalPosition;
+        }
+
+        fixtureSnapshotActive = false;
+        fixtureOriginalSettlement = null;
+        fixtureOriginalPosition = default;
     }
 
     private static IEnumerable<Agent> GetRemotePlayerAgents(IPlayerManager playerManager)
