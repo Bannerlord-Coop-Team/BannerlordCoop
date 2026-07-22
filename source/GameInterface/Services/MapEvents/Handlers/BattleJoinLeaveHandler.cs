@@ -28,7 +28,6 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// </summary>
 internal class BattleJoinLeaveHandler : IHandler
 {
-    private const string OrderAttackOptionId = "str_order_attack";
     private static readonly ILogger Logger = LogManager.GetLogger<BattleJoinLeaveHandler>();
 
     private readonly IMessageBroker messageBroker;
@@ -105,31 +104,12 @@ internal class BattleJoinLeaveHandler : IHandler
                             mobileParty.Position = positions[i];
                     }
                 }
-
-                // Map-event commit assigns PartyBase.MapEventSide after the involved-party snapshot.
-                initializationBarrier.RunAfterCommit(mapEvent, () => GameThread.EnqueueSafe(
-                    () => RefreshCurrentEncounterOrderAttackOption(mapEvent),
-                    context: nameof(Handle_NetworkAddInvolvedParties)));
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
         });
-    }
-
-    private static void RefreshCurrentEncounterOrderAttackOption(MapEvent mapEvent)
-    {
-        var menuContext = Campaign.Current?.CurrentMenuContext;
-        if (menuContext?.GameMenu?.StringId != "encounter" ||
-            (PlayerEncounter.Battle != mapEvent && MobileParty.MainParty?.MapEvent != mapEvent)) return;
-
-        foreach (var option in menuContext.GameMenu.MenuOptions)
-        {
-            if (option.IdString != OrderAttackOptionId) continue;
-            option.GetConditionsHold(Game.Current, menuContext);
-            return;
-        }
     }
 
     /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>

@@ -160,7 +160,7 @@ internal class MapEventSideDataHandler : IHandler
                 initializationBarrier.AttachClient(
                     mapEventSide,
                     mapEventParty,
-                    () => SwitchRaiderToEncounterIfNeeded(mapEventSide.MapEvent));
+                    () => AfterClientPartyAttached(mapEventSide.MapEvent));
             }
             catch (Exception e)
             {
@@ -169,11 +169,23 @@ internal class MapEventSideDataHandler : IHandler
         });
     }
 
-    private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
+    private static void AfterClientPartyAttached(MapEvent mapEvent)
     {
         if (ModInformation.IsServer)
             return;
 
+        SwitchRaiderToEncounterIfNeeded(mapEvent);
+
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext?.GameMenu?.StringId != "encounter" || MobileParty.MainParty?.MapEvent != mapEvent)
+            return;
+
+        // Encounter option conditions can depend on the party that was just attached to this side.
+        Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menuContext);
+    }
+
+    private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
+    {
         if (!mapEvent.IsRaidHostileAction() || mapEvent.IsActiveSlowVillageRaid())
             return;
 
