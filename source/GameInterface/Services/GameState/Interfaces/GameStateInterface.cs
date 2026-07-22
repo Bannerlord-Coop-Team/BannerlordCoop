@@ -6,7 +6,6 @@ using GameInterface.Services.Heroes;
 using SandBox;
 using Serilog;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -78,15 +77,17 @@ internal class GameStateInterface : IGameStateInterface
         messageBroker.Publish(this, new GameLoadStarted());
         GameThread.Run(() =>
         {
-            var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
-
-            if (save == null)
+            // Server loads cannot wait on vanilla's module-mismatch inquiry behind the loading screen.
+            if (!MBSaveLoad.IsSaveGameFileExists(saveName))
             {
                 Logger.Error("Failed to load save with name {SaveName}", saveName);
                 return;
             }
 
-            SandBoxSaveHelper.TryLoadSave(save, StartGame, null);
+            var loadResult = MBSaveLoad.LoadSaveGameData(saveName);
+            if (loadResult == null) return;
+
+            StartGame(loadResult);
         }, blocking: true);
     }
 
