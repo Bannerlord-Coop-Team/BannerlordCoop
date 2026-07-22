@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using LiteNetLib;
@@ -66,8 +66,8 @@ public class ConnectionLogic : IConnectionLogic
         {
             [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.ObjectManager, context.ModuleInfoProvider, context.ExistingPlayerSender),
             [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.ExistingPlayerSender),
-            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.Network, context.CoopSessionProvider, context.SaveInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.BattleSizeProvider),
-            [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.Network, context.JoinCampaignBaselineSender, context.ConnectionMessageQueue, context.Coalescer),
+            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.Network, context.CoopSessionProvider, context.SaveInterface, context.TimeControlInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.BattleSizeProvider),
+            [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker),
             [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker),
         };

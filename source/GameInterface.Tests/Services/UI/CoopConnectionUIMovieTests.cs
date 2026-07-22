@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using Xunit;
@@ -33,6 +33,37 @@ public class CoopConnectionUIMovieTests
             Assert.Equal("Fixed", tableSection.Attribute("WidthSizePolicy")?.Value);
             Assert.Equal("900", tableSection.Attribute("SuggestedWidth")?.Value);
         }
+    }
+
+    [Fact]
+    public void SteamLobbyPagination_BindsVisibilityNavigationAndPageText()
+    {
+        var document = XDocument.Load(FindMoviePath());
+        var controls = FindById(document, "LobbyPaginationControls");
+
+        Assert.Equal("@IsSteamLobbyPaginationVisible", controls.Attribute("IsVisible")?.Value);
+
+        var previous = FindById(document, "PreviousLobbyPageButton");
+        Assert.Equal("@IsPreviousSteamLobbyPageDisabled", previous.Attribute("IsDisabled")?.Value);
+        Assert.Equal("ActionPreviousSteamLobbyPage", previous.Attribute("Command.Click")?.Value);
+        Assert.Equal("@PreviousPageButtonText", previous.Attribute("Parameter.Text")?.Value);
+
+        var indicator = FindById(document, "LobbyPageIndicator");
+        Assert.Equal("@SteamLobbyPageText", indicator.Attribute("Text")?.Value);
+
+        var next = FindById(document, "NextLobbyPageButton");
+        Assert.Equal("@IsNextSteamLobbyPageDisabled", next.Attribute("IsDisabled")?.Value);
+        Assert.Equal("ActionNextSteamLobbyPage", next.Attribute("Command.Click")?.Value);
+        Assert.Equal("@NextPageButtonText", next.Attribute("Parameter.Text")?.Value);
+
+        Assert.Equal("334", FindById(document, "LobbyListContainer")
+            .Attribute("SuggestedHeight")?.Value);
+    }
+
+    private static XElement FindById(XDocument document, string id)
+    {
+        return Assert.Single(document.Descendants(),
+            element => element.Attribute("Id")?.Value == id);
     }
 
     private static string FindMoviePath([CallerFilePath] string sourceFile = "")

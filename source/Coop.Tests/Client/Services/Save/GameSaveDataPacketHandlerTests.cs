@@ -15,17 +15,17 @@ namespace Coop.Tests.Client.Services.Save;
 public class GameSaveDataPacketHandlerTests
 {
     [Fact]
-    public void GameSaveDataChunkPacket_RoundTripPreservesBattleSize()
+    public void GameSaveDataPacket_RoundTripPreservesBattleSize()
     {
         var original = CreatePacket(800);
 
-        GameSaveDataChunkPacket result;
+        GameSaveDataPacket result;
         using (var stream = new MemoryStream())
         {
             RuntimeTypeModel.Default.Serialize(stream, original);
             stream.Position = 0;
-            result = (GameSaveDataChunkPacket)RuntimeTypeModel.Default.Deserialize(
-                stream, null, typeof(GameSaveDataChunkPacket));
+            result = (GameSaveDataPacket)RuntimeTypeModel.Default.Deserialize(
+                stream, null, typeof(GameSaveDataPacket));
         }
 
         Assert.Equal(800, result.BattleSize);
@@ -72,15 +72,10 @@ public class GameSaveDataPacketHandlerTests
         packetManager.Verify(m => m.RemovePacketHandler(handler), Times.Once);
     }
 
-    private static GameSaveDataChunkPacket CreatePacket(int battleSize)
+    private static GameSaveDataPacket CreatePacket(int battleSize)
     {
         byte[] compressedSave = SaveDataCompression.Compress(Array.Empty<byte>());
-        return new GameSaveDataChunkPacket(
-            1,
-            0,
-            1,
-            compressedSave.Length,
-            0,
+        return new GameSaveDataPacket(
             compressedSave,
             "campaign",
             null!,
