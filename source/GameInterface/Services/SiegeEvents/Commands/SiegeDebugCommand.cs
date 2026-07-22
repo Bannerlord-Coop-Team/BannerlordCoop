@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Patches;
@@ -28,6 +29,52 @@ namespace GameInterface.Services.SiegeEvents.Commands;
 public class SiegeDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeDebugCommand>();
+
+    [CommandLineArgumentFunction("request_besiege", "coop.debug.siege")]
+    public static string RequestBesiege(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.request_besiege <settlementId>";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        MessageBroker.Instance.Publish(null, new BesiegeSettlementAttempted(MobileParty.MainParty, settlement));
+        return $"Requested that the local player party besiege {settlement.Name}";
+    }
+
+    [CommandLineArgumentFunction("request_assault", "coop.debug.siege")]
+    public static string RequestAssault(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.request_assault <settlementId>";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        MessageBroker.Instance.Publish(null, new AssaultSiegeAttempted(MobileParty.MainParty, settlement));
+        return $"Requested that the local player party assault {settlement.Name}";
+    }
 
     [CommandLineArgumentFunction("leave_settlement", "coop.debug.siege")]
     public static string LeaveSettlement(List<string> args)
