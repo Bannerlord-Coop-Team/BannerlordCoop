@@ -1,0 +1,439 @@
+using System;
+using System.Linq;
+using Common.Messaging;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Surrogates;
+using HarmonyLib;
+using Missions;
+using Missions.Battles;
+using Missions.Data;
+using Missions.Messages;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace E2E.Tests.Services.Missions;
+
+/// <summary>
+/// BR-110 (Maximum Concurrent Agents): the Bannerlord engine can only render a maximum of 2000 agents, so no
+/// coop spawn path — supplier wave pulls, mid-battle reinforcement parties, or replicated puppets — may push a
+/// client's live agent count past that limit. Withheld troops are deferred, not lost: puppets stay buffered
+/// and drain as removals free capacity, withheld reinforcement troops field on tick, and unallocated wave
+/// troops stay unsupplied (wave-eligible) in the reserve. RED today: none of the spawn paths consults any
+/// mission-wide agent count, so each spawns straight past the limit.
+/// </summary>
+public class BattleAgentRenderCapTests : MissionTestEnvironment
+{
+    /// <summary>The engine's render ceiling per BR-110 — asserted as the literal requirement value, not the
+    /// production constant, so these tests pin the requirement itself.</summary>
+    private const int EngineAgentLimit = 2000;
+
+    public BattleAgentRenderCapTests(ITestOutputHelper output) : base(output) { }
+
+    private static int CountLiveAgents(MockMission mock)
+        => mock.Agents.Count(agent => AgentMirror.TryGet(agent, out var mirror) && mirror.IsActive);
+
+    /// <summary>Spawns inert filler agents until the mock mission holds <paramref name="liveTarget"/> live
+    /// agents, simulating a battle already rendering that many.</summary>
+    private static void FloodToLiveCount(MockMission mock, int liveTarget)
+    {
+        var character = (CharacterObject)Game.Current.PlayerTroop;
+        int missing = liveTarget - CountLiveAgents(mock);
+        for (int i = 0; i < missing; i++)
+            mock.SpawnAgent(new AgentBuildData(character)
+                .Controller(AgentControllerType.None)
+                .Team(mock.DefenderTeam.Shell));
+    }
+
+    /// <summary>Marks <paramref name="count"/> live agents inactive — the harness equivalent of agents being
+    /// removed from the mission, freeing render capacity.</summary>
+    private static void DeactivateAgents(MockMission mock, int count)
+    {
+        foreach (var agent in mock.Agents)
+        {
+            if (count == 0) return;
+            if (AgentMirror.TryGet(agent, out var mirror) && mirror.IsActive)
+            {
+                mirror.IsActive = false;
+                count--;
+            }
+        }
+    }
+
+    private static IReinforcementFielder GetFielder(CoopBattleController controller)
+        => (IReinforcementFielder)AccessTools.Field(typeof(CoopBattleController), "reinforcementFielder").GetValue(controller);
+
+    private static IPuppetSpawner GetPuppetSpawner(CoopBattleController controller)
+        => (IPuppetSpawner)AccessTools.Field(typeof(CoopBattleController), "puppetSpawner").GetValue(controller);
+
+    /// <summary>Adds an AI party with <paramref name="troopCount"/> able troops to the battle's defender side
+    /// (registered everywhere, roster populated on the host). Returns its MapEventParty id.</summary>
+    private string AddAiReinforcementParty(string mapEventId, EnvironmentInstance host, int troopCount)
+    {
+        var aiPartyId = CreateRegisteredObject<MobileParty>();
+        string mapEventPartyId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var aiParty));
+
+            aiParty.Party.MapEventSide = mapEvent.DefenderSide;
+
+            var mep = mapEvent.DefenderSide.Parties.Last(p => p.Party == aiParty.Party);
+            Assert.True(Server.ObjectManager.TryGetId(mep, out mapEventPartyId));
+        }, MapEventDisabledMethods);
+
+        host.Call(() =>
+        {
+            Assert.True(host.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var aiParty));
+            aiParty.Party.MemberRoster.Clear();
+            aiParty.Party.MemberRoster.AddToCounts((CharacterObject)Game.Current.PlayerTroop, troopCount);
+        });
+
+        Assert.NotNull(mapEventPartyId);
+        return mapEventPartyId;
+    }
+
+    private static void PublishInvolvedPartiesAdded(EnvironmentInstance instance, string mapEventId, string mapEventPartyId)
+    {
+        instance.Resolve<IMessageBroker>().Publish(instance,
+            new NetworkAddInvolvedParties(mapEventId, new[] { mapEventPartyId }, new[] { new CampaignVec2(default, true) }));
+    }
+
+    private static TroopReserveEntry[] Entries(string characterId, int count, int seedBase = 500)
+    {
+        var entries = new TroopReserveEntry[count];
+        for (int i = 0; i < count; i++)
+            entries[i] = new TroopReserveEntry(seedBase + i, characterId, formationClass: 0);
+        return entries;
+    }
+
+    private static CoopTroopSupplier CreateSuppliedSupplier(IObjectManager objectManager, string characterId, int reserveCount)
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, objectManager, new BattleAgentBudget());
+        supplier.SetReserve(new[] { new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount)) });
+        return supplier;
+    }
+
+    /// <summary>
+    /// A new AI party joins a battle already at (near) the engine limit: the host fields only the troops that
+    /// fit under the limit and never spawns past it. RED today: SpawnReinforcementParty loops the full able
+    /// roster with no capacity check.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void ReinforcementParty_AtEngineAgentLimit_DoesNotSpawnPastIt()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "client");
+        var host = Clients.First();
+        var aiMapEventPartyId = AddAiReinforcementParty(mapEventId, host, troopCount: 5);
+
+        CoopBattleController controller = null;
+        MockMission mock = null;
+        host.Call(() =>
+        {
+            mock = fixture.CreateMission(host);
+            controller = host.Resolve<CoopBattleController>();
+        });
+
+        EnterBattle(host, mapEventId);
+
+        host.Call(() =>
+        {
+            controller.OnDeploymentFinished();
+            FloodToLiveCount(mock, EngineAgentLimit - 2);   // room for only 2 of the party's 5 troops
+
+            PublishInvolvedPartiesAdded(host, mapEventId, aiMapEventPartyId);
+
+            Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+        });
+
+        GC.KeepAlive(controller);
+    }
+
+    /// <summary>
+    /// Troops withheld at the limit are deferred, not lost (BR-110, BR-073): as removals free capacity, the
+    /// fielder's tick spawns the remainder — never exceeding the limit at any point.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void ReinforcementParty_WithheldTroops_FieldAsCapacityFrees()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "client");
+        var host = Clients.First();
+        var aiMapEventPartyId = AddAiReinforcementParty(mapEventId, host, troopCount: 5);
+
+        CoopBattleController controller = null;
+        MockMission mock = null;
+        host.Call(() =>
+        {
+            mock = fixture.CreateMission(host);
+            controller = host.Resolve<CoopBattleController>();
+        });
+
+        EnterBattle(host, mapEventId);
+
+        host.Call(() =>
+        {
+            controller.OnDeploymentFinished();
+            FloodToLiveCount(mock, EngineAgentLimit - 2);
+            int flooded = mock.Agents.Count;
+
+            PublishInvolvedPartiesAdded(host, mapEventId, aiMapEventPartyId);
+            Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));      // 2 fielded, 3 withheld
+
+            DeactivateAgents(mock, 3);                                  // casualties free 3 slots
+            GetFielder(controller).Tick();
+
+            Assert.Equal(flooded + 5, mock.Agents.Count);               // all 5 troops fielded in the end
+            Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));      // and the live count never passed the cap
+
+            GetFielder(controller).Tick();                              // queue is drained — nothing double-spawns
+            Assert.Equal(flooded + 5, mock.Agents.Count);
+        });
+
+        GC.KeepAlive(controller);
+    }
+
+    /// <summary>
+    /// A puppet record arriving while the mission is at the engine limit is buffered (deferred), not spawned
+    /// and not dropped; the drain fields it once removals free capacity. RED today: TrySpawnPuppetNow spawns
+    /// unconditionally.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void PuppetSpawn_AtEngineAgentLimit_IsDeferredUntilCapacityFrees()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("host", "peer");
+        var host = Clients.First();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var agentId = Guid.NewGuid();
+
+        try
+        {
+            host.Call(() =>
+            {
+                var mock = fixture.CreateMission(host);
+                var controller = host.Resolve<CoopBattleController>();
+                var registry = host.Resolve<INetworkAgentRegistry>();
+                controller.Session.TryBegin(mapEventId);
+                host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+
+                Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var peerParty));
+                var mep = peerParty.MapEvent.DefenderSide.Parties.Single(p => p.Party == peerParty.Party);
+                Assert.True(host.ObjectManager.TryGetId(mep, out var mapEventPartyId));
+
+                FloodToLiveCount(mock, EngineAgentLimit);
+
+                var record = new BattleAgentSpawnData(
+                    agentId, characterId, default, BattleSideEnum.Defender, 100f,
+                    "peer", mapEventPartyId, 7, new Equipment(), new BodyProperties(), new MissionEquipmentData(new()));
+                host.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+
+                Assert.False(registry.TryGetAgentInfo(agentId, out _)); // deferred: not spawned at the limit
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+
+                DeactivateAgents(mock, 1);                              // a removal frees one slot
+                GetPuppetSpawner(controller).DrainPendingPuppets();
+
+                Assert.True(registry.TryGetAgentInfo(agentId, out _));  // the buffered puppet fielded
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    /// <summary>
+    /// A NEW PLAYER joins a battle already near the engine limit (BR-005 late join) and reveals their troops
+    /// — which reach every existing client as ONE NetworkSpawnBattleAgents batch. The receiving client fields
+    /// only the records that fit under the limit; the rest are deferred (buffered, none dropped) and drain
+    /// progressively as removals free capacity, until the joiner's whole party is fielded.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    [Trait("Requirement", "BR-005")]
+    public void NewPlayerJoins_BattleNearEngineAgentLimit_TroopBatchDefersAndFieldsAsCapacityFrees()
+    {
+        using var fixture = new MissionEngineFixture();
+        // Three players; "joiner" is a registered remote player with a party on the attacker side. This test
+        // is the HOST's view of the join, so the joiner needs no client instance — only its mesh traffic.
+        var (mapEventId, partyIds) = SetupCoopBattle("host", "peer", "joiner");
+        var host = Clients.First();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var agentIds = Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray();
+
+        try
+        {
+            host.Call(() =>
+            {
+                var mock = fixture.CreateMission(host);
+                var controller = host.Resolve<CoopBattleController>();
+                var registry = host.Resolve<INetworkAgentRegistry>();
+                controller.Session.TryBegin(mapEventId);
+                host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer", "joiner" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+
+                Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var joinerParty));
+                var mep = joinerParty.MapEvent.AttackerSide.Parties.Single(p => p.Party == joinerParty.Party);
+                Assert.True(host.ObjectManager.TryGetId(mep, out var mapEventPartyId));
+
+                FloodToLiveCount(mock, EngineAgentLimit - 5);           // room for only 5 of the joiner's 10 troops
+
+                var records = agentIds.Select((id, i) => new BattleAgentSpawnData(
+                    id, characterId, default, BattleSideEnum.Attacker, 100f,
+                    "joiner", mapEventPartyId, 100 + i, new Equipment(), new BodyProperties(), new MissionEquipmentData(new()))).ToArray();
+                host.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(records));
+
+                int Registered() => agentIds.Count(id => registry.TryGetAgentInfo(id, out _));
+
+                Assert.Equal(5, Registered());                          // fields exactly what fits...
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));  // ...and stops at the limit
+
+                DeactivateAgents(mock, 3);                              // casualties free 3 slots
+                GetPuppetSpawner(controller).DrainPendingPuppets();
+                Assert.Equal(8, Registered());                          // partial drain: 3 more, 2 still deferred
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+
+                DeactivateAgents(mock, 2);
+                GetPuppetSpawner(controller).DrainPendingPuppets();
+                Assert.Equal(10, Registered());                         // the joiner's whole party fielded, none dropped
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+
+                GetPuppetSpawner(controller).DrainPendingPuppets();     // buffer is empty — nothing double-spawns
+                Assert.Equal(10, Registered());
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    /// <summary>
+    /// A mounted puppet record spawns rider AND horse in one SpawnAgent call — two agents, two slots. With
+    /// only one slot free it must be deferred; with two free it fields both without passing the limit.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void MountedPuppet_WithOneSlotFree_IsDeferredUntilTwoSlotsFree()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("host", "peer");
+        var host = Clients.First();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var agentId = Guid.NewGuid();
+        var mountAgentId = Guid.NewGuid();
+
+        try
+        {
+            host.Call(() =>
+            {
+                var mock = fixture.CreateMission(host);
+                var controller = host.Resolve<CoopBattleController>();
+                var registry = host.Resolve<INetworkAgentRegistry>();
+                controller.Session.TryBegin(mapEventId);
+                host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+
+                Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var peerParty));
+                var mep = peerParty.MapEvent.DefenderSide.Parties.Single(p => p.Party == peerParty.Party);
+                Assert.True(host.ObjectManager.TryGetId(mep, out var mapEventPartyId));
+
+                FloodToLiveCount(mock, EngineAgentLimit - 1);           // one slot free — not enough for two agents
+                mock.SpawnMounted = true;                               // a spawn now would mint rider + horse
+
+                var record = new BattleAgentSpawnData(
+                    agentId, characterId, default, BattleSideEnum.Defender, 100f,
+                    "peer", mapEventPartyId, 7, new Equipment(), new BodyProperties(), new MissionEquipmentData(new()),
+                    mountAgentId);
+                host.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+
+                Assert.False(registry.TryGetAgentInfo(agentId, out _)); // deferred: rider + horse would exceed the limit
+                Assert.Equal(EngineAgentLimit - 1, CountLiveAgents(mock));
+
+                DeactivateAgents(mock, 1);                              // now two slots free
+                GetPuppetSpawner(controller).DrainPendingPuppets();
+
+                Assert.True(registry.TryGetAgentInfo(agentId, out _));
+                Assert.True(registry.TryGetAgentInfo(mountAgentId, out _));
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    /// <summary>
+    /// The native wave pump (SupplyTroops) allocates no more troops than the engine has capacity for; the
+    /// unallocated remainder stays UNSUPPLIED so later waves can re-request it as casualties free slots.
+    /// RED today: SupplyTroops honors the requested batch size unconditionally.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void SupplierWaveRequest_IsClampedToRemainingEngineCapacity()
+    {
+        using var fixture = new MissionEngineFixture();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            FloodToLiveCount(mock, EngineAgentLimit - 5);
+
+            var supplier = CreateSuppliedSupplier(client.ObjectManager, characterId, reserveCount: 50);
+            var origins = supplier.SupplyTroops(30).ToList();
+
+            Assert.Equal(5, origins.Count);                             // only the remaining engine capacity
+            Assert.Equal(45, supplier.NumTroopsNotSupplied);            // the rest stays wave-eligible, unconsumed
+        });
+    }
+
+    /// <summary>At the limit the wave pump supplies nothing — and consumes nothing from the reserve.</summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void SupplierWaveRequest_AtEngineAgentLimit_SuppliesNothing()
+    {
+        using var fixture = new MissionEngineFixture();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            FloodToLiveCount(mock, EngineAgentLimit);
+
+            var supplier = CreateSuppliedSupplier(client.ObjectManager, characterId, reserveCount: 50);
+            var origins = supplier.SupplyTroops(10).ToList();
+
+            Assert.Empty(origins);
+            Assert.Equal(50, supplier.NumTroopsNotSupplied);
+        });
+    }
+}

@@ -48,6 +48,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
+    private readonly IBattleAgentBudget agentBudget;
 
     // Puppet spawns from the host's catch-up burst can arrive while THIS client's mission is still loading
     // (before MissionCombatantsLogic creates the teams). An agent built with a null team later NREs the
@@ -67,7 +68,8 @@ public class PuppetSpawner : IPuppetSpawner
         IBattleSession session,
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
-        IAgentFormationAssigner formationAssigner)
+        IAgentFormationAssigner formationAssigner,
+        IBattleAgentBudget agentBudget)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -77,6 +79,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.casualties = casualties;
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
+        this.agentBudget = agentBudget;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -132,6 +135,12 @@ public class PuppetSpawner : IPuppetSpawner
         // with NO deployment plan (puppets aren't deployment-spawned) — which stalls the gate so this client's OWN
         // party/hero never spawn. Buffer until our deployment commits; DrainPendingPuppets then fields them.
         if (LocalDeploymentInProgress()) return false;                  // still deploying — buffer
+
+        // BR-110: the engine renders at most a fixed number of agents. At capacity the puppet is deferred, not
+        // dropped — buffered and retried by DrainPendingPuppets as removals free slots. A mounted record spawns
+        // rider AND horse in one SpawnAgent call, so it needs two slots.
+        int slotsNeeded = data.MountAgentId != Guid.Empty ? 2 : 1;
+        if (!agentBudget.HasCapacityFor(Mission.Current, slotsNeeded)) return false; // at capacity — buffer
 
         var team = ResolvePuppetTeam(data);
         if (team == null) return false;                                 // teams not created yet — buffer

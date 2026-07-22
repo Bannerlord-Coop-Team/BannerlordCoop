@@ -1,7 +1,7 @@
 # Battle Requirements
 
-**Version:** 1.1 (2026-07-15)
-**Status:** Baseline (v1.1 amends BR-017 — abandonment destroys the instance only; the map event persists for player-discretion resolution — with matching scope updates to BR-003 and BR-054)
+**Version:** 1.2 (2026-07-21)
+**Status:** Baseline (v1.2 adds Section 12 / BR-110 — the engine's 2000-agent render limit; v1.1 amended BR-017 — abandonment destroys the instance only; the map event persists for player-discretion resolution — with matching scope updates to BR-003 and BR-054)
 
 ## Scope
 
@@ -482,3 +482,20 @@ Messages from a previous or unrelated battle mission shall not affect the curren
 
 All battle participants and results shall use stable party, hero, troop, player, and agent
 identifiers.
+
+---
+
+## 12. Engine Constraints
+
+### BR-110 — Maximum Concurrent Agents
+
+The Bannerlord engine can only render a maximum of 2000 agents.
+
+The number of concurrently active agents in a battle mission on any client — locally spawned
+troops, puppet agents replicated from other players, mid-battle reinforcements, and mounts alike —
+shall therefore never exceed 2000.
+
+A spawn system shall not spawn an agent when doing so would exceed the limit (a mounted troop and
+its horse are two agents). Withheld troops are deferred, not lost: they remain eligible unspawned
+reinforcements (BR-070, BR-073) and shall spawn as active agents are removed and capacity becomes
+available.

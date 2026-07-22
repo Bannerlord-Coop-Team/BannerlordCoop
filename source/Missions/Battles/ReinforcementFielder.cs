@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
@@ -41,10 +42,30 @@ public class ReinforcementFielder : IReinforcementFielder
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly IBattleAgentBudget agentBudget;
 
     // [Host] Map-event party ids we have already fielded as mid-battle reinforcements, so a repeated involved-
     // parties broadcast for the same party doesn't double-spawn it.
     private readonly HashSet<string> reinforcedParties = new HashSet<string>();
+
+    /// <summary>A reinforcement party's troops still waiting for engine agent capacity (BR-110): fielding
+    /// stops at the render limit and <see cref="Tick"/> spawns the remainder as removals free slots.</summary>
+    private sealed class PendingReinforcementParty
+    {
+        public readonly BattleSideEnum Side;
+        public readonly string PartyId;
+        public readonly Queue<CoopAgentOrigin> Origins;
+
+        public PendingReinforcementParty(BattleSideEnum side, string partyId, Queue<CoopAgentOrigin> origins)
+        {
+            Side = side;
+            PartyId = partyId;
+            Origins = origins;
+        }
+    }
+
+    // [Host] Reinforcement troops withheld at the engine agent limit, fielded by Tick as capacity frees.
+    private readonly List<PendingReinforcementParty> pendingReinforcements = new List<PendingReinforcementParty>();
 
     /// <summary>Reserve state captured before the promoted host requests its expanded ownership.</summary>
     private sealed class MigrationReserveSnapshot
@@ -93,7 +114,8 @@ public class ReinforcementFielder : IReinforcementFielder
         IBattleSession session,
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
-        ICasualtyAttributionMap casualties)
+        ICasualtyAttributionMap casualties,
+        IBattleAgentBudget agentBudget)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -102,6 +124,7 @@ public class ReinforcementFielder : IReinforcementFielder
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
         this.casualties = casualties;
+        this.agentBudget = agentBudget;
 
         // [Host] A new AI party joining the live battle is fielded through our own spawn path (reinforcements).
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
@@ -122,6 +145,7 @@ public class ReinforcementFielder : IReinforcementFielder
         {
             TryQueueMigrationReserves();
             FieldMigrationReserves();
+            FieldPendingReinforcements();
         }
         catch (Exception e)
         {
@@ -311,11 +335,7 @@ public class ReinforcementFielder : IReinforcementFielder
         int spawned = FieldRecoverySide(BattleSideEnum.Defender, targets.Defenders - activeDefenders, formations);
         spawned += FieldRecoverySide(BattleSideEnum.Attacker, targets.Attackers - activeAttackers, formations);
 
-        foreach (var formation in formations)
-        {
-            formation.SetControlledByAI(true);
-            formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
-        }
+        ChargeFormations(formations);
 
         if (spawned > 0)
             Logger.Information("[BattleSync] Fielded {Count} migration reserve troop(s) toward active targets Defender={Def}, Attacker={Atk}",
@@ -351,6 +371,10 @@ public class ReinforcementFielder : IReinforcementFielder
         int spawned = 0;
         while (available > 0 && parties.Count > 0)
         {
+            // BR-110: stop at the engine agent limit; the recovery queues persist, so the next Tick resumes
+            // fielding as removals free capacity.
+            if (!agentBudget.HasCapacityFor(Mission.Current, 1)) break;
+
             if (recoveryCursors[sideIndex] >= parties.Count)
                 recoveryCursors[sideIndex] = 0;
 
@@ -514,9 +538,10 @@ public class ReinforcementFielder : IReinforcementFielder
     // side's default reinforcement frame, then put the formations they land in on a charge. Capture is NOT
     // suppressed, so each spawn flows through the owner-side capture pipeline (registered under us, broadcast
     // to peers as puppets, casualty attributed from the origin) — the same pipeline the initial troops use.
+    // Fielding stops at the engine agent limit (BR-110); the remainder is queued and Tick spawns it as
+    // removals free capacity.
     private void SpawnReinforcementParty(PartyBase party, string mapEventPartyId)
     {
-        var mission = Mission.Current;
         var team = BattleTeams.Resolve(party.Side);
         if (team == null)
         {
@@ -524,8 +549,7 @@ public class ReinforcementFielder : IReinforcementFielder
             return;
         }
 
-        var formations = new HashSet<Formation>();
-        int spawned = 0;
+        var origins = new Queue<CoopAgentOrigin>();
         foreach (var element in party.MemberRoster.GetTroopRoster())
         {
             var character = element.Character;
@@ -533,28 +557,79 @@ public class ReinforcementFielder : IReinforcementFielder
 
             int able = element.Number - element.WoundedNumber;
             for (int i = 0; i < able; i++)
-            {
-                var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(MBRandom.RandomInt(int.MaxValue)));
-                var agent = SpawnReinforcementTroop(mission, team, origin);
-                if (agent?.Formation != null) formations.Add(agent.Formation);
-                spawned++;
-            }
+                origins.Enqueue(new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(MBRandom.RandomInt(int.MaxValue))));
         }
 
-        // A coop battle has no general commanding formations, so order each formation the reinforcements joined
-        // to engage — SetControlledByAI alone leaves them idle without an active behavior.
-        foreach (var formation in formations)
-        {
-            formation.SetControlledByAI(true);
-            formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
-        }
+        var pending = new PendingReinforcementParty(party.Side, mapEventPartyId, origins);
+        int spawned = FieldPendingParty(pending);
 
         Logger.Information("[BattleSync] Fielded reinforcement party {Party}: spawned {Count} troop(s)", mapEventPartyId, spawned);
+
+        if (pending.Origins.Count > 0)
+        {
+            pendingReinforcements.Add(pending);
+            Logger.Information("[BattleSync] Withheld {Count} reinforcement troop(s) for party {Party} at the engine agent limit (BR-110); they spawn as capacity frees",
+                pending.Origins.Count, mapEventPartyId);
+        }
 
         if (spawned > 0)
         {
             var troopText = spawned > 1 ? $"{spawned} troops" : $"{spawned} troop";
             InformationManager.DisplayMessage(new InformationMessage($"Reinforcements have arrived: {party.Name} ({troopText})"));
+        }
+    }
+
+    // [Host, game thread] Field a pending party's troops while the engine has agent capacity (BR-110). The
+    // capacity is re-read per spawn, so implicitly spawned cavalry mounts count against it as they appear.
+    private int FieldPendingParty(PendingReinforcementParty pending)
+    {
+        var mission = Mission.Current;
+        var team = BattleTeams.Resolve(pending.Side);
+        if (team == null) return 0;
+
+        var formations = new HashSet<Formation>();
+        int spawned = 0;
+        while (pending.Origins.Count > 0 && agentBudget.HasCapacityFor(mission, 1))
+        {
+            var origin = pending.Origins.Dequeue();
+            var agent = SpawnReinforcementTroop(mission, team, origin);
+            if (agent?.Formation != null) formations.Add(agent.Formation);
+            spawned++;
+        }
+
+        ChargeFormations(formations);
+        return spawned;
+    }
+
+    // [Host, game thread] Field reinforcement troops withheld at the engine agent limit (BR-110) as removals
+    // free capacity.
+    private void FieldPendingReinforcements()
+    {
+        for (int i = 0; i < pendingReinforcements.Count;)
+        {
+            var pending = pendingReinforcements[i];
+            int spawned = FieldPendingParty(pending);
+            if (spawned > 0)
+                Logger.Information("[BattleSync] Fielded {Count} deferred reinforcement troop(s) for party {Party}", spawned, pending.PartyId);
+
+            if (pending.Origins.Count == 0)
+            {
+                pendingReinforcements.RemoveAt(i);
+                continue;
+            }
+
+            break; // still at the limit — later parties can't field either
+        }
+    }
+
+    // A coop battle has no general commanding formations, so order each formation the reinforcements joined
+    // to engage — SetControlledByAI alone leaves them idle without an active behavior.
+    private static void ChargeFormations(HashSet<Formation> formations)
+    {
+        foreach (var formation in formations)
+        {
+            formation.SetControlledByAI(true);
+            formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
         }
     }
 

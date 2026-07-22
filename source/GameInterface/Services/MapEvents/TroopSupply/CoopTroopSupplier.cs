@@ -47,15 +47,18 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
     // objects without hitting the service locator each call. Null only in tests that don't exercise that path.
     private readonly IObjectManager objectManager;
+    // BR-110: the engine agent budget clamps wave/initial allocation to the mission's render capacity.
+    private readonly IBattleAgentBudget agentBudget;
 
     public string MapEventId { get; }
     public BattleSideEnum Side { get; }
 
-    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager)
+    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager, IBattleAgentBudget agentBudget)
     {
         MapEventId = mapEventId;
         Side = side;
         this.objectManager = objectManager;
+        this.agentBudget = agentBudget;
     }
 
     /// <summary>
@@ -261,10 +264,16 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     public IEnumerable<IAgentOriginBase> SupplyTroops(int numberToAllocate)
     {
+        // BR-110: allocate no more troops than the engine has render capacity for. The unallocated remainder
+        // stays UNSUPPLIED (wave-eligible), so the native wave logic re-requests it as casualties free slots.
+        // A null budget (the service-locator fallback path could not resolve one) means no clamp, matching the
+        // no-mission behaviour.
+        int allowed = agentBudget?.ClampToCapacity(Mission.Current, numberToAllocate) ?? numberToAllocate;
+
         var origins = new List<IAgentOriginBase>();
         lock (gate)
         {
-            int remaining = numberToAllocate;
+            int remaining = allowed;
             foreach (var party in parties)
             {
                 while (remaining > 0 && party.Supplied < party.Entries.Length)
@@ -277,8 +286,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 if (remaining == 0) break;
             }
         }
-        Logger.Information("[TroopSupply] {MapEvent} side {Side}: SupplyTroops({Req}) -> {Ret} origins, {Remaining} remaining",
-            MapEventId, Side, numberToAllocate, origins.Count, NumTroopsNotSupplied);
+        Logger.Information("[TroopSupply] {MapEvent} side {Side}: SupplyTroops({Req}) -> {Ret} origins ({Withheld} withheld at the engine agent limit), {Remaining} remaining",
+            MapEventId, Side, numberToAllocate, origins.Count, numberToAllocate - allowed, NumTroopsNotSupplied);
         return origins;
     }
 
