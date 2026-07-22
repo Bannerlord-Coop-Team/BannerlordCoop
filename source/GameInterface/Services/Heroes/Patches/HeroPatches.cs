@@ -34,9 +34,9 @@ namespace GameInterface.Services.Heroes.Patches
             return false;
         }
 
-        [HarmonyPatch("OnLoad")]
-        [HarmonyPostfix]
-        private static void OnLoadPostfix(Hero __instance)
+        [HarmonyPatch("PreAfterLoad")]
+        [HarmonyPrefix]
+        private static void PreAfterLoadPrefix(Hero __instance)
         {
             if (__instance.CharacterObject != null) return;
             if (!ContainerProvider.TryResolve<IHeroCharacterObjectRepairer>(out var repairer)) return;

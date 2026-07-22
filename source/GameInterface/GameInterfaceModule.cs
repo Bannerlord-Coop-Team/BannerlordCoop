@@ -53,6 +53,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<CharacterObjectCreator>().As<ICharacterObjectCreator>().InstancePerDependency();
+        builder.RegisterType<CultureObjectProvider>().As<ICultureObjectProvider>().InstancePerDependency();
         builder.RegisterType<HeroCharacterObjectRepairer>().As<IHeroCharacterObjectRepairer>().InstancePerDependency();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();

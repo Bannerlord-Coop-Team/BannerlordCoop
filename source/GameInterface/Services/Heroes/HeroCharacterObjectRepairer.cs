@@ -1,4 +1,5 @@
 ﻿using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes;
@@ -16,11 +17,16 @@ internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
 {
     private readonly ILogger logger;
     private readonly ICharacterObjectCreator characterObjectCreator;
+    private readonly ICultureObjectProvider cultureObjectProvider;
 
-    public HeroCharacterObjectRepairer(ILogger logger, ICharacterObjectCreator characterObjectCreator)
+    public HeroCharacterObjectRepairer(
+        ILogger logger,
+        ICharacterObjectCreator characterObjectCreator,
+        ICultureObjectProvider cultureObjectProvider)
     {
         this.logger = logger;
         this.characterObjectCreator = characterObjectCreator;
+        this.cultureObjectProvider = cultureObjectProvider;
     }
 
     public bool TryRepair(Hero hero)
@@ -28,18 +34,37 @@ internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
         if (hero == null) throw new System.ArgumentNullException(nameof(hero));
         if (hero.CharacterObject != null) return false;
 
-        var template = hero.Culture?.BasicTroop;
+        var availableCultures = cultureObjectProvider.GetAll();
+        var culture = GetUsableCulture(hero.Culture)
+            ?? GetUsableCulture(hero.Clan?.Culture)
+            ?? GetUsableCulture(hero.OriginClan?.Culture)
+            ?? GetUsableCulture(hero.CurrentSettlement?.Culture)
+            ?? GetUsableCulture(hero.BornSettlement?.Culture)
+            ?? availableCultures.FirstOrDefault(candidate =>
+                candidate?.IsMainCulture == true && candidate.BasicTroop != null)
+            ?? availableCultures.FirstOrDefault(candidate => candidate?.BasicTroop != null);
+
+        var template = culture?.BasicTroop;
         if (template == null)
         {
-            logger.Error("Unable to repair missing CharacterObject for hero {HeroId}: culture basic troop was unavailable", hero.StringId);
+            logger.Error("Unable to repair missing CharacterObject for hero {HeroId}: no culture basic troop was available", hero.StringId);
             return false;
         }
 
         var characterObject = characterObjectCreator.CreateFrom(template);
         characterObject.HeroObject = hero;
         hero._characterObject = characterObject;
+        hero.Culture = culture;
 
-        logger.Warning("Repaired missing CharacterObject for hero {HeroId} using {TemplateId}", hero.StringId, template.StringId);
+        logger.Warning("Repaired missing CharacterObject for hero {HeroId} using {TemplateId} from culture {CultureId}",
+            hero.StringId,
+            template.StringId,
+            culture.StringId);
         return true;
+    }
+
+    private static CultureObject GetUsableCulture(CultureObject culture)
+    {
+        return culture?.BasicTroop != null ? culture : null;
     }
 }
