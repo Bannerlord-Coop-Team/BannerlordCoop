@@ -113,7 +113,7 @@ Collapses every native scoreboard party roster and returns the scroll position t
         if (dataSource == null)
             return "Failed: no battle scoreboard UI.";
 
-        if (!TryGetScoreboardWidgets(scoreboard, out var scoreboardWidget, out var partyHeaderCount, out var partyDetails))
+        if (!TryGetScoreboardWidgets(scoreboard, out var scrollablePanel, out var partyHeaderCount, out var partyDetails))
             return "Failed: native scoreboard widgets are not loaded.";
 
         var expectedPartyCount = dataSource.Attackers.Parties.Count + dataSource.Defenders.Parties.Count;
@@ -121,7 +121,6 @@ Collapses every native scoreboard party roster and returns the scroll position t
             return $"Failed: found {partyHeaderCount} native party headers and {partyDetails.Count} party detail panels, " +
                    $"expected {expectedPartyCount} each.";
 
-        var scrollablePanel = scoreboardWidget.ScrollablePanel;
         var verticalScrollbar = scrollablePanel.VerticalScrollbar;
 
         foreach (var partyDetail in partyDetails)
@@ -180,14 +179,14 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
         var scrollTop = false;
         var nativeWidgetsLoaded = TryGetScoreboardWidgets(
             scoreboard,
-            out var scoreboardWidget,
+            out var scrollablePanel,
             out var partyHeaderCount,
             out var partyDetails);
         if (nativeWidgetsLoaded)
         {
             expandedPartyDetails = partyDetails.Count(details => details.IsVisible);
-            var scrollbar = scoreboardWidget.ScrollablePanel?.VerticalScrollbar;
-            scrollTop = scrollbar != null && Math.Abs(scrollbar.ValueFloat - scrollbar.MinValue) < 0.01f;
+            var scrollbar = scrollablePanel.VerticalScrollbar;
+            scrollTop = Math.Abs(scrollbar.ValueFloat - scrollbar.MinValue) < 0.01f;
         }
 
         return $"Visible: {dataSource.ShowScoreboard}; " +
@@ -202,11 +201,11 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
 
     private static bool TryGetScoreboardWidgets(
         MissionGauntletBattleScore scoreboard,
-        out ScoreboardScreenWidget scoreboardWidget,
+        out ScrollablePanel scrollablePanel,
         out int partyHeaderCount,
         out List<Widget> partyDetails)
     {
-        scoreboardWidget = null;
+        scrollablePanel = null;
         partyHeaderCount = 0;
         partyDetails = new List<Widget>();
 
@@ -218,15 +217,12 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
         if (rootWidget == null)
             return false;
 
-        scoreboardWidget = rootWidget as ScoreboardScreenWidget ??
-                           rootWidget.GetAllChildrenOfTypeRecursive<ScoreboardScreenWidget>().FirstOrDefault();
-        if (scoreboardWidget == null)
-            return false;
-
         var widgets = rootWidget.GetAllChildrenRecursive();
+        scrollablePanel = widgets.OfType<ScrollablePanel>()
+            .FirstOrDefault(panel => panel.VerticalScrollbar != null);
         partyHeaderCount = widgets.Count(widget => widget.Id == PartyScoreToggleWidgetId);
         partyDetails = widgets.Where(widget => widget.Id == PartyDetailsWidgetId).ToList();
-        return scoreboardWidget.ScrollablePanel?.VerticalScrollbar != null;
+        return scrollablePanel != null;
     }
 
     private static string FormatPartyNames(IEnumerable<PartyBase> parties)
