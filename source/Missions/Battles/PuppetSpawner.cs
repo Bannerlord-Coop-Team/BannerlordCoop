@@ -38,6 +38,14 @@ public interface IPuppetSpawner : IDisposable
 /// <inheritdoc cref="IPuppetSpawner"/>
 public class PuppetSpawner : IPuppetSpawner
 {
+    private enum StableSpawnResolution
+    {
+        Proceed,
+        Consume,
+        Replace,
+        Defer,
+    }
+
     private static readonly ILogger Logger = LogManager.GetLogger<PuppetSpawner>();
 
     private readonly IMessageBroker messageBroker;
@@ -48,6 +56,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
+    private readonly IBattleAgentIdAliasMap agentIdAliases;
 
     // Puppet spawns from the host's catch-up burst can arrive while THIS client's mission is still loading
     // (before MissionCombatantsLogic creates the teams). An agent built with a null team later NREs the
@@ -55,9 +64,11 @@ public class PuppetSpawner : IPuppetSpawner
     // such spawns and drain them on tick once the teams exist.
     private readonly object pendingPuppetLock = new object();
     private readonly List<BattleAgentSpawnData> pendingPuppets = new List<BattleAgentSpawnData>();
+    private readonly Dictionary<Guid, Guid> mountIdsByRiderId = new Dictionary<Guid, Guid>();
     private readonly object withdrawnControllerLock = new object();
     private readonly HashSet<string> withdrawnControllers = new HashSet<string>();
     private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
+    private readonly HashSet<string> knownHostControllers = new HashSet<string>();
 
     public PuppetSpawner(
         IMessageBroker messageBroker,
@@ -67,7 +78,8 @@ public class PuppetSpawner : IPuppetSpawner
         IBattleSession session,
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
-        IAgentFormationAssigner formationAssigner)
+        IAgentFormationAssigner formationAssigner,
+        IBattleAgentIdAliasMap agentIdAliases)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -77,8 +89,10 @@ public class PuppetSpawner : IPuppetSpawner
         this.casualties = casualties;
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
+        this.agentIdAliases = agentIdAliases;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
+        messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_HostAssigned);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -87,6 +101,7 @@ public class PuppetSpawner : IPuppetSpawner
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
+        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_HostAssigned);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -123,9 +138,35 @@ public class PuppetSpawner : IPuppetSpawner
     {
         var registry = coopMissionComponent.AgentRegistry;
 
-        if (Mission.Current == null) return true;                       // no mission — drop
-        if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
-        if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
+        if (session.IsHostController(data.OwnerControllerId))
+        {
+            lock (withdrawnControllerLock)
+                knownHostControllers.Add(data.OwnerControllerId);
+        }
+
+        if (Mission.Current == null) return true;      // no mission — drop
+        if (IsWithdrawnPlayerParty(data)) return true; // stale replay after leave/drop — drop
+        if (!string.IsNullOrEmpty(data.MapEventPartyId) && casualties.WasDeparted(data.TroopSeed))
+            return true; // a terminal event already removed this stable troop
+        if (registry.TryGetAgentInfo(data.AgentId, out _))
+        {
+            CompletePrioritySpawn(data.MapEventPartyId);
+            return true; // already spawned — dedupe
+        }
+
+        var stableResolution = ResolveStableSpawn(data, registry, out var supersededAgent);
+        if (stableResolution == StableSpawnResolution.Consume)
+        {
+            CompletePrioritySpawn(data.MapEventPartyId);
+            return true;
+        }
+        if (stableResolution == StableSpawnResolution.Defer)
+            return false;
+        bool replacingStableAgent = stableResolution == StableSpawnResolution.Replace;
+
+        // Mission-mesh spawns and campaign departures have no shared ordering. Buffer any new human while the
+        // local copy is full, then the ordinary pending drain fields it after the corresponding removal arrives.
+        if (!replacingStableAgent && !BattleSpawnGate.HasAvailableHumanAgentSlot(Mission.Current)) return false;
 
         // While THIS client is still in its own Order-of-Battle phase, hold puppets OUT of the mission: a puppet
         // populates a team the native spawn gate (DefaultBattleMissionAgentSpawnLogic.CheckDeployment) inspects, but
@@ -167,7 +208,13 @@ public class PuppetSpawner : IPuppetSpawner
             Logger.Warning("[BattleSync] Puppet {AgentId} spawned with a fallback {Side} party; {Party} unresolved", data.AgentId, data.Side, data.MapEventPartyId);
         }
 
-        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed));
+        var origin = new CoopAgentOrigin(
+            character,
+            party,
+            -1,
+            null,
+            new UniqueTroopDescriptor(data.TroopSeed),
+            data.MapEventPartyId);
 
         var missionEquipment = ResolveMissionEquipment(data.MissionEquipmentData);
 
@@ -185,6 +232,10 @@ public class PuppetSpawner : IPuppetSpawner
             : AgentControllerType.None);
         buildData.ClothingColor1(origin.FactionColor);
         buildData.ClothingColor2(origin.FactionColor2);
+
+        Guid supersededMountId = Guid.Empty;
+        if (replacingStableAgent)
+            supersededMountId = RemoveSupersededPuppet(supersededAgent);
 
         // Suppress capture for the duration of this spawn: a puppet is another owner's troop replicated to us,
         // not ours, so BattleAgentSpawnedPatch must not re-capture and re-broadcast it.
@@ -228,26 +279,56 @@ public class PuppetSpawner : IPuppetSpawner
             agent.SetIsAIPaused(false);
         }
 
-        registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent);
+        if (!registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent))
+        {
+            BattleSpawnGate.RunWithAdministrativeRemoval(agent, agent.MountAgent, () =>
+            {
+                if (agent.IsActive())
+                    agent.FadeOut(hideInstantly: true, hideMount: agent.MountAgent?.IsActive() == true);
+            });
+            return true;
+        }
+        CompletePrioritySpawn(data.MapEventPartyId);
 
         // The owner registered its cavalry's horse with its own network id; our engine spawned a matching
         // horse implicitly (same equipment) inside SpawnAgent. Register OUR copy under the same id, so mount
         // hits route by the horse's identity and its death broadcast finds it. No casualty record — a horse
         // is not a roster troop. If the puppet unexpectedly spawned on foot, the id just stays unmapped here
         // and hits on the (nonexistent) horse can't occur anyway.
+        bool mountRegistered = false;
         if (data.MountAgentId != Guid.Empty)
         {
             if (agent.MountAgent is Agent mount)
-                registry.TryRegisterAgent(data.OwnerControllerId, data.MountAgentId, mount);
+                mountRegistered = registry.TryRegisterAgent(data.OwnerControllerId, data.MountAgentId, mount);
             else
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
         }
+        if (mountRegistered)
+            mountIdsByRiderId[data.AgentId] = data.MountAgentId;
 
         // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
         objectManager.TryGetId(character, out var troopCharacterId);
         casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);
+        if (replacingStableAgent)
+        {
+            agentIdAliases.Record(supersededAgent.AgentId, data.AgentId);
+            if (supersededMountId != Guid.Empty && mountRegistered)
+                agentIdAliases.Record(supersededMountId, data.MountAgentId);
+        }
         Logger.Information("[BattleSync] Spawned puppet {Char} (agent {AgentId}, ownAgent={Own})", data.CharacterId, data.AgentId, isOwnAgent);
         return true;
+    }
+
+    private static void CompletePrioritySpawn(string mapEventPartyId)
+    {
+        BattleSpawnGate.CompletePrioritySpawn(BattleSpawnGate.ActiveMapEventId, mapEventPartyId);
+    }
+
+    private void Handle_HostAssigned(MessagePayload<NetworkBattleHostAssigned> payload)
+    {
+        if (payload.What.MapEventId != session.InstanceId) return;
+        lock (withdrawnControllerLock)
+            knownHostControllers.Add(payload.What.HostControllerId);
     }
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
@@ -277,9 +358,11 @@ public class PuppetSpawner : IPuppetSpawner
     {
         if (string.IsNullOrEmpty(controllerId)) return;
         if (instanceId != null && instanceId != session.InstanceId) return;
-        bool wasHost = session.IsHostController(controllerId);
+        bool wasHost;
         lock (withdrawnControllerLock)
         {
+            wasHost = session.IsHostController(controllerId)
+                || knownHostControllers.Contains(controllerId);
             withdrawnControllers.Add(controllerId);
             if (wasHost) withdrawnHostControllers.Add(controllerId);
         }
@@ -288,10 +371,36 @@ public class PuppetSpawner : IPuppetSpawner
         // player's party on the game thread, while leaving NPC parties from the old host available to migrate.
         GameThread.RunSafe(() =>
         {
+            ClearConsumedPrioritySpawn(controllerId);
             lock (pendingPuppetLock)
                 pendingPuppets.RemoveAll(data => data.OwnerControllerId == controllerId
                     && (!wasHost || IsPlayerPartyRecord(data, controllerId)));
         });
+    }
+
+    private void ClearConsumedPrioritySpawn(string controllerId)
+    {
+        if (string.IsNullOrEmpty(session.InstanceId)
+            || !playerManager.TryGetPlayer(controllerId, out var player)
+            || !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var mobileParty))
+        {
+            return;
+        }
+
+        var side = mobileParty?.Party?.MapEventSide;
+        if (side == null) return;
+
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty?.Party != mobileParty.Party
+                || !objectManager.TryGetId(mapEventParty, out var mapEventPartyId))
+            {
+                continue;
+            }
+
+            BattleSpawnGate.ClearConsumedPrioritySpawn(session.InstanceId, mapEventPartyId);
+            return;
+        }
     }
 
     // [Game thread] A replay from the old host can already be buffered when its disconnect arrives. Drop only
@@ -306,6 +415,190 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         return !wasHost || IsPlayerPartyRecord(data, data.OwnerControllerId);
+    }
+
+    // Mission-mesh spawn records and campaign host assignments have no shared order. Compare stable troop
+    // identity here so a recovered successor body and an old-host replay cannot coexist under different GUIDs.
+    private StableSpawnResolution ResolveStableSpawn(
+        BattleAgentSpawnData data,
+        INetworkAgentRegistry registry,
+        out CoopAgentInfo existing)
+    {
+        existing = null;
+        if (string.IsNullOrEmpty(data.MapEventPartyId)) return StableSpawnResolution.Proceed;
+
+        foreach (var controllerId in registry.GetControllerIds())
+        {
+            foreach (var info in registry.GetAgents(controllerId))
+            {
+                var agent = info.Agent;
+                if (agent == null || agent.IsMount || !agent.IsActive()) continue;
+
+                var attribution = casualties.GetOrDefault(info.AgentId);
+                bool stableMatch = attribution.MapEventPartyId == data.MapEventPartyId
+                    && attribution.TroopSeed == data.TroopSeed;
+                if (!stableMatch
+                    && agent.Origin is CoopAgentOrigin origin)
+                {
+                    stableMatch = origin.MapEventPartyId == data.MapEventPartyId
+                        && origin.UniqueSeed == data.TroopSeed;
+                }
+                if (stableMatch)
+                {
+                    existing = info;
+                    break;
+                }
+            }
+            if (existing != null) break;
+        }
+
+        if (existing == null) return StableSpawnResolution.Proceed;
+        if (existing.AgentId == data.AgentId) return StableSpawnResolution.Consume;
+
+        bool incomingWithdrawn = IsControllerWithdrawn(data.OwnerControllerId);
+        bool existingWithdrawn = IsControllerWithdrawn(existing.CurrentAuthority);
+        bool incomingPlayerOwner = IsPlayerPartyRecord(data, data.OwnerControllerId);
+        bool existingPlayerOwner = IsPlayerPartyRecord(data, existing.CurrentAuthority);
+
+        StableSpawnResolution resolution;
+        if (data.OwnerControllerId == existing.CurrentAuthority)
+        {
+            resolution = StableSpawnResolution.Consume;
+        }
+        else if (incomingWithdrawn != existingWithdrawn)
+        {
+            resolution = incomingWithdrawn
+                ? StableSpawnResolution.Consume
+                : StableSpawnResolution.Replace;
+        }
+        else if (incomingPlayerOwner != existingPlayerOwner)
+        {
+            resolution = incomingPlayerOwner
+                ? StableSpawnResolution.Replace
+                : StableSpawnResolution.Consume;
+        }
+        else
+        {
+            bool incomingCurrentHost = session.IsHostController(data.OwnerControllerId);
+            bool existingCurrentHost = session.IsHostController(existing.CurrentAuthority);
+            if (incomingCurrentHost != existingCurrentHost && incomingCurrentHost)
+                resolution = StableSpawnResolution.Replace;
+            else
+                resolution = StableSpawnResolution.Defer;
+        }
+
+        if (resolution == StableSpawnResolution.Consume)
+        {
+            // Alias only a definitely superseded authority. A same-owner duplicate has no generation marker,
+            // so redirecting its later terminal event could kill the wrong generation after a reconnect.
+            if (incomingWithdrawn)
+                RecordSupersededAliases(data, existing);
+
+            Logger.Information(
+                "[BattleSync] Dropped spawn {ReplayAgentId} from {Controller}; party {Party} seed {Seed} is already represented as {CurrentAgentId} by {CurrentAuthority}",
+                data.AgentId,
+                data.OwnerControllerId,
+                data.MapEventPartyId,
+                data.TroopSeed,
+                existing.AgentId,
+                existing.CurrentAuthority);
+        }
+
+        return resolution;
+    }
+
+    private bool IsControllerWithdrawn(string controllerId)
+    {
+        lock (withdrawnControllerLock)
+            return withdrawnControllers.Contains(controllerId);
+    }
+
+    private void RecordSupersededAliases(BattleAgentSpawnData data, CoopAgentInfo existing)
+    {
+        agentIdAliases.Record(data.AgentId, existing.AgentId);
+        if (data.MountAgentId == Guid.Empty || existing.Agent?.MountAgent == null) return;
+
+        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(existing.Agent.MountAgent, out var mountInfo))
+            agentIdAliases.Record(data.MountAgentId, mountInfo.AgentId);
+    }
+
+    // Locally discard the losing body without announcing a rout or marking its troop departed. Every receiver
+    // independently sees the successor spawn; only this stale local representation is being replaced.
+    private Guid RemoveSupersededPuppet(CoopAgentInfo superseded)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+        var agent = superseded?.Agent;
+        if (agent == null) return Guid.Empty;
+
+        if (agent.Origin is CoopAgentOrigin origin)
+            origin.SuppressRemoval();
+
+        var mount = agent.MountAgent;
+        CoopAgentInfo mountInfo = null;
+        if (mount != null)
+            registry.TryGetAgentInfo(mount, out mountInfo);
+        mountIdsByRiderId.TryGetValue(superseded.AgentId, out var rememberedMountId);
+        bool removeMount = CanRemoveSupersededMount(
+            agent,
+            mount,
+            mountInfo,
+            superseded.CurrentAuthority);
+        bool hideMount = removeMount && mount?.IsActive() == true;
+        if (removeMount && mount?.Origin is CoopAgentOrigin mountOrigin)
+            mountOrigin.SuppressRemoval();
+
+        coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+        if (removeMount)
+            coopMissionComponent.AgentMovementHandler.Interpolator.Forget(mount);
+
+        BattleSpawnGate.RunWithAdministrativeRemoval(agent, removeMount ? mount : null, () =>
+        {
+            if (agent.IsActive())
+                agent.FadeOut(hideInstantly: true, hideMount: hideMount);
+            if (removeMount && !hideMount && mount.IsActive())
+                mount.FadeOut(hideInstantly: true, hideMount: false);
+        });
+
+        registry.RemoveAgent(superseded.AgentId);
+        casualties.Forget(superseded.AgentId);
+        mountIdsByRiderId.Remove(superseded.AgentId);
+        if (removeMount && mountInfo != null)
+        {
+            registry.RemoveAgent(mountInfo.AgentId);
+            casualties.Forget(mountInfo.AgentId);
+        }
+
+        Logger.Information(
+            "[BattleSync] Replaced stale agent {AgentId} from {Authority} without recording a casualty",
+            superseded.AgentId,
+            superseded.CurrentAuthority);
+        if (!removeMount) return Guid.Empty;
+        return mountInfo?.AgentId ?? rememberedMountId;
+    }
+
+    private bool CanRemoveSupersededMount(
+        Agent spawnRider,
+        Agent mount,
+        CoopAgentInfo mountInfo,
+        string supersededAuthority)
+    {
+        if (mount == null) return false;
+
+        var currentRider = mount.RiderAgent;
+        if (currentRider != null && currentRider.IsActive() && !ReferenceEquals(currentRider, spawnRider))
+        {
+            if (mountInfo != null
+                && coopMissionComponent.AgentRegistry.TryGetAgentInfo(currentRider, out var riderInfo)
+                && mountInfo.CurrentAuthority != riderInfo.CurrentAuthority)
+            {
+                coopMissionComponent.AgentRegistry.TryTransferAuthority(
+                    riderInfo.CurrentAuthority,
+                    mountInfo.AgentId);
+            }
+            return false;
+        }
+
+        return mountInfo == null || mountInfo.CurrentAuthority == supersededAuthority;
     }
 
     // [Game thread] Match a spawn record to the controller's player party. The hero check covers a record

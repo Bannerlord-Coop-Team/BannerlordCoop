@@ -1,7 +1,8 @@
-using System.Linq;
+﻿using System.Linq;
 using Common.Messaging;
 using Common.Network;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Handlers;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
@@ -106,6 +107,141 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     private static void RequestOwnedReserves(EnvironmentInstance client, string mapEventId, string controllerId)
     {
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestBattleReserves(mapEventId, controllerId)));
+    }
+
+    [Fact]
+    public void PostPlanParty_RefreshesEveryAuthorityWithTheNewPersistentReserve()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "other-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var other = clients[1];
+        GiveRoster(mapEventId, partyIds[0], troopCount: 2);
+        GiveRoster(mapEventId, partyIds[1], troopCount: 2);
+
+        EnterBattle(host, mapEventId);
+        EnterBattle(other, mapEventId);
+
+        var aiPartyId = CreateRegisteredObject<MobileParty>();
+        var reinforcementTroopId = CreateRegisteredObject<CharacterObject>();
+        string aiMapEventPartyId = null;
+        int hostBaseline = FeedBaseline(host, mapEventId);
+        int otherBaseline = FeedBaseline(other, mapEventId);
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                var reserveBuilder = Server.Resolve<IBattleTroopReserveBuilder>();
+
+                // Four existing troops consume four slots, leaving two of the six-slot plan for the late party.
+                reserveBuilder.PreparePlan(mapEvent, battleSize: 6);
+
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var aiParty));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(reinforcementTroopId, out var troop));
+                aiParty.Party.MemberRoster.Clear();
+                aiParty.Party.MemberRoster.AddToCounts(troop, 5);
+                aiParty.Party.MapEventSide = mapEvent.DefenderSide;
+
+                var aiMapEventParty = mapEvent.DefenderSide.Parties.Last(party => party.Party == aiParty.Party);
+                aiMapEventParty.Update();
+                Assert.True(Server.ObjectManager.TryGetId(aiMapEventParty, out aiMapEventPartyId));
+
+                Server.Resolve<IMessageBroker>().Publish(this,
+                    new MapEventInvolvedPartiesAdded(mapEvent, new[] { aiMapEventParty }));
+            }, MapEventDisabledMethods);
+
+            var hostRefresh = FeedsSince(host, mapEventId, hostBaseline);
+            var otherRefresh = FeedsSince(other, mapEventId, otherBaseline);
+            Assert.Equal(2, hostRefresh.Length);
+            Assert.Equal(2, otherRefresh.Length);
+
+            var hostAiReserve = hostRefresh
+                .Single(feed => feed.Side == (int)BattleSideEnum.Defender)
+                .Parties.Single(party => party.PartyId == aiMapEventPartyId);
+            Assert.Equal(5, hostAiReserve.Entries.Length);
+            Assert.Equal(2, hostAiReserve.InitialSpawnCount);
+            Assert.Equal(0, hostAiReserve.SuppliedCount);
+
+            Assert.DoesNotContain(
+                otherRefresh.SelectMany(feed => feed.Parties),
+                party => party.PartyId == aiMapEventPartyId);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    [Fact]
+    public void PostPlanParty_WithExistingHost_DoesNotFinalizeLoadingSuccessorBeforeItsRoleIsKnown()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "loading-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var loading = clients[1];
+        GiveRoster(mapEventId, partyIds[0], troopCount: 2);
+        GiveRoster(mapEventId, partyIds[1], troopCount: 2);
+
+        EnterBattle(host, mapEventId);
+        EnterBattle(loading, mapEventId, missionReady: false);
+        AssertHost(Server, mapEventId, "host-ctrl");
+
+        var aiPartyId = CreateRegisteredObject<MobileParty>();
+        var reinforcementTroopId = CreateRegisteredObject<CharacterObject>();
+        string aiMapEventPartyId = null;
+        int hostBaseline = FeedBaseline(host, mapEventId);
+        int loadingBaseline = FeedBaseline(loading, mapEventId);
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                Server.Resolve<IBattleTroopReserveBuilder>().PreparePlan(mapEvent, battleSize: 6);
+
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var aiParty));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(reinforcementTroopId, out var troop));
+                aiParty.Party.MemberRoster.Clear();
+                aiParty.Party.MemberRoster.AddToCounts(troop, 5);
+                aiParty.Party.MapEventSide = mapEvent.DefenderSide;
+
+                var aiMapEventParty = mapEvent.DefenderSide.Parties.Last(party => party.Party == aiParty.Party);
+                aiMapEventParty.Update();
+                Assert.True(Server.ObjectManager.TryGetId(aiMapEventParty, out aiMapEventPartyId));
+
+                Server.Resolve<IMessageBroker>().Publish(this,
+                    new MapEventInvolvedPartiesAdded(mapEvent, new[] { aiMapEventParty }));
+            }, MapEventDisabledMethods);
+
+            // The ready host receives a complete refresh, while the loading client receives only its
+            // nonempty owned side. An explicit empty second side on the loading client would
+            // populate both suppliers and let spawn sizing latch before the host election grants NPC troops.
+            var hostRefresh = FeedsSince(host, mapEventId, hostBaseline);
+            Assert.Equal(2, hostRefresh.Length);
+            var aiReserve = hostRefresh
+                .Single(feed => feed.Side == (int)BattleSideEnum.Defender)
+                .Parties.Single(party => party.PartyId == aiMapEventPartyId);
+            Assert.Equal(5, aiReserve.Entries.Length);
+            Assert.Equal(2, aiReserve.InitialSpawnCount);
+
+            var loadingRefresh = Assert.Single(FeedsSince(loading, mapEventId, loadingBaseline));
+            Assert.NotEmpty(loadingRefresh.Parties);
+            Assert.DoesNotContain(loadingRefresh.Parties, party => party.PartyId == aiMapEventPartyId);
+
+            int readyBaseline = FeedBaseline(loading, mapEventId);
+            MakeMissionReady(loading, mapEventId);
+            AssertHost(Server, mapEventId, "host-ctrl", "loading-ctrl");
+
+            var readyFeeds = FeedsSince(loading, mapEventId, readyBaseline);
+            Assert.Equal(2, readyFeeds.Length);
+            Assert.DoesNotContain(
+                readyFeeds.SelectMany(feed => feed.Parties),
+                party => party.PartyId == aiMapEventPartyId);
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
     }
 
     /// <summary>
@@ -640,8 +776,8 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     }
 
     /// <summary>
-    /// BR-033 fallback (deadline): the flush ack never arrives (a legacy host that ignores FlushRequested,
-    /// or a lost message) and the host never departs. A server-side, campaign-tick-driven deadline must
+    /// BR-033 fallback (deadline): the flush ack never arrives and the host never departs. A server-side,
+    /// campaign-tick-driven deadline must
     /// serve the pending returner from the current ledger — the returner is never stranded. The deadline is
     /// set to zero so the first tick after the deferral expires it without wall-clock waits.
     /// </summary>
@@ -658,7 +794,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         var returner = clients[1];
         try
         {
-            // A legacy/unresponsive host: applies nothing, acks nothing.
+            // An unresponsive holder applies nothing and acks nothing.
             host.Call(() => host.Resolve<BattleTroopReserveHandler>().Dispose());
 
             // Expire pendings on the first tick after creation.
@@ -685,9 +821,84 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         }
     }
 
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void LateAcksFromExpiredFlushGeneration_DoNotCompleteTheNextReturn()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "return-a", "return-b");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var returnA = clients[1];
+        var returnB = clients[2];
+        GiveRoster(mapEventId, partyIds[1], ReturnerTroopCount);
+        GiveRoster(mapEventId, partyIds[2], ReturnerTroopCount);
+
+        EnterBattle(host, mapEventId);
+        EnterBattle(returnA, mapEventId);
+        EnterBattle(returnB, mapEventId);
+        DepartBattle("return-a", mapEventId, wasRetreat: false);
+        DepartBattle("return-b", mapEventId, wasRetreat: false);
+        RequestOwnedReserves(host, mapEventId, "host-ctrl");
+
+        try
+        {
+            host.Call(() => host.Resolve<BattleTroopReserveHandler>().Dispose());
+            Server.Call(() => Server.Resolve<BattleHostHandler>().FlushAckDeadline = TimeSpan.Zero);
+
+            int hostBaseline = FeedBaseline(host, mapEventId);
+            int returnABaseline = FeedBaseline(returnA, mapEventId);
+            EnterBattle(returnA, mapEventId);
+            Assert.Empty(FeedsSince(returnA, mapEventId, returnABaseline));
+
+            var refreshA = FeedsSince(host, mapEventId, hostBaseline)
+                .Where(feed => feed.FlushRequested)
+                .ToArray();
+            Assert.NotEmpty(refreshA);
+            long generationA = Assert.Single(refreshA.Select(feed => feed.GrantGeneration).Distinct());
+
+            Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick()));
+            Assert.NotEmpty(FeedsSince(returnA, mapEventId, returnABaseline));
+
+            Server.Call(() => Server.Resolve<BattleHostHandler>().FlushAckDeadline = TimeSpan.FromMinutes(1));
+            hostBaseline = FeedBaseline(host, mapEventId);
+            int returnBBaseline = FeedBaseline(returnB, mapEventId);
+            EnterBattle(returnB, mapEventId);
+            Assert.Empty(FeedsSince(returnB, mapEventId, returnBBaseline));
+
+            var refreshB = FeedsSince(host, mapEventId, hostBaseline)
+                .Where(feed => feed.FlushRequested)
+                .ToArray();
+            Assert.NotEmpty(refreshB);
+            long generationB = Assert.Single(refreshB.Select(feed => feed.GrantGeneration).Distinct());
+            Assert.NotEqual(generationA, generationB);
+
+            void SendFlushAcks(long generation, int count)
+            {
+                for (int index = 0; index < count; index++)
+                {
+                    host.Call(() => host.Resolve<INetwork>().SendAll(
+                        new NetworkBattleSupplyProgress(
+                            mapEventId,
+                            Array.Empty<SupplyProgressEntry>(),
+                            isFlush: true,
+                            grantGeneration: generation)));
+                }
+            }
+
+            SendFlushAcks(generationA, refreshA.Length);
+            Assert.Empty(FeedsSince(returnB, mapEventId, returnBBaseline));
+
+            SendFlushAcks(generationB, refreshB.Length);
+            Assert.NotEmpty(FeedsSince(returnB, mapEventId, returnBBaseline));
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
     /// <summary>
-    /// BR-033 legacy client contract: an UNFLAGGED shrink (FlushRequested = false — what today's server, or
-    /// a legacy one, sends) behaves exactly as before: the REPLACE applies and NO flush ack is sent. A
+    /// BR-033 reserve contract: an UNFLAGGED shrink applies the REPLACE and sends no flush ack. A
     /// FLAGGED shrink acks each message once with the dropped parties' final local pointers (IsFlush set),
     /// even when the REPLACE drops nothing.
     /// </summary>
@@ -705,10 +916,13 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             Enumerable.Range(0, count).Select(i => new TroopReserveEntry(seedBase + i, $"char_{seedBase + i}", 0)).ToArray();
         PartyReserve[] BothParties() => new[]
         {
-            new PartyReserve(returnedParty, 0, Entries(4, seedBase: 100)),
-            new PartyReserve(keptParty, 0, Entries(3, seedBase: 200)),
+            new PartyReserve(returnedParty, 0, Entries(4, seedBase: 100), initialSpawnCount: 0),
+            new PartyReserve(keptParty, 0, Entries(3, seedBase: 200), initialSpawnCount: 0),
         };
-        PartyReserve[] ShrunkToKept() => new[] { new PartyReserve(keptParty, 0, Entries(3, seedBase: 200)) };
+        PartyReserve[] ShrunkToKept() => new[]
+        {
+            new PartyReserve(keptParty, 0, Entries(3, seedBase: 200), initialSpawnCount: 0),
+        };
 
         CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         try
@@ -722,8 +936,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
                 .Count(message => message.MapEventId == mapEventId);
             int ackBaseline = AckCount();
 
-            // LEGACY: an unflagged shrink applies the REPLACE (the returned party leaves the supplier)
-            // but sends NO ack — exactly today's behavior.
+            // An unflagged shrink applies the REPLACE but sends no ack.
             client.SimulateMessage(Server.NetPeer,
                 new NetworkBattleTroopReserve(mapEventId, (int)BattleSideEnum.Defender, ShrunkToKept()));
             Assert.Equal(3, supplier.TotalTroops); // only kept-party remains
@@ -734,7 +947,12 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
             supplier.SetReserve(BothParties());
             supplier.SupplyTroops(2);
             client.SimulateMessage(Server.NetPeer,
-                new NetworkBattleTroopReserve(mapEventId, (int)BattleSideEnum.Defender, ShrunkToKept(), flushRequested: true));
+                new NetworkBattleTroopReserve(
+                    mapEventId,
+                    (int)BattleSideEnum.Defender,
+                    ShrunkToKept(),
+                    flushRequested: true,
+                    grantGeneration: 1949));
 
             var acks = client.NetworkSentMessages.GetMessages<NetworkBattleSupplyProgress>()
                 .Where(message => message.MapEventId == mapEventId)
@@ -742,6 +960,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
                 .ToArray();
             var ack = Assert.Single(acks);
             Assert.True(ack.IsFlush);
+            Assert.Equal(1949, ack.GrantGeneration);
             var flushed = Assert.Single(ack.Entries);
             Assert.Equal(returnedParty, flushed.PartyId);
             Assert.Equal(2, flushed.SuppliedCount);
@@ -753,28 +972,51 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     }
 
     /// <summary>
-    /// Wire safety of the additive handshake fields: both flags survive a real protobuf round trip (and
-    /// default to false, so unflagged/legacy traffic is unchanged on the wire).
+    /// Wire safety of the reserve metadata: the flush flag and sizing-grant fields survive a real protobuf
+    /// round trip, while omitted fields retain their defaults.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-033")]
     public void FlushHandshakeFields_RoundTripOverTheWire()
     {
         var reserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
-            "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>(), flushRequested: true));
+            "rt_battle", (int)BattleSideEnum.Attacker,
+            new[]
+            {
+                new PartyReserve(
+                    "party",
+                    0,
+                    new[]
+                    {
+                        new TroopReserveEntry(1949, "char_1949", 0),
+                        new TroopReserveEntry(1950, "char_1950", 0),
+                    },
+                    1,
+                    new[] { 1950 }),
+            },
+            flushRequested: true,
+            grantGeneration: 1949, completesInitialSizing: true));
         Assert.True(reserve.FlushRequested);
+        Assert.Equal(1949, reserve.GrantGeneration);
+        Assert.True(reserve.CompletesInitialSizing);
+        Assert.Equal(new[] { 1950 }, Assert.Single(reserve.Parties).DepartedSeeds);
 
-        var legacyReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
+        var unflaggedReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
             "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>()));
-        Assert.False(legacyReserve.FlushRequested);
+        Assert.False(unflaggedReserve.FlushRequested);
+        Assert.Equal(0, unflaggedReserve.GrantGeneration);
+        Assert.False(unflaggedReserve.CompletesInitialSizing);
 
         var flush = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
-            "rt_battle", new[] { new SupplyProgressEntry("party", 2) }, isFlush: true));
+            "rt_battle", new[] { new SupplyProgressEntry("party", 2) }, isFlush: true,
+            grantGeneration: 1949));
         Assert.True(flush.IsFlush);
+        Assert.Equal(1949, flush.GrantGeneration);
         Assert.Equal(2, flush.Entries.Single().SuppliedCount);
 
-        var legacyReport = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
+        var periodicReport = Server.EnsureSerializable(new NetworkBattleSupplyProgress(
             "rt_battle", new[] { new SupplyProgressEntry("party", 2) }));
-        Assert.False(legacyReport.IsFlush);
+        Assert.False(periodicReport.IsFlush);
+        Assert.Equal(0, periodicReport.GrantGeneration);
     }
 }

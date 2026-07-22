@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -57,8 +57,15 @@ internal class CoopBattleDepletionPatch
             // or if the spawn handler deliberately crossed its reserve timeout for this exact side. The latter
             // is latched only after the full hold deadline; BattleEndLogic itself remains disabled until the
             // other side fields and deployment activates.
-            __result = had[(int)side] || BattleSpawnGate.IsMissingReserveSideAccepted(side);
+            __result = DetermineSideDepleted(had[(int)side], side);
         }
         return false; // skip the native count-based check
+    }
+
+    internal static bool DetermineSideDepleted(bool hadAgents, BattleSideEnum side)
+    {
+        if (BattleSpawnGate.HasPendingPrioritySpawn) return false;
+
+        return hadAgents || BattleSpawnGate.IsMissingReserveSideAccepted(side);
     }
 }

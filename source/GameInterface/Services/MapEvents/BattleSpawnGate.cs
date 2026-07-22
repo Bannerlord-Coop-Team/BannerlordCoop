@@ -7,6 +7,24 @@ using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
 
+/// <summary>A server-assigned transfer that reserves the next open human-agent slot for a waiting party.</summary>
+public readonly struct BattlePrioritySpawnAssignment
+{
+    public BattlePrioritySpawnAssignment(
+        long transferId,
+        string waitingPartyId,
+        string donorPartyId)
+    {
+        TransferId = transferId;
+        WaitingPartyId = waitingPartyId;
+        DonorPartyId = donorPartyId;
+    }
+
+    public long TransferId { get; }
+    public string WaitingPartyId { get; }
+    public string DonorPartyId { get; }
+}
+
 /// <summary>
 /// Static bridge that lets the (GameInterface) battle-spawn Harmony patches know whether a coop field battle is
 /// the active mission (and which map event it is): the Missions battle stack marks one active on entry
@@ -26,7 +44,15 @@ public static class BattleSpawnGate
     private static readonly object Gate = new object();
     private static readonly Queue<CombatLogContext> CombatLogContexts = new Queue<CombatLogContext>();
     private static readonly List<RoutedPlayerHitNotification> RoutedPlayerHitNotifications = new List<RoutedPlayerHitNotification>();
+    private static readonly Dictionary<string, HashSet<string>> PendingPrioritySpawns = new Dictionary<string, HashSet<string>>();
+    private static readonly Dictionary<string, Dictionary<long, BattlePrioritySpawnAssignment>> PrioritySpawnAssignments =
+        new Dictionary<string, Dictionary<long, BattlePrioritySpawnAssignment>>();
+    private static readonly Dictionary<string, HashSet<long>> ConsumedPrioritySpawnTransfers =
+        new Dictionary<string, HashSet<long>>();
+    private static readonly Dictionary<string, HashSet<string>> RegisteredPrioritySpawnParties =
+        new Dictionary<string, HashSet<string>>();
     private static string _activeMapEventId;
+    private static int _battleSize;
     private static bool _defenderReserveTimedOut;
     private static bool _attackerReserveTimedOut;
 
@@ -35,6 +61,12 @@ public static class BattleSpawnGate
 
     [System.ThreadStatic]
     private static Agent _replicatedDeathAgent;
+
+    [System.ThreadStatic]
+    private static Agent _administrativeRemovalAgent;
+
+    [System.ThreadStatic]
+    private static Agent _administrativeRemovalMount;
 
     [System.ThreadStatic]
     private static Agent _replicatedDeathAffector;
@@ -131,6 +163,30 @@ public static class BattleSpawnGate
     public static bool IsReplicatedDeath(Agent affectedAgent)
     {
         return ReferenceEquals(_replicatedDeathAgent, affectedAgent);
+    }
+
+    /// <summary>Removes an uncommitted duplicate without reporting a routed troop or rebroadcasting its removal.</summary>
+    public static void RunWithAdministrativeRemoval(Agent agent, Agent spawnMount, Action remove)
+    {
+        var previousAgent = _administrativeRemovalAgent;
+        var previousMount = _administrativeRemovalMount;
+        _administrativeRemovalAgent = agent;
+        _administrativeRemovalMount = spawnMount;
+        try
+        {
+            remove();
+        }
+        finally
+        {
+            _administrativeRemovalAgent = previousAgent;
+            _administrativeRemovalMount = previousMount;
+        }
+    }
+
+    public static bool IsAdministrativeRemoval(Agent agent)
+    {
+        return ReferenceEquals(_administrativeRemovalAgent, agent)
+            || ReferenceEquals(_administrativeRemovalMount, agent);
     }
 
     public static bool TryGetReplicatedDeath(
@@ -287,6 +343,300 @@ public static class BattleSpawnGate
         get { lock (Gate) { return _activeMapEventId; } }
     }
 
+    /// <summary>The server-authoritative human-agent budget frozen for the active battle.</summary>
+    public static int BattleSize
+    {
+        get { lock (Gate) { return _battleSize; } }
+    }
+
+    /// <summary>Queues a party that must receive the next server-assigned human-agent slot.</summary>
+    public static void QueuePrioritySpawn(string mapEventId, string partyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId) || string.IsNullOrEmpty(partyId)) return;
+
+        lock (Gate)
+        {
+            if (IsPrioritySpawnRegistered(mapEventId, partyId))
+                return;
+            GetOrCreatePendingPrioritySpawns(mapEventId).Add(partyId);
+        }
+    }
+
+    /// <summary>Clears stale transfer state for a reconnecting party and queues it unless its puppet arrived.</summary>
+    public static void ResetAndQueuePrioritySpawn(string mapEventId, string partyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId) || string.IsNullOrEmpty(partyId)) return;
+
+        lock (Gate)
+        {
+            RemovePrioritySpawnAssignments(mapEventId, partyId, consumedOnly: false);
+            if (!IsPrioritySpawnRegistered(mapEventId, partyId))
+                GetOrCreatePendingPrioritySpawns(mapEventId).Add(partyId);
+        }
+    }
+
+    /// <summary>Replaces transient transfer state before an authoritative entry snapshot is replayed.</summary>
+    public static void ResetPrioritySpawnSnapshot(string mapEventId)
+    {
+        if (string.IsNullOrEmpty(mapEventId)) return;
+
+        lock (Gate)
+        {
+            ClearPrioritySpawnSnapshotState(mapEventId);
+        }
+    }
+
+    /// <summary>Records the donor slot selected by the server for a waiting party.</summary>
+    public static void RecordPrioritySpawnAssignment(
+        string mapEventId,
+        long transferId,
+        string waitingPartyId,
+        string donorPartyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId)
+            || transferId <= 0
+            || string.IsNullOrEmpty(waitingPartyId)
+            || string.IsNullOrEmpty(donorPartyId))
+        {
+            return;
+        }
+
+        lock (Gate)
+        {
+            bool isRegistered = IsPrioritySpawnRegistered(mapEventId, waitingPartyId);
+            if (!PrioritySpawnAssignments.TryGetValue(mapEventId, out var assignments))
+            {
+                assignments = new Dictionary<long, BattlePrioritySpawnAssignment>();
+                PrioritySpawnAssignments[mapEventId] = assignments;
+            }
+
+            var staleTransfers = new List<long>();
+            foreach (var assignment in assignments)
+            {
+                if (assignment.Key != transferId
+                    && assignment.Value.WaitingPartyId == waitingPartyId)
+                {
+                    staleTransfers.Add(assignment.Key);
+                }
+            }
+            foreach (var staleTransferId in staleTransfers)
+            {
+                assignments.Remove(staleTransferId);
+                RemoveConsumedPrioritySpawnTransfer(mapEventId, staleTransferId);
+            }
+
+            if (assignments.TryGetValue(transferId, out var previous)
+                && previous.WaitingPartyId != waitingPartyId)
+            {
+                RemovePendingPrioritySpawn(mapEventId, previous.WaitingPartyId);
+                RemoveConsumedPrioritySpawnTransfer(mapEventId, transferId);
+            }
+
+            assignments[transferId] = new BattlePrioritySpawnAssignment(
+                transferId,
+                waitingPartyId,
+                donorPartyId);
+            if (!isRegistered)
+                GetOrCreatePendingPrioritySpawns(mapEventId).Add(waitingPartyId);
+        }
+    }
+
+    /// <summary>Records the server's consumed acknowledgement without releasing the human-slot gate.</summary>
+    public static bool MarkPrioritySpawnConsumed(string mapEventId, long transferId, string waitingPartyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId)
+            || transferId <= 0
+            || string.IsNullOrEmpty(waitingPartyId))
+        {
+            return false;
+        }
+
+        lock (Gate)
+        {
+            if (!PrioritySpawnAssignments.TryGetValue(mapEventId, out var assignments)
+                || !assignments.TryGetValue(transferId, out var assignment)
+                || assignment.WaitingPartyId != waitingPartyId)
+            {
+                return false;
+            }
+
+            if (!ConsumedPrioritySpawnTransfers.TryGetValue(mapEventId, out var consumedTransfers))
+            {
+                consumedTransfers = new HashSet<long>();
+                ConsumedPrioritySpawnTransfers[mapEventId] = consumedTransfers;
+            }
+            consumedTransfers.Add(transferId);
+            return true;
+        }
+    }
+
+    /// <summary>Clears a party's pending marker after its priority spawn is registered locally.</summary>
+    public static bool CompletePrioritySpawn(string mapEventId, string partyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId) || string.IsNullOrEmpty(partyId)) return false;
+
+        lock (Gate)
+        {
+            bool registered = GetOrCreateRegisteredPrioritySpawns(mapEventId).Add(partyId);
+            bool removed = RemovePendingPrioritySpawn(mapEventId, partyId);
+            return registered || removed;
+        }
+    }
+
+    /// <summary>Clears a party that left before its priority spawn was registered.</summary>
+    public static bool CancelPrioritySpawn(string mapEventId, string partyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId) || string.IsNullOrEmpty(partyId)) return false;
+
+        lock (Gate)
+        {
+            bool removed = RemovePendingPrioritySpawn(mapEventId, partyId);
+            return RemovePrioritySpawnAssignments(mapEventId, partyId, consumedOnly: false) || removed;
+        }
+    }
+
+    /// <summary>Clears a departed party only after the server acknowledged that its slot was consumed.</summary>
+    public static bool ClearConsumedPrioritySpawn(string mapEventId, string partyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId) || string.IsNullOrEmpty(partyId)) return false;
+
+        lock (Gate)
+        {
+            RemovePrioritySpawnRegistration(mapEventId, partyId);
+            bool removed = RemovePrioritySpawnAssignments(mapEventId, partyId, consumedOnly: true);
+            if (removed)
+                RemovePendingPrioritySpawn(mapEventId, partyId);
+            return removed;
+        }
+    }
+
+    /// <summary>Forgets a consumed transfer whose priority human departed without restoring its donor phase.</summary>
+    public static bool SettlePrioritySpawn(string mapEventId, long transferId, string waitingPartyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId)
+            || transferId <= 0
+            || string.IsNullOrEmpty(waitingPartyId))
+        {
+            return false;
+        }
+
+        lock (Gate)
+        {
+            if (!PrioritySpawnAssignments.TryGetValue(mapEventId, out var assignments)
+                || !assignments.TryGetValue(transferId, out var assignment)
+                || assignment.WaitingPartyId != waitingPartyId)
+            {
+                return false;
+            }
+
+            assignments.Remove(transferId);
+            if (assignments.Count == 0)
+                PrioritySpawnAssignments.Remove(mapEventId);
+            RemoveConsumedPrioritySpawnTransfer(mapEventId, transferId);
+            RemovePendingPrioritySpawn(mapEventId, waitingPartyId);
+            RemovePrioritySpawnRegistration(mapEventId, waitingPartyId);
+            return true;
+        }
+    }
+
+    /// <summary>Clears a departed waiter unless the server has already assigned it a donor slot.</summary>
+    public static bool CancelUnassignedPrioritySpawn(string mapEventId, string partyId)
+    {
+        if (string.IsNullOrEmpty(mapEventId) || string.IsNullOrEmpty(partyId)) return false;
+
+        lock (Gate)
+        {
+            if (PrioritySpawnAssignments.TryGetValue(mapEventId, out var assignments))
+            {
+                foreach (var assignment in assignments.Values)
+                {
+                    if (assignment.WaitingPartyId == partyId)
+                        return false;
+                }
+            }
+
+            return RemovePendingPrioritySpawn(mapEventId, partyId);
+        }
+    }
+
+    /// <summary>Clears a server-cancelled transfer and its waiting-party marker.</summary>
+    public static bool CancelPrioritySpawnAssignment(string mapEventId, long transferId)
+    {
+        if (string.IsNullOrEmpty(mapEventId) || transferId <= 0) return false;
+
+        lock (Gate)
+        {
+            if (!PrioritySpawnAssignments.TryGetValue(mapEventId, out var assignments)
+                || !assignments.TryGetValue(transferId, out var assignment))
+            {
+                return false;
+            }
+
+            assignments.Remove(transferId);
+            RemoveConsumedPrioritySpawnTransfer(mapEventId, transferId);
+            if (assignments.Count == 0)
+                PrioritySpawnAssignments.Remove(mapEventId);
+            RemovePendingPrioritySpawn(mapEventId, assignment.WaitingPartyId);
+            return true;
+        }
+    }
+
+    /// <summary>Whether the active battle has a player party waiting for its priority spawn.</summary>
+    public static bool HasPendingPrioritySpawn
+    {
+        get
+        {
+            lock (Gate)
+            {
+                return _activeMapEventId != null
+                    && PendingPrioritySpawns.TryGetValue(_activeMapEventId, out var parties)
+                    && parties.Count > 0;
+            }
+        }
+    }
+
+    /// <summary>Returns a stable snapshot of the server's current assignments for a map event.</summary>
+    public static IReadOnlyList<BattlePrioritySpawnAssignment> GetPrioritySpawnAssignments(string mapEventId)
+    {
+        if (string.IsNullOrEmpty(mapEventId)) return Array.Empty<BattlePrioritySpawnAssignment>();
+
+        lock (Gate)
+        {
+            if (!PrioritySpawnAssignments.TryGetValue(mapEventId, out var assignments)
+                || assignments.Count == 0)
+            {
+                return Array.Empty<BattlePrioritySpawnAssignment>();
+            }
+
+            var snapshot = new BattlePrioritySpawnAssignment[assignments.Count];
+            assignments.Values.CopyTo(snapshot, 0);
+            Array.Sort(snapshot, (left, right) => left.TransferId.CompareTo(right.TransferId));
+            return snapshot;
+        }
+    }
+
+    /// <summary>Whether the active coop battle has room for another active human agent.</summary>
+    public static bool HasAvailableHumanAgentSlot(Mission mission)
+    {
+        int battleSize;
+        lock (Gate)
+        {
+            if (_activeMapEventId == null || _battleSize <= 0 || mission == null)
+                return false;
+            battleSize = _battleSize;
+        }
+
+        int activeHumans = 0;
+        foreach (var agent in mission.Agents)
+        {
+            if (agent == null || !agent.IsHuman || !agent.IsActive()) continue;
+            activeHumans++;
+            if (activeHumans >= battleSize) return false;
+        }
+
+        return true;
+    }
+
     /// <summary>
     /// Marks a side whose reserve never arrived before the spawn handler's explicit fallback deadline.
     /// Battle-end checks may treat that side as intentionally absent once deployment is active; an ordinary
@@ -313,11 +663,16 @@ public static class BattleSpawnGate
     }
 
     /// <summary>[Controller] Mark a coop battle active.</summary>
-    public static void BeginBattle(string mapEventId)
+    public static void BeginBattle(string mapEventId, int battleSize)
     {
+        if (battleSize <= 0) throw new ArgumentOutOfRangeException(nameof(battleSize));
+
         lock (Gate)
         {
+            if (_activeMapEventId != null && _activeMapEventId != mapEventId)
+                ClearPrioritySpawnState(_activeMapEventId);
             _activeMapEventId = mapEventId;
+            _battleSize = battleSize;
             _defenderReserveTimedOut = false;
             _attackerReserveTimedOut = false;
             CombatLogContexts.Clear();
@@ -330,7 +685,9 @@ public static class BattleSpawnGate
     {
         lock (Gate)
         {
+            ClearPrioritySpawnState(_activeMapEventId);
             _activeMapEventId = null;
+            _battleSize = 0;
             _defenderReserveTimedOut = false;
             _attackerReserveTimedOut = false;
             CombatLogContexts.Clear();
@@ -339,6 +696,105 @@ public static class BattleSpawnGate
 
         EndCombatLog();
         _routedAttackerWeapon = null;
+    }
+
+    private static void ClearPrioritySpawnState(string mapEventId)
+    {
+        if (mapEventId == null) return;
+        ClearPrioritySpawnSnapshotState(mapEventId);
+        RegisteredPrioritySpawnParties.Remove(mapEventId);
+    }
+
+    private static void ClearPrioritySpawnSnapshotState(string mapEventId)
+    {
+        PendingPrioritySpawns.Remove(mapEventId);
+        PrioritySpawnAssignments.Remove(mapEventId);
+        ConsumedPrioritySpawnTransfers.Remove(mapEventId);
+    }
+
+    private static HashSet<string> GetOrCreateRegisteredPrioritySpawns(string mapEventId)
+    {
+        if (!RegisteredPrioritySpawnParties.TryGetValue(mapEventId, out var parties))
+        {
+            parties = new HashSet<string>();
+            RegisteredPrioritySpawnParties[mapEventId] = parties;
+        }
+        return parties;
+    }
+
+    private static bool IsPrioritySpawnRegistered(string mapEventId, string partyId)
+    {
+        return RegisteredPrioritySpawnParties.TryGetValue(mapEventId, out var parties)
+            && parties.Contains(partyId);
+    }
+
+    private static void RemovePrioritySpawnRegistration(string mapEventId, string partyId)
+    {
+        if (!RegisteredPrioritySpawnParties.TryGetValue(mapEventId, out var parties))
+            return;
+
+        parties.Remove(partyId);
+        if (parties.Count == 0)
+            RegisteredPrioritySpawnParties.Remove(mapEventId);
+    }
+
+    private static bool RemovePrioritySpawnAssignments(
+        string mapEventId,
+        string partyId,
+        bool consumedOnly)
+    {
+        if (!PrioritySpawnAssignments.TryGetValue(mapEventId, out var assignments))
+            return false;
+
+        ConsumedPrioritySpawnTransfers.TryGetValue(mapEventId, out var consumedTransfers);
+        var removedTransfers = new List<long>();
+        foreach (var assignment in assignments)
+        {
+            if (assignment.Value.WaitingPartyId != partyId)
+                continue;
+            if (consumedOnly && (consumedTransfers == null || !consumedTransfers.Contains(assignment.Key)))
+                continue;
+            removedTransfers.Add(assignment.Key);
+        }
+
+        foreach (var transferId in removedTransfers)
+        {
+            assignments.Remove(transferId);
+            RemoveConsumedPrioritySpawnTransfer(mapEventId, transferId);
+        }
+        if (assignments.Count == 0)
+            PrioritySpawnAssignments.Remove(mapEventId);
+        return removedTransfers.Count > 0;
+    }
+
+    private static void RemoveConsumedPrioritySpawnTransfer(string mapEventId, long transferId)
+    {
+        if (!ConsumedPrioritySpawnTransfers.TryGetValue(mapEventId, out var consumedTransfers))
+            return;
+
+        consumedTransfers.Remove(transferId);
+        if (consumedTransfers.Count == 0)
+            ConsumedPrioritySpawnTransfers.Remove(mapEventId);
+    }
+
+    private static HashSet<string> GetOrCreatePendingPrioritySpawns(string mapEventId)
+    {
+        if (!PendingPrioritySpawns.TryGetValue(mapEventId, out var parties))
+        {
+            parties = new HashSet<string>();
+            PendingPrioritySpawns[mapEventId] = parties;
+        }
+        return parties;
+    }
+
+    private static bool RemovePendingPrioritySpawn(string mapEventId, string partyId)
+    {
+        if (!PendingPrioritySpawns.TryGetValue(mapEventId, out var parties)) return false;
+
+        bool removed = parties.Remove(partyId);
+        if (parties.Count == 0)
+            PendingPrioritySpawns.Remove(mapEventId);
+        return removed;
     }
 
     private static void RemoveExpiredRoutedPlayerHitNotifications()

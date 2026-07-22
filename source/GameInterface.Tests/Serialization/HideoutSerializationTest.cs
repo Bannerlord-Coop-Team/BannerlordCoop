@@ -11,6 +11,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
+    [Collection(CampaignHideoutsTestCollection.Name)]
     public class HideoutSerializationTest
     {
         IContainer container;
@@ -28,24 +29,35 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Hideout_Serialize()
         {
-            MBList<Hideout> allhideouts = new MBList<Hideout>();
-            Hideout item = new Hideout();
-            allhideouts.Add(item);
-            Campaign.Current._hideouts = allhideouts;
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            HideoutBinaryPackage package = new HideoutBinaryPackage(item, factory);
+            var campaign = Campaign.Current;
+            Assert.NotNull(campaign);
+            var previousHideouts = campaign._hideouts;
+            try
+            {
+                Hideout item = new Hideout();
+                campaign._hideouts = new MBList<Hideout> { item };
+                var factory = container.Resolve<IBinaryPackageFactory>();
+                HideoutBinaryPackage package = new HideoutBinaryPackage(item, factory);
 
-            package.Pack();
+                package.Pack();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+                byte[] bytes = BinaryPackageSerializer.Serialize(package);
 
-            Assert.NotEmpty(bytes);
+                Assert.NotEmpty(bytes);
+            }
+            finally
+            {
+                campaign._hideouts = previousHideouts;
+            }
         }
 
         [Fact]
         public void Hideout_Full_Serialization()
         {
-            lock (Hideout.All)
+            var campaign = Campaign.Current;
+            Assert.NotNull(campaign);
+            var previousHideouts = campaign._hideouts;
+            try
             {
                 Hideout hideout = new Hideout
                 {
@@ -53,12 +65,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 };
 
                 hideout._nextPossibleAttackTime = new CampaignTime();
-
-                MBList<Hideout> allhideouts = Campaign.Current?._hideouts as MBList<Hideout> ?? new MBList<Hideout>();
-
-                allhideouts.Add(hideout);
-
-                Campaign.Current._hideouts = allhideouts;
+                campaign._hideouts = new MBList<Hideout> { new Hideout(), hideout };
 
                 var factory = container.Resolve<IBinaryPackageFactory>();
                 HideoutBinaryPackage package = new HideoutBinaryPackage(hideout, factory);
@@ -82,6 +89,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 Assert.Equal(hideout.IsSpotted, newHideout.IsSpotted);
                 Assert.Equal(hideout._nextPossibleAttackTime,
                              newHideout._nextPossibleAttackTime);
+            }
+            finally
+            {
+                campaign._hideouts = previousHideouts;
             }
         }
     }

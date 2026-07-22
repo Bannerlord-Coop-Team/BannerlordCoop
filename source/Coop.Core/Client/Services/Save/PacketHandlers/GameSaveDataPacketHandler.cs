@@ -20,7 +20,9 @@ internal class GameSaveDataPacketHandler : IPacketHandler
     private readonly IPacketManager packetManager;
     private readonly IMessageBroker messageBroker;
 
-    public GameSaveDataPacketHandler(IPacketManager packetManager, IMessageBroker messageBroker)
+    public GameSaveDataPacketHandler(
+        IPacketManager packetManager,
+        IMessageBroker messageBroker)
     {
         this.packetManager = packetManager;
         this.messageBroker = messageBroker;

@@ -1,0 +1,16 @@
+<ListPanel IsVisible="@IsServerOptionsVisible" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
+  <Children>
+    <ListPanel DataSource="{SelectedServerOptionsTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+               LayoutImp.LayoutMethod="VerticalTopToBottom">
+      <Children>
+        <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                   LayoutImp.LayoutMethod="VerticalTopToBottom">
+          <ItemTemplate>
+            <!-- COOP_OPTIONS_SECTION:Sections/BattleSizeSection.xml -->
+          </ItemTemplate>
+        </ListPanel>
+      </Children>
+    </ListPanel>
+  </Children>
+</ListPanel>

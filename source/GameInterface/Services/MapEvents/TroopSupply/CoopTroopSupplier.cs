@@ -3,6 +3,7 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -28,21 +29,108 @@ namespace GameInterface.Services.MapEvents.TroopSupply;
 public class CoopTroopSupplier : IMissionTroopSupplier
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopTroopSupplier>();
+    private static long nextSupplierLockOrder;
+
+    public enum ClaimedTroopUseResult
+    {
+        ClaimMissing,
+        Deferred,
+        Committed,
+    }
+
+    public readonly struct PartyCapacitySnapshot
+    {
+        public readonly string PartyId;
+        public readonly int TotalTroops;
+        public readonly int InitialSpawnCount;
+
+        public PartyCapacitySnapshot(string partyId, int totalTroops, int initialSpawnCount)
+        {
+            PartyId = partyId;
+            TotalTroops = totalTroops;
+            InitialSpawnCount = initialSpawnCount;
+        }
+    }
+
+    /// <summary>One lock-consistent view of the fields used to size a battle side.</summary>
+    public readonly struct SizingSnapshot
+    {
+        public readonly bool IsPopulated;
+        public readonly int TotalTroops;
+        public readonly int InitialTroops;
+        public readonly int ReserveRevision;
+        public readonly long GrantGeneration;
+        public readonly bool CompletesInitialSizing;
+        public readonly PartyCapacitySnapshot[] PartyCapacities;
+
+        public SizingSnapshot(
+            bool isPopulated,
+            int totalTroops,
+            int initialTroops,
+            int reserveRevision,
+            long grantGeneration,
+            bool completesInitialSizing,
+            PartyCapacitySnapshot[] partyCapacities)
+        {
+            IsPopulated = isPopulated;
+            TotalTroops = totalTroops;
+            InitialTroops = initialTroops;
+            ReserveRevision = reserveRevision;
+            GrantGeneration = grantGeneration;
+            CompletesInitialSizing = completesInitialSizing;
+            PartyCapacities = partyCapacities;
+        }
+    }
+
+    /// <summary>The current tail of parties captured by the native initial phase.</summary>
+    public readonly struct InitialPhaseSnapshot
+    {
+        public readonly bool IsCaptured;
+        public readonly int ReserveRevision;
+        public readonly int RemainingTroops;
+        public readonly int RemainingInitialTroops;
+
+        public InitialPhaseSnapshot(
+            bool isCaptured,
+            int reserveRevision,
+            int remainingTroops,
+            int remainingInitialTroops)
+        {
+            IsCaptured = isCaptured;
+            ReserveRevision = reserveRevision;
+            RemainingTroops = remainingTroops;
+            RemainingInitialTroops = remainingInitialTroops;
+        }
+    }
 
     private sealed class PartyState
     {
         public string PartyId;
         public TroopReserveEntry[] Entries = Array.Empty<TroopReserveEntry>();
         public int Supplied;
+        public int InitialSpawnCount;
+        public HashSet<int> DepartedSeeds = new HashSet<int>();
+        public int ClaimBaseSupplied;
+        public HashSet<int> PendingClaimSeeds;
+        public bool ParkClaimsAtEnd;
     }
 
     private readonly object gate = new object();
+    private readonly long supplierLockOrder = Interlocked.Increment(ref nextSupplierLockOrder);
     private readonly List<PartyState> parties = new List<PartyState>();
+    private readonly Dictionary<string, int> representedPhaseCapacities = new Dictionary<string, int>();
+    private readonly Dictionary<string, int> representedPhaseInitialSpawnCounts = new Dictionary<string, int>();
+    private readonly Dictionary<string, int> initialSupplyRemaining = new Dictionary<string, int>();
+    private readonly HashSet<string> initialPhasePartyIds = new HashSet<string>();
+    private bool initialPhaseCaptured;
+    private bool initialSupplyActive;
     // seed -> partyId, rebuilt alongside `parties` in SetReserve, so GetParty/FindPartyId is O(1) instead of
     // scanning every party's entries per agent. Entry seeds are server-unique, so one seed maps to one party.
     private readonly Dictionary<int, string> seedToPartyId = new Dictionary<int, string>();
     private bool populated;
     private int reserveRevision;
+    private long grantGeneration;
+    private bool completesInitialSizing;
     private int numWounded, numKilled, numRouted;
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
     // objects without hitting the service locator each call. Null only in tests that don't exercise that path.
@@ -71,7 +159,10 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// definitively this supplier's last word on those parties.
     /// </para>
     /// </summary>
-    public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve)
+    public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(
+        IReadOnlyList<PartyReserve> reserve,
+        long grantGeneration = 0,
+        bool completesInitialSizing = true)
     {
         var dropped = new List<(string PartyId, int Supplied)>();
         lock (gate)
@@ -81,9 +172,9 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             // our OWN party at that lagging value. Resuming from the server value alone would rewind a party we
             // have already supplied further and re-spawn troops already on the field (with duplicate seeds). So
             // resume from max(local, server), mirroring the server ledger's own monotonic ReportSupplied.
-            var priorSupplied = new Dictionary<string, int>(parties.Count);
+            var priorStates = new Dictionary<string, PartyState>(parties.Count);
             foreach (var existing in parties)
-                priorSupplied[existing.PartyId] = existing.Supplied;
+                priorStates[existing.PartyId] = existing;
 
             parties.Clear();
             seedToPartyId.Clear();
@@ -93,29 +184,60 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 {
                     var entries = party.Entries ?? Array.Empty<TroopReserveEntry>();
                     int supplied = Math.Min(Math.Max(0, party.SuppliedCount), entries.Length);
-                    if (priorSupplied.TryGetValue(party.PartyId, out var local) && local > supplied)
-                        supplied = Math.Min(local, entries.Length);
-                    priorSupplied.Remove(party.PartyId); // kept — not part of the dropped set
-                    parties.Add(new PartyState
+                    priorStates.TryGetValue(party.PartyId, out var priorState);
+                    if (priorState != null && priorState.Supplied > supplied)
+                        supplied = Math.Min(priorState.Supplied, entries.Length);
+                    priorStates.Remove(party.PartyId); // kept — not part of the dropped set
+                    int initialSpawnCount = Math.Min(Math.Max(0, party.InitialSpawnCount), entries.Length);
+                    var departedSeeds = new HashSet<int>(party.DepartedSeeds ?? Array.Empty<int>());
+                    var currentSeeds = new HashSet<int>();
+                    foreach (var entry in entries)
+                        currentSeeds.Add(entry.Seed);
+                    departedSeeds.RemoveWhere(seed => !currentSeeds.Contains(seed));
+                    if (priorState != null)
+                        foreach (var seed in priorState.DepartedSeeds)
+                            if (currentSeeds.Contains(seed))
+                                departedSeeds.Add(seed);
+                    if (priorState != null
+                        && supplied > priorState.Supplied
+                        && initialSupplyRemaining.TryGetValue(party.PartyId, out var remainingInitial))
+                    {
+                        int consumedAvailable = 0;
+                        for (int i = priorState.Supplied; i < supplied; i++)
+                            if (!departedSeeds.Contains(entries[i].Seed))
+                                consumedAvailable++;
+                        int adjustedInitial = Math.Max(0, remainingInitial - consumedAvailable);
+                        if (adjustedInitial == 0)
+                            initialSupplyRemaining.Remove(party.PartyId);
+                        else
+                            initialSupplyRemaining[party.PartyId] = adjustedInitial;
+                    }
+                    var state = new PartyState
                     {
                         PartyId = party.PartyId,
                         Entries = entries,
                         Supplied = supplied,
-                    });
+                        InitialSpawnCount = initialSpawnCount,
+                        DepartedSeeds = departedSeeds,
+                    };
+                    PreservePendingClaims(priorState, state, party.SuppliedCount);
+                    parties.Add(state);
                     foreach (var entry in entries)
                         seedToPartyId[entry.Seed] = party.PartyId;
                 }
             }
             populated = true;
             reserveRevision++;
+            this.grantGeneration = grantGeneration;
+            this.completesInitialSizing = completesInitialSizing;
 
             // Whatever the new set did not re-claim was DROPPED by this replace.
-            foreach (var prior in priorSupplied)
-                dropped.Add((prior.Key, prior.Value));
+            foreach (var prior in priorStates)
+                dropped.Add((prior.Key, GetReportableSupplied(prior.Value)));
         }
 
-        Logger.Information("[TroopSupply] Supplier {MapEvent} side {Side}: SetReserve {Parties} parties / {Entries} troops ({Dropped} parties dropped)",
-            MapEventId, Side, parties.Count, NumTroopsNotSupplied, dropped.Count);
+        Logger.Information("[TroopSupply] Supplier {MapEvent} side {Side}: SetReserve generation {Generation} (complete={Complete}), {Parties} parties / {Entries} troops / {Initial} initial slots ({Dropped} parties dropped)",
+            MapEventId, Side, grantGeneration, completesInitialSizing, parties.Count, NumTroopsNotSupplied, InitialTroops, dropped.Count);
         return dropped;
     }
 
@@ -126,7 +248,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         {
             var result = new List<(string, int)>(parties.Count);
             foreach (var party in parties)
-                result.Add((party.PartyId, party.Supplied));
+                result.Add((party.PartyId, GetReportableSupplied(party)));
             return result;
         }
     }
@@ -139,6 +261,279 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// <summary>Monotonic count of authoritative reserve snapshots applied to this supplier.</summary>
     public int ReserveRevision { get { lock (gate) { return reserveRevision; } } }
 
+    /// <summary>The server grant generation represented by this supplier's current reserve.</summary>
+    public long GrantGeneration { get { lock (gate) { return grantGeneration; } } }
+
+    /// <summary>Whether the current grant explicitly finalized both sides for initial mission sizing.</summary>
+    public bool CompletesInitialSizing { get { lock (gate) { return completesInitialSizing; } } }
+
+    /// <summary>Atomically reads the populated state, reserve totals, entitlement, and revision.</summary>
+    public SizingSnapshot GetSizingSnapshot()
+    {
+        lock (gate)
+            return CreateSizingSnapshot();
+    }
+
+    /// <summary>Atomically reads both battle sides so neither reserve can change during joint sizing.</summary>
+    public static void GetSizingSnapshots(
+        CoopTroopSupplier defenderSupplier,
+        CoopTroopSupplier attackerSupplier,
+        out SizingSnapshot defender,
+        out SizingSnapshot attacker)
+    {
+        if (defenderSupplier == null) throw new ArgumentNullException(nameof(defenderSupplier));
+        if (attackerSupplier == null) throw new ArgumentNullException(nameof(attackerSupplier));
+
+        if (ReferenceEquals(defenderSupplier, attackerSupplier))
+        {
+            defender = defenderSupplier.GetSizingSnapshot();
+            attacker = defender;
+            return;
+        }
+
+        var (first, second) = OrderSizingLocks(defenderSupplier, attackerSupplier);
+
+        lock (first.gate)
+        lock (second.gate)
+        {
+            defender = defenderSupplier.CreateSizingSnapshot();
+            attacker = attackerSupplier.CreateSizingSnapshot();
+        }
+    }
+
+    internal static (CoopTroopSupplier First, CoopTroopSupplier Second) OrderSizingLocks(
+        CoopTroopSupplier left,
+        CoopTroopSupplier right)
+    {
+        return left.supplierLockOrder < right.supplierLockOrder
+            ? (left, right)
+            : (right, left);
+    }
+
+    private SizingSnapshot CreateSizingSnapshot()
+    {
+        int totalTroops = 0;
+        int initialTroops = 0;
+        var partyCapacities = new PartyCapacitySnapshot[parties.Count];
+        int partyIndex = 0;
+        foreach (var party in parties)
+        {
+            int remainingTroops = CountAvailableRemaining(party);
+            int initialSpawnCount = CountAvailableInitialRemaining(party);
+            totalTroops += remainingTroops;
+            initialTroops += initialSpawnCount;
+            partyCapacities[partyIndex++] = new PartyCapacitySnapshot(
+                party.PartyId,
+                party.Entries.Length,
+                initialSpawnCount);
+        }
+
+        return new SizingSnapshot(
+            populated,
+            totalTroops,
+            initialTroops,
+            reserveRevision,
+            grantGeneration,
+            completesInitialSizing,
+            partyCapacities);
+    }
+
+    /// <summary>Record the exact party depths represented by the native mission phase.</summary>
+    public void RecordPhaseCapacities(IReadOnlyList<PartyCapacitySnapshot> capacities)
+    {
+        if (capacities == null) return;
+
+        lock (gate)
+        {
+            foreach (var capacity in capacities)
+                RecordPhaseCapacityInternal(capacity.PartyId, capacity.TotalTroops);
+        }
+    }
+
+    /// <summary>Capture the frozen per-party leases used by the native initial deployment pull.</summary>
+    public void BeginInitialSupply(IReadOnlyList<PartyCapacitySnapshot> capacities)
+    {
+        lock (gate)
+        {
+            initialSupplyRemaining.Clear();
+            initialPhasePartyIds.Clear();
+            initialPhaseCaptured = capacities != null;
+            initialSupplyActive = false;
+            if (capacities == null) return;
+
+            foreach (var capacity in capacities)
+            {
+                initialPhasePartyIds.Add(capacity.PartyId);
+                int available = GetRemainingInitialForPartyInternal(capacity.PartyId);
+                int initial = Math.Min(Math.Max(0, capacity.InitialSpawnCount), available);
+                if (initial > 0)
+                    initialSupplyRemaining[capacity.PartyId] = initial;
+            }
+            initialSupplyActive = initialSupplyRemaining.Count > 0;
+        }
+    }
+
+    /// <summary>Read the current unsupplied tail of the parties represented by the initial native phase.</summary>
+    public InitialPhaseSnapshot GetInitialPhaseSnapshot()
+    {
+        lock (gate)
+        {
+            int remainingTroops = 0;
+            int remainingInitialTroops = 0;
+            foreach (var party in parties)
+            {
+                if (!initialPhasePartyIds.Contains(party.PartyId)) continue;
+
+                int remaining = CountAvailableRemaining(party);
+                remainingTroops += remaining;
+                if (initialSupplyRemaining.TryGetValue(party.PartyId, out var initial))
+                    remainingInitialTroops += Math.Min(
+                        Math.Max(0, initial),
+                        CountAvailableInitialRemaining(party));
+            }
+
+            return new InitialPhaseSnapshot(
+                initialPhaseCaptured,
+                reserveRevision,
+                remainingTroops,
+                remainingInitialTroops);
+        }
+    }
+
+    /// <summary>Commit one game-thread phase rebase and discard captured leases no longer in this reserve.</summary>
+    public bool CommitInitialPhaseRebase(int expectedReserveRevision)
+    {
+        lock (gate)
+        {
+            if (reserveRevision != expectedReserveRevision) return false;
+
+            var capturedPartyIds = new List<string>(initialSupplyRemaining.Keys);
+            foreach (var partyId in capturedPartyIds)
+            {
+                int available = GetRemainingInitialForPartyInternal(partyId);
+                if (available == 0)
+                    initialSupplyRemaining.Remove(partyId);
+                else if (initialSupplyRemaining[partyId] > available)
+                    initialSupplyRemaining[partyId] = available;
+            }
+
+            initialSupplyActive = initialSupplyRemaining.Count > 0;
+            return true;
+        }
+    }
+
+    /// <summary>Snapshot the exact seeds in one party's current unsupplied tail.</summary>
+    public IReadOnlyList<int> GetRemainingSeedsForParty(string partyId)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+
+                int count = Math.Max(0, party.Entries.Length - party.Supplied);
+                var seeds = new int[count];
+                for (int i = 0; i < count; i++)
+                    seeds[i] = party.Entries[party.Supplied + i].Seed;
+                return seeds;
+            }
+
+            return Array.Empty<int>();
+        }
+    }
+
+    /// <summary>Consume the contiguous unsupplied prefix already represented by live or departed agents.</summary>
+    public int AdvanceResolvedPrefix(string partyId, ISet<int> resolvedSeeds)
+    {
+        if (resolvedSeeds == null || resolvedSeeds.Count == 0) return 0;
+
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId || party.PendingClaimSeeds != null) continue;
+
+                int start = party.Supplied;
+                int resolvedAvailable = 0;
+                while (party.Supplied < party.Entries.Length
+                    && resolvedSeeds.Contains(party.Entries[party.Supplied].Seed))
+                {
+                    if (party.Supplied < party.InitialSpawnCount
+                        && !party.DepartedSeeds.Contains(party.Entries[party.Supplied].Seed))
+                        resolvedAvailable++;
+                    party.Supplied++;
+                }
+
+                int advanced = party.Supplied - start;
+                if (advanced > 0 && initialSupplyRemaining.TryGetValue(partyId, out var initial))
+                {
+                    int remainingInitial = Math.Max(0, initial - resolvedAvailable);
+                    if (remainingInitial == 0)
+                        initialSupplyRemaining.Remove(partyId);
+                    else
+                        initialSupplyRemaining[partyId] = remainingInitial;
+                    if (initialSupplyRemaining.Count == 0)
+                        initialSupplyActive = false;
+                }
+                return advanced;
+            }
+
+            return 0;
+        }
+    }
+
+    /// <summary>Record one post-plan party's depth after extending the native mission phase.</summary>
+    public void RecordPhaseCapacity(string partyId, int totalTroops)
+    {
+        if (string.IsNullOrEmpty(partyId)) return;
+
+        lock (gate)
+            RecordPhaseCapacityInternal(partyId, totalTroops);
+    }
+
+    /// <summary>Historical depth already represented in the native phase, retained across scope shrink.</summary>
+    public int GetRepresentedPhaseCapacity(string partyId)
+    {
+        lock (gate)
+            return representedPhaseCapacities.TryGetValue(partyId, out var capacity) ? capacity : 0;
+    }
+
+    /// <summary>Update the native phase's represented initial entitlement and return its authoritative delta.</summary>
+    public int ReconcileRepresentedInitialSpawnCount(string partyId)
+    {
+        lock (gate)
+        {
+            if (!representedPhaseInitialSpawnCounts.TryGetValue(partyId, out var represented)) return 0;
+
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+
+                representedPhaseInitialSpawnCounts[partyId] = party.InitialSpawnCount;
+                return party.InitialSpawnCount - represented;
+            }
+
+            return 0;
+        }
+    }
+
+    private void RecordPhaseCapacityInternal(string partyId, int totalTroops)
+    {
+        if (string.IsNullOrEmpty(partyId)) return;
+
+        int capacity = Math.Max(0, totalTroops);
+        if (!representedPhaseCapacities.TryGetValue(partyId, out var current) || capacity > current)
+            representedPhaseCapacities[partyId] = capacity;
+
+        foreach (var party in parties)
+        {
+            if (party.PartyId != partyId) continue;
+
+            representedPhaseInitialSpawnCounts[partyId] = party.InitialSpawnCount;
+            break;
+        }
+    }
+
     /// <summary>Remaining troop count for each party in the current authoritative reserve.</summary>
     public IReadOnlyList<(string partyId, int remaining)> GetRemainingByParty()
     {
@@ -146,7 +541,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         {
             var result = new List<(string, int)>(parties.Count);
             foreach (var party in parties)
-                result.Add((party.PartyId, party.Entries.Length - party.Supplied));
+                result.Add((party.PartyId, CountAvailableRemaining(party)));
             return result;
         }
     }
@@ -158,9 +553,57 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         {
             foreach (var party in parties)
                 if (party.PartyId == partyId)
-                    return party.Entries.Length - party.Supplied;
+                    return CountAvailableRemaining(party);
             return 0;
         }
+    }
+
+    /// <summary>Read one party's authoritative totals and pointers from the current snapshot.</summary>
+    public bool TryGetPartyCounts(string partyId, out int total, out int supplied, out int initial)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+
+                total = party.Entries.Length;
+                supplied = party.Supplied;
+                initial = party.InitialSpawnCount;
+                return true;
+            }
+        }
+
+        total = 0;
+        supplied = 0;
+        initial = 0;
+        return false;
+    }
+
+    /// <summary>Read the next unsupplied character id without advancing the party's authoritative pointer.</summary>
+    public bool TryGetNextTroopCharacterId(string partyId, out string characterId)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId || party.PendingClaimSeeds != null) continue;
+
+                int index = party.Supplied;
+                while (index < party.Entries.Length
+                    && party.DepartedSeeds.Contains(party.Entries[index].Seed))
+                {
+                    index++;
+                }
+                if (index >= party.Entries.Length) break;
+
+                characterId = party.Entries[index].CharacterId;
+                return true;
+            }
+        }
+
+        characterId = null;
+        return false;
     }
 
     /// <summary>Whether this authoritative reserve snapshot still contains a party.</summary>
@@ -175,9 +618,22 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
     }
 
+    /// <summary>Whether the server has recorded this troop as permanently gone from the mission.</summary>
+    public bool WasDeparted(int troopSeed)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+                if (party.DepartedSeeds.Contains(troopSeed))
+                    return true;
+            return false;
+        }
+    }
+
     /// <summary>
-    /// Claim the missing live troops of a newly-owned migration party for explicit recovery. The whole party
-    /// is marked supplied so the native wave path cannot also spawn entries now owned by the recovery queue.
+    /// Claim the missing live troops of a newly-owned migration party for explicit recovery. The native pointer
+    /// is parked at the end while the claim is active so the wave path cannot consume the same entries, while
+    /// reportable progress advances only as the recovery queue actually fields them.
     /// </summary>
     public IReadOnlyList<CoopAgentOrigin> ClaimRecoveryTroops(
         string partyId,
@@ -190,6 +646,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             foreach (var party in parties)
             {
                 if (party.PartyId != partyId) continue;
+                if (party.PendingClaimSeeds != null) break;
 
                 var remainingNeeded = new Dictionary<string, int>();
                 foreach (var pair in neededByCharacter)
@@ -206,11 +663,133 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                     }
                 }
 
-                party.Supplied = party.Entries.Length;
+                if (origins.Count > 0)
+                {
+                    party.ClaimBaseSupplied = party.Supplied;
+                    party.PendingClaimSeeds = new HashSet<int>();
+                    foreach (var origin in origins)
+                        party.PendingClaimSeeds.Add(origin.UniqueSeed);
+                    party.ParkClaimsAtEnd = true;
+                    party.Supplied = party.Entries.Length;
+                }
                 break;
             }
         }
         return origins;
+    }
+
+    /// <summary>
+    /// Consume one party entry for an explicit spawn attempt without reporting it supplied until
+    /// <see cref="TryUseClaimedTroop"/> confirms that the agent exists in the mission. A null origin is an
+    /// unresolvable authoritative entry and is consumed normally because there is no seed to commit.
+    /// </summary>
+    public bool TryClaimOneTroopFromParty(string partyId, out IAgentOriginBase origin)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+                if (party.PendingClaimSeeds != null)
+                {
+                    origin = null;
+                    return false;
+                }
+                if (party.Supplied >= party.Entries.Length)
+                {
+                    origin = null;
+                    return false;
+                }
+
+                int claimIndex = party.Supplied;
+                origin = CreateOrigin(party.Entries[claimIndex], party.PartyId);
+                party.Supplied++;
+
+                if (origin is CoopAgentOrigin claimedOrigin)
+                {
+                    if (party.PendingClaimSeeds == null)
+                    {
+                        party.ClaimBaseSupplied = claimIndex;
+                        party.PendingClaimSeeds = new HashSet<int>();
+                        party.ParkClaimsAtEnd = false;
+                    }
+                    party.PendingClaimSeeds.Add(claimedOrigin.UniqueSeed);
+                }
+                return true;
+            }
+
+            origin = null;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Run one claimed troop's use while reserve replacement is excluded, then make it reportable only when
+    /// the callback confirms the agent exists. A failed callback leaves the exact claim pending for retry.
+    /// </summary>
+    public ClaimedTroopUseResult TryUseClaimedTroop(
+        string partyId,
+        int troopSeed,
+        Func<bool> tryUse)
+    {
+        if (tryUse == null) throw new ArgumentNullException(nameof(tryUse));
+
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId || party.PendingClaimSeeds == null) continue;
+                if (!party.PendingClaimSeeds.Contains(troopSeed))
+                    return ClaimedTroopUseResult.ClaimMissing;
+                if (!tryUse())
+                    return ClaimedTroopUseResult.Deferred;
+
+                party.PendingClaimSeeds.Remove(troopSeed);
+                if (party.PendingClaimSeeds.Count == 0)
+                {
+                    party.PendingClaimSeeds = null;
+                    party.ParkClaimsAtEnd = false;
+                }
+                return ClaimedTroopUseResult.Committed;
+            }
+        }
+
+        return ClaimedTroopUseResult.ClaimMissing;
+    }
+
+    private static int GetReportableSupplied(PartyState party)
+    {
+        if (party.PendingClaimSeeds == null)
+            return party.Supplied;
+
+        for (int index = Math.Max(0, party.ClaimBaseSupplied); index < party.Entries.Length; index++)
+            if (party.PendingClaimSeeds.Contains(party.Entries[index].Seed))
+                return index;
+
+        return party.Supplied;
+    }
+
+    private static void PreservePendingClaims(PartyState prior, PartyState current, int serverSupplied)
+    {
+        if (prior?.PendingClaimSeeds == null) return;
+
+        var currentSeeds = new HashSet<int>();
+        foreach (var entry in current.Entries)
+            currentSeeds.Add(entry.Seed);
+
+        var pending = new HashSet<int>();
+        foreach (var seed in prior.PendingClaimSeeds)
+            if (currentSeeds.Contains(seed))
+                pending.Add(seed);
+        if (pending.Count == 0) return;
+
+        current.ClaimBaseSupplied = Math.Min(
+            current.Entries.Length,
+            Math.Max(prior.ClaimBaseSupplied, Math.Max(0, serverSupplied)));
+        current.PendingClaimSeeds = pending;
+        current.ParkClaimsAtEnd = prior.ParkClaimsAtEnd;
+        if (current.ParkClaimsAtEnd)
+            current.Supplied = current.Entries.Length;
     }
 
     /// <summary>Total troops this side's supplier owns (across its parties), regardless of supplied state —
@@ -229,6 +808,22 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
     }
 
+    /// <summary>The persistent initial-spawn entitlement across this side's owned parties. Full reserves remain
+    /// available for later reinforcement waves through <see cref="TotalTroops"/>.</summary>
+    public int InitialTroops
+    {
+        get
+        {
+            lock (gate)
+            {
+                int total = 0;
+                foreach (var party in parties)
+                    total += party.InitialSpawnCount;
+                return total;
+            }
+        }
+    }
+
     public int NumTroopsNotSupplied
     {
         get
@@ -237,7 +832,12 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             {
                 int notSupplied = 0;
                 foreach (var party in parties)
-                    notSupplied += party.Entries.Length - party.Supplied;
+                {
+                    int supplied = party.PendingClaimSeeds != null && !party.ParkClaimsAtEnd
+                        ? GetReportableSupplied(party)
+                        : party.Supplied;
+                    notSupplied += CountAvailableRemaining(party, supplied);
+                }
                 return notSupplied;
             }
         }
@@ -253,7 +853,12 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             {
                 if (!populated) return true;
                 foreach (var party in parties)
-                    if (party.Supplied < party.Entries.Length) return true;
+                {
+                    int supplied = party.PendingClaimSeeds != null && !party.ParkClaimsAtEnd
+                        ? GetReportableSupplied(party)
+                        : party.Supplied;
+                    if (CountAvailableRemaining(party, supplied) > 0) return true;
+                }
                 return false;
             }
         }
@@ -264,18 +869,21 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         var origins = new List<IAgentOriginBase>();
         lock (gate)
         {
-            int remaining = numberToAllocate;
-            foreach (var party in parties)
+            int remaining = Math.Max(0, numberToAllocate);
+            bool initialPull = initialSupplyActive;
+            while (remaining > 0)
             {
-                while (remaining > 0 && party.Supplied < party.Entries.Length)
-                {
-                    var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
-                    party.Supplied++;
-                    remaining--;
-                    if (origin != null) origins.Add(origin);
-                }
-                if (remaining == 0) break;
+                bool supplied = initialPull
+                    ? TrySupplyInitialTroop(out var origin)
+                    : TrySupplyNextTroop(out origin);
+                if (!supplied) break;
+
+                remaining--;
+                if (origin != null) origins.Add(origin);
             }
+
+            if (initialPull && initialSupplyRemaining.Count == 0)
+                initialSupplyActive = false;
         }
         Logger.Information("[TroopSupply] {MapEvent} side {Side}: SupplyTroops({Req}) -> {Ret} origins, {Remaining} remaining",
             MapEventId, Side, numberToAllocate, origins.Count, NumTroopsNotSupplied);
@@ -286,34 +894,151 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     {
         lock (gate)
         {
-            foreach (var party in parties)
-            {
-                if (party.Supplied < party.Entries.Length)
-                {
-                    var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
-                    party.Supplied++;
-                    return origin;
-                }
-            }
-            return null;
+            bool supplied = TrySupplyNextAvailableTroop(out var origin);
+            if (initialSupplyActive && initialSupplyRemaining.Count == 0)
+                initialSupplyActive = false;
+            return supplied ? origin : null;
         }
+    }
+
+    private bool TrySupplyNextAvailableTroop(out IAgentOriginBase origin)
+    {
+        return initialSupplyActive
+            ? TrySupplyInitialTroop(out origin)
+            : TrySupplyNextTroop(out origin);
+    }
+
+    private bool TrySupplyInitialTroop(out IAgentOriginBase origin)
+    {
+        foreach (var party in parties)
+        {
+            if (!initialSupplyRemaining.TryGetValue(party.PartyId, out var remaining)) continue;
+            if (party.PendingClaimSeeds != null) continue;
+            SkipDepartedEntries(party, party.InitialSpawnCount);
+            if (remaining <= 0
+                || party.Supplied >= party.Entries.Length
+                || party.Supplied >= party.InitialSpawnCount)
+            {
+                initialSupplyRemaining.Remove(party.PartyId);
+                continue;
+            }
+
+            origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
+            party.Supplied++;
+            if (remaining == 1)
+                initialSupplyRemaining.Remove(party.PartyId);
+            else
+                initialSupplyRemaining[party.PartyId] = remaining - 1;
+            return true;
+        }
+
+        var unavailable = new List<string>();
+        foreach (var partyId in initialSupplyRemaining.Keys)
+            if (GetRemainingForPartyInternal(partyId) == 0)
+                unavailable.Add(partyId);
+        foreach (var partyId in unavailable)
+            initialSupplyRemaining.Remove(partyId);
+
+        origin = null;
+        return false;
+    }
+
+    private bool TrySupplyNextTroop(out IAgentOriginBase origin)
+    {
+        foreach (var party in parties)
+        {
+            if (party.PendingClaimSeeds != null) continue;
+            SkipDepartedEntries(party);
+            if (party.Supplied >= party.Entries.Length) continue;
+
+            origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
+            party.Supplied++;
+            return true;
+        }
+
+        origin = null;
+        return false;
+    }
+
+    private int GetRemainingForPartyInternal(string partyId)
+    {
+        foreach (var party in parties)
+            if (party.PartyId == partyId)
+                return CountAvailableRemaining(party);
+        return 0;
+    }
+
+    private int GetRemainingInitialForPartyInternal(string partyId)
+    {
+        foreach (var party in parties)
+            if (party.PartyId == partyId)
+                return CountAvailableInitialRemaining(party);
+        return 0;
+    }
+
+    private static int CountAvailableRemaining(PartyState party, int? supplied = null)
+    {
+        int count = 0;
+        int start = Math.Min(Math.Max(0, supplied ?? party.Supplied), party.Entries.Length);
+        for (int i = start; i < party.Entries.Length; i++)
+            if (!party.DepartedSeeds.Contains(party.Entries[i].Seed))
+                count++;
+        return count;
+    }
+
+    private static int CountAvailableInitialRemaining(PartyState party)
+    {
+        int count = 0;
+        int end = Math.Min(party.InitialSpawnCount, party.Entries.Length);
+        for (int i = Math.Min(Math.Max(0, party.Supplied), end); i < end; i++)
+            if (!party.DepartedSeeds.Contains(party.Entries[i].Seed))
+                count++;
+        return count;
+    }
+
+    private static void SkipDepartedEntries(PartyState party, int? end = null)
+    {
+        int limit = Math.Min(end ?? party.Entries.Length, party.Entries.Length);
+        while (party.Supplied < limit
+            && party.DepartedSeeds.Contains(party.Entries[party.Supplied].Seed))
+            party.Supplied++;
     }
 
     /// <summary>Supply the next remaining troop from one party without consuming any other party.</summary>
     public IAgentOriginBase SupplyOneTroopFromParty(string partyId)
+    {
+        TrySupplyOneTroopFromParty(partyId, out var origin);
+        return origin;
+    }
+
+    /// <summary>Consume the next reserve entry from one party. Returns false only when no entry remained;
+    /// a true result can carry a null origin when the authoritative entry no longer resolves locally.</summary>
+    public bool TrySupplyOneTroopFromParty(string partyId, out IAgentOriginBase origin)
     {
         lock (gate)
         {
             foreach (var party in parties)
             {
                 if (party.PartyId != partyId) continue;
-                if (party.Supplied >= party.Entries.Length) return null;
+                if (party.PendingClaimSeeds != null)
+                {
+                    origin = null;
+                    return false;
+                }
+                SkipDepartedEntries(party);
+                if (party.Supplied >= party.Entries.Length)
+                {
+                    origin = null;
+                    return false;
+                }
 
-                var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
+                origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
                 party.Supplied++;
-                return origin;
+                return true;
             }
-            return null;
+
+            origin = null;
+            return false;
         }
     }
 
@@ -325,6 +1050,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             foreach (var party in parties)
                 foreach (var entry in party.Entries)
                 {
+                    if (party.DepartedSeeds.Contains(entry.Seed)) continue;
                     var origin = CreateOrigin(entry, party.PartyId);
                     if (origin != null) origins.Add(origin);
                 }
@@ -351,7 +1077,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         {
             int count = 0;
             foreach (var party in parties)
-                count += party.Entries.Length;
+                count += CountAvailableRemaining(party, supplied: 0);
             return count;
         }
     }

@@ -1,5 +1,4 @@
-﻿using Common;
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;
@@ -8,7 +7,7 @@ using TaleWorlds.GauntletUI.Data;
 namespace GameInterface.Services.UI.Patches
 {
     /// <summary>
-    /// Grows the campaign-map escape-menu background pillar so it fits its contents on clients.
+    /// Grows the campaign-map escape-menu background pillar so it fits its contents on clients and the server.
     /// </summary>
     [HarmonyPatch(typeof(GauntletLayer), "LoadMovieAux")]
     internal class EscapeMenuPanelHeightPatch
@@ -28,7 +27,6 @@ namespace GameInterface.Services.UI.Patches
         [HarmonyPostfix]
         static void GrowPanelToFitItems(IGauntletMovie __result)
         {
-            if (!ModInformation.IsClient) return;
             if (__result == null || __result.MovieName != EscapeMenuMovieName) return;
 
             // Character creation and the education screen use this same movie.

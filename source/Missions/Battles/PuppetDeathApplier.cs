@@ -33,17 +33,20 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly IBattleAgentIdAliasMap agentIdAliases;
     private readonly Dictionary<Guid, NetworkBattleAgentDied> pendingDeaths =
         new Dictionary<Guid, NetworkBattleAgentDied>();
 
     public PuppetDeathApplier(
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
-        ICasualtyAttributionMap casualties)
+        ICasualtyAttributionMap casualties,
+        IBattleAgentIdAliasMap agentIdAliases = null)
     {
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.casualties = casualties;
+        this.agentIdAliases = agentIdAliases ?? new BattleAgentIdAliasMap();
 
         messageBroker.Subscribe<NetworkBattleAgentDied>(Handle_NetworkBattleAgentDied);
     }
@@ -83,16 +86,21 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     private bool TryApplyDeath(NetworkBattleAgentDied death)
     {
         var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(death.AgentId, out var info)) return false;
+        bool wasAliased = agentIdAliases.TryResolve(death.AgentId, out var agentId);
+        if (!registry.TryGetAgentInfo(agentId, out var info))
+            return wasAliased;
         if (Mission.Current == null) return false;
 
         Agent agent = info.Agent;
-        Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", death.AgentId, agent != null, agent?.Health ?? -1f);
+        Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", agentId, agent != null, agent?.Health ?? -1f);
         if (agent != null && agent.Health > 0)
         {
             Agent affectorAgent = null;
-            if (death.AffectorAgentId != Guid.Empty
-                && registry.TryGetAgentInfo(death.AffectorAgentId, out var affectorInfo))
+            var affectorAgentId = death.AffectorAgentId;
+            if (agentIdAliases.TryResolve(affectorAgentId, out var resolvedAffectorAgentId))
+                affectorAgentId = resolvedAffectorAgentId;
+            if (affectorAgentId != Guid.Empty
+                && registry.TryGetAgentInfo(affectorAgentId, out var affectorInfo))
             {
                 affectorAgent = affectorInfo.Agent;
             }
@@ -120,8 +128,8 @@ public class PuppetDeathApplier : IPuppetDeathApplier
 
         // Deregister after the game-thread kill. Removing on the poll thread before the queued apply would
         // make the registry lookup fail and leave the puppet alive but unregistered.
-        registry.RemoveAgent(death.AgentId);
-        casualties.Forget(death.AgentId);
+        registry.RemoveAgent(agentId);
+        casualties.MarkDeparted(agentId);
         return true;
     }
 

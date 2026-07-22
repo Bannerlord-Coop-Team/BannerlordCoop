@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using E2E.Tests.Environment.MockEngine;
@@ -45,7 +45,10 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     private static CoopTroopSupplier CreateSuppliedSupplier(IObjectManager objectManager, string characterId, int reserveCount)
     {
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, objectManager);
-        supplier.SetReserve(new[] { new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount)) });
+        supplier.SetReserve(new[]
+        {
+            new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount), initialSpawnCount: 0),
+        });
         return supplier;
     }
 
@@ -61,7 +64,8 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
             var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, client.ObjectManager);
             supplier.SetReserve(new[]
             {
-                new PartyReserve("unresolvable-party", suppliedCount: 10, entries: Entries(characterId, count: 10)),
+                new PartyReserve("unresolvable-party", suppliedCount: 10,
+                    entries: Entries(characterId, count: 10), initialSpawnCount: 0),
             });
 
             var origins = supplier.ClaimRecoveryTroops(
@@ -72,6 +76,99 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
             Assert.Equal(3, origins.Count);
             Assert.Equal(new[] { 500, 501, 502 }, origins.Select(origin => origin.UniqueSeed));
             Assert.Equal(10, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+        });
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-031")]
+    public void MigrationRecovery_ScopeLossReportsOnlyFieldedClaimProgress()
+    {
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            const string partyId = "scope-loss-recovery-party";
+            var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, client.ObjectManager);
+            supplier.SetReserve(new[]
+            {
+                new PartyReserve(partyId, suppliedCount: 4,
+                    entries: Entries(characterId, count: 10), initialSpawnCount: 0),
+            });
+
+            var origins = supplier.ClaimRecoveryTroops(
+                partyId,
+                new Dictionary<string, int> { [characterId] = 3 },
+                new HashSet<int> { 504, 505, 506 });
+
+            Assert.Equal(3, origins.Count);
+            Assert.Equal(4, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+
+            Assert.Equal(
+                CoopTroopSupplier.ClaimedTroopUseResult.Committed,
+                supplier.TryUseClaimedTroop(partyId, origins[1].UniqueSeed, () => true));
+
+            // A failed earlier spawn is requeued behind later origins. Reporting cannot advance past that
+            // gap until the earlier descriptor is actually present in the mission.
+            Assert.Equal(4, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+
+            Assert.Equal(
+                CoopTroopSupplier.ClaimedTroopUseResult.Committed,
+                supplier.TryUseClaimedTroop(partyId, origins[0].UniqueSeed, () => true));
+
+            Assert.Equal(6, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+
+            var dropped = Assert.Single(supplier.SetReserve(Array.Empty<PartyReserve>()));
+            Assert.Equal(partyId, dropped.PartyId);
+            Assert.Equal(6, dropped.Supplied);
+        });
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-031")]
+    public void MigrationRecovery_ReserveRefreshPreservesPendingClaimAndProgress()
+    {
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            const string partyId = "refreshed-recovery-party";
+            var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, client.ObjectManager);
+            supplier.SetReserve(new[]
+            {
+                new PartyReserve(partyId, suppliedCount: 4,
+                    entries: Entries(characterId, count: 10), initialSpawnCount: 0),
+            });
+
+            var origins = supplier.ClaimRecoveryTroops(
+                partyId,
+                new Dictionary<string, int> { [characterId] = 3 },
+                new HashSet<int> { 504, 505, 506 });
+            Assert.Equal(3, origins.Count);
+
+            Assert.Equal(
+                CoopTroopSupplier.ClaimedTroopUseResult.Committed,
+                supplier.TryUseClaimedTroop(partyId, origins[0].UniqueSeed, () => true));
+            Assert.Equal(5, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+
+            var droppedByRefresh = supplier.SetReserve(new[]
+            {
+                new PartyReserve(partyId, suppliedCount: 4,
+                    entries: Entries(characterId, count: 10), initialSpawnCount: 0),
+            });
+
+            Assert.Empty(droppedByRefresh);
+            Assert.Equal(5, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+            Assert.Empty(supplier.ClaimRecoveryTroops(
+                partyId,
+                new Dictionary<string, int> { [characterId] = 3 },
+                new HashSet<int> { 504, 505, 506 }));
+
+            Assert.Equal(
+                CoopTroopSupplier.ClaimedTroopUseResult.Committed,
+                supplier.TryUseClaimedTroop(partyId, origins[1].UniqueSeed, () => true));
+            Assert.Equal(6, Assert.Single(supplier.GetSuppliedByParty()).supplied);
         });
     }
 

@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using LiteNetLib;

@@ -17,6 +17,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
 
+[Collection(BattleSpawnGateTestCollection.Name)]
 public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
 {
     public BattlePuppetTeamOwnershipTests(ITestOutputHelper output) : base(output) { }
@@ -55,7 +56,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 host.Resolve<IBattleHostRegistry>().Set(
                     mapEventId,
                     new BattleHostAssignment("host", new[] { "enemy", "ally" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BattleSpawnGate.BeginBattle(mapEventId, 1000);
+                BattleSpawnGate.ResetPrioritySpawnSnapshot(mapEventId);
 
                 var mapEventParties = ownParty.MapEvent.AttackerSide.Parties;
                 var ownMapEventParty = mapEventParties.Single(party => party.Party == ownParty.Party);
@@ -73,10 +75,12 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     "ally", alliedMapEventPartyId, 2, equipment, new BodyProperties(), missionEquipment);
 
                 var broker = host.Resolve<IMessageBroker>();
+                BattleSpawnGate.QueuePrioritySpawn(mapEventId, alliedMapEventPartyId);
                 broker.Publish(this, new NetworkSpawnBattleAgents(new[] { alliedRecord }));
                 // The unsafe fallback used to spawn this record directly onto PlayerTeam.
                 Assert.False(registry.TryGetAgentInfo(alliedAgentId, out _));
                 Assert.Empty(mock.Agents);
+                Assert.True(BattleSpawnGate.HasPendingPrioritySpawn);
 
                 var combatants = new IBattleCombatant[] { ownParty.Party, enemyParty.Party };
                 var combatantsLogic = new MissionCombatantsLogic(
@@ -109,6 +113,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 Assert.True(registry.IsLocallyControlled(ownAgentId));
                 Assert.False(registry.IsLocallyControlled(alliedAgentId));
                 Assert.Equal("ally", alliedAgent.CurrentAuthority);
+                Assert.False(BattleSpawnGate.HasPendingPrioritySpawn);
 
                 GC.KeepAlive(controller);
             });

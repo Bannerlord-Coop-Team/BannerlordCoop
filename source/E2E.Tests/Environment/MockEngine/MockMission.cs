@@ -130,5 +130,13 @@ public sealed class MockMission
         return horse;
     }
 
+    /// <summary>Remove an agent from the active mission view without changing its mirrored state. Used to model
+    /// a rider that exists and is linked to its built mount but has not reached Mission.BuildAgent yet.</summary>
+    public bool UntrackAgent(Agent agent)
+    {
+        if (!AgentMirror.TryGet(agent, out var mirror)) return false;
+        return agentsByIndex.Remove(mirror.Index);
+    }
+
     public Agent FindAgentWithIndex(int index) => agentsByIndex.TryGetValue(index, out var a) ? a : null;
 }

@@ -1,4 +1,4 @@
-using GameInterface.Services.MapEvents;
+﻿using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
@@ -126,7 +126,7 @@ public class HostMigrationTests : MissionTestEnvironment
 
         // The just-promoted successor immediately leaves with no one behind it: no valid host remains, so the
         // migration terminates at empty.
-        DepartBattle("ctrl-B", mapEventId);
+        DepartBattle("ctrl-B", mapEventId, wasRetreat: false, isInstanceEmpty: true);
 
         // Server-authoritative outcome: the host assignment is cleared and the battle's reserves are forgotten.
         Server.Call(() => Assert.False(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out _)));

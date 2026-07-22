@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment;
@@ -105,7 +105,7 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
                 // A live coop battle: the movement handler's location-style peer cleanup must stand down (it is
                 // gated on the spawn gate), exactly as in a real battle — otherwise it would despawn A's agents
                 // wholesale and there would be nothing left to adopt.
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BattleSpawnGate.BeginBattle(mapEventId, 1000);
 
                 Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var hostParty));
                 var character = (CharacterObject)Game.Current.PlayerTroop;

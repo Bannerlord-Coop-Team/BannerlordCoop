@@ -1,11 +1,13 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -47,15 +49,18 @@ internal class BattleMissionStartHandler : IHandler
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
+    private readonly IServerBattleSizeProvider battleSizeProvider;
+    private readonly IBattleTroopReserveBuilder battleTroopReserveBuilder;
 
     // Server-side: terrain seed chosen once per map event and reused for every client that opens the same battle,
     // so they all use the same terrain seed. Keyed by map event id.
     private readonly ConcurrentDictionary<string, int> mapEventTerrainSeeds = new ConcurrentDictionary<string, int>();
+    private readonly ConcurrentDictionary<string, int> mapEventBattleSizes = new ConcurrentDictionary<string, int>();
     private readonly Random terrainSeedRandom = new Random();
 
-    // Server-side: the siege mission inputs (wall level, wall HPs, engine lists) snapshotted once per map event,
-    // so a joiner entering mid-assault loads the same scene as the first entrant even though the campaign-side
-    // container keeps syncing. Evicted with the terrain seed when the event finalizes.
+    // Server-side: the siege mission inputs (wall level, wall HPs, engine lists) snapshotted once per mission claim,
+    // so a joiner entering mid-assault loads the same scene as the first entrant. A restarted mission replaces the
+    // snapshot; finalization evicts it.
     private readonly ConcurrentDictionary<string, NetworkStartSiegeMission> siegeMissionSnapshots = new ConcurrentDictionary<string, NetworkStartSiegeMission>();
 
     public BattleMissionStartHandler(
@@ -64,7 +69,9 @@ internal class BattleMissionStartHandler : IHandler
         IPlayerManager playerManager,
         INetwork network,
         IMapEventLogger mapEventLogger,
-        IBattleMissionInitializerResolver missionInitializerResolver)
+        IBattleMissionInitializerResolver missionInitializerResolver,
+        IServerBattleSizeProvider battleSizeProvider,
+        IBattleTroopReserveBuilder battleTroopReserveBuilder)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -72,6 +79,8 @@ internal class BattleMissionStartHandler : IHandler
         this.network = network;
         this.mapEventLogger = mapEventLogger;
         this.missionInitializerResolver = missionInitializerResolver;
+        this.battleSizeProvider = battleSizeProvider;
+        this.battleTroopReserveBuilder = battleTroopReserveBuilder;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
@@ -93,6 +102,7 @@ internal class BattleMissionStartHandler : IHandler
         if (objectManager.TryGetId(payload.What.MapEvent, out var mapEventId))
         {
             mapEventTerrainSeeds.TryRemove(mapEventId, out _);
+            mapEventBattleSizes.TryRemove(mapEventId, out _);
             siegeMissionSnapshots.TryRemove(mapEventId, out _);
         }
     }
@@ -185,6 +195,20 @@ internal class BattleMissionStartHandler : IHandler
                     side.MakeReadyForMission(null);
                 }
 
+                operation = "freeze battle size and initial spawn plan";
+                int battleSize;
+                if (isNewMissionClaim)
+                {
+                    battleSize = battleSizeProvider.BattleSize;
+                    mapEventBattleSizes[payload.What.MapEventId] = battleSize;
+                }
+                else
+                {
+                    battleSize = mapEventBattleSizes.GetOrAdd(
+                        payload.What.MapEventId, _ => battleSizeProvider.BattleSize);
+                }
+                battleTroopReserveBuilder.PreparePlan(mapEvent, battleSize);
+
                 // Reply first so the requesting client's blocked consequence unblocks before the mission-open
                 // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
                 // flow, rather than re-entrantly during the blocking wait.
@@ -194,7 +218,10 @@ internal class BattleMissionStartHandler : IHandler
                 if (mapEvent.IsSiegeAssault)
                 {
                     operation = "send siege mission snapshot";
-                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
+                    var snapshot = GetOrCreateSiegeMissionSnapshot(
+                        payload.What.MapEventId,
+                        isNewMissionClaim,
+                        () => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent, battleSize));
                     // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
                     network.SendAll(new NetworkStartSiegeMission(
                         snapshot.MapEventId,
@@ -202,7 +229,8 @@ internal class BattleMissionStartHandler : IHandler
                         snapshot.WallHitPointRatios,
                         snapshot.AttackerEngines,
                         snapshot.DefenderEngines,
-                        payload.What.AttackerPartyId));
+                        payload.What.AttackerPartyId,
+                        snapshot.BattleSize));
                 }
                 else
                 {
@@ -212,7 +240,7 @@ internal class BattleMissionStartHandler : IHandler
                     operation = "send attack mission start";
                     network.SendAll(new NetworkStartAttackMission(
                         payload.What.MapEventId, randomTerrainSeed, atmosphereOnCampaign,
-                        payload.What.AttackerPartyId));
+                        payload.What.AttackerPartyId, battleSize));
                 }
 
                 // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
@@ -227,6 +255,17 @@ internal class BattleMissionStartHandler : IHandler
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
             }
         }, context: nameof(Handle_NetworkBattleStartRequest));
+    }
+
+    internal NetworkStartSiegeMission GetOrCreateSiegeMissionSnapshot(
+        string mapEventId,
+        bool isNewMissionClaim,
+        Func<NetworkStartSiegeMission> createSnapshot)
+    {
+        if (isNewMissionClaim)
+            siegeMissionSnapshots.TryRemove(mapEventId, out _);
+
+        return siegeMissionSnapshots.GetOrAdd(mapEventId, _ => createSnapshot());
     }
 
     private static AtmosphereInfo GetAtmosphereOnCampaign(MapEvent mapEvent)
@@ -306,12 +345,12 @@ internal class BattleMissionStartHandler : IHandler
         var message = payload.What;
         GameThread.RunSafe(
             () => OpenAttackMission(message.MapEventId, message.RandomTerrainSeed, message.AtmosphereOnCampaign,
-                message.InitiatingPartyId),
+                message.InitiatingPartyId, message.BattleSize),
             context: nameof(Handle_NetworkStartAttackMission));
     }
 
     /// <summary>[Server] Snapshot the mission-defining siege inputs for one map event.</summary>
-    private static NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent)
+    private static NetworkStartSiegeMission BuildSiegeMissionSnapshot(string mapEventId, MapEvent mapEvent, int battleSize)
     {
         var settlement = mapEvent.MapEventSettlement;
         var siegeEvent = settlement.SiegeEvent;
@@ -322,7 +361,7 @@ internal class BattleMissionStartHandler : IHandler
 
         return new NetworkStartSiegeMission(mapEventId, wallLevel,
             settlement.SettlementWallSectionHitPointsRatioList.ToArray(), attackerEngines, defenderEngines,
-            initiatingPartyId: null);
+            initiatingPartyId: null, battleSize);
     }
 
     private void Handle_NetworkStartSiegeMission(MessagePayload<NetworkStartSiegeMission> payload)
@@ -374,7 +413,7 @@ internal class BattleMissionStartHandler : IHandler
 
             if (BattleSpawnConfig.Enabled)
             {
-                BattleSpawnGate.BeginBattle(payload.MapEventId);
+                BattleSpawnGate.BeginBattle(payload.MapEventId, payload.BattleSize);
                 spawnGateEngaged = true;
                 Logger.Information("[BattleSync] Engaged spawn gate in OpenSiegeMission: mapEvent={MapEventId}", payload.MapEventId);
             }
@@ -458,7 +497,7 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     private void OpenAttackMission(string mapEventId, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign,
-        string initiatingPartyId)
+        string initiatingPartyId, int battleSize)
     {
         bool spawnGateEngaged = false;
         try
@@ -521,7 +560,7 @@ internal class BattleMissionStartHandler : IHandler
             // who fields which troops is decided by the server-fed reserves (CoopTroopSupplier).
             if (BattleSpawnConfig.Enabled)
             {
-                BattleSpawnGate.BeginBattle(battleMapEventId);
+                BattleSpawnGate.BeginBattle(battleMapEventId, battleSize);
                 spawnGateEngaged = true;
                 Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", battleMapEventId);
             }

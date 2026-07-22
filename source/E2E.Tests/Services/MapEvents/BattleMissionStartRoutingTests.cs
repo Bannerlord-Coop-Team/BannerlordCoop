@@ -1,4 +1,4 @@
-using GameInterface.Services.MapEvents;
+﻿using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
 using Moq;
@@ -52,7 +52,7 @@ public class BattleMissionStartRoutingTests
     [Fact]
     public void FailedMissionOpen_ReleasesSpawnGate()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        BattleSpawnGate.BeginBattle("battle-1", 1000);
         try
         {
             BattleMissionStartHandler.UnwindSpawnGateAfterFailedOpen(spawnGateEngaged: true);

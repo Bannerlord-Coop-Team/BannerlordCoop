@@ -94,7 +94,7 @@ internal class UpdateCampaignOptionsHandler : IHandler
         {
             var message = new NetworkUpdateOtherOptions(serverOptionsProvider.GetServerOptions());
             network.SendAll(message);
-        });  
+        });
     }
 
     private void Handle_NetworkUpdateOtherOptions(MessagePayload<NetworkUpdateOtherOptions> obj)
@@ -117,7 +117,6 @@ internal class UpdateCampaignOptionsHandler : IHandler
 
     private void UpdateOtherOptions(ServerOptions newOptions)
     {
-        // Add other server options as needed
-        BannerlordConfig.PlayerReceivedDamageDifficulty = newOptions.PlayerReceivedDamage;
+        serverOptionsProvider.ApplyServerOptions(newOptions);
     }
 }

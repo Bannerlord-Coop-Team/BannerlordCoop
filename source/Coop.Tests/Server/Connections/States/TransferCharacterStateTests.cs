@@ -1,8 +1,10 @@
-using Autofac;
+﻿using Autofac;
 using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.CampaignService.Data;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using LiteNetLib;
 using Moq;
@@ -69,6 +71,8 @@ namespace Coop.Tests.Server.Connections.States
             string campaignId = "12345";
             var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
             saveMock.Setup(m => m.SaveCurrentGame()).Returns(new SaveResults(true, data, campaignId));
+            var serverOptionsProvider = serverComponent.Container.Resolve<Mock<IServerOptionsProvider>>();
+            serverOptionsProvider.Setup(m => m.GetServerOptions()).Returns(new ServerOptions(2, 800));
 
             // Act — entering the state packages the save and sends it to the joining peer.
             connectionLogic.SetState<TransferSaveState>();
@@ -79,6 +83,8 @@ namespace Coop.Tests.Server.Connections.States
             var packet = Assert.Single(serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataPacket>(playerPeer));
             Assert.Equal(data, SaveDataCompression.Decompress(packet.GameSaveData));
             Assert.Equal(campaignId, packet.CampaignID);
+            Assert.Equal(2, packet.ServerOptions.PlayerReceivedDamage);
+            Assert.Equal(800, packet.ServerOptions.BattleSize);
 
             // The directed save is not sent to any other peer.
             var otherPeerGotSave =

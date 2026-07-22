@@ -1,6 +1,7 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -47,14 +48,16 @@ internal class BattleMissionEntryPatch
     {
         if (ModInformation.IsServer) return;
         if (!BattleSpawnConfig.Enabled) return;
+        if (BattleSpawnGate.IsCoopBattleActive) return;
 
         var mapEvent = PlayerEncounter.Battle ?? MobileParty.MainParty?.MapEvent;
         if (mapEvent == null) return;
 
         if (!ContainerProvider.TryResolve(out IObjectManager objectManager)) return;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
+        if (!ContainerProvider.TryResolve(out IServerBattleSizeProvider battleSizeProvider)) return;
 
-        BattleSpawnGate.BeginBattle(mapEventId);
+        BattleSpawnGate.BeginBattle(mapEventId, battleSizeProvider.BattleSize);
         Logger.Information("[BattleSync] Engaged spawn gate before mission load: mapEvent={MapEventId}", mapEventId);
     }
 

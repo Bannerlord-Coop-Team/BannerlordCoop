@@ -1490,7 +1490,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
     private static void RunInBattle(string mapEventId, Action action)
     {
-        BattleSpawnGate.BeginBattle(mapEventId);
+        BattleSpawnGate.BeginBattle(mapEventId, 1000);
         try
         {
             action();

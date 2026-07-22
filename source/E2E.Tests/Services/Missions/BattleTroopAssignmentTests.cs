@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using GameInterface.Services.MapEvents.TroopSupply;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -156,7 +156,7 @@ public class CoopTroopSupplierControllableCountTests
     public void PlayerControllableTroops_EqualsOwnedEntryCount()
     {
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
-        supplier.SetReserve(new[] { new PartyReserve("own", 0, Entries(5, seedBase: 500)) });
+        supplier.SetReserve(new[] { new PartyReserve("own", 0, Entries(5, seedBase: 500), initialSpawnCount: 0) });
 
         Assert.Equal(5, supplier.GetNumberOfPlayerControllableTroops());
     }
@@ -168,8 +168,8 @@ public class CoopTroopSupplierControllableCountTests
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null);
         supplier.SetReserve(new[]
         {
-            new PartyReserve("p1", 0, Entries(3, seedBase: 100)),
-            new PartyReserve("p2", 0, Entries(2, seedBase: 200)),
+            new PartyReserve("p1", 0, Entries(3, seedBase: 100), initialSpawnCount: 0),
+            new PartyReserve("p2", 0, Entries(2, seedBase: 200), initialSpawnCount: 0),
         });
 
         Assert.Equal(5, supplier.GetNumberOfPlayerControllableTroops());

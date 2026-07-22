@@ -12,8 +12,12 @@ public class ServerOptions
     [ProtoMember(1)]
     public readonly int PlayerReceivedDamage;
 
-    public ServerOptions(int playerReceivedDamage)
+    [ProtoMember(2)]
+    public readonly int BattleSize;
+
+    public ServerOptions(int playerReceivedDamage, int battleSize)
     {
         PlayerReceivedDamage = playerReceivedDamage;
+        BattleSize = battleSize;
     }
 }

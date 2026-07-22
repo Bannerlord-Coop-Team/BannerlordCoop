@@ -1,0 +1,27 @@
+<ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
+  <Children>
+    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                Brush="Clan.TabControl.Text" Brush.FontSize="36"
+                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                Text="@TitleText"/>
+    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.FontColor="#B8B8B8FF"
+                Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                Text="@DescriptionText"/>
+
+    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="78"
+               LayoutImp.LayoutMethod="HorizontalLeftToRight">
+      <Children>
+        <Standard.Slider WidthSizePolicy="Fixed" SuggestedWidth="640" HeightSizePolicy="Fixed" SuggestedHeight="46"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Parameter.ValueInt="@BattleSizeIndex" Parameter.MinValue="0" Parameter.MaxValue="6"/>
+        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="120" HeightSizePolicy="Fixed" SuggestedHeight="48"
+                    VerticalAlignment="Center" MarginLeft="28"
+                    Brush="Clan.TabControl.Text" Brush.FontSize="28"
+                    Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                    Text="@BattleSizeText"/>
+      </Children>
+    </ListPanel>
+  </Children>
+</ListPanel>

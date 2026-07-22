@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MapEvents.TroopSupply;
 using Missions.Messages;
 using System.Linq;
@@ -64,9 +64,9 @@ public class BattleRetreatCasualtyTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var broker = Server.Resolve<IMessageBroker>();
-            broker.Publish(this, new NetworkRequestBattleCasualty(retreatPartyId, troopId, wounded: false));
-            broker.Publish(this, new NetworkRequestBattleCasualty(retreatPartyId, troopId, wounded: false));
-            broker.Publish(this, new NetworkRequestBattleCasualty(retreatPartyId, troopId, wounded: true));
+            broker.Publish(this, new NetworkRequestBattleCasualty(retreatPartyId, troopId, wounded: false, troopSeed: 0));
+            broker.Publish(this, new NetworkRequestBattleCasualty(retreatPartyId, troopId, wounded: false, troopSeed: 0));
+            broker.Publish(this, new NetworkRequestBattleCasualty(retreatPartyId, troopId, wounded: true, troopSeed: 0));
 
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             Assert.Equal(2, CountAvailable(mapEvent.DefenderSide.Parties[0].Troops, troop));

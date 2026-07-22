@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using Missions.Messages;
 using Serilog;
 using System;
@@ -24,6 +26,7 @@ public class AgentRoutReporter : IAgentRoutReporter
     private static readonly ILogger Logger = LogManager.GetLogger<AgentRoutReporter>();
 
     private readonly IBattleNetwork network;
+    private readonly INetwork relayNetwork;
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
@@ -31,12 +34,14 @@ public class AgentRoutReporter : IAgentRoutReporter
 
     public AgentRoutReporter(
         IBattleNetwork network,
+        INetwork relayNetwork,
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         ICasualtyAttributionMap casualties)
     {
         this.network = network;
+        this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
@@ -59,10 +64,24 @@ public class AgentRoutReporter : IAgentRoutReporter
             if (!registry.TryGetAgentInfo(payload.What.Agent, out var info)) return;
             if (info.CurrentAuthority != session.OwnControllerId) return;
 
+            var attribution = casualties.GetOrDefault(info.AgentId);
             Logger.Information("[DeathDiag] Broadcasting rout of agent {AgentId} to the battle mesh", info.AgentId);
-            network.SendAll(new NetworkBattleAgentRouted(info.AgentId));
+            network.SendAll(new NetworkBattleAgentRouted(
+                info.AgentId,
+                hideMount: true,
+                isAdministrativeRemoval: false));
 
-            casualties.Forget(info.AgentId);
+            // Start peer removal before reporting the freed slot; the priority and human-count gates cover
+            // the lack of ordering between the battle mesh and campaign relay.
+            if (session.HasInstance && attribution.MapEventPartyId != null)
+            {
+                relayNetwork.SendAll(new NetworkBattleTroopDeparted(
+                    session.InstanceId,
+                    attribution.MapEventPartyId,
+                    attribution.TroopSeed));
+            }
+
+            casualties.MarkDeparted(info.AgentId);
             registry.RemoveAgent(info.AgentId);
         });
     }

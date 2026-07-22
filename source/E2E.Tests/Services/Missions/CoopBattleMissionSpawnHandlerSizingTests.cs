@@ -11,12 +11,45 @@ namespace E2E.Tests.Services.Missions;
 public class CoopBattleMissionSpawnHandlerSizingTests
 {
     [Fact]
+    public void InitialPhaseRebase_PreservesTheWaveDepthTruncatedByNativeInit()
+    {
+        var sizing = CoopBattleMissionSpawnHandler.InitialPhaseSizing.Calculate(
+            representedTotalTroops: 7,
+            representedInitialTroops: 2,
+            spawnedTroops: 0,
+            reservedTroops: 0,
+            unsuppliedTroops: 10,
+            unsuppliedInitialTroops: 2);
+
+        Assert.Equal(7, sizing.TotalTroops);
+        Assert.Equal(2, sizing.InitialTroops);
+        Assert.Equal(5, sizing.RemainingTroops);
+    }
+
+    [Fact]
+    public void InitialPhaseRebase_ShrinksBelowRepresentedDepthWhenScopeCannotFillIt()
+    {
+        var sizing = CoopBattleMissionSpawnHandler.InitialPhaseSizing.Calculate(
+            representedTotalTroops: 7,
+            representedInitialTroops: 2,
+            spawnedTroops: 0,
+            reservedTroops: 0,
+            unsuppliedTroops: 1,
+            unsuppliedInitialTroops: 1);
+
+        Assert.Equal(1, sizing.TotalTroops);
+        Assert.Equal(1, sizing.InitialTroops);
+        Assert.Equal(0, sizing.RemainingTroops);
+    }
+
+    [Fact]
     public void OneSideNotPopulated_NotReady_HoldsBothSides()
     {
         // Own side already has its reserve but the enemy side's (empty) reserve is still in flight: not ready,
         // so both sides stay held at zero until the second reserve lands.
         var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
-            defenderPopulated: true, attackerPopulated: false, defenderOwned: 7, attackerOwned: 0);
+            defenderPopulated: true, attackerPopulated: false, defenderOwned: 7, attackerOwned: 0,
+            defenderInitial: 7, attackerInitial: 0);
 
         Assert.False(sizing.Ready);
         Assert.False(sizing.SizeNow);
@@ -27,7 +60,8 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     public void NeitherPopulated_NotReady()
     {
         var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
-            defenderPopulated: false, attackerPopulated: false, defenderOwned: 0, attackerOwned: 0);
+            defenderPopulated: false, attackerPopulated: false, defenderOwned: 0, attackerOwned: 0,
+            defenderInitial: 0, attackerInitial: 0);
 
         Assert.False(sizing.Ready);
         Assert.False(sizing.SizeNow);
@@ -39,11 +73,14 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     {
         // A non-host: own defender side owns troops, enemy attacker side is an empty (but populated) reserve.
         var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
-            defenderPopulated: true, attackerPopulated: true, defenderOwned: 7, attackerOwned: 0);
+            defenderPopulated: true, attackerPopulated: true, defenderOwned: 7, attackerOwned: 0,
+            defenderInitial: 4, attackerInitial: 0);
 
         Assert.True(sizing.Ready);
         Assert.True(sizing.SizeNow);
         Assert.True(sizing.HasAnyOwnedTroops);
+        Assert.Equal(7, sizing.DefenderOwned);
+        Assert.Equal(4, sizing.DefenderInitial);
     }
 
     [Fact]
@@ -51,7 +88,8 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     {
         // Defensive: both sides owning nothing must not hand Init a 0/0 total (which would divide by zero).
         var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
-            defenderPopulated: true, attackerPopulated: true, defenderOwned: 0, attackerOwned: 0);
+            defenderPopulated: true, attackerPopulated: true, defenderOwned: 0, attackerOwned: 0,
+            defenderInitial: 0, attackerInitial: 0);
 
         Assert.True(sizing.Ready);
         Assert.False(sizing.SizeNow);
@@ -95,46 +133,97 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     }
 
     [Fact]
-    public void MigrationRecoveryTargets_LargeArmyReserves_StayWithinJointBattleSize()
+    public void MigrationRecoverySlots_SubtractActiveTroopsFromAuthorityEntitlements()
     {
-        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
-            defenderTotal: 1154,
-            attackerTotal: 1336,
-            battleSize: 1000,
-            maximumSideRatio: 0.75f,
-            defenderAdvantageFactor: 1f);
+        var slots = ReinforcementFielder.RecoverySlots.Calculate(
+            defenderEntitlement: 120,
+            attackerEntitlement: 80,
+            activeOwnedDefenders: 70,
+            activeOwnedAttackers: 50,
+            totalActiveHumans: 120,
+            battleSize: 200);
 
-        Assert.Equal(464, targets.Defenders);
-        Assert.Equal(536, targets.Attackers);
-        Assert.Equal(1000, targets.Defenders + targets.Attackers);
+        Assert.Equal(50, slots.Defenders);
+        Assert.Equal(30, slots.Attackers);
     }
 
     [Fact]
-    public void MigrationRecoveryTargets_OneSidedReserve_UsesAvailableBattleCapacity()
+    public void MigrationRecoverySlots_ActiveAtOrAboveEntitlementClampsToZero()
     {
-        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
-            defenderTotal: 1000,
-            attackerTotal: 0,
-            battleSize: 500,
-            maximumSideRatio: 0.75f,
-            defenderAdvantageFactor: 1f);
+        var slots = ReinforcementFielder.RecoverySlots.Calculate(
+            defenderEntitlement: 120,
+            attackerEntitlement: 80,
+            activeOwnedDefenders: 120,
+            activeOwnedAttackers: 95,
+            totalActiveHumans: 215,
+            battleSize: 200);
 
-        Assert.Equal(500, targets.Defenders);
-        Assert.Equal(0, targets.Attackers);
+        Assert.Equal(0, slots.Defenders);
+        Assert.Equal(0, slots.Attackers);
     }
 
     [Fact]
-    public void MigrationRecoveryTargets_SmallBattle_DoesNotInventTroops()
+    public void MigrationRecoverySlots_DoesNotBorrowUnusedCapacityAcrossSides()
     {
-        var targets = ReinforcementFielder.RecoveryTargets.Calculate(
-            defenderTotal: 40,
-            attackerTotal: 60,
-            battleSize: 1000,
-            maximumSideRatio: 0.75f,
-            defenderAdvantageFactor: 1f);
+        var slots = ReinforcementFielder.RecoverySlots.Calculate(
+            defenderEntitlement: 100,
+            attackerEntitlement: 50,
+            activeOwnedDefenders: 0,
+            activeOwnedAttackers: 50,
+            totalActiveHumans: 50,
+            battleSize: 150);
 
-        Assert.Equal(40, targets.Defenders);
-        Assert.Equal(60, targets.Attackers);
+        Assert.Equal(100, slots.Defenders);
+        Assert.Equal(0, slots.Attackers);
+        Assert.Equal(100, slots.Defenders + slots.Attackers);
+    }
+
+    [Fact]
+    public void MigrationRecoverySlots_ActivePlusRecoveredNeverExceedsBattleSize()
+    {
+        var slots = ReinforcementFielder.RecoverySlots.Calculate(
+            defenderEntitlement: 700,
+            attackerEntitlement: 700,
+            activeOwnedDefenders: 400,
+            activeOwnedAttackers: 400,
+            totalActiveHumans: 800,
+            battleSize: 1000);
+
+        Assert.Equal(100, slots.Defenders);
+        Assert.Equal(100, slots.Attackers);
+        Assert.Equal(1000, 400 + 400 + slots.Defenders + slots.Attackers);
+    }
+
+    [Fact]
+    public void MigrationRecoverySlots_ExistingSideOverflowConsumesJointCapacity()
+    {
+        var slots = ReinforcementFielder.RecoverySlots.Calculate(
+            defenderEntitlement: 500,
+            attackerEntitlement: 500,
+            activeOwnedDefenders: 600,
+            activeOwnedAttackers: 0,
+            totalActiveHumans: 600,
+            battleSize: 1000);
+
+        Assert.Equal(0, slots.Defenders);
+        Assert.Equal(400, slots.Attackers);
+        Assert.Equal(1000, 600 + slots.Attackers);
+    }
+
+    [Fact]
+    public void MigrationRecoverySlots_RemotePuppetsConsumeGlobalCapacityWithoutReducingOwnedEntitlement()
+    {
+        var slots = ReinforcementFielder.RecoverySlots.Calculate(
+            defenderEntitlement: 500,
+            attackerEntitlement: 500,
+            activeOwnedDefenders: 300,
+            activeOwnedAttackers: 300,
+            totalActiveHumans: 900,
+            battleSize: 1000);
+
+        Assert.Equal(50, slots.Defenders);
+        Assert.Equal(50, slots.Attackers);
+        Assert.Equal(1000, 900 + slots.Defenders + slots.Attackers);
     }
 
     [Theory]

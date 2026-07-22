@@ -135,6 +135,13 @@ public class CoopAgentOrigin : IAgentOriginBase
     public void SetKilled() { if (TryLatchRemoval()) _supplier.OnTroopKilled(_descriptor); }
     public void SetRouted(bool isOrderRetreat) { if (TryLatchRemoval()) _supplier.OnTroopRouted(_descriptor, isOrderRetreat); }
 
+    /// <summary>Marks an uncommitted spawn body so its later native removal cannot advance the supplier quota.</summary>
+    public void SuppressRemoval() => Interlocked.Exchange(ref _removedLatch, 1);
+
+    /// <summary>Creates a fresh origin for retry after the previous uncommitted body was administratively removed.</summary>
+    public CoopAgentOrigin CreateRetryOrigin()
+        => new CoopAgentOrigin(_troop, _party, Rank, _banner, _descriptor, MapEventPartyId, _supplier);
+
     // An agent can be reported removed more than once (a Wounded knockdown then a Killed finish, or a
     // duplicate replicated removal), but must count exactly once against the quota — hence the one-shot
     // latch, interlocked because replicated removals can arrive off the game thread. Origins without a

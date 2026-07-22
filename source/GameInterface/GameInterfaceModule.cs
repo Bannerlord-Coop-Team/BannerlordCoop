@@ -15,6 +15,7 @@ using GameInterface.Services.LiveTesting;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
@@ -68,6 +69,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<KingdomMembershipState>().AsSelf().As<IKingdomMembershipState>().InstancePerLifetimeScope();
         builder.RegisterType<MainPartyBattleRewardsCache>().As<IMainPartyBattleRewardsCache>().InstancePerLifetimeScope();
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+        builder.RegisterType<BattleInitialSpawnAllocator>().As<IBattleInitialSpawnAllocator>().InstancePerDependency();
 
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();

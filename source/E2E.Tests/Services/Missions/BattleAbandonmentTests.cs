@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Coop.Core.Server.Services.Instances;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
@@ -78,9 +78,9 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var broker = Server.Resolve<IMessageBroker>();
-            broker.Publish(this, new NetworkRequestBattleCasualty(defenderPartyId, troopId, wounded: false));
-            broker.Publish(this, new NetworkRequestBattleCasualty(defenderPartyId, troopId, wounded: false));
-            broker.Publish(this, new NetworkRequestBattleCasualty(defenderPartyId, troopId, wounded: true));
+            broker.Publish(this, new NetworkRequestBattleCasualty(defenderPartyId, troopId, wounded: false, troopSeed: 0));
+            broker.Publish(this, new NetworkRequestBattleCasualty(defenderPartyId, troopId, wounded: false, troopSeed: 0));
+            broker.Publish(this, new NetworkRequestBattleCasualty(defenderPartyId, troopId, wounded: true, troopSeed: 0));
 
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             Assert.Equal(2, CountAvailable(mapEvent.DefenderSide.Parties[0].Troops, troop));
@@ -332,12 +332,40 @@ public class BattleAbandonmentTests : MissionTestEnvironment
     {
         var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "loader-ctrl");
         var clients = Clients.ToArray();
+        var troop = Server.CreateRegisteredObject<CharacterObject>("hostless_live_plan_troop");
+        var hostPartyMep = GetMapEventPartyId(mapEventId, partyIds[0]);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            foreach (var party in mapEvent.AttackerSide.Parties.Concat(mapEvent.DefenderSide.Parties))
+            {
+                party.Party.MemberRoster.Clear();
+                party.Party.MemberRoster.AddToCounts(troop, 3);
+                party.Update();
+            }
+
+            Server.Resolve<IBattleTroopReserveBuilder>().PreparePlan(mapEvent, battleSize: 6);
+        });
 
         EnterBattle(clients[0], mapEventId);                      // host-ctrl -> host (mission-ready)
         EnterBattle(clients[1], mapEventId, missionReady: false); // loader-ctrl entered but still loading
         AssertHost(Server, mapEventId, "host-ctrl");              // no successor — the loader is not ready
 
-        var hostPartyMep = GetMapEventPartyId(mapEventId, partyIds[0]);
+        int expectedHostInitialSpawns = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            var hostReserve = Server.Resolve<IBattleTroopReserveBuilder>()
+                .GetOwnedReserves(mapEvent, "host-ctrl", isHost: false)
+                .SelectMany(reserve => reserve.Parties)
+                .Single(party => party.PartyId == hostPartyMep);
+            expectedHostInitialSpawns = hostReserve.InitialSpawnCount;
+            Assert.True(expectedHostInitialSpawns > 0);
+
+            Server.Resolve<IBattleTroopLedger>()
+                .ReportSupplied(mapEventId, hostPartyMep, hostReserve.Entries.Length);
+        });
 
         Server.NetworkSentMessages.Clear();
 
@@ -363,8 +391,10 @@ public class BattleAbandonmentTests : MissionTestEnvironment
             .Where(message => message.MapEventId == mapEventId)
             .Skip(loaderBaseline)
             .SelectMany(feed => feed.Parties)
-            .Select(party => party.PartyId);
-        Assert.Contains(hostPartyMep, grantedParties);
+            .ToArray();
+        var inheritedHostParty = Assert.Single(grantedParties, party => party.PartyId == hostPartyMep);
+        Assert.Equal(0, inheritedHostParty.SuppliedCount);
+        Assert.Equal(expectedHostInitialSpawns, inheritedHostParty.InitialSpawnCount);
     }
 
     // ------------------------------------------------------------------

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
@@ -8,7 +8,7 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.MapEvents.TroopSupply.Handlers;
 
 /// <summary>
-/// [Client] Receives the server's per-party reserve and feeds it into the matching side's troop supplier.
+/// [Client] Receives each full reserve and initial-spawn entitlement, then feeds the matching side's troop supplier.
 /// The supplier may not exist yet (the reserve can arrive before the mission builds), so this goes through
 /// <see cref="CoopTroopSupplierRegistry"/>, which buffers until the supplier registers.
 /// <para>
@@ -47,16 +47,22 @@ internal class BattleTroopReserveHandler : IHandler
         var dropped = CoopTroopSupplierRegistry.Feed(
             message.MapEventId,
             (BattleSideEnum)message.Side,
-            message.Parties ?? Array.Empty<PartyReserve>());
+            message.Parties ?? Array.Empty<PartyReserve>(),
+            message.GrantGeneration,
+            message.CompletesInitialSizing);
 
         if (!message.FlushRequested)
-            return; // legacy shrink — REPLACE only, no ack (today's behavior)
+            return;
 
         var entries = new SupplyProgressEntry[dropped.Count];
         for (int i = 0; i < entries.Length; i++)
             entries[i] = new SupplyProgressEntry(dropped[i].PartyId, dropped[i].Supplied);
 
         // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkBattleSupplyProgress(message.MapEventId, entries, isFlush: true));
+        network.SendAll(new NetworkBattleSupplyProgress(
+            message.MapEventId,
+            entries,
+            isFlush: true,
+            grantGeneration: message.GrantGeneration));
     }
 }

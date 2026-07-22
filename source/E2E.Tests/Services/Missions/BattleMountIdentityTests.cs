@@ -222,6 +222,40 @@ public class BattleMountIdentityTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void OwnedSpawn_RegistrationConflict_DoesNotBroadcastUnregisteredIdentity()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var peer = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(peer, "peer");
+
+        var characterId = CreateRegisteredObject<CharacterObject>();
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            var controller = owner.Resolve<CoopBattleController>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+
+            Assert.True(owner.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            var agent = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None));
+            var remoteId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("peer", remoteId, agent));
+            int messagesBefore = peer.InternalMessages.GetMessageCount<NetworkSpawnBattleAgents>();
+
+            owner.Resolve<IMessageBroker>().Publish(this, new AgentSpawnedInBattle(agent));
+
+            Assert.True(registry.TryGetAgentInfo(agent, out var info));
+            Assert.Equal(remoteId, info.AgentId);
+            Assert.Equal("peer", info.CurrentAuthority);
+            Assert.Equal(messagesBefore, peer.InternalMessages.GetMessageCount<NetworkSpawnBattleAgents>());
+
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
     public void MountDeath_Broadcasts_KillsThePuppetHorse_AndReportsNoServerCasualty()
     {
         using var fixture = new MissionEngineFixture();
@@ -563,7 +597,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BattleSpawnGate.BeginBattle(mapEventId, 1000);
 
                 Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var hostParty));
                 var character = (CharacterObject)Game.Current.PlayerTroop;
@@ -634,7 +668,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
                 var registry = observer.Resolve<INetworkAgentRegistry>();
 
                 controller.Session.TryBegin("mapEvent1");
-                BattleSpawnGate.BeginBattle("mapEvent1");
+                BattleSpawnGate.BeginBattle("mapEvent1", 1000);
 
                 // The non-host retreat despawn selects A's troops by the player team's side.
                 mock.PlayerTeam = mock.DefenderTeam;

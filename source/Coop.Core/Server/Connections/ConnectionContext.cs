@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.CoopSessionData;

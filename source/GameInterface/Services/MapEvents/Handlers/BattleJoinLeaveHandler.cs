@@ -8,6 +8,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -50,6 +51,12 @@ internal class BattleJoinLeaveHandler : IHandler
         this.initializationBarrier = initializationBarrier;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
+        messageBroker.Subscribe<NetworkBattlePrioritySnapshotReset>(Handle_NetworkBattlePrioritySnapshotReset);
+        messageBroker.Subscribe<NetworkBattlePrioritySlotAssigned>(Handle_NetworkBattlePrioritySlotAssigned);
+        messageBroker.Subscribe<NetworkBattlePrioritySlotCancelled>(Handle_NetworkBattlePrioritySlotCancelled);
+        messageBroker.Subscribe<NetworkBattlePrioritySlotConsumed>(Handle_NetworkBattlePrioritySlotConsumed);
+        messageBroker.Subscribe<NetworkBattlePrioritySlotSettled>(Handle_NetworkBattlePrioritySlotSettled);
+        messageBroker.Subscribe<NetworkBattlePriorityWaitQueued>(Handle_NetworkBattlePriorityWaitQueued);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
         messageBroker.Subscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
         messageBroker.Subscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
@@ -60,6 +67,12 @@ internal class BattleJoinLeaveHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySnapshotReset>(Handle_NetworkBattlePrioritySnapshotReset);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySlotAssigned>(Handle_NetworkBattlePrioritySlotAssigned);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySlotCancelled>(Handle_NetworkBattlePrioritySlotCancelled);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySlotConsumed>(Handle_NetworkBattlePrioritySlotConsumed);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySlotSettled>(Handle_NetworkBattlePrioritySlotSettled);
+        messageBroker.Unsubscribe<NetworkBattlePriorityWaitQueued>(Handle_NetworkBattlePriorityWaitQueued);
         messageBroker.Unsubscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
         messageBroker.Unsubscribe<NetworkRequestJoinBattle>(Handle_NetworkRequestJoinBattle);
         messageBroker.Unsubscribe<PlayerLeaveBattleAttempted>(Handle_PlayerLeaveBattleAttempted);
@@ -70,6 +83,19 @@ internal class BattleJoinLeaveHandler : IHandler
     private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
     {
         var message = payload.What;
+
+        // This can arrive before mission entry. Record the wait synchronously so a later BeginBattle sees it
+        // even though the campaign apply below is deferred to the game thread.
+        var waitsForPrioritySpawn = message.WaitsForPrioritySpawn;
+        if (waitsForPrioritySpawn != null)
+        {
+            int count = Math.Min(message.MapEventPartyIds.Length, waitsForPrioritySpawn.Length);
+            for (int i = 0; i < count; i++)
+            {
+                if (waitsForPrioritySpawn[i])
+                    BattleSpawnGate.QueuePrioritySpawn(message.MapEventId, message.MapEventPartyIds[i]);
+            }
+        }
 
         GameThread.RunSafe(() =>
         {
@@ -110,6 +136,71 @@ internal class BattleJoinLeaveHandler : IHandler
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
         });
+    }
+
+    private static void Handle_NetworkBattlePrioritySnapshotReset(
+        MessagePayload<NetworkBattlePrioritySnapshotReset> payload)
+    {
+        BattleSpawnGate.ResetPrioritySpawnSnapshot(payload.What.MapEventId);
+    }
+
+    private static void Handle_NetworkBattlePrioritySlotAssigned(
+        MessagePayload<NetworkBattlePrioritySlotAssigned> payload)
+    {
+        var message = payload.What;
+        BattleSpawnGate.RecordPrioritySpawnAssignment(
+            message.MapEventId,
+            message.TransferId,
+            message.WaitingPartyId,
+            message.DonorPartyId);
+    }
+
+    private static void Handle_NetworkBattlePrioritySlotCancelled(
+        MessagePayload<NetworkBattlePrioritySlotCancelled> payload)
+    {
+        var message = payload.What;
+        if (message.TransferId > 0)
+            BattleSpawnGate.CancelPrioritySpawnAssignment(message.MapEventId, message.TransferId);
+        else
+            BattleSpawnGate.CancelUnassignedPrioritySpawn(message.MapEventId, message.WaitingPartyId);
+    }
+
+    private static void Handle_NetworkBattlePrioritySlotConsumed(
+        MessagePayload<NetworkBattlePrioritySlotConsumed> payload)
+    {
+        var message = payload.What;
+        BattleSpawnGate.MarkPrioritySpawnConsumed(
+            message.MapEventId,
+            message.TransferId,
+            message.WaitingPartyId);
+    }
+
+    private static void Handle_NetworkBattlePrioritySlotSettled(
+        MessagePayload<NetworkBattlePrioritySlotSettled> payload)
+    {
+        var message = payload.What;
+        BattleSpawnGate.SettlePrioritySpawn(
+            message.MapEventId,
+            message.TransferId,
+            message.WaitingPartyId);
+    }
+
+    private static void Handle_NetworkBattlePriorityWaitQueued(
+        MessagePayload<NetworkBattlePriorityWaitQueued> payload)
+    {
+        var message = payload.What;
+        if (message.ResetExistingState)
+        {
+            BattleSpawnGate.ResetAndQueuePrioritySpawn(
+                message.MapEventId,
+                message.WaitingPartyId);
+        }
+        else
+        {
+            BattleSpawnGate.QueuePrioritySpawn(
+                message.MapEventId,
+                message.WaitingPartyId);
+        }
     }
 
     /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
@@ -201,11 +292,32 @@ internal class BattleJoinLeaveHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
+                PublishBattlePartyLeaving(party);
                 ApplyAuthoritativeLeave(party);
                 network.SendAll(new NetworkPartyLeftBattle(partyId));
             },
             blocking: true,
             context: nameof(RemovePartyFromBattleAndBroadcast));
+    }
+
+    private void PublishBattlePartyLeaving(PartyBase party)
+    {
+        var side = party?.MapEventSide;
+        var mapEvent = side?.MapEvent;
+        if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId))
+            return;
+
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty.Party != party
+                || !objectManager.TryGetId(mapEventParty, out var mapEventPartyId))
+            {
+                continue;
+            }
+
+            messageBroker.Publish(this, new BattlePartyLeaving(mapEventId, mapEventPartyId));
+            return;
+        }
     }
 
     /// <summary>[Client] Apply a joiner's removal from its map event side.</summary>
@@ -219,9 +331,32 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (Campaign.Current == null) return;
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
+                ClearConsumedPrioritySpawn(party);
                 ApplyNetworkLeave(party);
             },
             context: nameof(Handle_NetworkPartyLeftBattle));
+    }
+
+    private void ClearConsumedPrioritySpawn(PartyBase party)
+    {
+        var side = party?.MapEventSide;
+        if (side?.MapEvent == null
+            || !objectManager.TryGetId(side.MapEvent, out var mapEventId))
+        {
+            return;
+        }
+
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty?.Party != party
+                || !objectManager.TryGetId(mapEventParty, out var mapEventPartyId))
+            {
+                continue;
+            }
+
+            BattleSpawnGate.ClearConsumedPrioritySpawn(mapEventId, mapEventPartyId);
+            return;
+        }
     }
 
     // Authoritative campaign logic runs with patches live so removal, finalization, and replication stay ordered.

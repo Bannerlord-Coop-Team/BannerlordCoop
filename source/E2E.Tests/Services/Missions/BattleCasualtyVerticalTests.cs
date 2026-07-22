@@ -1,7 +1,10 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using E2E.Tests.Environment;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using Missions.Messages;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Roster;
@@ -48,10 +51,63 @@ public class BattleCasualtyVerticalTests : MissionTestEnvironment
             broker.Subscribe<OnTroopKilledAttempted>(_ => applied++);
 
             // An owner reports one of them as a (non-wounded) casualty, addressed by the character's object id.
-            broker.Publish(this, new NetworkRequestBattleCasualty(partyId, troopId, wounded: false));
+            broker.Publish(this, new NetworkRequestBattleCasualty(partyId, troopId, wounded: false, troopSeed: 0));
 
             Assert.True(applied > 0, "BattleCasualtyHandler did not apply the casualty on the server");
             Assert.Equal(1, CountLive(party.Troops, troop)); // one killed in the authoritative roster
+        });
+    }
+
+    [Fact]
+    public void ReportedBattleCasualty_PrefersTheExactSeedForIdenticalTroops()
+    {
+        var (mapEventId, _) = SetupCoopBattle("attacker", "defender");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            var party = mapEvent.DefenderSide.Parties[0];
+            Assert.True(Server.ObjectManager.TryGetId(party, out var partyId));
+            var troop = Server.CreateRegisteredObject<CharacterObject>("e2e_exact_troop");
+            Assert.True(Server.ObjectManager.TryGetId(troop, out var troopId));
+
+            party.Party.MemberRoster.AddToCounts(troop, 2);
+            party.Update();
+            var seeds = new List<int>();
+            foreach (var element in party.Troops)
+                if (element.Troop == troop)
+                    seeds.Add(element.Descriptor.UniqueSeed);
+            Assert.Equal(2, seeds.Count);
+
+            var ledgerEntries = new TroopReserveEntry[seeds.Count];
+            for (int i = 0; i < seeds.Count; i++)
+                ledgerEntries[i] = new TroopReserveEntry(seeds[i], troopId, formationClass: 0);
+            var ledger = Server.Resolve<IBattleTroopLedger>();
+            ledger.SetReserve(mapEventId, partyId, ledgerEntries);
+
+            BattleHumanSlotFreed? freedSlot = null;
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Subscribe<BattleHumanSlotFreed>(payload => freedSlot = payload.What);
+            broker.Publish(this, new NetworkRequestBattleCasualty(
+                partyId,
+                troopId,
+                wounded: false,
+                troopSeed: seeds[1]));
+
+            bool firstKilled = false;
+            bool secondKilled = false;
+            foreach (var element in party.Troops)
+            {
+                if (element.Descriptor.UniqueSeed == seeds[0]) firstKilled = element.IsKilled;
+                if (element.Descriptor.UniqueSeed == seeds[1]) secondKilled = element.IsKilled;
+            }
+            Assert.False(firstKilled);
+            Assert.True(secondKilled);
+            Assert.Equal(new[] { seeds[1] }, ledger.GetDepartedSeeds(mapEventId, partyId));
+            Assert.True(freedSlot.HasValue);
+            Assert.Equal(mapEventId, freedSlot.Value.MapEventId);
+            Assert.Equal(partyId, freedSlot.Value.PartyId);
+            Assert.Equal(seeds[1], freedSlot.Value.TroopSeed);
         });
     }
 

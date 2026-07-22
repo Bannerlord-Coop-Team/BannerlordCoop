@@ -1,4 +1,4 @@
-using Missions.Battles;
+﻿using Missions.Battles;
 using System;
 using Xunit;
 
@@ -55,5 +55,18 @@ public class CasualtyAttributionMapTests
 
         // Forgetting an unknown/already-forgotten agent is a no-op, not a throw (death + despawn can both forget).
         map.Forget(agentId);
+    }
+
+    [Fact]
+    public void MarkDeparted_RemembersTheReserveSeedAfterRemovingAgentAttribution()
+    {
+        var agentId = Guid.NewGuid();
+        map.Record(agentId, "party1", 1949, "char1");
+
+        map.MarkDeparted(agentId);
+
+        Assert.Null(map.GetOrDefault(agentId).MapEventPartyId);
+        Assert.True(map.WasDeparted(1949));
+        Assert.False(map.WasDeparted(1950));
     }
 }

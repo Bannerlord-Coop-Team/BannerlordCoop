@@ -14,6 +14,8 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -47,6 +49,7 @@ internal class BattleHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerRegistry;
     private readonly ITimeControlInterface timeControlInterface;
+    private readonly IBattleTroopReserveBuilder battleTroopReserveBuilder;
 
     // Server-side: number of players in a map event at the last broadcast, used to
     // detect when fast-forward becomes (un)available and to keep clients informed.
@@ -58,7 +61,8 @@ internal class BattleHandler : IHandler
         INetwork network,
         IMapEventLogger mapEventLogger,
         IPlayerManager playerRegistry,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        IBattleTroopReserveBuilder battleTroopReserveBuilder)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -66,6 +70,7 @@ internal class BattleHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
+        this.battleTroopReserveBuilder = battleTroopReserveBuilder;
         messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
 
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
@@ -151,6 +156,9 @@ internal class BattleHandler : IHandler
 
         var partyIds = new List<string>();
         var partyPositions = new List<CampaignVec2>();
+        var initialSpawnCounts = new List<int>();
+        var postPlanAdditions = new List<bool>();
+        var waitsForPrioritySpawn = new List<bool>();
 
         foreach (var addedParty in message.AddedParties)
         {
@@ -158,6 +166,13 @@ internal class BattleHandler : IHandler
                 continue;
 
             partyIds.Add(mapEventPartyId);
+            initialSpawnCounts.Add(battleTroopReserveBuilder.GrantUnassignedInitialSpawns(
+                message.MapEvent,
+                addedParty,
+                out var isPostPlanAddition,
+                out var waitsForPrioritySlot));
+            postPlanAdditions.Add(isPostPlanAddition);
+            waitsForPrioritySpawn.Add(waitsForPrioritySlot);
             // Capture the party's authoritative map position, in lockstep with the id and
             // before the roster check below so the two arrays stay index-aligned. Settlement
             // parties have no MobileParty; their slot is a default the client never applies.
@@ -177,8 +192,14 @@ internal class BattleHandler : IHandler
         network.SendAll(new NetworkAddInvolvedParties(
             mapEventSideId,
             partyIds.ToArray(),
-            partyPositions.ToArray()
+            partyPositions.ToArray(),
+            initialSpawnCounts.ToArray(),
+            postPlanAdditions.ToArray(),
+            waitsForPrioritySpawn.ToArray()
         ));
+
+        if (postPlanAdditions.Any(isAddition => isAddition))
+            messageBroker.Publish(this, new BattleReserveScopeChanged(mapEventSideId));
 
         // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
         // blocks them now. Server-driven because the client-side MapEventInvolvedPartiesAdded never fires for a

@@ -20,6 +20,18 @@ Current persisted shape:
 }
 ```
 
+The dedicated server stores its authoritative battle size in the same file:
+
+```json
+{
+  "ServerOptionsTab": {
+    "BattleSizeSection": {
+      "battleSize": 1000
+    }
+  }
+}
+```
+
 For external reads, use provider helpers instead of hard-coding ids. For example, `KillFeedOptionsTabProvider.TryGetKillFeedColor(options, out var color)` reads from the provider-owned tab and section path.
 
 ## UI XML

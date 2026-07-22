@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
 
@@ -39,16 +39,24 @@ public class NetworkBattleSupplyProgress : IEvent
     /// FINAL local pointers for the parties that REPLACE dropped, captured atomically with the replace, so
     /// the server can land them in the ledger and only then serve the returning owner. Distinguished from
     /// the periodic throttled reports so the server can count acks against a pending return; the pointer
-    /// application itself stays idempotent either way (the ledger is monotonic + clamped). Additive and
-    /// default-false, so legacy senders keep plain periodic-report semantics.
+    /// application itself stays idempotent either way (the ledger is monotonic + clamped).
     /// </summary>
     [ProtoMember(3)]
     public readonly bool IsFlush;
 
-    public NetworkBattleSupplyProgress(string mapEventId, SupplyProgressEntry[] entries, bool isFlush = false)
+    /// <summary>The flagged reserve grant this flush acknowledges. Periodic reports leave this at zero.</summary>
+    [ProtoMember(4)]
+    public readonly long GrantGeneration;
+
+    public NetworkBattleSupplyProgress(
+        string mapEventId,
+        SupplyProgressEntry[] entries,
+        bool isFlush = false,
+        long grantGeneration = 0)
     {
         MapEventId = mapEventId;
         Entries = entries;
         IsFlush = isFlush;
+        GrantGeneration = grantGeneration;
     }
 }

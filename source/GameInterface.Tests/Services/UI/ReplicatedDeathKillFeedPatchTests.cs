@@ -20,7 +20,7 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
     [Fact]
     public void Prefix_RestoresAffectorAndKillingBlow_OnlyInsideMatchingDeathScope()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        BattleSpawnGate.BeginBattle("battle-1", 1000);
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
         var otherAgent = ObjectHelper.SkipConstructor<Agent>();
         var affectorAgent = ObjectHelper.SkipConstructor<Agent>();
@@ -56,7 +56,7 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
     [Fact]
     public void RemoveRoutedPlayerHitNotification_RemovesOnlyMatchingVictimNotification()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        BattleSpawnGate.BeginBattle("battle-1", 1000);
         var firstAgent = ObjectHelper.SkipConstructor<Agent>();
         var secondAgent = ObjectHelper.SkipConstructor<Agent>();
         bool firstRemoved = false;
@@ -74,7 +74,7 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
     [Fact]
     public void TrackRoutedPlayerHitNotification_RemovesNotification_WhenDeathArrivesFirst()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        BattleSpawnGate.BeginBattle("battle-1", 1000);
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
         bool notificationRemoved = false;
 
@@ -88,7 +88,7 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
     [Fact]
     public void CombatLogContext_PreservesUntrackedEntryBeforeRoutedHit()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        BattleSpawnGate.BeginBattle("battle-1", 1000);
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
 
         BattleSpawnGate.EnqueueCombatLogContext(null!, 50);

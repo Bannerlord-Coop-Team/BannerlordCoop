@@ -59,6 +59,7 @@ internal class BattleHostHandler : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleTroopLedger ledger;
+    private long nextReserveGrantGeneration;
 
     // [Server] Highest host epoch ever issued per battle instance (BR-102), retained across assignment
     // removal: clients keep their last assignment when a battle is fully abandoned (only the server's entry
@@ -82,6 +83,18 @@ internal class BattleHostHandler : IHandler
     // current assignment at use, so a stale entry (an old host that migrated away) is never used. Game thread only.
     private readonly Dictionary<string, HostEndpoint> hostPeers = new Dictionary<string, HostEndpoint>();
 
+    // [Server] Every controller that requested reserves for a battle and its latest peer. A post-plan party can
+    // belong to the host, a direct player, or a player army leader, so all active authorities need a refreshed
+    // scope after the builder allocates it. Game thread only.
+    private readonly Dictionary<string, Dictionary<string, NetPeer>> reservePeers =
+        new Dictionary<string, Dictionary<string, NetPeer>>();
+
+    // [Server] Exact departed human identities already considered for a priority transfer. A death and a
+    // repeated rout report can name the same seed, but one human departure may transfer at most one slot.
+    // Game thread only; cleared with the battle instance.
+    private readonly Dictionary<string, Dictionary<string, HashSet<int>>> prioritySlotDepartures =
+        new Dictionary<string, Dictionary<string, HashSet<int>>>();
+
     private sealed class HostEndpoint
     {
         public string ControllerId;
@@ -90,8 +103,8 @@ internal class BattleHostHandler : IHandler
 
     /// <summary>
     /// [Server] How long a deferred return grant waits for the host's flush ack (BR-033 handshake) before
-    /// the returner is served from the current ledger anyway — the returner must NEVER be stranded on a
-    /// lost ack or a legacy host that ignores <c>FlushRequested</c>. Checked on the campaign tick.
+    /// the returner is served from the current ledger anyway — the returner must never be stranded when
+    /// the holder stops before completing the flush. Checked on the campaign tick.
     /// Internal-settable so tests can drive the deadline without wall-clock waits.
     /// </summary>
     internal TimeSpan FlushAckDeadline { get; set; } = TimeSpan.FromSeconds(2.5);
@@ -99,8 +112,7 @@ internal class BattleHostHandler : IHandler
     // [Server] Per battle: return grants DEFERRED behind the shrunk host's flush acks (BR-033 handshake).
     // The ledger only holds the host's last THROTTLED progress report, so the returner must not be served
     // until the host flushed its true local pointers for the parties the shrink refresh dropped. One entry
-    // per outstanding returner, completed FIFO as the acks arrive (the refreshes travel one reliable-ordered
-    // stream and every flagged side message produces exactly one ack, so ack order matches refresh order),
+    // per outstanding returner, completed only by acks carrying that refresh's grant generation,
     // or by the fallbacks: the host's departure serves them, the tick deadline serves them, teardown drops
     // them. Game thread only (all mutation sites run under GameThread.RunSafe or on the campaign tick).
     private readonly Dictionary<string, List<PendingReturn>> pendingReturns = new Dictionary<string, List<PendingReturn>>();
@@ -113,6 +125,7 @@ internal class BattleHostHandler : IHandler
         public string HostControllerId;
         public bool IncludeEmptySides;
         public int AwaitedAcks;
+        public long GrantGeneration;
         public DateTime DeadlineUtc;
     }
 
@@ -140,8 +153,14 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<NetworkRequestBattleHost>(Handle_NetworkRequestBattleHost);
         messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Subscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
+        messageBroker.Subscribe<BattlePlayerDisconnected>(Handle_BattlePlayerDisconnected);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Subscribe<BattleReserveScopeChanged>(Handle_BattleReserveScopeChanged);
+        messageBroker.Subscribe<BattleHumanSlotFreed>(Handle_BattleHumanSlotFreed);
+        messageBroker.Subscribe<BattlePartyLeaving>(Handle_BattlePartyLeaving);
+        messageBroker.Subscribe<NetworkBattlePrioritySlotConsumed>(Handle_NetworkBattlePrioritySlotConsumed);
+        messageBroker.Subscribe<NetworkBattlePrioritySlotDeclined>(Handle_NetworkBattlePrioritySlotDeclined);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -152,8 +171,14 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestBattleHost>(Handle_NetworkRequestBattleHost);
         messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Unsubscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
+        messageBroker.Unsubscribe<BattlePlayerDisconnected>(Handle_BattlePlayerDisconnected);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Unsubscribe<BattleReserveScopeChanged>(Handle_BattleReserveScopeChanged);
+        messageBroker.Unsubscribe<BattleHumanSlotFreed>(Handle_BattleHumanSlotFreed);
+        messageBroker.Unsubscribe<BattlePartyLeaving>(Handle_BattlePartyLeaving);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySlotConsumed>(Handle_NetworkBattlePrioritySlotConsumed);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySlotDeclined>(Handle_NetworkBattlePrioritySlotDeclined);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -211,6 +236,8 @@ internal class BattleHostHandler : IHandler
                     mapEventId, requesterId);
                 return;
             }
+
+            RememberReservePeer(mapEventId, requesterId, requester);
 
             if (hostRegistry.TryGet(mapEventId, out var existing))
             {
@@ -279,6 +306,9 @@ internal class BattleHostHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
+            RememberReservePeer(mapEventId, requesterId, requester);
+            RequeuePriorityWaitIfNeeded(mapEventId, mapEvent, requesterId);
+
             // A request from a member that had DROPPED is its re-entry (BR-033): take its parties back out
             // of the host's reserve scope BEFORE computing the reply — the returner's grant below must carry
             // its own parties again — and push the shrunk holder its refresh. The refresh asks the holder to
@@ -296,8 +326,61 @@ internal class BattleHostHandler : IHandler
             if (deferred || TryDeferToPendingReturn(mapEventId, requesterId, requester, includeEmptySides))
                 return;
 
-            SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides);
+            SendEntryReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides);
         });
+    }
+
+    // [Server, game thread] A disconnected zero-entitlement joiner stays in the campaign MapEvent, so a
+    // reconnect has no new involved-party add to queue it again. Its reserve request is the re-entry signal.
+    private void RequeuePriorityWaitIfNeeded(string mapEventId, MapEvent mapEvent, string controllerId)
+    {
+        if (!TryGetControllerMapEventParty(mapEvent, controllerId, out var mapEventParty))
+            return;
+
+        reserveBuilder.GrantUnassignedInitialSpawns(
+            mapEvent,
+            mapEventParty,
+            out _,
+            out var waitsForPrioritySlot);
+        if (!waitsForPrioritySlot || !objectManager.TryGetId(mapEventParty, out var partyId))
+            return;
+
+        // Broadcast before this requester's reserve reply. Both use the reliable-ordered campaign stream,
+        // so every established peer reinstates the cap gate before it sees the waiting scope.
+        network.SendAll(new NetworkBattlePriorityWaitQueued(
+            mapEventId,
+            partyId,
+            resetExistingState: true));
+        DrainRetainedPrioritySlots(mapEventId, mapEvent);
+        Logger.Information("[BattleHost] Requeued priority wait for {PartyId} in {MapEventId} from {Controller}'s reserve request",
+            partyId, mapEventId, controllerId);
+    }
+
+    private bool TryGetControllerMapEventParty(
+        MapEvent mapEvent,
+        string controllerId,
+        out MapEventParty mapEventParty)
+    {
+        mapEventParty = null;
+        if (!playerManager.TryGetPlayer(controllerId, out var player)
+            || !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var mobileParty))
+        {
+            return false;
+        }
+
+        foreach (var party in mapEvent.AttackerSide.Parties)
+        {
+            if (party.Party != mobileParty.Party) continue;
+            mapEventParty = party;
+            return true;
+        }
+        foreach (var party in mapEvent.DefenderSide.Parties)
+        {
+            if (party.Party != mobileParty.Party) continue;
+            mapEventParty = party;
+            return true;
+        }
+        return false;
     }
 
     /// <summary>[Server] Send the requester every reserve it owns, one message per side. With
@@ -308,7 +391,60 @@ internal class BattleHostHandler : IHandler
     {
         if (requester == null) return;
         SendSideReserves(requester, mapEventId,
-            BuildOwnedReserves(mapEventId, mapEvent, requesterId, includeEmptySides), flushRequested: false);
+            BuildOwnedReserves(mapEventId, mapEvent, requesterId, includeEmptySides),
+            flushRequested: false,
+            completesInitialSizing: includeEmptySides);
+    }
+
+    // [Server, game thread] An entrant missed earlier priority broadcasts. Replay the authoritative gate
+    // before its reserve packets, then repeat it after the reserve feed so transfer application can retry.
+    private void SendEntryReserves(
+        string mapEventId,
+        MapEvent mapEvent,
+        NetPeer requester,
+        string requesterId,
+        bool includeEmptySides)
+    {
+        if (requester == null) return;
+
+        var prioritySnapshot = reserveBuilder.GetPrioritySlotSnapshot(mapEvent);
+        network.Send(requester, new NetworkBattlePrioritySnapshotReset(mapEventId));
+        SendPrioritySlotSnapshot(requester, mapEventId, prioritySnapshot);
+        SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides);
+        SendPrioritySlotSnapshot(requester, mapEventId, prioritySnapshot);
+    }
+
+    private void SendPrioritySlotSnapshot(
+        NetPeer requester,
+        string mapEventId,
+        IReadOnlyList<BattlePrioritySlotState> prioritySnapshot)
+    {
+        if (requester == null || prioritySnapshot == null) return;
+
+        foreach (var state in prioritySnapshot)
+        {
+            if (state.TransferId <= 0)
+            {
+                network.Send(requester, new NetworkBattlePriorityWaitQueued(
+                    mapEventId,
+                    state.WaitingPartyId,
+                    resetExistingState: false));
+                continue;
+            }
+
+            network.Send(requester, new NetworkBattlePrioritySlotAssigned(
+                mapEventId,
+                state.TransferId,
+                state.WaitingPartyId,
+                state.DonorPartyId));
+            if (state.IsConsumed)
+            {
+                network.Send(requester, new NetworkBattlePrioritySlotConsumed(
+                    mapEventId,
+                    state.TransferId,
+                    state.WaitingPartyId));
+            }
+        }
     }
 
     // [Server, game thread] The per-side reserve messages a requester's grant/refresh consists of, at the
@@ -333,12 +469,26 @@ internal class BattleHostHandler : IHandler
         return sides;
     }
 
-    private void SendSideReserves(NetPeer receiver, string mapEventId, List<SideReserve> reserves, bool flushRequested)
+    private void SendSideReserves(
+        NetPeer receiver,
+        string mapEventId,
+        List<SideReserve> reserves,
+        bool flushRequested,
+        bool completesInitialSizing,
+        long grantGeneration = 0)
     {
-        if (receiver == null) return;
+        if (receiver == null || reserves == null || reserves.Count == 0) return;
+
+        if (grantGeneration == 0)
+            grantGeneration = ++nextReserveGrantGeneration;
         foreach (var sideReserve in reserves)
             network.Send(receiver, new NetworkBattleTroopReserve(
-                mapEventId, (int)sideReserve.Side, sideReserve.Parties, flushRequested));
+                mapEventId,
+                (int)sideReserve.Side,
+                sideReserve.Parties,
+                flushRequested,
+                grantGeneration,
+                completesInitialSizing));
     }
 
     /// <summary>[Server, game thread] Record the current host's live peer for this battle, from one of its
@@ -350,6 +500,352 @@ internal class BattleHostHandler : IHandler
             return;
 
         hostPeers[mapEventId] = new HostEndpoint { ControllerId = requesterId, Peer = requester };
+    }
+
+    private void RememberReservePeer(string mapEventId, string requesterId, NetPeer requester)
+    {
+        if (requester == null || string.IsNullOrEmpty(requesterId)) return;
+        if (!reservePeers.TryGetValue(mapEventId, out var peers))
+        {
+            peers = new Dictionary<string, NetPeer>();
+            reservePeers[mapEventId] = peers;
+        }
+        peers[requesterId] = requester;
+    }
+
+    /// <summary>[Server] The builder allocated a party after the frozen plan. Re-send each active authority's
+    /// complete scope after the add broadcast, so the reliable-ordered stream delivers identity before reserve.</summary>
+    private void Handle_BattleReserveScopeChanged(MessagePayload<BattleReserveScopeChanged> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var mapEventId = payload.What.MapEventId;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
+                return;
+
+            int transferred = DrainRetainedPrioritySlots(mapEventId, mapEvent);
+            int refreshed = 0;
+            if (transferred == 0)
+            {
+                refreshed = RefreshReserveAuthorities(mapEventId, mapEvent);
+                BroadcastPrioritySlotSnapshot(
+                    mapEventId,
+                    reserveBuilder.GetPrioritySlotSnapshot(mapEvent));
+            }
+
+            Logger.Information("[BattleHost] Refreshed {Count} reserve authority/authorities and transferred {Transfers} retained slot(s) after battle {MapEventId} gained a post-plan party",
+                refreshed, transferred, mapEventId);
+        });
+    }
+
+    private void BroadcastPrioritySlotSnapshot(
+        string mapEventId,
+        IReadOnlyList<BattlePrioritySlotState> prioritySnapshot)
+    {
+        if (prioritySnapshot == null) return;
+
+        foreach (var state in prioritySnapshot)
+        {
+            if (state.TransferId <= 0)
+            {
+                network.SendAll(new NetworkBattlePriorityWaitQueued(
+                    mapEventId,
+                    state.WaitingPartyId,
+                    resetExistingState: false));
+                continue;
+            }
+
+            network.SendAll(new NetworkBattlePrioritySlotAssigned(
+                mapEventId,
+                state.TransferId,
+                state.WaitingPartyId,
+                state.DonorPartyId));
+            if (state.IsConsumed)
+            {
+                network.SendAll(new NetworkBattlePrioritySlotConsumed(
+                    mapEventId,
+                    state.TransferId,
+                    state.WaitingPartyId));
+            }
+        }
+    }
+
+    /// <summary>[Server] The waiting player's custom spawn consumed its transfer. Completing it in the frozen
+    /// plan prevents a later ordinary disconnect from restoring a slot that is already on the field.</summary>
+    private void Handle_NetworkBattlePrioritySlotConsumed(
+        MessagePayload<NetworkBattlePrioritySlotConsumed> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
+                return;
+            if (!reserveBuilder.CompletePrioritySpawn(
+                    mapEvent,
+                    message.TransferId,
+                    message.WaitingPartyId))
+            {
+                return;
+            }
+
+            // Peers may not have received the P2P puppet yet. Mark the transfer consumed everywhere without
+            // clearing its cap gate; puppet registration or a later consumed-party departure completes it.
+            network.SendAll(new NetworkBattlePrioritySlotConsumed(
+                message.MapEventId,
+                message.TransferId,
+                message.WaitingPartyId));
+            Logger.Information("[BattleHost] Priority slot {TransferId} in {MapEventId} was consumed by {WaitingParty}",
+                message.TransferId, message.MapEventId, message.WaitingPartyId);
+        });
+    }
+
+    /// <summary>[Server] The waiting client cannot field its assigned hero. Validate the exact active transfer,
+    /// then move it to the next waiter or restore its donor.</summary>
+    private void Handle_NetworkBattlePrioritySlotDeclined(
+        MessagePayload<NetworkBattlePrioritySlotDeclined> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
+                return;
+            if (!reserveBuilder.TryDeclinePrioritySlot(
+                    mapEvent,
+                    message.TransferId,
+                    message.WaitingPartyId,
+                    out var transfer,
+                    out var released))
+            {
+                return;
+            }
+
+            PublishPrioritySlotCleanup(
+                message.MapEventId,
+                mapEvent,
+                transfer,
+                released,
+                "the waiting player declined it");
+        });
+    }
+
+    /// <summary>[Server] Transfer one departed human's frozen slot to the first waiting player. Every active
+    /// authority receives the changed reserve plan before the assignment marker, so each peer can stop the
+    /// donor's replacement and let the waiting player enter on the same reliable-ordered stream.</summary>
+    private void Handle_BattleHumanSlotFreed(MessagePayload<BattleHumanSlotFreed> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var mapEventId = payload.What.MapEventId;
+        var donorPartyId = payload.What.PartyId;
+        int troopSeed = payload.What.TroopSeed;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
+                return;
+            if (!TryRememberPrioritySlotDeparture(mapEventId, donorPartyId, troopSeed))
+                return;
+            if (!reserveBuilder.TryTransferInitialSpawnOnDeparture(
+                    mapEvent,
+                    donorPartyId,
+                    out var transfer,
+                    out var settledTransfer))
+                return;
+
+            PublishPrioritySlotTransfer(
+                mapEventId,
+                mapEvent,
+                transfer,
+                settledTransfer,
+                "a human slot became available");
+        });
+    }
+
+    private int DrainRetainedPrioritySlots(string mapEventId, MapEvent mapEvent)
+    {
+        int transferred = 0;
+        while (reserveBuilder.TryTransferRetainedInitialSpawn(
+                   mapEvent,
+                   out var transfer,
+                   out var settledTransfer))
+        {
+            PublishPrioritySlotTransfer(
+                mapEventId,
+                mapEvent,
+                transfer,
+                settledTransfer,
+                "a retained human slot was claimed");
+            transferred++;
+        }
+
+        return transferred;
+    }
+
+    private void PublishPrioritySlotTransfer(
+        string mapEventId,
+        MapEvent mapEvent,
+        BattleInitialSpawnTransfer transfer,
+        BattleInitialSpawnTransfer settledTransfer,
+        string reason)
+    {
+        if (settledTransfer.TransferId > 0)
+        {
+            network.SendAll(new NetworkBattlePrioritySlotSettled(
+                mapEventId,
+                settledTransfer.TransferId,
+                settledTransfer.WaitingPartyId));
+        }
+        if (transfer.TransferId <= 0)
+        {
+            Logger.Information("[BattleHost] Settled priority slot {TransferId} in {MapEventId} after {WaitingParty}'s human departed; its native replacement retains the slot",
+                settledTransfer.TransferId,
+                mapEventId,
+                settledTransfer.WaitingPartyId);
+            return;
+        }
+
+        int refreshed = RefreshReserveAuthorities(mapEventId, mapEvent);
+        network.SendAll(new NetworkBattlePrioritySlotAssigned(
+            mapEventId,
+            transfer.TransferId,
+            transfer.WaitingPartyId,
+            transfer.DonorPartyId));
+
+        Logger.Information("[BattleHost] Assigned priority slot {TransferId} in {MapEventId}: {DonorParty} -> {WaitingParty} because {Reason}; refreshed {Count} reserve authority/authorities first",
+            transfer.TransferId,
+            mapEventId,
+            transfer.DonorPartyId,
+            transfer.WaitingPartyId,
+            reason,
+            refreshed);
+    }
+
+    private bool TryRememberPrioritySlotDeparture(string mapEventId, string partyId, int troopSeed)
+    {
+        if (!prioritySlotDepartures.TryGetValue(mapEventId, out var parties))
+        {
+            parties = new Dictionary<string, HashSet<int>>();
+            prioritySlotDepartures[mapEventId] = parties;
+        }
+        if (!parties.TryGetValue(partyId, out var seeds))
+        {
+            seeds = new HashSet<int>();
+            parties[partyId] = seeds;
+        }
+        return seeds.Add(troopSeed);
+    }
+
+    /// <summary>[Server] A connected campaign party is leaving before mission membership necessarily reports
+    /// it. Release any unconsumed wait while its MapEventParty is still addressable.</summary>
+    private void Handle_BattlePartyLeaving(MessagePayload<BattlePartyLeaving> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            ClearPrioritySlotDepartures(message.MapEventId, message.MapEventPartyId);
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
+                return;
+
+            bool isDirectPlayerParty = IsDirectPlayerMapEventParty(
+                mapEvent,
+                message.MapEventPartyId);
+            if (reserveBuilder.TryReassignOrReleasePrioritySlot(
+                    mapEvent,
+                    message.MapEventPartyId,
+                    out var transfer,
+                    out var released))
+            {
+                PublishPrioritySlotCleanup(
+                    message.MapEventId,
+                    mapEvent,
+                    transfer,
+                    released,
+                    "the waiting party left the campaign battle");
+            }
+
+            if (!isDirectPlayerParty)
+                return;
+
+            int retained = reserveBuilder.RetainInitialSpawnVacancies(
+                mapEvent,
+                message.MapEventPartyId);
+            int transferred = DrainRetainedPrioritySlots(message.MapEventId, mapEvent);
+            Logger.Information("[BattleHost] Retained {Retained} initial slot(s) and transferred {Transferred} after player party {PartyId} left battle {MapEventId}",
+                retained, transferred, message.MapEventPartyId, message.MapEventId);
+        });
+    }
+
+    private bool IsDirectPlayerMapEventParty(MapEvent mapEvent, string mapEventPartyId)
+    {
+        foreach (var party in mapEvent.AttackerSide.Parties)
+        {
+            if (objectManager.TryGetId(party, out var partyId)
+                && partyId == mapEventPartyId)
+            {
+                return playerManager.Contains(party.Party?.MobileParty);
+            }
+        }
+        foreach (var party in mapEvent.DefenderSide.Parties)
+        {
+            if (objectManager.TryGetId(party, out var partyId)
+                && partyId == mapEventPartyId)
+            {
+                return playerManager.Contains(party.Party?.MobileParty);
+            }
+        }
+
+        return false;
+    }
+
+    // [Server, game thread] Push the current complete reserve scope to each connected participant known to
+    // this battle. A loading client still receives only its nonempty side until its mission-ready role is final.
+    private int RefreshReserveAuthorities(string mapEventId, MapEvent mapEvent)
+    {
+        if (!reservePeers.TryGetValue(mapEventId, out var peers))
+            return 0;
+
+        int refreshed = 0;
+        foreach (var endpoint in new List<KeyValuePair<string, NetPeer>>(peers))
+        {
+            if (endpoint.Value == null || endpoint.Value.ConnectionState != ConnectionState.Connected)
+                continue;
+            if (!IsRequesterInBattle(mapEvent, endpoint.Key) || HasPendingReturn(mapEventId, endpoint.Key))
+                continue;
+
+            // Explicit empty sides finalize sizing only after this authority has a role in the host generation.
+            bool includeEmptySides = IsMissionReadyAuthority(mapEventId, endpoint.Key);
+            SendOwnedReserves(mapEventId, mapEvent, endpoint.Value, endpoint.Key, includeEmptySides);
+            refreshed++;
+        }
+        return refreshed;
+    }
+
+    private bool IsMissionReadyAuthority(string mapEventId, string controllerId)
+    {
+        if (!hostRegistry.TryGet(mapEventId, out var assignment))
+            return false;
+        if (assignment.HostControllerId == controllerId)
+            return true;
+        foreach (var successorId in assignment.SuccessorControllerIds)
+            if (successorId == controllerId)
+                return true;
+        return false;
+    }
+
+    private bool HasPendingReturn(string mapEventId, string controllerId)
+    {
+        if (!pendingReturns.TryGetValue(mapEventId, out var pendings)) return false;
+        foreach (var pending in pendings)
+            if (pending.ReturnerControllerId == controllerId)
+                return true;
+        return false;
     }
 
     /// <summary>
@@ -404,14 +900,20 @@ internal class BattleHostHandler : IHandler
         var refresh = BuildOwnedReserves(mapEventId, mapEvent, host.ControllerId, includeEmptySides: true);
         if (refresh.Count == 0 || requesterPeer == null)
         {
-            // Nothing to flush, or no peer to defer a grant for: refresh unflagged (legacy semantics) and
-            // let the caller serve immediately from the ledger.
-            SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: false);
+            // Nothing to flush, or no peer to defer a grant for: refresh without a handshake and let the
+            // caller serve immediately from the ledger.
+            SendSideReserves(
+                host.Peer,
+                mapEventId,
+                refresh,
+                flushRequested: false,
+                completesInitialSizing: true);
             Logger.Information("[BattleHost] Refreshed host {Host}'s reserve scope for {MapEventId} after {Controller} returned",
                 host.ControllerId, mapEventId, requesterId);
             return false;
         }
 
+        long grantGeneration = ++nextReserveGrantGeneration;
         var pending = new PendingReturn
         {
             MapEventId = mapEventId,
@@ -420,6 +922,7 @@ internal class BattleHostHandler : IHandler
             HostControllerId = host.ControllerId,
             IncludeEmptySides = includeEmptySides,
             AwaitedAcks = refresh.Count,
+            GrantGeneration = grantGeneration,
             DeadlineUtc = DateTime.UtcNow + FlushAckDeadline,
         };
         if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
@@ -429,7 +932,13 @@ internal class BattleHostHandler : IHandler
         }
         pendings.Add(pending);
 
-        SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: true);
+        SendSideReserves(
+            host.Peer,
+            mapEventId,
+            refresh,
+            flushRequested: true,
+            completesInitialSizing: true,
+            grantGeneration: grantGeneration);
         Logger.Information("[BattleHost] Refreshed host {Host}'s reserve scope for {MapEventId} after {Controller} returned; the return grant awaits {Acks} flush ack(s)",
             host.ControllerId, mapEventId, requesterId, refresh.Count);
         return true;
@@ -462,16 +971,15 @@ internal class BattleHostHandler : IHandler
     }
 
     /// <summary>[Server] A FLUSH ACK from the shrunk holder (BR-033 handshake): land the flushed pointers in
-    /// the LEDGER first, then complete the battle's oldest pending return once all of its refresh messages
+    /// the LEDGER first, then complete the matching pending return once all of its refresh messages
     /// are acked — the returner's grant is then computed at the caught-up pointers. The pointers are applied
     /// to the injected ledger directly rather than relying on <c>BattleSupplyProgressHandler</c> having run
     /// first: broker delivery order between two subscribers is registration-order dependent with no
     /// contract, while the direct apply makes ack-before-grant self-contained — and the double application
-    /// is harmless because <c>ReportSupplied</c> is monotonic and clamped. Acks complete pendings FIFO per
-    /// battle: the refreshes travel the host's one reliable-ordered stream and every flagged side message
-    /// produces exactly one ack, so ack arrival order matches refresh order. A stale or duplicate ack (its
-    /// pending already completed by a fallback, or none ever existed) still lands its pointers and changes
-    /// nothing else. Periodic (non-flush) reports stay <c>BattleSupplyProgressHandler</c>'s job.</summary>
+    /// is harmless because <c>ReportSupplied</c> is monotonic and clamped. The echoed grant generation keeps
+    /// a delayed ack from a fallback-completed return from completing a newer return. A stale or duplicate ack
+    /// still lands its pointers and changes nothing else. Periodic (non-flush) reports stay
+    /// <c>BattleSupplyProgressHandler</c>'s job.</summary>
     private void Handle_NetworkBattleSupplyProgress(MessagePayload<NetworkBattleSupplyProgress> payload)
     {
         if (ModInformation.IsClient) return;
@@ -489,11 +997,20 @@ internal class BattleHostHandler : IHandler
             if (!pendingReturns.TryGetValue(message.MapEventId, out var pendings) || pendings.Count == 0)
                 return;
 
-            var pending = pendings[0];
+            PendingReturn pending = null;
+            foreach (var candidate in pendings)
+            {
+                if (candidate.GrantGeneration != message.GrantGeneration) continue;
+                pending = candidate;
+                break;
+            }
+            if (pending == null)
+                return;
+
             if (--pending.AwaitedAcks > 0)
                 return;
 
-            pendings.RemoveAt(0);
+            pendings.Remove(pending);
             if (pendings.Count == 0)
                 pendingReturns.Remove(message.MapEventId);
 
@@ -502,8 +1019,8 @@ internal class BattleHostHandler : IHandler
     }
 
     /// <summary>[Server, game thread — published by the Campaign.Tick postfix] Deadline sweep for pending
-    /// returns: a flush ack that never arrives (a legacy host without the handshake, a lost message) must
-    /// not strand the returner — past <see cref="FlushAckDeadline"/> it is served from the current ledger
+    /// returns: an interrupted flush must not strand the returner — past <see cref="FlushAckDeadline"/> it
+    /// is served from the current ledger
     /// with a warning, accepting the pre-handshake race for that one grant. Tick-driven on purpose: no
     /// background timers into the broker/network.</summary>
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
@@ -546,7 +1063,7 @@ internal class BattleHostHandler : IHandler
             return;
         }
 
-        SendOwnedReserves(pending.MapEventId, mapEvent, pending.ReturnerPeer, pending.ReturnerControllerId, pending.IncludeEmptySides);
+        SendEntryReserves(pending.MapEventId, mapEvent, pending.ReturnerPeer, pending.ReturnerControllerId, pending.IncludeEmptySides);
         Logger.Information("[BattleHost] Served {Controller}'s deferred return grant for {MapEventId} ({Reason})",
             pending.ReturnerControllerId, pending.MapEventId, reason);
     }
@@ -610,6 +1127,27 @@ internal class BattleHostHandler : IHandler
         // Mutates the shared assignment, so run on the main thread (serializes with election).
         GameThread.RunSafe(() =>
         {
+            if (reservePeers.TryGetValue(mapEventId, out var peers))
+            {
+                peers.Remove(controllerId);
+                if (peers.Count == 0)
+                    reservePeers.Remove(mapEventId);
+            }
+
+            MapEvent liveMapEvent = null;
+            string withdrawingPartyId = null;
+            if (!payload.What.IsInstanceEmpty
+                && objectManager.TryGetObject<MapEvent>(mapEventId, out liveMapEvent))
+            {
+                if (payload.What.WasRetreat
+                    && TryGetControllerMapEventParty(liveMapEvent, controllerId, out var withdrawingParty))
+                {
+                    objectManager.TryGetId(withdrawingParty, out withdrawingPartyId);
+                }
+
+                HandleDepartedPriorityPlayer(mapEventId, liveMapEvent, controllerId);
+            }
+
             // BR-017: no players remain in the mission instance — destroy the battle instance record
             // outright, regardless of whether the departed controller was the recorded host. Keying on the
             // server-observed empty instance (not on who left last) also covers a successor emptying the
@@ -649,8 +1187,19 @@ internal class BattleHostHandler : IHandler
             // party.
             if (payload.What.WasRetreat)
             {
-                if (objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent))
-                    reserveBuilder.ForgetController(mapEvent, controllerId);
+                if (liveMapEvent != null)
+                {
+                    ClearPrioritySlotDeparturesForController(mapEventId, liveMapEvent, controllerId);
+                    int retained = withdrawingPartyId == null
+                        ? 0
+                        : reserveBuilder.RetainInitialSpawnVacancies(
+                            liveMapEvent,
+                            withdrawingPartyId);
+                    int transferred = DrainRetainedPrioritySlots(mapEventId, liveMapEvent);
+                    reserveBuilder.ForgetController(liveMapEvent, controllerId);
+                    Logger.Information("[BattleHost] Retained {Retained} initial slot(s) and transferred {Transferred} after {Controller} withdrew from {MapEventId}",
+                        retained, transferred, controllerId, mapEventId);
+                }
             }
             else
             {
@@ -673,11 +1222,10 @@ internal class BattleHostHandler : IHandler
                     // The recorded host left and no mission-ready successor exists — but the instance is NOT
                     // empty here (the empty branch above already returned), so a participant is still LOADING
                     // and will become the eventual host. Remove the now-hostless assignment and the departed
-                    // host's stale peer, and re-flatten the reserves (ForgetMapEvent) exactly as the empty
-                    // branch does: with no surviving ready client, none of the departed host's on-field troops
-                    // persist anywhere, so the eventual host must re-spawn the whole (casualty-reduced) roster
-                    // from a reset pointer — retaining the advanced pointer would under-spawn the troops that
-                    // vanished with the host. But do NOT clear the scope bookkeeping (no ClearBattleRecords):
+                    // host's stale peer, and re-flatten the reserves: with no surviving ready client, none of
+                    // the departed host's on-field troops persist anywhere, so the eventual host must re-spawn
+                    // the whole (casualty-reduced) roster from a reset pointer. Preserve the frozen spawn plan
+                    // because this mission instance is still live, and do NOT clear the scope bookkeeping:
                     // the departed host stays ABSENT so its party falls to the eventual host's reserve scope.
                     // Clearing it here (as the abandonment teardown does) let the party resolve back to the
                     // still-registered departed host, so the eventual host never received it. The full teardown
@@ -687,8 +1235,8 @@ internal class BattleHostHandler : IHandler
                     hostRegistry.Remove(mapEventId);
                     hostPeers.Remove(mapEventId); // the departed host's recorded peer is stale
 
-                    if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
-                        reserveBuilder.ForgetMapEvent(abandonedEvent);
+                    if (objectManager.TryGetObject<MapEvent>(mapEventId, out var liveEvent))
+                        reserveBuilder.RebuildMapEventReserves(liveEvent);
 
                     // A returner whose grant was pending on the departed host's flush ack must still be
                     // served (it is one of the still-loading participants). AFTER the re-flatten above, so
@@ -730,6 +1278,128 @@ internal class BattleHostHandler : IHandler
                 network.SendAll(ToMessage(mapEventId, updated));
             }
         });
+    }
+
+    /// <summary>[Server] A loading player can disconnect before mission membership exists, so no
+    /// <see cref="MissionMemberDeparted"/> is raised. The campaign disconnect path retains its controller id
+    /// long enough to cancel or reassign a priority wait even before its first reserve request.</summary>
+    private void Handle_BattlePlayerDisconnected(MessagePayload<BattlePlayerDisconnected> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            RemoveReservePeer(message.MapEventId, message.ControllerId);
+            if (!objectManager.TryGetObject<MapEvent>(message.MapEventId, out var mapEvent))
+                return;
+
+            ClearPrioritySlotDeparturesForController(
+                message.MapEventId,
+                mapEvent,
+                message.ControllerId);
+            HandleDepartedPriorityPlayer(message.MapEventId, mapEvent, message.ControllerId);
+
+            if (!TryGetControllerMapEventParty(
+                    mapEvent,
+                    message.ControllerId,
+                    out var disconnectedParty)
+                || !objectManager.TryGetId(disconnectedParty, out var disconnectedPartyId))
+            {
+                return;
+            }
+
+            int retained = reserveBuilder.RetainInitialSpawnVacancies(
+                mapEvent,
+                disconnectedPartyId);
+            int transferred = DrainRetainedPrioritySlots(message.MapEventId, mapEvent);
+            Logger.Information("[BattleHost] Retained {Retained} initial slot(s) and transferred {Transferred} after loading controller {Controller} disconnected from {MapEventId}",
+                retained, transferred, message.ControllerId, message.MapEventId);
+        });
+    }
+
+    private void RemoveReservePeer(string mapEventId, string controllerId)
+    {
+        if (!reservePeers.TryGetValue(mapEventId, out var peers))
+            return;
+
+        peers.Remove(controllerId);
+        if (peers.Count == 0)
+            reservePeers.Remove(mapEventId);
+    }
+
+    // [Server, game thread] An assigned player departed before acknowledging its spawn. Reassign the same
+    // transfer id when another player is waiting, otherwise restore the original donor and cancel the gate.
+    private void HandleDepartedPriorityPlayer(string mapEventId, MapEvent mapEvent, string controllerId)
+    {
+        if (!reserveBuilder.TryReassignOrReleasePrioritySlotForController(
+                mapEvent,
+                controllerId,
+                out var transfer,
+                out var released))
+        {
+            return;
+        }
+
+        PublishPrioritySlotCleanup(
+            mapEventId,
+            mapEvent,
+            transfer,
+            released,
+            "the waiting player departed");
+    }
+
+    private void PublishPrioritySlotCleanup(
+        string mapEventId,
+        MapEvent mapEvent,
+        BattleInitialSpawnTransfer transfer,
+        bool released,
+        string reason)
+    {
+        int refreshed = RefreshReserveAuthorities(mapEventId, mapEvent);
+        if (released)
+        {
+            network.SendAll(new NetworkBattlePrioritySlotCancelled(
+                mapEventId,
+                transfer.TransferId,
+                transfer.WaitingPartyId,
+                transfer.DonorPartyId));
+            Logger.Information("[BattleHost] Cancelled unconsumed priority slot {TransferId} in {MapEventId} because {Reason}; waiting={WaitingParty}, restored donor={DonorParty}, refreshed {Count} reserve authority/authorities first",
+                transfer.TransferId, mapEventId, reason, transfer.WaitingPartyId, transfer.DonorPartyId, refreshed);
+            return;
+        }
+
+        network.SendAll(new NetworkBattlePrioritySlotAssigned(
+            mapEventId,
+            transfer.TransferId,
+            transfer.WaitingPartyId,
+            transfer.DonorPartyId));
+        Logger.Information("[BattleHost] Reassigned unconsumed priority slot {TransferId} in {MapEventId} to {WaitingParty} because {Reason}; refreshed {Count} reserve authority/authorities first",
+            transfer.TransferId, mapEventId, transfer.WaitingPartyId, reason, refreshed);
+    }
+
+    private void ClearPrioritySlotDeparturesForController(
+        string mapEventId,
+        MapEvent mapEvent,
+        string controllerId)
+    {
+        if (!TryGetControllerMapEventParty(mapEvent, controllerId, out var mapEventParty)
+            || !objectManager.TryGetId(mapEventParty, out var partyId))
+        {
+            return;
+        }
+
+        ClearPrioritySlotDepartures(mapEventId, partyId);
+    }
+
+    private void ClearPrioritySlotDepartures(string mapEventId, string partyId)
+    {
+        if (!prioritySlotDepartures.TryGetValue(mapEventId, out var parties))
+            return;
+
+        parties.Remove(partyId);
+        if (parties.Count == 0)
+            prioritySlotDepartures.Remove(mapEventId);
     }
 
     /// <summary>[Client] Store the server's host assignment for this battle.</summary>
@@ -837,7 +1507,9 @@ internal class BattleHostHandler : IHandler
     {
         absentControllers.Remove(mapEventId);
         hostPeers.Remove(mapEventId);
+        reservePeers.Remove(mapEventId);
         pendingReturns.Remove(mapEventId);
+        prioritySlotDepartures.Remove(mapEventId);
     }
 
     // [Server] Issue the battle's next host epoch (BR-102): one past the highest ever issued for this map
