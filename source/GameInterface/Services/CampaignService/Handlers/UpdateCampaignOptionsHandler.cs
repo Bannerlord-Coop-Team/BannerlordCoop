@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.CampaignService.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.CampaignService.Handlers;
 
@@ -24,12 +25,18 @@ internal class UpdateCampaignOptionsHandler : IHandler
 
         messageBroker.Subscribe<UpdateCampaignOptions>(Handle_UpdateCampaignOptions);
         messageBroker.Subscribe<NetworkUpdateCampaignOptions>(Handle_NetworkUpdateCampaignOptions);
+
+        messageBroker.Subscribe<UpdateOtherOptions>(Handle_UpdateOtherOptions);
+        messageBroker.Subscribe<NetworkUpdateOtherOptions>(Handle_NetworkUpdateOtherOptions);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<UpdateCampaignOptions>(Handle_UpdateCampaignOptions);
         messageBroker.Unsubscribe<NetworkUpdateCampaignOptions>(Handle_NetworkUpdateCampaignOptions);
+
+        messageBroker.Unsubscribe<UpdateOtherOptions>(Handle_UpdateOtherOptions);
+        messageBroker.Unsubscribe<NetworkUpdateOtherOptions>(Handle_NetworkUpdateOtherOptions);
     }
 
     private void Handle_UpdateCampaignOptions(MessagePayload<UpdateCampaignOptions> obj)
@@ -70,6 +77,27 @@ internal class UpdateCampaignOptionsHandler : IHandler
             CampaignOptions.ClanMemberDeathChance = newOptions.ClanMemberDeathChance;
             CampaignOptions.IsIronmanMode = newOptions.IsIronmanMode;
             CampaignOptions.BattleDeath = newOptions.BattleDeath;
+        });
+    }
+
+    private void Handle_UpdateOtherOptions(MessagePayload<UpdateOtherOptions> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            var message = new NetworkUpdateOtherOptions(
+                BannerlordConfig.PlayerReceivedDamageDifficulty
+            );
+            network.SendAll(message);
+        });
+    }
+
+    private void Handle_NetworkUpdateOtherOptions(MessagePayload<NetworkUpdateOtherOptions> obj)
+    {
+        var newOptions = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            BannerlordConfig.PlayerReceivedDamageDifficulty = newOptions.PlayerReceivedDamageDifficulty;
         });
     }
 }

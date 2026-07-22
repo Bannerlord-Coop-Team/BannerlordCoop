@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.CampaignService.Messages;
 using HarmonyLib;
 using SandBox.View.Map;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.CampaignService.Patches;
 
@@ -20,5 +21,19 @@ internal class UpdateCampaignOptionsPatch
 
         var message = new UpdateCampaignOptions();
         MessageBroker.Instance.Publish(__instance, message);
+    }
+}
+
+[HarmonyPatch(typeof(ManagedOptions))]
+internal class UpdateOtherOptionsPatch
+{
+    [HarmonyPatch(nameof(ManagedOptions.SetConfig))]
+    [HarmonyPostfix]
+    public static void SetConfigPostfix()
+    {
+        if (ModInformation.IsClient) return;
+
+        var message = new UpdateOtherOptions();
+        MessageBroker.Instance.Publish(null, message);
     }
 }
