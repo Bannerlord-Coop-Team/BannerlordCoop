@@ -144,7 +144,7 @@ public sealed class PacketProfiler : IDisposable
     /// </summary>
     public void Dispose()
     {
-        poller.StopAndWait(TimeSpan.FromSeconds(5));
+        poller.Stop();
     }
 
     // Running per-type totals: how many packets were sent and their combined serialized byte size.

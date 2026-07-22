@@ -48,7 +48,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathMarkKillerHero)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastKnownClosestSettlement)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HitPoints)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathDay)));
+            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathDay))); // Set method doesn't seem to be used
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastExaminedLogEntryID)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Clan)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.SupporterOf)));
@@ -66,6 +66,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Father)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Mother)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Spouse)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.IsReady)));
 
             // TODO add all fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Culture)));
@@ -75,6 +76,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroPerks)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._characterAttributes)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._deathDay))); // Despite having a property, directly set by SetDeathDay() method
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Level)));
         }
     }
