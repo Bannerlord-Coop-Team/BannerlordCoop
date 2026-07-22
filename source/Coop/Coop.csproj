@@ -240,7 +240,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Deploy module into the Bannerlord install (mb2 junction). See Deploy.targets. -->
   <PropertyGroup>
-    <ModName>Coop</ModName>
+    <ModName>Bannerlord Coop</ModName>
     <MainClass>CoopMod</MainClass>
     <ModVersion>v$(CoopVersion)</ModVersion>
     <GameVersion>v1.4.6</GameVersion>
