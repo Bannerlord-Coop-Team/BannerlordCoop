@@ -33,7 +33,8 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
             controller.ResultCommitter,
             controller.SiegeEngineStateReporter,
             messageBroker,
-            controller.Session));
+            controller.Session,
+            controller.Deployment));
         Logger.Information("[BattleSync] Attached coop battle behaviors to mission '{Scene}'", mission.SceneName);
     }
 }

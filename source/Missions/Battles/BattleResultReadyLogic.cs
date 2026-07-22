@@ -13,18 +13,20 @@ public class BattleResultReadyLogic : MissionLogic
     private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
-    private volatile MissionResult resolvedResult;
+    private readonly IBattleDeploymentCoordinator deployment;
 
     public BattleResultReadyLogic(
         IBattleResultCommitter resultCommitter,
         ISiegeEngineStateReporter siegeEngineStateReporter,
         IMessageBroker messageBroker,
-        IBattleSession session)
+        IBattleSession session,
+        IBattleDeploymentCoordinator deployment)
     {
         this.resultCommitter = resultCommitter;
         this.siegeEngineStateReporter = siegeEngineStateReporter;
         this.messageBroker = messageBroker;
         this.session = session;
+        this.deployment = deployment;
 
         messageBroker.Subscribe<BattleHostAuthorityAcquired>(Handle_BattleHostAuthorityAcquired);
     }
@@ -33,7 +35,6 @@ public class BattleResultReadyLogic : MissionLogic
     {
         if (missionResult?.BattleResolved == true)
         {
-            resolvedResult = missionResult;
             siegeEngineStateReporter.ReportConcludedIfHost();
         }
 
@@ -48,16 +49,18 @@ public class BattleResultReadyLogic : MissionLogic
 
     private void Handle_BattleHostAuthorityAcquired(MessagePayload<BattleHostAuthorityAcquired> payload)
     {
-        if (resolvedResult == null || payload.What.MapEventId != session.InstanceId)
+        if (payload.What.MapEventId != session.InstanceId)
             return;
 
         GameThread.RunSafe(() =>
         {
-            if (!session.IsLocalHost || payload.What.MapEventId != session.InstanceId)
+            if (!session.IsLocalHost || !deployment.IsCommitted ||
+                payload.What.MapEventId != session.InstanceId ||
+                !resultCommitter.TryGetResolvedState(out _))
                 return;
 
             siegeEngineStateReporter.ReportConcludedIfHost();
-            resultCommitter.ReportResolvedResult(resolvedResult);
+            resultCommitter.ReportAcceptedResult();
         }, context: nameof(Handle_BattleHostAuthorityAcquired));
     }
 }

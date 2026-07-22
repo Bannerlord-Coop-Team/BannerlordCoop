@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -71,6 +72,7 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeMachineStateReplicator siegeMachineState;
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private NetworkBattleResultSnapshot? pendingResultSnapshot;
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
@@ -118,8 +120,10 @@ public class CoopBattleController : CoopMissionController
         hostRegistryRef = hostRegistry;
         Session = session;
         Deployment = deployment;
-        ResultCommitter = new BattleResultCommitter(relayNetwork, session);
+        ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
+        messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
+        messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
 
         // Decode order clips during battle setup so the first issued order does not hitch.
         coopMissionComponent.AgentVoiceHandler.WarmUp();
@@ -141,6 +145,8 @@ public class CoopBattleController : CoopMissionController
         siegeMachineState.Dispose();
         siegeWeaponFire.Dispose();
         Deployment.Dispose();
+        messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
+        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
 
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
@@ -299,6 +305,8 @@ public class CoopBattleController : CoopMissionController
 
         if (Deployment.OnLocalDeploymentFinished())
             replicator.BroadcastOwnDeployedTroops();
+
+        ResultCommitter.ReportAcceptedResult();
     }
 
     protected override void SendJoinInfo(string controllerId)
@@ -320,6 +328,15 @@ public class CoopBattleController : CoopMissionController
         replicator.ReplicateCurrentAgentsTo(controllerId);
         siegeEngineDeployment.CatchUpJoiner(controllerId);
         siegeMachineState.CatchUpJoiner(controllerId);
+
+        if (Session.IsLocalHost && ResultCommitter.TryGetResolvedState(out var battleState))
+        {
+            network.Send(controllerId, new NetworkBattleResultSnapshot(
+                Session.InstanceId,
+                Session.OwnControllerId,
+                Session.HostEpoch,
+                battleState));
+        }
     }
 
     protected override void HandleJoinInfo(NetPeer peer, NetworkMissionJoinInfo joinInfo)
@@ -327,6 +344,62 @@ public class CoopBattleController : CoopMissionController
         // Log receipt to confirm the bidirectional handshake; the joiner catch-up itself happens on the
         // owners' side (SendJoinInfo -> ReplicateCurrentAgentsTo).
         Logger.Information("[BattleSync] Received join info from {Controller} (instance {Instance})", joinInfo.ControllerId, Session.InstanceId);
+    }
+
+    private void Handle_BattleResultSnapshot(MessagePayload<NetworkBattleResultSnapshot> payload)
+    {
+        var snapshot = payload.What;
+        GameThread.RunSafe(() => TryAcceptResultSnapshot(snapshot), context: nameof(Handle_BattleResultSnapshot));
+    }
+
+    private void Handle_BattleHostAssigned(MessagePayload<NetworkBattleHostAssigned> payload)
+    {
+        if (payload.What.MapEventId != Session.InstanceId)
+            return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (pendingResultSnapshot.HasValue)
+                TryAcceptResultSnapshot(pendingResultSnapshot.Value);
+        }, context: nameof(Handle_BattleHostAssigned));
+    }
+
+    private void TryAcceptResultSnapshot(NetworkBattleResultSnapshot snapshot)
+    {
+        if (snapshot.InstanceId != Session.InstanceId || Session.IsLocalHost)
+            return;
+
+        if (snapshot.HostEpoch > Session.HostEpoch)
+        {
+            if (!pendingResultSnapshot.HasValue ||
+                snapshot.HostEpoch > pendingResultSnapshot.Value.HostEpoch)
+            {
+                pendingResultSnapshot = snapshot;
+            }
+
+            return;
+        }
+
+        if (snapshot.HostEpoch != Session.HostEpoch ||
+            !Session.IsHostController(snapshot.HostControllerId))
+        {
+            ClearAppliedPendingResultSnapshot();
+            return;
+        }
+
+        ClearAppliedPendingResultSnapshot();
+        ResultCommitter.AcceptResolvedState(snapshot.BattleState);
+        if (Deployment.IsCommitted)
+            ResultCommitter.ReportAcceptedResult();
+    }
+
+    private void ClearAppliedPendingResultSnapshot()
+    {
+        if (pendingResultSnapshot.HasValue &&
+            pendingResultSnapshot.Value.HostEpoch <= Session.HostEpoch)
+        {
+            pendingResultSnapshot = null;
+        }
     }
 
     protected override void OnLeaving()
