@@ -104,12 +104,23 @@ internal class BattleJoinLeaveHandler : IHandler
                             mobileParty.Position = positions[i];
                     }
                 }
+
+                RefreshCurrentEncounterMenu(mapEvent);
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkAddInvolvedParties));
             }
         });
+    }
+
+    private static void RefreshCurrentEncounterMenu(MapEvent mapEvent)
+    {
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext?.GameMenu?.StringId != "encounter" ||
+            (PlayerEncounter.Battle != mapEvent && MobileParty.MainParty?.MapEvent != mapEvent)) return;
+
+        menuContext.Refresh();
     }
 
     /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
