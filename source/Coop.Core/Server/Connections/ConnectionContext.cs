@@ -1,12 +1,12 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
-using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 
@@ -33,8 +33,8 @@ public class ConnectionContext
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
-        IServerBattleSizeProvider battleSizeProvider,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        IServerOptionsProvider serverOptionsProvider)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -49,8 +49,8 @@ public class ConnectionContext
         ConnectionMessageQueue = connectionMessageQueue;
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
-        BattleSizeProvider = battleSizeProvider;
         ExistingPlayerSender = existingPlayerSender;
+        ServerOptionsProvider = serverOptionsProvider;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -66,6 +66,6 @@ public class ConnectionContext
     public IConnectionMessageQueue ConnectionMessageQueue { get; }
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
-    public IServerBattleSizeProvider BattleSizeProvider { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
+    public IServerOptionsProvider ServerOptionsProvider { get; }
 }

@@ -16,7 +16,7 @@
             <Tag Value="Singleplayer" />
             <Tag Value="v1.1.6" />
         </Tags>
-        <Image Value="C:\Users\My\Downloads\mystic_knight_stick_figure_by_wrpigeek_dvg1be-fullview.jpg"/>
+        <Image Value="C:\Users\PC\Downloads\Banner.png"/>
         <!-- Determines the featured image displayed on Steam Workshop, a direct path to it must be inserted here (the image should be smaller than 1 MB) -->
         <Visibility Value="Private"/>
         <!-- Determines visibility on Steam Workshop. Can be: Public, FriendsOnly, Private -->

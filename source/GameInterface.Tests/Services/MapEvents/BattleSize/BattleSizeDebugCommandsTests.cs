@@ -1,7 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.Messaging;
-using Common.Network;
+using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.MapEvents.BattleSize.Commands;
 using GameInterface.Services.UI.CoopOptions;
@@ -68,15 +68,12 @@ public class BattleSizeDebugCommandsTests : IDisposable
         ModInformation.IsServer = true;
         var provider = new ServerBattleSizeProvider();
         var broker = new MessageBroker();
-        var network = new Mock<INetwork>();
         var store = new Mock<ICoopOptionsStore>();
         store.Setup(value => value.LoadOrDefault()).Returns(new CoopOptionsData());
-        IMessage sent = null!;
-        network.Setup(value => value.SendAll(It.IsAny<IMessage>()))
-            .Callback<IMessage>(message => sent = message);
+        int updates = 0;
+        broker.Subscribe<UpdateOtherOptions>(_ => updates++);
         using var handler = new ServerBattleSizeSyncHandler(
             broker,
-            network.Object,
             store.Object,
             provider);
         SetContainer(provider, broker);
@@ -85,7 +82,7 @@ public class BattleSizeDebugCommandsTests : IDisposable
 
         Assert.Equal("Server battle size set to 300 for this runtime.", result);
         Assert.Equal(300, provider.BattleSize);
-        Assert.Equal(300, Assert.IsType<NetworkBattleSizeChanged>(sent).BattleSize);
+        Assert.Equal(1, updates);
     }
 
     private void SetContainer(

@@ -2,7 +2,6 @@
 using Common.PacketHandlers;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network.Packets;
-using GameInterface.Services.MapEvents.BattleSize;
 using LiteNetLib;
 
 namespace Coop.Core.Client.Services.Save.PacketHandlers;
@@ -20,16 +19,13 @@ internal class GameSaveDataPacketHandler : IPacketHandler
 
     private readonly IPacketManager packetManager;
     private readonly IMessageBroker messageBroker;
-    private readonly IServerBattleSizeProvider battleSizeProvider;
 
     public GameSaveDataPacketHandler(
         IPacketManager packetManager,
-        IMessageBroker messageBroker,
-        IServerBattleSizeProvider battleSizeProvider)
+        IMessageBroker messageBroker)
     {
         this.packetManager = packetManager;
         this.messageBroker = messageBroker;
-        this.battleSizeProvider = battleSizeProvider;
         packetManager.RegisterPacketHandler(this);
     }
 
@@ -42,8 +38,6 @@ internal class GameSaveDataPacketHandler : IPacketHandler
     {
         GameSaveDataPacket convertedPacket = (GameSaveDataPacket)packet;
 
-        battleSizeProvider.SetBattleSize(convertedPacket.BattleSize);
-
         messageBroker.Publish(this, new NetworkGameSaveDataReceived(
             SaveDataCompression.Decompress(convertedPacket.GameSaveData),
             convertedPacket.CampaignID,
@@ -53,6 +47,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             convertedPacket.AlleyPlayerData,
             convertedPacket.InteractionsPlayerData,
             convertedPacket.TradePlayerData,
-            convertedPacket.AttachmentIdMap));
+            convertedPacket.AttachmentIdMap,
+            convertedPacket.ServerOptions));
     }
 }

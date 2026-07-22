@@ -6,7 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.MountAndBlade.ViewModelCollection.GameOptions;
 using TaleWorlds.ScreenSystem;
@@ -158,5 +160,31 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         }
 
         ScreenManager.PopScreen();
+    }
+
+    [CommandLineArgumentFunction("pop_state", "coop.debug.ui")]
+    public static string PopState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.pop_state";
+
+        TaleWorlds.Core.GameState activeState = Game.Current?.GameStateManager?.ActiveState;
+        if (activeState == null)
+            return "Failed: no active game state.";
+
+        if (activeState is MapState)
+            return "Active state is already MapState.";
+
+        Game.Current.GameStateManager.PopState();
+        return $"Queued pop for {activeState.GetType().Name}.";
+    }
+
+    [CommandLineArgumentFunction("active_state", "coop.debug.ui")]
+    public static string ActiveState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.active_state";
+
+        return Game.Current?.GameStateManager?.ActiveState?.GetType().Name ?? "none";
     }
 }

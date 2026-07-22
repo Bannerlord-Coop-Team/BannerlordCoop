@@ -4,10 +4,10 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -31,7 +31,7 @@ public class TransferSaveState : ConnectionStateBase
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
-        IServerBattleSizeProvider battleSizeProvider)
+        IServerOptionsProvider serverOptionsProvider)
         : base(connectionLogic)
     {
         GameThread.Run(() =>
@@ -74,7 +74,7 @@ public class TransferSaveState : ConnectionStateBase
                 coopSessionProvider.CoopSession?.InteractionsPlayerData,
                 coopSessionProvider.CoopSession?.TradePlayerData,
                 attachmentIdMapper.BuildServerMap(),
-                battleSizeProvider.BattleSize);
+                serverOptionsProvider.GetServerOptions());
 
             // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
             // runs in a blocking GameThread.Run call issued from the network thread, so the poller is

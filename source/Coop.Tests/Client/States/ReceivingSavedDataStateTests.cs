@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
@@ -16,6 +16,8 @@ using System;
 using Xunit;
 using Xunit.Abstractions;
 using GameInterface.Services.Inventory.TradeSkills;
+using GameInterface.Services.CampaignService.Data;
+using GameInterface.Services.MapEvents.BattleSize;
 
 namespace Coop.Tests.Client.States
 {
@@ -37,7 +39,7 @@ namespace Coop.Tests.Client.States
         }
 
         private static NetworkGameSaveDataReceived SaveData(byte[] data, string campaignId) =>
-            new NetworkGameSaveDataReceived(data, campaignId, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new CaravansPlayerData(new(), new()), new AlleyPlayerData(new()), new InteractionsPlayerData(new(), new(), new(), new()), new TradePlayerData(new()), new AttachmentIdMap(new()));
+            new NetworkGameSaveDataReceived(data, campaignId, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new CaravansPlayerData(new(), new()), new AlleyPlayerData(new()), new InteractionsPlayerData(new(), new(), new(), new()), new TradePlayerData(new()), new AttachmentIdMap(new()), new ServerOptions(0, ServerBattleSizeProvider.DefaultBattleSize));
 
         [Fact]
         public void StateEntered_Shows_LoadingProgressMessage()

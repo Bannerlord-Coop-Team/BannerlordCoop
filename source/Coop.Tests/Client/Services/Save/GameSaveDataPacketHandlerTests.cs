@@ -3,7 +3,7 @@ using Common.Tests.Utils;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Save.PacketHandlers;
 using Coop.Core.Common.Network.Packets;
-using GameInterface.Services.MapEvents.BattleSize;
+using GameInterface.Services.CampaignService.Data;
 using Moq;
 using ProtoBuf.Meta;
 using System;
@@ -15,7 +15,7 @@ namespace Coop.Tests.Client.Services.Save;
 public class GameSaveDataPacketHandlerTests
 {
     [Fact]
-    public void GameSaveDataPacket_RoundTripPreservesBattleSize()
+    public void GameSaveDataPacket_RoundTripPreservesServerOptions()
     {
         var original = CreatePacket(800);
 
@@ -28,34 +28,28 @@ public class GameSaveDataPacketHandlerTests
                 stream, null, typeof(GameSaveDataPacket));
         }
 
-        Assert.Equal(800, result.BattleSize);
+        Assert.Equal(2, result.ServerOptions.PlayerReceivedDamage);
+        Assert.Equal(800, result.ServerOptions.BattleSize);
     }
 
     [Fact]
-    public void HandlePacket_AppliesBattleSizeBeforePublishingSave()
+    public void HandlePacket_PublishesServerOptionsWithSave()
     {
         var packetManager = new Mock<IPacketManager>();
         var messageBroker = new TestMessageBroker();
-        var battleSizeProvider = new Mock<IServerBattleSizeProvider>();
-        int currentBattleSize = ServerBattleSizeProvider.DefaultBattleSize;
-        int battleSizeWhenSavePublished = 0;
-
-        battleSizeProvider
-            .Setup(m => m.SetBattleSize(It.IsAny<int>()))
-            .Callback<int>(value => currentBattleSize = value);
+        ServerOptions receivedOptions = null!;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(
-            _ => battleSizeWhenSavePublished = currentBattleSize);
+            payload => receivedOptions = payload.What.ServerOptions);
 
         var handler = new GameSaveDataPacketHandler(
             packetManager.Object,
-            messageBroker,
-            battleSizeProvider.Object);
+            messageBroker);
         var packet = CreatePacket(800);
 
         handler.HandlePacket(null!, packet);
 
-        Assert.Equal(800, currentBattleSize);
-        Assert.Equal(800, battleSizeWhenSavePublished);
+        Assert.Equal(2, receivedOptions.PlayerReceivedDamage);
+        Assert.Equal(800, receivedOptions.BattleSize);
     }
 
     [Fact]
@@ -64,8 +58,7 @@ public class GameSaveDataPacketHandlerTests
         var packetManager = new Mock<IPacketManager>();
         var handler = new GameSaveDataPacketHandler(
             packetManager.Object,
-            new TestMessageBroker(),
-            Mock.Of<IServerBattleSizeProvider>());
+            new TestMessageBroker());
 
         handler.Dispose();
 
@@ -85,6 +78,6 @@ public class GameSaveDataPacketHandlerTests
             null!,
             null!,
             null!,
-            battleSize);
+            new ServerOptions(2, battleSize));
     }
 }

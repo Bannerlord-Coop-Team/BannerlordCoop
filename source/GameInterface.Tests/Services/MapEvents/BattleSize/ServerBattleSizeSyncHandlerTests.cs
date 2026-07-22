@@ -1,6 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
-using Common.Network;
+using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.MapEvents.BattleSize;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.Messages;
@@ -13,7 +13,7 @@ namespace GameInterface.Tests.Services.MapEvents.BattleSize;
 public class ServerBattleSizeSyncHandlerTests
 {
     [Fact]
-    public void ServerSelection_AppliesAndBroadcastsBattleSize()
+    public void ServerSelection_AppliesAndRequestsConsolidatedOptionsUpdate()
     {
         bool wasServer = ModInformation.IsServer;
         ModInformation.IsServer = true;
@@ -21,26 +21,22 @@ public class ServerBattleSizeSyncHandlerTests
         try
         {
             var messageBroker = new MessageBroker();
-            var network = new Mock<INetwork>();
             var optionsStore = new Mock<ICoopOptionsStore>();
             var battleSizeProvider = new ServerBattleSizeProvider();
             optionsStore.Setup(m => m.LoadOrDefault()).Returns(new CoopOptionsData());
 
-            IMessage sentMessage = null!;
-            network.Setup(m => m.SendAll(It.IsAny<IMessage>()))
-                .Callback<IMessage>(message => sentMessage = message);
+            int updates = 0;
+            messageBroker.Subscribe<UpdateOtherOptions>(_ => updates++);
 
             using var handler = new ServerBattleSizeSyncHandler(
                 messageBroker,
-                network.Object,
                 optionsStore.Object,
                 battleSizeProvider);
 
             messageBroker.Publish(this, new ServerBattleSizeSelected(650));
 
             Assert.Equal(650, battleSizeProvider.BattleSize);
-            var update = Assert.IsType<NetworkBattleSizeChanged>(sentMessage);
-            Assert.Equal(650, update.BattleSize);
+            Assert.Equal(1, updates);
         }
         finally
         {
@@ -49,7 +45,7 @@ public class ServerBattleSizeSyncHandlerTests
     }
 
     [Fact]
-    public void ClientUpdate_AppliesServerBattleSizeWithoutBroadcasting()
+    public void ClientSelection_DoesNotApplyOrRequestUpdate()
     {
         bool wasServer = ModInformation.IsServer;
         ModInformation.IsServer = false;
@@ -57,20 +53,20 @@ public class ServerBattleSizeSyncHandlerTests
         try
         {
             var messageBroker = new MessageBroker();
-            var network = new Mock<INetwork>();
             var optionsStore = new Mock<ICoopOptionsStore>();
             var battleSizeProvider = new ServerBattleSizeProvider();
+            int updates = 0;
+            messageBroker.Subscribe<UpdateOtherOptions>(_ => updates++);
 
             using var handler = new ServerBattleSizeSyncHandler(
                 messageBroker,
-                network.Object,
                 optionsStore.Object,
                 battleSizeProvider);
 
-            messageBroker.Publish(this, new NetworkBattleSizeChanged(725));
+            messageBroker.Publish(this, new ServerBattleSizeSelected(300));
 
-            Assert.Equal(725, battleSizeProvider.BattleSize);
-            network.Verify(m => m.SendAll(It.IsAny<IMessage>()), Times.Never);
+            Assert.Equal(ServerBattleSizeProvider.DefaultBattleSize, battleSizeProvider.BattleSize);
+            Assert.Equal(0, updates);
             optionsStore.Verify(m => m.LoadOrDefault(), Times.Never);
         }
         finally
