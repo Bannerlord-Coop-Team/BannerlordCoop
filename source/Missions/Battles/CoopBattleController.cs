@@ -61,6 +61,7 @@ public class CoopBattleController : CoopMissionController
     private readonly IPuppetSpawner puppetSpawner;
     private readonly IPuppetDeathApplier puppetDeathApplier;
     private readonly IPuppetRoutApplier puppetRoutApplier;
+    private readonly IBattleAgentIdAliasMap agentIdAliases;
     private readonly IBattleDamageRouter damageRouter;
     private readonly IBattleAuthorityMigrator authorityMigrator;
     private readonly IReinforcementFielder reinforcementFielder;
@@ -85,6 +86,7 @@ public class CoopBattleController : CoopMissionController
         ICoopMissionComponent coopMissionComponent,
         IBattleHostRegistry hostRegistry,
         IAgentFormationAssigner formationAssigner,
+        IBattleAgentIdAliasMap agentIdAliases,
         IMissionContext missionContext,
         IHostEpochPolicy hostEpochPolicy)
         : base(network, messageBroker, objectManager, coopMissionComponent)
@@ -98,12 +100,13 @@ public class CoopBattleController : CoopMissionController
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, relayNetwork, messageBroker, coopMissionComponent, session, casualties);
-        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
-        puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
-        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
+        this.agentIdAliases = agentIdAliases;
+        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentIdAliases);
+        puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties, agentIdAliases);
+        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties, agentIdAliases);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext);
-        reinforcementFielder = new ReinforcementFielder(messageBroker, network, objectManager, coopMissionComponent, missionContext, session, deployment, formationAssigner, casualties);
+        reinforcementFielder = new ReinforcementFielder(messageBroker, network, relayNetwork, objectManager, coopMissionComponent, missionContext, session, deployment, formationAssigner, casualties, agentIdAliases);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
         // watermark spans every host-authority message type (engine placement + machine state/authority)
         // — a superseded hosting generation is dropped consistently across both. The policy is a
@@ -135,6 +138,7 @@ public class CoopBattleController : CoopMissionController
         damageRouter.Dispose();
         authorityMigrator.Dispose();
         reinforcementFielder.Dispose();
+        agentIdAliases.Clear();
         siegeEngineDeployment.Dispose();
         siegeMachineState.Dispose();
         siegeWeaponFire.Dispose();

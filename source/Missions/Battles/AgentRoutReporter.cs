@@ -65,6 +65,14 @@ public class AgentRoutReporter : IAgentRoutReporter
             if (info.CurrentAuthority != session.OwnControllerId) return;
 
             var attribution = casualties.GetOrDefault(info.AgentId);
+            Logger.Information("[DeathDiag] Broadcasting rout of agent {AgentId} to the battle mesh", info.AgentId);
+            network.SendAll(new NetworkBattleAgentRouted(
+                info.AgentId,
+                hideMount: true,
+                isAdministrativeRemoval: false));
+
+            // Start peer removal before reporting the freed slot; the priority and human-count gates cover
+            // the lack of ordering between the battle mesh and campaign relay.
             if (session.HasInstance && attribution.MapEventPartyId != null)
             {
                 relayNetwork.SendAll(new NetworkBattleTroopDeparted(
@@ -72,12 +80,6 @@ public class AgentRoutReporter : IAgentRoutReporter
                     attribution.MapEventPartyId,
                     attribution.TroopSeed));
             }
-
-            Logger.Information("[DeathDiag] Broadcasting rout of agent {AgentId} to the battle mesh", info.AgentId);
-            network.SendAll(new NetworkBattleAgentRouted(
-                info.AgentId,
-                hideMount: true,
-                isAdministrativeRemoval: false));
 
             casualties.MarkDeparted(info.AgentId);
             registry.RemoveAgent(info.AgentId);

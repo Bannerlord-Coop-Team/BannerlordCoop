@@ -1,10 +1,12 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -43,8 +45,16 @@ public class ReinforcementFielder : IReinforcementFielder
         Registered,
     }
 
+    private enum PriorityPlayerFieldResult
+    {
+        Pending,
+        Spawned,
+        Declined,
+    }
+
     private readonly IMessageBroker messageBroker;
     private readonly IBattleNetwork network;
+    private readonly INetwork relayNetwork;
     private readonly IObjectManager objectManager;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IMissionContext missionContext;
@@ -52,6 +62,7 @@ public class ReinforcementFielder : IReinforcementFielder
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly IBattleAgentIdAliasMap agentIdAliases;
     private readonly Func<DefaultBattleMissionAgentSpawnLogic> spawnLogicProvider;
     private readonly Func<Mission, AgentBuildData, Agent> agentSpawner;
 
@@ -85,6 +96,9 @@ public class ReinforcementFielder : IReinforcementFielder
     private readonly object reinforcementGate = new object();
     private readonly Dictionary<string, PendingReinforcementParty> pendingReinforcementParties =
         new Dictionary<string, PendingReinforcementParty>();
+    private readonly HashSet<long> reportedPrioritySlotResolutions = new HashSet<long>();
+    private readonly HashSet<string> fieldedPriorityPlayerParties = new HashSet<string>();
+    private PendingReinforcementParty pendingPriorityPlayerParty;
 
     /// <summary>Reserve state captured before the promoted host requests its expanded ownership.</summary>
     private sealed class MigrationReserveSnapshot
@@ -113,6 +127,8 @@ public class ReinforcementFielder : IReinforcementFielder
         public CoopAgentOrigin PendingOrigin;
         public Agent PendingSpawnMount;
         public bool PendingSpawnMountCaptured;
+        public readonly HashSet<Guid> SupersededAgentIds = new HashSet<Guid>();
+        public readonly HashSet<Guid> SupersededMountIds = new HashSet<Guid>();
 
         public RecoveryParty(
             CoopTroopSupplier supplier,
@@ -139,6 +155,7 @@ public class ReinforcementFielder : IReinforcementFielder
     public ReinforcementFielder(
         IMessageBroker messageBroker,
         IBattleNetwork network,
+        INetwork relayNetwork,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
         IMissionContext missionContext,
@@ -146,11 +163,13 @@ public class ReinforcementFielder : IReinforcementFielder
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
         ICasualtyAttributionMap casualties,
+        IBattleAgentIdAliasMap agentIdAliases,
         Func<DefaultBattleMissionAgentSpawnLogic> spawnLogicProvider = null,
         Func<Mission, AgentBuildData, Agent> agentSpawner = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.relayNetwork = relayNetwork;
         this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
         this.missionContext = missionContext;
@@ -158,18 +177,23 @@ public class ReinforcementFielder : IReinforcementFielder
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
         this.casualties = casualties;
+        this.agentIdAliases = agentIdAliases;
         this.spawnLogicProvider = spawnLogicProvider
             ?? (() => Mission.Current?.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>());
         this.agentSpawner = agentSpawner ?? ((mission, buildData) => mission.SpawnAgent(buildData));
 
         // An authority fields a newly-owned AI party through our own spawn path (reinforcements).
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
+        messageBroker.Subscribe<NetworkBattlePrioritySlotAssigned>(Handle_PrioritySlotAssigned);
+        messageBroker.Subscribe<NetworkBattlePrioritySlotCancelled>(Handle_PrioritySlotCancelled);
         messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_ReinforcementPartiesAdded);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySlotAssigned>(Handle_PrioritySlotAssigned);
+        messageBroker.Unsubscribe<NetworkBattlePrioritySlotCancelled>(Handle_PrioritySlotCancelled);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
@@ -182,7 +206,10 @@ public class ReinforcementFielder : IReinforcementFielder
             RetryPendingAgentSetups();
 
             if (deployment.IsCommitted && deployment.IsActivated)
+            {
+                FieldPriorityPlayerParty();
                 FieldPendingReinforcementParties();
+            }
 
             if (!session.IsLocalHost || !deployment.IsCommitted) return;
             TryQueueMigrationReserves();
@@ -384,12 +411,18 @@ public class ReinforcementFielder : IReinforcementFielder
 
         if (!TryGetSuppliers(out var defenderSupplier, out var attackerSupplier)) return;
 
-        CountActiveOwnedHumans(defenderSupplier, attackerSupplier, out var activeDefenders, out var activeAttackers);
+        CountActiveHumans(
+            defenderSupplier,
+            attackerSupplier,
+            out var activeOwnedDefenders,
+            out var activeOwnedAttackers,
+            out var totalActiveHumans);
         var slots = RecoverySlots.Calculate(
             defenderSupplier.InitialTroops,
             attackerSupplier.InitialTroops,
-            activeDefenders,
-            activeAttackers,
+            activeOwnedDefenders,
+            activeOwnedAttackers,
+            totalActiveHumans,
             BattleSpawnGate.BattleSize);
         var formations = new HashSet<Formation>();
         int spawned = FieldRecoverySide(BattleSideEnum.Defender, slots.Defenders, formations);
@@ -402,20 +435,23 @@ public class ReinforcementFielder : IReinforcementFielder
                 spawned, slots.Defenders, slots.Attackers);
     }
 
-    private void CountActiveOwnedHumans(
+    private void CountActiveHumans(
         CoopTroopSupplier defenderSupplier,
         CoopTroopSupplier attackerSupplier,
-        out int defenders,
-        out int attackers)
+        out int ownedDefenders,
+        out int ownedAttackers,
+        out int total)
     {
-        defenders = 0;
-        attackers = 0;
+        ownedDefenders = 0;
+        ownedAttackers = 0;
+        total = 0;
         foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
         {
             foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(controllerId))
             {
                 var agent = info.Agent;
                 if (agent == null || !agent.IsActive() || !agent.IsHuman) continue;
+                total++;
 
                 var attribution = casualties.GetOrDefault(info.AgentId);
                 bool isOwned = controllerId == session.OwnControllerId
@@ -424,15 +460,15 @@ public class ReinforcementFielder : IReinforcementFielder
                 if (!isOwned) continue;
 
                 var side = agent.Team?.Side ?? BattleSideEnum.None;
-                if (side == BattleSideEnum.Defender) defenders++;
-                else if (side == BattleSideEnum.Attacker) attackers++;
+                if (side == BattleSideEnum.Defender) ownedDefenders++;
+                else if (side == BattleSideEnum.Attacker) ownedAttackers++;
             }
         }
 
-        CountUnregisteredPendingHumans(ref defenders, ref attackers);
+        CountUnregisteredPendingHumans(ref ownedDefenders, ref ownedAttackers, ref total);
     }
 
-    private void CountUnregisteredPendingHumans(ref int defenders, ref int attackers)
+    private void CountUnregisteredPendingHumans(ref int ownedDefenders, ref int ownedAttackers, ref int total)
     {
         var mission = Mission.Current;
         var countedAgents = new HashSet<Agent>();
@@ -447,8 +483,9 @@ public class ReinforcementFielder : IReinforcementFielder
                     || coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out _))
                     continue;
 
-                if (sideIndex == (int)BattleSideEnum.Defender) defenders++;
-                else attackers++;
+                total++;
+                if (sideIndex == (int)BattleSideEnum.Defender) ownedDefenders++;
+                else ownedAttackers++;
             }
         }
 
@@ -464,8 +501,9 @@ public class ReinforcementFielder : IReinforcementFielder
                 || coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out _))
                 continue;
 
-            if (agent.Team?.Side == BattleSideEnum.Defender) defenders++;
-            else if (agent.Team?.Side == BattleSideEnum.Attacker) attackers++;
+            total++;
+            if (agent.Team?.Side == BattleSideEnum.Defender) ownedDefenders++;
+            else if (agent.Team?.Side == BattleSideEnum.Attacker) ownedAttackers++;
         }
     }
 
@@ -546,13 +584,17 @@ public class ReinforcementFielder : IReinforcementFielder
                                     if (!TryTakeOwnershipOfStaleReplay(replayAgent))
                                         return false;
 
-                                    DespawnLocalRecoveryAgent(
+                                    if (DespawnLocalRecoveryAgent(
                                         replayAgent,
                                         replayAgent.MountAgent,
                                         spawnMountCaptured: true,
                                         recovery.PartyId,
                                         origin.UniqueSeed,
-                                        "departed-host late replay lost");
+                                        "departed-host late replay lost",
+                                        out var supersededIds))
+                                    {
+                                        RetainSupersededIds(recovery, supersededIds);
+                                    }
                                 }
                                 else
                                 {
@@ -611,13 +653,17 @@ public class ReinforcementFielder : IReinforcementFielder
                             if (!TryTakeOwnershipOfStaleReplay(agent))
                                 return false;
 
-                            DespawnLocalRecoveryAgent(
+                            if (DespawnLocalRecoveryAgent(
                                 agent,
                                 agent.MountAgent,
                                 spawnMountCaptured: true,
                                 recovery.PartyId,
                                 origin.UniqueSeed,
-                                "departed-host late replay removed before recovery");
+                                "departed-host late replay removed before recovery",
+                                out var supersededIds))
+                            {
+                                RetainSupersededIds(recovery, supersededIds);
+                            }
                             agent = null;
                         }
 
@@ -654,6 +700,7 @@ public class ReinforcementFielder : IReinforcementFielder
 
                 if (useResult == CoopTroopSupplier.ClaimedTroopUseResult.Committed)
                 {
+                    RecordReplacementAliases(recovery, agent);
                     ClearPendingRecoveryOrigin(recovery);
 
                     if (unavailableReserveEntry)
@@ -787,6 +834,37 @@ public class ReinforcementFielder : IReinforcementFielder
         recovery.PendingOrigin = null;
         recovery.PendingSpawnMount = null;
         recovery.PendingSpawnMountCaptured = false;
+        recovery.SupersededAgentIds.Clear();
+        recovery.SupersededMountIds.Clear();
+    }
+
+    private static void RetainSupersededIds(
+        RecoveryParty recovery,
+        SupersededAgentIds supersededIds)
+    {
+        if (supersededIds.AgentId != Guid.Empty)
+            recovery.SupersededAgentIds.Add(supersededIds.AgentId);
+        if (supersededIds.MountId != Guid.Empty)
+            recovery.SupersededMountIds.Add(supersededIds.MountId);
+    }
+
+    private void RecordReplacementAliases(RecoveryParty recovery, Agent replacement)
+    {
+        if (replacement == null) return;
+
+        var registry = coopMissionComponent.AgentRegistry;
+        if (registry.TryGetAgentInfo(replacement, out var replacementInfo))
+        {
+            foreach (var supersededAgentId in recovery.SupersededAgentIds)
+                agentIdAliases.Record(supersededAgentId, replacementInfo.AgentId);
+        }
+
+        if (replacement.MountAgent != null
+            && registry.TryGetAgentInfo(replacement.MountAgent, out var replacementMountInfo))
+        {
+            foreach (var supersededMountId in recovery.SupersededMountIds)
+                agentIdAliases.Record(supersededMountId, replacementMountInfo.AgentId);
+        }
     }
 
     private static void ClearPendingReinforcementOrigin(PendingReinforcementParty pending)
@@ -849,7 +927,37 @@ public class ReinforcementFielder : IReinforcementFielder
         string partyId,
         int troopSeed,
         string reason)
+        => DespawnLocalRecoveryAgent(
+            agent,
+            spawnMount,
+            spawnMountCaptured,
+            partyId,
+            troopSeed,
+            reason,
+            out _);
+
+    private readonly struct SupersededAgentIds
     {
+        public readonly Guid AgentId;
+        public readonly Guid MountId;
+
+        public SupersededAgentIds(Guid agentId, Guid mountId)
+        {
+            AgentId = agentId;
+            MountId = mountId;
+        }
+    }
+
+    private bool DespawnLocalRecoveryAgent(
+        Agent agent,
+        Agent spawnMount,
+        bool spawnMountCaptured,
+        string partyId,
+        int troopSeed,
+        string reason,
+        out SupersededAgentIds supersededIds)
+    {
+        supersededIds = default;
         if (agent == null) return false;
 
         var registry = coopMissionComponent.AgentRegistry;
@@ -909,6 +1017,10 @@ public class ReinforcementFielder : IReinforcementFielder
             registry.RemoveAgent(mountId.Value);
             casualties.Forget(mountId.Value);
         }
+
+        supersededIds = new SupersededAgentIds(
+            agentId.GetValueOrDefault(),
+            mountId.GetValueOrDefault());
 
         Logger.Information("[BattleSync] Despawned pending local reinforcement seed {Seed} for party {Party}: {Reason}",
             troopSeed, partyId, reason);
@@ -1047,15 +1159,16 @@ public class ReinforcementFielder : IReinforcementFielder
         public static RecoverySlots Calculate(
             int defenderEntitlement,
             int attackerEntitlement,
-            int activeDefenders,
-            int activeAttackers,
+            int activeOwnedDefenders,
+            int activeOwnedAttackers,
+            int totalActiveHumans,
             int battleSize)
         {
-            int defenderTarget = Math.Max(0, defenderEntitlement - activeDefenders);
-            int attackerTarget = Math.Max(0, attackerEntitlement - activeAttackers);
+            int defenderTarget = Math.Max(0, defenderEntitlement - activeOwnedDefenders);
+            int attackerTarget = Math.Max(0, attackerEntitlement - activeOwnedAttackers);
             int targetTotal = defenderTarget + attackerTarget;
             int available = (int)Math.Max(0L,
-                (long)battleSize - Math.Max(0, activeDefenders) - Math.Max(0, activeAttackers));
+                (long)battleSize - Math.Max(0, totalActiveHumans));
             if (targetTotal <= available)
                 return new RecoverySlots(defenderTarget, attackerTarget);
             if (targetTotal == 0 || available == 0)
@@ -1066,8 +1179,289 @@ public class ReinforcementFielder : IReinforcementFielder
         }
     }
 
-    // Queue only the party that this broad snapshot added after the frozen plan. The authoritative reserve follows
-    // on the same ordered stream, and Tick integrates it after deployment even when this message arrived early.
+    // Established authorities rebase their already-live phase when the assignment arrives. A mission that
+    // opens later sizes itself from the refreshed reserve and must not replay this decrement.
+    private void Handle_PrioritySlotAssigned(MessagePayload<NetworkBattlePrioritySlotAssigned> payload)
+    {
+        var message = payload.What;
+        if (message.MapEventId != session.InstanceId) return;
+
+        GameThread.RunSafe(() => ReconcilePrioritySlotTransfer(new BattlePrioritySpawnAssignment(
+            message.TransferId,
+            message.WaitingPartyId,
+            message.DonorPartyId)));
+    }
+
+    private void Handle_PrioritySlotCancelled(MessagePayload<NetworkBattlePrioritySlotCancelled> payload)
+    {
+        var message = payload.What;
+        if (message.TransferId <= 0 || message.MapEventId != session.InstanceId) return;
+
+        GameThread.RunSafe(() => ReconcilePrioritySlotTransfer(new BattlePrioritySpawnAssignment(
+            message.TransferId,
+            message.WaitingPartyId,
+            message.DonorPartyId)));
+    }
+
+    // Reserve refreshes change the donor entitlement first. Reconcile only the unread difference between
+    // that authoritative value and the value already represented by the live native phase.
+    private void ReconcilePrioritySlotTransfer(BattlePrioritySpawnAssignment assignment)
+    {
+        if (!TryGetOwningSupplier(assignment.DonorPartyId, out var supplier)) return;
+
+        var spawnLogic = spawnLogicProvider();
+        if (spawnLogic == null) return;
+
+        var phase = supplier.Side == BattleSideEnum.Defender
+            ? spawnLogic.DefenderActivePhase
+            : spawnLogic.AttackerActivePhase;
+        var context = spawnLogic._battleSideSpawnContexts[(int)supplier.Side];
+        if (phase == null || context == null) return;
+
+        int delta = supplier.ReconcileRepresentedInitialSpawnCount(assignment.DonorPartyId);
+        if (delta == 0) return;
+
+        int previousTarget = phase.InitialSpawnedNumber;
+        phase.InitialSpawnedNumber = Math.Max(0, previousTarget + delta);
+        phase.NumberActiveTroops = context.NumberOfActiveTroops;
+        Logger.Information("[BattleSync] Priority slot {Transfer} reconciled party {Donor}; {Side} native target changed from {Previous} to {Initial}",
+            assignment.TransferId, assignment.DonorPartyId, supplier.Side, previousTarget, phase.InitialSpawnedNumber);
+    }
+
+    // The add broadcast usually predates this joiner's mission controller. Discover the assigned local main
+    // party from persistent gate state and its populated supplier instead of relying on that one-shot event.
+    private void FieldPriorityPlayerParty()
+    {
+        if (string.IsNullOrEmpty(session.InstanceId)) return;
+
+        string partyId;
+        if (pendingPriorityPlayerParty?.MapEventId == session.InstanceId)
+            partyId = pendingPriorityPlayerParty.PartyId;
+        else if (!TryGetLocalMainMapEventPartyId(out partyId))
+            return;
+        if (fieldedPriorityPlayerParties.Contains(partyId)) return;
+
+        BattlePrioritySpawnAssignment assignment = default;
+        bool assigned = false;
+        foreach (var candidate in BattleSpawnGate.GetPrioritySpawnAssignments(session.InstanceId))
+        {
+            if (candidate.WaitingPartyId != partyId) continue;
+            assignment = candidate;
+            assigned = true;
+            break;
+        }
+        if (!assigned) return;
+
+        if (pendingPriorityPlayerParty == null || pendingPriorityPlayerParty.PartyId != partyId)
+            pendingPriorityPlayerParty = new PendingReinforcementParty(session.InstanceId, partyId, initialSpawnCount: 1);
+
+        var result = TryFieldPriorityPlayerParty(pendingPriorityPlayerParty);
+        if (result == PriorityPlayerFieldResult.Pending
+            || !reportedPrioritySlotResolutions.Add(assignment.TransferId))
+        {
+            return;
+        }
+
+        if (result == PriorityPlayerFieldResult.Declined)
+        {
+            relayNetwork.SendAll(new NetworkBattlePrioritySlotDeclined(
+                session.InstanceId,
+                assignment.TransferId,
+                partyId));
+            Logger.Warning("[BattleSync] Priority slot {Transfer} declined by local player party {Party}",
+                assignment.TransferId, partyId);
+            return;
+        }
+
+        relayNetwork.SendAll(new NetworkBattlePrioritySlotConsumed(
+            session.InstanceId,
+            assignment.TransferId,
+            partyId));
+        fieldedPriorityPlayerParties.Add(partyId);
+        pendingPriorityPlayerParty = null;
+        BattleSpawnGate.CompletePrioritySpawn(session.InstanceId, partyId);
+        Logger.Information("[BattleSync] Priority slot {Transfer} fielded local player party {Party}",
+            assignment.TransferId, partyId);
+    }
+
+    private bool TryGetLocalMainMapEventPartyId(out string partyId)
+    {
+        partyId = null;
+        if (Mission.Current?.MainAgent?.Origin is CoopAgentOrigin origin
+            && !string.IsNullOrEmpty(origin.MapEventPartyId))
+        {
+            partyId = origin.MapEventPartyId;
+            return true;
+        }
+
+        var mainParty = PartyBase.MainParty;
+        var side = mainParty?.MapEventSide;
+        if (side == null) return false;
+
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty?.Party != mainParty) continue;
+            return objectManager.TryGetId(mapEventParty, out partyId);
+        }
+        return false;
+    }
+
+    private PriorityPlayerFieldResult TryFieldPriorityPlayerParty(PendingReinforcementParty pending)
+    {
+        if (!TryGetOwningSupplier(pending.PartyId, out var supplier)) return PriorityPlayerFieldResult.Pending;
+        if (!supplier.TryGetPartyCounts(pending.PartyId, out _, out var supplied, out var initial))
+            return PriorityPlayerFieldResult.Pending;
+
+        if (supplied > 0)
+            return IsRegisteredLocalMainAgent(pending.PartyId)
+                ? PriorityPlayerFieldResult.Spawned
+                : PriorityPlayerFieldResult.Pending;
+        if (initial <= 0) return PriorityPlayerFieldResult.Pending; // wait for the assignment's refreshed reserve
+
+        var spawnLogic = spawnLogicProvider();
+        if (spawnLogic == null || !spawnLogic.IsInitialSpawnOver) return PriorityPlayerFieldResult.Pending;
+        var phase = supplier.Side == BattleSideEnum.Defender
+            ? spawnLogic.DefenderActivePhase
+            : spawnLogic.AttackerActivePhase;
+        var context = spawnLogic._battleSideSpawnContexts[(int)supplier.Side];
+        if (phase == null || context == null) return PriorityPlayerFieldResult.Pending;
+        if (!BattleSpawnGate.HasAvailableHumanAgentSlot(Mission.Current)) return PriorityPlayerFieldResult.Pending;
+
+        var mainHeroCharacter = Hero.MainHero?.CharacterObject;
+        if (mainHeroCharacter == null
+            || !objectManager.TryGetId(mainHeroCharacter, out var mainHeroCharacterId)
+            || !supplier.TryGetNextTroopCharacterId(pending.PartyId, out var nextCharacterId)
+            || nextCharacterId != mainHeroCharacterId)
+        {
+            Logger.Error("[BattleSync] Priority player party {Party} does not have the local main hero at its reserve pointer",
+                pending.PartyId);
+            return PriorityPlayerFieldResult.Declined;
+        }
+
+        if (!objectManager.TryGetObject<MapEventParty>(pending.PartyId, out var mapEventParty)
+            || mapEventParty?._roster == null)
+            return PriorityPlayerFieldResult.Pending;
+
+        var team = BattleTeams.Resolve(supplier.Side);
+        if (team == null) return PriorityPlayerFieldResult.Pending;
+
+        if (pending.PendingOrigin == null)
+        {
+            if (!supplier.TryClaimOneTroopFromParty(pending.PartyId, out var suppliedOrigin))
+                return PriorityPlayerFieldResult.Pending;
+            if (suppliedOrigin is not CoopAgentOrigin coopOrigin)
+            {
+                phase.RemainingSpawnNumber = Math.Max(0, phase.RemainingSpawnNumber - 1);
+                RemoveUnspawnableTroop(spawnLogic, phase, supplier.Side);
+                return PriorityPlayerFieldResult.Declined;
+            }
+
+            pending.PendingOrigin = coopOrigin;
+            pending.PendingSpawnMount = null;
+            pending.PendingSpawnMountCaptured = false;
+        }
+
+        var origin = pending.PendingOrigin;
+        Agent agent = null;
+        bool liveAgentWon = false;
+        bool unavailableReserveEntry = false;
+        var useResult = supplier.TryUseClaimedTroop(
+            pending.PartyId,
+            origin.UniqueSeed,
+            () =>
+            {
+                if (casualties.WasDeparted(origin.UniqueSeed) || supplier.WasDeparted(origin.UniqueSeed))
+                {
+                    unavailableReserveEntry = true;
+                    return true;
+                }
+
+                if (TryGetLivePartyAgent(pending.PartyId, origin.UniqueSeed, out agent))
+                {
+                    origin.SuppressRemoval();
+                    liveAgentWon = true;
+                    return true;
+                }
+
+                if (GetRosterEntryState(mapEventParty, origin.UniqueSeed) == RosterEntryState.Inactive)
+                {
+                    unavailableReserveEntry = true;
+                    return true;
+                }
+
+                bool created = TryCreateReinforcementAgent(team, origin, pending.PartyId, out agent);
+                if (!created && TryFindActiveOriginAgent(Mission.Current, origin, out var pendingAgent))
+                {
+                    if (!pending.PendingSpawnMountCaptured)
+                    {
+                        pending.PendingSpawnMount = pendingAgent.MountAgent;
+                        pending.PendingSpawnMountCaptured = true;
+                    }
+                    if (DespawnLocalRecoveryAgent(
+                            pendingAgent,
+                            pending.PendingSpawnMount,
+                            pending.PendingSpawnMountCaptured,
+                            pending.PartyId,
+                            origin.UniqueSeed,
+                            "priority player capture did not register"))
+                    {
+                        pending.PendingOrigin = origin.CreateRetryOrigin();
+                        pending.PendingSpawnMount = null;
+                        pending.PendingSpawnMountCaptured = false;
+                    }
+                }
+                return created;
+            });
+
+        if (useResult == CoopTroopSupplier.ClaimedTroopUseResult.Deferred)
+            return PriorityPlayerFieldResult.Pending;
+        if (useResult == CoopTroopSupplier.ClaimedTroopUseResult.ClaimMissing)
+        {
+            DespawnPendingLocalAgent(pending, "priority player claim removed");
+            ClearPendingReinforcementOrigin(pending);
+            return PriorityPlayerFieldResult.Pending;
+        }
+
+        ClearPendingReinforcementOrigin(pending);
+        phase.RemainingSpawnNumber = Math.Max(0, phase.RemainingSpawnNumber - 1);
+        if (unavailableReserveEntry)
+        {
+            RemoveUnspawnableTroop(spawnLogic, phase, supplier.Side);
+            Logger.Warning("[BattleSync] Priority player seed {Seed} in party {Party} became unavailable",
+                origin.UniqueSeed, pending.PartyId);
+            return PriorityPlayerFieldResult.Declined;
+        }
+
+        phase.InitialSpawnedNumber++;
+        if (!liveAgentWon)
+        {
+            context._numSpawnedTroops++;
+            TrySetupReinforcementAgent(agent, new HashSet<Formation>());
+        }
+        phase.NumberActiveTroops = context.NumberOfActiveTroops;
+        return IsRegisteredLocalMainAgent(pending.PartyId)
+            ? PriorityPlayerFieldResult.Spawned
+            : PriorityPlayerFieldResult.Pending;
+    }
+
+    private bool IsRegisteredLocalMainAgent(string partyId)
+    {
+        var mainAgent = Mission.Current?.MainAgent;
+        if (mainAgent == null
+            || !mainAgent.IsActive()
+            || mainAgent.Controller != AgentControllerType.Player
+            || mainAgent.Origin is not CoopAgentOrigin origin
+            || origin.MapEventPartyId != partyId)
+        {
+            return false;
+        }
+
+        return coopMissionComponent.AgentRegistry.TryGetAgentInfo(mainAgent, out var info)
+            && info.CurrentAuthority == session.OwnControllerId;
+    }
+
+    // The add and reserve messages travel on the same ordered stream, and Tick integrates the party after
+    // deployment even when the add arrived first.
     private void Handle_ReinforcementPartiesAdded(MessagePayload<NetworkAddInvolvedParties> payload)
     {
         var message = payload.What;
@@ -1608,7 +2002,8 @@ public class ReinforcementFielder : IReinforcementFielder
         // AI-controlled but NOT alarmed and holds stale enemy caches, so it ignores its formation's Charge order
         // (set by the caller) and stands idle — the "reinforcements spawn but don't move" bug. In a
         // coop battle no general drives the formation, so nothing else alarms them.
-        AgentAiWaker.Wake(agent);
+        if (agent.Controller != AgentControllerType.Player)
+            AgentAiWaker.Wake(agent);
     }
 
     private static void ApplyFormationOrders(IEnumerable<Formation> formations)

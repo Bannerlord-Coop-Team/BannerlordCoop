@@ -2,6 +2,7 @@
 using E2E.Tests.Environment;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using Missions.Messages;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -84,7 +85,10 @@ public class BattleCasualtyVerticalTests : MissionTestEnvironment
             var ledger = Server.Resolve<IBattleTroopLedger>();
             ledger.SetReserve(mapEventId, partyId, ledgerEntries);
 
-            Server.Resolve<IMessageBroker>().Publish(this, new NetworkRequestBattleCasualty(
+            BattleHumanSlotFreed? freedSlot = null;
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Subscribe<BattleHumanSlotFreed>(payload => freedSlot = payload.What);
+            broker.Publish(this, new NetworkRequestBattleCasualty(
                 partyId,
                 troopId,
                 wounded: false,
@@ -100,6 +104,10 @@ public class BattleCasualtyVerticalTests : MissionTestEnvironment
             Assert.False(firstKilled);
             Assert.True(secondKilled);
             Assert.Equal(new[] { seeds[1] }, ledger.GetDepartedSeeds(mapEventId, partyId));
+            Assert.True(freedSlot.HasValue);
+            Assert.Equal(mapEventId, freedSlot.Value.MapEventId);
+            Assert.Equal(partyId, freedSlot.Value.PartyId);
+            Assert.Equal(seeds[1], freedSlot.Value.TroopSeed);
         });
     }
 

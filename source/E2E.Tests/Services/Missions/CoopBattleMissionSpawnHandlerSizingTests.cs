@@ -138,8 +138,9 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         var slots = ReinforcementFielder.RecoverySlots.Calculate(
             defenderEntitlement: 120,
             attackerEntitlement: 80,
-            activeDefenders: 70,
-            activeAttackers: 50,
+            activeOwnedDefenders: 70,
+            activeOwnedAttackers: 50,
+            totalActiveHumans: 120,
             battleSize: 200);
 
         Assert.Equal(50, slots.Defenders);
@@ -152,8 +153,9 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         var slots = ReinforcementFielder.RecoverySlots.Calculate(
             defenderEntitlement: 120,
             attackerEntitlement: 80,
-            activeDefenders: 120,
-            activeAttackers: 95,
+            activeOwnedDefenders: 120,
+            activeOwnedAttackers: 95,
+            totalActiveHumans: 215,
             battleSize: 200);
 
         Assert.Equal(0, slots.Defenders);
@@ -166,8 +168,9 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         var slots = ReinforcementFielder.RecoverySlots.Calculate(
             defenderEntitlement: 100,
             attackerEntitlement: 50,
-            activeDefenders: 0,
-            activeAttackers: 50,
+            activeOwnedDefenders: 0,
+            activeOwnedAttackers: 50,
+            totalActiveHumans: 50,
             battleSize: 150);
 
         Assert.Equal(100, slots.Defenders);
@@ -181,8 +184,9 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         var slots = ReinforcementFielder.RecoverySlots.Calculate(
             defenderEntitlement: 700,
             attackerEntitlement: 700,
-            activeDefenders: 400,
-            activeAttackers: 400,
+            activeOwnedDefenders: 400,
+            activeOwnedAttackers: 400,
+            totalActiveHumans: 800,
             battleSize: 1000);
 
         Assert.Equal(100, slots.Defenders);
@@ -196,13 +200,30 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         var slots = ReinforcementFielder.RecoverySlots.Calculate(
             defenderEntitlement: 500,
             attackerEntitlement: 500,
-            activeDefenders: 600,
-            activeAttackers: 0,
+            activeOwnedDefenders: 600,
+            activeOwnedAttackers: 0,
+            totalActiveHumans: 600,
             battleSize: 1000);
 
         Assert.Equal(0, slots.Defenders);
         Assert.Equal(400, slots.Attackers);
         Assert.Equal(1000, 600 + slots.Attackers);
+    }
+
+    [Fact]
+    public void MigrationRecoverySlots_RemotePuppetsConsumeGlobalCapacityWithoutReducingOwnedEntitlement()
+    {
+        var slots = ReinforcementFielder.RecoverySlots.Calculate(
+            defenderEntitlement: 500,
+            attackerEntitlement: 500,
+            activeOwnedDefenders: 300,
+            activeOwnedAttackers: 300,
+            totalActiveHumans: 900,
+            battleSize: 1000);
+
+        Assert.Equal(50, slots.Defenders);
+        Assert.Equal(50, slots.Attackers);
+        Assert.Equal(1000, 900 + slots.Defenders + slots.Attackers);
     }
 
     [Theory]

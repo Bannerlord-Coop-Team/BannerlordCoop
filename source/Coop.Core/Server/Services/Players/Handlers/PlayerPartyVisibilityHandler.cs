@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
@@ -73,7 +74,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         var peer = payload.What.PlayerId;
 
-        if (!TryResolveParty(peer, out var party))
+        if (!TryResolveParty(peer, out var controllerId, out var party))
         {
             // Not every disconnect belongs to a player mid-campaign so a miss can be expected, not an error
             return;
@@ -88,6 +89,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
             var mapEvent = party.MapEvent;
             if (mapEvent != null)
             {
+                if (objectManager.TryGetId(mapEvent, out var mapEventId))
+                    messageBroker.Publish(this, new BattlePlayerDisconnected(mapEventId, controllerId));
+
                 deferredMapEventParking[party] = mapEvent;
                 Logger.Information(
                     "Keeping party {PartyId} active in MapEvent {MapEventId} after peer {Peer} disconnected",
@@ -217,11 +221,18 @@ internal class PlayerPartyVisibilityHandler : IHandler
         network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
     }
 
-    private bool TryResolveParty(NetPeer peer, out MobileParty party)
+    private bool TryResolveParty(NetPeer peer, out string controllerId, out MobileParty party)
     {
+        controllerId = null;
         party = null;
 
-        return playerManager.TryGetPlayer(peer, out var player) &&
-            objectManager.TryGetObjectWithLogging(player.MobilePartyId, out party);
+        if (!playerManager.TryGetPlayer(peer, out var player)
+            || !objectManager.TryGetObjectWithLogging(player.MobilePartyId, out party))
+        {
+            return false;
+        }
+
+        controllerId = player.ControllerId;
+        return true;
     }
 }

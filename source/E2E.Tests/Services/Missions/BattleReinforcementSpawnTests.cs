@@ -2,16 +2,19 @@
 using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Missions;
 using Missions.Battles;
+using Missions.Data;
 using Missions.Messages;
 using Missions.Services.Network;
 using TaleWorlds.CampaignSystem;
@@ -82,6 +85,23 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
         public void SendAllBut(string controllerId, IMessage message) => throw new NotSupportedException();
     }
 
+    private sealed class RecordingRelayNetwork : INetwork
+    {
+        public List<IMessage> SentMessages { get; } = new List<IMessage>();
+        public INetworkConfig Config => null;
+
+        public void Dispose() { }
+        public void Start() { }
+        public void Send(LiteNetLib.NetPeer netPeer, Common.PacketHandlers.IPacket packet) => throw new NotSupportedException();
+        public void SendImmediate(LiteNetLib.NetPeer netPeer, Common.PacketHandlers.IPacket packet) => throw new NotSupportedException();
+        public void SendAll(Common.PacketHandlers.IPacket packet) => throw new NotSupportedException();
+        public void SendAllBut(LiteNetLib.NetPeer excludedPeer, Common.PacketHandlers.IPacket packet) => throw new NotSupportedException();
+        public void Send(LiteNetLib.NetPeer netPeer, IMessage message) => throw new NotSupportedException();
+        public void SendImmediate(LiteNetLib.NetPeer netPeer, IMessage message) => throw new NotSupportedException();
+        public void SendAll(IMessage message) => SentMessages.Add(message);
+        public void SendAllBut(LiteNetLib.NetPeer excludedPeer, IMessage message) => throw new NotSupportedException();
+    }
+
     public enum PendingRecoveryResolution
     {
         ExactAgent,
@@ -145,7 +165,8 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
                 new[] { mapEventPartyId },
                 new[] { new CampaignVec2(default, true) },
                 new[] { initialSpawnCount },
-                new[] { true }));
+                new[] { true },
+                new[] { false }));
     }
 
     private static TroopReserveEntry[] Entries(string reinforcementCharacterId)
@@ -165,6 +186,37 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
         supplier.SetReserve(Array.Empty<PartyReserve>());
         CoopTroopSupplierRegistry.Register(supplier);
         return supplier;
+    }
+
+    private void RegisterMainHeroCharacter(string characterId)
+    {
+        void Register(EnvironmentInstance instance)
+        {
+            instance.Call(() =>
+            {
+                var character = Assert.IsType<CharacterObject>(Hero.MainHero.CharacterObject);
+                Assert.True(instance.ObjectManager.AddExisting(characterId, character));
+            });
+        }
+
+        Register(Server);
+        foreach (var client in Clients)
+            Register(client);
+    }
+
+    private static void RestoreMainPartyMapEventSide(
+        EnvironmentInstance authority,
+        string mapEventId,
+        string partyId)
+    {
+        authority.Call(() =>
+        {
+            Assert.True(authority.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(authority.ObjectManager.TryGetObject<MobileParty>(partyId, out var mainParty));
+            Campaign.Current.MainParty = mainParty;
+            mainParty.Party._mapEventSide = mapEvent.DefenderSide;
+            mainParty.Party.CustomName = new TaleWorlds.Localization.TextObject("priority player party");
+        });
     }
 
     private static void FeedReinforcementReserve(
@@ -222,10 +274,13 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
         Func<Mission, AgentBuildData, Agent> agentSpawner = null,
         IMessageBroker messageBroker = null,
         ICasualtyAttributionMap casualties = null,
-        IBattleNetwork network = null)
+        IBattleNetwork network = null,
+        INetwork relayNetwork = null,
+        IBattleAgentIdAliasMap agentIdAliases = null)
         => new ReinforcementFielder(
             messageBroker ?? authority.Resolve<IMessageBroker>(),
             network ?? authority.Resolve<IBattleNetwork>(),
+            relayNetwork ?? authority.Resolve<INetwork>(),
             authority.ObjectManager,
             authority.Resolve<ICoopMissionComponent>(),
             authority.Resolve<IMissionContext>(),
@@ -233,6 +288,7 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
             controller.Deployment,
             formationAssigner ?? authority.Resolve<IAgentFormationAssigner>(),
             casualties ?? new CasualtyAttributionMap(),
+            agentIdAliases ?? new BattleAgentIdAliasMap(),
             () => spawnLogic,
             agentSpawner);
 
@@ -259,6 +315,478 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
             .Select(agent => Assert.IsType<CoopAgentOrigin>(agent.Origin).UniqueSeed)
             .OrderBy(seed => seed)
             .ToArray();
+    }
+
+    [Fact]
+    public void PendingPriorityPlayer_PreventsVanillaFromReservingItsHeroBeforeAssignment()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("host", "client");
+        var playerCharacterId = CreateRegisteredObject<CharacterObject>();
+        var authority = Clients.Last();
+        string playerMapEventPartyId = null;
+
+        authority.Call(() =>
+        {
+            fixture.CreateMission(authority);
+            Assert.True(authority.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var playerParty));
+            var mapEventParty = Assert.Single(playerParty.Party.MapEventSide.Parties,
+                candidate => candidate.Party == playerParty.Party);
+            Assert.True(authority.ObjectManager.TryGetId(mapEventParty, out playerMapEventPartyId));
+        });
+
+        EnterBattle(authority, mapEventId);
+
+        authority.Call(() =>
+        {
+            var supplier = RegisterEmptySupplier(authority, mapEventId);
+            supplier.SetReserve(new[]
+            {
+                new PartyReserve(
+                    playerMapEventPartyId,
+                    suppliedCount: 0,
+                    new[] { new TroopReserveEntry(194999, playerCharacterId, formationClass: 0) },
+                    initialSpawnCount: 1),
+            });
+
+            var spawnLogic = CreateSpawnLogic(mapEventId, authority, supplier);
+            spawnLogic.DefenderPhase.TotalSpawnNumber = 2;
+            spawnLogic.DefenderPhase.InitialSpawnedNumber = 1;
+            spawnLogic.DefenderPhase.RemainingSpawnNumber = 1;
+
+            BattleSpawnGate.BeginBattle(mapEventId, battleSize: 1);
+            BattleSpawnGate.QueuePrioritySpawn(mapEventId, playerMapEventPartyId);
+            try
+            {
+                Assert.False(spawnLogic.DefenderContext.CheckReinforcementBatch());
+                Assert.Equal(0, spawnLogic.DefenderContext.ReservedTroopsCount);
+                Assert.Equal(0, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+                CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+            }
+        });
+    }
+
+    [Fact]
+    public void LatePlayerAtFullBattleSize_WaitsThenClaimsTransferredSlot()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("host", "client");
+        var incumbentCharacterId = CreateRegisteredObject<CharacterObject>();
+        var authority = Clients.Last();
+        const string playerCharacterId = "priority-player-character";
+        CoopBattleController controller = null;
+        MockMission mock = null;
+        string playerMapEventPartyId = null;
+        var recordingRelay = new RecordingRelayNetwork();
+
+        authority.Call(() =>
+        {
+            mock = fixture.CreateMission(authority);
+            controller = authority.Resolve<CoopBattleController>();
+
+            Assert.True(authority.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var playerParty));
+            Campaign.Current.MainParty = playerParty;
+            var mapEventParty = Assert.Single(playerParty.Party.MapEventSide.Parties,
+                candidate => candidate.Party == playerParty.Party);
+            Assert.True(authority.ObjectManager.TryGetId(mapEventParty, out playerMapEventPartyId));
+
+            var playerCharacter = Assert.IsType<CharacterObject>(Game.Current.PlayerTroop);
+            Assert.Same(Hero.MainHero, playerCharacter.HeroObject);
+        });
+
+        EnterBattle(authority, mapEventId);
+        authority.Call(() => controller.OnDeploymentFinished());
+        RestoreMainPartyMapEventSide(authority, mapEventId, partyIds[1]);
+        RegisterMainHeroCharacter(playerCharacterId);
+        SetFlattenedRoster(authority, playerMapEventPartyId, playerCharacterId, 194999);
+
+        authority.Call(() =>
+        {
+            var supplier = RegisterEmptySupplier(authority, mapEventId);
+            supplier.SetReserve(new[]
+            {
+                new PartyReserve(
+                    playerMapEventPartyId,
+                    suppliedCount: 0,
+                    new[] { new TroopReserveEntry(194999, playerCharacterId, formationClass: 0) },
+                    initialSpawnCount: 1),
+            });
+            supplier.RecordPhaseCapacity(playerMapEventPartyId, totalTroops: 1);
+
+            var spawnLogic = CreateSpawnLogic(mapEventId, authority, supplier);
+            spawnLogic.DefenderPhase.TotalSpawnNumber = 1;
+            spawnLogic.DefenderPhase.RemainingSpawnNumber = 1;
+            spawnLogic.Logic._numberOfTroopsInTotal[(int)BattleSideEnum.Defender] = 1;
+
+            Assert.True(authority.ObjectManager.TryGetObject<CharacterObject>(
+                incumbentCharacterId, out var incumbentCharacter));
+            var incumbent = mock.SpawnAgent(new AgentBuildData(incumbentCharacter)
+                .Team(mock.AttackerTeam.Shell));
+
+            BattleSpawnGate.BeginBattle(mapEventId, battleSize: 1);
+            BattleSpawnGate.QueuePrioritySpawn(mapEventId, playerMapEventPartyId);
+            BattleSpawnGate.RecordPrioritySpawnAssignment(
+                mapEventId,
+                transferId: 1,
+                playerMapEventPartyId,
+                donorPartyId: "departed-party");
+
+            using var fielder = CreateFielder(
+                authority,
+                controller,
+                spawnLogic.Logic,
+                relayNetwork: recordingRelay);
+            try
+            {
+                fielder.Tick();
+
+                Assert.Null(mock.MainAgent);
+                Assert.Single(mock.Agents, agent => agent.IsActive() && agent.IsHuman);
+                Assert.Equal(0, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+
+                Assert.True(mock.UntrackAgent(incumbent));
+                Assert.True(BattleSpawnGate.HasAvailableHumanAgentSlot(mock.Shell));
+                Assert.True(authority.ObjectManager.TryGetId(
+                    Hero.MainHero.CharacterObject, out var mainHeroCharacterId));
+                Assert.Equal(playerCharacterId, mainHeroCharacterId);
+                Assert.True(supplier.TryGetNextTroopCharacterId(
+                    playerMapEventPartyId, out var nextCharacterId));
+                Assert.Equal(playerCharacterId, nextCharacterId);
+                fielder.Tick();
+                fielder.Tick();
+
+                var playerAgent = Assert.Single(mock.Agents, agent => agent.IsActive() && agent.IsHuman);
+                Assert.Same(playerAgent, mock.MainAgent);
+                Assert.Equal(AgentControllerType.Player, playerAgent.Controller);
+                Assert.Equal(194999, Assert.IsType<CoopAgentOrigin>(playerAgent.Origin).UniqueSeed);
+                Assert.Equal(1, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+                Assert.Equal(1, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+                Assert.Equal(0, spawnLogic.DefenderPhase.RemainingSpawnNumber);
+                Assert.Equal(1, spawnLogic.DefenderContext._numSpawnedTroops);
+
+                Assert.True(authority.Resolve<INetworkAgentRegistry>()
+                    .TryGetAgentInfo(playerAgent, out var playerInfo));
+                Assert.Equal(controller.Session.OwnControllerId, playerInfo.CurrentAuthority);
+                Assert.Equal(playerMapEventPartyId,
+                    Assert.IsType<CoopAgentOrigin>(playerAgent.Origin).MapEventPartyId);
+                // A replay for an already-registered party must still let the fielder report consumption.
+                BattleSpawnGate.RecordPrioritySpawnAssignment(
+                    mapEventId,
+                    transferId: 1,
+                    playerMapEventPartyId,
+                    donorPartyId: "departed-party");
+                var retainedAssignment = Assert.Single(
+                    BattleSpawnGate.GetPrioritySpawnAssignments(mapEventId));
+                Assert.Equal(playerMapEventPartyId, retainedAssignment.WaitingPartyId);
+                fielder.Tick();
+
+                var consumedMessage = Assert.Single(
+                    recordingRelay.SentMessages.OfType<NetworkBattlePrioritySlotConsumed>());
+                Assert.Equal(mapEventId, consumedMessage.MapEventId);
+                Assert.Equal(1, consumedMessage.TransferId);
+                Assert.Equal(playerMapEventPartyId, consumedMessage.WaitingPartyId);
+                Assert.Empty(recordingRelay.SentMessages.OfType<NetworkBattlePrioritySlotDeclined>());
+
+                fielder.Tick();
+                Assert.Single(mock.Agents, agent => agent.IsActive() && agent.IsHuman);
+                Assert.Single(recordingRelay.SentMessages.OfType<NetworkBattlePrioritySlotConsumed>());
+                Assert.Empty(recordingRelay.SentMessages.OfType<NetworkBattlePrioritySlotDeclined>());
+                Assert.False(BattleSpawnGate.HasPendingPrioritySpawn);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+                CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+            }
+        });
+
+        GC.KeepAlive(controller);
+    }
+
+    [Fact]
+    public void PrioritySlotWithWrongReserveHero_DeclinesOnceAndWaitsForServerCancellation()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("host", "client");
+        var wrongCharacterId = CreateRegisteredObject<CharacterObject>();
+        var authority = Clients.Last();
+        CoopBattleController controller = null;
+        MockMission mock = null;
+        string playerMapEventPartyId = null;
+
+        authority.Call(() =>
+        {
+            mock = fixture.CreateMission(authority);
+            controller = authority.Resolve<CoopBattleController>();
+
+            Assert.True(authority.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var playerParty));
+            Campaign.Current.MainParty = playerParty;
+            var mapEventParty = Assert.Single(playerParty.Party.MapEventSide.Parties,
+                candidate => candidate.Party == playerParty.Party);
+            Assert.True(authority.ObjectManager.TryGetId(mapEventParty, out playerMapEventPartyId));
+        });
+
+        EnterBattle(authority, mapEventId);
+        authority.Call(() => controller.OnDeploymentFinished());
+        RestoreMainPartyMapEventSide(authority, mapEventId, partyIds[1]);
+        RegisterMainHeroCharacter("priority-player-character");
+
+        authority.Call(() =>
+        {
+            var supplier = RegisterEmptySupplier(authority, mapEventId);
+            supplier.SetReserve(new[]
+            {
+                new PartyReserve(
+                    playerMapEventPartyId,
+                    suppliedCount: 0,
+                    new[] { new TroopReserveEntry(194999, wrongCharacterId, formationClass: 0) },
+                    initialSpawnCount: 1),
+            });
+            supplier.RecordPhaseCapacity(playerMapEventPartyId, totalTroops: 1);
+
+            var spawnLogic = CreateSpawnLogic(mapEventId, authority, supplier);
+            spawnLogic.DefenderPhase.TotalSpawnNumber = 1;
+            spawnLogic.DefenderPhase.RemainingSpawnNumber = 1;
+            spawnLogic.Logic._numberOfTroopsInTotal[(int)BattleSideEnum.Defender] = 1;
+
+            BattleSpawnGate.BeginBattle(mapEventId, battleSize: 1);
+            BattleSpawnGate.QueuePrioritySpawn(mapEventId, playerMapEventPartyId);
+            BattleSpawnGate.RecordPrioritySpawnAssignment(
+                mapEventId,
+                transferId: 2,
+                playerMapEventPartyId,
+                donorPartyId: "departed-party");
+
+            Assert.True(controller.Deployment.IsCommitted);
+            Assert.True(controller.Deployment.IsActivated);
+            Assert.Equal(mapEventId, controller.Session.InstanceId);
+            Assert.Same(Campaign.Current.MainParty.Party, PartyBase.MainParty);
+            Assert.NotNull(PartyBase.MainParty.MapEventSide);
+            Assert.Contains(PartyBase.MainParty.MapEventSide.Parties,
+                party => party.Party == PartyBase.MainParty);
+            Assert.Single(BattleSpawnGate.GetPrioritySpawnAssignments(mapEventId));
+            Assert.True(spawnLogic.Logic.IsInitialSpawnOver);
+            Assert.True(supplier.TryGetPartyCounts(
+                playerMapEventPartyId, out _, out var supplied, out var initial));
+            Assert.Equal(0, supplied);
+            Assert.Equal(1, initial);
+            Assert.True(authority.ObjectManager.TryGetId(
+                Hero.MainHero.CharacterObject, out var mainHeroCharacterId));
+            Assert.Equal("priority-player-character", mainHeroCharacterId);
+            Assert.True(supplier.TryGetNextTroopCharacterId(
+                playerMapEventPartyId, out var nextCharacterId));
+            Assert.Equal(wrongCharacterId, nextCharacterId);
+            Assert.True(BattleSpawnGate.HasAvailableHumanAgentSlot(mock.Shell));
+
+            var recordingRelay = new RecordingRelayNetwork();
+            using var fielder = CreateFielder(
+                authority,
+                controller,
+                spawnLogic.Logic,
+                relayNetwork: recordingRelay);
+            try
+            {
+                fielder.Tick();
+                fielder.Tick();
+
+                var declinedMessage = Assert.Single(
+                    recordingRelay.SentMessages.OfType<NetworkBattlePrioritySlotDeclined>());
+                Assert.Equal(mapEventId, declinedMessage.MapEventId);
+                Assert.Equal(2, declinedMessage.TransferId);
+                Assert.Equal(playerMapEventPartyId, declinedMessage.WaitingPartyId);
+                Assert.Empty(recordingRelay.SentMessages.OfType<NetworkBattlePrioritySlotConsumed>());
+                Assert.Equal(0, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+                Assert.Null(mock.MainAgent);
+                Assert.Empty(mock.Agents.Where(agent => agent.IsActive() && agent.IsHuman));
+                Assert.True(BattleSpawnGate.HasPendingPrioritySpawn);
+
+                Assert.True(BattleSpawnGate.CancelPrioritySpawnAssignment(mapEventId, transferId: 2));
+                Assert.False(BattleSpawnGate.HasPendingPrioritySpawn);
+                fielder.Tick();
+                Assert.Single(recordingRelay.SentMessages.OfType<NetworkBattlePrioritySlotDeclined>());
+                Assert.Empty(recordingRelay.SentMessages.OfType<NetworkBattlePrioritySlotConsumed>());
+                Assert.Equal(0, Assert.Single(supplier.GetSuppliedByParty()).supplied);
+                Assert.Null(mock.MainAgent);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+                CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+            }
+        });
+
+        GC.KeepAlive(controller);
+    }
+
+    [Fact]
+    public void PrioritySlotTransfer_RebasesOnlyRepresentedLivePhaseAndCancellationRestoresItOnce()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "client");
+        var authority = Clients.Last();
+        CoopBattleController controller = null;
+
+        authority.Call(() =>
+        {
+            fixture.CreateMission(authority);
+            controller = authority.Resolve<CoopBattleController>();
+        });
+
+        EnterBattle(authority, mapEventId);
+
+        authority.Call(() =>
+        {
+            controller.OnDeploymentFinished();
+
+            var supplier = RegisterEmptySupplier(authority, mapEventId);
+            supplier.SetReserve(new[]
+            {
+                new PartyReserve(
+                    "donor-party",
+                    suppliedCount: 0,
+                    new[] { new TroopReserveEntry(194901, "donor-character", formationClass: 0) },
+                    initialSpawnCount: 1),
+            });
+            supplier.RecordPhaseCapacity("donor-party", totalTroops: 1);
+            var spawnLogic = CreateSpawnLogic(mapEventId, authority, supplier);
+            spawnLogic.DefenderPhase.InitialSpawnedNumber = 1;
+
+            BattleSpawnGate.BeginBattle(mapEventId, battleSize: 1);
+            BattleSpawnGate.RecordPrioritySpawnAssignment(
+                mapEventId,
+                transferId: 7,
+                waitingPartyId: "first-waiter",
+                donorPartyId: "donor-party");
+
+            using var fielder = CreateFielder(authority, controller, spawnLogic.Logic);
+            try
+            {
+                fielder.Tick();
+                Assert.Equal(1, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+
+                var broker = authority.Resolve<IMessageBroker>();
+                supplier.SetReserve(new[]
+                {
+                    new PartyReserve(
+                        "donor-party",
+                        suppliedCount: 0,
+                        new[] { new TroopReserveEntry(194901, "donor-character", formationClass: 0) },
+                        initialSpawnCount: 0),
+                });
+                broker.Publish(this, new NetworkBattlePrioritySlotAssigned(
+                    mapEventId, 7, "first-waiter", "donor-party"));
+                Assert.Equal(0, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+
+                broker.Publish(this, new NetworkBattlePrioritySlotAssigned(
+                    mapEventId, 7, "second-waiter", "donor-party"));
+                Assert.Equal(0, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+
+                supplier.SetReserve(new[]
+                {
+                    new PartyReserve(
+                        "donor-party",
+                        suppliedCount: 0,
+                        new[] { new TroopReserveEntry(194901, "donor-character", formationClass: 0) },
+                        initialSpawnCount: 1),
+                });
+                broker.Publish(this, new NetworkBattlePrioritySlotCancelled(
+                    mapEventId, 7, "second-waiter", "donor-party"));
+                Assert.Equal(1, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+
+                broker.Publish(this, new NetworkBattlePrioritySlotCancelled(
+                    mapEventId, 7, "second-waiter", "donor-party"));
+                Assert.Equal(1, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+
+                supplier.SetReserve(new[]
+                {
+                    new PartyReserve(
+                        "migration-donor",
+                        suppliedCount: 0,
+                        new[] { new TroopReserveEntry(194902, "migration-character", formationClass: 0) },
+                        initialSpawnCount: 0),
+                });
+                broker.Publish(this, new NetworkBattlePrioritySlotAssigned(
+                    mapEventId, 8, "third-waiter", "migration-donor"));
+                Assert.Equal(1, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+                CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+            }
+        });
+
+        GC.KeepAlive(controller);
+    }
+
+    [Fact]
+    public void PrioritySlotCancellation_RestoresFreshPhaseThatStartedWithoutDonorEntitlement()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "client");
+        var authority = Clients.Last();
+        CoopBattleController controller = null;
+
+        authority.Call(() =>
+        {
+            fixture.CreateMission(authority);
+            controller = authority.Resolve<CoopBattleController>();
+        });
+
+        EnterBattle(authority, mapEventId);
+
+        authority.Call(() =>
+        {
+            controller.OnDeploymentFinished();
+
+            var supplier = RegisterEmptySupplier(authority, mapEventId);
+            supplier.SetReserve(new[]
+            {
+                new PartyReserve(
+                    "donor-party",
+                    suppliedCount: 0,
+                    new[] { new TroopReserveEntry(194903, "donor-character", formationClass: 0) },
+                    initialSpawnCount: 0),
+            });
+            supplier.RecordPhaseCapacity("donor-party", totalTroops: 1);
+            var spawnLogic = CreateSpawnLogic(mapEventId, authority, supplier);
+            spawnLogic.DefenderPhase.InitialSpawnedNumber = 0;
+
+            BattleSpawnGate.BeginBattle(mapEventId, battleSize: 1);
+
+            using var fielder = CreateFielder(authority, controller, spawnLogic.Logic);
+            try
+            {
+                supplier.SetReserve(new[]
+                {
+                    new PartyReserve(
+                        "donor-party",
+                        suppliedCount: 0,
+                        new[] { new TroopReserveEntry(194903, "donor-character", formationClass: 0) },
+                        initialSpawnCount: 1),
+                });
+
+                var broker = authority.Resolve<IMessageBroker>();
+                broker.Publish(this, new NetworkBattlePrioritySlotCancelled(
+                    mapEventId, 9, "waiting-party", "donor-party"));
+                Assert.Equal(1, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+
+                broker.Publish(this, new NetworkBattlePrioritySlotCancelled(
+                    mapEventId, 9, "waiting-party", "donor-party"));
+                Assert.Equal(1, spawnLogic.DefenderPhase.InitialSpawnedNumber);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+                CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+            }
+        });
+
+        GC.KeepAlive(controller);
     }
 
     private static void SetFlattenedRoster(
@@ -1376,6 +1904,189 @@ public class BattleReinforcementSpawnTests : MissionTestEnvironment
                 Assert.Equal(1, spawnLogic.DefenderContext._numSpawnedTroops);
                 Assert.Equal(2, formationAssigner.Attempts);
                 Assert.Equal(new[] { 194900 }, GetSpawnedSeeds(mock));
+            }
+            finally
+            {
+                CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+                BattleSpawnGate.EndBattle();
+            }
+        });
+
+        GC.KeepAlive(controller);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void MigrationRecovery_StaleHostReplacementAliasesLateDeathToFreshRiderOrMount(
+        bool targetMount,
+        bool targetFirstGeneration)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "client");
+        var reinforcementCharacterId = CreateRegisteredObject<CharacterObject>();
+        var authority = Clients.First();
+        CoopBattleController controller = null;
+        MockMission mock = null;
+
+        authority.Call(() =>
+        {
+            mock = fixture.CreateMission(authority);
+            controller = authority.Resolve<CoopBattleController>();
+        });
+        EnterBattle(authority, mapEventId);
+        var aiMapEventPartyId = AddAiReinforcementParty(
+            mapEventId, reinforcementCharacterId, authority);
+        SetFlattenedRoster(
+            authority, aiMapEventPartyId, reinforcementCharacterId, 194900);
+
+        authority.Call(() =>
+        {
+            controller.OnDeploymentFinished();
+            BattleSpawnGate.BeginBattle(mapEventId, 1000);
+
+            var defenderSupplier = RegisterEmptySupplier(authority, mapEventId);
+            var attackerSupplier = new CoopTroopSupplier(
+                mapEventId, BattleSideEnum.Attacker, authority.ObjectManager);
+            attackerSupplier.SetReserve(Array.Empty<PartyReserve>());
+            CoopTroopSupplierRegistry.Register(attackerSupplier);
+
+            var spawnLogic = CreateSpawnLogic(mapEventId, authority, defenderSupplier);
+            var registry = authority.Resolve<INetworkAgentRegistry>();
+            var casualties = new CasualtyAttributionMap();
+            var aliases = new BattleAgentIdAliasMap();
+            var freshAgentId = Guid.NewGuid();
+            var freshMountId = Guid.NewGuid();
+            Agent freshAgent = null;
+            Agent freshMount = null;
+            int spawnAttempts = 0;
+            Agent SpawnAgent(Mission _, AgentBuildData buildData)
+            {
+                spawnAttempts++;
+                if (spawnAttempts == 1)
+                    throw new InvalidOperationException("injected pre-agent migration failure");
+
+                freshAgent = mock.SpawnAgent(buildData);
+                freshMount = mock.SpawnMount(freshAgent);
+                Assert.True(registry.TryRegisterAgent(
+                    controller.Session.OwnControllerId,
+                    freshAgentId,
+                    freshAgent));
+                Assert.True(registry.TryRegisterAgent(
+                    controller.Session.OwnControllerId,
+                    freshMountId,
+                    freshMount));
+                casualties.Record(
+                    freshAgentId,
+                    aiMapEventPartyId,
+                    194900,
+                    reinforcementCharacterId);
+                return freshAgent;
+            }
+
+            using var migrationBroker = new MessageBroker();
+            using var deathApplier = new PuppetDeathApplier(
+                migrationBroker,
+                authority.Resolve<ICoopMissionComponent>(),
+                casualties,
+                aliases);
+            using var fielder = CreateFielder(
+                authority,
+                controller,
+                spawnLogic.Logic,
+                agentSpawner: SpawnAgent,
+                messageBroker: migrationBroker,
+                casualties: casualties,
+                network: new RecordingBattleNetwork(),
+                agentIdAliases: aliases);
+            try
+            {
+                migrationBroker.Publish(authority, new BattleHostMigrated(mapEventId, "departed-host"));
+                defenderSupplier.SetReserve(new[]
+                {
+                    new PartyReserve(
+                        aiMapEventPartyId,
+                        suppliedCount: 0,
+                        new[] { Entries(reinforcementCharacterId)[0] },
+                        initialSpawnCount: 1),
+                });
+                attackerSupplier.SetReserve(Array.Empty<PartyReserve>());
+
+                fielder.Tick();
+                Assert.Equal(1, spawnAttempts);
+
+                Assert.True(authority.ObjectManager.TryGetObject<CharacterObject>(
+                    reinforcementCharacterId, out var reinforcementCharacter));
+                Assert.True(authority.ObjectManager.TryGetObject<MapEventParty>(
+                    aiMapEventPartyId, out var mapEventParty));
+                (Guid AgentId, Guid MountId) SpawnStaleGeneration(string authorityId)
+                {
+                    var staleOrigin = new CoopAgentOrigin(
+                        reinforcementCharacter,
+                        mapEventParty.Party,
+                        -1,
+                        null,
+                        new UniqueTroopDescriptor(194900),
+                        aiMapEventPartyId);
+                    var staleAgent = mock.SpawnAgent(new AgentBuildData(reinforcementCharacter)
+                        .Team(BattleTeams.Resolve(BattleSideEnum.Defender))
+                        .TroopOrigin(staleOrigin)
+                        .Controller(AgentControllerType.None));
+                    var staleMount = mock.SpawnMount(staleAgent);
+                    var staleAgentId = Guid.NewGuid();
+                    var staleMountId = Guid.NewGuid();
+                    Assert.True(registry.TryRegisterAgent(authorityId, staleAgentId, staleAgent));
+                    Assert.True(registry.TryRegisterAgent(authorityId, staleMountId, staleMount));
+                    casualties.Record(
+                        staleAgentId,
+                        aiMapEventPartyId,
+                        194900,
+                        reinforcementCharacterId);
+                    return (staleAgentId, staleMountId);
+                }
+
+                var firstStale = SpawnStaleGeneration("departed-host-1");
+
+                fielder.Tick();
+                Assert.Equal(1, spawnAttempts);
+                Assert.False(registry.TryGetAgentInfo(firstStale.AgentId, out _));
+                Assert.False(registry.TryGetAgentInfo(firstStale.MountId, out _));
+
+                var secondStale = SpawnStaleGeneration("departed-host-2");
+
+                fielder.Tick();
+                Assert.False(registry.TryGetAgentInfo(secondStale.AgentId, out _));
+                Assert.False(registry.TryGetAgentInfo(secondStale.MountId, out _));
+                if (spawnAttempts == 1)
+                    fielder.Tick();
+
+                Assert.Equal(2, spawnAttempts);
+                Assert.True(registry.TryGetAgentInfo(freshAgentId, out _));
+                Assert.True(registry.TryGetAgentInfo(freshMountId, out _));
+                foreach (var stale in new[] { firstStale, secondStale })
+                {
+                    Assert.True(aliases.TryResolve(stale.AgentId, out var resolvedAgentId));
+                    Assert.Equal(freshAgentId, resolvedAgentId);
+                    Assert.True(aliases.TryResolve(stale.MountId, out var resolvedMountId));
+                    Assert.Equal(freshMountId, resolvedMountId);
+                }
+
+                var targetStale = targetFirstGeneration ? firstStale : secondStale;
+
+                migrationBroker.Publish(this, new NetworkBattleAgentDied(
+                    targetMount ? targetStale.MountId : targetStale.AgentId,
+                    wounded: false,
+                    Guid.Empty,
+                    inflictedDamage: 100,
+                    BoneBodyPartType.Head,
+                    deathAction: 456));
+
+                var target = targetMount ? freshMount : freshAgent;
+                Assert.True(AgentMirror.TryGet(target, out var targetMirror));
+                Assert.False(targetMirror.IsActive);
+                Assert.True(targetMirror.WasKilled);
             }
             finally
             {

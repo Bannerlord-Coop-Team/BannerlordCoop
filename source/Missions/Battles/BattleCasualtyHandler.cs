@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
@@ -138,6 +139,10 @@ internal class BattleCasualtyHandler : IHandler
                             selectedDescriptor.UniqueSeed,
                             msg.TroopSeed);
                         ledger.ReportDeparted(mapEventId, msg.MapEventPartyId, departedSeed);
+                        messageBroker.Publish(this, new BattleHumanSlotFreed(
+                            mapEventId,
+                            msg.MapEventPartyId,
+                            departedSeed));
                     }
                     return;
                 }

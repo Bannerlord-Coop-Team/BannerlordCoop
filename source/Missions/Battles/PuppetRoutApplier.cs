@@ -36,16 +36,19 @@ public class PuppetRoutApplier : IPuppetRoutApplier
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly IBattleAgentIdAliasMap agentIdAliases;
     private readonly Dictionary<Guid, PendingRout> pendingRouts = new Dictionary<Guid, PendingRout>();
 
     public PuppetRoutApplier(
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
-        ICasualtyAttributionMap casualties)
+        ICasualtyAttributionMap casualties,
+        IBattleAgentIdAliasMap agentIdAliases = null)
     {
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.casualties = casualties;
+        this.agentIdAliases = agentIdAliases ?? new BattleAgentIdAliasMap();
 
         messageBroker.Subscribe<NetworkBattleAgentRouted>(Handle_NetworkBattleAgentRouted);
     }
@@ -98,7 +101,10 @@ public class PuppetRoutApplier : IPuppetRoutApplier
     private bool TryApplyRout(Guid agentId, bool hideMount, bool isAdministrativeRemoval)
     {
         var registry = coopMissionComponent.AgentRegistry;
-        if (!registry.TryGetAgentInfo(agentId, out var info)) return false;
+        bool wasAliased = agentIdAliases.TryResolve(agentId, out var resolvedAgentId);
+        var currentAgentId = isAdministrativeRemoval ? agentId : resolvedAgentId;
+        if (!registry.TryGetAgentInfo(currentAgentId, out var info))
+            return wasAliased;
         if (Mission.Current == null) return false;
 
         Agent agent = info.Agent;
@@ -118,11 +124,11 @@ public class PuppetRoutApplier : IPuppetRoutApplier
 
         // Deregister AFTER the despawn, inside this game-thread action — same ordering rationale as
         // PuppetDeathApplier.
-        registry.RemoveAgent(agentId);
+        registry.RemoveAgent(currentAgentId);
         if (isAdministrativeRemoval)
-            casualties.Forget(agentId);
+            casualties.Forget(currentAgentId);
         else
-            casualties.MarkDeparted(agentId);
+            casualties.MarkDeparted(currentAgentId);
         return true;
     }
 }

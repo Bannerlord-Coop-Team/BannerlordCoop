@@ -28,5 +28,9 @@ internal class BattleTroopDepartedHandler : IHandler
 
         var message = payload.What;
         ledger.ReportDeparted(message.MapEventId, message.PartyId, message.TroopSeed);
+        messageBroker.Publish(this, new BattleHumanSlotFreed(
+            message.MapEventId,
+            message.PartyId,
+            message.TroopSeed));
     }
 }

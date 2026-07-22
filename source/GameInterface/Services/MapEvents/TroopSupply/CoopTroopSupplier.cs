@@ -119,6 +119,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private readonly long supplierLockOrder = Interlocked.Increment(ref nextSupplierLockOrder);
     private readonly List<PartyState> parties = new List<PartyState>();
     private readonly Dictionary<string, int> representedPhaseCapacities = new Dictionary<string, int>();
+    private readonly Dictionary<string, int> representedPhaseInitialSpawnCounts = new Dictionary<string, int>();
     private readonly Dictionary<string, int> initialSupplyRemaining = new Dictionary<string, int>();
     private readonly HashSet<string> initialPhasePartyIds = new HashSet<string>();
     private bool initialPhaseCaptured;
@@ -497,6 +498,25 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             return representedPhaseCapacities.TryGetValue(partyId, out var capacity) ? capacity : 0;
     }
 
+    /// <summary>Update the native phase's represented initial entitlement and return its authoritative delta.</summary>
+    public int ReconcileRepresentedInitialSpawnCount(string partyId)
+    {
+        lock (gate)
+        {
+            if (!representedPhaseInitialSpawnCounts.TryGetValue(partyId, out var represented)) return 0;
+
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+
+                representedPhaseInitialSpawnCounts[partyId] = party.InitialSpawnCount;
+                return party.InitialSpawnCount - represented;
+            }
+
+            return 0;
+        }
+    }
+
     private void RecordPhaseCapacityInternal(string partyId, int totalTroops)
     {
         if (string.IsNullOrEmpty(partyId)) return;
@@ -504,6 +524,14 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         int capacity = Math.Max(0, totalTroops);
         if (!representedPhaseCapacities.TryGetValue(partyId, out var current) || capacity > current)
             representedPhaseCapacities[partyId] = capacity;
+
+        foreach (var party in parties)
+        {
+            if (party.PartyId != partyId) continue;
+
+            representedPhaseInitialSpawnCounts[partyId] = party.InitialSpawnCount;
+            break;
+        }
     }
 
     /// <summary>Remaining troop count for each party in the current authoritative reserve.</summary>
@@ -549,6 +577,32 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         total = 0;
         supplied = 0;
         initial = 0;
+        return false;
+    }
+
+    /// <summary>Read the next unsupplied character id without advancing the party's authoritative pointer.</summary>
+    public bool TryGetNextTroopCharacterId(string partyId, out string characterId)
+    {
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId || party.PendingClaimSeeds != null) continue;
+
+                int index = party.Supplied;
+                while (index < party.Entries.Length
+                    && party.DepartedSeeds.Contains(party.Entries[index].Seed))
+                {
+                    index++;
+                }
+                if (index >= party.Entries.Length) break;
+
+                characterId = party.Entries[index].CharacterId;
+                return true;
+            }
+        }
+
+        characterId = null;
         return false;
     }
 

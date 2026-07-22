@@ -158,6 +158,7 @@ internal class BattleHandler : IHandler
         var partyPositions = new List<CampaignVec2>();
         var initialSpawnCounts = new List<int>();
         var postPlanAdditions = new List<bool>();
+        var waitsForPrioritySpawn = new List<bool>();
 
         foreach (var addedParty in message.AddedParties)
         {
@@ -166,8 +167,12 @@ internal class BattleHandler : IHandler
 
             partyIds.Add(mapEventPartyId);
             initialSpawnCounts.Add(battleTroopReserveBuilder.GrantUnassignedInitialSpawns(
-                message.MapEvent, addedParty, out var isPostPlanAddition));
+                message.MapEvent,
+                addedParty,
+                out var isPostPlanAddition,
+                out var waitsForPrioritySlot));
             postPlanAdditions.Add(isPostPlanAddition);
+            waitsForPrioritySpawn.Add(waitsForPrioritySlot);
             // Capture the party's authoritative map position, in lockstep with the id and
             // before the roster check below so the two arrays stay index-aligned. Settlement
             // parties have no MobileParty; their slot is a default the client never applies.
@@ -189,7 +194,8 @@ internal class BattleHandler : IHandler
             partyIds.ToArray(),
             partyPositions.ToArray(),
             initialSpawnCounts.ToArray(),
-            postPlanAdditions.ToArray()
+            postPlanAdditions.ToArray(),
+            waitsForPrioritySpawn.ToArray()
         ));
 
         if (postPlanAdditions.Any(isAddition => isAddition))

@@ -25,18 +25,23 @@ public readonly struct NetworkAddInvolvedParties : ICommand
     /// <summary>Whether each party was added to the frozen spawn plan by this broadcast.</summary>
     [ProtoMember(5)]
     public readonly bool[] PostPlanAdditions;
+    /// <summary>Whether each party must wait for a server-assigned priority slot.</summary>
+    [ProtoMember(6)]
+    public readonly bool[] WaitsForPrioritySpawn;
 
     public NetworkAddInvolvedParties(
         string mapEventId,
         string[] mapEventPartyIds,
         CampaignVec2[] positions,
         int[] initialSpawnCounts,
-        bool[] postPlanAdditions)
+        bool[] postPlanAdditions,
+        bool[] waitsForPrioritySpawn)
     {
         MapEventId = mapEventId;
         MapEventPartyIds = mapEventPartyIds;
         Positions = positions;
         InitialSpawnCounts = initialSpawnCounts;
         PostPlanAdditions = postPlanAdditions;
+        WaitsForPrioritySpawn = waitsForPrioritySpawn;
     }
 }
