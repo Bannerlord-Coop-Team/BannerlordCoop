@@ -1,9 +1,11 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections;
@@ -14,6 +16,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -109,6 +112,41 @@ public class MapEventDebugCommands
         return $"Started encounter with {nearest.Name} (StringId {nearest.StringId}, registry id {partyId}), " +
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("opposing_raid_attack", "coop.debug.mapevent")]
+    public static string AttackOpposingRaider(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on Player 1.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.opposing_raid_attack <raiderPartyId>";
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(args[0], out var raider))
+            return $"Unable to resolve raider party {args[0]}.";
+
+        var playerParty = MobileParty.MainParty;
+        var raid = raider.MapEvent;
+        if (playerParty == null || raid == null || !raid.IsActiveSlowVillageRaid() ||
+            !ReferenceEquals(raid.AttackerSide?.LeaderParty?.MobileParty, raider))
+            return "The selected party is not leading an active slow village raid.";
+
+        if (MissionState.Current != null || PlayerEncounter.Current != null || playerParty.MapEvent != null)
+            return "Player 1 must be free on the campaign map with no active mission or encounter.";
+
+        // Keep the natural local join state used by mission setup; the server rejects this defender join.
+        PlayerEncounter.Start();
+        PlayerEncounter.Current.SetupFields(raider.Party, playerParty.Party);
+        PlayerEncounter.JoinBattle(BattleSideEnum.Defender);
+        GameMenu.ActivateGameMenu("encounter");
+
+        MenuHelper.EncounterAttackConsequence(null);
+        objectManager.TryGetId(raid, out var mapEventId);
+        return $"attack=true; raider={args[0]}; mapEvent={mapEventId}; deploymentRequested=true";
+    }
+#endif
 
     // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
     /// <summary>
