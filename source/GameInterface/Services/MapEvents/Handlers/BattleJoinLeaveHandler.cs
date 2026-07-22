@@ -105,7 +105,10 @@ internal class BattleJoinLeaveHandler : IHandler
                     }
                 }
 
-                RefreshCurrentEncounterMenu(mapEvent);
+                // The involved-party snapshot can finish one frame before the encounter menu activates.
+                GameThread.EnqueueSafe(
+                    () => RefreshCurrentEncounterMenu(mapEvent),
+                    context: nameof(Handle_NetworkAddInvolvedParties));
             }
             catch (Exception e)
             {
