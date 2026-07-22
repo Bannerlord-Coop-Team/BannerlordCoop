@@ -482,6 +482,28 @@ public class MapEventDebugCommands
     }
 
 #if DEBUG
+    // coop.debug.mapevent.late_join_mode_begin_field_battle
+    /// <summary>Finishes the local deployment phase so live evidence shows the active field battle.</summary>
+    [CommandLineArgumentFunction("late_join_mode_begin_field_battle", "coop.debug.mapevent")]
+    public static string BeginLateJoinModeFixtureFieldBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.late_join_mode_begin_field_battle";
+
+        var mission = Mission.Current;
+        if (mission == null)
+            return "No mission is active.";
+
+        var deploymentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+        if (deploymentHandler == null)
+            return "The field battle is already active.";
+
+        deploymentHandler.FinishDeployment();
+        return "Local deployment finished; the field battle is active.";
+    }
+
     // coop.debug.mapevent.late_join_mode_exit_missions
     /// <summary>Asks every fixture mission member to return to campaign before authoritative cleanup.</summary>
     [CommandLineArgumentFunction("late_join_mode_exit_missions", "coop.debug.mapevent")]
@@ -561,10 +583,12 @@ public class MapEventDebugCommands
         var missionAgents = ModInformation.IsClient && Mission.Current != null
             ? Mission.Current.Agents.Count
             : 0;
+        var deploymentActive = ModInformation.IsClient &&
+                               Mission.Current?.HasMissionBehavior<DeploymentHandler>() == true;
 
         return $"Late-join mode state: controller={args[0]}, mapEvent={mapEventId}, eventType={eventType}, " +
                $"village={villageName}, militiaResistance={militiaResistance}, side={side}, mode={mode}, " +
-               $"missionActive={missionActive}, missionAgents={missionAgents}.";
+               $"missionActive={missionActive}, missionAgents={missionAgents}, deploymentActive={deploymentActive}.";
     }
 
     // coop.debug.mapevent.late_join_mode_cleanup
