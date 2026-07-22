@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.CampaignService.Data;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.CampaignService.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -16,14 +17,16 @@ internal class UpdateCampaignOptionsHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IServerOptionsProvider serverOptionsProvider;
 
     public UpdateCampaignOptionsHandler(
         IMessageBroker messageBroker,
-        INetwork network)
+        INetwork network,
+        IServerOptionsProvider serverOptionsProvider)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-
+        this.serverOptionsProvider = serverOptionsProvider;
         messageBroker.Subscribe<UpdateCampaignOptions>(Handle_UpdateCampaignOptions);
         messageBroker.Subscribe<NetworkUpdateCampaignOptions>(Handle_NetworkUpdateCampaignOptions);
 
@@ -87,30 +90,34 @@ internal class UpdateCampaignOptionsHandler : IHandler
 
     private void Handle_UpdateOtherOptions(MessagePayload<UpdateOtherOptions> obj)
     {
-        // Add other server options as needed
-        var message = new NetworkUpdateOtherOptions(new(
-            BannerlordConfig.PlayerReceivedDamageDifficulty
-        ));
-        network.SendAll(message);
+        GameThread.RunSafe(() =>
+        {
+            var message = new NetworkUpdateOtherOptions(serverOptionsProvider.GetServerOptions());
+            network.SendAll(message);
+        });  
     }
 
     private void Handle_NetworkUpdateOtherOptions(MessagePayload<NetworkUpdateOtherOptions> obj)
     {
-        var newOptions = obj.What.ServerOptions;
-        UpdateOtherOptions(newOptions);
+        GameThread.RunSafe(() =>
+        {
+            var newOptions = obj.What.ServerOptions;
+            UpdateOtherOptions(newOptions);
+        });
     }
 
     private void Handle_InitializeServerOptionsOnClient(MessagePayload<InitializeServerOptionsOnClient> obj)
     {
-        var newOptions = obj.What.ServerOptions;
-        UpdateOtherOptions(newOptions);
+        GameThread.RunSafe(() =>
+        {
+            var newOptions = obj.What.ServerOptions;
+            UpdateOtherOptions(newOptions);
+        });
     }
 
     private void UpdateOtherOptions(ServerOptions newOptions)
     {
-        GameThread.RunSafe(() =>
-        {
-            BannerlordConfig.PlayerReceivedDamageDifficulty = newOptions.PlayerReceivedDamage;
-        });
+        // Add other server options as needed
+        BannerlordConfig.PlayerReceivedDamageDifficulty = newOptions.PlayerReceivedDamage;
     }
 }
