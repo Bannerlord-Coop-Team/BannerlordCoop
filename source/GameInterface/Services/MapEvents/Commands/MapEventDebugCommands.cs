@@ -21,6 +21,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -170,6 +171,24 @@ public class MapEventDebugCommands
 
         deploymentHandler.FinishDeployment();
         return $"deploymentFinished=true; missionMode={mission.Mode}; mainAgent={Agent.Main != null}";
+    }
+
+    [CommandLineArgumentFunction("deployment_evidence_marker", "coop.debug.mapevent")]
+    public static string ShowDeploymentEvidenceMarker(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on Player 1.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.deployment_evidence_marker";
+
+        var deploymentController = Mission.Current?.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+            return "No active deployment phase.";
+
+        InformationManager.DisplayMessage(new InformationMessage(
+            "Five in-game days elapsed; deployment and raid remain active."));
+        return "deploymentEvidenceMarker=true";
     }
 
     [CommandLineArgumentFunction("exit_battle", "coop.debug.mapevent")]
