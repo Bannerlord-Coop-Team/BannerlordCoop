@@ -28,9 +28,7 @@ internal class BattleTeamKillCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
 
-    private const string ScoreboardMovieName = "SPScoreboard";
-    private const string PartyScoreToggleWidgetId = "PartyScoreToggleWidget";
-
+    private const string ScoreboardLayerName = "Scoreboard";
     private const string FinishDeploymentUsage =
 @"Usage:
   coop.debug.mapevent.finish_deployment
@@ -203,23 +201,20 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
         scoreboardWidget = null;
         partyHeaders = new List<ToggleButtonWidget>();
 
-        var rootWidget = scoreboard.MissionScreen?.Layers
+        var contextRoot = scoreboard.MissionScreen?.Layers
             .OfType<GauntletLayer>()
-            .Select(layer => layer.GetMovieIdentifier(ScoreboardMovieName))
-            .FirstOrDefault(identifier => identifier?.Movie?.RootWidget != null)?
-            .Movie.RootWidget;
-        if (rootWidget == null)
+            .FirstOrDefault(layer => layer.Name == ScoreboardLayerName)?
+            .UIContext?.Root;
+        if (contextRoot == null)
             return false;
 
-        scoreboardWidget = rootWidget as ScoreboardScreenWidget ??
-                           rootWidget.GetAllChildrenOfTypeRecursive<ScoreboardScreenWidget>().FirstOrDefault();
+        scoreboardWidget = contextRoot.GetAllChildrenOfTypeRecursive<ScoreboardScreenWidget>().FirstOrDefault();
         if (scoreboardWidget == null)
             return false;
 
-        partyHeaders = scoreboardWidget.GetAllChildrenOfTypeRecursive<ToggleButtonWidget>(
-            widget => widget.Id == PartyScoreToggleWidgetId);
-        return partyHeaders.All(header => header.WidgetToClose != null) &&
-               scoreboardWidget.ScrollablePanel?.VerticalScrollbar != null;
+        partyHeaders = contextRoot.GetAllChildrenOfTypeRecursive<ToggleButtonWidget>(
+            header => header.WidgetToClose != null);
+        return scoreboardWidget.ScrollablePanel?.VerticalScrollbar != null;
     }
 
     private static string FormatPartyNames(IEnumerable<PartyBase> parties)
