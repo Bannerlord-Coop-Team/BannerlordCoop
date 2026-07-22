@@ -272,34 +272,6 @@ public class GameThread : IUpdateable
     }
 
     /// <summary>
-    /// Queues an action for a later game-loop pump even when called from the game thread. Use this when running
-    /// inline would mutate a collection currently being iterated by the engine.
-    /// </summary>
-    public static void EnqueueSafe(Action action, string context = null,
-        [CallerFilePath] string callerFile = null,
-        [CallerMemberName] string callerMember = null)
-    {
-        CancellationToken cancellation = m_AmbientCancellation.Value;
-        if (cancellation.IsCancellationRequested) return;
-
-        string label = context ?? BuildLabel(callerFile, callerMember);
-        lock (Instance.m_QueueLock)
-        {
-            Instance.m_Queue.Enqueue((() =>
-            {
-                try
-                {
-                    action();
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to run deferred action on the game thread: {Context}", context ?? "(none)");
-                }
-            }, null, label, cancellation));
-        }
-    }
-
-    /// <summary>
     /// Blocks until <paramref name="condition"/> returns true or <paramref name="deadline"/> passes, and
     /// reports which happened, draining <see cref="Update"/> each iteration so the work the condition depends
     /// on — and the blocking <see cref="Run"/> handlers the network thread is waiting on — keeps making
