@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common.Network.Packets;
-using Coop.Core.Server.Connections;
 using GameInterface.Services.Time.Interfaces;
 using Serilog;
 using System;
@@ -27,23 +26,15 @@ public class CampaignTimeSyncHandler : IHandler
 
     private readonly INetwork network;
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
-    private readonly IConnectionCollection connectionCollection;
-    private readonly IConnectionMessageQueue connectionMessageQueue;
 
     private readonly object publishGate = new object();
     private readonly Timer publishTimer;
     private bool disposed;
 
-    public CampaignTimeSyncHandler(
-        INetwork network,
-        IMapTimeTrackerInterface mapTimeTrackerInterface,
-        IConnectionCollection connectionCollection,
-        IConnectionMessageQueue connectionMessageQueue)
+    public CampaignTimeSyncHandler(INetwork network, IMapTimeTrackerInterface mapTimeTrackerInterface)
     {
         this.network = network;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
-        this.connectionCollection = connectionCollection;
-        this.connectionMessageQueue = connectionMessageQueue;
 
         // Each broadcast re-arms the timer when it finishes instead of auto-resetting, so at most
         // one callback is ever in flight: a send stalled on a slow consumer delays the next tick
@@ -77,18 +68,7 @@ public class CampaignTimeSyncHandler : IHandler
                 // No campaign loaded yet, nothing authoritative to broadcast.
                 if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
 
-                foreach (var connection in connectionCollection)
-                {
-                    int joinPacketsRemaining = connectionMessageQueue.TryGetCatchUpPacketsRemaining(
-                        connection.Peer,
-                        out int packetsRemaining)
-                        ? packetsRemaining
-                        : -1;
-
-                    network.Send(
-                        connection.Peer,
-                        new CampaignTimePacket(currentTicks, joinPacketsRemaining));
-                }
+                network.SendAll(new CampaignTimePacket(currentTicks));
             }
             catch (Exception ex)
             {

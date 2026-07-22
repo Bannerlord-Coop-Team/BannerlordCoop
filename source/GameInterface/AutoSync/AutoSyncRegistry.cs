@@ -36,7 +36,7 @@ public class AutoSyncRegistry
         if (!AddMember(property.DeclaringType, property, debug, coalesce)) throw new ArgumentException($"{nameof(AutoSyncBuilder)} Property: {property.Name} has already been registered as a synced property");
     }
 
-    public bool AddTargetMethod(Type type, MethodInfo methodInfo)
+    public bool AddTargetMethod(Type type, MethodInfo methodInfo, string patchCategory = null)
     {
 
         if (!Registrations.ContainsKey(type))
@@ -44,10 +44,10 @@ public class AutoSyncRegistry
             Registrations.Add(type, new AutoSyncRegistryItem());
         }
 
-        if (Registrations[type].TargetMethods.Contains(methodInfo))
+        if (Registrations[type].ContainsTargetMethod(methodInfo))
             return false;
 
-        Registrations[type].AddTargetMethod(methodInfo);
+        Registrations[type].AddTargetMethod(methodInfo, patchCategory);
 
         return true;
     }
