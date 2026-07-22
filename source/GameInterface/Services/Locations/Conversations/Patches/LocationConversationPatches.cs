@@ -6,6 +6,9 @@ using HarmonyLib;
 using SandBox.Conversation.MissionLogics;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
+#if DEBUG
+using GameInterface.Services.Locations.Conversations.Commands;
+#endif
 
 namespace GameInterface.Services.Locations.Conversations.Patches;
 
@@ -59,6 +62,9 @@ internal static class LocationConversationPatches
 
         var generation = ++requestGeneration;
         pending = new PendingConversation(agent, locationId, characterId, generation);
+#if DEBUG
+        LocationConversationLiveTestProbe.RecordRequested(generation, locationId, characterId);
+#endif
         MessageBroker.Instance.Publish(agent, new LocationConversationRequested(locationId, characterId, generation));
 
         // Hold the conversation; it starts when the server approves.
@@ -100,6 +106,9 @@ internal static class LocationConversationPatches
         if (heldNpcKey == null) return;
 
         heldNpcKey = null;
+#if DEBUG
+        LocationConversationLiveTestProbe.RecordEnded();
+#endif
         MessageBroker.Instance.Publish(null, new LocationConversationEnded());
     }
 
