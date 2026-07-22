@@ -385,7 +385,11 @@ public class MapEventDebugCommands
             var callbackArgs = new MenuCallbackArgs((MenuContext)null, null);
             var shown = new EncounterGameMenuBehavior()
                 .game_menu_encounter_order_attack_on_condition(callbackArgs);
-            option = $"shown={shown},enabled={callbackArgs.IsEnabled},leaveType={callbackArgs.optionLeaveType}";
+            var renderedOption = Campaign.Current?.CurrentMenuContext?.GameMenu?.MenuOptions
+                .FirstOrDefault(menuOption => menuOption.IdString == "str_order_attack");
+            option = $"conditionShown={shown},conditionEnabled={callbackArgs.IsEnabled}," +
+                     $"leaveType={callbackArgs.optionLeaveType},renderedRegistered={renderedOption != null}," +
+                     $"renderedEnabled={renderedOption?.IsEnabled ?? false}";
         }
 
         objectManager.TryGetId(mapEvent, out string mapEventId);
