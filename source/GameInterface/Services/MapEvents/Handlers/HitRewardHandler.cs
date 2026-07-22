@@ -228,6 +228,9 @@ public class HitRewardHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            var mission = Mission.Current;
+            if (mission == null) return;
+
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(data.AffectorCharacterId, out var affectorCharacter)) return;
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.AffectorPartyId, out var affectorParty)) return;
@@ -235,10 +238,10 @@ public class HitRewardHandler : IHandler
             // Skip update if the client is not in this map event
             if (MapEvent.PlayerMapEvent != mapEvent) return;
 
-            BattleObserverMissionLogic battleObserverMissionLogic = Mission.Current.GetMissionBehavior<BattleObserverMissionLogic>();
+            BattleObserverMissionLogic battleObserverMissionLogic = mission.GetMissionBehavior<BattleObserverMissionLogic>();
             if ((battleObserverMissionLogic?.BattleObserver) == null) return;
 
-            TroopUpgradeTracker troopUpgradeTracker = MapEvent.PlayerMapEvent.TroopUpgradeTracker;
+            TroopUpgradeTracker troopUpgradeTracker = mapEvent.TroopUpgradeTracker;
             if (affectorCharacter.IsHero)
             {
                 Hero heroObject = affectorCharacter.HeroObject;
