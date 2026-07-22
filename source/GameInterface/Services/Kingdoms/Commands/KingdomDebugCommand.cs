@@ -4,6 +4,7 @@ using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
 using GameInterface.Services.Kingdoms.Data;
@@ -239,6 +240,51 @@ public class KingdomDebugCommand
 
         string previousKingdomId = previousKingdom?.StringId ?? "<none>";
         return $"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.";
+    }
+
+    // coop.debug.kingdom.force_player_vassalage Player khuzait true
+    [CommandLineArgumentFunction("force_player_vassalage", "coop.debug.kingdom")]
+    public static string ForcePlayerVassalage(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be run on the server.";
+        }
+
+        if (args.Count < 2 || args.Count > 3)
+        {
+            return "Usage: coop.debug.kingdom.force_player_vassalage <controllerId> <kingdomId> [grantRewards]";
+        }
+
+        if (!TryGetPlayerManager(out var playerManager))
+        {
+            return "Unable to resolve PlayerManager";
+        }
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+        {
+            return $"Player not found with controller id: {args[0]}";
+        }
+
+        if (!playerManager.TryGetPeer(args[0], out var peer))
+        {
+            return $"Player {args[0]} does not have a connected peer.";
+        }
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetObject<Kingdom>(args[1], out var kingdom))
+        {
+            return $"Kingdom not found with id: {args[1]}";
+        }
+
+        bool grantRewards = true;
+        if (args.Count == 3 && !bool.TryParse(args[2], out grantRewards))
+        {
+            return $"Unable to parse {args[2]} as a boolean.";
+        }
+
+        MessageBroker.Instance.Publish(peer, new RequestVassalService(kingdom.StringId, grantRewards));
+        return $"Queued vassalage for player {player.ControllerId} in kingdom {kingdom.StringId}. GrantRewards={grantRewards}.";
     }
 
     // coop.debug.kingdom.add_decision_usage
