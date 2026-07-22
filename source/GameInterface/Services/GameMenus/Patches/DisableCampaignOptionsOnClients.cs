@@ -2,8 +2,10 @@
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
+using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Options.ManagedOptions;
+using TaleWorlds.MountAndBlade.ViewModelCollection.GameOptions;
 
 namespace GameInterface.Services.GameMenus.Patches;
 
@@ -38,7 +40,25 @@ internal class DisableManagingOtherOptionsOnClients
         var type = __instance.Type;
         if (ModInformation.IsClient && type == ManagedOptions.ManagedOptionsType.PlayerReceivedDamageDifficulty)
         {
-            __result = new("Managing this option is disabled on clients; the host does this.", true);
+            __result = new("str_coop_server_managed_player_received_damage", true);
+            return false;
+        }
+
+        return true;
+    }
+}
+
+[HarmonyPatch(typeof(GenericOptionDataVM))]
+internal class DisableResetToDefaultOnClients
+{
+    [HarmonyPatch(nameof(GenericOptionDataVM.ResetToDefault))]
+    [HarmonyPrefix]
+    public static bool ResetToDefaultPrefix(GenericOptionDataVM __instance)
+    {
+        var optionType = __instance.Option.GetOptionType();
+
+        if (ModInformation.IsClient && optionType is ManagedOptions.ManagedOptionsType.PlayerReceivedDamageDifficulty)
+        {
             return false;
         }
 
