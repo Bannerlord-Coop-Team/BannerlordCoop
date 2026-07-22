@@ -1,0 +1,54 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
+      <Children>
+        <!-- Dim backdrop. A plain Widget tints correctly; a ButtonWidget renders the raw white
+             sprite (ignores Color), which whited-out the whole screen. Input to the screen below is
+             already blocked by the focus layer, so the backdrop needs no click handling. -->
+        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.7"/>
+
+        <!-- Dialog border. -->
+        <Widget WidthSizePolicy="Fixed" SuggestedWidth="560" HeightSizePolicy="CoverChildren"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Sprite="BlankWhiteSquare_9" Color="#6E5A3AFF">
+          <Children>
+            <!-- Dialog body. -->
+            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                       MarginTop="3" MarginBottom="3" MarginLeft="3" MarginRight="3"
+                       Sprite="BlankWhiteSquare_9" Color="#1C1712FF"
+                       StackLayout.LayoutMethod="VerticalTopToBottom">
+              <Children>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                            MarginTop="28" MarginLeft="34" MarginRight="34" MarginBottom="8"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="23"
+                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                            Text="@PromptText"/>
+
+                <!-- Vertical list of donation platforms. -->
+                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                           MarginLeft="80" MarginRight="80" MarginTop="10"
+                           StackLayout.LayoutMethod="VerticalTopToBottom">
+                  <Children>
+                    <Standard.Button WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="60"
+                                     MarginBottom="14" Command.Click="ActionPayPal" Parameter.Text="@PayPalButtonText"/>
+                    <Standard.Button WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="60"
+                                     MarginBottom="14" Command.Click="ActionBuyMeACoffee" Parameter.Text="@BuyMeACoffeeButtonText"/>
+                    <Standard.Button WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="60"
+                                     MarginBottom="14" Command.Click="ActionIfdian" Parameter.Text="@IfdianButtonText"/>
+                    <Standard.Button WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="60"
+                                     MarginBottom="14" Command.Click="ActionBoosty" Parameter.Text="@BoostyButtonText"/>
+                  </Children>
+                </ListPanel>
+
+                <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="168" HeightSizePolicy="Fixed" SuggestedHeight="56"
+                                 HorizontalAlignment="Center" MarginTop="4" MarginBottom="26"
+                                 Command.Click="ActionClose" Parameter.Text="@CloseButtonText"/>
+              </Children>
+            </ListPanel>
+          </Children>
+        </Widget>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

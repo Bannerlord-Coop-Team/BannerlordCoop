@@ -7,6 +7,7 @@ using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -49,6 +50,36 @@ namespace GameInterface.Services.Smithing.Patches
             MessageBroker.Instance.Publish(__instance, message);
 
             // Skip original to override original client saving
+            return false;
+        }
+
+        [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateCraftedWeaponInCraftingOrderMode))]
+        [HarmonyPrefix]
+        public static bool CreateCraftedWeaponInCraftingOrderModePrefix(CraftingCampaignBehavior __instance, ref ItemObject __result, Hero crafterHero, CraftingOrder craftingOrder, WeaponDesign weaponDesign)
+        {
+            ItemObject itemObject = __instance.CreateCraftedWeaponInternal(false, crafterHero, weaponDesign, null);
+            float xpAmount = craftingOrder.GetOrderExperience(itemObject, __instance._currentItemModifier) + (float)Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(itemObject);
+
+            var message = new AddSkillXpFromCrafting(crafterHero, xpAmount);
+            MessageBroker.Instance.Publish(__instance, message);
+
+            __result = itemObject;
+            return false;
+        }
+
+        [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateCraftedWeaponInFreeBuildMode))]
+        [HarmonyPrefix]
+        public static bool CreateCraftedWeaponInFreeBuildModePrefix(CraftingCampaignBehavior __instance, ref ItemObject __result, Hero hero, WeaponDesign weaponDesign, ItemModifier weaponModifier = null)
+        {
+            ItemObject itemObject = __instance.CreateCraftedWeaponInternal(true, hero, weaponDesign, weaponModifier);
+            int skillXpForSmithingInFreeBuildMode = Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInFreeBuildMode(itemObject);
+
+            var message = new AddSkillXpFromCrafting(hero, (float)skillXpForSmithingInFreeBuildMode);
+            MessageBroker.Instance.Publish(__instance, message);
+            
+            __instance.AddItemToHistory(itemObject);
+
+            __result = itemObject;
             return false;
         }
     }

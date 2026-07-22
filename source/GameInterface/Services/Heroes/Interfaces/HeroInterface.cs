@@ -5,16 +5,20 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.MobileParties;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -36,16 +40,18 @@ internal class HeroInterface : IHeroInterface
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
+    private readonly IPartyVisibilitySweep partyVisibilitySweep;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IPartyVisibilitySweep partyVisibilitySweep)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.objectManager = objectManager;
+        this.partyVisibilitySweep = partyVisibilitySweep;
     }
 
     public byte[] PackageMainHero()
@@ -57,7 +63,7 @@ internal class HeroInterface : IHeroInterface
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
-        return BinaryFormatterSerializer.Serialize(package);
+        return BinaryPackageSerializer.Serialize(package);
     }
 
     public Hero ServerUnpackHero(byte[] bytes)
@@ -83,7 +89,7 @@ internal class HeroInterface : IHeroInterface
             {
                 using (new AllowedThread())
                 {
-                    hero = BinaryFormatterSerializer
+                    hero = BinaryPackageSerializer
                         .Deserialize<HeroBinaryPackage>(bytes)
                         .Unpack<Hero>(binaryPackageFactory);
 
@@ -118,7 +124,33 @@ internal class HeroInterface : IHeroInterface
 
         Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
 
-        ChangePlayerCharacterAction.Apply(playerHero);
+        // Vanilla's character change ejects a main hero from its settlement, which would pop the
+        // reloaded party outside on this client only (the server's save keeps it inside); keep it
+        // inside and rebuild the local in-settlement state afterwards.
+        LeaveSettlementActionPatches.SuppressForPlayerSwitch = true;
+        try
+        {
+            ChangePlayerCharacterAction.Apply(playerHero);
+        }
+        finally
+        {
+            LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
+        }
+
+        if (playerParty.CurrentSettlement != null || playerParty.BesiegerCamp != null)
+        {
+            // Queued so it runs after the campaign state is entered; the headless server's save
+            // carries no player encounter, menu, or player-siege state for this hero. Covers both
+            // a party reloaded inside a settlement and one besieging a settlement, which would
+            // otherwise sit at the siege camp with no menu (soft lock).
+            GameThread.RunSafe(() =>
+            {
+                if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
+                {
+                    siegeEventInterface.RestoreReloadedPlayer();
+                }
+            });
+        }
 
         // Recapture if previously captured
         if (playerHero.PartyBelongedToAsPrisoner != null)
@@ -126,19 +158,47 @@ internal class HeroInterface : IHeroInterface
             playerHero.PartyBelongedTo = null;
             messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
         }
+
+        // The transferred host save carries the server's always-visible party state
+        // (PartyVisibilityServerPatches) and the native load path never rebuilds fog of war
+        // (Campaign.GameInitTick only runs for new campaigns), so distant parties and their battle
+        // icons would stay revealed forever. Queued so it runs once the campaign state is entered
+        // and the hero switched to above is the local main party.
+        GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
     }
 
     private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
     {
+        // Player birth dates come from a separate character-creation campaign, so rebase them to this campaign.
+        hero.SetBirthDay(CampaignTime.YearsFromNow(-hero._defaultAge));
+
         var party = hero.PartyBelongedTo;
 
         party.Anchor = new AnchorPoint(party);
 
         party.Party.OnFinishLoadState();
-        party.IsVisible = true;
 
         party.CheckPositionsForMapChangeAndUpdateIfNeeded();
-        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+
+        // On the server this write is coerced to always-visible by PartyVisibilityOnServerPatch;
+        // on clients it computes the real fog-of-war state so a remote player's new party is not
+        // permanently revealed wherever it spawned (the native per-tick sweep only re-evaluates
+        // parties near the local main party).
+        if (MobileParty.MainParty != null)
+        {
+            party.Party.UpdateVisibilityAndInspected(MobileParty.MainParty.Position);
+        }
+        else
+        {
+            party.IsVisible = true;
+        }
+
+        // Headless hosts run without the SandBox.View layer, so the visual manager is null there
+        // and party visuals are optional (same contract as PartyBaseExtensions.GetPartyVisual).
+        // An unguarded call here aborts the whole hero setup before its network ids are assigned.
+        if (MobilePartyVisualManager.Current != null)
+            MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
 
         // Add to game managed lists
@@ -148,6 +208,10 @@ internal class HeroInterface : IHeroInterface
             Logger.Error("{type} was null when trying to register a {managedType}", typeof(CampaignObjectManager), typeof(Hero));
             return;
         }
+
+        // Restore the roster before assignNetworkIds registers it. Otherwise the AllowedThread AddToCounts
+        // patch sends a roster update before clients receive the hero creation message.
+        RestorePlayerMemberships(hero, party);
 
         // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
         // the next "PlayerN" from CampaignObjectType.MaxCreatedPostfixIndex, which is cached in OnItemAdded when an
@@ -179,6 +243,18 @@ internal class HeroInterface : IHeroInterface
         campaignObjectManager.AddClan(hero.Clan);
     }
 
+    internal static void RestorePlayerMemberships(Hero hero, MobileParty party)
+    {
+        // PackageMainHero unregisters the player hero before packaging, so ClanBinaryPackage cannot store its
+        // network ID in the clan's hero and alive-lord caches.
+        if (!hero.Clan.Heroes.Contains(hero))
+            hero.Clan.OnLordAdded(hero);
+
+        // TroopRosterBinaryPackage excludes roster elements, so the imported party has an empty member roster.
+        if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
+            party.MemberRoster.AddToCounts(hero.CharacterObject, 1, insertAtFront: true);
+    }
+
     /// <summary>
     /// Host: assign fresh, campaign-unique "Player" StringIds to the hero graph and register them.
     /// </summary>
@@ -190,6 +266,9 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(party, NewServerStringId(party));
         RegisterPrimary(hero.Clan, NewServerStringId(hero.Clan));
         RegisterPrimary(hero.CharacterObject, hero.StringId);
+
+        // HeroDeveloper is not a child of MBObjectBase, can't use RegisterPrimary
+        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{hero.StringId}", hero.HeroDeveloper); 
 
         RegisterPartyChildren(party);
     }
@@ -206,6 +285,9 @@ internal class HeroInterface : IHeroInterface
         RegisterPrimary(party, StripTypePrefix(player.MobilePartyId, party));
         RegisterPrimary(hero.Clan, StripTypePrefix(player.ClanId, hero.Clan));
         RegisterPrimary(hero.CharacterObject, StripTypePrefix(player.CharacterObjectId, hero.CharacterObject));
+
+        // HeroDeveloper is not a child of MBObjectBase, can't use RegisterPrimary
+        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{StripTypePrefix(player.HeroId, hero)}", hero.HeroDeveloper);
 
         RegisterPartyChildren(party);
     }

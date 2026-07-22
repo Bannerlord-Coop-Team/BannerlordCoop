@@ -10,6 +10,7 @@ using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
 using Serilog;
@@ -86,6 +87,8 @@ internal class PartyDoneLogicHandler : IHandler
         var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightMemberRoster, obj.What.InitialRightMemberRoster);
         var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightPrisonerRoster, obj.What.InitialRightPrisonerRoster);
 
+        var rightMemberOrderData = troopRosterInterface.PackTroopRosterOrderData(obj.What.RightMemberRoster);
+
         var releaserPartyPosition = GetReleaserPartyPosition(obj.What.MainHero);
 
         var message = new NetworkCompleteDoneLogic(
@@ -105,7 +108,9 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.PartyInfluenceChangeAmount,
             obj.What.PartyMoraleChangeAmount,
             obj.What.DoNotApplyGoldTransactions,
-            releaserPartyPosition
+            releaserPartyPosition,
+            obj.What.PartyScreenMode,
+            rightMemberOrderData
         );
 
         network.SendAll(message);
@@ -127,19 +132,29 @@ internal class PartyDoneLogicHandler : IHandler
     private void Handle_CompletePartyDoneLogic(MessagePayload<NetworkCompleteDoneLogic> obj)
     {
         var message = obj.What;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
-
+        
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
+
             if (!TryResolveCompleteDoneLogic(message, out var leftParty, out var leftPrisonerRoster, out var upgradedTroopHistory)) return;
 
             var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.DonatedPrisonersRoster, objectManager);
-            var releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
-                message.LeftPrisonerRosterData,
-                message.RightPrisonerRosterData,
-                message.ReleaserPartyPosition,
-                out var leftPrisonerRosterData,
-                out var rightPrisonerRosterData);
+            var recruitedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.RecruitedPrisonersRoster, objectManager);
+            var releasedPlayerCaptivityEvents = new List<PlayerCaptivityEndedByServer>();
+            var leftPrisonerRosterData = message.LeftPrisonerRosterData;
+            var rightPrisonerRosterData = message.RightPrisonerRosterData;
+            // SellPrisonersHandler owns ransom releases so the same player is not released twice.
+            if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
+            {
+                releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
+                    message.LeftPrisonerRosterData,
+                    message.RightPrisonerRosterData,
+                    leftParty != null || leftPrisonerRoster != null,
+                    message.ReleaserPartyPosition,
+                    out leftPrisonerRosterData,
+                    out rightPrisonerRosterData);
+            }
 
             var rosterDeltas = CreateRosterDeltas(
                 mainHero,
@@ -150,12 +165,19 @@ internal class PartyDoneLogicHandler : IHandler
                 rightPrisonerRosterData);
 
             PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
-            troopRosterInterface.ApplyTroopRosterDeltas(rosterDeltas);
+
+            // Only apply deltas if not ransoming. SellPrisonersAction already changes troop rosters
+            if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
+            {
+                troopRosterInterface.ApplyTroopRosterDeltas(rosterDeltas);
+            }
             ApplyRightOwnerPartyItemRoster(mainHero, message);
             NotifyDonatedPrisonersChanged(donatedPrisonersRoster);
             ApplyPartyRewardChanges(mainHero, message);
             ApplyUpgradedTroopHistory(mainHero, upgradedTroopHistory);
-            ApplyPrisonerRecruitmentEffects(mainHero, message, donatedPrisonersRoster);
+            ApplyPrisonerRecruitmentEffects(mainHero, message, recruitedPrisonersRoster);
+
+            ApplyRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData);
         });
     }
 
@@ -270,13 +292,13 @@ internal class PartyDoneLogicHandler : IHandler
     private static void ApplyPrisonerRecruitmentEffects(
         Hero mainHero,
         NetworkCompleteDoneLogic message,
-        FlattenedTroopRoster donatedPrisonersRoster)
+        FlattenedTroopRoster recruitedPrisonersRoster)
     {
         if (message.RecruitedPrisonersRoster == null) return;
-        if (donatedPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>()) return;
+        if (recruitedPrisonersRoster.IsEmpty<FlattenedTroopRosterElement>()) return;
 
         // Replacement for CampaignEventDispatcher.Instance.OnMainPartyPrisonerRecruited(obj.What.RecruitedPrisonersRoster);
-        foreach (CharacterObject characterObject in donatedPrisonersRoster.Troops)
+        foreach (CharacterObject characterObject in recruitedPrisonersRoster.Troops)
         {
             ApplyPrisonerRecruitmentEffect(mainHero, characterObject);
         }
@@ -300,15 +322,24 @@ internal class PartyDoneLogicHandler : IHandler
         mainHero.PartyBelongedTo.RecentEventsMorale += (float)prisonerRecruitmentMoraleEffect;
     }
 
+    private void ApplyRosterOrder(TroopRoster roster, TroopRosterOrderData orderData)
+    {
+        messageBroker.Publish(this, new ApplyTroopRosterOrder(roster, orderData));
+    }
+
     internal List<PlayerCaptivityEndedByServer> CreatePlayerCaptivityReleaseEvents(
         TroopRosterData leftPrisonerRosterData,
         TroopRosterData rightPrisonerRosterData,
+        bool hasLeftPrisonerDestination,
         CampaignVec2 releaserPartyPosition,
         out TroopRosterData filteredLeftPrisonerRosterData,
         out TroopRosterData filteredRightPrisonerRosterData)
     {
         var releasedPlayerPrisoners = new List<Hero>();
-        var transferredPlayerPrisoners = GetTransferredPlayerPrisoners(leftPrisonerRosterData, rightPrisonerRosterData);
+        // The normal party screen's left prisoner roster is a dummy discard target, not a transfer destination.
+        var transferredPlayerPrisoners = hasLeftPrisonerDestination
+            ? GetTransferredPlayerPrisoners(leftPrisonerRosterData, rightPrisonerRosterData)
+            : GetTransferredPlayerPrisoners(rightPrisonerRosterData);
         filteredLeftPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(leftPrisonerRosterData, transferredPlayerPrisoners, releasedPlayerPrisoners);
         filteredRightPrisonerRosterData = FilterPlayerPrisonerReleaseDelta(rightPrisonerRosterData, transferredPlayerPrisoners, releasedPlayerPrisoners);
 

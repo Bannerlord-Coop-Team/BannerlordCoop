@@ -1,6 +1,7 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages;
@@ -13,10 +14,9 @@ namespace Missions.Messages;
 /// damage number + a synthetic kill) keeps combat faithful and removes the fixed-magnitude "fatal blow".
 /// <para>
 /// Agent indices are per-client, so the blow's attacker index can't be used as-is: <see cref="AttackerAgentId"/>
-/// carries the attacker's network id and the owner re-maps it to its local agent's index. Missiles are not
-/// synced (the projectile is simulated only on the shooter), but <c>Agent.RegisterBlow</c> resolves damage
-/// from the blow and never dereferences the projectile index — so a routed missile blow applies cleanly with
-/// no fix-up.
+/// carries the attacker's network id and the owner re-maps it to its local agent's index. A replicated visual
+/// missile has a receiver-local index, so the owner clears the sender-local index before applying this already
+/// resolved blow.
 /// </para>
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
@@ -36,13 +36,30 @@ public class NetworkApplyBattleDamage : IEvent
     /// keyed off its rider's id and the owner resolves the rider's current MountAgent at apply time.</summary>
     [ProtoMember(5)]
     public bool IsMount { get; }
-
-    public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData, bool isMount = false)
+    /// <summary>
+    /// Identity of the exact missile launch that produced this blow. Zero means correlation was unavailable.
+    /// </summary>
+    [ProtoMember(6)]
+    public long MissileShotSequence { get; }
+    /// <summary>
+    /// Explicit copy of the engine-private missile bit. Keeping this on the envelope makes presentation and
+    /// correlation independent of the binary layout used to serialize <see cref="Blow"/>.
+    /// </summary>
+    [ProtoMember(7)]
+    public bool IsMissile { get; }
+    /// <summary>The original missile weapon used by vanilla to select the combat skill reward.</summary>
+    [ProtoMember(8)]
+    public WeaponComponentData AttackerWeapon { get; }
+    public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData,
+        bool isMount = false, long missileShotSequence = 0, WeaponComponentData attackerWeapon = null)
     {
         VictimAgentId = victimAgentId;
         AttackerAgentId = attackerAgentId;
         Blow = blow;
         CollisionData = collisionData;
         IsMount = isMount;
+        MissileShotSequence = missileShotSequence;
+        IsMissile = blow.IsMissile;
+        AttackerWeapon = attackerWeapon;
     }
 }

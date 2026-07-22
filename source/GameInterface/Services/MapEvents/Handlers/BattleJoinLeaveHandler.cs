@@ -1,9 +1,10 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -33,17 +34,20 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
+    private readonly IMapEventInitializationBarrier initializationBarrier;
 
     public BattleJoinLeaveHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IMapEventLogger mapEventLogger)
+        IMapEventLogger mapEventLogger,
+        IMapEventInitializationBarrier initializationBarrier)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.mapEventLogger = mapEventLogger;
+        this.initializationBarrier = initializationBarrier;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
@@ -84,8 +88,7 @@ internal class BattleJoinLeaveHandler : IHandler
 
                 var positions = message.Positions;
 
-                // Re-applying campaign-collection state replicated from the server; the
-                // AutoSync TroopUpgradeTracker patches must stand down during the apply.
+                var trackParties = !initializationBarrier.IsPending(mapEvent);
                 using (new AllowedThread())
                 {
                     for (int i = 0; i < message.MapEventPartyIds.Length; i++)
@@ -94,18 +97,11 @@ internal class BattleJoinLeaveHandler : IHandler
                         if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
                             continue;
 
-                        mapEventLogger.DebugMapEvent(mapEvent, "Adding involved map event party {MapEventPartyId} to troop upgrade tracker", mapEventPartyId);
-                        mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
-
-                        // Snap the party to its server-side map position so it lines up with the
-                        // battle. Every involved party is snapped, including this client's own, so
-                        // all clients place the parties where the server has them, lined up with the
-                        // battle center the server is authoritative for.
+                        if (trackParties)
+                            mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
                         var mobileParty = mapEventParty.Party.MobileParty;
                         if (mobileParty != null && positions != null && i < positions.Length)
-                        {
                             mobileParty.Position = positions[i];
-                        }
                     }
                 }
             }
@@ -177,7 +173,7 @@ internal class BattleJoinLeaveHandler : IHandler
             context: nameof(Handle_NetworkRequestJoinBattle));
     }
 
-    /// <summary>[Client] Bridge a joiner's leave to a server request; [Server/host] perform it directly.</summary>
+    /// <summary>[Client] Bridge a joiner's leave to a server request; [Server] perform it directly.</summary>
     private void Handle_PlayerLeaveBattleAttempted(MessagePayload<PlayerLeaveBattleAttempted> payload)
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.LeavingParty, out var partyId)) return;
@@ -205,7 +201,7 @@ internal class BattleJoinLeaveHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
-                ApplyLeave(party);
+                ApplyAuthoritativeLeave(party);
                 network.SendAll(new NetworkPartyLeftBattle(partyId));
             },
             blocking: true,
@@ -223,14 +219,21 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (Campaign.Current == null) return;
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
-                ApplyLeave(party);
+                ApplyNetworkLeave(party);
             },
             context: nameof(Handle_NetworkPartyLeftBattle));
     }
 
-    // Remove the party from its side (idempotent) and, if it is this instance's own party, close its encounter UI.
+    // Authoritative campaign logic runs with patches live so removal, finalization, and replication stay ordered.
+    private static void ApplyAuthoritativeLeave(PartyBase party)
+    {
+        if (party.MapEventSide != null)
+            party.MapEventSide = null;
+    }
+
+    // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
     // PlayerEncounter.Finish is safe here: with MapEventSide already cleared, LeaveBattle no longer finalizes.
-    private static void ApplyLeave(PartyBase party)
+    private static void ApplyNetworkLeave(PartyBase party)
     {
         using (new AllowedThread())
         {

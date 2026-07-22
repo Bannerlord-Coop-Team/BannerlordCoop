@@ -66,8 +66,9 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         var mission = CreateCoopFieldBattle(rec, mapEventId);
 
         // Same post-open coop entry the native path drove via BattleMissionEntryPatch: the controller requests
-        // the P2P instance and the host handler requests election + this client's troop reserves. The reserves
-        // reach the (already-registered) suppliers during scene load, before AfterStart sizes them.
+        // the P2P instance and the host handler requests this client's OWN troop reserves, which reach the
+        // (already-registered) suppliers during scene load. The host election follows at mission-ready
+        // (CoopBattleController.AfterStart, once loading finishes) and delivers the remaining sides.
         messageBroker.Publish(mapEvent, new PlayerEnteredBattle(mapEvent));
         return mission;
     }
@@ -168,8 +169,8 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest
     // sergeant-score first — the coop-scoped replacement for HeroHelper.OrderHeroesOnPlayerSideByPriority, which
     // spans the whole side. Carried as CharacterObject string ids, matching the native list that
-    // AssignPlayerRoleInTeamMissionController consumes.
-    private static List<string> OwnPartyHeroesByPriority()
+    // AssignPlayerRoleInTeamMissionController consumes. Shared with the siege launcher.
+    internal static List<string> OwnPartyHeroesByPriority()
     {
         var heroes = new List<Hero>();
         foreach (var member in MobileParty.MainParty.MemberRoster.GetTroopRoster())

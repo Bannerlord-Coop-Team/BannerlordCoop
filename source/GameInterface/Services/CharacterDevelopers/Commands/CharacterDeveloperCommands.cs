@@ -17,7 +17,7 @@ internal class CharacterDeveloperCommands
     /// <summary>
     /// Output attributes, focuses, skills and perks of a specific hero
     /// </summary>
-    [CommandLineArgumentFunction("herostats", "coop.debug.hero")]
+    [CommandLineArgumentFunction("stats", "coop.debug.herodeveloper")]
     public static string HeroStatsCommand(List<string> strings)
     {
         if (strings.Count == 0)
@@ -32,20 +32,24 @@ internal class CharacterDeveloperCommands
             {
                 string heroData = hero.Name + ":\n";
 
-                heroData += "Level: " + hero.Level + "\n";
+                heroData += " Level: " + hero.Level + "\n";
 
-                heroData += "Total XP: " + hero.HeroDeveloper.TotalXp + "\n";
+                heroData += " Total XP: " + hero.HeroDeveloper.TotalXp + "\n";
 
-                heroData += "Attributes: {";
+                heroData += " Unspent Focus Points: " + hero.HeroDeveloper.UnspentFocusPoints + "\n";
+
+                heroData += " Unspent Attribute Points: " + hero.HeroDeveloper.UnspentAttributePoints + "\n";
+
+                heroData += " Attributes: {";
                 foreach (CharacterAttribute attribute in hero._characterAttributes._attributes.Keys)
                 {
                     heroData += attribute.Name + ": " + hero.GetAttributeValue(attribute) + ",";
                 }
 
-                heroData += "\nSkill XPs: {";
-                foreach (SkillObject skill in hero._heroSkills._attributes.Keys)
+                heroData += "\n Skill XPs: {";
+                foreach (var skillXp in hero.HeroDeveloper._skillXps)
                 {
-                    heroData += skill.Name + ": " + hero.HeroDeveloper.GetSkillXp(skill) + ",";
+                    heroData += skillXp.Key.Name + ": " + skillXp.Value + ",";
                 }
 
                 heroData += "}\n Focuses: {";

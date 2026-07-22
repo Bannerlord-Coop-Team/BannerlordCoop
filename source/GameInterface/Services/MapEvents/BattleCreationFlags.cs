@@ -1,4 +1,4 @@
-namespace GameInterface.Services.MapEvents;
+﻿namespace GameInterface.Services.MapEvents;
 
 /// <summary>
 /// Snapshot of the <see cref="TaleWorlds.CampaignSystem.Encounters.PlayerEncounter"/> "force" flags that
@@ -21,6 +21,9 @@ public readonly struct BattleCreationFlags
     public readonly bool ForceBlockadeAttack;
     public readonly bool ForceBlockadeSallyOutAttack;
     public readonly bool ForceHideoutSendTroops;
+
+    public bool IsForced => ForceRaid || ForceSallyOut || ForceVolunteers || ForceSupplies ||
+        IsSallyOutAmbush || ForceBlockadeAttack || ForceBlockadeSallyOutAttack || ForceHideoutSendTroops;
 
     public BattleCreationFlags(
         bool forceRaid,

@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Util;
 using Serilog;
 using System;
@@ -253,17 +253,22 @@ public class GameThread : IUpdateable
         [CallerMemberName] string callerMember = null)
     {
         string label = context ?? BuildLabel(callerFile, callerMember);
-        Run(() =>
+        Run(WrapSafe(action, context), blocking, label);
+    }
+
+    /// <summary>
+    /// Queues an action for a later <see cref="Update"/> even when called from the game-loop thread.
+    /// Use this when running inline would mutate state currently being iterated by the engine.
+    /// </summary>
+    public static void EnqueueSafe(Action action, string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
+    {
+        string label = context ?? BuildLabel(callerFile, callerMember);
+        lock (Instance.m_QueueLock)
         {
-            try
-            {
-                action();
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
-            }
-        }, blocking, label);
+            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label));
+        }
     }
 
     /// <summary>
@@ -322,8 +327,32 @@ public class GameThread : IUpdateable
         return $"{Path.GetFileNameWithoutExtension(callerFile)}.{callerMember}";
     }
 
+    private static Action WrapSafe(Action action, string context) => () =>
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
+        }
+    };
+
     public void MarkGameThread()
     {
         m_GameLoopThreadId = Thread.CurrentThread.ManagedThreadId;
+    }
+
+    /// <summary>
+    /// Clears the game-loop thread registration. A thread that was marked via
+    /// <see cref="MarkGameThread"/> must call this before it exits: .NET recycles managed thread
+    /// ids, so a registration left behind by a dead thread can silently promote an unrelated
+    /// future thread to "game thread", flipping <see cref="Run(Action, bool, string, string, string)"/>
+    /// from queueing to inline execution.
+    /// </summary>
+    public void UnmarkGameThread()
+    {
+        m_GameLoopThreadId = 0;
     }
 }

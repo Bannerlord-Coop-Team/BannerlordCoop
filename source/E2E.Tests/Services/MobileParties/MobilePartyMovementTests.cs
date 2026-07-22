@@ -2,12 +2,12 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using SandBox;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -17,26 +17,15 @@ namespace E2E.Tests.Services.MobileParties;
 
 public class MobilePartyMovementTests : SyncTestBase
 {
-    private readonly string ServerId = "TestServer";
-
-    private readonly string HeroId = "TestHero";
     private readonly string MobilePartyId = "TestParty";
     private readonly string TargetPartyId = "TargetParty";
     private readonly string TargetSettlementId = "TargetSettlement";
 
     public MobilePartyMovementTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.Server.Container.Resolve<IControllerIdProvider>().SetControllerId(ServerId);
-
-
-
         MobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TargetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TargetSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-
-        var playerManager = TestEnvironment.Server.Container.Resolve<IPlayerManager>();
-
-        playerManager.AddPlayer(new Player(ServerId, HeroId, MobilePartyId, "MyClan", "MyCharacterObject"));
 
         var clientNum = 1;
 
@@ -50,7 +39,6 @@ public class MobilePartyMovementTests : SyncTestBase
     public void Party_SetMoveHold_Sync()
     {
         // Arrange
-        var dt = 0.1f;
         var point = new Vec2(0.1f, 0.2f);
         var campaignPoint = new CampaignVec2(point, true);
 
@@ -61,17 +49,9 @@ public class MobilePartyMovementTests : SyncTestBase
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
             serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
-            serverParty.Ai.Tick(dt);
+            serverParty.SetMoveModeHold();
+            TestEnvironment.FlushCoalescer();
         });
-
-        foreach (var client in TestEnvironment.Clients)
-        {
-            client.Call(() =>
-            {
-                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var clientParty));
-                clientParty.Ai.Tick(dt);
-            });
-        }
 
         // Assert
         foreach (var client in TestEnvironment.Clients)
@@ -96,8 +76,10 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var targetParty));
+            serverParty.SetMoveEngageParty(targetParty, MobileParty.NavigationType.Default);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -132,8 +114,10 @@ public class MobilePartyMovementTests : SyncTestBase
         // Act
         server.Call(() =>
         {
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var targetParty));
+            serverParty.SetMoveGoAroundParty(targetParty, MobileParty.NavigationType.Default);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -168,8 +152,10 @@ public class MobilePartyMovementTests : SyncTestBase
         // Act
         server.Call(() =>
         {
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(TargetSettlementId, out var targetSettlement));
+            serverParty.SetMoveGoToSettlement(targetSettlement, MobileParty.NavigationType.Default, false);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -207,6 +193,7 @@ public class MobilePartyMovementTests : SyncTestBase
             
             serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -243,8 +230,9 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             serverParty.SetMoveToNearestLand(targetSettlement);
-            serverParty.ShortTermBehavior = AiBehavior.AssaultSettlement;
+            serverParty.SetShortTermBehavior(AiBehavior.AssaultSettlement, targetSettlement.Party);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         }, disabledMethods: new MethodBase[] { 
             AccessTools.Method(typeof(MapScene), nameof(MapScene.GetNearestFaceCenterForPositionWithPath))
         });
@@ -283,8 +271,10 @@ public class MobilePartyMovementTests : SyncTestBase
         // Act
         server.Call(() =>
         {
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(TargetSettlementId, out var targetSettlement));
+            serverParty.SetMoveGoToInteractablePoint(targetSettlement.Party, MobileParty.NavigationType.Default);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -301,22 +291,7 @@ public class MobilePartyMovementTests : SyncTestBase
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var clientParty));
-
             AssertPartyMovementValues(client, clientParty);
-
-            if (serverParty.Ai.AiBehaviorInteractable is not null)
-            {
-                Assert.True(client.ObjectManager.TryGetId(clientParty.Ai, out var aiId));
-                Assert.True(client.ObjectManager.TryGetId((PartyBase)clientParty.Ai.AiBehaviorInteractable, out var targetSettlementId));
-                Assert.Equal(TargetSettlementId, targetSettlementId);
-            }
-
-            if (serverParty.Ai.AiBehaviorPartyBase is not null)
-            {
-                Assert.True(client.ObjectManager.TryGetId(clientParty.Ai, out var aiId));
-                Assert.True(client.ObjectManager.TryGetId(clientParty.Ai.AiBehaviorPartyBase, out var targetSettlementId));
-                Assert.Equal(TargetSettlementId, targetSettlementId);
-            }
         }
     }
 
@@ -335,8 +310,10 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var targetParty));
+            serverParty.SetMoveEscortParty(targetParty, MobileParty.NavigationType.Default, false);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -358,6 +335,54 @@ public class MobilePartyMovementTests : SyncTestBase
     }
 
     [Fact]
+    public void Peace_HoldsAiPartyWithLongRangePursuit()
+    {
+        var pursuingClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var targetClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        TestEnvironment.Server.Call(() =>
+        {
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var pursuingParty));
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var targetParty));
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<Clan>(pursuingClanId, out var pursuingClan));
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<Clan>(targetClanId, out var targetClan));
+
+            pursuingParty.ActualClan = pursuingClan;
+            targetParty.ActualClan = targetClan;
+            VillageHostileFactionStanceHelper.ApplyWarStance(pursuingClan, targetClan);
+            pursuingParty.SetMoveGoAroundParty(targetParty, MobileParty.NavigationType.Default);
+
+            Assert.True(FactionManager.IsAtWarAgainstFaction(pursuingClan, targetClan));
+            Assert.Equal(AiBehavior.GoAroundParty, pursuingParty.DefaultBehavior);
+            Assert.Equal(targetParty, pursuingParty.TargetParty);
+
+            MakePeaceAction.Apply(pursuingClan, targetClan);
+
+            Assert.False(FactionManager.IsAtWarAgainstFaction(pursuingClan, targetClan));
+            Assert.Equal(AiBehavior.Hold, pursuingParty.DefaultBehavior);
+            Assert.Equal(AiBehavior.Hold, pursuingParty.ShortTermBehavior);
+            Assert.Equal(MoveModeType.Hold, pursuingParty.PartyMoveMode);
+            Assert.Null(pursuingParty.TargetParty);
+            Assert.Null(pursuingParty.MoveTargetParty);
+
+            TestEnvironment.FlushCoalescer();
+        });
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var pursuingParty));
+                Assert.Equal(AiBehavior.Hold, pursuingParty.DefaultBehavior);
+                Assert.Equal(AiBehavior.Hold, pursuingParty.ShortTermBehavior);
+                Assert.Equal(MoveModeType.Hold, pursuingParty.PartyMoveMode);
+                Assert.Null(pursuingParty.TargetParty);
+                Assert.Null(pursuingParty.MoveTargetParty);
+            });
+        }
+    }
+
+    [Fact]
     public void Party_SetMovePatrolAroundPoint_Sync()
     {
         // Arrange
@@ -372,8 +397,9 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            serverParty.SetMovePatrolAroundPoint(campaignPoint, MobileParty.NavigationType.Default);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -410,8 +436,10 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(TargetSettlementId, out var targetSettlement));
+            serverParty.SetMovePatrolAroundSettlement(targetSettlement, MobileParty.NavigationType.Default, false);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -448,8 +476,10 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(TargetSettlementId, out var targetSettlement));
+            serverParty.SetMoveRaidSettlement(targetSettlement, MobileParty.NavigationType.Default, false);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -486,8 +516,10 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(TargetSettlementId, out var targetSettlement));
+            serverParty.SetMoveBesiegeSettlement(targetSettlement, MobileParty.NavigationType.Default);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -524,8 +556,10 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
-            serverParty.SetMoveGoToPoint(campaignPoint, MobileParty.NavigationType.Default);
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(TargetSettlementId, out var targetSettlement));
+            serverParty.SetMoveDefendSettlement(targetSettlement, false, MobileParty.NavigationType.Default);
             serverParty.Ai.Tick(dt);
+            TestEnvironment.FlushCoalescer();
         });
 
         foreach (var client in TestEnvironment.Clients)
@@ -547,37 +581,47 @@ public class MobilePartyMovementTests : SyncTestBase
         }
     }
 
-    private void AssertPartyMovementValues(EnvironmentInstance client, MobileParty clientParty)
-
+    private void AssertPartyMovementValues(
+        EnvironmentInstance client,
+        MobileParty clientParty)
     {
         var server = TestEnvironment.Server;
         Assert.True(server.ObjectManager.TryGetObject<MobileParty>(MobilePartyId, out var serverParty));
 
         Assert.Equal(serverParty.DefaultBehavior, clientParty.DefaultBehavior);
         Assert.Equal(serverParty.ShortTermBehavior, clientParty.ShortTermBehavior);
+        Assert.Equal(serverParty.TargetPosition, clientParty.TargetPosition);
         Assert.Equal(serverParty.MoveTargetPoint, clientParty.MoveTargetPoint);
         Assert.Equal(serverParty.DesiredAiNavigationType, clientParty.DesiredAiNavigationType);
+        Assert.Equal(serverParty.IsTargetingPort, clientParty.IsTargetingPort);
+        Assert.Equal(serverParty.PartyMoveMode, clientParty.PartyMoveMode);
+        Assert.Equal(serverParty.Ai.BehaviorTarget, clientParty.Ai.BehaviorTarget);
 
-        if (serverParty.TargetParty is not null)
-        {
-            Assert.True(client.ObjectManager.TryGetId(clientParty.TargetParty, out var targetPartyId));
-            Assert.Equal(TargetPartyId, targetPartyId);
-        }
-
-        if (serverParty.TargetSettlement is not null)
-        {
-            Assert.True(client.ObjectManager.TryGetId(clientParty.TargetSettlement, out var targetSettlementId));
-            Assert.Equal(TargetSettlementId, targetSettlementId);
-        }
-
-        if (serverParty.Ai.AiBehaviorPartyBase is null)
-        {
-            Assert.Null(clientParty.Ai.AiBehaviorPartyBase);
-        }
-
-        if (serverParty.Ai.AiBehaviorInteractable is null)
-        {
+        AssertSameReference(client, serverParty.TargetParty, clientParty.TargetParty);
+        AssertSameReference(client, serverParty.TargetSettlement, clientParty.TargetSettlement);
+        AssertSameReference(client, serverParty.MoveTargetParty, clientParty.MoveTargetParty);
+        AssertSameReference(client, serverParty.Ai.AiBehaviorPartyBase, clientParty.Ai.AiBehaviorPartyBase);
+        if (serverParty.Ai.AiBehaviorInteractable is PartyBase serverInteractable)
+            AssertSameReference(
+                client,
+                serverInteractable,
+                Assert.IsType<PartyBase>(clientParty.Ai.AiBehaviorInteractable));
+        else
             Assert.Null(clientParty.Ai.AiBehaviorInteractable);
+    }
+
+    private void AssertSameReference<T>(EnvironmentInstance client, T serverValue, T clientValue)
+        where T : class
+    {
+        if (serverValue == null)
+        {
+            Assert.Null(clientValue);
+            return;
         }
+
+        Assert.NotNull(clientValue);
+        Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverValue, out var serverId));
+        Assert.True(client.ObjectManager.TryGetId(clientValue, out var clientId));
+        Assert.Equal(serverId, clientId);
     }
 }

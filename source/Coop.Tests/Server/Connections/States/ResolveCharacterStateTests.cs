@@ -88,7 +88,9 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
-            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) };
+            // Community (non-official) modules — official modules are exempt from module
+            // matching, so they would not exercise the comparison at all.
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", false, false, new ApplicationVersion()) };
 
             serverComponent.Container
                 .Resolve<Mock<IModuleInfoProvider>>()
@@ -114,16 +116,19 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
+            // Community (non-official) modules — official modules are exempt from module
+            // matching (a dedicated server's official module set differs from a client's),
+            // so only community modules can produce a mismatch.
             serverComponent.Container
                 .Resolve<Mock<IModuleInfoProvider>>()
                 .Setup(mip => mip.GetModuleInfos())
                 .Returns(
-                    new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) }
+                    new List<ModuleInfo> { new ModuleInfo("1", false, false, new ApplicationVersion()) }
                 );
 
             // Act
             var payload = new MessagePayload<NetworkModuleVersionsValidate>(
-                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", true, false, new ApplicationVersion())}));
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", false, false, new ApplicationVersion())}));
             currentState.Handle_ModuleVersionsValidate(payload);
 
             // Assert
@@ -132,6 +137,54 @@ namespace Coop.Tests.Server.Connections.States
 
             var castedMessage = (NetworkModuleVersionsValidated)message;
             Assert.False(castedMessage.Matches);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_FromDifferentPeer_Ignored()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) };
+
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
+                .Setup(mip => mip.GetModuleInfos())
+                .Returns(modules);
+
+            // Act — another connection's validate request must not be answered by this connection;
+            // without the peer guard every concurrent joiner was also answered with a result
+            // computed from another client's module list.
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                differentPeer, new NetworkModuleVersionsValidate(modules));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            // Assert — no response was sent to anyone.
+            Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ValidationThrows_RespondsDenied()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
+                .Setup(mip => mip.GetModuleInfos())
+                .Throws(new System.InvalidOperationException("boom"));
+
+            // Act — a throw used to die in the network poller, so the joiner never got an answer
+            // and sat on the "Validating modules..." loading screen forever.
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo>()));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            // Assert — the client must receive a denial with a reason instead of silence.
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            var castedMessage = Assert.IsType<NetworkModuleVersionsValidated>(message);
+            Assert.False(castedMessage.Matches);
+            Assert.Contains("failed to validate", castedMessage.Reason);
         }
 
         [Fact]

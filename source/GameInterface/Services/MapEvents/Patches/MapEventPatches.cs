@@ -2,6 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -12,9 +14,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -24,8 +28,8 @@ internal class MapEventPatches
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
 
     [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
-    [HarmonyPrefix]
-    private static void Prefix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
+    [HarmonyPostfix]
+    private static void Postfix_AddInvolvedPartyInternal(MapEvent __instance, MapEventParty mapEventParty)
     {
         // Broadcast the involved parties to clients when a player joins, OR when an AI party joins as a
         // reinforcement while the join window is still open (InteractionPatches.IsWithinAiJoinWindow). Parties
@@ -35,32 +39,30 @@ internal class MapEventPatches
         if (!isPlayerJoin && !InteractionPatches.IsWithinAiJoinWindow(__instance))
             return;
 
-        var partiesAdded = new List<MapEventParty>();
-
-        __instance.TroopUpgradeTracker = new TroopUpgradeTracker();
-        MapEventSide[] sides = __instance._sides;
-        for (int i = 0; i < sides.Length; i++)
-        {
-            foreach (var existingParty in sides[i].Parties)
-            {
-                __instance.TroopUpgradeTracker.AddParty(existingParty);
-                partiesAdded.Add(existingParty);
-            }
-        }
-
-        var message = new MapEventInvolvedPartiesAdded(__instance, partiesAdded);
+        var message = new MapEventInvolvedPartiesAdded(
+            __instance,
+            __instance._sides.SelectMany(side => side.Parties).ToList());
         MessageBroker.Instance.Publish(__instance, message);
     }
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
-    private static bool Prefix_FinalizeEventAux(MapEvent __instance)
+    [HarmonyPriority(Priority.First)]
+    private static bool Prefix_FinalizeEventAux(MapEvent __instance, out bool __state)
     {
+        __state = false;
+
+        if (ModInformation.IsServer)
+            MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
+
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
 
         if (ModInformation.IsServer)
+        {
+            __state = !__instance.IsFinalized;
             return true;
+        }
 
         var message = new MapEventFinalizeAttempted(__instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -70,20 +72,25 @@ internal class MapEventPatches
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPostfix]
-    private static void Postfix_FinalizeEventAux(MapEvent __instance)
+    private static void Postfix_FinalizeEventAux(MapEvent __instance, bool __state, bool __runOriginal)
     {
-        // By this point the event's parties have left it, so the server can
-        // re-evaluate whether any player is still in a map event.
-        if (ModInformation.IsClient)
+        if (!__runOriginal || !__state)
             return;
 
+        // Keep the event registered while finalized handlers clear their per-event state.
         MessageBroker.Instance.Publish(__instance, new MapEventFinalized(__instance));
+        MessageBroker.Instance.Publish(__instance, new InstanceDestroyed<MapEvent>(__instance));
     }
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     private static bool Prefix_BattleState(MapEvent __instance, BattleState value)
     {
+        if (ModInformation.IsServer &&
+            (value == BattleState.AttackerVictory || value == BattleState.DefenderVictory))
+            MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
+
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             return true;
@@ -108,6 +115,17 @@ internal class MapEventPatches
         // resolving to the same victory). The native setter ignores a no-op change, so only relay an
         // actual state change to avoid sending a redundant battle result to the server.
         if (value == __instance.BattleState)
+        {
+            return true;
+        }
+
+        // A mission peer's local conclusion is not authoritative: its mission can diverge from the
+        // battle host's (e.g. commit before the host fielded anything) and read an empty enemy side
+        // as a victory, which would drive the server to finalize and capture while the host still
+        // fights. Only the battle host relays a mission victory; the local set still runs so the
+        // peer's own mission winds down, and the real result arrives through the sync.
+        if ((value == BattleState.AttackerVictory || value == BattleState.DefenderVictory)
+            && BattleConclusionGate.IsInCoopBattleMission && !BattleConclusionGate.IsLocalBattleHost)
         {
             return true;
         }
@@ -144,18 +162,33 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static bool Prefix_OnBattleWon(MapEvent __instance)
     {
-        var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayerParty()));
-
         // Skip on client
         if (ModInformation.IsClient)
             return false;
 
+        // Need to calculate map event results before committing changes
+        __instance.CalculateMapEventResults();
+
         if (__instance.ContainsPlayerParty())
         {
+            // Run a custom implementation of MapEvent.CalculateAndCommitMapEventResults that broadcasts results to players
+            var message = new CommitMapEventResults(__instance);
+            MessageBroker.Instance.Publish(__instance, message);
+        }
+        else
+        {
+            // Mirror native OnBattleWon: a battle without players commits its results directly.
             __instance.CalculateAndCommitMapEventResults();
         }
 
-        return true;
+        IBattleObserver battleObserver = __instance.BattleObserver;
+        if (battleObserver == null)
+        {
+            return false;
+        }
+        battleObserver.BattleResultsReady();
+
+        return false;
     }
 
     [HarmonyPatch("CommitCalculatedMapEventResults")]
@@ -190,13 +223,13 @@ internal class MapEventPatches
                 return true;
         }
 
-        // Skip if any parties are not set
-        if (__instance.InvolvedParties.Any(x => x?.MobileParty is null))
+        // A settlement PartyBase is a complete participant even though it has no MobileParty.
+        if (__instance.InvolvedParties.Any(x => x is null || (!x.IsMobile && !x.IsSettlement)))
             return false;
 
         // Don't update if a player is involved
         // Prevents server from instantly finishing the battle and waits for client finish request
-        if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsControlledByThisInstance()))
+        if (__instance.InvolvedParties.Any(x => x.IsMobile && !x.MobileParty.IsControlledByThisInstance()))
             return false;
 
         return true;

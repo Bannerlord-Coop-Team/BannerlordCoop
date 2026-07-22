@@ -1,11 +1,11 @@
-using Common;
-using Common.Logging;
+﻿using Common;
+using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
 using LiteNetLib;
 using Missions.Agents.Packets;
-using Serilog;
+using Missions.Messages;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
@@ -15,11 +15,20 @@ namespace Missions.Agents.Handlers;
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
     /// <summary>
-    /// [Game thread] Detect discrete action changes on owned agents and broadcast them. Driven per-frame from
+    /// [Game thread] Detect discrete action, defend-input, and realized guard changes on owned agents and broadcast them. Driven per-frame from
     /// CoopMissionController.OnMissionTick: the game thread is the only place a
     /// one-frame action transition can be observed without racing the engine, and event capture must be exact.
     /// </summary>
     void PollActions();
+
+    /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
+    void CatchUpJoiner(string controllerId);
+
+    /// <summary>[Game thread] Reassert received puppet defend state immediately before the display snapshot.</summary>
+    void ReassertRemoteDefendStates(float dt = 0f);
+
+    /// <summary>[Game thread] Apply queued remote actions and refresh their retained defend state.</summary>
+    void ApplyRemoteGuardStates();
 }
 
 /// <summary>
@@ -27,54 +36,56 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// an event — "this agent started a punch/attack/jump" — that plays out locally over time. So instead of polling
 /// the full action state every tick and re-applying it (which lost one-frame triggers, fought the local
 /// animation, and churned the skeleton), this diffs each owned agent's action channels ON THE GAME THREAD and,
-/// only when a DISCRETE action changes, broadcasts it <see cref="DeliveryMethod.ReliableOrdered"/>. The receiver
-/// applies it ONCE and lets the engine advance it. Locomotion (walk/run/idle) is skipped — it is reproduced from
-/// the synced <c>MovementInputVector</c>.
+/// only when a DISCRETE action, held defend input, or realized guard state changes, broadcasts it
+/// <see cref="DeliveryMethod.ReliableOrdered"/>. The receiver applies the transition and lets the engine advance
+/// it. Locomotion (walk/run/idle) is skipped — it is reproduced from the synced <c>MovementInputVector</c>.
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<AgentActionHandler>();
-
     // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
     private const int MaxAgentsPerActionPacket = 8;
 
     private readonly IBattleNetwork client;
     private readonly IPacketManager packetManager;
+    private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IRemoteAgentActionProcessor remoteActionProcessor;
 
-    // Last observed action indices per owned agent, so we broadcast only on change. WasDiscrete lets us also send
-    // the END of a discrete action (discrete -> locomotion) while still skipping locomotion<->locomotion churn.
-    private readonly Dictionary<Guid, ActionState> _lastActions = new Dictionary<Guid, ActionState>();
+    // Outbound observation and sequence share one record because both belong to the local agent's action stream.
+    private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
+        new Dictionary<Guid, LocalAgentActionState>();
 
     private bool _disposed;
 
-    private readonly struct ActionState
+    private struct LocalAgentActionState
     {
-        public readonly int Action0;
-        public readonly int Action1;
-        public readonly bool WasDiscrete;
-
-        public ActionState(int action0, int action1, bool wasDiscrete)
-        {
-            Action0 = action0;
-            Action1 = action1;
-            WasDiscrete = wasDiscrete;
-        }
+        public bool HasObservation;
+        public int Action0;
+        public int Action1;
+        public Agent.MovementControlFlag DefendFlags;
+        public Agent.GuardMode GuardMode;
+        public bool WasDiscrete;
+        public long Sequence;
     }
 
     public AgentActionHandler(
         IBattleNetwork client,
         IPacketManager packetManager,
+        IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        IRemoteAgentActionProcessor remoteActionProcessor)
     {
         this.client = client;
         this.packetManager = packetManager;
+        this.messageBroker = messageBroker;
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
+        this.remoteActionProcessor = remoteActionProcessor;
 
         this.packetManager.RegisterPacketHandler(this);
+        this.messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
     }
 
     public PacketType PacketType => PacketType.AgentAction;
@@ -85,10 +96,12 @@ public class AgentActionHandler : IAgentActionHandler
 
         List<Guid> ids = null;
         List<AgentActionData> actions = null;
+        List<long> sequences = null;
 
         foreach (var info in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
         {
             Agent agent = info.Agent;
+            remoteActionProcessor.ClearForLocalAgent(info.AgentId, agent);
             if (agent == null || agent.Mission == null || !agent.IsActive() || agent.Health <= 0)
                 continue;
 
@@ -100,69 +113,174 @@ public class AgentActionHandler : IAgentActionHandler
 
             int action0 = agent.GetCurrentAction(0).Index;
             int action1 = agent.GetCurrentAction(1).Index;
+            var defendFlags = AgentActionData.GetEffectiveDefendMovementFlags(agent);
+            Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
+                agent,
+                defendFlags);
 
-            bool hadState = _lastActions.TryGetValue(info.AgentId, out var last);
-            if (hadState && last.Action0 == action0 && last.Action1 == action1)
-                continue; // no action change
+            _localAgentStates.TryGetValue(info.AgentId, out var state);
+            bool hadState = state.HasObservation;
+            bool defendChanged;
+            if (hadState)
+            {
+                defendChanged = state.DefendFlags != defendFlags;
+            }
+            else
+            {
+                defendChanged = defendFlags != Agent.MovementControlFlag.None;
+            }
+
+            bool guardChanged;
+            if (hadState)
+            {
+                guardChanged = state.GuardMode != guardMode;
+            }
+            else
+            {
+                guardChanged = AgentActionData.IsGuardMode(guardMode);
+            }
+
+            if (hadState && state.Action0 == action0 && state.Action1 == action1
+                && !defendChanged && !guardChanged)
+                continue;
 
             bool nowDiscrete = IsDiscreteAction(agent.GetCurrentActionType(0))
                             || IsDiscreteAction(agent.GetCurrentActionType(1));
 
-            // Broadcast entering/holding a discrete action, or leaving one (its END). Pure locomotion changes
-            // (walk<->run<->idle) are skipped — the puppet reproduces those from the synced movement input.
-            bool broadcast = nowDiscrete || (hadState && last.WasDiscrete);
+            // Native command actions are untyped, so recognize the main agent's order gesture by action name.
+            if (!nowDiscrete && agent == Mission.Current.MainAgent)
+            {
+                nowDiscrete = IsOrderGesture(AgentActionData.GetActionNameWithCode(action0))
+                           || IsOrderGesture(AgentActionData.GetActionNameWithCode(action1));
+            }
 
-            _lastActions[info.AgentId] = new ActionState(action0, action1, nowDiscrete);
+            // Defend input and realized guard state can change before the animation index, so send them explicitly too.
+            bool broadcast = defendChanged || guardChanged || nowDiscrete || (hadState && state.WasDiscrete);
+
+            state.HasObservation = true;
+            state.Action0 = action0;
+            state.Action1 = action1;
+            state.DefendFlags = defendFlags;
+            state.GuardMode = guardMode;
+            state.WasDiscrete = nowDiscrete;
+            _localAgentStates[info.AgentId] = state;
             if (!broadcast)
                 continue;
 
+            long sequence = NextActionSequence(info.AgentId);
             (ids ??= new List<Guid>()).Add(info.AgentId);
-            (actions ??= new List<AgentActionData>()).Add(new AgentActionData(agent));
+            (actions ??= new List<AgentActionData>()).Add(
+                new AgentActionData(agent, defendFlags, guardMode));
+            (sequences ??= new List<long>()).Add(sequence);
         }
 
         if (ids == null) return;
 
+        SendActionPackets(
+            controllerIdProvider.ControllerId,
+            ids,
+            actions,
+            sequences,
+            packet => client.SendAll(packet));
+    }
+
+    public void CatchUpJoiner(string controllerId)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (_disposed || Mission.Current == null) return;
+
+            List<Guid> ids = null;
+            List<AgentActionData> actions = null;
+            List<long> sequences = null;
+
+            foreach (var info in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
+            {
+                Agent agent = info.Agent;
+                if (agent == null || agent.Mission == null || !agent.IsActive() || agent.Health <= 0 || agent.IsMount)
+                    continue;
+
+                var defendFlags = AgentActionData.GetEffectiveDefendMovementFlags(agent);
+                Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
+                    agent,
+                    defendFlags);
+                if (defendFlags == Agent.MovementControlFlag.None
+                    && !AgentActionData.IsGuardMode(guardMode))
+                    continue;
+
+                (ids ??= new List<Guid>()).Add(info.AgentId);
+                (actions ??= new List<AgentActionData>()).Add(
+                    new AgentActionData(agent, defendFlags, guardMode));
+                (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
+            }
+
+            if (ids == null) return;
+            SendActionPackets(
+                controllerIdProvider.ControllerId,
+                ids,
+                actions,
+                sequences,
+                packet => client.Send(controllerId, packet));
+        });
+    }
+
+    private void SendActionPackets(
+        string controllerId,
+        List<Guid> ids,
+        List<AgentActionData> actions,
+        List<long> sequences,
+        Action<AgentActionPacket> send)
+    {
+        int battleHostEpoch = remoteActionProcessor.GetOutgoingBattleHostEpoch();
         for (int start = 0; start < ids.Count; start += MaxAgentsPerActionPacket)
         {
             int count = Math.Min(MaxAgentsPerActionPacket, ids.Count - start);
             var idChunk = new Guid[count];
             var dataChunk = new AgentActionData[count];
+            var sequenceChunk = new long[count];
             ids.CopyTo(start, idChunk, 0, count);
             actions.CopyTo(start, dataChunk, 0, count);
-            client.SendAll(new AgentActionPacket(idChunk, dataChunk));
+            sequences.CopyTo(start, sequenceChunk, 0, count);
+            send(new AgentActionPacket(
+                controllerId,
+                idChunk,
+                dataChunk,
+                sequenceChunk,
+                battleHostEpoch));
         }
+    }
+
+    private long NextActionSequence(Guid agentId)
+    {
+        _localAgentStates.TryGetValue(agentId, out var state);
+        state.Sequence++;
+        _localAgentStates[agentId] = state;
+        return state.Sequence;
+    }
+
+    public void ApplyRemoteGuardStates()
+    {
+        remoteActionProcessor.ApplyRemoteGuardStates();
+    }
+
+    public void ReassertRemoteDefendStates(float dt = 0f)
+    {
+        remoteActionProcessor.ReassertRemoteDefendStates(dt);
+    }
+
+    private void Handle_BattleHostAssigned(
+        MessagePayload<NetworkBattleHostAssigned> payload)
+    {
+        if (_disposed) return;
+
+        remoteActionProcessor.HandleBattleHostAssigned(payload.What);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
-        var actionPacket = (AgentActionPacket)packet;
-        if (actionPacket.AgentIds == null) return;
+        if (_disposed) return;
 
-        // Resolve and apply the whole batch in ONE game-thread action, matching AgentMovementHandler.
-        // Resolving here keeps this ordered behind earlier game-thread spawn/register work.
-        GameThread.RunSafe(() =>
-        {
-            if (Mission.Current == null) return;
-
-            using (new AllowedThread())
-            {
-                for (int i = 0; i < actionPacket.AgentIds.Length; i++)
-                {
-                    var agentId = actionPacket.AgentIds[i];
-                    if (agentRegistry.IsLocallyControlled(agentId)) continue;
-                    if (!agentRegistry.TryGetAgentInfo(agentId, out var info)) continue;
-
-                    Agent agent = info.Agent;
-                    AgentActionData data = actionPacket.Actions[i];
-
-                    // The agent may have become invalid between queueing and running; only apply while active.
-                    if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
-                        continue;
-
-                    data.Apply(agent);
-                }
-            }
-        });
+        remoteActionProcessor.Receive((AgentActionPacket)packet);
     }
 
     // Discrete actions worth replicating explicitly. Pure locomotion (Idle / the generic Other bucket that
@@ -172,12 +290,24 @@ public class AgentActionHandler : IAgentActionHandler
         return type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle;
     }
 
+    internal static bool IsOrderGesture(string actionName)
+    {
+        if (actionName == null) return false;
+
+        return actionName == "act_command"
+            || actionName.StartsWith("act_command_", StringComparison.Ordinal)
+            || actionName == "act_horse_command"
+            || actionName.StartsWith("act_horse_command_", StringComparison.Ordinal);
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
 
+        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
         packetManager.RemovePacketHandler(this);
-        _lastActions.Clear();
+        remoteActionProcessor.Dispose();
+        _localAgentStates.Clear();
     }
 }

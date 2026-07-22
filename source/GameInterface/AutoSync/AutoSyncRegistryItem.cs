@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace GameInterface.AutoSync;
@@ -9,6 +10,7 @@ public class AutoSyncRegistryItem
     public HashSet<Debuggable<PropertyInfo>> Properties = new();
 
     public List<MethodInfo> TargetMethods = new();
+    public Dictionary<string, List<MethodInfo>> CategorizedTargetMethods = new();
 
     public bool Contains(FieldInfo field)
     {
@@ -22,19 +24,37 @@ public class AutoSyncRegistryItem
             || Properties.Contains(new Debuggable<PropertyInfo>(property, false));
     }
 
-    public void AddField(FieldInfo field, bool debug)
+    public void AddField(FieldInfo field, bool debug, bool coalesce)
     {
-        Fields.Add(new Debuggable<FieldInfo>(field, debug));
+        Fields.Add(new Debuggable<FieldInfo>(field, debug, coalesce));
     }
 
-    public void AddProperty(PropertyInfo property, bool debug)
+    public void AddProperty(PropertyInfo property, bool debug, bool coalesce)
     {
-        Properties.Add(new Debuggable<PropertyInfo>(property, debug));
+        Properties.Add(new Debuggable<PropertyInfo>(property, debug, coalesce));
     }
 
-    public void AddTargetMethod(MethodInfo targetMethod)
+    public void AddTargetMethod(MethodInfo targetMethod, string patchCategory = null)
     {
-         TargetMethods.Add(targetMethod);
+        if (patchCategory == null)
+        {
+            TargetMethods.Add(targetMethod);
+            return;
+        }
+
+        if (!CategorizedTargetMethods.TryGetValue(patchCategory, out var targetMethods))
+        {
+            targetMethods = new List<MethodInfo>();
+            CategorizedTargetMethods.Add(patchCategory, targetMethods);
+        }
+
+        targetMethods.Add(targetMethod);
+    }
+
+    public bool ContainsTargetMethod(MethodInfo targetMethod)
+    {
+        return TargetMethods.Contains(targetMethod) ||
+            CategorizedTargetMethods.Values.Any(methods => methods.Contains(targetMethod));
     }
 }
 
@@ -42,10 +62,13 @@ public class Debuggable<T>
 {
     public T Value;
     public bool Debug;
+    // Route this member's per-change sends through the per-tick coalescer instead of SendAll.
+    public bool Coalesce;
 
-    public Debuggable(T value, bool debug)
+    public Debuggable(T value, bool debug, bool coalesce = false)
     {
         Value = value;
         Debug = debug;
+        Coalesce = coalesce;
     }
 }

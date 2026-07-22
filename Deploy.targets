@@ -8,7 +8,7 @@
 
   A consuming .csproj must set these properties before importing this file:
 
-    <ModName>      Coop          Module folder name + DLL/class name root
+    <ModName>      Bannerlord Coop          Module folder name + DLL/class name root
     <MainClass>    CoopMod       SubModule class type (ModName.MainClass)
     <ModVersion>   v0.0.1        Module version
     <GameVersion>  v1.3.12       Depended-module game version
@@ -36,9 +36,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- All build outputs (DLLs) for this project. -->
-    <DeployDllFiles Include="$(TargetDir)**\*.dll" />
-
     <!-- Static module files (start-*.bat, instructions); SubModule.xml is templated separately. -->
     <DeployStaticFiles Include="$(DeploySourceDir)\**\*"
                        Exclude="$(SubModuleTemplate)" />
@@ -54,6 +51,11 @@
     <Message Importance="high" Text="Deploying $(ModName) -> $(ModDir)" />
 
     <MakeDir Directories="$(ModBinDir);$(ModPrefabDir)" />
+
+    <!-- Evaluate after Build so DLLs created by a clean build are included. -->
+    <ItemGroup>
+      <DeployDllFiles Include="$(TargetDir)**\*.dll" />
+    </ItemGroup>
 
     <!-- DLLs -->
     <Copy SourceFiles="@(DeployDllFiles)"

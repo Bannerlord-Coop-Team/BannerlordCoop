@@ -2,7 +2,9 @@
 
 using Common.Messaging;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
@@ -32,7 +34,11 @@ public record NetworkGameSaveDataReceived : IEvent
     [ProtoMember(7)]
     public InteractionsPlayerData InteractionsPlayerData { get; }
     [ProtoMember(8)]
+    public TradePlayerData TradePlayerData { get; }
+    [ProtoMember(9)]
     public AttachmentIdMap AttachmentIdMap { get; }
+    [ProtoMember(10)]
+    public ServerOptions ServerOptions { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
@@ -42,7 +48,9 @@ public record NetworkGameSaveDataReceived : IEvent
         CaravansPlayerData caravansPlayerData,
         AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData,
-        AttachmentIdMap attachmentIdMap)
+        TradePlayerData tradePlayerData,
+        AttachmentIdMap attachmentIdMap,
+        ServerOptions serverOptions)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -51,6 +59,8 @@ public record NetworkGameSaveDataReceived : IEvent
         CaravansPlayerData = caravansPlayerData;
         AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
+        TradePlayerData = tradePlayerData;
         AttachmentIdMap = attachmentIdMap;
+        ServerOptions = serverOptions;
     }
 }

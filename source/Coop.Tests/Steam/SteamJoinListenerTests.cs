@@ -29,16 +29,25 @@ namespace Coop.Tests.Steam
         private void Handle_Failed(MessagePayload<SessionJoinFailed> payload) => failed.Add(payload.What);
 
         private void SetupLobby(ulong lobbyId, string address = "203.0.113.7", int port = 4200,
-            int version = SessionJoinInfo.CurrentVersion)
+            int version = SessionJoinInfo.CurrentVersion, ulong serverSteamId = 0)
         {
-            foreach (var pair in LobbyDataCodec.Encode(new SessionJoinInfo { Address = address, Port = port, Version = version }))
+            var info = new SessionJoinInfo
+            {
+                Address = address,
+                Port = port,
+                Version = version,
+                ServerSteamId = serverSteamId,
+                ModVersion = Common.ModInformation.BuildVersion,
+            };
+
+            foreach (var pair in LobbyDataCodec.Encode(info))
             {
                 api.SetLobbyData(lobbyId, pair.Key, pair.Value);
             }
         }
 
         [Fact]
-        public void LobbyJoinRequest_PublishesResolvedJoinInfoAndLeavesLobby()
+        public void LobbyJoinRequest_PublishesResolvedJoinInfoAndRetainsMembership()
         {
             SetupLobby(42);
 
@@ -48,7 +57,9 @@ namespace Coop.Tests.Steam
             Assert.Equal("203.0.113.7", info.Address);
             Assert.Equal(4200, info.Port);
             Assert.Empty(failed);
-            Assert.Contains(42UL, api.LeftLobbies);
+            Assert.True(listener.IsInLobby);
+            Assert.Equal(42UL, listener.LobbyId);
+            Assert.DoesNotContain(42UL, api.LeftLobbies);
         }
 
         [Fact]
@@ -59,6 +70,41 @@ namespace Coop.Tests.Steam
             messageBroker.Publish(this, new JoinSteamLobby(42));
 
             Assert.Single(resolved);
+        }
+
+        [Fact]
+        public void JoinSessionLobby_RetainsMembershipWithoutResolvingAgain()
+        {
+            listener.JoinSessionLobby(42);
+
+            Assert.True(listener.IsInLobby);
+            Assert.Equal(42UL, listener.LobbyId);
+            Assert.Empty(resolved);
+            Assert.Empty(failed);
+        }
+
+        [Fact]
+        public void LeaveSessionLobby_LeavesActiveLobby()
+        {
+            listener.JoinSessionLobby(42);
+
+            listener.LeaveSessionLobby();
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
+        public void LeaveSessionLobby_WhileJoinInFlight_LeavesLateLobby()
+        {
+            api.CompleteOperationsImmediately = false;
+            listener.JoinSessionLobby(42);
+
+            listener.LeaveSessionLobby();
+            api.CompletePendingJoin();
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
         }
 
         [Fact]
@@ -124,6 +170,19 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void DifferentModVersion_PublishesFailureAndLeaves()
+        {
+            SetupLobby(42);
+            api.SetLobbyData(42, LobbyDataCodec.ModVersionKey, "different-build");
+
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Empty(resolved);
+            Assert.Contains("mod", Assert.Single(failed).Reason);
+            Assert.Contains(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
         public void DirectOnlyLobbyWithoutAddress_PublishesFailureAndLeaves()
         {
             SetupLobby(42, address: null, version: SessionJoinInfo.MinTunnelVersion - 1);
@@ -146,7 +205,65 @@ namespace Coop.Tests.Steam
             Assert.Equal(api.LobbyOwner, info.HostSteamId);
             Assert.False(info.HasAddress);
             Assert.Empty(failed);
-            // The owner is only readable while a member, so the leave must come after the read.
+            Assert.True(listener.IsInLobby);
+            Assert.DoesNotContain(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
+        public void StandaloneServerLobby_PrefersServerSteamIdOverLobbyOwner()
+        {
+            SetupLobby(42, address: null, serverSteamId: 76561198000000042);
+
+            api.RaiseLobbyJoinRequested(42);
+
+            var info = Assert.Single(resolved).JoinInfo;
+            Assert.Equal(76561198000000042UL, info.HostSteamId);
+            Assert.NotEqual(api.LobbyOwner, info.HostSteamId);
+            Assert.Empty(failed);
+        }
+
+        [Fact]
+        public void OwnLobby_LeaveSessionLobbyKeepsSteamMembership()
+        {
+            SetupLobby(42, address: null, serverSteamId: 76561198000000042);
+            api.UserSteamId = api.LobbyOwner;
+
+            api.RaiseLobbyJoinRequested(42);
+            listener.LeaveSessionLobby();
+
+            Assert.Single(resolved);
+            Assert.Empty(failed);
+            Assert.False(listener.IsInLobby);
+            // Leaving as the lobby's owning account would empty the lobby and Steam would
+            // destroy it, delisting the dedicated server this client just connected to.
+            Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
+        public void OwnLobby_StaysEvenWhenJoinInfoIsRejected()
+        {
+            api.UserSteamId = api.LobbyOwner;
+
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Empty(resolved);
+            Assert.Single(failed);
+            Assert.False(listener.IsInLobby);
+            Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
+        public void PromotedToLobbyOwnerAfterAdvertiserLeft_LeaveSessionLobbyStillLeaves()
+        {
+            SetupLobby(42);
+            api.RaiseLobbyJoinRequested(42);
+
+            // Server shutdown disconnects clients before withdrawing the lobby; Steam
+            // promotes this client to owner before its teardown runs on the game thread.
+            api.LobbyOwner = api.UserSteamId;
+            listener.LeaveSessionLobby();
+
+            Assert.False(listener.IsInLobby);
             Assert.Contains(42UL, api.LeftLobbies);
         }
 

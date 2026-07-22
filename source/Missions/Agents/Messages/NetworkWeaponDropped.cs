@@ -17,10 +17,17 @@ namespace Missions.Agents.Messages
         [ProtoMember(2)]
         public EquipmentIndex EquipmentIndex { get; }
 
-        public NetworkWeaponDropped(Guid agentId, EquipmentIndex equipmentIndex)
+        [ProtoMember(3)]
+        public Guid WorldItemId { get; }
+
+        public NetworkWeaponDropped(
+            Guid agentId,
+            EquipmentIndex equipmentIndex,
+            Guid worldItemId)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
+            WorldItemId = worldItemId;
         }
     }
 }

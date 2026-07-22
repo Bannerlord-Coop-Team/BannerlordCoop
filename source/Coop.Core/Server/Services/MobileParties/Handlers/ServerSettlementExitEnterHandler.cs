@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -7,6 +7,7 @@ using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -60,19 +61,58 @@ public class ServerSettlementExitEnterHandler : IHandler
         var payload = obj.What;
         var peer = (NetPeer)obj.Who;
 
-        network.Send(peer, new NetworkStartSettlementEncounter(payload));
-
-        // Tell the other clients to apply the entry synchronously here, so the broadcast does not depend
-        // on the game-loop pump (the server's own apply below is marshalled onto the game thread).
-        network.SendAllBut(peer, new NetworkPartyEnterSettlement(payload.SettlementId, payload.PartyId));
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
-            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement)) return;
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty))
+            {
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
+            if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement))
+            {
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
+
+            if (mobileParty.Party?.MapEventSide != null)
+            {
+                Logger.Warning(
+                    "Rejecting settlement entry for party {PartyId} because it is already in a map event",
+                    payload.PartyId);
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
+
+            if (mobileParty.CurrentSettlement != null)
+            {
+                if (mobileParty.CurrentSettlement == settlement)
+                {
+                    network.Send(peer, new NetworkStartSettlementEncounter(payload));
+                }
+                else
+                {
+                    Logger.Warning(
+                        "Rejecting settlement entry for party {PartyId} because it is already in settlement {SettlementId}",
+                        payload.PartyId,
+                        objectManager.TryGetId(mobileParty.CurrentSettlement, out var currentSettlementId)
+                            ? currentSettlementId
+                            : mobileParty.CurrentSettlement.StringId);
+                    network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                }
+                return;
+            }
+
+            network.Send(peer, new NetworkStartSettlementEncounter(payload));
+
+            // Vanilla starts under-siege and under-raid encounters outside the settlement.
+            if (settlement.IsUnderSiege || (settlement.IsVillage && settlement.IsUnderRaid)) return;
+
+            network.SendAllBut(peer, new NetworkPartyEnterSettlement(
+                Compact(payload.SettlementId, typeof(Settlement)),
+                Compact(payload.PartyId, typeof(MobileParty))));
 
             settlementInterface.PartyEnterSettlement(mobileParty, settlement);
-        });
+        }, context: nameof(NetworkRequestStartSettlementEncounter));
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
@@ -82,6 +122,14 @@ public class ServerSettlementExitEnterHandler : IHandler
         objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
         if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
         {
+            if (obj.Who is NetPeer suppressedPeer)
+            {
+                network.Send(
+                    suppressedPeer,
+                    new NetworkSettlementEncounterLeaveResult(
+                        payload.PartyId,
+                        SettlementEncounterLeaveOutcome.Suppressed));
+            }
             return;
         }
 
@@ -89,9 +137,14 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         // The sending client is currently in a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
-        network.Send(peer, new NetworkEndSettlementEncounter());
+        network.Send(
+            peer,
+            new NetworkSettlementEncounterLeaveResult(
+                payload.PartyId,
+                SettlementEncounterLeaveOutcome.Applied));
 
-        network.SendAllBut(peer, new NetworkPartyLeaveSettlement(payload.PartyId));
+        network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
+            Compact(payload.PartyId, typeof(MobileParty))));
 
         GameThread.RunSafe(() =>
         {
@@ -108,6 +161,9 @@ public class ServerSettlementExitEnterHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.Settlement, out var settlementId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
 
+        settlementId = Compact(settlementId, typeof(Settlement));
+        mobilePartyId = Compact(mobilePartyId, typeof(MobileParty));
+
         network.SendAll(new NetworkPartyEnterSettlement(settlementId, mobilePartyId));
 
         settlementInterface.OnPartyEnteredSettlement(payload.Settlement, payload.MobileParty);
@@ -123,8 +179,8 @@ public class ServerSettlementExitEnterHandler : IHandler
         {
             return;
         }
-
-        network.SendAll(new NetworkPartyLeaveSettlement(mobilePartyId));
+        network.SendAll(new NetworkPartyLeaveSettlement(
+            Compact(mobilePartyId, typeof(MobileParty))));
 
         settlementInterface.OnPartyLeftSettlement(payload.MobileParty);
     }

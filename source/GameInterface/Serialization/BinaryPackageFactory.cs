@@ -82,8 +82,9 @@ namespace GameInterface.Serialization
             if (obj == null) return new NullBinaryPackage();
 
             Type type = obj.GetType();
-   
-            if (type.IsFullySerializable()) return new PrimitiveBinaryPackage(obj);
+
+            if (type.IsEnum) return new EnumBinaryPackage(obj);
+            if (PrimitiveBinaryPackage.IsSupported(type)) return new PrimitiveBinaryPackage(obj);
 
             ObjectAndType wrappedObj = new ObjectAndType(type.AssemblyQualifiedName, obj);
 

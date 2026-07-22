@@ -27,6 +27,13 @@ namespace Coop.IntegrationTests.Kingdoms
                     act();
                 }
                 catch (Exception e) { captured = e; }
+                finally
+                {
+                    // The registration must not outlive this thread: managed thread ids are recycled,
+                    // so a stale mark would make an unrelated later test thread run GameThread actions
+                    // inline (observed as order-dependent CI failures in unrelated tests).
+                    GameThread.Instance.UnmarkGameThread();
+                }
             });
             thread.Start();
             thread.Join();

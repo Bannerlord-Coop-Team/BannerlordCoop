@@ -1,6 +1,8 @@
 ﻿using Common.PacketHandlers;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
@@ -18,8 +20,10 @@ namespace Coop.Core.Common.Network.Packets;
 /// separate from the world-change message stream. World deltas are withheld from a joining client on
 /// the server side (the connection message queue) until it has loaded and entered the campaign, so the
 /// save's arrival no longer drives any client-side buffering. Uses <see cref="DeliveryMethod.ReliableOrdered"/>
-/// — the same channel as <see cref="MessagePacket"/> — so it stays correctly ordered relative to the
-/// deltas that follow once the client is live.
+/// on the dedicated bulk channel (see <c>CoopNetworkBase.BulkChannel</c>), so its tens of thousands of
+/// fragments neither head-of-line block the world-sync channel nor count toward the queue depth that
+/// pauses campaign time; the held-back deltas make cross-channel ordering unobservable.
+/// <see cref="GameSaveData"/> is deflate-compressed (see <see cref="SaveDataCompression"/>).
 /// </remarks>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct GameSaveDataPacket : IPacket
@@ -50,7 +54,13 @@ public readonly struct GameSaveDataPacket : IPacket
     public readonly InteractionsPlayerData InteractionsPlayerData;
 
     [ProtoMember(8)]
+    public readonly TradePlayerData TradePlayerData;
+
+    [ProtoMember(9)]
     public readonly AttachmentIdMap AttachmentIdMap;
+
+    [ProtoMember(10)]
+    public readonly ServerOptions ServerOptions;
 
     public GameSaveDataPacket(
         byte[] gameSaveData,
@@ -60,7 +70,9 @@ public readonly struct GameSaveDataPacket : IPacket
         CaravansPlayerData caravansPlayerData,
         AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData,
-        AttachmentIdMap attachmentIdMap)
+        TradePlayerData tradePlayerData,
+        AttachmentIdMap attachmentIdMap,
+        ServerOptions serverOptions)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -69,6 +81,8 @@ public readonly struct GameSaveDataPacket : IPacket
         CaravansPlayerData = caravansPlayerData;
         AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
+        TradePlayerData = tradePlayerData;
         AttachmentIdMap = attachmentIdMap;
+        ServerOptions = serverOptions;
     }
 }

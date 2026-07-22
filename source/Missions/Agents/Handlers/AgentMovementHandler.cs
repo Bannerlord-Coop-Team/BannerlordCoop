@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using AgentControllerType = TaleWorlds.Core.AgentControllerType;
 
 namespace Missions.Agents.Handlers;
 
@@ -36,17 +37,11 @@ public class AgentMovementHandler : IAgentMovementHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
-    // Max agents per movement packet. The host has authority over every AI troop, so its batch can be
-    // dozens of agents — one packet for all of them overflows the unreliable MTU ceiling (LiteNetLib
-    // throws TooBigPacketException on oversized non-fragmentable sends). The MTU can stay near its ~1 KB floor
-    // (no negotiation up over P2P), and a mounted/well-equipped agent can run a few hundred bytes, so keep the
-    // chunk small enough that the common case fits one unreliable packet; the send path promotes any chunk that
-    // still overflows to a fragmentable reliable channel.
-    private const int MaxAgentsPerMovementPacket = 4;
+    // Movement is strictly droppable, so keep even mounted snapshots below the 1 KB unreliable ceiling.
+    private const int MaxAgentsPerMovementPacket = 3;
 
-    // Keep the old movement-send ceiling after moving capture onto the game thread. High-FPS clients can tick
-    // faster than the old poller, and sending every frame would raise battle bandwidth.
-    private const float MovementPollingIntervalSeconds = 0.01f;
+    // Forty updates per second keeps locally authoritative agents responsive.
+    private const float MovementPollingIntervalSeconds = 0.025f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -133,21 +128,15 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public PacketType PacketType => PacketType.Movement;
 
-    // Broadcast the movement of every agent the local node currently has authority over: its own party,
-    // plus any party it has assumed control of as host.
+    // Broadcast every locally authoritative agent.
     public void PollMovement(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
         movementPollElapsed += dt;
         if (movementPollElapsed < MovementPollingIntervalSeconds) return;
-        movementPollElapsed = 0f;
+        movementPollElapsed %= MovementPollingIntervalSeconds;
 
-        // Collect every agent we have authority over, then broadcast them in MTU-safe chunks. One packet
-        // per agent floods the mesh and the receiver's game-thread queue at battle scale (the GameThread
-        // lockup); one packet for ALL of them overflows the unreliable MTU ceiling. The single registry pass
-        // partitions the two movement streams: troops as AgentData, masterless registered horses as
-        // standalone AgentMountData (a ridden horse's pose rides inside its rider's AgentData instead).
         var ids = new List<Guid>();
         var data = new List<AgentData>();
         List<Guid> mountIds = null;
@@ -157,9 +146,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             Agent agent = agentInfo.Agent;
             // Skip agents whose native object is already gone (dead/removed but not yet deregistered):
-            // building the snapshot calls into the agent (GetCurrentActionType, etc.), which throws an
-            // AccessViolationException on a freed agent. Mirrors the IsActive() guard on the apply path.
+            // building the snapshot calls into the agent, which can access-violate after native teardown.
             if (agent == null || agent.Mission == null || !agent.IsActive()) continue;
+
+            EnsureLocallyDrivenMountController(agent);
             if (!ShouldBroadcastMovement(agent)) continue;
 
             if (agent.IsMount)
@@ -232,6 +222,11 @@ public class AgentMovementHandler : IAgentMovementHandler
                         continue;
 
                     SyncMountState(agent, data);
+
+                    // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
+                    if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
+                        puppetMount.Controller = AgentControllerType.None;
+
                     data.Apply(agent);
 
                     // Position is reconciled per-frame by the interpolator (smoother than a per-packet
@@ -246,6 +241,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                             agent,
                             data.Position,
                             data.MovementDirection,
+                            data.MountData.MountMovementDirection,
                             data.MountData.MountPosition);
                     }
                     else
@@ -271,9 +267,11 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             // Owner dismounted: get the puppet off the horse. Remember the horse for a possible re-mount, and
             // stop interpolating it (its target is no longer being reported).
-            _dismountedHorses[agent] = agent.MountAgent;
-            _interpolator.Forget(agent.MountAgent);
+            Agent horse = agent.MountAgent;
+            _dismountedHorses[agent] = horse;
+            _interpolator.Forget(horse);
             agent.MountAgent = null;
+            RestoreLocallyControlledMount(horse);
         }
         else if (ownerMounted && !agent.HasMount)
         {
@@ -294,10 +292,37 @@ public class AgentMovementHandler : IAgentMovementHandler
             if (reported != null && !ReferenceEquals(reported, agent.MountAgent)
                 && reported.IsActive() && reported.RiderAgent == null)
             {
-                _interpolator.Forget(agent.MountAgent);
+                Agent previous = agent.MountAgent;
+                _interpolator.Forget(previous);
                 agent.MountAgent = reported;
+                RestoreLocallyControlledMount(previous);
             }
         }
+    }
+
+    // A locally driven rider needs a live horse controller; so does a locally authoritative loose horse.
+    // Do not wake a locally owned horse while another controller's active rider is driving it remotely.
+    private void EnsureLocallyDrivenMountController(Agent agent)
+    {
+        Agent mount = agent.IsMount ? agent : agent.MountAgent;
+        if (mount == null || !mount.IsActive() || mount.Mission != Mission.Current) return;
+        if (mount.RiderAgent is Agent rider && rider.IsActive()
+            && !agentRegistry.IsLocallyControlled(rider)) return;
+        if (mount.Controller != AgentControllerType.AI)
+        {
+            mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+            mount.Controller = AgentControllerType.AI;
+        }
+    }
+
+    private void RestoreLocallyControlledMount(Agent mount)
+    {
+        if (mount == null || !mount.IsActive() || mount.Mission != Mission.Current) return;
+        if (agentRegistry.TryGetAgentInfo(mount, out _)
+            && !agentRegistry.IsLocallyControlled(mount)) return;
+        mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+        if (mount.Controller != AgentControllerType.AI)
+            mount.Controller = AgentControllerType.AI;
     }
 
     /// <summary>
@@ -358,9 +383,8 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         if (controllerId == controllerIdProvider.ControllerId) return;
 
-        // In a coop field battle a departing player's troops are NOT despawned: the host adopts them
-        // (CoopBattleController.HandlePeerGone) so they keep fighting under host AI, and other peers keep
-        // them as puppets that follow the host's movement. Skip the location-style cleanup entirely.
+        // BattleAuthorityMigrator owns battle withdrawal because it can distinguish the player's party from
+        // NPC forces the departed host was running. Skip this location-style all-controller cleanup.
         if (BattleSpawnGate.IsCoopBattleActive) return;
 
         bool sceneActive = Mission.Current != null;
@@ -376,10 +400,10 @@ public class AgentMovementHandler : IAgentMovementHandler
                 GameThread.RunSafe(() =>
                 {
                     if (Mission.Current == null) return;
-                    if (agent != null && agent.Health > 0)
+                    if (agent != null && agent.IsActive() && agent.Health > 0)
                     {
-                        agent.MakeDead(false, ActionIndexCache.act_none);
-                        agent.FadeOut(false, true);
+                        bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
+                        agent.FadeOut(false, hideMount);
                     }
                 });
             }

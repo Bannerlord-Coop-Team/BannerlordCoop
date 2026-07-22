@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -9,6 +9,8 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -29,9 +31,8 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// both parties are players or either party is already in a <see cref="TaleWorlds.CampaignSystem.MapEvents.MapEvent"/>.
 /// Client (on approval): re-runs <c>PlayerEncounter.RestartPlayerEncounter</c> with the same parameters under an
 /// <see cref="AllowedThread"/> so the now-approved original executes.
-/// Server (additionally): while a player's conversation is open, the AI party is held in place and marked engaged
-/// in <see cref="ConversationPartyTracker"/> (requests against it from other players are rejected); the hold is
-/// released when the client reports the encounter finished, fails to start it, or disconnects.
+/// Server (additionally): while a conversation is open, the AI party is held in place. Hostile players may share
+/// that hold so simultaneous attack attempts can converge on one MapEvent.
 /// </remarks>
 internal class ConversationRequestHandler : IHandler
 {
@@ -44,6 +45,7 @@ internal class ConversationRequestHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly PlayerPartyInteractionHandler playerPartyInteractionHandler;
+    private readonly IPlayerManager playerManager;
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
 
@@ -57,13 +59,15 @@ internal class ConversationRequestHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         ConversationPartyTracker conversationPartyTracker,
-        PlayerPartyInteractionHandler playerPartyInteractionHandler)
+        PlayerPartyInteractionHandler playerPartyInteractionHandler,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.conversationPartyTracker = conversationPartyTracker;
         this.playerPartyInteractionHandler = playerPartyInteractionHandler;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<ConversationRequested>(Handle_ConversationRequested);
         messageBroker.Subscribe<NetworkRequestConversation>(Handle_NetworkRequestConversation);
@@ -87,14 +91,23 @@ internal class ConversationRequestHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
     }
 
-    /// <summary>[Client] Rate-limit, resolve ids, and forward the request to the server.</summary>
+    /// <summary>Route a local encounter request to the server-side approval flow.</summary>
     private void Handle_ConversationRequested(MessagePayload<ConversationRequested> payload)
     {
+        var request = payload.What;
+
+        if (ModInformation.IsServer)
+        {
+            ProcessServerConversationRequest(request);
+            return;
+        }
+
+        if (PlayerPartyInteractionDialogState.HasActiveState)
+            return;
+
         var now = DateTime.UtcNow;
         if (now - lastRequestSentUtc < RequestCooldown)
             return; // drop: at most one request per cooldown window
-
-        var request = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(request.DefenderParty, out var defenderId)) return;
         if (!objectManager.TryGetIdWithLogging(request.AttackerParty, out var attackerId)) return;
@@ -104,7 +117,37 @@ internal class ConversationRequestHandler : IHandler
         Logger.Debug("Requesting conversation from server. AttackerId={AttackerId}, DefenderId={DefenderId}", attackerId, defenderId);
 
         // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkRequestConversation(defenderId, attackerId, request.ForcePlayerOutFromSettlement, request.Source));
+        network.SendAll(new NetworkRequestConversation(defenderId, attackerId, request.ForcePlayerOutFromSettlement, request.Source, request.ArmyTalkEncounter));
+    }
+
+    private void ProcessServerConversationRequest(ConversationRequested request)
+    {
+        var attackerIsPlayer = request.AttackerParty?.MobileParty?.IsPlayerParty() == true;
+        var defenderIsPlayer = request.DefenderParty?.MobileParty?.IsPlayerParty() == true;
+        if (attackerIsPlayer == defenderIsPlayer) return;
+
+        var playerParty = attackerIsPlayer
+            ? request.AttackerParty.MobileParty
+            : request.DefenderParty.MobileParty;
+
+        if (!PlayerManager.TryGetControlledObjectInfo(playerParty, out var controlInfo)) return;
+        if (!playerManager.TryGetPeer(controlInfo.ObjectControllerId, out var playerPeer)) return;
+        if (!objectManager.TryGetIdWithLogging(request.DefenderParty, out var defenderId)) return;
+        if (!objectManager.TryGetIdWithLogging(request.AttackerParty, out var attackerId)) return;
+
+        Logger.Debug(
+            "Starting server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
+            attackerId,
+            defenderId);
+
+        ProcessConversationRequest(
+            playerPeer,
+            new NetworkRequestConversation(
+                defenderId,
+                attackerId,
+                request.ForcePlayerOutFromSettlement,
+                request.Source,
+                false));
     }
 
     /// <summary>[Server] Validate the request; reply to allow, or stay silent to reject.</summary>
@@ -120,6 +163,13 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
+        GameThread.RunSafe(
+            () => ProcessConversationRequest(requestingPeer, request),
+            context: nameof(Handle_NetworkRequestConversation));
+    }
+
+    private void ProcessConversationRequest(NetPeer requestingPeer, NetworkRequestConversation request)
+    {
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out var attacker)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
 
@@ -139,14 +189,11 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Mark and hold on the game thread, then reply, so the party is frozen and protected before the client
-        // (re)opens the encounter. The filter above runs on the network thread; game state can change while the
-        // approval is queued, so the hold step re-validates everything it depends on.
-        GameThread.Run(() => HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId));
+        HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId);
     }
 
     /// <summary>
-    /// [Server] Network-thread filter that identifies the AI side and rejects when both parties are already in
+    /// [Server] Identifies the AI side and rejects when both parties are already in
     /// (separate) battles. Returns false (rejection logged, and the requester told when the party is engaged by
     /// another player) when the request must not proceed. On success <paramref name="aiParty"/> is the AI mobile
     /// party to hold, or null when only a settlement side is involved or both sides are players — in which case
@@ -172,6 +219,28 @@ internal class ConversationRequestHandler : IHandler
         var attackerInMapEvent = attacker.MapEvent != null;
         var defenderInMapEvent = defender.MapEvent != null;
 
+        // A concluded map event is finalized before every client has to leave its victory screen. Keep those
+        // remaining parties unavailable until their MissionLeft removes them from the mission membership.
+        if (Patches.EncounterManagerPatches.IsAwaitingMissionExit(attacker) ||
+            Patches.EncounterManagerPatches.IsAwaitingMissionExit(defender))
+        {
+            Logger.Information(
+                "[MissionExitGuard] Refused campaign interaction while a party is still leaving its mission. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
+            return false;
+        }
+
+        if ((attackerIsPlayer && !attacker.MobileParty.IsActive) ||
+            (defenderIsPlayer && !defender.MobileParty.IsActive))
+        {
+            Logger.Debug(
+                "Rejecting PvP conversation: a player party is inactive. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
+            return false;
+        }
+
         // PvP: a party joining an existing battle (exactly one side is already in a map event) is allowed through so
         // the joining player's PlayerEncounter can attach to that battle. There is no AI party to hold for a join.
         if (attackerInMapEvent ^ defenderInMapEvent)
@@ -181,11 +250,24 @@ internal class ConversationRequestHandler : IHandler
                 request.AttackerId, request.DefenderId);
             return true;
         }
-
+        
         // PvP: two human players are allowed to open the encounter so they can fight each other. Neither side is AI,
         // so there is nothing to hold; the defending player is shown a "hold on" popup instead.
         if (attackerIsPlayer && defenderIsPlayer)
         {
+            // Checks if there is a request to open army menu and executes if true
+            if (attacker.MobileParty?.ActualClan?.Kingdom != null
+                && attacker.MobileParty?.ActualClan?.Kingdom == defender.MobileParty?.ActualClan?.Kingdom
+                && defender.MobileParty?.Army != null
+                && defender.MobileParty?.Army?.LeaderParty == defender.MobileParty
+                && defender.MobileParty.Army.LeaderParty.AttachedParties.Contains(attacker.MobileParty) == false
+                && !request.ArmyTalkEncounter)
+            {
+                Logger.Debug(
+                "Allowing army join. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+                return true;
+            }
             // Reject if either player is already conversing with someone else (first interaction wins) — otherwise a
             // third player could open an encounter with a defender already locked in a conversation.
             if (IsConversingWithOther(request.DefenderId, request.AttackerId) ||
@@ -194,7 +276,7 @@ internal class ConversationRequestHandler : IHandler
                 Logger.Debug(
                     "Rejecting PvP conversation: a party is already conversing with another player. AttackerId={AttackerId}, DefenderId={DefenderId}",
                     request.AttackerId, request.DefenderId);
-                network.Send(requestingPeer, new NetworkConversationDenied());
+                network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
                 return false;
             }
 
@@ -231,30 +313,18 @@ internal class ConversationRequestHandler : IHandler
 
         aiParty = aiSide.MobileParty;
 
-        if (aiParty != null && conversationPartyTracker.IsEngagedByOther(aiPartyId, requestingPeer))
-        {
-            Logger.Debug(
-                "Rejecting conversation request: the party is in a conversation with another player. PartyId={PartyId}",
-                aiPartyId);
-            network.Send(requestingPeer, new NetworkConversationDenied());
-            return false;
-        }
-
         Logger.Debug(
-            "Allowing conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
-            request.AttackerId, request.DefenderId);
+        "Allowing conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
+        request.AttackerId, request.DefenderId);
 
         return true;
     }
 
     /// <summary>
-    /// [Server, game thread] Re-validate (state can change while the approval is queued), hold the AI party, and
-    /// reply to allow. Stays silent (rejecting) when a party no longer resolves or entered a battle meanwhile, and
-    /// tells the requester when the party or the requester became engaged in the interim (first approval wins).
+    /// [Server, game thread] Holds the AI party and replies to allow.
     /// </summary>
     private void HoldAndApprove(NetPeer requestingPeer, NetworkRequestConversation request, string aiPartyId, string playerPartyId)
     {
-        // Re-resolve on the game thread: either party may have been removed since the network-thread lookup.
         if (!objectManager.TryGetObject(aiPartyId, out PartyBase aiPartyBase) || aiPartyBase.MobileParty == null)
         {
             Logger.Debug(
@@ -271,7 +341,6 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Re-check map events: a party may have entered a battle while the approval was queued.
         if (aiPartyBase.MapEvent != null || playerPartyBase.MapEvent != null)
         {
             Logger.Debug(
@@ -280,18 +349,34 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        // Re-check the engagement: another player may have engaged the party meanwhile, or the requester may
-        // still hold an unfinished engagement with a different party (first approval wins).
+        if (conversationPartyTracker.IsEngagedByOther(aiPartyId, requestingPeer) &&
+            !AreHostile(playerPartyBase, aiPartyBase))
+        {
+            Logger.Debug(
+                "Rejecting shared conversation for a non-hostile party. PartyId={PartyId}",
+                aiPartyId);
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
+            return;
+        }
+
+        // A requester may share this hostile target but cannot replace its own live engagement with another target.
         if (!ConversationPartyHold.TryEngage(conversationPartyTracker, requestingPeer, playerPartyId, aiPartyBase.MobileParty, aiPartyId))
         {
             Logger.Debug(
                 "Rejecting conversation request: the party or the requester is already engaged. PartyId={PartyId}",
                 aiPartyId);
-            network.Send(requestingPeer, new NetworkConversationDenied());
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
             return;
         }
 
         SendAllowConversation(requestingPeer, request);
+    }
+
+    private static bool AreHostile(PartyBase playerParty, PartyBase aiParty)
+    {
+        var playerFaction = playerParty?.MapFaction;
+        var aiFaction = aiParty?.MapFaction;
+        return VillageHostileFactionStanceHelper.HasWarStance(playerFaction, aiFaction);
     }
 
     /// <summary>[Server] Replies to the requester that the conversation may (re)open.</summary>
@@ -347,20 +432,20 @@ internal class ConversationRequestHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DefenderId, out var defender))
+        GameThread.RunSafe(() =>
         {
-            SendConversationEndedToServer();
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DefenderId, out var defender))
+            {
+                SendConversationEndedToServer();
+                return;
+            }
 
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.AttackerId, out var attacker))
-        {
-            SendConversationEndedToServer();
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.AttackerId, out var attacker))
+            {
+                SendConversationEndedToServer();
+                return;
+            }
 
-        GameThread.Run(() =>
-        {
             try
             {
                 if (PlayerEncounter.Current != null)
@@ -399,7 +484,7 @@ internal class ConversationRequestHandler : IHandler
                 Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
                 SendConversationEndedToServer();
             }
-        });
+        }, context: nameof(Handle_NetworkAllowConversation));
     }
 
     /// <summary>[Client] This player's encounter finished; tell the server to release the held party.</summary>
@@ -433,12 +518,15 @@ internal class ConversationRequestHandler : IHandler
         EndPvpInteraction(peer);
     }
 
-    /// <summary>[Client] The server denied the request because the party is engaged; tell the player why.</summary>
+    /// <summary>[Client] The server denied the request; tell the player why.</summary>
     private void Handle_NetworkConversationDenied(MessagePayload<NetworkConversationDenied> payload)
     {
         if (ModInformation.IsServer) return;
 
-        GameThread.Run(ConversationPartyHold.ShowInteractionBlockedMessage);
+        Action showMessage = payload.What.Reason == ConversationDeniedReason.PlayerUnavailable
+            ? ConversationPartyHold.ShowPlayerUnavailableMessage
+            : ConversationPartyHold.ShowInteractionBlockedMessage;
+        GameThread.RunSafe(showMessage, context: "Show conversation denied");
     }
 
     /// <summary>[Server] The defender's client reports it is showing the "hold on" popup; record its peer so a

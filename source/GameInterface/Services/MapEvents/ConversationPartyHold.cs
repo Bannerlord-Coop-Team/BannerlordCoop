@@ -1,4 +1,4 @@
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -10,17 +10,18 @@ namespace GameInterface.Services.MapEvents;
 /// keeping the bookkeeping in <see cref="ConversationPartyTracker"/> and the party's AI state in step.
 /// </summary>
 /// <remarks>
-/// Holding stops the party's current movement (<see cref="MobileParty.SetMoveModeHold"/>) and freezes its decision
-/// making (<see cref="MobilePartyAi.DisableAi"/>) so it stays in place while campaign time keeps running for the
-/// other players. <c>MobilePartyAi._isDisabled</c> is dynamically synced, so clients see the held state too. A
-/// party whose AI was already disabled (e.g. by a quest) is tracked but left untouched. All methods must run on
-/// the game's main thread.
+/// Holding stops a roaming party's current movement (<see cref="MobileParty.SetMoveModeHold"/>) and freezes its
+/// decision making (<see cref="MobilePartyAi.DisableAi"/>) so it stays in place while campaign time keeps running
+/// for the other players. Besiegers retain their siege movement state because the camp already keeps them stationary.
+/// <c>MobilePartyAi._isDisabled</c> is dynamically synced, so clients see the held state too. A party whose AI was
+/// already disabled (e.g. by a quest) is tracked but left untouched. All methods must run on the game's main thread.
 /// </remarks>
 internal static class ConversationPartyHold
 {
     private static readonly TimeSpan BlockedMessageCooldown = TimeSpan.FromSeconds(5);
 
-    private static DateTime lastBlockedMessageUtc = DateTime.MinValue;
+    private static DateTime lastInteractionBlockedMessageUtc = DateTime.MinValue;
+    private static DateTime lastPlayerUnavailableMessageUtc = DateTime.MinValue;
 
     /// <summary>
     /// Shows the local player why their interaction with an engaged party did nothing, at most once per cooldown
@@ -28,18 +29,28 @@ internal static class ConversationPartyHold
     /// </summary>
     public static void ShowInteractionBlockedMessage()
     {
-        var now = DateTime.UtcNow;
-        if (now - lastBlockedMessageUtc < BlockedMessageCooldown) return;
-        lastBlockedMessageUtc = now;
+        ShowBlockedMessage(
+            ref lastInteractionBlockedMessageUtc,
+            "You cannot interact with the party while another player is interacting with it");
+    }
 
-        InformationManager.DisplayMessage(new InformationMessage(
-            "You cannot interact with the party while another player is interacting with it"));
+    /// <summary>Shows the local player that the targeted player cannot currently be spoken to.</summary>
+    public static void ShowPlayerUnavailableMessage()
+    {
+        ShowBlockedMessage(ref lastPlayerUnavailableMessageUtc, "You cannot speak to this player right now");
+    }
+
+    private static void ShowBlockedMessage(ref DateTime lastMessageUtc, string message)
+    {
+        var now = DateTime.UtcNow;
+        if (now - lastMessageUtc < BlockedMessageCooldown) return;
+        lastMessageUtc = now;
+
+        InformationManager.DisplayMessage(new InformationMessage(message));
     }
 
     /// <summary>
-    /// Marks the party as engaged by the given player and holds it in place. Fails when another player already
-    /// engages the party, or when this player still holds an engagement with a different party (first approval
-    /// wins; that hold is released when its conversation ends).
+    /// Marks the party as engaged and holds it in place. The tracker decides whether the engagement can be shared.
     /// </summary>
     public static bool TryEngage(ConversationPartyTracker tracker, object engagerKey, string engagerPartyId, MobileParty party, string partyId)
     {
@@ -52,7 +63,9 @@ internal static class ConversationPartyHold
 
         if (!wasAiDisabled)
         {
-            party.SetMoveModeHold();
+            // A besieger is already stationary; SetMoveModeHold clears BesiegeSettlement and vanilla evicts it next tick.
+            if (party.BesiegerCamp == null)
+                party.SetMoveModeHold();
 
             // Certain parties such as caravans are still able to make new decisions even with their AI disabled
             // Setting DoNotMakeNewDecisions to true blocks setting new behaviors for these parties
@@ -68,15 +81,15 @@ internal static class ConversationPartyHold
     {
         if (tracker == null) return;
 
-        if (!tracker.TryEndEngagement(engagerKey, out var partyId, out var engagement))
+        if (!tracker.TryEndEngagement(engagerKey, out var partyId, out var engagement, out var shouldReleaseParty))
             return;
 
-        ReleaseParty(tracker.ObjectManager, partyId, engagement.WasAiDisabled);
+        if (shouldReleaseParty)
+            ReleaseParty(tracker.ObjectManager, partyId, engagement.WasAiDisabled);
     }
 
     /// <summary>
-    /// [Server] True when the target party is held in a player's conversation and the interacting party is not the
-    /// engaging player's own party, so the map interaction must be blocked.
+    /// [Server] True when the target is held and the interacting party is not one of its registered contenders.
     /// </summary>
     public static bool IsInteractionBlocked(PartyBase targetParty, MobileParty interactor)
     {
@@ -94,9 +107,9 @@ internal static class ConversationPartyHold
         if (interactor?.Party != null)
             objectManager.TryGetId(interactor.Party, out interactorId);
 
-        // AI party held in a conversation: only the engaging player's party may interact.
-        if (tracker.TryGetEngagement(targetPartyId, out var engagement))
-            return interactorId != engagement.EngagerPartyId;
+        // Every contender registered for a shared hostile encounter may interact with the target.
+        if (tracker.TryGetEngagement(targetPartyId, out _))
+            return !tracker.IsEngagerParty(targetPartyId, interactorId);
 
         // PvP conversation: only the partner (the other player in the conversation) may interact.
         if (tracker.TryGetPvpPartner(targetPartyId, out var partnerId))

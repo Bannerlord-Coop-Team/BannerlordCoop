@@ -73,9 +73,11 @@ namespace Coop.Tests.Server.Connections.States
             // Act — entering the state packages the save and sends it to the joining peer.
             connectionLogic.SetState<TransferSaveState>();
 
-            // Assert — exactly one save packet, carrying the save data, to the joining peer.
+            // Assert — exactly one save packet, carrying the save data (deflate-compressed on the
+            // wire; decompressing verifies the round trip the client handler performs), to the
+            // joining peer.
             var packet = Assert.Single(serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataPacket>(playerPeer));
-            Assert.Equal(data, packet.GameSaveData);
+            Assert.Equal(data, SaveDataCompression.Decompress(packet.GameSaveData));
             Assert.Equal(campaignId, packet.CampaignID);
 
             // The directed save is not sent to any other peer.

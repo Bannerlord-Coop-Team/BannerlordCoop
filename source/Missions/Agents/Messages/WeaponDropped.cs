@@ -11,11 +11,16 @@ namespace Missions.Agents.Messages
     {
         public Agent Agent { get; }
         public EquipmentIndex EquipmentIndex { get; }
+        public SpawnedItemEntity DroppedItem { get; }
 
-        public WeaponDropped(Agent agent, EquipmentIndex equipmentIndex)
+        public WeaponDropped(
+            Agent agent,
+            EquipmentIndex equipmentIndex,
+            SpawnedItemEntity droppedItem)
         {
             Agent = agent;
             EquipmentIndex = equipmentIndex;
+            DroppedItem = droppedItem;
         }
     }
 }

@@ -24,6 +24,8 @@ namespace GameInterface.AutoSync.Builders
         // registered-but-serializable type (e.g. ItemRoster), deserializing an unregistered copy on the client.
         protected bool SyncByValue(Type type) => RuntimeTypeModel.Default.CanSerialize(type) && !autoRegistryFactory.IsManaged(type);
 
+        protected bool IsManaged(Type type) => autoRegistryFactory.IsManaged(type);
+
         protected (string serialize,string deserialize) GetSerializerMethodNames(Type type)
         {
             var serializer = autoSyncRegistry.DefaultSerializer;

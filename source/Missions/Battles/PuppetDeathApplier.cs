@@ -1,10 +1,14 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.MapEvents;
 using Missions.Messages;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -15,6 +19,10 @@ namespace Missions.Battles;
 /// </summary>
 public interface IPuppetDeathApplier : IDisposable
 {
+    /// <summary>
+    /// [Game thread] Apply deaths that arrived before their deployment-buffered puppets registered.
+    /// </summary>
+    void DrainPendingDeaths();
 }
 
 /// <inheritdoc cref="IPuppetDeathApplier"/>
@@ -25,6 +33,8 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly Dictionary<Guid, NetworkBattleAgentDied> pendingDeaths =
+        new Dictionary<Guid, NetworkBattleAgentDied>();
 
     public PuppetDeathApplier(
         IMessageBroker messageBroker,
@@ -41,43 +51,91 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkBattleAgentDied>(Handle_NetworkBattleAgentDied);
+        pendingDeaths.Clear();
     }
 
     private void Handle_NetworkBattleAgentDied(MessagePayload<NetworkBattleAgentDied> payload)
     {
-        var registry = coopMissionComponent.AgentRegistry;
         Logger.Information("[DeathDiag] Received death broadcast for agent {AgentId}", payload.What.AgentId);
 
         GameThread.RunSafe(() =>
         {
-            if (!registry.TryGetAgentInfo(payload.What.AgentId, out _))
+            if (!TryApplyDeath(payload.What))
             {
-                Logger.Information("[DeathDiag] No registered puppet for {AgentId} — cannot kill it (its spawn was missed, or the id does not match)", payload.What.AgentId);
-                return;
+                pendingDeaths[payload.What.AgentId] = payload.What;
+                Logger.Information("[DeathDiag] Deferring death of {AgentId} until its puppet registers", payload.What.AgentId);
             }
-
-            if (!registry.TryGetAgentInfo(payload.What.AgentId, out var info)) return;
-
-            Agent agent = info.Agent;
-            if (Mission.Current == null) return;
-            Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", payload.What.AgentId, agent != null, agent?.Health ?? -1f);
-            if (agent != null && agent.Health > 0)
-            {
-                // Dismount first: MakeDead skips the dismount a real death does, so the horse would keep a link to
-                // the dead rider and AVE in native Agent.Die when later killed. The horse itself is left
-                // standing — a REGISTERED one dies through its OWN death broadcast (see AgentDeathReporter),
-                // an unregistered one stays a local loose horse.
-                if (agent.MountAgent != null)
-                    agent.MountAgent = null;
-                agent.MakeDead(!payload.What.Wounded, ActionIndexCache.act_none);
-            }
-
-            // Deregister AFTER the kill, INSIDE this game-thread action. We receive this on the network thread,
-            // so RunSafe queues the kill; removing on the network thread (outside the lambda) raced ahead of it,
-            // and the re-check above then found the agent already gone and bailed — so MakeDead never ran and the
-            // puppet stayed alive (removed but not killed → an invincible, unroutable agent).
-            registry.RemoveAgent(payload.What.AgentId);
-            casualties.Forget(payload.What.AgentId);
         });
+    }
+
+    public void DrainPendingDeaths()
+    {
+        if (pendingDeaths.Count == 0) return;
+
+        var deaths = new List<NetworkBattleAgentDied>(pendingDeaths.Values);
+        foreach (var death in deaths)
+        {
+            if (TryApplyDeath(death))
+                pendingDeaths.Remove(death.AgentId);
+        }
+    }
+
+    private bool TryApplyDeath(NetworkBattleAgentDied death)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(death.AgentId, out var info)) return false;
+        if (Mission.Current == null) return false;
+
+        Agent agent = info.Agent;
+        Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", death.AgentId, agent != null, agent?.Health ?? -1f);
+        if (agent != null && agent.Health > 0)
+        {
+            Agent affectorAgent = null;
+            if (death.AffectorAgentId != Guid.Empty
+                && registry.TryGetAgentInfo(death.AffectorAgentId, out var affectorInfo))
+            {
+                affectorAgent = affectorInfo.Agent;
+            }
+
+            var blow = CreateReplicatedBlow(death, affectorAgent?.Index ?? -1);
+            var killingBlow = death.DeathAction >= 0
+                ? CreateReplicatedKillingBlow(blow, death.DeathAction)
+                : default;
+            blow.InflictedDamage = Math.Max(blow.InflictedDamage, (int)Math.Ceiling(agent.Health));
+            var agentState = death.Wounded ? AgentState.Unconscious : AgentState.Killed;
+
+            BattleSpawnGate.RunWithReplicatedDeath(
+                agent,
+                affectorAgent,
+                killingBlow,
+                agentState,
+                () =>
+                {
+                    using (new AllowedThread())
+                    {
+                        agent.RegisterBlow(blow, default);
+                    }
+                });
+        }
+
+        // Deregister after the game-thread kill. Removing on the poll thread before the queued apply would
+        // make the registry lookup fail and leave the puppet alive but unregistered.
+        registry.RemoveAgent(death.AgentId);
+        casualties.Forget(death.AgentId);
+        return true;
+    }
+
+    private static Blow CreateReplicatedBlow(NetworkBattleAgentDied message, int ownerId)
+    {
+        return new Blow(ownerId)
+        {
+            InflictedDamage = message.InflictedDamage,
+            VictimBodyPart = message.VictimBodyPart,
+        };
+    }
+
+    private static KillingBlow CreateReplicatedKillingBlow(Blow blow, int deathAction)
+    {
+        return new KillingBlow(blow, Vec3.Zero, Vec3.Zero, deathAction, 0);
     }
 }

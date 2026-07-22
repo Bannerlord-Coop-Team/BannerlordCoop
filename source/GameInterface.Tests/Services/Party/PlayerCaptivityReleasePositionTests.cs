@@ -67,6 +67,7 @@ public class PlayerCaptivityReleasePositionTests
             var releaseEvents = handler.CreatePlayerCaptivityReleaseEvents(
                 leftPrisonerDelta,
                 rightPrisonerDelta,
+                true,
                 releasePosition,
                 out var filteredLeftPrisonerDelta,
                 out var filteredRightPrisonerDelta);
@@ -102,6 +103,7 @@ public class PlayerCaptivityReleasePositionTests
         var releaseEvents = handler.CreatePlayerCaptivityReleaseEvents(
             leftPrisonerDelta,
             EmptyRosterData(),
+            true,
             releasePosition,
             out var filteredLeftPrisonerDelta,
             out _);
@@ -135,6 +137,7 @@ public class PlayerCaptivityReleasePositionTests
             var releaseEvents = handler.CreatePlayerCaptivityReleaseEvents(
                 leftPrisonerDelta,
                 rightPrisonerDelta,
+                true,
                 releasePosition,
                 out var filteredLeftPrisonerDelta,
                 out var filteredRightPrisonerDelta);
@@ -142,6 +145,85 @@ public class PlayerCaptivityReleasePositionTests
             Assert.Empty(releaseEvents);
             Assert.Equal(-1, Assert.Single(filteredLeftPrisonerDelta.Data).Number);
             Assert.Equal(1, Assert.Single(filteredRightPrisonerDelta.Data).Number);
+        }
+        finally
+        {
+            GetPlayerObjects().Remove(playerHero);
+        }
+    }
+
+    [Fact]
+    public void CreatePlayerCaptivityReleaseEvents_PlayerPrisonerDiscardedFromRight_CreatesRelease()
+    {
+        var playerHero = ObjectHelper.SkipConstructor<Hero>();
+        var playerCharacter = ObjectHelper.SkipConstructor<CharacterObject>();
+        playerCharacter.HeroObject = playerHero;
+        var releasePosition = Position(3f, 4f);
+        var leftPrisonerDelta = new TroopRosterData(new[]
+        {
+            new TroopRosterElementData("player-character", 1, 0, 0),
+        });
+        var rightPrisonerDelta = new TroopRosterData(new[]
+        {
+            new TroopRosterElementData("player-character", -1, 0, 0),
+        });
+
+        SetupObject("player-character", playerCharacter);
+        MarkPlayerHero(playerHero, "player-hero");
+        try
+        {
+            var releaseEvents = handler.CreatePlayerCaptivityReleaseEvents(
+                leftPrisonerDelta,
+                rightPrisonerDelta,
+                false,
+                releasePosition,
+                out var filteredLeftPrisonerDelta,
+                out var filteredRightPrisonerDelta);
+
+            var releaseEvent = Assert.Single(releaseEvents);
+            Assert.Same(playerHero, releaseEvent.PrisonerHero);
+            Assert.True(releaseEvent.HasReleasePosition);
+            AssertPosition(releasePosition, releaseEvent.ReleasePosition);
+            Assert.Equal(1, Assert.Single(filteredLeftPrisonerDelta.Data).Number);
+            Assert.Empty(filteredRightPrisonerDelta.Data);
+        }
+        finally
+        {
+            GetPlayerObjects().Remove(playerHero);
+        }
+    }
+
+    [Fact]
+    public void CreatePlayerCaptivityReleaseEvents_PlayerPrisonerTransferredFromRightToLeft_KeepsRosterDelta()
+    {
+        var playerHero = ObjectHelper.SkipConstructor<Hero>();
+        var playerCharacter = ObjectHelper.SkipConstructor<CharacterObject>();
+        playerCharacter.HeroObject = playerHero;
+        var releasePosition = Position(5f, 6f);
+        var leftPrisonerDelta = new TroopRosterData(new[]
+        {
+            new TroopRosterElementData("player-character", 1, 0, 0),
+        });
+        var rightPrisonerDelta = new TroopRosterData(new[]
+        {
+            new TroopRosterElementData("player-character", -1, 0, 0),
+        });
+
+        SetupObject("player-character", playerCharacter);
+        MarkPlayerHero(playerHero, "player-hero");
+        try
+        {
+            var releaseEvents = handler.CreatePlayerCaptivityReleaseEvents(
+                leftPrisonerDelta,
+                rightPrisonerDelta,
+                true,
+                releasePosition,
+                out var filteredLeftPrisonerDelta,
+                out var filteredRightPrisonerDelta);
+
+            Assert.Empty(releaseEvents);
+            Assert.Equal(1, Assert.Single(filteredLeftPrisonerDelta.Data).Number);
+            Assert.Equal(-1, Assert.Single(filteredRightPrisonerDelta.Data).Number);
         }
         finally
         {
@@ -170,7 +252,9 @@ public class PlayerCaptivityReleasePositionTests
             0,
             0,
             true,
-            releasePosition);
+            releasePosition,
+            Helpers.PartyScreenHelper.PartyScreenMode.Normal,
+            new TroopRosterOrderData(new()));
 
         byte[] bytes;
         using (var ms = new MemoryStream())

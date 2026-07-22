@@ -37,13 +37,15 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         GameSaveDataPacket convertedPacket = (GameSaveDataPacket)packet;
 
         messageBroker.Publish(this, new NetworkGameSaveDataReceived(
-            convertedPacket.GameSaveData,
+            SaveDataCompression.Decompress(convertedPacket.GameSaveData),
             convertedPacket.CampaignID,
             convertedPacket.CraftingPlayerData,
             convertedPacket.WorkshopPlayerData,
             convertedPacket.CaravansPlayerData,
             convertedPacket.AlleyPlayerData,
             convertedPacket.InteractionsPlayerData,
-            convertedPacket.AttachmentIdMap));
+            convertedPacket.TradePlayerData,
+            convertedPacket.AttachmentIdMap,
+            convertedPacket.ServerOptions));
     }
 }

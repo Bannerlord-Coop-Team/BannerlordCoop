@@ -6,6 +6,8 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network;
+using Coop.Core.Common.Services.Connection.Messages;
+using Coop.Core.Common.Session.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using Serilog;
@@ -110,6 +112,24 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
+        if (!isConnected && disconnectInfo.Reason == DisconnectReason.ConnectionRejected)
+        {
+            var rejectCode = ReadRejectCode(disconnectInfo);
+            reconnectPending = false;
+
+            string message = rejectCode == ConnectionRejectCode.IncorrectPassword
+                ? "The server password is incorrect."
+                : "The server rejected the connection.";
+
+            Logger.Warning("Connection rejected by server: {Reason}", rejectCode);
+            GameThread.RunSafe(() =>
+            {
+                messageBroker.Publish(this, new SendPopupMessage(message));
+                messageBroker.Publish(this, new EndCoopMode());
+            }, context: "ConnectionRejected");
+            return;
+        }
+
         if (isConnected == true)
         {
             messageBroker.Publish(this, new SendInformationMessage(disconnectInfo.Reason.ToString()));
@@ -122,6 +142,26 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             Logger.Warning("Connection attempt failed ({Reason}), retrying in 3 seconds...", disconnectInfo.Reason);
             reconnectPending = true;
             reconnectAfter = DateTime.UtcNow.AddSeconds(3);
+        }
+    }
+
+    private static ConnectionRejectCode ReadRejectCode(DisconnectInfo disconnectInfo)
+    {
+        var data = disconnectInfo.AdditionalData;
+        if (data == null || data.IsNull) return ConnectionRejectCode.None;
+
+        try
+        {
+            if (data.TryGetByte(out var raw) && raw == (byte)ConnectionRejectCode.IncorrectPassword)
+            {
+                return ConnectionRejectCode.IncorrectPassword;
+            }
+
+            return ConnectionRejectCode.None;
+        }
+        finally
+        {
+            data.Recycle();
         }
     }
 
@@ -186,6 +226,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public override void Update(TimeSpan frameTime)
     {
         netManager.PollEvents();
+
+        // Send any sub-budget aggregated messages so nothing waits longer than one poll interval.
+        FlushPendingMessages();
 
         if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
         {

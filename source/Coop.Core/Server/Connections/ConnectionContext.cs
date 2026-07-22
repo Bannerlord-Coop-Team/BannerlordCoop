@@ -2,7 +2,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.CoopSessionData;
-using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
@@ -27,14 +27,14 @@ public class ConnectionContext
         IPlayerManager playerManager,
         IObjectManager objectManager,
         IHeroInterface heroInterface,
-        IGameStateInterface gameStateInterface,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
         ITimeControlInterface timeControlInterface,
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        IServerOptionsProvider serverOptionsProvider)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -43,7 +43,6 @@ public class ConnectionContext
         PlayerManager = playerManager;
         ObjectManager = objectManager;
         HeroInterface = heroInterface;
-        GameStateInterface = gameStateInterface;
         CoopSessionProvider = coopSessionProvider;
         SaveInterface = saveInterface;
         TimeControlInterface = timeControlInterface;
@@ -51,6 +50,7 @@ public class ConnectionContext
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
         ExistingPlayerSender = existingPlayerSender;
+        ServerOptionsProvider = serverOptionsProvider;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -60,7 +60,6 @@ public class ConnectionContext
     public IPlayerManager PlayerManager { get; }
     public IObjectManager ObjectManager { get; }
     public IHeroInterface HeroInterface { get; }
-    public IGameStateInterface GameStateInterface { get; }
     public ICoopSessionProvider CoopSessionProvider { get; }
     public ISaveInterface SaveInterface { get; }
     public ITimeControlInterface TimeControlInterface { get; }
@@ -68,4 +67,5 @@ public class ConnectionContext
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
+    public IServerOptionsProvider ServerOptionsProvider { get; }
 }

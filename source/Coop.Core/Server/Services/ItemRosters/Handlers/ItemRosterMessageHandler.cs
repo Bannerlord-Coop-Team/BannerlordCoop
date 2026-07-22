@@ -4,6 +4,9 @@ using Common.Network.Coalescing;
 using Coop.Core.Server.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.ItemRosters.Handlers;
 
@@ -44,6 +47,10 @@ public class ItemRosterMessageHandler : IHandler
             return;
         }
 
+        itemRosterId = Compact(itemRosterId, typeof(ItemRoster));
+        itemId = Compact(itemId, typeof(ItemObject));
+        itemModifierId = Compact(itemModifierId, typeof(ItemModifier));
+
         // Sum this tick's deltas for the element and send one update at flush instead of one per AddToCounts.
         var key = new CoalesceKey(ItemRosterUpdateChannel, itemRosterId, $"{itemId}:{itemModifierId}");
         coalescer.Enqueue(key, new SummedPayload<int>(
@@ -57,6 +64,7 @@ public class ItemRosterMessageHandler : IHandler
         var message = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(message.ItemRoster, out var itemRosterId)) return;
+        itemRosterId = Compact(itemRosterId, typeof(ItemRoster));
 
         // A clear supersedes this roster's pending updates; drop them so the clear isn't trailed by a stale update.
         coalescer.DropInstance(itemRosterId);

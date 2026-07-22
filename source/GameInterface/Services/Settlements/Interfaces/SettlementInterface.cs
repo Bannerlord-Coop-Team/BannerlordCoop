@@ -62,6 +62,11 @@ internal class SettlementInterface : ISettlementInterface
 
     public void PartyEnterSettlement(MobileParty party, Settlement settlement)
     {
+        // A besieger stays outside the settlement it besieges (vanilla's HandleEncounterForMobileParty skips
+        // besiegers). A settlement-encounter round-trip that races the siege start would otherwise re-enter it,
+        // and the garrison sally-out scan then reads the besieger as zero strength and sallies every check.
+        if (party.BesiegedSettlement == settlement) return;
+
         EnterSettlementAction.ApplyForParty(party, settlement);
     }
 
@@ -74,6 +79,9 @@ internal class SettlementInterface : ISettlementInterface
 
     public void StartSettlementEncounter(MobileParty party, Settlement settlement)
     {
+        // Same invariant as PartyEnterSettlement: no settlement encounter for a party besieging this settlement.
+        if (party.BesiegedSettlement == settlement) return;
+
         var settlementParty = settlement.Party;
         if (settlementParty == null)
         {
@@ -97,11 +105,22 @@ internal class SettlementInterface : ISettlementInterface
         // CurrentSettlement, it does not reposition. Without this the party is still on the settlement
         // when the encounter ends, so EncounterManager.HandleEncounterForMobileParty immediately re-fires
         // StartSettlementEncounter and the player is put right back in.
-        if (mainParty.CurrentSettlement != null)
-            mainParty.Position = mainParty.CurrentSettlement.GatePosition;
+        // Fall back to the encounter settlement: after a co-op siege capture the party sits in a
+        // settlement encounter without CurrentSettlement set, so it would otherwise leave from the
+        // besieger-camp position instead of the gate.
+        var leftSettlement = mainParty.CurrentSettlement ?? Settlement.CurrentSettlement;
+        if (leftSettlement != null)
+            mainParty.Position = leftSettlement.GatePosition;
+
+        // ExitToLast returns to the map inside Finish. Hold first so the still-active target cannot
+        // immediately start another encounter before Finish returns to this method.
+        mainParty.SetMoveModeHold();
 
         try
         {
+            if (PlayerEncounter.Current == null && mainParty.CurrentSettlement != null)
+                PlayerEncounter.LeaveSettlement();
+
             PlayerEncounter.Finish(true);
         }
         finally
@@ -109,8 +128,8 @@ internal class SettlementInterface : ISettlementInterface
             Campaign.Current.PlayerEncounter = null;
         }
 
-        // Hold AFTER finishing: Finish -> LeaveSettlementAction resets party behavior, which would
-        // otherwise clobber the hold and let the party walk straight back into the settlement.
+        // Hold again because Finish calls LeaveSettlementAction, which resets party behavior and would
+        // otherwise let the party walk straight back into the settlement.
         mainParty.SetMoveModeHold();
 
         Campaign.Current.SaveHandler?.SignalAutoSave();

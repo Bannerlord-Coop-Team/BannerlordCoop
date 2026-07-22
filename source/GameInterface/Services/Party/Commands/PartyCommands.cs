@@ -1,14 +1,24 @@
 using Autofac;
 using Common;
 using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Serilog;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
@@ -68,6 +78,66 @@ internal class PartyCommands
         return me.PartyBelongedTo != null
             ? "You are " + me.Name + " | hero id: " + me.StringId + " | party id: " + me.PartyBelongedTo.StringId
             : "You are " + me.Name + " | hero id: " + me.StringId + " | NO PARTY";
+    }
+
+    /// <summary>
+    /// Issues a local player-party point movement order so automated live tests can verify that a restored
+    /// party accepts client control and sends the normal behavior update to the server.
+    /// </summary>
+    [CommandLineArgumentFunction("move_offset", "coop.debug.mobileparty")]
+    public static string MoveOffsetCommand(List<string> strings)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (strings.Count != 2 ||
+            !float.TryParse(strings[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetX) ||
+            !float.TryParse(strings[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var offsetY))
+            return "Usage: coop.debug.mobileparty.move_offset <offsetX> <offsetY>";
+
+        var party = Hero.MainHero?.PartyBelongedTo;
+        if (party == null) return "The local player hero has no party.";
+
+        var current = party.Position;
+        var target = new CampaignVec2(
+            new TaleWorlds.Library.Vec2(current.X + offsetX, current.Y + offsetY),
+            current.IsOnLand);
+        party.SetNavigationModePoint(target);
+        MessageBroker.Instance.Publish(typeof(PartyCommands), new PartyBehaviorChangeAttempted(party));
+
+        return
+            $"Movement order submitted for {party.StringId}.\n" +
+            $"From: {current.X:R},{current.Y:R}\n" +
+            $"Target: {target.X:R},{target.Y:R}";
+    }
+
+    /// <summary>
+    /// Restores a party to an exact campaign-map position and hold state after an automated live test.
+    /// </summary>
+    [CommandLineArgumentFunction("restore_position", "coop.debug.mobileparty")]
+    public static string RestorePositionCommand(List<string> strings)
+    {
+        if (!ModInformation.IsServer) return "Command can only be run on the server.";
+        if (strings.Count != 4 ||
+            !float.TryParse(strings[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionX) ||
+            !float.TryParse(strings[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionY) ||
+            !bool.TryParse(strings[3], out var isOnLand))
+            return "Usage: coop.debug.mobileparty.restore_position <partyId> <x> <y> <isOnLand>";
+
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found";
+
+        party.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(positionX, positionY), isOnLand);
+        party.SetMoveModeHold();
+        party.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(PartyCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea,
+                resetMovementToHold: true));
+
+        return $"Restored {party.StringId} to {party.Position.X:R},{party.Position.Y:R} in Hold mode.";
     }
 
     /// <summary>
@@ -175,6 +245,66 @@ internal class PartyCommands
         }
 
         return stringBuilder.ToString();
+    }
+
+    // coop.debug.mobileparty.siege_buff
+    /// <summary>
+    /// Fills a party to 2000 troops, maxes its morale, forces a high map speed, and stocks it with food so it
+    /// can march to and win a siege for testing without starving. Server only; the troop and item adds replicate
+    /// via the roster sync. Get the party id from coop.debug.mobileparty.whoami on the client that owns the party.
+    /// </summary>
+    [CommandLineArgumentFunction("siege_buff", "coop.debug.mobileparty")]
+    public static string SiegeBuffCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (strings.Count != 1) return "Usage: coop.debug.mobileparty.siege_buff <partyId>";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party)) return $"Party with id {strings[0]} not found";
+
+        var troop = party.MapFaction?.Culture?.EliteBasicTroop ?? party.MapFaction?.Culture?.BasicTroop;
+        if (troop == null) return $"Could not resolve a troop for {party.Name}'s culture";
+
+        int toAdd = 2000 - party.MemberRoster.TotalManCount;
+        if (toAdd > 0) party.MemberRoster.AddToCounts(troop, toAdd);
+
+        party.RecentEventsMorale = 100f;
+        PartyDebugBuffPatches.Boost(party);
+
+        // Stock every food type so a 2000-troop army doesn't starve on the march to the siege. AddToCounts routes
+        // through the synced EquipmentElement overload, so the food replicates to the owning client.
+        int foodTypes = 0;
+        foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+        {
+            if (item?.IsFood != true) continue;
+            party.ItemRoster.AddToCounts(item, 500);
+            foodTypes++;
+        }
+
+        return $"Buffed {party.Name} ({party.StringId}): {party.MemberRoster.TotalManCount} troops, max morale, boosted speed and party-size limit, {foodTypes} food type(s) x500";
+    }
+
+    // coop.debug.mobileparty.declare_war
+    /// <summary>
+    /// Declares war between a party's faction and a settlement's faction, so the party can besiege that
+    /// settlement. Works for an independent clan (no kingdom needed). Server only; the war replicates.
+    /// </summary>
+    [CommandLineArgumentFunction("declare_war", "coop.debug.mobileparty")]
+    public static string DeclareWarCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (strings.Count != 2) return "Usage: coop.debug.mobileparty.declare_war <partyId> <settlementId>";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party)) return $"Party with id {strings[0]} not found";
+        if (!objectManager.TryGetObject(strings[1], out Settlement settlement)) return $"Settlement with id {strings[1]} not found";
+
+        var attacker = party.MapFaction;
+        var defender = settlement.MapFaction;
+        if (attacker == null || defender == null) return "Could not resolve both factions";
+        if (attacker == defender) return "The party and the settlement share a faction";
+        if (attacker.IsAtWarWith(defender)) return $"{attacker.Name} is already at war with {defender.Name}";
+
+        DeclareWarAction.ApplyByDefault(attacker, defender);
+        return $"{attacker.Name} is now at war with {defender.Name}";
     }
 
     /// <summary>

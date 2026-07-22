@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.ItemRosters.Interfaces;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
 using Helpers;
@@ -80,8 +82,12 @@ internal class VillagerConversationsPatches
     {
         MobileParty encounteredMobileParty = PlayerEncounter.EncounteredMobileParty;
 
+        // EndConversation clears ConversationParty before this consequence runs.
+        __instance.SetPlayerInteraction(encounteredMobileParty, VillagerCampaignBehavior.PlayerInteraction.Hostile);
+
         // Call helper function to implement vanilla open loot screen logic
-        OpenLootScreen(encounteredMobileParty, out var itemRosterElements);
+        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
+        itemRosterInterface.OpenPartyLootScreen(encounteredMobileParty, out var _, out var itemRosterElements);
 
         // Open prisoner transfer screen
         using (new AllowedThread())
@@ -94,13 +100,10 @@ internal class VillagerConversationsPatches
             PartyScreenHelper.OpenScreenAsLoot(TroopRoster.CreateDummyTroopRoster(), troopRoster, encounteredMobileParty.Name, troopRoster.TotalManCount, null);
         }
 
-        // Locally set player interaction, and then save in CoopSession on server
-        __instance.SetPlayerInteraction(MobileParty.ConversationParty, VillagerCampaignBehavior.PlayerInteraction.Hostile);
-
-        PlayerEncounter.LeaveEncounter = true;
-
         var message = new VillagersTookPrisonerOnConsequence(Hero.MainHero, MobileParty.MainParty, encounteredMobileParty, itemRosterElements);
         MessageBroker.Instance.Publish(__instance, message);
+
+        PlayerEncounter.LeaveEncounter = true;
 
         return false;
     }
@@ -151,7 +154,8 @@ internal class VillagerConversationsPatches
     public static bool ConversationVillageFarmerSurrenderOnLeaveConsequencePrefix(ref VillagerCampaignBehavior __instance)
     {
         // Call helper function to implement vanilla open loot screen logic
-        OpenLootScreen(MobileParty.ConversationParty, out var itemRosterElements);
+        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
+        itemRosterInterface.OpenPartyLootScreen(MobileParty.ConversationParty, out var _, out var itemRosterElements);
 
         // Locally set player interaction, and then save in CoopSession on server
         __instance.SetPlayerInteraction(MobileParty.ConversationParty, VillagerCampaignBehavior.PlayerInteraction.Hostile);
@@ -162,27 +166,5 @@ internal class VillagerConversationsPatches
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
-    }
-
-    private static void OpenLootScreen(MobileParty encounterParty, out ItemRosterElement[] itemRosterElements)
-    {
-        ItemRoster itemRoster = null;
-        using (new AllowedThread())
-        {
-            itemRoster = new ItemRoster(encounterParty.ItemRoster);
-
-            itemRosterElements = itemRoster._data;
-
-            if (itemRoster.Count > 0)
-            {
-                InventoryScreenHelper.OpenScreenAsLoot(new Dictionary<PartyBase, ItemRoster>
-            {
-                {
-                    PartyBase.MainParty,
-                    itemRoster
-                }
-            });
-            }
-        }
     }
 }

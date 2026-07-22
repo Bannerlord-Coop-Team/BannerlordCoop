@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Caravans.Messages;
+using GameInterface.Services.ItemRosters.Interfaces;
 using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
@@ -152,7 +153,8 @@ internal class CaravansConversationsPatches
     public static bool ConversationCaravanSurrenderLeaveOnConsequencePrefix(ref CaravansCampaignBehavior __instance)
     {
         // Call helper function to implement vanilla open loot screen logic
-        OpenLootScreen(MobileParty.ConversationParty, out var caravanHasItems, out var itemRosterElements);
+        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
+        itemRosterInterface.OpenPartyLootScreen(MobileParty.ConversationParty, out var caravanHasItems, out var itemRosterElements);
 
         // Locally set player interaction, and then save in CoopSession on server
         __instance.SetPlayerInteraction(MobileParty.ConversationParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
@@ -171,8 +173,12 @@ internal class CaravansConversationsPatches
     {
         MobileParty encounteredMobileParty = PlayerEncounter.EncounteredMobileParty;
 
+        // Locally set player interaction, and then save in CoopSession on server
+        __instance.SetPlayerInteraction(encounteredMobileParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
+
         // Call helper function to implement vanilla open loot screen logic
-        OpenLootScreen(encounteredMobileParty, out var caravanHasItems, out var itemRosterElements);
+        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
+        itemRosterInterface.OpenPartyLootScreen(encounteredMobileParty, out var caravanHasItems, out var itemRosterElements);
 
         // Open prisoner transfer screen
         using (new AllowedThread())
@@ -185,45 +191,11 @@ internal class CaravansConversationsPatches
             PartyScreenHelper.OpenScreenAsLoot(TroopRoster.CreateDummyTroopRoster(), troopRoster, encounteredMobileParty.Name, troopRoster.TotalManCount, null);
         }
 
-        // Locally set player interaction, and then save in CoopSession on server
-        __instance.SetPlayerInteraction(MobileParty.ConversationParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
-
-        PlayerEncounter.LeaveEncounter = true;
-
         var message = new CaravanTookPrisonerOnConsequence(Hero.MainHero, MobileParty.MainParty, encounteredMobileParty, caravanHasItems, itemRosterElements);
         MessageBroker.Instance.Publish(__instance, message);
 
+        PlayerEncounter.LeaveEncounter = true;
+
         return false;
-    }
-
-    private static void OpenLootScreen(MobileParty encounterParty, out bool caravanHasItems, out ItemRosterElement[] itemRosterElements)
-    {
-        ItemRoster itemRoster = null;
-        using (new AllowedThread())
-        {
-            itemRoster = new ItemRoster(encounterParty.ItemRoster);
-        }
-
-        itemRosterElements = itemRoster._data;
-
-        caravanHasItems = false;
-        for (int i = 0; i < itemRoster.Count; i++)
-        {
-            if (itemRoster.GetElementNumber(i) > 0)
-            {
-                caravanHasItems = true;
-                break;
-            }
-        }
-        if (caravanHasItems)
-        {
-            InventoryScreenHelper.OpenScreenAsLoot(new Dictionary<PartyBase, ItemRoster>
-            {
-                {
-                    PartyBase.MainParty,
-                    itemRoster
-                }
-            });
-        }
     }
 }

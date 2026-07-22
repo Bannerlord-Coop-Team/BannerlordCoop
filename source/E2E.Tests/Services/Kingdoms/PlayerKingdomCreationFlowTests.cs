@@ -8,6 +8,7 @@ using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
@@ -20,6 +21,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Stances.Messages;
+using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -162,6 +164,82 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 AssertKingdomContainsFief(client.ObjectManager, kingdom, fiefId);
             });
         }
+    }
+
+    [Fact]
+    public void VassalServiceAccepted_JoinsPlayerClanAuthoritativelyAndRejectsReplay()
+    {
+        var client = Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var ruler = CreateSyncedPlayerContext("VassalRuler", _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+        SetClanTierEverywhere(player.ClanId, 2);
+
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
+
+        Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+        client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<RequestVassalService>());
+        Assert.Equal(kingdomId, request.KingdomId);
+        Assert.False(request.GrantRewards);
+
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
+        Assert.True(accepted.Accepted);
+        Assert.False(accepted.GrantRewards);
+
+        Server.Call(() => AssertVassalMembership(Server, player.ClanId, kingdomId));
+        foreach (var instance in Clients)
+        {
+            instance.Call(() => AssertVassalMembership(instance, player.ClanId, kingdomId));
+        }
+
+        Server.NetworkSentMessages.Clear();
+        client.SimulateMessage(this, new VassalServiceAccepted(kingdom, grantRewards: false));
+
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
+        Assert.False(rejected.Accepted);
+    }
+
+    [Fact]
+    public void ClanChangedFactionNotification_AllowsNullKingdomEndpoints()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+        Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+        Server.SimulateMessage(
+            this,
+            new NotifyClanChangedFaction(
+                clan,
+                oldKingdom: null,
+                newKingdom: kingdom,
+                detail: ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom,
+                showNotification: true));
+
+        var factionChanged = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkNotifyClanChangedFaction>(),
+            message => message.ClanId == player.ClanId);
+        Assert.Null(factionChanged.OldKingdomId);
+        Assert.Equal(kingdomId, factionChanged.NewKingdomId);
+
+        Server.NetworkSentMessages.Clear();
+        Server.SimulateMessage(
+            this,
+            new NotifyClanChangedFaction(
+                clan,
+                oldKingdom: kingdom,
+                newKingdom: null,
+                detail: ChangeKingdomAction.ChangeKingdomActionDetail.LeaveKingdom,
+                showNotification: true));
+
+        factionChanged = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkNotifyClanChangedFaction>(),
+            message => message.ClanId == player.ClanId);
+        Assert.Equal(kingdomId, factionChanged.OldKingdomId);
+        Assert.Null(factionChanged.NewKingdomId);
     }
 
     [Fact]
@@ -1476,7 +1554,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void ClientKingdomCreationRequest_SuppressesAccidentalSettlementLeaveConsequence()
+    public void ClientKingdomCreationRequest_ServerSuppressesAccidentalSettlementLeaveConsequence()
     {
         var player = CreateSyncedPlayerContext();
         var client = Clients.First();
@@ -1497,9 +1575,14 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
         client.SimulateMessage(this, new EndSettlementEncounterAttempted(GetObject<MobileParty>(client, player.PartyId)));
 
-        Assert.DoesNotContain(
+        var leaveRequest = Assert.Single(
             client.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>(),
             message => message.PartyId == player.PartyId);
+        Assert.Equal(player.PartyId, leaveRequest.PartyId);
+        var leaveResult = Assert.Single(
+            client.InternalMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
+            message => message.PartyId == player.PartyId);
+        Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, leaveResult.Outcome);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
             message => message.PartyId == player.PartyId);
@@ -1526,7 +1609,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
 
         Assert.DoesNotContain(
-            Server.NetworkSentMessages.GetMessages<NetworkEndSettlementEncounter>(),
+            Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
             message => true);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
@@ -1574,7 +1657,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(
             this,
             new NetworkPlayerKingdomCreated(ControllerId, kingdomId, KingdomName, player.ClanId, player.PartyId, settlementId));
-        client.SimulateMessage(this, new NetworkEndSettlementEncounter());
+        client.SimulateMessage(
+            this,
+            new NetworkSettlementEncounterLeaveResult(
+                player.PartyId,
+                SettlementEncounterLeaveOutcome.Suppressed));
 
         client.Call(() =>
         {
@@ -1829,6 +1916,39 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             ConfigureClanInKingdom(client, clanId, kingdomId);
         }
+    }
+
+    private void SetClanTierEverywhere(string clanId, int tier)
+    {
+        SetClanTier(Server, clanId, tier);
+        foreach (var client in Clients)
+        {
+            SetClanTier(client, clanId, tier);
+        }
+    }
+
+    private static void AssertVassalMembership(
+        EnvironmentInstance instance,
+        string clanId,
+        string kingdomId)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+        Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+        Assert.Same(kingdom, clan.Kingdom);
+        Assert.Contains(clan, kingdom.Clans);
+        Assert.False(clan.IsUnderMercenaryService);
+    }
+
+    private static void SetClanTier(EnvironmentInstance instance, string clanId, int tier)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+            using (new AllowedThread())
+            {
+                clan._tier = tier;
+            }
+        });
     }
 
     private static void ConfigureClanInKingdom(EnvironmentInstance instance, string clanId, string kingdomId)

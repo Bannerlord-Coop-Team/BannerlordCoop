@@ -13,11 +13,13 @@ namespace E2E.Tests.Services.MobileParties;
 public class MobilePartyPropertyTests : SyncTestBase
 {
     private string MobilePartyId;
+    private string ParentPartyId;
     private string LordPartyId;
 
     public MobilePartyPropertyTests(ITestOutputHelper output) : base(output)
     {
         MobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        ParentPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TestEnvironment.CreateRegisteredObject<Settlement>();
         TestEnvironment.CreateRegisteredObject<MobilePartyAi>();
         TestEnvironment.CreateRegisteredObject<BesiegerCamp>(new System.Collections.Generic.List<System.Reflection.MethodBase>
@@ -48,7 +50,7 @@ public class MobilePartyPropertyTests : SyncTestBase
         TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.ShouldJoinPlayerBattles), true);
         TestEnvironment.AssertProperty<MobileParty, bool>(nameof(MobileParty.IsDisbanding), true);
         TestEnvironment.AssertReferenceProperty<MobileParty, Settlement>(nameof(MobileParty.CurrentSettlement));
-        TestEnvironment.AssertReferenceProperty<MobileParty, MobileParty>(nameof(MobileParty.AttachedTo));
+        TestEnvironment.AssertReferenceProperty<MobileParty, MobileParty>(nameof(MobileParty.AttachedTo), MobilePartyId, ParentPartyId);
         //TestEnvironment.AssertReferenceProperty<MobileParty, BesiegerCamp>(nameof(MobileParty.BesiegerCamp));
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Scout));
         TestEnvironment.AssertReferenceProperty<MobileParty, Hero>(nameof(MobileParty.Engineer));
@@ -70,6 +72,9 @@ public class MobilePartyPropertyTests : SyncTestBase
             Server.ObjectManager.TryGetId(party, out LordPartyId);
             party.PartyTradeGold = 500;
         });
+
+        // Lord-party trade gold is the leader hero's Gold, which is coalesced; drain it before reading clients.
+        TestEnvironment.FlushCoalescer();
 
         foreach (var client in Clients)
         {

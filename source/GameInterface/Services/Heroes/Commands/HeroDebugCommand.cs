@@ -5,11 +5,14 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Utils.Commands;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -50,6 +53,47 @@ public class HeroDebugCommand
         }
 
         return stringBuilder.ToString();
+    }
+
+    [CommandLineArgumentFunction("id", "coop.debug.hero")]
+    public static string FindIds(List<string> args)
+    {
+        if (args == null || args.Count == 0)
+        {
+            return "Usage: coop.debug.hero.id <hero name>";
+        }
+
+        var heroName = string.Join(" ", args).Trim();
+        if (string.IsNullOrWhiteSpace(heroName)) return "Usage: coop.debug.hero.id <hero name>";
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        var campaign = Campaign.Current;
+        if (campaign == null) return "Campaign is not loaded.";
+
+        var heroes = campaign.CampaignObjectManager.GetAllHeroes()
+            .Where(hero => string.Equals(hero.Name?.ToString(), heroName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (heroes.Count == 0) return $"No hero named '{heroName}' was found.";
+
+        var result = new StringBuilder();
+        foreach (var hero in heroes)
+        {
+            if (objectManager.TryGetId(hero, out var id))
+            {
+                result.AppendLine($"ID: '{id}', Name: '{hero.Name}', Game StringId: {hero.StringId}");
+            }
+            else
+            {
+                result.AppendLine($"Name: '{hero.Name}' was not registered with object manager");
+            }
+        }
+
+        return result.ToString();
     }
 
     // coop.debug.hero.info
@@ -418,6 +462,26 @@ public class HeroDebugCommand
         return "Hero not found.";
     }
 
+    /// <summary>
+    /// Runs the authoritative volunteer refresh for one settlement.
+    /// </summary>
+    [CommandLineArgumentFunction("refresh_volunteers", "coop.debug.hero")]
+    public static string RefreshVolunteersCommand(List<string> args)
+    {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.refresh_volunteers")) return error;
+        if (args.Count > 1) return "Usage: coop.debug.hero.refresh_volunteers [settlementId]";
+
+        string settlementId = args.Count == 0 ? "town_ES1" : args[0];
+        var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == settlementId);
+        if (settlement == null) return $"Settlement '{settlementId}' not found.";
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<RecruitmentCampaignBehavior>();
+        if (behavior == null) return $"Unable to find {nameof(RecruitmentCampaignBehavior)}.";
+
+        behavior.UpdateVolunteersOfNotablesInSettlement(settlement);
+        return $"Refreshed volunteers for {settlement.Name} ({settlement.StringId}).";
+    }
+
     // coop.debug.hero.set_relation
     [CommandLineArgumentFunction("set_relation", "coop.debug.hero")]
     public static string SetRelation(List<string> args)
@@ -487,5 +551,108 @@ public class HeroDebugCommand
         }
 
         return $"Relation between '{hero1.Name}' and '{hero2.Name}': {CharacterRelationManager.GetHeroRelation(hero1, hero2)}";
+    }
+
+    [CommandLineArgumentFunction("get_effective_relation", "coop.debug.hero")]
+    public static string GetEffectiveRelation(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.get_effective_relation <hero1Id> <hero2Id>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero1) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[1], out var hero2) == false)
+        {
+            return $"Unable to find hero with id: {args[1]}";
+        }
+
+        var campaign = Campaign.Current;
+        if (campaign?.Models?.DiplomacyModel == null)
+        {
+            return "Campaign diplomacy model is not available";
+        }
+
+        campaign.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+            hero1,
+            hero2,
+            out var effectiveHero1,
+            out var effectiveHero2);
+        if (effectiveHero1 == null || effectiveHero2 == null)
+        {
+            return "Unable to resolve effective relation heroes";
+        }
+
+        return $"Effective relation between '{effectiveHero1.Name}' and '{effectiveHero2.Name}': " +
+            CharacterRelationManager.GetHeroRelation(effectiveHero1, effectiveHero2);
+    }
+
+    [CommandLineArgumentFunction("set_effective_relation", "coop.debug.hero")]
+    public static string SetEffectiveRelation(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Set effective relation is only to be called on the server";
+        }
+
+        if (args.Count != 3)
+        {
+            return "Usage: coop.debug.hero.set_effective_relation <hero1Id> <hero2Id> <value>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero1) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[1], out var hero2) == false)
+        {
+            return $"Unable to find hero with id: {args[1]}";
+        }
+
+        if (int.TryParse(args[2], out int value) == false)
+        {
+            return $"{args[2]} is not a valid integer";
+        }
+
+        var campaign = Campaign.Current;
+        if (campaign?.Models?.DiplomacyModel == null)
+        {
+            return "Campaign diplomacy model is not available";
+        }
+
+        campaign.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+            hero1,
+            hero2,
+            out var effectiveHero1,
+            out var effectiveHero2);
+        if (effectiveHero1 == null || effectiveHero2 == null)
+        {
+            return "Unable to resolve effective relation heroes";
+        }
+
+        if (effectiveHero1 == effectiveHero2)
+        {
+            return "A hero cannot have a relation with itself";
+        }
+
+        CharacterRelationManager.SetHeroRelation(effectiveHero1, effectiveHero2, value);
+
+        return $"Set effective relation between '{effectiveHero1.Name}' and '{effectiveHero2.Name}' to " +
+            CharacterRelationManager.GetHeroRelation(effectiveHero1, effectiveHero2);
     }
 }

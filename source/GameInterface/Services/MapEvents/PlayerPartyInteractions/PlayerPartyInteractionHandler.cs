@@ -1,16 +1,18 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -24,6 +26,7 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -32,6 +35,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 using TaleWorlds.Core;
+using TaleWorlds.ScreenSystem;
 using Helpers;
 using TaleWorlds.Library;
 
@@ -53,9 +57,12 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
     private readonly ConcurrentDictionary<string, string> sessionsByPartyId = new ConcurrentDictionary<string, string>();
+    private readonly object sessionGate = new object();
     private readonly HashSet<string> openedConversationSessionIds = new HashSet<string>();
+    private readonly HashSet<string> endedInteractionSessionIds = new HashSet<string>();
     private readonly HashSet<string> hostileEncounterSessionIds = new HashSet<string>();
     private readonly HashSet<string> closedHostileEncounterPartyIds = new HashSet<string>();
+    private bool presentationTickRegistered;
 
     public PlayerPartyInteractionHandler(
         IMessageBroker messageBroker,
@@ -63,7 +70,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         IObjectManager objectManager,
         ConversationPartyTracker conversationPartyTracker,
         INetworkConfig configuration,
-        IPlayerPartyHostileEncounterService hostileEncounterService)
+        IPlayerPartyHostileEncounterService hostileEncounterService,
+        IKingdomMembershipState kingdomMembershipState)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -71,7 +79,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.conversationPartyTracker = conversationPartyTracker;
         this.configuration = configuration;
         this.hostileEncounterService = hostileEncounterService;
-        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager);
+        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, kingdomMembershipState);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -91,6 +99,9 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     public void Dispose()
     {
+        if (presentationTickRegistered && Campaign.Current != null)
+            CampaignEvents.TickEvent.ClearListeners(this);
+
         messageBroker.Unsubscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Unsubscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
         messageBroker.Unsubscribe<NetworkSubmitPlayerPartyInteractionOption>(Handle_NetworkSubmitPlayerPartyInteractionOption);
@@ -105,6 +116,11 @@ internal class PlayerPartyInteractionHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerPartyTradeOfferUpdated>(Handle_NetworkPlayerPartyTradeOfferUpdated);
         messageBroker.Unsubscribe<NetworkPlayerPartyTradeAcceptChanged>(Handle_NetworkPlayerPartyTradeAcceptChanged);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+
+        // The dialog state is a process-wide static, not container state: a session that ends mid-dialog
+        // would otherwise leave HasActiveState set after this handler's container is torn down, and
+        // ConversationRequestHandler silently drops every conversation request while it is set.
+        PlayerPartyInteractionDialogState.Clear();
     }
 
     public bool TryStartSession(
@@ -115,31 +131,31 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         if (ModInformation.IsClient) return false;
 
-        if (IsPartyBusy(request.AttackerId, request.DefenderId) || IsPartyBusy(request.DefenderId, request.AttackerId))
+        PlayerPartyInteractionSession session;
+        lock (sessionGate)
         {
-            network.Send(initiatorPeer, new NetworkPlayerPartyInteractionDenied(PlayerPartyInteractionDeniedReason.Busy));
-            return false;
+            var existing = FindExistingSession(request.AttackerId) ?? FindExistingSession(request.DefenderId);
+            if (existing != null)
+            {
+                if (!IsSamePair(existing, request.AttackerId, request.DefenderId))
+                    network.Send(initiatorPeer, new NetworkPlayerPartyInteractionDenied(PlayerPartyInteractionDeniedReason.Busy));
+                return false;
+            }
+
+            session = new PlayerPartyInteractionSession(
+                Guid.NewGuid().ToString("N"),
+                request.AttackerId,
+                request.DefenderId,
+                GetPartyName(initiatorParty, "Player"),
+                GetPartyName(responderParty, "Player"),
+                initiatorPeer,
+                AreHostile(initiatorParty, responderParty));
+            AddInitialOptions(session, initiatorParty, responderParty);
+            if (!sessionsById.TryAdd(session.SessionId, session)) return false;
+            sessionsByPartyId[session.InitiatorPartyId] = session.SessionId;
+            sessionsByPartyId[session.ResponderPartyId] = session.SessionId;
+            conversationPartyTracker.BeginPvpConversation(session.InitiatorPartyId, session.ResponderPartyId);
         }
-
-        var isHostile = AreHostile(initiatorParty, responderParty);
-
-        var session = new PlayerPartyInteractionSession(
-            Guid.NewGuid().ToString("N"),
-            request.AttackerId,
-            request.DefenderId,
-            GetPartyName(initiatorParty, "Player"),
-            GetPartyName(responderParty, "Player"),
-            initiatorPeer,
-            isHostile);
-
-        AddInitialOptions(session, initiatorParty, responderParty);
-
-        if (!sessionsById.TryAdd(session.SessionId, session))
-            return false;
-
-        sessionsByPartyId[session.InitiatorPartyId] = session.SessionId;
-        sessionsByPartyId[session.ResponderPartyId] = session.SessionId;
-        conversationPartyTracker.BeginPvpConversation(session.InitiatorPartyId, session.ResponderPartyId);
 
         GameThread.RunSafe(() =>
         {
@@ -184,11 +200,13 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (endedInteractionSessionIds.Contains(message.SessionId)) return;
             if (!objectManager.TryGetObject<PartyBase>(message.PartyId, out var party)) return;
             if (party.MobileParty?.IsControlledByThisInstance() != true) return;
 
             PlayerPartyInteractionDialogState.Apply(message);
-            TryOpenMapConversation(message.SessionId, message.PartyId, message.OtherPartyId);
+            EnsurePresentationTickListener();
+            TryOpenPendingMapConversation();
 
             if (message.Phase == PlayerPartyInteractionPhase.TradeActive)
             {
@@ -215,6 +233,11 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!(payload.Who is NetPeer peer)) return;
 
         var message = payload.What;
+        GameThread.RunSafe(() => ProcessSubmittedOption(peer, message), context: nameof(Handle_NetworkSubmitPlayerPartyInteractionOption));
+    }
+
+    private void ProcessSubmittedOption(NetPeer peer, NetworkSubmitPlayerPartyInteractionOption message)
+    {
         if (!sessionsById.TryGetValue(message.SessionId, out var session))
         {
             Logger.Warning(
@@ -275,18 +298,24 @@ internal class PlayerPartyInteractionHandler : IHandler
             var isLocalInteraction = TryGetLocalInteractionParty(message, out var localParty);
             if (!isLocalInteraction && !IsCurrentLocalInteractionSession(message.SessionId)) return;
 
+            endedInteractionSessionIds.Add(message.SessionId);
             PlayerPartyInteractionDialogState.Clear(message.SessionId);
             PlayerPartyTradeContext.End(message.SessionId, message.OutcomeType);
             PlayerPartyTradeOverlay.Instance.Hide(message.SessionId);
-            openedConversationSessionIds.Remove(message.SessionId);
+            var conversationWasOpened = openedConversationSessionIds.Remove(message.SessionId);
 
             var conversationManager = Campaign.Current?.ConversationManager;
-            if (conversationManager?.IsConversationInProgress == true)
+            if (conversationWasOpened && conversationManager?.IsConversationInProgress == true)
                 conversationManager.EndConversation();
 
             var hostileEncounterStarted = hostileEncounterSessionIds.Remove(message.SessionId);
             if (message.OutcomeType != PlayerPartyInteractionOutcomeType.HostileDemandAccepted || !hostileEncounterStarted)
-                CloseLocalPlayerPartyEncounter(localParty?.MobileParty);
+            {
+                if (conversationWasOpened)
+                    CloseLocalPlayerPartyEncounter(localParty?.MobileParty);
+                else
+                    ClearLocalPartyEngageOrder(localParty?.MobileParty);
+            }
         }, context: "End player-party interaction");
     }
 
@@ -676,7 +705,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             partyItems,
             otherPartyItems,
             enabledOptions,
-            session.IsHostile));
+            session.IsHostile,
+            session.VassalUnavailableReason));
     }
 
     private void SendResponderState(
@@ -707,16 +737,20 @@ internal class PlayerPartyInteractionHandler : IHandler
             partyItems,
             otherPartyItems,
             enabledOptions,
-            session.IsHostile));
+            session.IsHostile,
+            session.VassalUnavailableReason));
     }
 
     private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
     {
-        if (!sessionsById.TryRemove(session.SessionId, out _)) return;
+        lock (sessionGate)
+        {
+            if (!sessionsById.TryRemove(session.SessionId, out _)) return;
 
-        sessionsByPartyId.TryRemove(session.InitiatorPartyId, out _);
-        sessionsByPartyId.TryRemove(session.ResponderPartyId, out _);
-        conversationPartyTracker.EndPvpConversation(session.InitiatorPartyId);
+            sessionsByPartyId.TryRemove(session.InitiatorPartyId, out _);
+            sessionsByPartyId.TryRemove(session.ResponderPartyId, out _);
+            conversationPartyTracker.EndPvpConversation(session.InitiatorPartyId);
+        }
 
         var outcome = new PlayerPartyInteractionOutcome(session, outcomeType);
         outcomeHandler.Handle(outcome);
@@ -744,10 +778,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, enabled: !session.IsHostile);
         AddInitiatorOption(session, PlayerPartyInteractionOption.HostileDemand, hostileEncounterService.CanStartHostileEncounter(initiatorParty, responderParty));
         AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan, enabled: false);
+        var vassalAvailable = IsVassalServiceAvailable(initiatorParty, responderParty, out var vassalUnavailableReason);
+        session.VassalUnavailableReason = vassalUnavailableReason;
         AddInitiatorOption(
             session,
             PlayerPartyInteractionOption.Vassal,
-            IsVassalServiceAvailable(initiatorParty, responderParty));
+            vassalAvailable);
         AddInitiatorOption(session, PlayerPartyInteractionOption.Leave, enabled: true);
     }
 
@@ -758,12 +794,41 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorEnabledOptions.Add(option);
     }
 
-    private static bool IsVassalServiceAvailable(PartyBase initiatorParty, PartyBase responderParty)
+    private static bool IsVassalServiceAvailable(
+        PartyBase initiatorParty,
+        PartyBase responderParty,
+        out PlayerPartyInteractionVassalUnavailableReason unavailableReason)
     {
         var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
         var responderHero = responderParty.LeaderHero;
+        var responderKingdom = responderHero?.Clan?.Kingdom;
 
-        return responderHero?.IsKingdomLeader == true && initiatorClan?.Tier == 2;
+        if (responderHero?.IsKingdomLeader != true || responderKingdom?.RulingClan != responderHero.Clan)
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.TargetIsNotKingdomLeader;
+            return false;
+        }
+
+        if (initiatorClan == null)
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorHasNoClan;
+            return false;
+        }
+
+        if (initiatorClan.Kingdom != null)
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorIsInKingdom;
+            return false;
+        }
+
+        if (initiatorClan.Tier < 2)
+        {
+            unavailableReason = PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow;
+            return false;
+        }
+
+        unavailableReason = PlayerPartyInteractionVassalUnavailableReason.None;
+        return true;
     }
 
     private static PlayerPartyInteractionProposal ToProposal(PlayerPartyInteractionOption option)
@@ -819,16 +884,21 @@ internal class PlayerPartyInteractionHandler : IHandler
         return PlayerPartyInteractionOutcomeType.Left;
     }
 
-    private bool IsPartyBusy(string partyId, string allowedPartnerId)
+    private PlayerPartyInteractionSession FindExistingSession(string partyId)
     {
-        if (!sessionsByPartyId.TryGetValue(partyId, out var existingSessionId))
-            return conversationPartyTracker.TryGetPvpPartner(partyId, out var partner) && partner != allowedPartnerId;
+        if (!sessionsByPartyId.TryGetValue(partyId, out var sessionId))
+            return null;
 
-        if (!sessionsById.TryGetValue(existingSessionId, out var existingSession))
-            return false;
+        if (sessionsById.TryGetValue(sessionId, out var session))
+            return session;
 
-        return existingSession.GetOtherPartyId(partyId) != allowedPartnerId;
+        sessionsByPartyId.TryRemove(partyId, out _);
+        return null;
     }
+
+    private static bool IsSamePair(PlayerPartyInteractionSession session, string partyA, string partyB)
+        => (session.InitiatorPartyId == partyA && session.ResponderPartyId == partyB) ||
+           (session.InitiatorPartyId == partyB && session.ResponderPartyId == partyA);
 
     private static bool AreHostile(PartyBase initiatorParty, PartyBase responderParty)
     {
@@ -860,7 +930,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (party == null) return;
 
         party.SetMoveModeHold();
-        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
     private static string GetPartyName(PartyBase party, string fallback)
@@ -1058,6 +1128,33 @@ internal class PlayerPartyInteractionHandler : IHandler
         => PlayerPartyInteractionDialogState.SessionId == sessionId ||
            PlayerPartyTradeContext.SessionId == sessionId;
 
+    private void EnsurePresentationTickListener()
+    {
+        if (presentationTickRegistered || Campaign.Current == null) return;
+
+        CampaignEvents.TickEvent.AddNonSerializedListener(this, _ => TryOpenPendingMapConversation());
+        presentationTickRegistered = true;
+    }
+
+    private void TryOpenPendingMapConversation()
+    {
+        if (!PlayerPartyInteractionDialogState.HasActiveState) return;
+
+        var sessionId = PlayerPartyInteractionDialogState.SessionId;
+        if (endedInteractionSessionIds.Contains(sessionId)) return;
+
+        TryOpenMapConversation(sessionId, PlayerPartyInteractionDialogState.PartyId, PlayerPartyInteractionDialogState.OtherPartyId);
+    }
+
+    private static bool CanOpenMapConversation()
+    {
+        if (!(GameStateManager.Current?.ActiveState is MapState mapState) || mapState.AtMenu)
+            return false;
+
+        var mapScreen = MapScreen.Instance;
+        return mapScreen != null && ScreenManager.TopScreen == mapScreen;
+    }
+
     private static void CloseLocalPlayerPartyEncounter(MobileParty localParty)
     {
         if (PlayerEncounter.Current != null)
@@ -1085,7 +1182,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (party.MapEvent != null) return;
 
         party.SetMoveModeHold();
-        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
     private bool TryGetLocalPartyId(out string partyId)
@@ -1097,6 +1194,8 @@ internal class PlayerPartyInteractionHandler : IHandler
     private void TryOpenMapConversation(string sessionId, string myPartyId, string otherPartyId)
     {
         if (openedConversationSessionIds.Contains(sessionId)) return;
+        if (endedInteractionSessionIds.Contains(sessionId)) return;
+        if (!CanOpenMapConversation()) return;
 
         if (!objectManager.TryGetObject<PartyBase>(myPartyId, out var myParty)) return;
         if (!objectManager.TryGetObject<PartyBase>(otherPartyId, out var otherParty)) return;

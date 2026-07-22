@@ -12,23 +12,21 @@ namespace GameInterface.Services.Heroes
 {
     internal class HeroSync : IAutoSync
     {
-        private IEnumerable<MethodInfo> externalMethods => new MethodInfo[]
+        private IEnumerable<MethodInfo> ExternalMethods => new MethodInfo[]
         {
-            AccessTools.Method(typeof(HeroDeveloper), "CheckLevel"),
-            AccessTools.Method(typeof(HeroDeveloper), "ClearHeroLevel"),
+            AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel)),
+            AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel)),
             AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal)),
-            AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(Hero) }),
-            AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(PregnancyCampaignBehavior.Pregnancy) }),
+            AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver)),
             AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
             AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
         };
 
         public HeroSync(AutoSyncRegistry autoSyncBuilder)
         {
-            foreach (var method in externalMethods)
+            foreach (var method in ExternalMethods)
             {
-                //ISSUES WITH THIS
-                //autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
+                autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
             }
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StaticBodyProperties)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Weight)));
@@ -50,7 +48,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathMarkKillerHero)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastKnownClosestSettlement)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HitPoints)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathDay)));
+            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathDay))); // Set method doesn't seem to be used
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastExaminedLogEntryID)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Clan)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.SupporterOf)));
@@ -62,17 +60,24 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HasMet)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastMeetingTimeWithPlayer)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.BornSettlement)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Gold)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Gold)), coalesce: true);
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.RandomValue)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.BannerItem)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Father)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Mother)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Spouse)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.IsReady)));
 
             // TODO add all fields
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._health)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Culture)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._power)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroDeveloper)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroTraits)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroPerks)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._characterAttributes)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._deathDay))); // Despite having a property, directly set by SetDeathDay() method
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Level)));
         }
     }
 }

@@ -60,9 +60,17 @@ public class ClientModule : CommonModule
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void RegisterSteamSessionServices(ContainerBuilder builder)
     {
-        builder.RegisterType<SteamLobbyApi>().As<ISteamLobbyApi>().InstancePerLifetimeScope();
+        builder.RegisterInstance(SteamBoot.JoinListener)
+            .As<ISteamLobbyMembership>()
+            .ExternallyOwned();
+        builder.RegisterType<SteamLobbyApi>()
+            .As<ISteamLobbyApi>()
+            .As<ISteamPublicLobbyApi>()
+            .InstancePerLifetimeScope();
         builder.RegisterType<SteamLobbyAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+        builder.RegisterType<SessionLobbyMembershipHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<SteamNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
         builder.RegisterType<SteamTunnelHost>().As<ISessionTunnelHost>().InstancePerLifetimeScope();
+        builder.RegisterType<SteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
     }
 }

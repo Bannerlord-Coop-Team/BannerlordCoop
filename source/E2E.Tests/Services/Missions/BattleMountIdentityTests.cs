@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
@@ -250,8 +250,8 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             (_, ownerHorse) = RegisterMountedRider(
                 mock, owner.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.AI);
 
-            // What BattleAgentDiedPatch publishes when OUR horse dies (it fires for any agent, human or not).
-            owner.Resolve<IMessageBroker>().Publish(this, new BattleAgentDied(ownerHorse, wounded: false));
+            // The mission death callback publishes this when OUR horse dies, human or not.
+            owner.Resolve<IMessageBroker>().Publish(this, new BattleAgentDied(ownerHorse, null, wounded: false));
         });
 
         // The death was broadcast and the peer's puppet horse died with it — no more zombie horse.
@@ -304,7 +304,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
                 mock, registry, "owner", riderId, horseId, AgentControllerType.AI);
 
             // The rider dies; its death is broadcast and it leaves the registry — the horse must not.
-            owner.Resolve<IMessageBroker>().Publish(this, new BattleAgentDied(ownerRider, wounded: false));
+            owner.Resolve<IMessageBroker>().Publish(this, new BattleAgentDied(ownerRider, null, wounded: false));
             Assert.False(registry.TryGetAgentInfo(riderId, out _));
             Assert.True(registry.TryGetAgentInfo(horseId, out _));
         });
@@ -328,9 +328,8 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         GC.KeepAlive(attackerController);
     }
 
-    /// <summary>A rider-death broadcast dismounts the puppet BEFORE the kill (killing a horse still linked to
-    /// a dead rider AVs in native Agent.Die) and leaves the horse standing — even an unregistered one, which
-    /// simply stays a local loose horse.</summary>
+    /// <summary>A rider-death broadcast dismounts the puppet and leaves the horse standing, even an unregistered
+    /// one, which simply stays a local loose horse.</summary>
     [Fact]
     public void RiderDeathBroadcast_DismountsThePuppet_AndLeavesItsHorseStanding()
     {
@@ -362,7 +361,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             var rider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
             Assert.True(owner.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", riderId, rider));
 
-            owner.Resolve<IMessageBroker>().Publish(this, new BattleAgentDied(rider, wounded: false));
+            owner.Resolve<IMessageBroker>().Publish(this, new BattleAgentDied(rider, null, wounded: false));
         });
 
         // The puppet rider died dismounted; its horse was not taken along.
@@ -469,6 +468,8 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             // Our local copy of another owner's masterless horse.
             var puppetHorse = mock.SpawnMount();
             Assert.True(registry.TryRegisterAgent("owner", horseId, puppetHorse));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetMirror));
+            puppetMirror.Controller = AgentControllerType.AI;
 
             // The owner's copy of that horse, with live movement state — the source of the packet.
             var remoteHorse = mock.SpawnMount();
@@ -483,7 +484,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
             // The packet's movement input landed on the puppet horse (position itself is reconciled per-frame
             // by the interpolator, which this packet also fed).
-            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetMirror));
+            Assert.Equal(AgentControllerType.None, puppetMirror.Controller);
             Assert.Equal(remoteMirror.LookDirection, puppetMirror.LookDirection);
             Assert.Equal(remoteMirror.MovementDirection, puppetMirror.MovementDirection);
             Assert.Equal(remoteMirror.InputVector, puppetMirror.InputVector);

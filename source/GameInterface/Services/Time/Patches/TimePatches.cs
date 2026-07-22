@@ -1,16 +1,19 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time;
+using GameInterface.Services.Time.Interfaces;
 using HarmonyLib;
 using SandBox.View.Map;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapBar;
 
 namespace GameInterface.Services.Heroes.Patches;
@@ -70,6 +73,20 @@ internal class TimePatches
     internal static void PublishBlockedTimeControlAttempt(object source, TimeControlEnum controlMode)
     {
         MessageBroker.Instance.Publish(source, new TimeSpeedChangedAttempted(controlMode));
+    }
+}
+
+[HarmonyPatch(typeof(Campaign), "TickMapTime")]
+internal class CampaignTimePacingPatches
+{
+    [HarmonyPostfix]
+    private static void TickMapTimePostfix(Campaign __instance, float realDt)
+    {
+        if (ModInformation.IsClient &&
+            ContainerProvider.TryResolve<IMapTimeTrackerInterface>(out var mapTimeTrackerInterface))
+        {
+            mapTimeTrackerInterface.ApplyClientSimulationTime(__instance, realDt);
+        }
     }
 }
 
@@ -141,6 +158,8 @@ internal class AllowTimeControlFromHotKeysPatches
         var revoke = AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.RevokeThisThread));
 
         var setTime = AccessTools.Method(typeof(Campaign), nameof(Campaign.SetTimeSpeed));
+        var isWaitActive = AccessTools.PropertyGetter(typeof(GameMenu), nameof(GameMenu.IsWaitActive));
+        var allowTimeControlInMenu = AccessTools.Method(typeof(AllowTimeControlFromHotKeysPatches), nameof(AllowTimeControlInMenu));
 
         foreach (var instr in instructions)
         {
@@ -151,12 +170,21 @@ internal class AllowTimeControlFromHotKeysPatches
                 yield return instr;
                 yield return new CodeInstruction(OpCodes.Call, revoke);
             }
+            else if (instr.Calls(isWaitActive))
+            {
+                // Co-op pauses when everyone is occupied, so menus must still let a player resume time.
+                instr.opcode = OpCodes.Call;
+                instr.operand = allowTimeControlInMenu;
+                yield return instr;
+            }
             else
             {
                 yield return instr;
             }
         }
     }
+
+    private static bool AllowTimeControlInMenu(GameMenu _) => true;
 }
 
 [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]

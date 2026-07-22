@@ -65,8 +65,8 @@ public class ConnectionLogic : IConnectionLogic
         new Dictionary<Type, Func<IConnectionState>>
         {
             [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.ObjectManager, context.ModuleInfoProvider, context.ExistingPlayerSender),
-            [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.GameStateInterface, context.ExistingPlayerSender),
-            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.Network, context.CoopSessionProvider, context.SaveInterface, context.TimeControlInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper),
+            [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.ExistingPlayerSender),
+            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.Network, context.CoopSessionProvider, context.SaveInterface, context.TimeControlInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker),
             [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker),

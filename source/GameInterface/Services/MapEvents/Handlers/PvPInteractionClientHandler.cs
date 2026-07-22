@@ -2,6 +2,8 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -38,6 +40,7 @@ internal class PvPInteractionClientHandler : IHandler
     // Party id the popup is currently shown for (always this client's own party), or null when nothing is shown.
     // Only touched on the game main thread.
     private string shownDefenderPartyId;
+    private bool shownLocationInteraction;
 
     // This instance's player hero name, to tell instances apart in a combined log.
     private static string Who => Hero.MainHero?.Name?.ToString() ?? "?";
@@ -64,8 +67,7 @@ internal class PvPInteractionClientHandler : IHandler
         // Make sure a popup never outlives the co-op session.
         if (shownDefenderPartyId != null)
         {
-            InformationManager.HideInquiry();
-            shownDefenderPartyId = null;
+            HideWaitingPopup();
         }
     }
 
@@ -79,21 +81,30 @@ internal class PvPInteractionClientHandler : IHandler
         GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
+            if (message.IsLocationInteraction && !LocationMissionTracker.IsLocationMission(Mission.Current)) return;
 
             // Already showing the popup for this party (a rate-limited retry re-broadcast): nothing to do.
-            if (shownDefenderPartyId == message.DefenderPartyId) return;
+            if (shownDefenderPartyId == message.DefenderPartyId &&
+                shownLocationInteraction == message.IsLocationInteraction) return;
+
+            if (shownDefenderPartyId != null)
+                HideWaitingPopup();
 
             if (!objectManager.TryGetObject<PartyBase>(message.DefenderPartyId, out var defenderParty)) return;
 
             // Only the client that controls the defending party shows the popup.
             if (defenderParty.MobileParty?.IsControlledByThisInstance() != true) return;
 
-            ShowWaitingPopup(message.AttackerName);
+            ShowWaitingPopup(message.AttackerName, message.IsLocationInteraction);
             shownDefenderPartyId = message.DefenderPartyId;
+            shownLocationInteraction = message.IsLocationInteraction;
 
-            // Tell the server which peer is the defender, so it can end the conversation and free the attacker if we
-            // disconnect. On a client, SendAll targets the server.
-            network.SendAll(new NetworkPvpDefenderShown(message.DefenderPartyId));
+            if (!message.IsLocationInteraction)
+            {
+                // Tell the server which peer is the defender, so it can end the conversation and free the attacker if we
+                // disconnect. On a client, SendAll targets the server.
+                network.SendAll(new NetworkPvpDefenderShown(message.DefenderPartyId));
+            }
         });
     }
 
@@ -106,14 +117,19 @@ internal class PvPInteractionClientHandler : IHandler
 
         GameThread.Run(() =>
         {
-            if (shownDefenderPartyId == null || shownDefenderPartyId != message.DefenderPartyId) return;
+            if (shownDefenderPartyId == null ||
+                shownDefenderPartyId != message.DefenderPartyId ||
+                shownLocationInteraction != message.IsLocationInteraction) return;
 
             HideWaitingPopup();
 
-            // The attacker left without a battle. When the attacker engaged, native opened a local encounter menu
-            // on the defender's client too (its own party ran HandleEncounterForMobileParty); close it so the
-            // defender returns to the map instead of being stranded in the now-meaningless menu.
-            CloseEncounter();
+            if (!message.IsLocationInteraction)
+            {
+                // The attacker left without a battle. When the attacker engaged, native opened a local encounter menu
+                // on the defender's client too (its own party ran HandleEncounterForMobileParty); close it so the
+                // defender returns to the map instead of being stranded in the now-meaningless menu.
+                CloseEncounter();
+            }
         });
     }
 
@@ -143,7 +159,9 @@ internal class PvPInteractionClientHandler : IHandler
         {
             return;
         }
-        ClearMapEventBackReferences(partyIds);
+        var activeMission = MissionState.Current != null || Mission.Current != null;
+        var localMapEvent = activeMission ? localParty?.MapEvent : null;
+        ClearMapEventBackReferences(partyIds, localMapEvent != null ? localParty : null);
 
         Logger.Information("[PvPEncounterClose] Closing local encounter; partyIds=[{PartyIds}] surrenderedPartyId={SurrenderedPartyId} mapEventId={MapEventId}",
             FormatIds(partyIds),
@@ -158,11 +176,14 @@ internal class PvPInteractionClientHandler : IHandler
         CloseEncounter(localParty);
     }
 
-    private void ClearMapEventBackReferences(string[] partyIds)
+    private void ClearMapEventBackReferences(string[] partyIds, PartyBase deferredParty = null)
     {
         foreach (var partyId in partyIds ?? Array.Empty<string>())
         {
             if (!objectManager.TryGetObject<PartyBase>(partyId, out var party))
+                continue;
+
+            if (party == deferredParty)
                 continue;
 
             if (party.MapEventSide != null)
@@ -358,14 +379,21 @@ internal class PvPInteractionClientHandler : IHandler
         GameThread.Run(() =>
         {
             if (shownDefenderPartyId == null) return;
+            if (shownLocationInteraction) return;
             if (Array.IndexOf(partyIds, shownDefenderPartyId) < 0) return;
 
             HideWaitingPopup();
         });
     }
 
-    private static void ShowWaitingPopup(string attackerName)
+    private static void ShowWaitingPopup(string attackerName, bool isLocationInteraction)
     {
+        if (isLocationInteraction)
+        {
+            LocationPlayerInteractionWaitingOverlay.Instance.Show(attackerName);
+            return;
+        }
+
         var name = string.IsNullOrEmpty(attackerName) ? "Another player" : attackerName;
 
         // Button-less popup: the defender cannot dismiss it themselves; it is closed programmatically when the
@@ -383,8 +411,13 @@ internal class PvPInteractionClientHandler : IHandler
 
     private void HideWaitingPopup()
     {
-        InformationManager.HideInquiry();
+        if (shownLocationInteraction)
+            LocationPlayerInteractionWaitingOverlay.Instance.Hide();
+        else
+            InformationManager.HideInquiry();
+
         shownDefenderPartyId = null;
+        shownLocationInteraction = false;
     }
 
     /// <summary>
@@ -407,8 +440,9 @@ internal class PvPInteractionClientHandler : IHandler
 
         if (MissionState.Current != null || Mission.Current != null)
         {
-            Logger.Information("[PvPEncounterClose] Ending active mission before forced campaign close");
-            ForceEndCurrentMission();
+            // Keep this party attached until vanilla processes its result screens after the player exits the mission.
+            Logger.Information("[PvPEncounterClose] Leaving active mission open until the local player exits");
+            return;
         }
 
         // A joiner stays bound to its map-event side after the attacker abandons the encounter: the abandon tears
@@ -428,69 +462,8 @@ internal class PvPInteractionClientHandler : IHandler
             return;
         }
 
-        if (PlayerEncounter.Current != null)
-        {
-            PlayerEncounter.LeaveEncounter = true;
-            try
-            {
-                PlayerEncounter.Finish(true);
-            }
-            finally
-            {
-                Campaign.Current.PlayerEncounter = null;
-            }
-        }
-
-        ForceCloseCurrentEncounterMenu();
-    }
-
-    private void ForceEndCurrentMission()
-    {
-        var mission = Mission.Current ?? MissionState.Current?.CurrentMission;
-        if (mission == null)
-        {
-            return;
-        }
-
-        try
-        {
-            if (!mission.MissionEnded && !mission.MissionIsEnding)
-                mission.EndMission();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "[PvPEncounterClose] ForceEndCurrentMission failed");
-        }
-    }
-
-    private void ForceCloseCurrentEncounterMenu()
-    {
-        var campaign = Campaign.Current;
-        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
-        var menuContext = campaign?.CurrentMenuContext;
-
-        try
-        {
-            GameMenu.ExitToLast();
-        }
-        catch (Exception ex)
-        {
-            Logger.Warning(ex, "[PvPEncounterClose] Failed to exit current menu during forced close");
-        }
-
-        try
-        {
-            menuContext?.Destroy();
-        }
-        catch (Exception ex)
-        {
-            Logger.Warning(ex, "[PvPEncounterClose] Failed to destroy current menu context during forced close");
-        }
-
-        ExitMapMenuMode(campaign, mapState);
-
-        if (campaign?.MapStateData != null)
-            campaign.MapStateData.GameMenuId = null;
+        // Leaving an encounter is handled by PlayerEncounter.Update, which is required to bring up loot screens and more
+        // Do not finish the PlayerEncounter here
     }
 
     private static void ExitMapMenuMode(Campaign campaign, MapState mapState)

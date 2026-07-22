@@ -200,4 +200,138 @@ public class ModuleValidatorTests
         Assert.False(result);
         Assert.Equal("Server does not support module 'ModuleC'.", error);
     }
+
+    [Fact]
+    public void Validate_Succeeds_WhenOnlyClientHasStoryMode()
+    {
+        var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 352);
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version },
+            new ModuleInfo { Id = "StoryMode", IsOfficial = true, Version = version }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_Succeeds_WhenOnlyServerHasStoryMode()
+    {
+        var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 352);
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version },
+            new ModuleInfo { Id = "StoryMode", IsOfficial = true, Version = version }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_Succeeds_WhenOnlyServerHasDedicatedServerWindowsModule()
+    {
+        var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 7, 352);
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version },
+            new ModuleInfo { Id = "DedicatedServer.Windows", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 7, 0) }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_Succeeds_WhenOnlyServerHasDedicatedServerLinuxModule()
+    {
+        var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 7, 352);
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version },
+            new ModuleInfo { Id = "DedicatedServer.Linux", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 7, 0) }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_Succeeds_WhenOnlyClientHasOfficialModule()
+    {
+        // A normal client launch enables official modules (CustomBattle, ...) a
+        // dedicated server does not; they carry the game version and are tolerated.
+        var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 7, 352);
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = version },
+            new ModuleInfo { Id = "CustomBattle", IsOfficial = true, Version = version }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_Succeeds_WhenGameVersionDiffersOnlyByChangeset()
+    {
+        // A dedicated-server distribution and the Steam client are different
+        // builds (changesets) of the same game version.
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 7, 117131) }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 7, 117484) }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
 }

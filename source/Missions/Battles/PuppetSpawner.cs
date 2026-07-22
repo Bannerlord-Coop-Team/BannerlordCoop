@@ -1,9 +1,11 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
+using Missions.Data;
+using GameInterface.Services.Players;
 using Missions.Messages;
 using Serilog;
 using System;
@@ -40,6 +42,7 @@ public class PuppetSpawner : IPuppetSpawner
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
@@ -52,10 +55,14 @@ public class PuppetSpawner : IPuppetSpawner
     // such spawns and drain them on tick once the teams exist.
     private readonly object pendingPuppetLock = new object();
     private readonly List<BattleAgentSpawnData> pendingPuppets = new List<BattleAgentSpawnData>();
+    private readonly object withdrawnControllerLock = new object();
+    private readonly HashSet<string> withdrawnControllers = new HashSet<string>();
+    private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
 
     public PuppetSpawner(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
+        IPlayerManager playerManager,
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         ICasualtyAttributionMap casualties,
@@ -64,6 +71,7 @@ public class PuppetSpawner : IPuppetSpawner
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
         this.casualties = casualties;
@@ -71,11 +79,17 @@ public class PuppetSpawner : IPuppetSpawner
         this.formationAssigner = formationAssigner;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
+        messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
+        messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
+        messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
+        messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
+        messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
+        messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
     }
 
     // [Peer] Spawn the owner's agents as local puppets, driven by replicated movement.
@@ -110,6 +124,7 @@ public class PuppetSpawner : IPuppetSpawner
         var registry = coopMissionComponent.AgentRegistry;
 
         if (Mission.Current == null) return true;                       // no mission — drop
+        if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
 
         // While THIS client is still in its own Order-of-Battle phase, hold puppets OUT of the mission: a puppet
@@ -127,10 +142,11 @@ public class PuppetSpawner : IPuppetSpawner
             return true;
         }
 
-        // We own the agent when we are its owner — i.e. our own hero. That hero is adopted as the local main
-        // agent and player-controlled; everything else is an inert puppet driven by its owner over the mesh.
+        // We own the agent when the record's assignment owner is us. This can be our initial spawn record or a
+        // fresh record after re-entry. Our hero becomes the local main agent; our troops become locally driven
+        // AI combatants. Everything else is an inert puppet driven by its owner over the mesh.
         bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
-        var equipment = character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment;
+        bool isOwnHero = isOwnAgent && character.IsHero && character.HeroObject == Hero.MainHero;
 
         // Carry the troop's party so the agent has a real BattleCombatant — the battle observer/scoreboard
         // reads origin.BattleCombatant, and SimpleAgentOrigin leaves it null for non-hero troops.
@@ -138,20 +154,35 @@ public class PuppetSpawner : IPuppetSpawner
 
         if (party == null)
         {
-            Logger.Warning("[BattleSync] Puppet skipped: unresolved party {Party} for agent {AgentId}", data.MapEventPartyId, data.AgentId);
-            return false;
+            // An unattributed spawn record must still produce a body — a puppet that never spawns is an
+            // invisible enemy (and re-buffering forever spams the log every tick). Fall back to any
+            // involved party on the agent's side; only the scoreboard attribution degrades.
+            party = ResolveFallbackParty(data.Side);
+            if (party == null)
+            {
+                Logger.Warning("[BattleSync] Puppet skipped: unresolved party {Party} for agent {AgentId}", data.MapEventPartyId, data.AgentId);
+                return false;
+            }
+
+            Logger.Warning("[BattleSync] Puppet {AgentId} spawned with a fallback {Side} party; {Party} unresolved", data.AgentId, data.Side, data.MapEventPartyId);
         }
 
         var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed));
 
+        var missionEquipment = ResolveMissionEquipment(data.MissionEquipmentData);
+
         var buildData = new AgentBuildData(character);
-        buildData.BodyProperties(character.GetBodyPropertiesMax());
         buildData.InitialPosition(data.Position);
         buildData.Team(team);
         buildData.InitialDirection(Vec2.Forward);
-        buildData.Equipment(equipment);
+        buildData.Equipment(data.SpawnEquipment); // Use calculated equipment from spawning client instead of character equipment (random per troop per client)
+        buildData.BodyProperties(data.BodyProperties);
+        buildData.Banner(origin.Banner);
         buildData.TroopOrigin(origin);
-        buildData.Controller(isOwnAgent ? AgentControllerType.Player : AgentControllerType.None);
+        buildData.MissionEquipment(missionEquipment);
+        buildData.Controller(isOwnHero ? AgentControllerType.Player
+            : isOwnAgent ? AgentControllerType.AI
+            : AgentControllerType.None);
         buildData.ClothingColor1(origin.FactionColor);
         buildData.ClothingColor2(origin.FactionColor2);
 
@@ -173,9 +204,18 @@ public class PuppetSpawner : IPuppetSpawner
         formationAssigner.Assign(agent, data.FormationIndex);
 
         // Adopt our own hero as the controllable main agent of this mission.
-        if (isOwnAgent)
+        if (isOwnHero)
         {
             Mission.Current.MainAgent = agent;
+        }
+        else if (isOwnAgent)
+        {
+            // One of our own troops arriving as a spawn record. It spawned AI-controlled and locally driven
+            // (never an interpolated puppet — we are its authority the moment it registers below), so wake its
+            // AI exactly as the adopt/reinforcement paths do or it stands idle. If our
+            // hero died while we were gone, the leaderless-control path (ChargeLeaderlessOwnTroops) charges
+            // these formations at our deployment finish, exactly as it does for a fresh leaderless spawn.
+            AgentAiWaker.Wake(agent);
         }
         else
         {
@@ -208,6 +248,84 @@ public class PuppetSpawner : IPuppetSpawner
         casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);
         Logger.Information("[BattleSync] Spawned puppet {Char} (agent {AgentId}, ownAgent={Own})", data.CharacterId, data.AgentId, isOwnAgent);
         return true;
+    }
+
+    private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
+    {
+        if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+        GameThread.RunSafe(() =>
+        {
+            lock (withdrawnControllerLock)
+            {
+                withdrawnControllers.Remove(payload.What.ControllerId);
+                withdrawnHostControllers.Remove(payload.What.ControllerId);
+            }
+        });
+    }
+
+    private void Handle_PeerLeft(MessagePayload<MissionPeerLeft> payload)
+    {
+        MarkControllerWithdrawn(payload.What.ControllerId, payload.What.InstanceId);
+    }
+
+    private void Handle_PeerDisconnected(MessagePayload<MissionPeerDisconnected> payload)
+    {
+        MarkControllerWithdrawn(payload.What.ControllerId, payload.What.InstanceId);
+    }
+
+    private void MarkControllerWithdrawn(string controllerId, string instanceId)
+    {
+        if (string.IsNullOrEmpty(controllerId)) return;
+        if (instanceId != null && instanceId != session.InstanceId) return;
+        bool wasHost = session.IsHostController(controllerId);
+        lock (withdrawnControllerLock)
+        {
+            withdrawnControllers.Add(controllerId);
+            if (wasHost) withdrawnHostControllers.Add(controllerId);
+        }
+
+        // Records received before the departure may already be sitting in the deployment buffer. Remove the
+        // player's party on the game thread, while leaving NPC parties from the old host available to migrate.
+        GameThread.RunSafe(() =>
+        {
+            lock (pendingPuppetLock)
+                pendingPuppets.RemoveAll(data => data.OwnerControllerId == controllerId
+                    && (!wasHost || IsPlayerPartyRecord(data, controllerId)));
+        });
+    }
+
+    // [Game thread] A replay from the old host can already be buffered when its disconnect arrives. Drop only
+    // records for that player's own party; NPC parties the host ran still belong to the successor migration.
+    private bool IsWithdrawnPlayerParty(BattleAgentSpawnData data)
+    {
+        bool wasHost;
+        lock (withdrawnControllerLock)
+        {
+            if (!withdrawnControllers.Contains(data.OwnerControllerId)) return false;
+            wasHost = withdrawnHostControllers.Contains(data.OwnerControllerId);
+        }
+
+        return !wasHost || IsPlayerPartyRecord(data, data.OwnerControllerId);
+    }
+
+    // [Game thread] Match a spawn record to the controller's player party. The hero check covers a record
+    // whose MapEventParty id was unavailable when it was captured.
+    private bool IsPlayerPartyRecord(BattleAgentSpawnData data, string controllerId)
+    {
+        if (!playerManager.TryGetPlayer(controllerId, out var player)) return false;
+
+        if (data.MapEventPartyId != null
+            && objectManager.TryGetObject<MapEventParty>(data.MapEventPartyId, out var mapEventParty)
+            && objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var mobileParty)
+            && mapEventParty?.Party == mobileParty?.Party)
+        {
+            return true;
+        }
+
+        return objectManager.TryGetObject<Hero>(player.HeroId, out var hero)
+            && objectManager.TryGetObject<CharacterObject>(data.CharacterId, out var character)
+            && character.IsHero
+            && character.HeroObject == hero;
     }
 
     // True while THIS client is still in its own Order-of-Battle deployment — a deployment controller is attached
@@ -255,13 +373,22 @@ public class PuppetSpawner : IPuppetSpawner
         return null;
     }
 
-    // The team a puppet joins. A puppet is ANOTHER owner's troop, so it must NOT land on our local PlayerTeam — the
-    // Order-of-Battle deployment lets the local player arrange/command EVERY formation on PlayerTeam, so a puppet
-    // there becomes deployable by us (the "non-host can deploy the host hero and NPC heroes" bug). Each client only
-    // spawns its OWN party into PlayerTeam (the rest arrive here as puppets), so keeping puppets off PlayerTeam means
-    // the local player only ever commands its own party. We put a puppet on a NON-player team for its side: the
-    // side's main team if that isn't ours, otherwise the side's ally team. Returns null only while the side's main
-    // team doesn't exist yet (mission still loading) so the caller buffers and retries.
+    // Any involved party of the given side, for a spawn record whose own party never resolved here.
+    private static PartyBase ResolveFallbackParty(BattleSideEnum side)
+    {
+        var mapEvent = MobileParty.MainParty?.MapEvent;
+        if (mapEvent == null || side == BattleSideEnum.None) return null;
+
+        foreach (var involved in mapEvent.GetMapEventSide(side).Parties)
+        {
+            if (involved?.Party != null) return involved.Party;
+        }
+
+        return null;
+    }
+
+    // Another owner's puppet must stay off PlayerTeam because every formation there is locally commandable.
+    // Use the side's non-player team; missing main or ally teams are buffered until initialization completes.
     private Team ResolvePuppetTeam(BattleAgentSpawnData data)
     {
         var mainTeam = BattleTeams.Resolve(data.Side);
@@ -281,7 +408,28 @@ public class PuppetSpawner : IPuppetSpawner
             : Mission.Current.DefenderAllyTeam;
         if (allyTeam != null && allyTeam != playerTeam) return allyTeam;
 
-        // No separate ally team on our side yet (only our own party present) — fall back to the main team.
-        return mainTeam;
+        // Never put another player's party on the local command team.
+        return null;
+    }
+
+    private MissionEquipment ResolveMissionEquipment(MissionEquipmentData data)
+    {
+        var missionEquipment = new MissionEquipment();
+        if (data == null || data.WeaponSlots.Count == 0) return null;
+
+        for (EquipmentIndex equipmentIndex = EquipmentIndex.WeaponItemBeginSlot; equipmentIndex < EquipmentIndex.NumAllWeaponSlots; equipmentIndex++)
+        {
+            missionEquipment._weaponSlots[(int)equipmentIndex] = ResolveMissionWeapon(data.WeaponSlots[(int)equipmentIndex]);
+        }
+        return missionEquipment;
+    }
+
+    private MissionWeapon ResolveMissionWeapon(MissionWeaponData data)
+    {
+        // Items can be null
+        objectManager.TryGetObject<ItemObject>(data.ItemObjectId, out var item);
+
+        var missionWeapon = new MissionWeapon(item, data.ItemModifier, data.Banner, data.DataValue, data.ReloadPhase, null);
+        return missionWeapon;
     }
 }

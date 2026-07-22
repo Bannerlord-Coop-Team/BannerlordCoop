@@ -205,11 +205,12 @@
     <Compile Include="AssemblyHellscape.cs" />
     <Compile Include="BootPatches.cs" />
     <Compile Include="CoopMod.cs" />
+    <Compile Include="LiveTesting\LiveTestControlServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
+    <None Include="app.config" />
     <None Include="Lib\NoHarmony\LICENSE" />
     <None Include="Lib\NoHarmony\README.md" />
     <None Include="packages.config" />
@@ -239,9 +240,9 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Deploy module into the Bannerlord install (mb2 junction). See Deploy.targets. -->
   <PropertyGroup>
-    <ModName>Coop</ModName>
+    <ModName>Bannerlord Coop</ModName>
     <MainClass>CoopMod</MainClass>
-    <ModVersion>v0.0.2</ModVersion>
+    <ModVersion>v$(CoopVersion)</ModVersion>
     <GameVersion>v1.4.6</GameVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />

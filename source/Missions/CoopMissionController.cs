@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -53,7 +53,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.AgentMovementHandler.PollMovement(dt);
 
         // Smoothly reconcile received puppets toward their owners' last-reported positions every frame; the
-        // per-packet correction was bound to the bursty ~10ms poll cadence and looked stepped. Subclasses that
+        // per-packet correction was bound to the bursty movement-poll cadence and looked stepped. Subclasses that
         // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
         // override it, so this runs for both battle and location missions.
         coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
@@ -62,6 +62,18 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
+
+        coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
+        coopMissionComponent.AgentVoiceHandler.PollVoices();
+        coopMissionComponent.MissileHandler.DrainPendingShots();
+    }
+
+    public override void OnPreDisplayMissionTick(float dt)
+    {
+        base.OnPreDisplayMissionTick(dt);
+
+        // This runs after the previous native agent tick and immediately before the display snapshot.
+        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates(dt);
     }
 
     public virtual void Dispose()
@@ -74,7 +86,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         // Server-mediated replacement for PeerConnected: a controller entered our instance (the notification
         // arrived over the campaign/relay connection), so send it our join info over the mesh.
-        SendJoinInfo(payload.What.ControllerId);
+        string controllerId = payload.What.ControllerId;
+        SendJoinInfo(controllerId);
+        coopMissionComponent.AgentActionHandler.CatchUpJoiner(controllerId);
     }
 
     private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
@@ -101,6 +115,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // finalizer runs.
         coopMissionComponent.AgentMovementHandler.Dispose();
         coopMissionComponent.AgentActionHandler.Dispose();
+        coopMissionComponent.AgentVoiceHandler.Dispose();
 
         coopMissionComponent.MissileHandler.Dispose();
         coopMissionComponent.WeaponDropHandler.Dispose();

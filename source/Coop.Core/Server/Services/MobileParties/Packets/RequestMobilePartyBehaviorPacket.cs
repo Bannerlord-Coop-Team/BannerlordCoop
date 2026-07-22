@@ -12,7 +12,7 @@ namespace Coop.Core.Server.Services.MobileParties.Packets;
 public struct RequestMobilePartyBehaviorPacket : IPacket
 {
     public PacketType PacketType => PacketType.RequestUpdatePartyBehavior;
-    public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
+    public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
     [ProtoMember(1)]
     public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 

@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using SandBox.Missions.MissionLogics;
 using Serilog;
@@ -20,7 +21,8 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
     // Hold this long for a still-in-flight reserve before sizing with whatever landed. A dropped or server-rejected
     // reserve request would otherwise never populate a supplier, and the deployment controller (which gates on
-    // IsSized) would wedge on the loading screen forever; the deadline degrades that to a mis-sized battle instead.
+    // IsSized) would wedge on the loading screen forever. A partial response degrades to a one-sided battle; a
+    // zero-troop response cannot produce a valid battle and is terminated through the normal mission lifecycle.
     private const float ReserveHoldDeadlineSeconds = 15f;
 
     private readonly CoopTroopSupplier _defenderSupplier;
@@ -31,6 +33,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
     // Time spent holding both sides while a reserve is in flight (only accrues on the held path).
     private float _heldSeconds;
+    private bool _emptyBattleAbortRequested;
 
     // Gated on by CoopBattleDeploymentMissionController: a game-thread latch, not the suppliers' network-thread
     // IsPopulated (which could read true mid-frame before Init has actually sized).
@@ -51,13 +54,20 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         if (sizing.Ready)
         {
-            // On-time (common): both reserves present, so size before the first tick.
             if (sizing.SizeNow)
+            {
+                // On-time (common): both reserves present, so size before the first tick.
                 RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
-            else
-                AddHeldPhases(); // both sides own nothing: keep phases so ticks don't NRE, spawn nothing
-            _sized = true;
-            Logger.Information("[BattleSync] Coop spawn sized on start: Defender={Def}, Attacker={Atk}", sizing.DefenderOwned, sizing.AttackerOwned);
+                _sized = true;
+                Logger.Information("[BattleSync] Coop spawn sized on start: Defender={Def}, Attacker={Atk}", sizing.DefenderOwned, sizing.AttackerOwned);
+                return;
+            }
+
+            // Both authoritative responses arrived but neither contains a combatant. There is no valid 0/0
+            // spawn setup (Init divides the joint cap by the total), and latching IsSized would open an empty
+            // deployment forever. Keep a safe held phase until the timeout ends the mission normally.
+            AddHeldPhases();
+            Logger.Error("[BattleSync] Both battle reserves arrived empty; holding briefly before aborting the invalid mission");
             return;
         }
 
@@ -67,30 +77,70 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
             sizing.DefenderPopulated, sizing.AttackerPopulated);
     }
 
-    // Size once both suppliers populate, then latch. If a reserve never lands, force-size with whatever arrived
-    // after ReserveHoldDeadlineSeconds so deployment degrades instead of hanging. A mid-battle migration re-feed
-    // re-populates an already-sized supplier and is left to the adopt path.
+    // Size once both suppliers populate, then latch. If a reserve never lands, size a usable partial response
+    // after ReserveHoldDeadlineSeconds; if no combatant exists, end the invalid mission instead. A mid-battle
+    // migration re-feed re-populates an already-sized supplier and is left to ReinforcementFielder, which can
+    // distinguish newly-owned parties with no adopted live agents without disturbing the initial phase sizing.
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
-        if (_sized) return;
+        if (_sized || _emptyBattleAbortRequested) return;
 
         _heldSeconds += dt;
         var sizing = ReadSizing();
-        if (!sizing.Ready && _heldSeconds < ReserveHoldDeadlineSeconds) return;
+        if (ShouldContinueHolding(sizing)) return;
 
-        // Ready, or the deadline expired with a partial/missing reserve. Size with what landed when anything did
-        // (a positive total keeps Init off its 0/0 split); if nothing landed, leave the held zero phases — latching
-        // still lets the deployment controller run SetupTeams so the client isn't stuck on the loading screen.
-        if (sizing.DefenderOwned + sizing.AttackerOwned > 0)
-            RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
+        if (!sizing.HasAnyOwnedTroops)
+        {
+            AbortEmptyBattle(sizing);
+            return;
+        }
 
+        AcceptMissingReserveSides(sizing);
+
+        // Ready, or the deadline expired with a partial/missing reserve. At least one combatant exists here,
+        // so the joint Init cannot hit its invalid 0/0 split.
+        RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
+        LogSizingCompleted(sizing);
+        _sized = true;
+    }
+
+    private bool ShouldContinueHolding(SideSizing sizing)
+    {
+        return _heldSeconds < ReserveHoldDeadlineSeconds
+            && (!sizing.Ready || !sizing.HasAnyOwnedTroops);
+    }
+
+    // A zero-troop mission has no safe sizing or deployment path. Reserves had the full hold window to
+    // arrive/recover; terminate through Mission.EndMission so the attached coop lifecycle releases the
+    // spawn gate and returns to campaign instead of leaving the loading screen gated forever.
+    private void AbortEmptyBattle(SideSizing sizing)
+    {
+        _emptyBattleAbortRequested = true;
+        Logger.Error("[BattleSync] No battle troops arrived within {Sec}s (Def populated={DefP}, Atk populated={AtkP}); ending invalid mission",
+            ReserveHoldDeadlineSeconds, sizing.DefenderPopulated, sizing.AttackerPopulated);
+        base.Mission.EndMission();
+    }
+
+    // This is the one point where an empty side becomes intentional rather than merely late. Record exactly
+    // which reserve timed out so the controller can eventually release BattleEndLogic and the depletion patch
+    // can call only that side depleted; the populated side must still field an agent.
+    private static void AcceptMissingReserveSides(SideSizing sizing)
+    {
+        if (sizing.Ready) return;
+        if (!sizing.DefenderPopulated)
+            BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Defender);
+        if (!sizing.AttackerPopulated)
+            BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Attacker);
+    }
+
+    private static void LogSizingCompleted(SideSizing sizing)
+    {
         if (sizing.Ready)
             Logger.Information("[BattleSync] Reserves landed after start; sized sides jointly: Defender={Def}, Attacker={Atk}", sizing.DefenderOwned, sizing.AttackerOwned);
         else
             Logger.Warning("[BattleSync] Reserves incomplete after {Sec}s hold (Def populated={DefP}, Atk populated={AtkP}) — sizing with what landed: Defender={Def}, Attacker={Atk}",
                 ReserveHoldDeadlineSeconds, sizing.DefenderPopulated, sizing.AttackerPopulated, sizing.DefenderOwned, sizing.AttackerOwned);
-        _sized = true;
     }
 
     // Snapshot both suppliers into a SideSizing. Read populated before owned so the pair can't tear: SetReserve
@@ -154,5 +204,8 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         // Ready and at least one side owns troops: run the real Init (a positive sum avoids Init's 0/0 NaN).
         public bool SizeNow => Ready && DefenderOwned + AttackerOwned > 0;
+
+        /// <summary>Whether a timeout can safely degrade to a one-sided sizing instead of empty/empty.</summary>
+        public bool HasAnyOwnedTroops => DefenderOwned + AttackerOwned > 0;
     }
 }

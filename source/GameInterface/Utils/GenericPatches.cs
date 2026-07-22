@@ -543,6 +543,391 @@ namespace GameInterface.Utils
         }
         #endregion
 
+        #region DictionaryTranspiler
+        /// <summary>
+        /// Used to transpile <see cref="Dictionary{TKey, TValue}"/> type collections. Intercepts every
+        /// mutation method available to game code (net472 surface): Add, the indexer setter (set_Item),
+        /// Remove(key) and Clear.
+        /// </summary>
+        /// <typeparam name="TKey">Type of the dictionary keys</typeparam>
+        /// <typeparam name="TValue">Type of the dictionary values</typeparam>
+        /// <typeparam name="TUpsertMessage">Message published on Add and on indexer set (both apply as an
+        /// upsert on the receiving side), has to extend <see cref="GenericPairEvent{TInstance, TKey, TValue}"/></typeparam>
+        /// <typeparam name="TRemoveMessage">Message published on Remove, has to extend <see cref="GenericEvent{TInstance, TKey}"/></typeparam>
+        /// <typeparam name="TClearMessage">Message published on Clear, needs a (TInstance) constructor</typeparam>
+        /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
+        /// <param name="fieldName">Name of the field to be patched</param>
+        /// <returns>The CodeInstructions</returns>
+        public static IEnumerable<CodeInstruction> DictionaryFieldChangeTranspiler<TKey, TValue, TUpsertMessage, TRemoveMessage, TClearMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TUpsertMessage : GenericPairEvent<TInstance, TKey, TValue>
+            where TRemoveMessage : GenericEvent<TInstance, TKey>
+            where TClearMessage : IEvent
+        {
+            var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+            return DictionaryChangeTranspiler<TKey, TValue, TUpsertMessage, TRemoveMessage, TClearMessage>(
+                instructions, fieldInfo, (ci) => IsCorrectField(ci, fieldInfo));
+        }
+
+        /// <summary>
+        /// Used to transpile <see cref="Dictionary{TKey, TValue}"/> type collections accessed through a property.
+        /// See <see cref="DictionaryFieldChangeTranspiler{TKey, TValue, TUpsertMessage, TRemoveMessage, TClearMessage}"/>.
+        /// </summary>
+        public static IEnumerable<CodeInstruction> DictionaryPropertyChangeTranspiler<TKey, TValue, TUpsertMessage, TRemoveMessage, TClearMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TUpsertMessage : GenericPairEvent<TInstance, TKey, TValue>
+            where TRemoveMessage : GenericEvent<TInstance, TKey>
+            where TClearMessage : IEvent
+        {
+            var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+            return DictionaryChangeTranspiler<TKey, TValue, TUpsertMessage, TRemoveMessage, TClearMessage>(
+                instructions, propertyInfo, (ci) => IsPropertyGetter(ci, propertyInfo));
+        }
+
+        private static IEnumerable<CodeInstruction> DictionaryChangeTranspiler<TKey, TValue, TUpsertMessage, TRemoveMessage, TClearMessage>(
+            IEnumerable<CodeInstruction> instructions, MemberInfo memberInfo, Func<CodeInstruction, bool> loadsMember)
+            where TUpsertMessage : GenericPairEvent<TInstance, TKey, TValue>
+            where TRemoveMessage : GenericEvent<TInstance, TKey>
+            where TClearMessage : IEvent
+        {
+            var patchesType = typeof(GenericPatches<TPatch, TInstance>);
+            var addIntercept = patchesType.GetMethod(nameof(DictionaryAddIntercept)).MakeGenericMethod(typeof(TKey), typeof(TValue), typeof(TUpsertMessage));
+            var setItemIntercept = patchesType.GetMethod(nameof(DictionarySetItemIntercept)).MakeGenericMethod(typeof(TKey), typeof(TValue), typeof(TUpsertMessage));
+            var removeIntercept = patchesType.GetMethod(nameof(DictionaryRemoveIntercept)).MakeGenericMethod(typeof(TKey), typeof(TValue), typeof(TRemoveMessage));
+            var clearIntercept = patchesType.GetMethod(nameof(DictionaryClearIntercept)).MakeGenericMethod(typeof(TKey), typeof(TValue), typeof(TClearMessage));
+
+            GenericPatchHelpers.DictionaryAddInterceptCache.TryAdd(memberInfo, addIntercept);
+            GenericPatchHelpers.DictionarySetItemInterceptCache.TryAdd(memberInfo, setItemIntercept);
+            GenericPatchHelpers.DictionaryRemoveInterceptCache.TryAdd(memberInfo, removeIntercept);
+            GenericPatchHelpers.DictionaryClearInterceptCache.TryAdd(memberInfo, clearIntercept);
+
+            var dictType = typeof(Dictionary<TKey, TValue>);
+            var interceptByMethod = new Dictionary<MethodInfo, MethodInfo>
+            {
+                [dictType.GetMethod(nameof(Dictionary<TKey, TValue>.Add))] = addIntercept,
+                [dictType.GetProperty("Item").SetMethod] = setItemIntercept,
+                [dictType.GetMethod(nameof(Dictionary<TKey, TValue>.Remove), new[] { typeof(TKey) })] = removeIntercept,
+                [dictType.GetMethod(nameof(Dictionary<TKey, TValue>.Clear))] = clearIntercept,
+            };
+
+            return InterceptMemberMutationCalls(instructions, loadsMember, interceptByMethod);
+        }
+
+        /// <summary>
+        /// Rewrites every <c>member.MutationMethod(args...)</c> call site into
+        /// <c>Intercept(instance, member, args...)</c>, where <paramref name="interceptByMethod"/> maps
+        /// each tracked mutation method to its intercept. The intercept MUST take the owning instance
+        /// first, then the loaded member, then the original arguments.
+        /// </summary>
+        private static IEnumerable<CodeInstruction> InterceptMemberMutationCalls(
+            IEnumerable<CodeInstruction> instructions,
+            Func<CodeInstruction, bool> loadsMember,
+            Dictionary<MethodInfo, MethodInfo> interceptByMethod)
+        {
+            var codes = new List<CodeInstruction>(instructions);
+
+            // First pass: for every load of the synced member, walk forward simulating relative stack
+            // depth to find the call that consumes the loaded member. A member load can sit several
+            // instructions before its call (2-arg calls push key AND value in between), so a fixed
+            // lookahead window cannot match here. The member is the receiver of a matched call
+            // exactly when that call pops one slot deeper than everything pushed since the load.
+            //
+            // Example - TownMarketData.SetItemData compiles 'this._itemDict[itemCategory] = itemData' to:
+            //   ldarg.0                                     owner for the ldfld below
+            //   ldfld _itemDict      -> depth 0             the tracked member load
+            //   ldarg.1 (key)        -> depth 1
+            //   ldarg.2 (value)      -> depth 2
+            //   callvirt set_Item       pops 3 == depth + 1 -> the dictionary is the receiver: match
+            var matches = new List<(int loadIndex, int callIndex, MethodInfo intercept)>();
+
+            for (int i = 0; i < codes.Count; i++)
+            {
+                if (!loadsMember(codes[i])) continue;
+
+                int depth = 0; // number of stack slots above the loaded member
+                for (int j = i + 1; j < codes.Count; j++)
+                {
+                    var inst = codes[j];
+
+                    // Branching (or being a branch target) makes linear stack tracking unsound - skip this load
+                    if (IsControlFlow(inst) || inst.labels.Count > 0) break;
+
+                    int pops = GetPopCount(inst);
+                    int pushes = GetPushCount(inst);
+
+                    if (pops > depth)
+                    {
+                        // This instruction consumes the member itself. It is our pattern only when
+                        // it is a call to a tracked mutation method with the member as receiver
+                        // (the deepest popped slot); anything else (stloc, pop, passed as argument to
+                        // another method, ...) aliases or consumes the member in a way we cannot
+                        // track, so leave the code untouched.
+                        if ((inst.opcode == OpCodes.Callvirt || inst.opcode == OpCodes.Call) &&
+                            inst.operand is MethodInfo target &&
+                            interceptByMethod.TryGetValue(target, out var intercept) &&
+                            pops == depth + 1)
+                        {
+                            matches.Add((i, j, intercept));
+                        }
+
+                        break;
+                    }
+
+                    depth += pushes - pops;
+                }
+            }
+
+            // Second pass: for each match, duplicate the owner reference (it is on the stack right below
+            // the member at the member load) so it rides under the call arguments until the intercept
+            // consumes it: [owner] -> dup -> [owner, owner] -> member load -> [owner, member] -> args ->
+            // [owner, member, key, value] -> call intercept(instance, member, key, value). Branches that
+            // targeted the member load must land on the dup so the owner is still duplicated.
+            var memberLoadsToPatch = new HashSet<int>(matches.Select(m => m.loadIndex));
+            var interceptByCallIndex = matches.ToDictionary(m => m.callIndex, m => m.intercept);
+
+            for (int i = 0; i < codes.Count; i++)
+            {
+                var instruction = codes[i];
+
+                if (memberLoadsToPatch.Contains(i))
+                {
+                    yield return new CodeInstruction(OpCodes.Dup)
+                    {
+                        labels = instruction.labels.ToList(),
+                        blocks = instruction.blocks.ToList(),
+                    };
+
+                    instruction.labels.Clear();
+                    instruction.blocks.Clear();
+                    yield return instruction;
+                    continue;
+                }
+
+                if (interceptByCallIndex.TryGetValue(i, out var intercept))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, intercept)
+                    {
+                        labels = instruction.labels.ToList(),
+                        blocks = instruction.blocks.ToList(),
+                    };
+                    continue;
+                }
+
+                yield return instruction;
+            }
+        }
+
+        private static bool IsControlFlow(CodeInstruction instruction)
+        {
+            switch (instruction.opcode.FlowControl)
+            {
+                case FlowControl.Branch:
+                case FlowControl.Cond_Branch:
+                case FlowControl.Return:
+                case FlowControl.Throw:
+                case FlowControl.Break:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static int GetPushCount(CodeInstruction instruction)
+        {
+            switch (instruction.opcode.StackBehaviourPush)
+            {
+                case StackBehaviour.Push0:
+                    return 0;
+                case StackBehaviour.Push1:
+                case StackBehaviour.Pushi:
+                case StackBehaviour.Pushi8:
+                case StackBehaviour.Pushr4:
+                case StackBehaviour.Pushr8:
+                case StackBehaviour.Pushref:
+                    return 1;
+                case StackBehaviour.Push1_push1:
+                    return 2;
+                case StackBehaviour.Varpush:
+                    // call/callvirt: pushes the return value unless void
+                    if (instruction.operand is MethodInfo method)
+                        return method.ReturnType == typeof(void) ? 0 : 1;
+                    return 1;
+                default:
+                    return 0;
+            }
+        }
+
+        // Pop count for call-shaped instructions whose operand cannot be resolved (calli, ...). Larger
+        // than any real evaluation stack, so the matcher's 'pops > depth' consumption check always fires
+        // and the scan safely gives up on that member load.
+        private const int UnknownPopCount = int.MaxValue / 2;
+
+        private static int GetPopCount(CodeInstruction instruction)
+        {
+            switch (instruction.opcode.StackBehaviourPop)
+            {
+                case StackBehaviour.Pop0:
+                    return 0;
+                case StackBehaviour.Pop1:
+                case StackBehaviour.Popi:
+                case StackBehaviour.Popref:
+                    return 1;
+                case StackBehaviour.Pop1_pop1:
+                case StackBehaviour.Popi_pop1:
+                case StackBehaviour.Popi_popi:
+                case StackBehaviour.Popi_popi8:
+                case StackBehaviour.Popi_popr4:
+                case StackBehaviour.Popi_popr8:
+                case StackBehaviour.Popref_pop1:
+                case StackBehaviour.Popref_popi:
+                    return 2;
+                case StackBehaviour.Popi_popi_popi:
+                case StackBehaviour.Popref_popi_popi:
+                case StackBehaviour.Popref_popi_popi8:
+                case StackBehaviour.Popref_popi_popr4:
+                case StackBehaviour.Popref_popi_popr8:
+                case StackBehaviour.Popref_popi_popref:
+                case StackBehaviour.Popref_popi_pop1:
+                    return 3;
+                case StackBehaviour.Varpop:
+                    // call/callvirt/newobj: pops the arguments, plus the receiver for instance calls
+                    if (instruction.operand is MethodBase methodBase)
+                    {
+                        int count = methodBase.GetParameters().Length;
+                        if (instruction.opcode != OpCodes.Newobj && !methodBase.IsStatic)
+                            count++;
+                        return count;
+                    }
+                    return UnknownPopCount;
+                default:
+                    return 0;
+            }
+        }
+
+        /// <summary>
+        /// Intercept that gets called when a pair is added to the dictionary via Add. Publishes the
+        /// same upsert message as <see cref="DictionarySetItemIntercept{TKey, TValue, TMessage}"/> -
+        /// the receiving side applies both operations identically (indexer assignment).
+        /// </summary>
+        /// <remarks>
+        /// The instance comes first because the transpiler duplicates the owner under the
+        /// dictionary on the evaluation stack (see the transpiler comment).
+        /// </remarks>
+        public static void DictionaryAddIntercept<TKey, TValue, TMessage>(TInstance instance, Dictionary<TKey, TValue> dict, TKey key, TValue value)
+            where TMessage : GenericPairEvent<TInstance, TKey, TValue>
+        {
+            // Allows original method call if this thread is allowed
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                dict.Add(key, value);
+                return;
+            }
+
+            // Skip method if called from client and allow origin
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated unmanaged {type}", typeof(Dictionary<TKey, TValue>));
+                dict.Add(key, value);
+                return;
+            }
+
+            // Mutate first so a duplicate-key exception propagates without a phantom broadcast
+            dict.Add(key, value);
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, key, value);
+            MessageBroker.Instance.Publish(instance, message);
+        }
+
+        /// <summary>
+        /// Intercept that gets called when a pair is assigned through the dictionary indexer. Publishes
+        /// the same upsert message as <see cref="DictionaryAddIntercept{TKey, TValue, TMessage}"/>.
+        /// </summary>
+        public static void DictionarySetItemIntercept<TKey, TValue, TMessage>(TInstance instance, Dictionary<TKey, TValue> dict, TKey key, TValue value)
+            where TMessage : GenericPairEvent<TInstance, TKey, TValue>
+        {
+            // Allows original method call if this thread is allowed
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                dict[key] = value;
+                return;
+            }
+
+            // Skip method if called from client and allow origin
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated unmanaged {type}", typeof(Dictionary<TKey, TValue>));
+                dict[key] = value;
+                return;
+            }
+
+            // Value-type dictionary entries represent an absolute value. Reassigning an identical
+            // value cannot change the receiver, so avoid publishing a redundant network update.
+            bool unchanged = typeof(TValue).IsValueType &&
+                dict.TryGetValue(key, out TValue existingValue) &&
+                EqualityComparer<TValue>.Default.Equals(existingValue, value);
+
+            dict[key] = value;
+
+            if (unchanged) return;
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, key, value);
+            MessageBroker.Instance.Publish(instance, message);
+        }
+
+        /// <summary>
+        /// Intercept that gets called when a key is removed from the dictionary
+        /// </summary>
+        public static bool DictionaryRemoveIntercept<TKey, TValue, TMessage>(TInstance instance, Dictionary<TKey, TValue> dict, TKey key)
+            where TMessage : GenericEvent<TInstance, TKey>
+        {
+            // Allows original method call if this thread is allowed
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                return dict.Remove(key);
+            }
+
+            // Skip method if called from client and allow origin
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated unmanaged {type}", typeof(Dictionary<TKey, TValue>));
+                return dict.Remove(key);
+            }
+
+            // Only broadcast removes that actually removed something
+            if (!dict.Remove(key)) return false;
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, key);
+            MessageBroker.Instance.Publish(instance, message);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Intercept that gets called when the dictionary is cleared
+        /// </summary>
+        public static void DictionaryClearIntercept<TKey, TValue, TMessage>(TInstance instance, Dictionary<TKey, TValue> dict)
+            where TMessage : IEvent
+        {
+            // Allows original method call if this thread is allowed
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                dict.Clear();
+                return;
+            }
+
+            // Skip method if called from client and allow origin
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated unmanaged {type}", typeof(Dictionary<TKey, TValue>));
+                dict.Clear();
+                return;
+            }
+
+            dict.Clear();
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance);
+            MessageBroker.Instance.Publish(instance, message);
+        }
+        #endregion
+
         #region ArrayTranspiler
         /// <summary>
         /// Used to transpile arrays
@@ -685,43 +1070,59 @@ namespace GameInterface.Utils
             items[index] = item;
         }
         /// <summary>
-        /// Intercept that gets called when SetPropertyValue is called on a PropertyOwner field
+        /// Used to transpile <see cref="PropertyOwner{T}"/> typed fields. Intercepts both mutation
+        /// methods on the owner: <c>SetPropertyValue(attribute, value)</c> (value 0 removes the key)
+        /// and <c>ClearAllProperty()</c>. Uses the same stack-simulating matcher as the dictionary
+        /// transpiler - SetPropertyValue takes 2 arguments, so its callvirt sits at least 3
+        /// instructions after the field load and a fixed lookahead window can never match it.
         /// </summary>
         /// <typeparam name="TItem">Type of the property key</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change</typeparam>
+        /// <typeparam name="TSetMessage">Message published on SetPropertyValue, needs a (TInstance, TItem, int) constructor</typeparam>
+        /// <typeparam name="TClearMessage">Message published on ClearAllProperty, needs a (TInstance) constructor</typeparam>
+        /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
+        /// <param name="fieldName">Name of the field to be patched</param>
+        /// <returns>The CodeInstructions</returns>
+        public static IEnumerable<CodeInstruction> PropertyOwnerFieldChangeTranspiler<TItem, TSetMessage, TClearMessage>(
+            IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TItem : MBObjectBase
+            where TSetMessage : IEvent
+            where TClearMessage : IEvent
+        {
+            var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+            var patchesType = typeof(GenericPatches<TPatch, TInstance>);
+            var setIntercept = patchesType.GetMethod(nameof(PropertyOwnerSetIntercept)).MakeGenericMethod(typeof(TItem), typeof(TSetMessage));
+            var clearIntercept = patchesType.GetMethod(nameof(PropertyOwnerClearIntercept)).MakeGenericMethod(typeof(TItem), typeof(TClearMessage));
+
+            GenericPatchHelpers.PropertyOwnerSetInterceptCache.TryAdd(fieldInfo, setIntercept);
+            GenericPatchHelpers.PropertyOwnerClearInterceptCache.TryAdd(fieldInfo, clearIntercept);
+
+            var ownerType = typeof(PropertyOwner<TItem>);
+            var interceptByMethod = new Dictionary<MethodInfo, MethodInfo>
+            {
+                [ownerType.GetMethod(nameof(PropertyOwner<TItem>.SetPropertyValue))] = setIntercept,
+                [ownerType.GetMethod(nameof(PropertyOwner<TItem>.ClearAllProperty))] = clearIntercept,
+            };
+
+            return InterceptMemberMutationCalls(instructions, (ci) => IsCorrectField(ci, fieldInfo), interceptByMethod);
+        }
+
+        /// <summary>
+        /// Intercept that gets called when SetPropertyValue is called on a PropertyOwner field.
+        /// Setting value 0 removes the attribute inside the vanilla SetPropertyValue, so removals
+        /// ride the same message with PropertyValue 0.
+        /// </summary>
+        /// <typeparam name="TItem">Type of the property key</typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change, needs a (TInstance, TItem, int) constructor</typeparam>
+        /// <param name="instance">The class that holds the PropertyOwner field</param>
         /// <param name="owner">The PropertyOwner being modified</param>
         /// <param name="attribute">The key being set</param>
         /// <param name="value">The value being set</param>
-        /// <param name="instance">The class that holds the PropertyOwner field</param>
         /// <remarks>
-        /// Can be called from other methods if the generic transpiler is not enough <br/>
-        /// Example: <br/>
-        /// public static void PropertyOwnerSetIntercept(PropertyOwner&lt;TraitObject&gt; owner, TraitObject attribute, int value, CharacterObject instance) <br/>
-        /// => PropertyOwnerSetIntercept&lt;TraitObject, CharacterObject__characterTraits_SetLocalMessage&gt;(owner, attribute, value, instance);
+        /// The instance comes first because the transpiler duplicates the owner under the
+        /// PropertyOwner on the evaluation stack (see the transpiler comment).
         /// </remarks>
-        public static IEnumerable<CodeInstruction> PropertyOwnerFieldChangeTranspiler<TItem, TSetMessage>(
-    IEnumerable<CodeInstruction> instructions, string fieldName)
-    where TItem : MBObjectBase
-    where TSetMessage : IEvent
-        {
-            var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
-            var setPropertyMethod = typeof(PropertyOwner<TItem>).GetMethod(nameof(PropertyOwner<TItem>.SetPropertyValue));
-            var setIntercept = typeof(GenericPatches<TPatch, TInstance>)
-                .GetMethod(nameof(PropertyOwnerSetIntercept))
-                .MakeGenericMethod(typeof(TItem), typeof(TSetMessage));
-
-            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(fieldInfo, setIntercept);
-
-            return PatchInstructions(instructions.ToList(),
-                (ci) => IsCorrectField(ci, fieldInfo),
-                setPropertyMethod,
-                setIntercept,
-                null,
-                null);
-        }
-
         public static void PropertyOwnerSetIntercept<TItem, TMessage>(
-            PropertyOwner<TItem> owner, TItem attribute, int value, TInstance instance)
+            TInstance instance, PropertyOwner<TItem> owner, TItem attribute, int value)
             where TItem : MBObjectBase
             where TMessage : IEvent
         {
@@ -738,10 +1139,45 @@ namespace GameInterface.Utils
                 return;
             }
 
-            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, attribute, value);
-            MessageBroker.Instance.Publish(instance, message);
+            // An unchanged value cannot change the receiver, so avoid a redundant network update
+            bool unchanged = owner.GetPropertyValue(attribute) == value;
 
             owner.SetPropertyValue(attribute, value);
+
+            if (unchanged) return;
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, attribute, value);
+            MessageBroker.Instance.Publish(instance, message);
+        }
+
+        /// <summary>
+        /// Intercept that gets called when ClearAllProperty is called on a PropertyOwner field
+        /// </summary>
+        /// <typeparam name="TItem">Type of the property key</typeparam>
+        /// <typeparam name="TMessage">Message to be published on Clear, needs a (TInstance) constructor</typeparam>
+        /// <param name="instance">The class that holds the PropertyOwner field</param>
+        /// <param name="owner">The PropertyOwner being cleared</param>
+        public static void PropertyOwnerClearIntercept<TItem, TMessage>(TInstance instance, PropertyOwner<TItem> owner)
+            where TItem : MBObjectBase
+            where TMessage : IEvent
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                owner.ClearAllProperty();
+                return;
+            }
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
+                owner.ClearAllProperty();
+                return;
+            }
+
+            owner.ClearAllProperty();
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance);
+            MessageBroker.Instance.Publish(instance, message);
         }
         #endregion
 
@@ -1006,5 +1442,16 @@ namespace GameInterface.Utils
         public static ConcurrentDictionary<MemberInfo, MethodInfo> CollectionAddInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
         public static ConcurrentDictionary<MemberInfo, MethodInfo> CollectionRemoveInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
         public static ConcurrentDictionary<MemberInfo, MethodInfo> ArrayChangeInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
+
+        // Dictionary intercepts take (instance, dict, ...) rather than the (collection, item, instance)
+        // order of the list/queue caches above, so they get their own caches to avoid signature confusion
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> DictionaryAddInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> DictionarySetItemInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> DictionaryRemoveInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> DictionaryClearInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
+
+        // PropertyOwner intercepts take (instance, owner, ...) like the dictionary intercepts above
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> PropertyOwnerSetInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> PropertyOwnerClearInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
     }
 }

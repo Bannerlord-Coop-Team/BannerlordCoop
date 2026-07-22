@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Coop.Steam;
 
@@ -9,6 +10,10 @@ namespace Coop.Steam;
 public interface ISteamLobbyApi : IDisposable
 {
     bool IsOverlayEnabled { get; }
+    /// <summary>Display name for the local Steam user that creates and owns the lobby.</summary>
+    string LocalPersonaName { get; }
+    /// <summary>Steam id of the local user's account, or 0 when it cannot be read.</summary>
+    ulong LocalSteamId { get; }
 
     void CreateFriendsOnlyLobby(int maxMembers, Action<ulong, bool> onCompleted);
     void JoinLobby(ulong lobbyId, Action<ulong, bool> onCompleted);
@@ -27,4 +32,19 @@ public interface ISteamLobbyApi : IDisposable
 
     /// <summary>Fires with a connect string from a rich-presence join or new launch parameters.</summary>
     event Action<string> ConnectStringReceived;
+}
+
+/// <summary>Standalone-server discovery operations layered on the existing invite-lobby API.</summary>
+public interface ISteamPublicLobbyApi : ISteamLobbyApi
+{
+    /// <summary>Creates a browsable public lobby for a standalone server.</summary>
+    void CreatePublicLobby(int maxMembers, Action<ulong, bool> onCompleted);
+
+    /// <summary>Gets lobby ids advertised by Steam friends playing this app.</summary>
+    IReadOnlyList<ulong> GetFriendLobbyIds();
+
+    /// <summary>Refreshes metadata for a lobby obtained through a friend rather than public search.</summary>
+    void RequestLobbyData(ulong lobbyId, Action<bool> onCompleted);
+
+    void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted);
 }

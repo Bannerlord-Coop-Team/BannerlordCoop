@@ -13,7 +13,7 @@ namespace Coop.Steam;
 /// Lives outside any session container because invites arrive at the main menu, before a
 /// session exists.
 /// </summary>
-public class SteamJoinListener : IDisposable
+public class SteamJoinListener : IDisposable, ISteamLobbyMembership
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamJoinListener>();
 
@@ -21,6 +21,14 @@ public class SteamJoinListener : IDisposable
     private readonly ISteamLobbyApi lobbyApi;
 
     private bool joinInFlight;
+    private bool resolveJoinInfoAfterEnter;
+    private bool leaveWhenJoinCompletes;
+    private ulong joiningLobbyId;
+    private ulong activeLobbyId;
+    private ulong activeLobbyAdvertiserId;
+
+    public ulong LobbyId => activeLobbyId;
+    public bool IsInLobby => activeLobbyId != 0;
 
     public SteamJoinListener(IMessageBroker messageBroker, ISteamLobbyApi lobbyApi)
     {
@@ -65,71 +73,165 @@ public class SteamJoinListener : IDisposable
 
     private void OnLobbyJoinRequested(ulong lobbyId)
     {
+        BeginLobbyJoin(lobbyId, resolveJoinInfo: true);
+    }
+
+    public void JoinSessionLobby(ulong lobbyId)
+    {
+        BeginLobbyJoin(lobbyId, resolveJoinInfo: false);
+    }
+
+    private void BeginLobbyJoin(ulong lobbyId, bool resolveJoinInfo)
+    {
+        if (lobbyId == 0 || activeLobbyId == lobbyId) return;
+
         // A second JoinLobby would silently unregister the first pending call result.
         if (joinInFlight)
         {
+            if (joiningLobbyId == lobbyId) return;
+
             Logger.Information("Ignoring Steam lobby join for {LobbyId}; another join is in flight", lobbyId.ToString());
             return;
         }
+
+        LeaveActiveLobby();
 
         try
         {
             // Lobby ids are logged as strings; numeric log properties get double-rounded past 2^53 in structured viewers.
             Logger.Information("Joining Steam lobby {LobbyId}", lobbyId.ToString());
             joinInFlight = true;
+            joiningLobbyId = lobbyId;
+            resolveJoinInfoAfterEnter = resolveJoinInfo;
+            leaveWhenJoinCompletes = false;
             lobbyApi.JoinLobby(lobbyId, OnLobbyEntered);
         }
         catch (Exception ex)
         {
             joinInFlight = false;
+            joiningLobbyId = 0;
+            resolveJoinInfoAfterEnter = false;
             Logger.Error(ex, "Failed to join Steam lobby {LobbyId}", lobbyId.ToString());
-            messageBroker.Publish(this, new SessionJoinFailed("Could not join the Steam lobby"));
+            if (resolveJoinInfo)
+            {
+                messageBroker.Publish(this, new SessionJoinFailed("Could not join the Steam lobby"));
+            }
         }
     }
 
     private void OnLobbyEntered(ulong lobbyId, bool success)
     {
         joinInFlight = false;
+        joiningLobbyId = 0;
+        bool resolveJoinInfo = resolveJoinInfoAfterEnter;
+        resolveJoinInfoAfterEnter = false;
 
         try
         {
             if (!success)
             {
-                messageBroker.Publish(this, new SessionJoinFailed("Could not join the Steam lobby"));
+                if (resolveJoinInfo)
+                {
+                    messageBroker.Publish(this, new SessionJoinFailed("Could not join the Steam lobby"));
+                }
                 return;
             }
 
-            // Membership is only needed to read the join info; leaving keeps the host's slots free.
-            bool decoded = LobbyDataCodec.TryDecode(key => lobbyApi.GetLobbyData(lobbyId, key), out var info, out var error);
-
-            // The owner runs the tunnel on tunnel-capable lobbies; readable only while still a member.
-            if (decoded && info.Version >= SessionJoinInfo.MinTunnelVersion)
+            activeLobbyId = lobbyId;
+            // The owner at entry is the advertiser; ownership migrates to a remaining
+            // member if the advertiser leaves first (see LeaveActiveLobby).
+            activeLobbyAdvertiserId = lobbyApi.GetLobbyOwner(lobbyId);
+            if (leaveWhenJoinCompletes)
             {
-                info.HostSteamId = lobbyApi.GetLobbyOwner(lobbyId);
-            }
-
-            lobbyApi.LeaveLobby(lobbyId);
-
-            if (!decoded)
-            {
-                messageBroker.Publish(this, new SessionJoinFailed(error));
+                leaveWhenJoinCompletes = false;
+                LeaveActiveLobby();
                 return;
             }
 
-            if (!info.HasAddress && !info.HasHostSteamId)
+            if (!resolveJoinInfo)
             {
-                messageBroker.Publish(this, new SessionJoinFailed(
-                    "The host has not set a public address on their co-op screen, so this session cannot be joined yet"));
+                Logger.Information("Joined session Steam lobby {LobbyId}", lobbyId.ToString());
                 return;
             }
 
-            messageBroker.Publish(this, new SessionJoinInfoResolved(info));
+            ResolveJoinInfo(lobbyId);
         }
         catch (Exception ex)
         {
+            LeaveActiveLobby();
             Logger.Error(ex, "Failed to read Steam lobby {LobbyId}", lobbyId.ToString());
-            messageBroker.Publish(this, new SessionJoinFailed("Could not read the Steam lobby"));
+            if (resolveJoinInfo)
+            {
+                messageBroker.Publish(this, new SessionJoinFailed("Could not read the Steam lobby"));
+            }
         }
+    }
+
+    private void ResolveJoinInfo(ulong lobbyId)
+    {
+        bool decoded = LobbyDataCodec.TryDecode(key => lobbyApi.GetLobbyData(lobbyId, key), out var info, out var error);
+
+        // A standalone server advertises its own game-server identity to tunnel to; otherwise the
+        // lobby owner runs the tunnel. Either is only readable while still a member of the lobby.
+        if (decoded && info.HasServerSteamId)
+        {
+            info.HostSteamId = info.ServerSteamId;
+        }
+        else if (decoded && info.Version >= SessionJoinInfo.MinTunnelVersion)
+        {
+            info.HostSteamId = lobbyApi.GetLobbyOwner(lobbyId);
+        }
+
+        if (!decoded)
+        {
+            LeaveActiveLobby();
+            messageBroker.Publish(this, new SessionJoinFailed(error));
+            return;
+        }
+
+        if (!info.HasAddress && !info.HasHostSteamId)
+        {
+            LeaveActiveLobby();
+            messageBroker.Publish(this, new SessionJoinFailed(
+                "The host has not set a public address on their co-op screen, so this session cannot be joined yet"));
+            return;
+        }
+
+        messageBroker.Publish(this, new SessionJoinInfoResolved(info));
+    }
+
+    public void LeaveSessionLobby()
+    {
+        leaveWhenJoinCompletes = joinInFlight;
+        LeaveActiveLobby();
+    }
+
+    /// <summary>
+    /// Guests give up their Steam membership so they don't hold one of the host's slots. The
+    /// lobby's owning account must keep it: Steam tracks membership per account, not per
+    /// process, so when a dedicated server's operator connects from the same account the
+    /// server advertises with, leaving would empty the lobby and Steam would destroy it,
+    /// delisting the server for everyone. The advertiser is identified by the owner at
+    /// entry, not current ownership: when the advertiser withdraws first (server shutdown),
+    /// Steam promotes a remaining member, and the promoted client must still leave rather
+    /// than linger in the dead lobby. Session tracking resets either way.
+    /// </summary>
+    private void LeaveActiveLobby()
+    {
+        if (activeLobbyId == 0) return;
+
+        ulong localSteamId = lobbyApi.LocalSteamId;
+        if (localSteamId != 0 && activeLobbyAdvertiserId == localSteamId)
+        {
+            Logger.Information("Staying in own Steam lobby {LobbyId}; the advertisement needs this account's membership", activeLobbyId.ToString());
+        }
+        else
+        {
+            lobbyApi.LeaveLobby(activeLobbyId);
+        }
+
+        activeLobbyId = 0;
+        activeLobbyAdvertiserId = 0;
     }
 
     public static bool TryParseConnectLobby(string text, out ulong lobbyId)
@@ -152,6 +254,7 @@ public class SteamJoinListener : IDisposable
 
     public void Dispose()
     {
+        LeaveSessionLobby();
         messageBroker.Unsubscribe<JoinSteamLobby>(Handle);
         lobbyApi.LobbyJoinRequested -= OnLobbyJoinRequested;
         lobbyApi.ConnectStringReceived -= OnConnectStringReceived;

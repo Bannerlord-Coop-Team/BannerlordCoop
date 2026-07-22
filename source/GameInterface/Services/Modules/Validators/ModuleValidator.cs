@@ -11,7 +11,8 @@ public interface IModuleValidator
 {
     /// <summary>
     /// Compares two lists of <see cref="ModuleInfo"/>, regardless of the order or sorting of the two lists. The server list specifies what the client list must fulfil. <para/>
-    /// Checks whether the client list contains all the server's modules, whether the versions are the same and whether the client only uses modules that the server also uses.
+    /// Checks that the game versions match (changeset aside), that the client has no DLC enabled, and that community modules match exactly in both
+    /// directions, versions included. Official non-DLC modules and the DedicatedServer.* host modules are exempt from the exact match.
     /// </summary>
     /// <param name="serverModules">The server modules</param>
     /// <param name="clientModules">The client modules</param>
@@ -42,6 +43,9 @@ public class ModuleValidator : IModuleValidator
         {
             return false;
         }
+
+        serverModules = serverModules.Where(ShouldValidateModule).ToList();
+        clientModules = clientModules.Where(ShouldValidateModule).ToList();
 
         foreach (var serverModule in serverModules)
         {
@@ -76,6 +80,21 @@ public class ModuleValidator : IModuleValidator
         return true;
     }
 
+    private static bool ShouldValidateModule(ModuleInfo module)
+    {
+        if (module.IsOfficial && !module.IsDlc)
+        {
+            return false;
+        }
+
+        if (module.Id != null && module.Id.StartsWith("DedicatedServer.", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     public bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, out string error)
     {
         var dlcModules = (modules ?? Enumerable.Empty<ModuleInfo>()).Where(module => module.IsDlc).ToList();
@@ -99,7 +118,9 @@ public class ModuleValidator : IModuleValidator
         var serverGameModule = serverModules.FirstOrDefault(module => module.IsOfficial);
         var clientGameModule = clientModules.FirstOrDefault(module => module.IsOfficial);
 
-        if (!serverGameModule.Version.IsSame(clientGameModule.Version, true))
+        // checkChangeSet: false — a dedicated-server distribution and the Steam
+        // client are different builds (changesets) of the same game version.
+        if (!serverGameModule.Version.IsSame(clientGameModule.Version, false))
         {
             error = $"Wrong game version detected. Server uses '{serverGameModule.Version.ToString()}', client uses '{clientGameModule.Version.ToString()}'.";
             return false;

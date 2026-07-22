@@ -1,11 +1,14 @@
 using Common;
 using Common.Logging;
+using Common.Network;
+using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -49,6 +52,10 @@ public class E2ETestEnvironment : IDisposable
 
         GameBootStrap.Initialize();
 
+        // Process-wide interaction state must not leak between E2E test environments.
+        PlayerPartyInteractionDialogState.Clear();
+        PlayerPartyTradeContext.End();
+
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
         SetupMainHero();
@@ -73,24 +80,33 @@ public class E2ETestEnvironment : IDisposable
             if (disposed) return;
             disposed = true;
 
-            if (AutoSyncConfiguration.Enabled)
+            try
             {
-                Server.Resolve<AutoSyncHandler>().Dispose();
+                if (AutoSyncConfiguration.Enabled)
+                {
+                    Server.Resolve<AutoSyncHandler>().Dispose();
+                    foreach (var client in Clients)
+                    {
+                        client.Resolve<AutoSyncHandler>().Dispose();
+                    }
+                }
+
+                Server.Dispose();
+
                 foreach (var client in Clients)
                 {
-                    client.Resolve<AutoSyncHandler>().Dispose();
+                    client.Dispose();
                 }
             }
-
-            Server.Dispose();
-
-            foreach (var client in Clients)
+            finally
             {
-                client.Dispose();
+                // Must run even when a disposal above throws: a live container left in ContainerProvider
+                // makes CallOriginalPolicy deny originals for every later environment-less test in the
+                // process (the shared Harmony patches stay applied), silently corrupting game-object
+                // construction there.
+                OutputSinkManager.RemoveLogCallback(TestOutputCallback);
+                ContainerProvider.Clear();
             }
-
-            OutputSinkManager.RemoveLogCallback(TestOutputCallback);
-            ContainerProvider.Clear();
         }
         finally
         {
@@ -250,6 +266,87 @@ public class E2ETestEnvironment : IDisposable
 
         Assert.True(GenericPatchHelpers.ArrayChangeInterceptCache.TryGetValue(member, out var intercept));
         return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary add intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary add intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryAddIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryAddInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary indexer set intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary indexer set intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionarySetItemIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionarySetItemInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary remove intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary remove intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryRemoveIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryRemoveInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the dictionary clear intercept from the given <paramref name="member"/>.
+    /// Dictionary intercepts take (instance, dictionary) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Dictionary clear intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetDictionaryClearIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.DictionaryClearInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the PropertyOwner SetPropertyValue intercept from the given <paramref name="member"/>.
+    /// PropertyOwner intercepts take (instance, owner, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>PropertyOwner set intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetPropertyOwnerSetIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.PropertyOwnerSetInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the PropertyOwner ClearAllProperty intercept from the given <paramref name="member"/>.
+    /// PropertyOwner intercepts take (instance, owner) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>PropertyOwner clear intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetPropertyOwnerClearIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.PropertyOwnerClearInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Drains the server's per-tick send coalescer the way <c>CoopServer.Update</c> does, delivering any
+    /// coalesced sends (e.g. Hero.Gold) to clients. A no-op when nothing is buffered.
+    /// </summary>
+    public void FlushCoalescer()
+    {
+        Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
     }
 
     /// <summary>
@@ -933,6 +1030,10 @@ public class E2ETestEnvironment : IDisposable
             propertyInfo.SetValue(serverInstance, serverValue);
         });
 
+        // A coalesced member (e.g. Hero.Gold) buffers its send until the tick flush, so drain it before
+        // reading client state. Inert for non-coalesced members: nothing is buffered.
+        FlushCoalescer();
+
         // Assert
         foreach (var client in Clients)
         {
@@ -1087,7 +1188,8 @@ public class E2ETestEnvironment : IDisposable
         {
             var expectedId = testEnvironment.CreateRegisteredObject<TItem>();
             var fieldInfo = AccessTools.Field(typeof(TDeclaring), fieldName);
-            var intercept = testEnvironment.GetCollectionAddIntercept(fieldInfo);
+            var setIntercept = testEnvironment.GetPropertyOwnerSetIntercept(fieldInfo);
+            var clearIntercept = testEnvironment.GetPropertyOwnerClearIntercept(fieldInfo);
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
@@ -1101,7 +1203,7 @@ public class E2ETestEnvironment : IDisposable
 
                 var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(serverInstance);
                 Assert.NotNull(owner);
-                intercept.Invoke(null, new object[] { owner, serverTrait, 1, serverInstance });
+                setIntercept.Invoke(null, new object[] { serverInstance, owner, serverTrait, 1 });
 
                 Assert.Equal(1, owner.GetPropertyValue(serverTrait));
             });
@@ -1112,11 +1214,29 @@ public class E2ETestEnvironment : IDisposable
                 Assert.True(client.ObjectManager.TryGetObject<TItem>(expectedId, out var clientTrait));
 
                 var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
-                Assert.NotNull(clientInstance);
                 Assert.NotNull(owner);
                 Assert.Equal(1, owner.GetPropertyValue(clientTrait));
-                Assert.NotNull(owner);
-                Assert.Equal(1, owner.GetPropertyValue(clientTrait));
+            }
+
+            // Clear propagates through its own message pair and empties the owner in place
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+                Assert.True(Server.ObjectManager.TryGetObject<TItem>(expectedId, out var serverTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(serverInstance);
+                clearIntercept.Invoke(null, new object[] { serverInstance, owner });
+
+                Assert.Equal(0, owner.GetPropertyValue(serverTrait));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.True(client.ObjectManager.TryGetObject<TItem>(expectedId, out var clientTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
+                Assert.Equal(0, owner.GetPropertyValue(clientTrait));
             }
         }
 

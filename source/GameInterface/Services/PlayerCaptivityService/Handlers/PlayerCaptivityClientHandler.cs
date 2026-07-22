@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -28,6 +28,10 @@ namespace GameInterface.Services.PlayerCaptivityService.Handlers;
 /// the battle.</item>
 /// <item><see cref="EndPlayerCaptivityAttempted"/> — a local captivity menu option ended captivity;
 /// ask the server to release the hero.</item>
+/// <item><see cref="EndCaptivityAttempted"/> — the player chose to release another hero; ask the
+/// server to apply the release.</item>
+/// <item><see cref="PrisonerLiberationAttempted"/> — the player liberated a prisoner through the
+/// post-battle conversation; ask the server to apply the relation reward.</item>
 /// <item><see cref="NetworkPlayerCaptivityEnded"/> — the server confirmed the release; leave the
 /// captivity menus.</item>
 /// </list>
@@ -54,6 +58,8 @@ internal class PlayerCaptivityClientHandler : IHandler
         messageBroker.Subscribe<PlayerCaptivityChanged>(Handle_PlayerCaptivityChanged);
         messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Subscribe<EndPlayerCaptivityAttempted>(Handle_EndPlayerCaptivityAttempted);
+        messageBroker.Subscribe<EndCaptivityAttempted>(Handle_EndCaptivityAttempted);
+        messageBroker.Subscribe<PrisonerLiberationAttempted>(Handle_PrisonerLiberationAttempted);
         messageBroker.Subscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
         messageBroker.Subscribe<NetworkPlayerCaptivityReleasePositionSet>(Handle_NetworkPlayerCaptivityReleasePositionSet);
     }
@@ -63,6 +69,8 @@ internal class PlayerCaptivityClientHandler : IHandler
         messageBroker.Unsubscribe<PlayerCaptivityChanged>(Handle_PlayerCaptivityChanged);
         messageBroker.Unsubscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Unsubscribe<EndPlayerCaptivityAttempted>(Handle_EndPlayerCaptivityAttempted);
+        messageBroker.Unsubscribe<EndCaptivityAttempted>(Handle_EndCaptivityAttempted);
+        messageBroker.Unsubscribe<PrisonerLiberationAttempted>(Handle_PrisonerLiberationAttempted);
         messageBroker.Unsubscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
         messageBroker.Unsubscribe<NetworkPlayerCaptivityReleasePositionSet>(Handle_NetworkPlayerCaptivityReleasePositionSet);
     }
@@ -180,6 +188,36 @@ internal class PlayerCaptivityClientHandler : IHandler
             PlayerCaptivity.IsCaptive);
 
         network.SendAll(new NetworkPlayerSurrendered(playerPartyId, mapEventId));
+    }
+
+    /// <summary>
+    /// A local conversation or screen released another hero; forward the intent to the server and
+    /// remove that hero from the local post-battle queue so the conversation does not reopen.
+    /// </summary>
+    private void Handle_EndCaptivityAttempted(MessagePayload<EndCaptivityAttempted> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var data = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.Prisoner, out string prisonerId)) return;
+
+        string facilitatorId = null;
+        if (data.Facilitator != null && !objectManager.TryGetIdWithLogging(data.Facilitator, out facilitatorId)) return;
+
+        network.SendAll(new NetworkEndCaptivityAttempted(prisonerId, data.Detail, facilitatorId, data.ShowNotification));
+
+        PlayerEncounter.Current?._capturedAlreadyPrisonerHeroes?
+            .RemoveAll(element => element.Character?.HeroObject == data.Prisoner);
+    }
+
+    private void Handle_PrisonerLiberationAttempted(MessagePayload<PrisonerLiberationAttempted> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        if (!objectManager.TryGetIdWithLogging(payload.What.Prisoner, out string prisonerId)) return;
+
+        network.SendAll(new NetworkPrisonerLiberationAttempted(prisonerId));
     }
 
     /// <summary>

@@ -9,21 +9,25 @@ using GameInterface.CoopSessionData;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.GameState.Interfaces;
-using GameInterface.Services.GuantletMapEventVisuals;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.UI;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
 using Moq;
@@ -31,6 +35,7 @@ using Serilog;
 using System;
 using Xunit.Abstractions;
 using IGameInterface = GameInterface.IGameInterface;
+using GameInterface.Services.CampaignService.Interfaces;
 
 namespace Coop.Tests;
 
@@ -78,6 +83,7 @@ internal abstract class TestComponentBase
 
 
         builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
+        builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreationSettlementTracker>().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
@@ -98,12 +104,20 @@ internal abstract class TestComponentBase
         RegisterMock<IMobilePartyInterface>(builder);
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
+        RegisterMock<ISiegeEventInterface>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
-        RegisterMock<IMapEventBattleSizeCorrection>(builder);
+        RegisterMock<IMapEventInitializationBarrier>(builder);
+        RegisterMock<IConnectedPlayerCountService>(builder);
+        // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
+        // which the real containers get from GameInterfaceModule — not loaded here.
+        RegisterMock<IBattleHostRegistry>(builder);
+        RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
+        RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
+        RegisterMock<IServerOptionsProvider>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does
