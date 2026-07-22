@@ -607,7 +607,7 @@ public class SiegeDebugCommand
         sb.AppendLine($"[{(ModInformation.IsServer ? "SERVER" : "CLIENT")}] siege state: {party.Name} ({party.StringId}) coopId={IdOf(objectManager, party)}");
         sb.AppendLine($"  Leader: {party.LeaderHero?.Name?.ToString() ?? "null"}  IsActive: {party.IsActive}");
         var pos = party.GetPosition2D;
-        sb.AppendLine($"  Position2D: {pos.x:0.00}, {pos.y:0.00}");
+        sb.AppendLine($"  Position2D: {pos.x:0.00}, {pos.y:0.00}  IsOnLand: {party.Position.IsOnLand}");
         sb.AppendLine($"  CurrentSettlement: {Describe(party.CurrentSettlement)}");
         sb.AppendLine($"  BesiegerCamp: {(party.BesiegerCamp != null ? "present" : "null")}");
         sb.AppendLine($"  BesiegedSettlement: {Describe(party.BesiegedSettlement)}");
