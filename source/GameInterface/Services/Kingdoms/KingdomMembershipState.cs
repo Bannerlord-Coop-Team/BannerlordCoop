@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -9,7 +9,12 @@ namespace GameInterface.Services.Kingdoms;
 public interface IKingdomMembershipState
 {
     void EnsureClanInKingdom(Kingdom kingdom, Clan clan, bool publishCollectionChanges);
-    void MoveClanToKingdom(Kingdom previousKingdom, Kingdom kingdom, Clan clan, bool publishCollectionChanges);
+    void MoveClanToKingdom(
+        Kingdom previousKingdom,
+        Kingdom kingdom,
+        Clan clan,
+        bool publishCollectionChanges,
+        bool republishExistingCollections = false);
 }
 
 internal class KingdomMembershipState : IKingdomMembershipState
@@ -23,9 +28,10 @@ internal class KingdomMembershipState : IKingdomMembershipState
         Kingdom previousKingdom,
         Kingdom kingdom,
         Clan clan,
-        bool publishCollectionChanges)
+        bool publishCollectionChanges,
+        bool republishExistingCollections = false)
     {
-        if (kingdom == null || clan == null) return;
+        if (clan == null) return;
 
         var clanFiefs = GetClanFiefs(clan);
         if (previousKingdom != null && previousKingdom != kingdom)
@@ -34,8 +40,23 @@ internal class KingdomMembershipState : IKingdomMembershipState
             RemoveClanState(previousKingdom, clan, clanFiefs, publishCollectionChanges);
         }
 
-        EnsureRuntimeCollections(kingdom);
-        AddClanState(kingdom, clan, clanFiefs, publishCollectionChanges);
+        if (kingdom != null)
+        {
+            EnsureRuntimeCollections(kingdom);
+            AddClanState(kingdom, clan, clanFiefs, publishCollectionChanges);
+        }
+
+        if (publishCollectionChanges && republishExistingCollections)
+        {
+            if (previousKingdom != null && previousKingdom != kingdom)
+            {
+                KingdomCollectionSync.RepublishMembershipCollections(previousKingdom);
+            }
+            if (kingdom != null)
+            {
+                KingdomCollectionSync.RepublishMembershipCollections(kingdom);
+            }
+        }
     }
 
     private static void AddClanState(
