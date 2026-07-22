@@ -5,6 +5,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Surrogates;
@@ -332,8 +333,9 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
     }
 
     /// <summary>
-    /// A mounted puppet record spawns rider AND horse in one SpawnAgent call — two agents, two slots. With
-    /// only one slot free it must be deferred; with two free it fields both without passing the limit.
+    /// A mounted puppet record spawns rider AND horse in one SpawnAgent call — two agents, two slots. The mount
+    /// is detected from the spawn EQUIPMENT (the horse the engine mints). With only one slot free it must be
+    /// deferred; with two free it fields both without passing the limit.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-110")]
@@ -366,7 +368,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
 
                 var record = new BattleAgentSpawnData(
                     agentId, characterId, default, BattleSideEnum.Defender, 100f,
-                    "peer", mapEventPartyId, 7, new Equipment(), new BodyProperties(), new MissionEquipmentData(new()),
+                    "peer", mapEventPartyId, 7, BattleAgentBudgetTests.MountedEquipment(), new BodyProperties(), new MissionEquipmentData(new()),
                     mountAgentId);
                 host.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
 
@@ -378,6 +380,63 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
 
                 Assert.True(registry.TryGetAgentInfo(agentId, out _));
                 Assert.True(registry.TryGetAgentInfo(mountAgentId, out _));
+                Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    /// <summary>
+    /// A catch-up puppet record whose original horse already died carries an EMPTY MountAgentId while its spawn
+    /// equipment still mounts a fresh horse. The slot count must come from the equipment, not MountAgentId, so
+    /// the rider+horse pair is still budgeted as two slots and deferred at the limit rather than pushing to 2001.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void MountedPuppet_WithEmptyMountId_CountsTheHorseFromEquipment()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("host", "peer");
+        var host = Clients.First();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var agentId = Guid.NewGuid();
+
+        try
+        {
+            host.Call(() =>
+            {
+                var mock = fixture.CreateMission(host);
+                var controller = host.Resolve<CoopBattleController>();
+                var registry = host.Resolve<INetworkAgentRegistry>();
+                controller.Session.TryBegin(mapEventId);
+                host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer" }));
+                BattleSpawnGate.BeginBattle(mapEventId);
+
+                Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var peerParty));
+                var mep = peerParty.MapEvent.DefenderSide.Parties.Single(p => p.Party == peerParty.Party);
+                Assert.True(host.ObjectManager.TryGetId(mep, out var mapEventPartyId));
+
+                FloodToLiveCount(mock, EngineAgentLimit - 1);           // one slot free
+                mock.SpawnMounted = true;                               // equipment mounts a horse → 2 agents
+
+                var record = new BattleAgentSpawnData(
+                    agentId, characterId, default, BattleSideEnum.Defender, 100f,
+                    "peer", mapEventPartyId, 7, BattleAgentBudgetTests.MountedEquipment(), new BodyProperties(), new MissionEquipmentData(new()),
+                    Guid.Empty);                                        // MountAgentId empty despite the mount
+                host.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+
+                Assert.False(registry.TryGetAgentInfo(agentId, out _)); // deferred on the equipment's 2-slot cost
+                Assert.Equal(EngineAgentLimit - 1, CountLiveAgents(mock));
+
+                DeactivateAgents(mock, 1);                              // two slots free
+                GetPuppetSpawner(controller).DrainPendingPuppets();
+
+                Assert.True(registry.TryGetAgentInfo(agentId, out _));  // rider fielded (its horse is unregistered)
                 Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
 
                 GC.KeepAlive(controller);
@@ -404,6 +463,11 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
 
         client.Call(() =>
         {
+            // Unmounted troops — one render slot each — so this exercises the pure count clamp (the harness's
+            // CharacterObjectBuilder fills the Horse slot with a placeholder, which would otherwise read as a mount).
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            character.Equipment[EquipmentIndex.Horse] = default;
+
             var mock = fixture.CreateMission(client);
             FloodToLiveCount(mock, EngineAgentLimit - 5);
 
@@ -434,6 +498,68 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
 
             Assert.Empty(origins);
             Assert.Equal(50, supplier.NumTroopsNotSupplied);
+        });
+    }
+
+    /// <summary>
+    /// The wave pump's clamp is by RENDER SLOTS, not troop count: a mounted troop spawns a rider and a horse, so
+    /// with three slots free it supplies only one mounted troop (the second would need two more) and leaves the
+    /// rest unsupplied and wave-eligible — never returning a cavalry origin that would push the mission to 2001.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void SupplierWave_MountedTroops_ClampsBySlotsNotTroopCount()
+    {
+        using var fixture = new MissionEngineFixture();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            // Give the supplier's character a real mount so each troop costs two render slots.
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            character.Equipment[EquipmentIndex.Horse] = new EquipmentElement(new ItemObject { ItemComponent = new HorseComponent() });
+            Assert.True(character.Equipment.Horse.Item.HasHorseComponent, "arrange: the supplier troop must be mounted");
+
+            var mock = fixture.CreateMission(client);
+            FloodToLiveCount(mock, EngineAgentLimit - 3);   // three slots free — room for one mounted troop only
+
+            var supplier = CreateSuppliedSupplier(client.ObjectManager, characterId, reserveCount: 50);
+            var origins = supplier.SupplyTroops(30).ToList();
+
+            Assert.Single(origins);                          // 1 mounted troop (2 slots); a second would need 2 more
+            Assert.Equal(49, supplier.NumTroopsNotSupplied); // the rest stays unsupplied (wave-eligible)
+        });
+    }
+
+    /// <summary>
+    /// BR-110 native drip gate (MissionSpawnCapacityPatch): the reserved wave spawns over ticks via the native
+    /// per-side SpawnTroops; each drip is clamped to the LIVE remaining capacity so a wave reserved earlier
+    /// cannot spend slots that other paths have since consumed. Null mission/budget and non-positive drips pass
+    /// through untouched.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void NativeDrip_ClampsToLiveRemainingCapacity()
+    {
+        using var fixture = new MissionEngineFixture();
+        var budget = new BattleAgentBudget();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            var mock = new MockMission();
+
+            Assert.Equal(300, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300)); // empty — unclamped
+
+            FloodToLiveCount(mock, EngineAgentLimit - 5);
+            Assert.Equal(5, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300));    // only 5 slots free
+
+            FloodToLiveCount(mock, EngineAgentLimit);
+            Assert.Equal(0, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, 300));    // at the limit
+
+            Assert.Equal(50, MissionSpawnCapacityPatch.ClampSpawnNumber(null, budget, 50));          // no mission — passthrough
+            Assert.Equal(-1, MissionSpawnCapacityPatch.ClampSpawnNumber(mock.Shell, budget, -1));    // non-positive — passthrough
         });
     }
 }

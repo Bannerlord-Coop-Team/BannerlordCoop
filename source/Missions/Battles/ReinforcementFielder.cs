@@ -371,10 +371,6 @@ public class ReinforcementFielder : IReinforcementFielder
         int spawned = 0;
         while (available > 0 && parties.Count > 0)
         {
-            // BR-110: stop at the engine agent limit; the recovery queues persist, so the next Tick resumes
-            // fielding as removals free capacity.
-            if (!agentBudget.HasCapacityFor(Mission.Current, 1)) break;
-
             if (recoveryCursors[sideIndex] >= parties.Count)
                 recoveryCursors[sideIndex] = 0;
 
@@ -385,6 +381,12 @@ public class ReinforcementFielder : IReinforcementFielder
                 recovery.Origins.Clear();
                 Logger.Information("[BattleSync] Cancelled migration recovery for party {Party}; it left this host's reserve scope", recovery.PartyId);
             }
+
+            // BR-110: stop at the engine agent limit, sized to the next origin's slots (mounted = 2); the
+            // recovery queues persist, so the next Tick resumes fielding as removals free capacity. An empty
+            // queue (null next) skips the check so the exhausted party is still cleaned up below.
+            var nextOrigin = recovery.Origins.Count > 0 ? recovery.Origins.Peek() : null;
+            if (nextOrigin != null && !agentBudget.HasCapacityFor(Mission.Current, SlotsForOrigin(nextOrigin))) break;
 
             var origin = recovery.Origins.Count > 0 ? recovery.Origins.Dequeue() : null;
             bool exhausted = recovery.Origins.Count == 0;
@@ -589,7 +591,9 @@ public class ReinforcementFielder : IReinforcementFielder
 
         var formations = new HashSet<Formation>();
         int spawned = 0;
-        while (pending.Origins.Count > 0 && agentBudget.HasCapacityFor(mission, 1))
+        // BR-110: size the capacity check to the NEXT origin's slots (mounted = rider + horse = 2), so a cavalry
+        // reinforcement with a single slot free is deferred rather than pushing the mission to 2001.
+        while (pending.Origins.Count > 0 && agentBudget.HasCapacityFor(mission, SlotsForOrigin(pending.Origins.Peek())))
         {
             var origin = pending.Origins.Dequeue();
             var agent = SpawnReinforcementTroop(mission, team, origin);
@@ -599,6 +603,17 @@ public class ReinforcementFielder : IReinforcementFielder
 
         ChargeFormations(formations);
         return spawned;
+    }
+
+    // BR-110: render slots a reinforcement origin consumes when spawned — a mounted troop spawns a rider and a
+    // horse (2), everyone else 1. Mirrors the equipment selection SpawnReinforcementTroop uses.
+    private int SlotsForOrigin(CoopAgentOrigin origin)
+    {
+        var character = origin?.Troop as CharacterObject;
+        var equipment = character == null
+            ? null
+            : (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
+        return agentBudget.SlotsForEquipment(equipment);
     }
 
     // [Host, game thread] Field reinforcement troops withheld at the engine agent limit (BR-110) as removals

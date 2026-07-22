@@ -1,4 +1,5 @@
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
@@ -25,6 +26,10 @@ public interface IBattleAgentBudget
 
     /// <summary>Clamp a spawn request to what the mission can still fit.</summary>
     int ClampToCapacity(Mission mission, int requested);
+
+    /// <summary>Render slots one spawn consumes: 2 when the equipment mounts a horse (the engine spawns the
+    /// rider and its mount together in a single <see cref="Mission.SpawnAgent"/> call), else 1.</summary>
+    int SlotsForEquipment(Equipment equipment);
 }
 
 /// <inheritdoc cref="IBattleAgentBudget"/>
@@ -62,4 +67,14 @@ public class BattleAgentBudget : IBattleAgentBudget
     /// <inheritdoc/>
     public int ClampToCapacity(Mission mission, int requested)
         => mission == null ? requested : Math.Min(requested, RemainingCapacity(CountLiveAgents(mission)));
+
+    /// <inheritdoc/>
+    public int SlotsForEquipment(Equipment equipment)
+    {
+        // A real mount is a Horse-slot item carrying a HorseComponent — the same signal the engine uses to
+        // spawn the rider's mount. (Checking only that the slot is non-empty would miscount, since not every
+        // Horse-slot item is a ridable mount.)
+        var horse = equipment?.Horse.Item;
+        return horse != null && horse.HasHorseComponent ? 2 : 1;
+    }
 }

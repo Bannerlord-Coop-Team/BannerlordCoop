@@ -1,4 +1,5 @@
 using GameInterface.Services.MapEvents;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -10,6 +11,16 @@ namespace E2E.Tests.Services.Missions;
 public class BattleAgentBudgetTests
 {
     private readonly IBattleAgentBudget budget = new BattleAgentBudget();
+
+    /// <summary>Equipment whose Horse slot carries a real mount (a HorseComponent item) — the engine spawns a
+    /// rider AND its mount from this in one SpawnAgent call.</summary>
+    internal static Equipment MountedEquipment()
+    {
+        var horse = new ItemObject { ItemComponent = new HorseComponent() };
+        var equipment = new Equipment();
+        equipment[EquipmentIndex.Horse] = new EquipmentElement(horse);
+        return equipment;
+    }
 
     [Fact]
     [Trait("Requirement", "BR-110")]
@@ -38,5 +49,26 @@ public class BattleAgentBudgetTests
         Assert.True(budget.HasCapacityFor(null, 5000));
         Assert.Equal(300, budget.ClampToCapacity(null, 300));
         Assert.Equal(0, budget.CountLiveAgents(null));
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void SlotsForEquipment_CountsAMountAsTwoSlots()
+    {
+        // A mounted troop spawns a rider AND a horse in one SpawnAgent call — two render slots.
+        Assert.Equal(2, budget.SlotsForEquipment(MountedEquipment()));
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-110")]
+    public void SlotsForEquipment_CountsUnmountedAndEmptyAsOneSlot()
+    {
+        Assert.Equal(1, budget.SlotsForEquipment(new Equipment())); // empty Horse slot
+        Assert.Equal(1, budget.SlotsForEquipment(null));            // no equipment at all
+
+        // A Horse-slot item WITHOUT a horse component is not a ridable mount — still one slot.
+        var equipment = new Equipment();
+        equipment[EquipmentIndex.Horse] = new EquipmentElement(new ItemObject());
+        Assert.Equal(1, budget.SlotsForEquipment(equipment));
     }
 }
