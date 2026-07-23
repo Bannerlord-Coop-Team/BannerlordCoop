@@ -1,7 +1,7 @@
 using Common;
 using Common.Logging;
 using GameInterface;
-using GameInterface.Extentions;
+using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -55,11 +55,9 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (ModInformation.IsClient) return false;
 
-            // Mirrors vanilla's `clan == Clan.PlayerClan` skip: never auto-propose for
-            // a connected player's own clan. Clan.PlayerClan is the vestigial launcher clan on the
-            // dedicated host, so the player set is the replicated GetPlayerMobileParties registry.
-            // Proposing here would spend the player's influence and author a decision in their name.
-            if (Campaign.Current.CampaignObjectManager.GetPlayerMobileParties().Any(party => party.ActualClan == clan))
+            // Mirrors vanilla's `clan == Clan.PlayerClan` skip. Proposing for a registered
+            // player clan would spend that player's influence and author a decision in their name.
+            if (clan.IsPlayerClan())
             {
                 return false;
             }
