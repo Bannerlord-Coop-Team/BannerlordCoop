@@ -159,30 +159,8 @@ internal class BanditInteractionsCampaignBehaviorPatches
             }
         }
 
-        var surrenderAsRecruitsMessage = new RosterScreenAfterBanditEncounter(enemySideParties, MobileParty.MainParty);
-        MessageBroker.Instance.Publish(__instance, surrenderAsRecruitsMessage);
-
-        return false;
-    }
-
-    [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.conversation_bandits_surrender_on_condition))]
-    [HarmonyPrefix]
-    public static bool ConversationBanditsSurrenderOnCondition(BanditInteractionsCampaignBehavior __instance, ref bool __result)
-    {
-        MobileParty conversationParty = MobileParty.ConversationParty;
-        if (conversationParty != null && conversationParty.IsInRaftState)
-        {
-            __result = true;
-            return false;
-        }
-        var interaction = __instance.GetPlayerInteraction(MobileParty.ConversationParty);
-        if (interaction == BanditInteractionsCampaignBehavior.PlayerInteraction.Hostile)
-        {
-            __result = false;
-            return false;
-        }
-        float surrenderChance = 1f;//Campaign.Current.Models.EncounterModel.GetSurrenderChance(MobileParty.ConversationParty, MobileParty.MainParty);
-        __result = MobileParty.ConversationParty.Party.RandomFloatWithSeed(4U, 1f) <= surrenderChance;
+        var message = new RosterScreenAfterBanditEncounter(enemySideParties, MobileParty.MainParty);
+        MessageBroker.Instance.Publish(__instance, message);
 
         return false;
     }
