@@ -8,17 +8,11 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -45,7 +39,7 @@ internal class BanditInteractionsCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.bandit_barter_successful_on_consequence))]
     [HarmonyPostfix]
-    public static void BanditBarterSuccessfulOnConsequencePostfix(ref BanditInteractionsCampaignBehavior __instance)
+    public static void BanditBarterSuccessfulOnConsequencePostfix(BanditInteractionsCampaignBehavior __instance)
     {
         // Locally update PlayerInteraction and send updated in postfix to save in CoopSession
         var message = new SetPlayerBanditInteraction(Hero.MainHero, MobileParty.ConversationParty, BanditInteractionsCampaignBehavior.PlayerInteraction.PaidOffParty);
@@ -54,7 +48,7 @@ internal class BanditInteractionsCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.bandit_neutral_greet_on_consequence))]
     [HarmonyPostfix]
-    public static void BanditNeutralGreetOnConsequence(ref BanditInteractionsCampaignBehavior __instance)
+    public static void BanditNeutralGreetOnConsequence(BanditInteractionsCampaignBehavior __instance)
     {
         // Locally update PlayerInteraction and send updated in postfix to save in CoopSession
         var message = new SetPlayerBanditInteraction(Hero.MainHero, MobileParty.ConversationParty, __instance.GetPlayerInteraction(MobileParty.ConversationParty));
@@ -63,7 +57,7 @@ internal class BanditInteractionsCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.conversation_bandit_set_hostile_on_consequence))]
     [HarmonyPostfix]
-    public static void ConversationBanditSetHostileOnConsequence(ref BanditInteractionsCampaignBehavior __instance)
+    public static void ConversationBanditSetHostileOnConsequence(BanditInteractionsCampaignBehavior __instance)
     {
         // Locally update PlayerInteraction and send updated in postfix to save in CoopSession
         var message = new SetPlayerBanditInteraction(Hero.MainHero, MobileParty.ConversationParty, BanditInteractionsCampaignBehavior.PlayerInteraction.Hostile);
@@ -72,7 +66,7 @@ internal class BanditInteractionsCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.DoneButtonCondition))]
     [HarmonyPrefix]
-    public static bool DoneButtonConditionPrefix(ref BanditInteractionsCampaignBehavior __instance, ref Tuple<bool, TextObject> __result, TroopRoster leftMemberRoster, TroopRoster leftPrisonRoster, TroopRoster rightMemberRoster, TroopRoster rightPrisonRoster, int leftLimitNum, int rightLimitNum)
+    public static bool DoneButtonConditionPrefix(BanditInteractionsCampaignBehavior __instance, ref Tuple<bool, TextObject> __result, TroopRoster leftMemberRoster, TroopRoster leftPrisonRoster, TroopRoster rightMemberRoster, TroopRoster rightPrisonRoster, int leftLimitNum, int rightLimitNum)
     {
         // This condition updates hero object states. Need to apply this on the server
         var message = new BanditPartyScreenDoneCondition(rightMemberRoster);
@@ -84,10 +78,9 @@ internal class BanditInteractionsCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.GetMemberAndPrisonerRostersFromParties))]
     [HarmonyPrefix]
-    public static bool GetMemberAndPrisonerRostersFromPartiesPrefix(ref BanditInteractionsCampaignBehavior __instance, List<MobileParty> parties, ref TroopRoster troopsTakenAsMember, ref TroopRoster troopsTakenAsPrisoner, bool doBanditsJoinPlayerSide)
+    public static bool GetMemberAndPrisonerRostersFromPartiesPrefix(BanditInteractionsCampaignBehavior __instance, List<MobileParty> parties, ref TroopRoster troopsTakenAsMember, ref TroopRoster troopsTakenAsPrisoner, bool doBanditsJoinPlayerSide)
     {
         // doBanditsJoinPlayerSide is always true. TaleWorlds code implements logic to create a troopsTakenAsPrisoner roster but it doesn't do anything
-
         foreach (MobileParty mobileParty in parties)
         {
             for (int i = 0; i < mobileParty.MemberRoster.Count; i++)
@@ -114,6 +107,7 @@ internal class BanditInteractionsCampaignBehaviorPatches
             }
         }
 
+        // Apply actions on server
         var message = new GetBanditMemberAndPrisonerRosters(Clan.PlayerClan, MobileParty.MainParty, parties, doBanditsJoinPlayerSide);
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -122,17 +116,25 @@ internal class BanditInteractionsCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.OpenRosterScreenAfterBanditEncounter))]
     [HarmonyPrefix]
-    public static bool OpenRosterScreenAfterBanditEncounterPrefix(ref BanditInteractionsCampaignBehavior __instance, MobileParty conversationParty, bool doBanditsJoinPlayerSide)
+    public static bool OpenRosterScreenAfterBanditEncounterPrefix(BanditInteractionsCampaignBehavior __instance, MobileParty conversationParty, bool doBanditsJoinPlayerSide)
     {
-        // Normal enemy surrender by instantly winning the battle
+        // Run enemy surrender logic on the server to properly start and end a map event
+        // Opening and closing a map event involved with involved looters is needed to apply 
+        // certain affects like increasing security around settlements.
         if (!doBanditsJoinPlayerSide)
         {
             if (PlayerEncounter.Battle == null)
             {
                 PlayerEncounter.StartBattle();
             }
+
             PlayerEncounter.Battle.SetOverrideWinner(PlayerEncounter.Battle.PlayerSide);
             PlayerEncounter.EnemySurrender = true;
+
+            // Nullify player's map event to use patched PlayerEncounter update.
+            // Without this, client gets a duplicate loot screen cycle.
+            PlayerEncounter.Current._mapEvent = null;
+
             return false;
         }
 
@@ -146,7 +148,7 @@ internal class BanditInteractionsCampaignBehaviorPatches
         using (new AllowedThread())
         {
             TroopRoster troopsTakenAsMember = TroopRoster.CreateDummyTroopRoster();
-            TroopRoster troopsTakenAsPrisoner = TroopRoster.CreateDummyTroopRoster(); // This troopRoster is not used idk why its being populated in TaleWorlds code
+            TroopRoster troopsTakenAsPrisoner = TroopRoster.CreateDummyTroopRoster(); // This troopRoster is not used but is still populated in TaleWorlds code
 
             __instance.GetMemberAndPrisonerRostersFromParties(enemySideParties, ref troopsTakenAsMember, ref troopsTakenAsPrisoner, doBanditsJoinPlayerSide);
             PartyScreenHelper.OpenScreenWithCondition(new IsTroopTransferableDelegate(__instance.IsTroopTransferable), new PartyPresentationDoneButtonConditionDelegate(__instance.DoneButtonCondition), new PartyPresentationDoneButtonDelegate(__instance.OnDoneClicked), null, PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.Transferable, PlayerEncounter.EncounteredParty.Name, troopsTakenAsMember.TotalManCount, false, false, PartyScreenHelper.PartyScreenMode.TroopsManage, troopsTakenAsMember, null);
@@ -157,8 +159,30 @@ internal class BanditInteractionsCampaignBehaviorPatches
             }
         }
 
-        var message = new RosterScreenAfterBanditEncounter(enemySideParties, MobileParty.MainParty);
-        MessageBroker.Instance.Publish(__instance, message);
+        var surrenderAsRecruitsMessage = new RosterScreenAfterBanditEncounter(enemySideParties, MobileParty.MainParty);
+        MessageBroker.Instance.Publish(__instance, surrenderAsRecruitsMessage);
+
+        return false;
+    }
+
+    [HarmonyPatch(nameof(BanditInteractionsCampaignBehavior.conversation_bandits_surrender_on_condition))]
+    [HarmonyPrefix]
+    public static bool ConversationBanditsSurrenderOnCondition(BanditInteractionsCampaignBehavior __instance, ref bool __result)
+    {
+        MobileParty conversationParty = MobileParty.ConversationParty;
+        if (conversationParty != null && conversationParty.IsInRaftState)
+        {
+            __result = true;
+            return false;
+        }
+        var interaction = __instance.GetPlayerInteraction(MobileParty.ConversationParty);
+        if (interaction == BanditInteractionsCampaignBehavior.PlayerInteraction.Hostile)
+        {
+            __result = false;
+            return false;
+        }
+        float surrenderChance = 1f;//Campaign.Current.Models.EncounterModel.GetSurrenderChance(MobileParty.ConversationParty, MobileParty.MainParty);
+        __result = MobileParty.ConversationParty.Party.RandomFloatWithSeed(4U, 1f) <= surrenderChance;
 
         return false;
     }

@@ -11,8 +11,10 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Bandits.Handlers;
 
@@ -72,43 +74,60 @@ internal class BanditInteractionsHandler : IHandler
 
     private void Handle_SetPlayerBanditInteraction(MessagePayload<SetPlayerBanditInteraction> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.ConversationParty, out var conversationPartyId)) return;
+        var data = obj.What;
 
-        var message = new NetworkSetPlayerBanditInteraction(mainHeroId, conversationPartyId, obj.What.Interaction);
-        network.SendAll(message);
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(data.MainHero, out var mainHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.ConversationParty, out var conversationPartyId)) return;
+
+            var message = new NetworkSetPlayerBanditInteraction(mainHeroId, conversationPartyId, data.Interaction);
+            network.SendAll(message);
+        });  
     }
 
     private void Handle_NetworkSetPlayerBanditInteraction(MessagePayload<NetworkSetPlayerBanditInteraction> obj)
     {
-        // Guard against saving ids that can't be resolved on the server
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var _)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var _)) return;
+        var data = obj.What;
 
-        sessionInteractionsPlayerDataInterface.SetPlayerBanditsInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, obj.What.Interaction);
+        GameThread.RunSafe(() =>
+        {
+            // Guard against saving ids that can't be resolved on the server
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.ConversationPartyId, out var _)) return;
+
+            sessionInteractionsPlayerDataInterface.SetPlayerBanditsInteraction(data.MainHeroId, data.ConversationPartyId, data.Interaction);
+        });
     }
 
     private void Handle_MobilePartyDestroyed(MessagePayload<MobilePartyDestroyed> obj)
     {
-        // Don't process anything for destroyed mobile parties that aren't bandits
-        if (!obj.What.MobileParty.IsBandit) return;
+        var data = obj.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+        GameThread.RunSafe(() =>
+        {
+            // Don't process anything for destroyed mobile parties that aren't bandits
+            if (!data.MobileParty.IsBandit) return;
 
-        // Update CoopSession data on server
-        sessionInteractionsPlayerDataInterface.RemoveInteractedBanditsForAllPlayers(mobilePartyId);
+            if (!objectManager.TryGetIdWithLogging(data.MobileParty, out var mobilePartyId)) return;
 
-        var message = new NetworkBanditPartyDestroyed(mobilePartyId);
-        network.SendAll(message);
+            // Update CoopSession data on server
+            sessionInteractionsPlayerDataInterface.RemoveInteractedBanditsForAllPlayers(mobilePartyId);
+
+            var message = new NetworkBanditPartyDestroyed(mobilePartyId);
+            network.SendAll(message);
+        }); 
     }
 
     private void Handle_NetworkBanditPartyDestroyed(MessagePayload<NetworkBanditPartyDestroyed> obj)
     {
+        var data = obj.What;
+
         // Don't need to run the full OnMobilePartyDestroyed logic on clients, only need to update these two dictionaries
         GameThread.RunSafe(() =>
         {
             if (!TryGetBanditInteractionsBehavior(out var banditInteractionsBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
 
             if (banditInteractionsBehavior._interactedBandits.ContainsKey(mobileParty))
             {
@@ -119,16 +138,21 @@ internal class BanditInteractionsHandler : IHandler
 
     private void Handle_BanditPartyScreenDoneCondition(MessagePayload<BanditPartyScreenDoneCondition> obj)
     {
-        var charactersIds = new List<string>();
-        foreach (var troopRosterElement in obj.What.RightMemberRoster.data)
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(troopRosterElement.Character, out var characterId)) continue;
+            var charactersIds = new List<string>();
+            foreach (var troopRosterElement in data.RightMemberRoster.data)
+            {
+                if (!objectManager.TryGetIdWithLogging(troopRosterElement.Character, out var characterId)) continue;
 
-            charactersIds.Add(characterId);
-        }
+                charactersIds.Add(characterId);
+            }
 
-        var message = new NetworkBanditPartyScreenDoneCondition(charactersIds);
-        network.SendAll(message);
+            var message = new NetworkBanditPartyScreenDoneCondition(charactersIds);
+            network.SendAll(message);
+        });  
     }
 
     private void Handle_NetworkBanditPartyScreenDoneCondition(MessagePayload<NetworkBanditPartyScreenDoneCondition> obj)
@@ -150,29 +174,36 @@ internal class BanditInteractionsHandler : IHandler
 
     private void Handle_GetBanditMemberAndPrisonerRosters(MessagePayload<GetBanditMemberAndPrisonerRosters> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.PlayerClan, out var playerClanId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.MainParty, out var mainPartyId)) return;
+        var data = obj.What;
 
-        var partiesIds = new List<string>();
-        foreach (var party in obj.What.Parties)
+        GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) continue;
+            if (!objectManager.TryGetIdWithLogging(data.PlayerClan, out var playerClanId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.MainParty, out var mainPartyId)) return;
 
-            partiesIds.Add(partyId);
-        }
+            var partiesIds = new List<string>();
+            foreach (var party in data.Parties)
+            {
+                if (!objectManager.TryGetIdWithLogging(party, out var partyId)) continue;
 
-        var message = new NetworkGetBanditMemberAndPrisonerRosters(playerClanId, mainPartyId, partiesIds, obj.What.DoBanditsJoinPlayerSide);
-        network.SendAll(message);
+                partiesIds.Add(partyId);
+            }
+
+            var message = new NetworkGetBanditMemberAndPrisonerRosters(playerClanId, mainPartyId, partiesIds, data.DoBanditsJoinPlayerSide);
+            network.SendAll(message);
+        });
     }
 
     private void Handle_NetworkGetBanditMemberAndPrisonerRosters(MessagePayload<NetworkGetBanditMemberAndPrisonerRosters> obj)
     {
+        var data = obj.What;
+
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.PlayerClanId, out var playerClan)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanId, out var playerClan)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
-            foreach (var partyId in obj.What.PartiesIds)
+            foreach (var partyId in data.PartiesIds)
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var mobileParty)) return;
 
@@ -181,7 +212,7 @@ internal class BanditInteractionsHandler : IHandler
                     CharacterObject characterAtIndex = mobileParty.PrisonRoster.GetCharacterAtIndex(j);
                     if (characterAtIndex.HeroObject.Clan == playerClan)
                     {
-                        if (obj.What.DoBanditsJoinPlayerSide)
+                        if (data.DoBanditsJoinPlayerSide)
                         {
                             EndCaptivityAction.ApplyByPeace(characterAtIndex.HeroObject, null);
                         }
@@ -203,27 +234,34 @@ internal class BanditInteractionsHandler : IHandler
 
     private void Handle_RosterScreenAfterBanditEncounter(MessagePayload<RosterScreenAfterBanditEncounter> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MainParty, out var mainPartyId)) return;
+        var data = obj.What;
 
-        var partiesIds = new List<string>();
-        foreach (var party in obj.What.Parties)
+        GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(party, out var partyId)) continue;
+            if (!objectManager.TryGetIdWithLogging(data.MainParty, out var mainPartyId)) return;
 
-            partiesIds.Add(partyId);
-        }
+            var partiesIds = new List<string>();
+            foreach (var party in data.Parties)
+            {
+                if (!objectManager.TryGetIdWithLogging(party, out var partyId)) continue;
 
-        var message = new NetworkRosterScreenAfterBanditEncounter(partiesIds, mainPartyId);
-        network.SendAll(message);
+                partiesIds.Add(partyId);
+            }
+
+            var message = new NetworkRosterScreenAfterBanditEncounter(partiesIds, mainPartyId);
+            network.SendAll(message);
+        });
     }
 
     private void Handle_NetworkRosterScreenAfterBanditEncounter(MessagePayload<NetworkRosterScreenAfterBanditEncounter> obj)
     {
+        var data = obj.What;
+
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
-            foreach (var partyId in obj.What.PartiesIds)
+            foreach (var partyId in data.PartiesIds)
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var mobileParty)) return;
 
