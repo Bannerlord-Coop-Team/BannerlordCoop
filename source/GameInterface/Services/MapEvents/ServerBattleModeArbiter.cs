@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using GameInterface.Services.MapEvents.Handlers;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -51,6 +52,24 @@ internal static class ServerBattleModeArbiter
         lock (lockObj)
         {
             return modes.ContainsKey(mapEventId);
+        }
+    }
+
+    /// <summary>Read the current mode without changing its claim.</summary>
+    public static bool TryGetMode(string mapEventId, out BattleStartMode mode)
+    {
+        mode = BattleStartMode.Unclaimed;
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            if (!modes.TryGetValue(mapEventId, out var current))
+                return false;
+
+            mode = current == Mode.Mission
+                ? BattleStartMode.Mission
+                : BattleStartMode.Simulation;
+            return true;
         }
     }
 

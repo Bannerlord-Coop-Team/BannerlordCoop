@@ -1695,6 +1695,100 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void RaidResistance_MissionClaimedBeforeAttackerJoin_ReplaysModeAndAcceptsMissionEntry()
+    {
+        var client = Clients.First();
+        var (raiderHeroId, raiderMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var (joinerHeroId, joinerMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
+        var defenderTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var target = CreateVillageTarget();
+        var joinerPartyId = GetPartyBaseId(joinerMobilePartyId);
+        string? raidMapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(raiderHeroId, out var raiderHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(joinerHeroId, out var joinerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raiderMobilePartyId, out var raiderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(defenderTroopId, out var defenderTroop));
+
+            using (new AllowedThread())
+            {
+                raiderParty.MemberRoster.AddToCounts(raiderHero.CharacterObject, 1);
+                joinerParty.MemberRoster.AddToCounts(joinerHero.CharacterObject, 1);
+                raiderHero.PartyBelongedTo = raiderParty;
+                joinerHero.PartyBelongedTo = joinerParty;
+            }
+
+            var mapEvent = CreateHostileActionMapEvent(raiderParty.Party, settlement.Party, VillageHostileAction.Raid);
+            var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            defenderParty.MemberRoster.AddToCounts(defenderTroop, 1);
+            AddSyntheticMapEventParty(mapEvent.DefenderSide, defenderParty.Party);
+
+            Assert.False(mapEvent.IsActiveSlowVillageRaid());
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out raidMapEventId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(raidMapEventId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(joinerHeroId, out var joinerHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = joinerParty;
+                joinerHero.PartyBelongedTo = joinerParty;
+                Game.Current.PlayerTroop = joinerHero.CharacterObject;
+            }
+
+            Assert.False(BattleModeRegistry.IsMission(raidMapEventId!));
+        });
+
+        Server.Call(() => Assert.True(ServerBattleModeArbiter.TryClaimMission(raidMapEventId!)));
+
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestJoinBattle(
+                raidMapEventId!,
+                joinerPartyId,
+                BattleSideEnum.Attacker)), MapEventDisabledMethods);
+
+            var replayedMode = Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>().Single();
+            Assert.Equal(raidMapEventId, replayedMode.MapEventId);
+            Assert.Equal((int)BattleStartMode.Mission, replayedMode.Mode);
+
+            client.Call(() => Assert.True(BattleModeRegistry.IsMission(raidMapEventId!)));
+            AssertHostileActionJoinerPresent(Server, raidMapEventId!, joinerPartyId);
+            foreach (var instance in Clients)
+            {
+                AssertHostileActionJoinerPresent(instance, raidMapEventId!, joinerPartyId);
+            }
+
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+                Guid.NewGuid().ToString(),
+                (int)BattleStartMode.Mission,
+                raidMapEventId!,
+                joinerMobilePartyId)), MapEventDisabledMethods);
+
+            Assert.True(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().Single().Accepted);
+            Assert.Equal(raidMapEventId, Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single().MapEventId);
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(raidMapEventId!));
+            client.Call(BattleModeRegistry.End);
+        }
+    }
+
+    [Fact]
     public void SlowRaidMapEvent_AttackerJoinRequest_AddsJoiner()
     {
         var client = Clients.First();
