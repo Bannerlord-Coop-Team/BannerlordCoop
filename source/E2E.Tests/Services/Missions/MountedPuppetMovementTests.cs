@@ -131,6 +131,34 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ApplyMount_PreservesStationaryTurnInput()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            sourceHorseMirror.RealGlobalVelocity = Vec3.Zero;
+            sourceHorseMirror.Action0Index = 101;
+            sourceHorseMirror.InputVector = new Vec2(0.4f, 0.6f);
+            puppetHorseMirror.Action0Index = ActionIndexCache.act_none.Index;
+
+            new AgentMountData(
+                sourceHorse,
+                mountAction0Speed: 0.8f,
+                mountAction0IsLocomotion: true,
+                mountAction0TurnDirection: AgentMountData.TurnRight).ApplyMount(puppetHorse);
+
+            Assert.Equal(sourceHorseMirror.InputVector, puppetHorseMirror.InputVector);
+        });
+    }
+
+    [Fact]
     public void ApplyMount_ClearsThePuppetGaitWhenTheOwnerActionIsNone()
     {
         using var fixture = new MissionEngineFixture();
@@ -187,6 +215,86 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             "horse_strafe_r_cross_fast"));
     }
 
+    [Theory]
+    [InlineData("act_horse_turn_right", "", AgentMountData.TurnRight)]
+    [InlineData("act_horse_turn_left", "", AgentMountData.TurnLeft)]
+    [InlineData("", "rider_horse_rotate_right", AgentMountData.TurnRight)]
+    [InlineData("", "rider_horse_rotate_left", AgentMountData.TurnLeft)]
+    [InlineData("act_horse_forward_walk", "rider_forward_walk", AgentMountData.NoTurn)]
+    public void GetTurnDirection_ClassifiesNativeStationaryTurnActions(
+        string actionName,
+        string animationName,
+        int expected)
+    {
+        Assert.Equal(
+            expected,
+            AgentMountData.GetTurnDirection(actionName, animationName));
+    }
+
+    [Theory]
+    [InlineData("", "horse", AgentMountData.TurnRight, "act_horse_turn_right")]
+    [InlineData("", "horse", AgentMountData.TurnLeft, "act_horse_turn_left")]
+    [InlineData("", "camel", AgentMountData.TurnRight, "act_camel_turn_right")]
+    [InlineData("", "camel", AgentMountData.TurnLeft, "act_camel_turn_left")]
+    [InlineData("act_camel_turn_right", "horse", AgentMountData.TurnRight, "act_camel_turn_right")]
+    [InlineData("act_horse_walk_turn_right_head", "horse", AgentMountData.TurnRight, "act_horse_turn_right")]
+    public void GetStationaryTurnActionName_UsesNativeMountActions(
+        string authoritativeActionName,
+        string monsterUsage,
+        int direction,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            AgentMountData.GetStationaryTurnActionName(
+                authoritativeActionName,
+                monsterUsage,
+                direction));
+    }
+
+    [Theory]
+    [InlineData("act_horse_turn_right", true)]
+    [InlineData("act_horse_turn_left", true)]
+    [InlineData("act_camel_turn_right", true)]
+    [InlineData("act_camel_turn_left", true)]
+    [InlineData("act_horse_walk_turn_right_head", false)]
+    [InlineData("act_camel_trot_turn_left_head", false)]
+    [InlineData("act_horse_turn_right_head", false)]
+    public void IsStationaryTurnAction_RejectsGaitAndHeadTurnActions(
+        string actionName,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            AgentMountData.IsStationaryTurnAction(actionName));
+    }
+
+    [Fact]
+    public void ResolveAction0Index_SelectsTheMountSpecificStationaryTurnAction()
+    {
+        Assert.Equal(
+            902,
+            AgentMountData.ResolveAction0Index(
+                actionIndex: 101,
+                speed: 0f,
+                isLocomotion: true,
+                turnDirection: AgentMountData.TurnRight,
+                turnActionIndex: 902));
+    }
+
+    [Fact]
+    public void ResolveAction0Index_ClearsTheGaitAfterAStationaryTurnSettles()
+    {
+        Assert.Equal(
+            ActionIndexCache.act_none.Index,
+            AgentMountData.ResolveAction0Index(
+                actionIndex: 101,
+                speed: 0f,
+                isLocomotion: true,
+                turnDirection: AgentMountData.NoTurn,
+                turnActionIndex: 902));
+    }
+
     [Fact]
     public void MountMovementPacket_RoundTripsHorizontalMountSpeed()
     {
@@ -205,12 +313,22 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             byte[] wire = serializer.Serialize(
                 new MountMovementPacket(
                     new[] { horseId },
-                    new[] { new AgentMountData(sourceHorse, horseId, 0.7f, true) }));
+                    new[] { new AgentMountData(
+                        sourceHorse,
+                        horseId,
+                        0.7f,
+                        true,
+                        AgentMountData.TurnLeft,
+                        902) }));
             var result = Assert.IsType<MountMovementPacket>(serializer.Deserialize<IPacket>(wire));
 
             Assert.Equal(5f, Assert.Single(result.Mounts).MountSpeed);
             Assert.Equal(0.7f, Assert.Single(result.Mounts).MountAction0Speed);
             Assert.True(Assert.Single(result.Mounts).MountAction0IsLocomotion);
+            Assert.Equal(
+                AgentMountData.TurnLeft,
+                Assert.Single(result.Mounts).MountAction0TurnDirection);
+            Assert.Equal(902, Assert.Single(result.Mounts).MountAction0TurnActionIndex);
         });
     }
 

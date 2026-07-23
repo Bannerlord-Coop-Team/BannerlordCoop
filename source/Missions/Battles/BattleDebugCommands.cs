@@ -104,6 +104,7 @@ internal static class BattleDebugCommands
 
         int stationaryCount = 0;
         int stationaryAnimatedCount = 0;
+        int stationaryTurningCount = 0;
         var output = new StringBuilder();
         foreach (var info in mounts)
         {
@@ -114,11 +115,18 @@ internal static class BattleDebugCommands
             string animationName = skeleton?.GetAnimationAtChannel(0);
             float animationSpeed = skeleton?.GetAnimationSpeedAtChannel(0) ?? 0f;
             int actionIndex = mount.GetCurrentAction(0).Index;
+            string actionName = AgentActionData.GetActionNameWithCode(actionIndex);
+            int turnDirection = AgentMountData.GetTurnDirection(actionName, animationName);
+            bool locomotionAction = AgentMountData.IsLocomotionAction(actionIndex, animationName);
             bool stationaryAnimated = stationary
-                && AgentMountData.IsLocomotionAction(actionIndex, animationName)
+                && locomotionAction
+                && animationSpeed > 0.001f;
+            bool stationaryTurning = stationary
+                && turnDirection != AgentMountData.NoTurn
                 && animationSpeed > 0.001f;
             if (stationary) stationaryCount++;
             if (stationaryAnimated) stationaryAnimatedCount++;
+            if (stationaryTurning) stationaryTurningCount++;
 
             string riderId = "none";
             if (mount.RiderAgent != null
@@ -134,11 +142,18 @@ internal static class BattleDebugCommands
                 .Append(" position=").Append(mount.Position.X.ToString("0.000", CultureInfo.InvariantCulture))
                 .Append(',').Append(mount.Position.Y.ToString("0.000", CultureInfo.InvariantCulture))
                 .Append(" speed=").Append(speed.ToString("0.000", CultureInfo.InvariantCulture))
-                .Append(" input=").Append(mount.MovementInputVector.Length.ToString("0.000", CultureInfo.InvariantCulture))
+                .Append(" input=").Append(mount.MovementInputVector.X.ToString("0.000", CultureInfo.InvariantCulture))
+                .Append(',').Append(mount.MovementInputVector.Y.ToString("0.000", CultureInfo.InvariantCulture))
+                .Append(" direction=").Append(mount.GetMovementDirection().X.ToString("0.000", CultureInfo.InvariantCulture))
+                .Append(',').Append(mount.GetMovementDirection().Y.ToString("0.000", CultureInfo.InvariantCulture))
                 .Append(" action0=").Append(actionIndex)
+                .Append(" actionName=").Append(actionName ?? "none")
                 .Append(" actionProgress=").Append(mount.GetCurrentActionProgress(0).ToString("0.000", CultureInfo.InvariantCulture))
                 .Append(" animation=").Append(animationName ?? "none")
                 .Append(" animationSpeed=").Append(animationSpeed.ToString("0.000", CultureInfo.InvariantCulture))
+                .Append(" locomotion=").Append(locomotionAction)
+                .Append(" turnDirection=").Append(turnDirection)
+                .Append(" stationaryTurning=").Append(stationaryTurning)
                 .Append(" stationaryAnimated=").Append(stationaryAnimated)
                 .AppendLine();
         }
@@ -146,6 +161,7 @@ internal static class BattleDebugCommands
         output.Insert(
             0,
             $"mounts={mounts.Length} stationary={stationaryCount} stationaryAnimated={stationaryAnimatedCount} " +
+            $"stationaryTurning={stationaryTurningCount} " +
             $"own={controller.Session.OwnControllerId} host={controller.Session.IsLocalHost}{Environment.NewLine}");
         return output.ToString().TrimEnd();
     }
@@ -247,6 +263,71 @@ internal static class BattleDebugCommands
         }
 
         return $"Stopped {formations.Length} battle-host cavalry formations";
+    }
+
+    [CommandLineArgumentFunction("turn_cavalry", "coop.debug.battle")]
+    public static string TurnCavalry(List<string> args)
+    {
+        if (args.Count != 1
+            || !float.TryParse(
+                args[0],
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out float degrees)
+            || float.IsNaN(degrees)
+            || float.IsInfinity(degrees)
+            || Math.Abs(degrees) < 15f
+            || Math.Abs(degrees) > 180f)
+        {
+            return "Usage: coop.debug.battle.turn_cavalry <degrees: -180 to -15 or 15 to 180>";
+        }
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        if (mission == null || controller == null)
+            return "No active coop battle mission";
+        if (!controller.Session.IsLocalHost)
+            return "Run this command on the battle-host client";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "Network agent registry is unavailable";
+
+        Agent[] riders = GetBattleHostCavalryRiders(
+            mission,
+            controller,
+            registry);
+        Formation[] formations = riders
+            .Select(agent => agent.Formation)
+            .Distinct()
+            .ToArray();
+        if (formations.Length == 0)
+            return "The battle host has no active cavalry formations";
+
+        foreach (Agent rider in riders)
+        {
+            rider.SetIsAIPaused(false);
+            rider.MountAgent?.SetIsAIPaused(false);
+        }
+
+        float radians = degrees * ((float)Math.PI / 180f);
+        float cosine = (float)Math.Cos(radians);
+        float sine = (float)Math.Sin(radians);
+        foreach (Formation formation in formations)
+        {
+            Vec2 direction = formation.Direction;
+            if (direction.LengthSquared <= 0.0001f)
+                direction = Vec2.Forward;
+            else
+                direction.Normalize();
+
+            var turnedDirection = new Vec2(
+                (direction.X * cosine) - (direction.Y * sine),
+                (direction.X * sine) + (direction.Y * cosine));
+            formation.SetMovementOrder(MovementOrder.MovementOrderStop);
+            formation.SetFacingOrder(
+                FacingOrder.FacingOrderLookAtDirection(turnedDirection));
+        }
+
+        return $"Turned {formations.Length} battle-host cavalry formations {degrees:0.0} degrees in place";
     }
 
     private static Agent[] GetBattleHostCavalryRiders(
