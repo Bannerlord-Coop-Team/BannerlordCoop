@@ -7,7 +7,9 @@ using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
@@ -220,10 +222,9 @@ internal class MapEventPatches
         {
             RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
 
-            // Slow raids are the only village hostile action with a campaign-map progress loop. Non-raid hostile
-            // actions still follow normal player battle gating so they do not resolve while a client is choosing mode.
+            // Slow raids need campaign-map progress, but not while their battle mission is occupied.
             if (__instance.IsActiveSlowVillageRaid())
-                return true;
+                return !HasOccupiedBattleMission(__instance);
         }
 
         // A settlement PartyBase is a complete participant even though it has no MobileParty.
@@ -236,6 +237,17 @@ internal class MapEventPatches
             return false;
 
         return true;
+    }
+
+    private static bool HasOccupiedBattleMission(MapEvent mapEvent)
+    {
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !objectManager.TryGetId(mapEvent, out var mapEventId) ||
+            !ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var membershipRegistry))
+            return false;
+
+        return ServerBattleModeArbiter.IsMissionClaimed(mapEventId) &&
+               membershipRegistry.IsInstanceOccupied(mapEventId);
     }
 
     [HarmonyPrefix]
