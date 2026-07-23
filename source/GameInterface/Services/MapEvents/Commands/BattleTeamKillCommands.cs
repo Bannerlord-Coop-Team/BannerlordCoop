@@ -31,6 +31,38 @@ internal class BattleTeamKillCommands
     private const string ScoreboardMovieName = "SPScoreboard";
     private const string PartyScoreToggleWidgetId = "PartyScoreToggleWidget";
     private const string PartyDetailsWidgetId = "PartyDetails";
+
+    private const string ClickDeploymentReadyUsage =
+@"Usage:
+  coop.debug.mapevent.click_deployment_ready
+
+Activates the deployment Ready button's native UI callback.";
+
+    [CommandLineArgumentFunction("click_deployment_ready", "coop.debug.mapevent")]
+    public static string ClickDeploymentReady(List<string> args)
+    {
+        var ctx = new CommandContext("click_deployment_ready", ClickDeploymentReadyUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+            return "No active deployment.";
+        if (!deploymentController.TeamSetupOver)
+            return "Failed: deployment team setup is not complete.";
+
+        var orderUi = mission.GetMissionBehavior<MissionGauntletSingleplayerOrderUIHandler>();
+        if (orderUi == null)
+            return "Failed: no deployment order UI.";
+
+        orderUi.OnBeginMission();
+        return "Clicked deployment Ready through the native UI callback.";
+    }
+
     private const string FinishDeploymentUsage =
 @"Usage:
   coop.debug.mapevent.finish_deployment

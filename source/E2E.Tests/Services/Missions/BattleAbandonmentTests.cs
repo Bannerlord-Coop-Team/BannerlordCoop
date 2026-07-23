@@ -1,5 +1,10 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using Common.Network.Messages;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
@@ -7,6 +12,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using GameInterface.Services.Players;
 using Missions.Messages;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -35,6 +41,46 @@ namespace E2E.Tests.Services.Missions;
 public class BattleAbandonmentTests : MissionTestEnvironment
 {
     public BattleAbandonmentTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void DisconnectAndReconnectToAnUnresolvedMapEvent_RefreshesTheFastForwardLock()
+    {
+        var (mapEventId, _) = SetupCoopBattle("connected-ctrl", "offline-ctrl");
+        var connected = Clients.First();
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            playerManager.SetPeer("connected-ctrl", connected.NetPeer);
+            Assert.True(playerManager.TryGetPlayer("connected-ctrl", out var player));
+            Assert.True(playerManager.IsConnected(player));
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerJoinedBattle());
+        });
+
+        Assert.Equal(1, Server.NetworkSentMessages.GetMessages<NetworkMapEventLockChanged>().Last().PlayersInMapEvent);
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().ClearPeer(connected.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(connected.NetPeer, default));
+        });
+
+        Assert.Equal(0, Server.NetworkSentMessages.GetMessages<NetworkMapEventLockChanged>().Last().PlayersInMapEvent);
+        Server.Call(() => Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _)));
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            playerManager.SetPeer("connected-ctrl", connected.NetPeer);
+            Server.Resolve<ITimeControlInterface>().ServerSetTimeControl(TimeControlEnum.Play_2x);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignEntered(connected.NetPeer));
+        });
+
+        Assert.Equal(1, Server.NetworkSentMessages.GetMessages<NetworkMapEventLockChanged>().Last().PlayersInMapEvent);
+        Server.Call(() => Assert.Equal(TimeControlEnum.Play_1x,
+            Server.Resolve<ITimeControlInterface>().GetTimeControl()));
+    }
 
     /// <summary>
     /// The last player DISCONNECTS from an active battle in which casualties were already synced. The battle

@@ -163,7 +163,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 session.Object,
                 new CasualtyAttributionMap(),
                 deployment.Object,
-                Mock.Of<IAgentFormationAssigner>());
+                Mock.Of<IAgentFormationAssigner>(),
+                new BattleAgentBudget());
 
             var equipment = new Equipment();
             var missionEquipment = new MissionEquipmentData(new());
@@ -233,7 +234,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     Mock.Of<IBattleSession>(),
                     new CasualtyAttributionMap(),
                     deployment.Object,
-                    Mock.Of<IAgentFormationAssigner>());
+                    Mock.Of<IAgentFormationAssigner>(),
+                    new BattleAgentBudget());
 
                 var record = new BattleAgentSpawnData(
                     agentId, characterId, default, BattleSideEnum.Attacker, 100f,

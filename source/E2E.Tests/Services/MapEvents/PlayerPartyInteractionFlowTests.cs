@@ -1336,6 +1336,39 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void AiPartyConversation_AllowedThreadFinish_ReleasesServerEngagement()
+    {
+        var (client1, _, initiatorPartyId, _) = CreateTwoPlayerParties();
+        var firstAiPartyId = CreateMobilePartyBase();
+        var secondAiPartyId = CreateMobilePartyBase();
+
+        RequestInteraction(client1, initiatorPartyId, firstAiPartyId);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+
+        SetMainParty(client1, initiatorPartyId);
+        EnableHeadlessEncounterFinish(client1);
+        SetMockPlayerEncounter(client1);
+        client1.NetworkSentMessages.Clear();
+
+        client1.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                PlayerEncounter.Finish(false);
+            }
+        }, MapEventDisabledMethods);
+
+        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkConversationEnded>());
+        AssertHasPlayerEncounter(client1, expected: false);
+
+        Server.NetworkSentMessages.Clear();
+        RequestInteraction(client1, initiatorPartyId, secondAiPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+    }
+
+    [Fact]
     public void ServerAiPartyEncounter_StartsConversationForDefendingPlayer()
     {
         var client = Clients.First();

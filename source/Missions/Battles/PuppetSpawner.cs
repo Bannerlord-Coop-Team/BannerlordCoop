@@ -46,6 +46,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
+    private readonly IBattleAgentBudget agentBudget;
 
     // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
     // agents without that identity later break team ownership and scoreboard attribution.
@@ -63,7 +64,8 @@ public class PuppetSpawner : IPuppetSpawner
         IBattleSession session,
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
-        IAgentFormationAssigner formationAssigner)
+        IAgentFormationAssigner formationAssigner,
+        IBattleAgentBudget agentBudget)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -73,6 +75,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.casualties = casualties;
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
+        this.agentBudget = agentBudget;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -107,13 +110,16 @@ public class PuppetSpawner : IPuppetSpawner
         // receive thread. Buffer missing mission identity and local pre-commit records for the tick drain.
         GameThread.RunSafe(() =>
         {
-            if (!TrySpawnPuppetNow(data))
+            // One puppet from the receive path: size the running slot budget to the live remaining capacity.
+            int slotsAvailable = agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current));
+            if (!TrySpawnPuppetNow(data, ref slotsAvailable))
                 lock (pendingPuppetLock) pendingPuppets.Add(data);
         });
     }
 
-    // [Game thread] Spawn one puppet. Returns false when a required team or explicit party identity is pending.
-    private bool TrySpawnPuppetNow(BattleAgentSpawnData data)
+    // [Game thread] Spawn one puppet, consuming <paramref name="slotsAvailable"/> render slots on success.
+    // Returns false when a required team, explicit party identity, local deployment commit, or render slot is pending.
+    private bool TrySpawnPuppetNow(BattleAgentSpawnData data, ref int slotsAvailable)
     {
         var registry = coopMissionComponent.AgentRegistry;
 
@@ -126,6 +132,15 @@ public class PuppetSpawner : IPuppetSpawner
         // stalling this client's own spawn gate.
         bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
         if (isOwnAgent && LocalDeploymentInProgress()) return false;
+
+        // BR-110: the engine renders at most a fixed number of agents. At capacity the puppet is deferred, not
+        // dropped — buffered and retried by DrainPendingPuppets as removals free slots. A mounted record spawns
+        // rider AND horse in one SpawnAgent call, so it needs two slots; whether it mounts is read from the
+        // SPAWN EQUIPMENT (the horse the engine mints), not MountAgentId — a catch-up record can carry an empty
+        // MountAgentId (the original horse already died) while its equipment still spawns a fresh mount. The
+        // caller owns the running slot budget so a drain counts capacity once instead of per buffered puppet.
+        int slotsNeeded = agentBudget.SlotsForEquipment(data.SpawnEquipment);
+        if (slotsNeeded > slotsAvailable) return false; // at capacity — buffer
 
         var team = ResolvePuppetTeam(data);
         if (team == null) return false;                                 // teams not created yet — buffer
@@ -244,6 +259,7 @@ public class PuppetSpawner : IPuppetSpawner
         objectManager.TryGetId(character, out var troopCharacterId);
         casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);
         Logger.Information("[BattleSync] Spawned puppet {Char} (agent {AgentId}, ownAgent={Own})", data.CharacterId, data.AgentId, isOwnAgent);
+        slotsAvailable -= slotsNeeded;
         return true;
     }
 
@@ -343,13 +359,18 @@ public class PuppetSpawner : IPuppetSpawner
             pendingPuppets.Clear();
         }
 
+        // BR-110: count the live remaining capacity ONCE for the whole drain and decrement it as puppets spawn,
+        // instead of recounting every mission agent per buffered puppet — a large catch-up backlog at the limit
+        // would otherwise do backlog x agentCount checks per frame while nothing can spawn.
+        int slotsAvailable = agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current));
+
         foreach (var data in pending)
         {
             // Per-puppet guard: one bad record must not abort the whole drain (and re-throw every tick). On
             // failure, drop it rather than re-buffering, so it can't spin a per-tick exception loop.
             try
             {
-                if (!TrySpawnPuppetNow(data))
+                if (!TrySpawnPuppetNow(data, ref slotsAvailable))
                     lock (pendingPuppetLock) pendingPuppets.Add(data);
             }
             catch (Exception e)

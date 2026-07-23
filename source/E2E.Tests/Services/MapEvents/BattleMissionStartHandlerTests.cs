@@ -50,6 +50,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var clientBattle));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(nonInitiatingPartyId, out var localParty));
+            var previousMainParty = Campaign.Current.MainParty;
             Campaign.Current.MainParty = localParty;
             Campaign.Current.PlayerEncounter = null;
 
@@ -105,6 +106,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
             finally
             {
                 BattleSpawnGate.EndBattle();
+                Campaign.Current.MainParty = previousMainParty;
                 Campaign.Current.PlayerEncounter = null;
                 ContainerProvider.SetContainer(client.Container);
             }
