@@ -20,6 +20,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -318,6 +319,80 @@ public class MapEventDebugCommands
         PlayerEncounter.JoinBattle(side);
 
         return $"Started the {side} join encounter for map event {args[0]}.";
+    }
+
+    [CommandLineArgumentFunction("leave_settlement", "coop.debug.mapevent")]
+    public static string LeaveSettlement(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.leave_settlement <controllerId>";
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return "Unable to resolve PlayerManager";
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+            return $"No registered player has controller id {args[0]}.";
+
+        if (!playerManager.IsConnected(player))
+            return $"Player {args[0]} is not connected.";
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+            return $"Unable to resolve player party {player.MobilePartyId}.";
+
+        var settlement = playerParty.CurrentSettlement;
+        if (settlement == null)
+            return $"Player {args[0]} is already outside a settlement.";
+
+        LeaveSettlementAction.ApplyForParty(playerParty);
+        return $"Moved player {args[0]} out of {settlement.Name}.";
+    }
+
+    [CommandLineArgumentFunction("finish_current_encounter", "coop.debug.mapevent")]
+    public static string FinishCurrentEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.finish_current_encounter";
+
+        if (PlayerEncounter.Current == null)
+            return "No active encounter.";
+
+        PlayerEncounter.Finish();
+        return "Finished the current local encounter.";
+    }
+
+    [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
+    public static string EnterCurrentBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.enter_current_battle";
+
+        if (PlayerEncounter.Current == null)
+            return "No active encounter.";
+
+        if (PlayerEncounter.Battle == null)
+        {
+            if (PlayerEncounter.StartBattle() == null)
+                return "Unable to start the current battle.";
+
+            GameMenu.SwitchToMenu("encounter");
+        }
+
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext == null)
+            return "No active encounter menu.";
+
+        MenuHelper.EncounterAttackConsequence(new MenuCallbackArgs(menuContext, null));
+        return "Requested entry into the current battle.";
     }
 
     // coop.debug.mapevent.finish_player_encounter PlayerOne
@@ -892,7 +967,7 @@ public class MapEventDebugCommands
         if (mapEvent == null) return "<null>";
 
         var id = "<no id>";
-        if (objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
+        if (!mapEvent.IsFinalized && objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
             id = resolved;
 
         return $"id={id} finalized={mapEvent.IsFinalized} state={mapEvent.BattleState} winner={mapEvent.WinningSide}";

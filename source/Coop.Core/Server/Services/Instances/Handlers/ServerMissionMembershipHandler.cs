@@ -138,11 +138,11 @@ public class ServerMissionMembershipHandler : IHandler
             foreach (var (_, otherPeer) in remaining)
                 network.Send(otherPeer, new MissionPeerDisconnected(controllerId, instanceId));
 
-            // A drop withdraws the player's party, so a rejoin must spawn fresh reserves.
+            // A drop preserves the reserve so the battle host can field the disconnected player's remaining troops.
             messageBroker.Publish(this, new MissionMemberDeparted(
                 controllerId,
                 instanceId,
-                wasRetreat: true,
+                wasRetreat: false,
                 isInstanceEmpty: remaining.Count == 0));
         }, context: nameof(Handle_PlayerDisconnected));
     }

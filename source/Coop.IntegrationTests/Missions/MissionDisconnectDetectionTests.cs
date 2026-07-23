@@ -28,7 +28,8 @@ namespace Coop.IntegrationTests.Missions;
 ///
 /// Positive: a server-observed <see cref="PlayerDisconnected"/> (the campaign-server connection dropping) fans a
 /// <see cref="MissionPeerDisconnected"/> to every remaining member's connection and raises exactly one
-/// <see cref="MissionMemberDeparted"/> marked for retreat-style party withdrawal. Negative: a mesh-only peer
+/// <see cref="MissionMemberDeparted"/> marked as an ungraceful drop so the reserve remains available to the
+/// battle host. Negative: a mesh-only peer
 /// drop (<see cref="LiteNetP2PClient.OnPeerDisconnected"/>) — the P2P link dying while the server link is intact
 /// — must NOT fabricate either mission-disconnect notification.
 /// </summary>
@@ -72,12 +73,12 @@ public class MissionDisconnectDetectionTests
         Assert.Equal(InstanceId, received[members[1].ControllerId][0].InstanceId);
         Assert.Empty(received[dropped]);
 
-        // Exactly one departure, flagged for retreat-style withdrawal so the player's reserve is forgotten,
+        // Exactly one ungraceful departure, so the player's remaining reserve can fall to the battle host,
         // and the instance still has members.
         var departure = Assert.Single(departures);
         Assert.Equal(dropped, departure.ControllerId);
         Assert.Equal(InstanceId, departure.InstanceId);
-        Assert.True(departure.WasRetreat);
+        Assert.False(departure.WasRetreat);
         Assert.False(departure.IsInstanceEmpty);
     }
 
@@ -96,14 +97,14 @@ public class MissionDisconnectDetectionTests
         Disconnect(members[1]);
         var first = Assert.Single(departures);
         Assert.Equal(members[1].ControllerId, first.ControllerId);
-        Assert.True(first.WasRetreat);
+        Assert.False(first.WasRetreat);
         Assert.False(first.IsInstanceEmpty);
 
         departures.Clear();
         Disconnect(members[0]);
         var last = Assert.Single(departures);
         Assert.Equal(members[0].ControllerId, last.ControllerId);
-        Assert.True(last.WasRetreat);
+        Assert.False(last.WasRetreat);
         Assert.True(last.IsInstanceEmpty);
     }
 

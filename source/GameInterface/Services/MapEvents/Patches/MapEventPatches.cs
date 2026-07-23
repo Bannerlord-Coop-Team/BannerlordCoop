@@ -52,6 +52,9 @@ internal class MapEventPatches
     {
         __state = false;
 
+        if (__instance.IsFinalized)
+            return false;
+
         if (ModInformation.IsServer)
             MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
 
