@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using Common.Network;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.Players;
@@ -191,8 +192,8 @@ public class MissionReadyElectionTests : MissionTestEnvironment
         }, MapEventDisabledMethods);
 
         // ---- Phase 1: the future host enters, then becomes ready (elected). ----
-        var hostAttacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, null);
-        var hostDefender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+        var hostAttacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        var hostDefender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
         CoopTroopSupplierRegistry.Register(hostAttacker);
         CoopTroopSupplierRegistry.Register(hostDefender);
         try
@@ -230,8 +231,8 @@ public class MissionReadyElectionTests : MissionTestEnvironment
         }
 
         // ---- Phase 2: the non-host enters, then becomes ready. Fresh suppliers observe only its feeds. ----
-        var otherAttacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, null);
-        var otherDefender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+        var otherAttacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        var otherDefender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
         CoopTroopSupplierRegistry.Register(otherAttacker);
         CoopTroopSupplierRegistry.Register(otherDefender);
         try

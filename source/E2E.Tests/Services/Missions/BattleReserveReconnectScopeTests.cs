@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Handlers;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
@@ -400,7 +401,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
 
             // The host's defender-side supplier (the side it now fields the returner's party on) receives the
             // adoption grant for real, so the supply-pointer advance goes through the actual supplier.
-            var hostDefenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+            var hostDefenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
             CoopTroopSupplierRegistry.Register(hostDefenderSupplier);
 
             RequestOwnedReserves(host, mapEventId, "host-ctrl");
@@ -618,7 +619,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         // The registry is process-static: drop the returner's own buffered entry/election feeds so the
         // host-labeled supplier below is populated only by the grant actually addressed to the HOST.
         CoopTroopSupplierRegistry.ClearBattle(mapEventId);
-        var hostDefenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+        var hostDefenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
         CoopTroopSupplierRegistry.Register(hostDefenderSupplier);
 
         // The host adopts (records its live peer on the server) and its supplier receives the grant.
@@ -847,7 +848,7 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         try
         {
-            var supplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+            var supplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
             CoopTroopSupplierRegistry.Register(supplier);
             supplier.SetReserve(BothParties());
             supplier.SupplyTroops(2); // advance "returned-party" locally to 2
