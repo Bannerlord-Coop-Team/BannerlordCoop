@@ -131,4 +131,4 @@ jobs:
 
       - name: Run E2E Test Shard
         working-directory: source
-        run: bash ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 64
+        run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 64
