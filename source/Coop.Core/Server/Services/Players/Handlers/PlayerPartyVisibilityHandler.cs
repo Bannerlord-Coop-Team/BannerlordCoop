@@ -5,12 +5,15 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
@@ -73,7 +76,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         var peer = payload.What.PlayerId;
 
-        if (!TryResolveParty(peer, out var party))
+        if (!TryResolveParty(peer, out var player, out var party))
         {
             // Not every disconnect belongs to a player mid-campaign so a miss can be expected, not an error
             return;
@@ -89,6 +92,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (mapEvent != null)
             {
                 deferredMapEventParking[party] = mapEvent;
+                messageBroker.Publish(this, new PlayerDisconnectedFromMapEvent(player.ControllerId, mapEvent));
                 Logger.Information(
                     "Keeping party {PartyId} active in MapEvent {MapEventId} after peer {Peer} disconnected",
                     party.StringId,
@@ -128,6 +132,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
         GameThread.RunSafe(() =>
         {
             deferredMapEventParking.Remove(party);
+            if (party.MapEvent != null)
+                messageBroker.Publish(this, new PlayerReconnectedToMapEvent());
+
             if (party.IsActive)
             {
                 return; // fresh join, never parked, nothing to restore
@@ -219,11 +226,12 @@ internal class PlayerPartyVisibilityHandler : IHandler
         network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
     }
 
-    private bool TryResolveParty(NetPeer peer, out MobileParty party)
+    private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)
     {
+        player = null;
         party = null;
 
-        return playerManager.TryGetPlayer(peer, out var player) &&
+        return playerManager.TryGetPlayer(peer, out player) &&
             objectManager.TryGetObjectWithLogging(player.MobilePartyId, out party);
     }
 }
