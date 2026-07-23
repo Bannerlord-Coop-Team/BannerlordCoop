@@ -35,18 +35,6 @@ internal readonly struct RomanceStatesChanged : IEvent
 {
 }
 
-internal readonly struct MarriageActionRequested : IEvent
-{
-    public readonly Hero FirstHero;
-    public readonly Hero SecondHero;
-
-    public MarriageActionRequested(Hero firstHero, Hero secondHero)
-    {
-        FirstHero = firstHero;
-        SecondHero = secondHero;
-    }
-}
-
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkRequestRomanceStateChange : ICommand
 {
@@ -124,79 +112,6 @@ internal readonly struct RomanceStateData
         LastVisit = lastVisit;
         ScoreFromPersuasion = scoreFromPersuasion;
     }
-}
-
-[ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkRequestRomanceMarriage : ICommand
-{
-    [ProtoMember(1)]
-    public readonly string TargetHeroId;
-
-    public NetworkRequestRomanceMarriage(string targetHeroId)
-    {
-        TargetHeroId = targetHeroId;
-    }
-}
-
-internal enum RomanceBarterTermType
-{
-    Gold,
-    Item,
-    Fief,
-    Prisoner,
-}
-
-[ProtoContract(SkipConstructor = true)]
-internal readonly struct RomanceBarterTerm
-{
-    [ProtoMember(1)]
-    public readonly int Type;
-    [ProtoMember(2)]
-    public readonly string OwnerHeroId;
-    [ProtoMember(3)]
-    public readonly string ObjectId;
-    [ProtoMember(4)]
-    public readonly string ItemModifierId;
-    [ProtoMember(5)]
-    public readonly bool ItemModifierNull;
-    [ProtoMember(6)]
-    public readonly int Amount;
-
-    public RomanceBarterTerm(
-        RomanceBarterTermType type,
-        string ownerHeroId,
-        string objectId,
-        string itemModifierId,
-        bool itemModifierNull,
-        int amount)
-    {
-        Type = (int)type;
-        OwnerHeroId = ownerHeroId;
-        ObjectId = objectId;
-        ItemModifierId = itemModifierId;
-        ItemModifierNull = itemModifierNull;
-        Amount = amount;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkRequestRomanceMarriageBarter : ICommand
-{
-    [ProtoMember(1)]
-    public readonly string TargetHeroId;
-    [ProtoMember(2)]
-    public readonly RomanceBarterTerm[] Terms;
-
-    public NetworkRequestRomanceMarriageBarter(string targetHeroId, RomanceBarterTerm[] terms)
-    {
-        TargetHeroId = targetHeroId;
-        Terms = terms;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkRomanceMarriageBarterAccepted : ICommand
-{
 }
 
 [ProtoContract(SkipConstructor = true)]

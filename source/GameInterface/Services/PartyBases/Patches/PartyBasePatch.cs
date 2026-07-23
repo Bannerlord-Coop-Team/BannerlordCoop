@@ -12,15 +12,10 @@ internal class PartyBaseHelperPatch
     [HarmonyPrefix]
     public static bool HasFeat(PartyBase party, FeatObject feat, ref bool __result)
     {
-        if (party == null)
-            __result = false;
-        if (party.LeaderHero != null)
-            __result = party.LeaderHero.Culture.HasFeat(feat);
-        if (party.MapFaction?.Culture != null)
-            __result = party.Culture.HasFeat(feat);
-        if (party.Owner?.Culture != null)
-            __result = party.Owner.Culture.HasFeat(feat);
-        __result = party.Settlement != null && party.Settlement.Culture.HasFeat(feat);
+        __result = (party?.LeaderHero?.Culture?.HasFeat(feat) == true)
+            || (party?.MapFaction?.Culture?.HasFeat(feat) == true)
+            || (party?.Owner?.Culture?.HasFeat(feat) == true)
+            || (party?.Settlement?.Culture?.HasFeat(feat) == true);
 
         return false;
     }

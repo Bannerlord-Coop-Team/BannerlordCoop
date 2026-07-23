@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
@@ -29,7 +30,8 @@ public class TransferSaveState : ConnectionStateBase
         ITimeControlInterface timeControlInterface,
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
-        IAttachmentIdMapper attachmentIdMapper)
+        IAttachmentIdMapper attachmentIdMapper,
+        IServerOptionsProvider serverOptionsProvider)
         : base(connectionLogic)
     {
         GameThread.Run(() =>
@@ -71,7 +73,8 @@ public class TransferSaveState : ConnectionStateBase
                 coopSessionProvider.CoopSession?.AlleyPlayerData,
                 coopSessionProvider.CoopSession?.InteractionsPlayerData,
                 coopSessionProvider.CoopSession?.TradePlayerData,
-                attachmentIdMapper.BuildServerMap());
+                attachmentIdMapper.BuildServerMap(),
+                serverOptionsProvider.GetServerOptions());
 
             // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
             // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
