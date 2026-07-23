@@ -279,7 +279,14 @@ namespace Coop.Core
                     joinInfo.Password = password ?? string.Empty;
                     StartResolvedJoin(joinInfo);
                 },
-                () => passwordInquiryPending = false,
+                () =>
+                {
+                    passwordInquiryPending = false;
+                    // The join keeps its Steam lobby membership alive while this prompt is
+                    // open; abandoning tells the join listener to leave, so a later Join
+                    // click starts a fresh attempt instead of no-oping on the stale membership.
+                    messageBroker.Publish(this, new SessionJoinAbandoned());
+                },
                 shouldInputBeObfuscated: true,
                 textCondition: password =>
                 {
