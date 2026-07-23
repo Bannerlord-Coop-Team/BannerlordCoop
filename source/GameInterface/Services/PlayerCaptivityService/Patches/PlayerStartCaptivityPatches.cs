@@ -153,8 +153,9 @@ internal class PlayerStartCaptivityPatches
 
         GameThread.EnqueueSafe(() =>
         {
-            // The camp can already be gone when the queue drains (the host's own native defeat cleared it,
-            // or the siege was torn down with the battle); the clear must not resurrect the cascade then.
+            // The camp can already be gone when the queue drains (the defeated client's native defeat
+            // clear may have reached the server first, or the siege was torn down with the battle); the
+            // clear must not resurrect the cascade then.
             if (defeatedParty.BesiegerCamp == null) return;
 
             defeatedParty.BesiegerCamp = null;
