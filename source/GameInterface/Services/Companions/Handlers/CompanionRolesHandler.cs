@@ -5,17 +5,21 @@ using Common.Network;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters.Messages;
+using LiteNetLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Companions.Handlers;
 
@@ -26,6 +30,8 @@ internal class CompanionRolesHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private string pendingFireCompanionRequestId;
+    private string pendingFireCompanionHeroId;
 
     public CompanionRolesHandler(
         IMessageBroker messageBroker,
@@ -40,6 +46,7 @@ internal class CompanionRolesHandler : IHandler
         messageBroker.Subscribe<DoClanNameSelection>(Handle_DoClanNameSelection);
         messageBroker.Subscribe<CompanionFired>(Handle_CompanionFired);
         messageBroker.Subscribe<FireCompanion>(Handle_FireCompanion);
+        messageBroker.Subscribe<FireCompanionCompleted>(Handle_FireCompanionCompleted);
         messageBroker.Subscribe<CompanionRejoinAfterEmprisonment>(Handle_CompanionRejoinAfterEmprisonment);
         messageBroker.Subscribe<DoCompanionRejoinAfterEmprisonment>(Handle_DoCompanionRejoinAfterEmprisonment);
         messageBroker.Subscribe<CompanionJoinedPartyByRescue>(Handle_CompanionJoinedPartyByRescue);
@@ -56,6 +63,7 @@ internal class CompanionRolesHandler : IHandler
         messageBroker.Unsubscribe<DoClanNameSelection>(Handle_DoClanNameSelection);
         messageBroker.Unsubscribe<CompanionFired>(Handle_CompanionFired);
         messageBroker.Unsubscribe<FireCompanion>(Handle_FireCompanion);
+        messageBroker.Unsubscribe<FireCompanionCompleted>(Handle_FireCompanionCompleted);
         messageBroker.Unsubscribe<CompanionRejoinAfterEmprisonment>(Handle_CompanionRejoinAfterEmprisonment);
         messageBroker.Unsubscribe<DoCompanionRejoinAfterEmprisonment>(Handle_DoCompanionRejoinAfterEmprisonment);
         messageBroker.Unsubscribe<CompanionJoinedPartyByRescue>(Handle_CompanionJoinedPartyByRescue);
@@ -141,31 +149,187 @@ internal class CompanionRolesHandler : IHandler
 
     private void Handle_CompanionFired(MessagePayload<CompanionFired> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.OneToOneConversationHero, out var oneToOneConversationHeroId)) return;
+        if (pendingFireCompanionRequestId != null)
+        {
+            logger.Warning("Ignored a second companion dismissal while request {RequestId} is pending",
+                pendingFireCompanionRequestId);
+            return;
+        }
 
-        var message = new FireCompanion(oneToOneConversationHeroId);
+        var requestId = Guid.NewGuid().ToString("N");
+        pendingFireCompanionRequestId = requestId;
+        pendingFireCompanionHeroId = null;
 
-        network.SendAll(message);
+        try
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.OneToOneConversationHero,
+                out var oneToOneConversationHeroId))
+                throw new InvalidOperationException("The companion being dismissed could not be resolved.");
+
+            pendingFireCompanionHeroId = oneToOneConversationHeroId;
+            if (obj.What.OneToOneConversationHero.CompanionOf == null)
+                throw new InvalidOperationException("The companion has no owning clan.");
+            if (!objectManager.TryGetIdWithLogging(obj.What.OneToOneConversationHero.CompanionOf,
+                out var expectedClanId))
+                throw new InvalidOperationException("The companion's owning clan could not be resolved.");
+
+            string expectedPartyId = null;
+            if (obj.What.OneToOneConversationHero.PartyBelongedTo != null &&
+                !objectManager.TryGetIdWithLogging(obj.What.OneToOneConversationHero.PartyBelongedTo,
+                    out expectedPartyId))
+                throw new InvalidOperationException("The companion's party could not be resolved.");
+
+            network.SendAll(new FireCompanion(requestId, oneToOneConversationHeroId,
+                expectedClanId, expectedPartyId));
+        }
+        catch (Exception exception)
+        {
+            CompletePendingFireCompanion(requestId, pendingFireCompanionHeroId, false, exception.Message);
+        }
     }
+
 
     private void Handle_FireCompanion(MessagePayload<FireCompanion> obj)
     {
         var data = obj.What;
+        var requester = obj.Who as NetPeer;
 
-        GameThread.Run(() =>
+        if (requester == null)
         {
+            logger.Error("Rejected {Message} without a requesting peer", nameof(FireCompanion));
+            return;
+        }
+
+        GameThread.RunSafe(() =>
+        {
+            bool success = false;
+            string error = null;
             try
             {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+                if (string.IsNullOrWhiteSpace(data.RequestId))
+                    throw new InvalidOperationException("The dismissal request has no correlation id.");
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId,
+                    out var oneToOneConversationHero))
+                    throw new InvalidOperationException("The requested companion could not be resolved.");
+                if (oneToOneConversationHero.CompanionOf == null ||
+                    !objectManager.TryGetIdWithLogging(oneToOneConversationHero.CompanionOf, out var currentClanId) ||
+                    currentClanId != data.ExpectedClanId)
+                    throw new InvalidOperationException("The companion's owning clan changed before dismissal.");
+
+                string currentPartyId = null;
+                if (oneToOneConversationHero.PartyBelongedTo != null &&
+                    !objectManager.TryGetIdWithLogging(oneToOneConversationHero.PartyBelongedTo, out currentPartyId))
+                    throw new InvalidOperationException("The companion's current party could not be resolved.");
+                if (currentPartyId != data.ExpectedPartyId)
+                    throw new InvalidOperationException("The companion's party changed before dismissal.");
+
+                TroopRoster memberRoster = oneToOneConversationHero.PartyBelongedTo?.MemberRoster;
+                string memberRosterId = null;
+                string characterId = null;
+                if (memberRoster != null)
+                {
+                    if (!objectManager.TryGetIdWithLogging(memberRoster, out memberRosterId) ||
+                        !objectManager.TryGetIdWithLogging(oneToOneConversationHero.CharacterObject, out characterId))
+                        throw new InvalidOperationException("The companion's party roster could not be resolved.");
+                    memberRosterId = Compact(memberRosterId, typeof(TroopRoster));
+                    characterId = Compact(characterId, typeof(CharacterObject));
+                }
 
                 RemoveCompanionAction.ApplyByFire(oneToOneConversationHero.CompanionOf, oneToOneConversationHero);
-                KillCharacterAction.ApplyByRemove(oneToOneConversationHero, false, true);
+                try
+                {
+                    KillCharacterAction.ApplyByRemove(oneToOneConversationHero, false, true);
+                }
+                finally
+                {
+                    // Once RemoveCompanionAction clears CompanionOf, a retry cannot rediscover the old party.
+                    // Always finish the captured roster correction, even if the follow-up removal throws.
+                    if (memberRoster != null)
+                    {
+                        ReconcileDismissedCompanionRoster(memberRoster, oneToOneConversationHero.CharacterObject,
+                            memberRosterId, characterId, network);
+                    }
+                }
+
+                success = true;
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                logger.Error(e, "Failed to apply {Message}", nameof(FireCompanion));
+                error = exception.Message;
+                logger.Error(exception, "Failed companion dismissal request {RequestId} for {HeroId}",
+                    data.RequestId, data.OneToOneConversationHeroId);
             }
-        });
+            finally
+            {
+                SendCompletion(requester, data.RequestId, data.OneToOneConversationHeroId, success, error);
+            }
+        }, context: nameof(FireCompanion));
+    }
+
+    private void Handle_FireCompanionCompleted(MessagePayload<FireCompanionCompleted> obj)
+    {
+        var data = obj.What;
+
+        // Roster corrections and this acknowledgement share the reliable ordered stream. Deferring all of
+        // them to the game thread preserves that FIFO before the player can open the party screen.
+        GameThread.RunSafe(() =>
+        {
+            CompletePendingFireCompanion(data.RequestId, data.OneToOneConversationHeroId,
+                data.Success, data.Error);
+        }, context: nameof(FireCompanionCompleted));
+    }
+
+    private void CompletePendingFireCompanion(string requestId, string heroId, bool success, string error)
+    {
+        if (requestId != pendingFireCompanionRequestId || heroId != pendingFireCompanionHeroId)
+        {
+            logger.Warning("Ignored unmatched companion dismissal completion {RequestId} for {HeroId}",
+                requestId, heroId);
+            return;
+        }
+
+        pendingFireCompanionRequestId = null;
+        pendingFireCompanionHeroId = null;
+
+        if (PlayerEncounter.Current != null)
+        {
+            PlayerEncounter.LeaveEncounter = true;
+        }
+
+        if (!success)
+        {
+            logger.Error("Companion dismissal request {RequestId} failed: {Error}", requestId, error);
+        }
+
+        messageBroker.Publish(this, new CompanionDismissalCompleted(requestId, heroId, success, error));
+    }
+
+    private void SendCompletion(NetPeer requester, string requestId, string heroId, bool success, string error)
+    {
+        network.Send(requester, new FireCompanionCompleted(requestId, heroId, success, error));
+    }
+
+    internal static void ReconcileDismissedCompanionRoster(TroopRoster memberRoster, CharacterObject character,
+        string memberRosterId, string characterId, INetwork network)
+    {
+        int index = memberRoster.FindIndexOfTroop(character);
+        if (index >= 0)
+        {
+            var element = memberRoster.GetElementCopyAtIndex(index);
+            if (element.Number != 0 || element.WoundedNumber != 0)
+            {
+                memberRoster.AddToCounts(character, -element.Number, false, -element.WoundedNumber,
+                    0, true);
+            }
+        }
+
+        memberRoster.RemoveZeroCounts();
+
+        // Send an absolute correction after the ordinary deltas. This is idempotent and repairs clients
+        // that entered the dismissal with duplicate companion counts.
+        network.SendAll(new NetworkTroopRosterSetWoundedNumber(memberRosterId, characterId, 0));
+        network.SendAll(new NetworkTroopRosterSetNumber(memberRosterId, characterId, 0));
+        network.SendAll(new NetworkTroopRosterRemoveZeroCounts(memberRosterId));
     }
 
     private void Handle_CompanionRejoinAfterEmprisonment(MessagePayload<CompanionRejoinAfterEmprisonment> obj)
