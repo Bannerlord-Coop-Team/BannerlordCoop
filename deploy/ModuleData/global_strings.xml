@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<strings>
+    <string id="str_coop_server_managed_player_received_damage" text="{=!}Managing this option is disabled on clients; the server does this." />
+    <!-- Add other custom text here in the future-->
+</strings>

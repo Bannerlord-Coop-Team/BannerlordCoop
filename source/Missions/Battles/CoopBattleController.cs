@@ -90,7 +90,8 @@ public class CoopBattleController : CoopMissionController
         IBattleHostRegistry hostRegistry,
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
-        IHostEpochPolicy hostEpochPolicy)
+        IHostEpochPolicy hostEpochPolicy,
+        IBattleAgentBudget agentBudget)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -102,12 +103,12 @@ public class CoopBattleController : CoopMissionController
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
-        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner);
+        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget);
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext);
-        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties);
+        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
         // watermark spans every host-authority message type (engine placement + machine state/authority)
         // — a superseded hosting generation is dropped consistently across both. The policy is a

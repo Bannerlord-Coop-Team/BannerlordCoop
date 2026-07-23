@@ -1,4 +1,5 @@
 using System.Linq;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -58,7 +59,7 @@ public class BattleTroopAssignmentTests : MissionTestEnvironment
 
         // Stand in for the mission's real (injection-patched) supplier for the entrant's own side, so the
         // reserve the server delivers over the network lands somewhere observable in this headless harness.
-        var ownSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+        var ownSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
         CoopTroopSupplierRegistry.Register(ownSupplier);
         try
         {
@@ -155,7 +156,7 @@ public class CoopTroopSupplierControllableCountTests
     [Trait("Requirement", "BR-020")]
     public void PlayerControllableTroops_EqualsOwnedEntryCount()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { new PartyReserve("own", 0, Entries(5, seedBase: 500)) });
 
         Assert.Equal(5, supplier.GetNumberOfPlayerControllableTroops());
@@ -165,7 +166,7 @@ public class CoopTroopSupplierControllableCountTests
     [Trait("Requirement", "BR-020")]
     public void PlayerControllableTroops_SumsAcrossOwnedParties()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
         supplier.SetReserve(new[]
         {
             new PartyReserve("p1", 0, Entries(3, seedBase: 100)),

@@ -7,6 +7,7 @@ using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
@@ -101,6 +102,11 @@ internal class SiegeEntryFlowPatches
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
+        // The host must run native directly: BreakSiegeAttempted only has a handler in the client
+        // container, and the running server's sync policy never allows the original, so without this
+        // bail the host's own leave click published into the void and its camp never cleared.
+        if (ModInformation.IsServer) return true;
+
         MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
         return false;
     }
@@ -121,6 +127,39 @@ internal class SiegeEntryFlowPatches
 
         MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
         MobileParty.MainParty.Army = null;
+        return false;
+    }
+
+    // A besieger's encounter-menu "Leave..." (the menu a player lands on after retreating out of a siege
+    // battle) funnels into MenuHelper.EncounterLeaveConsequence, which finishes the encounter and clears
+    // MainParty.BesiegerCamp directly — a client-local write the server never sees, so the party stayed in
+    // the camp and the siege map event there (issue #2263). Route the camp write through the server; the
+    // approval runs the local encounter finish. Patching the MenuHelper funnel (not the menu consequence)
+    // also keeps vanilla's "abandon the siege?" confirmation, whose Yes callback lands here too.
+    [HarmonyPatch(typeof(MenuHelper), nameof(MenuHelper.EncounterLeaveConsequence))]
+    [HarmonyPrefix]
+    private static bool EncounterLeaveConsequencePrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+        if (MobileParty.MainParty.BesiegerCamp == null) return true;
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
+        return false;
+    }
+
+    // The post-battle "Leave the siege" option (continue_siege_after_attack menu) writes the camp directly
+    // instead of calling LeaveSiege, so the LeaveSiege reroute never fires for it. Same split as above:
+    // the server owns the camp write, the approval closes the menu.
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.leave_siege_after_attack_on_consequence))]
+    [HarmonyPrefix]
+    private static bool LeaveSiegeAfterAttackPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+        if (MobileParty.MainParty.BesiegerCamp == null) return true;
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
         return false;
     }
 }
