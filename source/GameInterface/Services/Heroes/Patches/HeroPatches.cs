@@ -3,7 +3,6 @@ using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Patches
 {
@@ -36,20 +35,16 @@ namespace GameInterface.Services.Heroes.Patches
         }
     }
 
-    [HarmonyPatch(typeof(MBObjectManager), nameof(MBObjectManager.PreAfterLoad))]
-    internal static class MBObjectManagerHeroPatches
+    [HarmonyPatch(typeof(Hero), nameof(Hero.PreAfterLoad))]
+    internal static class HeroPreAfterLoadPatches
     {
         [HarmonyPrefix]
-        private static void PreAfterLoadPrefix(MBObjectManager __instance)
+        private static void PreAfterLoadPrefix(Hero __instance)
         {
+            if (__instance.CharacterObject != null) return;
             if (!ContainerProvider.TryResolve<IHeroCharacterObjectRepairer>(out var repairer)) return;
 
-            foreach (var hero in __instance.GetObjectTypeList<Hero>())
-            {
-                if (hero.CharacterObject != null) continue;
-
-                repairer.TryRepair(hero);
-            }
+            repairer.TryRepair(__instance);
         }
     }
 }
