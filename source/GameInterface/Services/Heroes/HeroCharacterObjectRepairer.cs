@@ -1,6 +1,7 @@
 ﻿using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes;
 
@@ -41,6 +42,7 @@ internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
             $"{DeferredCharacterObjectPrefix}{hero.StringId}");
         characterObject.HeroObject = hero;
         hero._characterObject = characterObject;
+        RestoreMissingName(hero);
 
         logger.Warning("Repaired missing CharacterObject for hero {HeroId}; registration and template initialization are deferred until load initialization completes",
             hero.StringId);
@@ -90,5 +92,21 @@ internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
     private static CultureObject GetUsableCulture(CultureObject culture)
     {
         return culture?.BasicTroop != null ? culture : null;
+    }
+
+    private static void RestoreMissingName(Hero hero)
+    {
+        var firstName = hero.FirstName ?? hero.Name;
+        var fullName = hero.Name ?? firstName;
+        if (firstName == null)
+        {
+            firstName = new TextObject(hero.StringId);
+            fullName = firstName;
+        }
+
+        if (hero.FirstName == null || hero.Name == null)
+        {
+            hero.SetName(fullName, firstName);
+        }
     }
 }

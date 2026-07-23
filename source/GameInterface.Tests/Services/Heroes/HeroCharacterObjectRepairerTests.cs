@@ -5,6 +5,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Heroes;
@@ -70,6 +71,35 @@ public class HeroCharacterObjectRepairerTests
             $"{HeroCharacterObjectRepairer.DeferredCharacterObjectPrefix}{hero.StringId}",
             characterObjectCreator.StringId);
         Assert.Null(characterObjectCreator.InitializationTemplate);
+    }
+
+    [Fact]
+    public void TryRepair_MissingNames_UsesHeroIdForBothNames()
+    {
+        var replacement = ObjectHelper.SkipConstructor<CharacterObject>();
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        hero.StringId = "Created_2878";
+        var repairer = CreateRepairer(new FakeCharacterObjectCreator(replacement));
+
+        Assert.True(repairer.TryRepair(hero));
+
+        Assert.Equal(hero.StringId, hero.FirstName.ToString());
+        Assert.Same(hero.FirstName, hero.Name);
+    }
+
+    [Fact]
+    public void TryRepair_MissingFirstName_PreservesFullName()
+    {
+        var replacement = ObjectHelper.SkipConstructor<CharacterObject>();
+        var fullName = new TextObject("Existing full name");
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        hero.SetName(fullName, null);
+        var repairer = CreateRepairer(new FakeCharacterObjectCreator(replacement));
+
+        Assert.True(repairer.TryRepair(hero));
+
+        Assert.Same(fullName, hero.FirstName);
+        Assert.Same(fullName, hero.Name);
     }
 
     [Fact]
