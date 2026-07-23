@@ -144,6 +144,28 @@ public class ServerBattleModeArbiterTests
         }
     }
 
+    [Fact]
+    public void IsMissionClaimed_DistinguishesMissionFromSimulation()
+    {
+        const string mapEventId = "mission-claim-mode";
+
+        try
+        {
+            Assert.False(ServerBattleModeArbiter.IsMissionClaimed(mapEventId));
+
+            Assert.True(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
+            Assert.False(ServerBattleModeArbiter.IsMissionClaimed(mapEventId));
+
+            ServerBattleModeArbiter.Release(mapEventId);
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId));
+            Assert.True(ServerBattleModeArbiter.IsMissionClaimed(mapEventId));
+        }
+        finally
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+        }
+    }
+
     // The mutual exclusion is scoped per map event (BR-001 addresses "a map event"): two distinct events are
     // independent battles and can hold opposite modes at once, each still excluding its own opposite.
     [Fact]
