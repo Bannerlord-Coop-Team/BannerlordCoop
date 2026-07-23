@@ -4,8 +4,8 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
@@ -15,6 +15,7 @@ using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
+using Helpers;
 using ProtoBuf;
 using Serilog;
 using System;
@@ -25,14 +26,18 @@ using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -80,6 +85,17 @@ public class MapEventDebugCommands
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out objectManager);
+    }
+
+    private static bool MatchesPartyId(IObjectManager objectManager, MobileParty party, string id)
+    {
+        if (party == null || string.IsNullOrEmpty(id)) return false;
+        if (party.StringId == id) return true;
+        if (objectManager.TryGetId(party, out string mobilePartyId) && mobilePartyId == id) return true;
+
+        return party.Party != null &&
+               objectManager.TryGetId(party.Party, out string partyBaseId) &&
+               partyBaseId == id;
     }
 
     /// <summary>
@@ -192,7 +208,7 @@ public class MapEventDebugCommands
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
     }
 
-    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
+    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne [excludedPartyId]
     /// <summary>
     /// Starts a server-authoritative bandit attack encounter against a connected player.
     /// </summary>
@@ -204,45 +220,22 @@ public class MapEventDebugCommands
             return "Run this command on the server.";
         }
 
-        if (args.Count != 1)
+        if (args.Count < 1 || args.Count > 2)
         {
-            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId>";
+            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId> [excludedPartyId]";
         }
 
-        if (!TryGetObjectManager(out var objectManager))
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
         {
-            return "Unable to resolve ObjectManager";
+            return error;
         }
 
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
-        {
-            return "Unable to resolve PlayerManager";
-        }
-
-        if (!playerManager.TryGetPlayer(args[0], out var player))
-        {
-            return $"No registered player has controller id {args[0]}.";
-        }
-
-        if (!playerManager.IsConnected(player))
-        {
-            return $"Player {args[0]} is not connected.";
-        }
-
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
-        {
-            return $"Unable to resolve player party {player.MobilePartyId}.";
-        }
-
-        if (playerParty.MapEvent != null)
-        {
-            return $"Player {args[0]} is already in a map event.";
-        }
-
+        var excludedPartyId = args.Count == 2 ? args[1] : null;
         var playerPosition = playerParty.Position.ToVec2();
         var banditParty = MobileParty.All
             .Where(p => p.IsActive && p.IsBandit && p != playerParty
-                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0)
+                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0
+                        && !MatchesPartyId(objectManager, p, excludedPartyId))
             .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
             .FirstOrDefault();
 
@@ -256,9 +249,144 @@ public class MapEventDebugCommands
         var partyId = objectManager.TryGetId(banditParty, out string registryId)
             ? registryId
             : banditParty.StringId;
+        var partyBaseId = objectManager.TryGetId(banditParty.Party, out string partyBaseRegistryId)
+            ? partyBaseRegistryId
+            : "<unregistered>";
 
-        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
+        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, " +
+               $"registry id {partyId}, PartyBase id {partyBaseId}) " +
                $"against player {args[0]}.";
+    }
+
+    [CommandLineArgumentFunction("leave_settlement", "coop.debug.mapevent")]
+    public static string LeaveSettlement(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.leave_settlement <controllerId>";
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return "Unable to resolve PlayerManager";
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+            return $"No registered player has controller id {args[0]}.";
+
+        if (!playerManager.IsConnected(player))
+            return $"Player {args[0]} is not connected.";
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+            return $"Unable to resolve player party {player.MobilePartyId}.";
+
+        var settlement = playerParty.CurrentSettlement;
+        if (settlement == null)
+            return $"Player {args[0]} is already outside a settlement.";
+
+        LeaveSettlementAction.ApplyForParty(playerParty);
+        return $"Moved player {args[0]} out of {settlement.Name}.";
+    }
+
+    [CommandLineArgumentFunction("finish_current_encounter", "coop.debug.mapevent")]
+    public static string FinishCurrentEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.finish_current_encounter";
+
+        if (PlayerEncounter.Current == null)
+            return "No active encounter.";
+
+        PlayerEncounter.Finish();
+        return "Finished the current local encounter.";
+    }
+
+    [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
+    public static string EnterCurrentBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.enter_current_battle";
+
+        if (PlayerEncounter.Current == null)
+            return "No active encounter.";
+
+        if (PlayerEncounter.Battle == null)
+        {
+            if (PlayerEncounter.StartBattle() == null)
+                return "Unable to start the current battle.";
+
+            GameMenu.SwitchToMenu("encounter");
+        }
+
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext == null)
+            return "No active encounter menu.";
+
+        MenuHelper.EncounterAttackConsequence(new MenuCallbackArgs(menuContext, null));
+        return "Requested entry into the current battle.";
+    }
+
+    // coop.debug.mapevent.finish_player_encounter PlayerOne
+    /// <summary>
+    /// Requests the connected client's encounter close through the existing authoritative leave message.
+    /// </summary>
+    [CommandLineArgumentFunction("finish_player_encounter", "coop.debug.mapevent")]
+    public static string FinishPlayerEncounter(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.finish_player_encounter <controllerId>";
+        }
+
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+        {
+            return "Unable to resolve Network";
+        }
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+        {
+            return error;
+        }
+
+        if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var partyBaseId))
+        {
+            return $"Unable to resolve PartyBase for player {args[0]}.";
+        }
+
+        network.SendAll(new NetworkPartyLeftBattle(partyBaseId));
+        return $"Requested encounter finish for player {args[0]} (PartyBase id {partyBaseId}).";
+    }
+
+    // coop.debug.mapevent.conversation_hold_state <partyBaseId>
+    /// <summary>
+    /// Reports whether the server currently holds an AI PartyBase for a conversation.
+    /// </summary>
+    [CommandLineArgumentFunction("conversation_hold_state", "coop.debug.mapevent")]
+    public static string ConversationHoldState(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.conversation_hold_state <partyBaseId>";
+        }
+
+        var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
+        return $"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.";
     }
 
     // coop.debug.mapevent.late_join_mode_fixture PlayerOne PlayerTwo
@@ -1192,9 +1320,9 @@ public class MapEventDebugCommands
         {
             sb.AppendLine($"\tBattle:           {FormatMapEvent(PlayerEncounter.Battle, objectManager)}");
             sb.AppendLine($"\t_mapEvent:        {FormatMapEvent(encounter._mapEvent, objectManager)}");
-            sb.AppendLine($"\tEncounteredParty: {FormatPartyBase(PlayerEncounter.EncounteredParty)}");
-            sb.AppendLine($"\t_attackerParty:   {FormatPartyBase(encounter._attackerParty)}");
-            sb.AppendLine($"\t_defenderParty:   {FormatPartyBase(encounter._defenderParty)}");
+            sb.AppendLine($"\tEncounteredParty: {FormatPartyBaseWithId(PlayerEncounter.EncounteredParty, objectManager)}");
+            sb.AppendLine($"\t_attackerParty:   {FormatPartyBaseWithId(encounter._attackerParty, objectManager)}");
+            sb.AppendLine($"\t_defenderParty:   {FormatPartyBaseWithId(encounter._defenderParty, objectManager)}");
         }
 
         var mainParty = MobileParty.MainParty;
@@ -1204,9 +1332,10 @@ public class MapEventDebugCommands
         if (side == null)
             sb.AppendLine("MainParty.MapEventSide:  <null>");
         else
-            sb.AppendLine($"MainParty.MapEventSide:  leader={FormatPartyBase(side.LeaderParty)} mainPartyIsLeader={side.LeaderParty == mainParty?.Party}");
+            sb.AppendLine($"MainParty.MapEventSide:  leader={FormatPartyBaseWithId(side.LeaderParty, objectManager)} mainPartyIsLeader={side.LeaderParty == mainParty?.Party}");
 
         sb.AppendLine($"CurrentMenu:             {Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>"}");
+        sb.AppendLine($"CurrentBattleSimulation: {(PlayerEncounter.CurrentBattleSimulation == null ? "<null>" : "PRESENT")}");
         sb.AppendLine($"MissionState.Current:    {(MissionState.Current == null ? "<null>" : "PRESENT")}");
 
         var result = sb.ToString();
@@ -1214,12 +1343,106 @@ public class MapEventDebugCommands
         return result;
     }
 
+    /// <summary>Shows, closes, or reports the live retreat confirmation for automated battle-exit testing.</summary>
+    [CommandLineArgumentFunction("retreat_confirmation", "coop.debug.mapevent")]
+    public static string RetreatConfirmation(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client in a battle mission.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.retreat_confirmation <show|accept|cancel|state>";
+
+        var handler = Mission.Current?.GetMissionBehavior<BasicMissionHandler>();
+        if (handler == null)
+            return "No active battle retreat handler.";
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "show":
+                if (handler.IsWarningWidgetOpened)
+                    return "Retreat confirmation already open: true";
+
+                handler.CreateWarningWidgetForResult(BattleEndLogic.ExitResult.NeedsPlayerConfirmation);
+                return $"Retreat confirmation open: {handler.IsWarningWidgetOpened}";
+            case "accept":
+                if (!handler.IsWarningWidgetOpened)
+                    return "Retreat confirmation is not open.";
+
+                InformationManager.HideInquiry();
+                handler.OnEventAcceptSelectionWidget();
+                return "Retreat confirmation accepted.";
+            case "cancel":
+                if (!handler.IsWarningWidgetOpened)
+                    return "Retreat confirmation is not open.";
+
+                InformationManager.HideInquiry();
+                handler.OnEventCancelSelectionWidget();
+                return $"Retreat confirmation open: {handler.IsWarningWidgetOpened}";
+            case "state":
+                return $"Retreat confirmation open: {handler.IsWarningWidgetOpened}";
+            default:
+                return "Usage: coop.debug.mapevent.retreat_confirmation <show|accept|cancel|state>";
+        }
+    }
+
+    /// <summary>Closes the current encounter conversation so vanilla can advance to battle choices.</summary>
+    [CommandLineArgumentFunction("complete_encounter_meeting", "coop.debug.mapevent")]
+    public static string CompleteEncounterMeeting(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client at the encounter meeting.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.complete_encounter_meeting";
+
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "encounter_meeting")
+            return "The encounter meeting is not active.";
+
+        var conversationManager = Campaign.Current.ConversationManager;
+        if (!conversationManager.IsConversationInProgress)
+            return "The encounter conversation is not active.";
+
+        conversationManager.EndConversation();
+        return "Encounter meeting completed.";
+    }
+
+    /// <summary>Runs the encounter menu's mission or simulation consequence for automated battle testing.</summary>
+    [CommandLineArgumentFunction("choose_battle_mode", "coop.debug.mapevent")]
+    public static string ChooseBattleMode(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client at the encounter menu.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.choose_battle_mode <mission|simulation>";
+
+        if (PlayerEncounter.Current == null)
+            return "No active player encounter.";
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<EncounterGameMenuBehavior>();
+        if (behavior == null)
+            return "Encounter menu behavior is unavailable.";
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "mission":
+                behavior.game_menu_encounter_attack_on_consequence(null);
+                return "Mission battle requested.";
+            case "simulation":
+                behavior.game_menu_encounter_order_attack_on_consequence(null);
+                return "Battle simulation requested.";
+            default:
+                return "Usage: coop.debug.mapevent.choose_battle_mode <mission|simulation>";
+        }
+    }
+
     private static string FormatMapEvent(MapEvent mapEvent, IObjectManager objectManager)
     {
         if (mapEvent == null) return "<null>";
 
         var id = "<no id>";
-        if (objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
+        if (!mapEvent.IsFinalized && objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
             id = resolved;
 
         return $"id={id} finalized={mapEvent.IsFinalized} state={mapEvent.BattleState} winner={mapEvent.WinningSide}";
@@ -1521,6 +1744,18 @@ public class MapEventDebugCommands
         var name = party.Name?.ToString() ?? "<no name>";
 
         return name;
+    }
+
+    private static string FormatPartyBaseWithId(PartyBase party, IObjectManager objectManager)
+    {
+        if (party == null)
+            return "<null>";
+
+        var partyBaseId = objectManager != null && objectManager.TryGetId(party, out string resolvedPartyBaseId)
+            ? resolvedPartyBaseId
+            : "<unregistered>";
+
+        return $"{FormatPartyBase(party)} (PartyBase id {partyBaseId})";
     }
 
     private static string GetFriendlyTypeName(Type type)
