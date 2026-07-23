@@ -141,6 +141,23 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void RejoinRequestWhileStillMember_ReadThrows_LeavesLobbyAndReportsFailure()
+        {
+            SetupLobby(42);
+            api.RaiseLobbyJoinRequested(42);
+            Assert.True(listener.IsInLobby);
+
+            // A lobby read throwing on the re-resolve must not strand the join in the lobby:
+            // release the membership and surface the failure, same as the OnLobbyEntered path.
+            api.ThrowOnGetLobbyData = true;
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
+            Assert.Single(failed);
+        }
+
+        [Fact]
         public void ConnectString_JoinsReferencedLobby()
         {
             SetupLobby(42);
