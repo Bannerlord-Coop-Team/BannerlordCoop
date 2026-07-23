@@ -83,6 +83,67 @@ public class NetworkBarterSerializationTest
     }
 
     [Fact]
+    public void LordBarterRequest_RoundTrip_PreservesSafePassageContextAndTerms()
+    {
+        var original = new NetworkRequestLordBarter(
+            "target-lord",
+            PeaceConversationContext.MapParty,
+            "target-party",
+            LordBarterKind.SafePassage,
+            new[]
+            {
+                new PeaceBarterTerm(PeaceBarterTermType.Gold, "player-hero", null, null, true, 500),
+            },
+            "lord-request");
+
+        var result = RoundTrip(original);
+
+        Assert.Equal("target-lord", result.TargetHeroId);
+        Assert.Equal((int)PeaceConversationContext.MapParty, result.Context);
+        Assert.Equal((int)LordBarterKind.SafePassage, result.Kind);
+        Assert.Equal("target-party", result.ContextId);
+        Assert.Equal("lord-request", result.RequestId);
+        Assert.Equal(500, Assert.Single(result.Terms).Amount);
+    }
+
+    [Fact]
+    public void LordBarterResult_RoundTrip_PreservesAuthoritativeGold()
+    {
+        var result = RoundTrip(new NetworkLordBarterResult("target-party", true, 350, null, "lord-request"));
+
+        Assert.True(result.Accepted);
+        Assert.Equal(350, result.PlayerGold);
+        Assert.Equal("lord-request", result.RequestId);
+    }
+
+    [Fact]
+    public void LordBarterAuthorization_RoundTrip_PreservesExactContextAndKind()
+    {
+        var original = new NetworkAuthorizeLordBarter(
+            "lord-request",
+            "target-lord",
+            PeaceConversationContext.MapParty,
+            "target-party",
+            LordBarterKind.JoinKingdomAsClan);
+
+        var result = RoundTrip(original);
+
+        Assert.Equal("lord-request", result.RequestId);
+        Assert.Equal("target-lord", result.TargetHeroId);
+        Assert.Equal((int)PeaceConversationContext.MapParty, result.Context);
+        Assert.Equal("target-party", result.ContextId);
+        Assert.Equal((int)LordBarterKind.JoinKingdomAsClan, result.Kind);
+    }
+
+    [Fact]
+    public void LordBarterAuthorizationCancellation_RoundTrip_PreservesCorrelation()
+    {
+        var result = RoundTrip(new NetworkCancelLordBarterAuthorization("lord-request"));
+
+        Assert.Equal("lord-request", result.RequestId);
+    }
+
+    [Fact]
     public void MarriageBarterRequest_RoundTrip_PreservesParticipantsContextAndTerms()
     {
         var original = new NetworkRequestMarriageBarter(
