@@ -250,22 +250,6 @@ public class MapEventDebugCommands
                $"against player {args[0]} after removing {removedTroops} excess fixture troops.";
     }
 
-    [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
-    public static string EnterCurrentBattle(List<string> args)
-    {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
-
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.enter_current_battle";
-
-        if (PlayerEncounter.Current == null || PlayerEncounter.Battle == null)
-            return "No active battle encounter.";
-
-        MenuHelper.EncounterAttackConsequence(null);
-        return "Requested entry into the current battle.";
-    }
-
     [CommandLineArgumentFunction("finish_non_battle_encounter", "coop.debug.mapevent")]
     public static string FinishNonBattleEncounter(List<string> args)
     {
