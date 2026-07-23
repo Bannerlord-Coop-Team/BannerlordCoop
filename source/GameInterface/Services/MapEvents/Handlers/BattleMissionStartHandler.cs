@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -13,8 +13,8 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Encounters;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -406,11 +406,9 @@ internal class BattleMissionStartHandler : IHandler
         }
     }
 
-    /// <summary>[Client] Re-validates everything a mission open depends on: the encounter can end (or
-    /// another mission can open) between the server round-trip and the queued open running, and a
-    /// finalized battle keeps PlayerEncounter.Battle set while releasing the main party. The
-    /// MissionState check covers a second start queued in the same frame (it is set synchronously by
-    /// the state push, unlike Mission.Current).</summary>
+    /// <summary>[Client] Re-validates everything a mission open depends on: the battle can end (or
+    /// another mission can open) between the server round-trip and the queued open running. The
+    /// MissionState check covers a second start queued in the same frame.</summary>
     private bool TryGetValidBattle(string messageName, string expectedMapEventId, out MapEvent battle)
     {
         battle = null;
@@ -420,22 +418,16 @@ internal class BattleMissionStartHandler : IHandler
             return false;
         }
 
-        battle = PlayerEncounter.Battle;
+        battle = MobileParty.MainParty?.MapEvent;
         if (battle == null)
         {
-            Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening the mission", messageName);
+            Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening the mission", messageName);
             return false;
         }
 
         if (!MatchesMapEventId(objectManager, battle, expectedMapEventId))
         {
             Logger.Warning("Received {Message} for map event {MapEventId}, but the local player is not in that battle; not opening the mission", messageName, expectedMapEventId);
-            return false;
-        }
-
-        if (MobileParty.MainParty?.MapEvent == null)
-        {
-            Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening the mission", messageName);
             return false;
         }
 
@@ -448,7 +440,6 @@ internal class BattleMissionStartHandler : IHandler
         return true;
     }
 
-    /// <summary>Pure routing check shared by the queued siege-open path and its regression tests.</summary>
     internal static bool MatchesMapEventId(IObjectManager objectManager, MapEvent battle, string expectedMapEventId)
     {
         return objectManager != null
@@ -463,37 +454,8 @@ internal class BattleMissionStartHandler : IHandler
         bool spawnGateEngaged = false;
         try
         {
-            // The encounter can end (or another mission can open) between the server
-            // round-trip and this running, so everything the mission depends on is
-            // re-validated here rather than at message arrival.
-            if (Campaign.Current == null)
-            {
-                Logger.Warning("Received {Message} but the campaign was not loaded, not opening battle mission", nameof(NetworkStartAttackMission));
+            if (!TryGetValidBattle(nameof(NetworkStartAttackMission), mapEventId, out var battle))
                 return;
-            }
-
-            var battle = PlayerEncounter.Battle;
-            if (battle == null)
-            {
-                Logger.Warning("Received {Message} but PlayerEncounter.Battle was null, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
-
-            if (!ContainerProvider.TryResolve(out IObjectManager objectManager) ||
-                !objectManager.TryGetId(battle, out var battleMapEventId) ||
-                battleMapEventId != mapEventId)
-            {
-                Logger.Warning("Received {Message} for map event {MapEventId}, but the local player is not in that battle; not opening battle mission", nameof(NetworkStartAttackMission), mapEventId);
-                return;
-            }
-
-            // A finalized battle keeps PlayerEncounter.Battle set but releases the
-            // main party from the map event, which the mission setup dereferences.
-            if (MobileParty.MainParty?.MapEvent == null)
-            {
-                Logger.Warning("Received {Message} but the main party is no longer in a map event, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
 
             objectManager.TryGetId(MobileParty.MainParty, out var localPartyId);
             if (!ShouldOpenBattleMission(Hero.MainHero?.IsWounded == true, localPartyId, initiatingPartyId))
@@ -502,17 +464,7 @@ internal class BattleMissionStartHandler : IHandler
                 return;
             }
 
-            // Pressing attack again while the request is in flight produces a second
-            // mission start; opening on top of the running mission corrupts the game
-            // state stack. MissionState.Current is set synchronously by the state
-            // push, unlike Mission.Current which is only set on the mission's first
-            // tick, so it also covers two mission starts queued in the same frame.
-            if (MissionState.Current != null)
-            {
-                Logger.Warning("Received {Message} but a mission is already open, not opening battle mission", nameof(NetworkStartAttackMission));
-                return;
-            }
-
+            InitializePlayerEncounter(battle);
             MissionInitializerRecord rec2 = missionInitializerResolver.Create(battle, randomTerrainSeed, atmosphereOnCampaign);
 
             // Engage the spawn gate BEFORE OpenBattleMission builds the mission — the deployment controller
@@ -521,9 +473,9 @@ internal class BattleMissionStartHandler : IHandler
             // who fields which troops is decided by the server-fed reserves (CoopTroopSupplier).
             if (BattleSpawnConfig.Enabled)
             {
-                BattleSpawnGate.BeginBattle(battleMapEventId);
+                BattleSpawnGate.BeginBattle(mapEventId);
                 spawnGateEngaged = true;
-                Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", battleMapEventId);
+                Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", mapEventId);
             }
 
             // Coop opens a custom battle mission (per-client troop suppliers) instead of the native one; the
@@ -553,6 +505,31 @@ internal class BattleMissionStartHandler : IHandler
         {
             UnwindSpawnGateAfterFailedOpen(spawnGateEngaged);
         }
+    }
+
+    internal static void InitializePlayerEncounter(MapEvent battle)
+    {
+        if (PlayerEncounter.Battle == battle)
+            return;
+
+        PlayerEncounter.Start();
+        var encounter = PlayerEncounter.Current;
+        var playerSide = battle.PlayerSide;
+        var opponentSide = playerSide.GetOppositeSide();
+        var opponentParty = playerSide == BattleSideEnum.Attacker
+            ? battle.DefenderSide.LeaderParty
+            : battle.AttackerSide.LeaderParty;
+
+        // The server already assigned map-event membership; restore this client's joined-battle context.
+        encounter._attackerParty = playerSide == BattleSideEnum.Attacker ? PartyBase.MainParty : opponentParty;
+        encounter._defenderParty = playerSide == BattleSideEnum.Defender ? PartyBase.MainParty : opponentParty;
+        encounter._encounteredParty = opponentParty;
+        encounter._mapEvent = battle;
+        encounter.PlayerSide = playerSide;
+        encounter.OpponentSide = opponentSide;
+        encounter.EncounterSettlementAux = battle.MapEventSettlement;
+        encounter.PlayerPartyInitialStrength = PartyBase.MainParty.CalculateCurrentStrength();
+        encounter.IsJoinedBattle = true;
     }
 
     internal static void UnwindSpawnGateAfterFailedOpen(bool spawnGateEngaged)

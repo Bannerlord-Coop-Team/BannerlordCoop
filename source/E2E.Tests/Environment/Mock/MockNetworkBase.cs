@@ -29,6 +29,7 @@ public abstract class MockNetworkBase : INetwork
     public NetPeer NetPeer { get; } = NetPeerExtensions.CreatePeer();
 
     public MessageCollection NetworkSentMessages { get; } = new MessageCollection();
+    public MessageCollection NetworkSentImmediateMessages { get; } = new MessageCollection();
     public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
 
     public void ReceiveFromNetwork(NetPeer peer, IPacket packet) => packetManager.HandleReceive(peer, packet);
@@ -49,7 +50,11 @@ public abstract class MockNetworkBase : INetwork
 
     public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
 
-    public void SendImmediate(NetPeer netPeer, IMessage message) => Send(netPeer, message);
+    public void SendImmediate(NetPeer netPeer, IMessage message)
+    {
+        NetworkSentImmediateMessages.Add(message);
+        Send(netPeer, message);
+    }
 
     public void SendAll(IPacket packet)
     {

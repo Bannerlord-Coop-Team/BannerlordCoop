@@ -422,20 +422,7 @@
         </Widget>
         <Widget WidthSizePolicy="Fixed" HeightSizePolicy="CoverChildren" SuggestedWidth="360" IsVisible="@IsCurrentMatchActive">
           <Children>
-            <TournamentMatchWidget DataSource="{CurrentMatch}" WidthSizePolicy="StretchToParent"
-                                   HeightSizePolicy="CoverChildren" IsVisible="@IsValid" State="@State">
-              <Children>
-                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-                           VerticalAlignment="Center" StackLayout.LayoutMethod="VerticalBottomToTop">
-                  <Children>
-                    <Tournament.Team DataSource="{Team1}" Parameter.OnMission="true" />
-                    <Tournament.Team DataSource="{Team2}" Parameter.OnMission="true" />
-                    <Tournament.Team DataSource="{Team3}" Parameter.OnMission="true" />
-                    <Tournament.Team DataSource="{Team4}" Parameter.OnMission="true" />
-                  </Children>
-                </ListPanel>
-              </Children>
-            </TournamentMatchWidget>
+            <Tournament.Match DataSource="{CurrentMatch}" Parameter.OnMission="true" />
           </Children>
         </Widget>
       </Children>

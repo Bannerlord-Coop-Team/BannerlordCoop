@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Utils.Commands;
 using Serilog;
 using System;
@@ -6,10 +7,13 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Scoreboard;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
@@ -23,6 +27,10 @@ namespace GameInterface.Services.MapEvents.Commands;
 internal class BattleTeamKillCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
+
+    private const string ScoreboardMovieName = "SPScoreboard";
+    private const string PartyScoreToggleWidgetId = "PartyScoreToggleWidget";
+    private const string PartyDetailsWidgetId = "PartyDetails";
 
     private const string ClickDeploymentReadyUsage =
 @"Usage:
@@ -86,16 +94,16 @@ Finishes the current battle deployment through the native deployment handler.";
         return "Finished the current deployment.";
     }
 
-    private const string PressScoreboardTabUsage =
+    private const string ToggleScoreboardUsage =
 @"Usage:
-  coop.debug.mapevent.press_scoreboard_tab
+  coop.debug.mapevent.toggle_scoreboard
 
-Presses or releases Tab through the native hold-to-show scoreboard input path.";
+Holds or releases the native scoreboard input without requiring window focus.";
 
-    [CommandLineArgumentFunction("press_scoreboard_tab", "coop.debug.mapevent")]
-    public static string PressScoreboardTab(List<string> args)
+    [CommandLineArgumentFunction("toggle_scoreboard", "coop.debug.mapevent")]
+    public static string ToggleScoreboard(List<string> args)
     {
-        var ctx = new CommandContext("press_scoreboard_tab", PressScoreboardTabUsage, args);
+        var ctx = new CommandContext("toggle_scoreboard", ToggleScoreboardUsage, args);
         if (!ctx.RequireArgCount(0, out var error))
             return error;
 
@@ -107,22 +115,60 @@ Presses or releases Tab through the native hold-to-show scoreboard input path.";
         if (scoreboard?.DataSource == null)
             return "Failed: no battle scoreboard UI.";
 
-        var tabHold = mission.GetMissionBehavior<ScoreboardTabHoldBehavior>();
-        if (tabHold == null)
+        if (mission.InputManager is ScoreboardInputContext scoreboardInput)
         {
-            mission.AddMissionBehavior(new ScoreboardTabHoldBehavior());
-            return "Pressed and holding Tab through the native scoreboard input path.";
+            mission.InputManager = scoreboardInput.Inner;
+            return "Released the native scoreboard input.";
         }
+        if (mission.InputManager == null)
+            return "Failed: no mission input context.";
 
-        mission.RemoveMissionBehavior(tabHold);
-        return "Released Tab through the native scoreboard input path.";
+        mission.InputManager = new ScoreboardInputContext(mission.InputManager);
+        return "Holding the native scoreboard input.";
+    }
+
+    private const string CollapseScoreboardPartiesUsage =
+@"Usage:
+  coop.debug.mapevent.collapse_scoreboard_parties
+
+Collapses every native scoreboard party roster and returns the scroll position to the top.";
+
+    [CommandLineArgumentFunction("collapse_scoreboard_parties", "coop.debug.mapevent")]
+    public static string CollapseScoreboardParties(List<string> args)
+    {
+        var ctx = new CommandContext("collapse_scoreboard_parties", CollapseScoreboardPartiesUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var scoreboard = Mission.Current?.GetMissionBehavior<MissionGauntletBattleScore>();
+        var dataSource = scoreboard?.DataSource;
+        if (dataSource == null)
+            return "Failed: no battle scoreboard UI.";
+
+        if (!TryGetScoreboardWidgets(scoreboard, out var scrollablePanel, out var partyHeaderCount, out var partyDetails))
+            return "Failed: native scoreboard widgets are not loaded.";
+
+        var expectedPartyCount = dataSource.Attackers.Parties.Count + dataSource.Defenders.Parties.Count;
+        if (partyHeaderCount != expectedPartyCount || partyDetails.Count != expectedPartyCount)
+            return $"Failed: found {partyHeaderCount} native party headers and {partyDetails.Count} party detail panels, " +
+                   $"expected {expectedPartyCount} each.";
+
+        var verticalScrollbar = scrollablePanel.VerticalScrollbar;
+
+        foreach (var partyDetail in partyDetails)
+            partyDetail.IsVisible = false;
+
+        scrollablePanel.ResetTweenSpeed();
+        verticalScrollbar.ValueFloat = verticalScrollbar.MinValue;
+        scrollablePanel.SetVerticalScrollTarget(verticalScrollbar.MinValue, 0f);
+        return $"Collapsed native party details: {partyHeaderCount}/{expectedPartyCount}.";
     }
 
     private const string ScoreboardStateUsage =
 @"Usage:
   coop.debug.mapevent.scoreboard_state
 
-Lists the map-event parties and the party rows currently loaded by the battle scoreboard.";
+Lists the map-event parties and party rows currently loaded by the battle scoreboard.";
 
     [CommandLineArgumentFunction("scoreboard_state", "coop.debug.mapevent")]
     public static string ScoreboardState(List<string> args)
@@ -140,10 +186,19 @@ Lists the map-event parties and the party rows currently loaded by the battle sc
         if (dataSource == null)
             return "Failed: no battle scoreboard UI.";
 
-        var expectedParties = MobileParty.MainParty?.MapEvent?.InvolvedParties
+        var mapEvent = MobileParty.MainParty?.MapEvent;
+        if (mapEvent == null)
+            return "Failed: the main party has no current map event.";
+
+        var expectedParties = mapEvent.InvolvedParties
             .Where(party => party != null)
             .Distinct()
-            .ToArray() ?? Array.Empty<PartyBase>();
+            .ToArray();
+        var expectedPlayerParties = expectedParties
+            .Where(party => party.MobileParty?.IsPlayerParty() == true)
+            .ToArray();
+        if (expectedPlayerParties.Length == 0)
+            return "Failed: the current map event has no registered player parties.";
         var scoreboardParties = dataSource.Attackers.Parties
             .Concat(dataSource.Defenders.Parties)
             .Select(party => party.BattleCombatant)
@@ -151,11 +206,55 @@ Lists the map-event parties and the party rows currently loaded by the battle sc
             .Distinct()
             .ToArray();
         var missingParties = expectedParties.Except(scoreboardParties).ToArray();
+        var missingPlayerParties = expectedPlayerParties.Except(scoreboardParties).ToArray();
+        var expandedPartyDetails = 0;
+        var scrollTop = false;
+        var nativeWidgetsLoaded = TryGetScoreboardWidgets(
+            scoreboard,
+            out var scrollablePanel,
+            out var partyHeaderCount,
+            out var partyDetails);
+        if (nativeWidgetsLoaded)
+        {
+            expandedPartyDetails = partyDetails.Count(details => details.IsVisible);
+            var scrollbar = scrollablePanel.VerticalScrollbar;
+            scrollTop = Math.Abs(scrollbar.ValueFloat - scrollbar.MinValue) < 0.01f;
+        }
 
         return $"Visible: {dataSource.ShowScoreboard}; " +
                $"Expected parties ({expectedParties.Length}): {FormatPartyNames(expectedParties)}; " +
+               $"Expected player parties ({expectedPlayerParties.Length}): {FormatPartyNames(expectedPlayerParties)}; " +
                $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
-               $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}";
+               $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}; " +
+               $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}; " +
+               $"Native widgets loaded: {nativeWidgetsLoaded}; " +
+               $"Party headers ({partyHeaderCount}); Expanded party details ({expandedPartyDetails}); Scroll top: {scrollTop}";
+    }
+
+    private static bool TryGetScoreboardWidgets(
+        MissionGauntletBattleScore scoreboard,
+        out ScrollablePanel scrollablePanel,
+        out int partyHeaderCount,
+        out List<Widget> partyDetails)
+    {
+        scrollablePanel = null;
+        partyHeaderCount = 0;
+        partyDetails = new List<Widget>();
+
+        var rootWidget = scoreboard.MissionScreen?.Layers
+            .OfType<GauntletLayer>()
+            .Select(layer => layer.GetMovieIdentifier(ScoreboardMovieName))
+            .FirstOrDefault(identifier => identifier?.Movie?.RootWidget != null)?
+            .Movie.RootWidget;
+        if (rootWidget == null)
+            return false;
+
+        var widgets = rootWidget.GetAllChildrenRecursive();
+        scrollablePanel = widgets.OfType<ScrollablePanel>()
+            .FirstOrDefault(panel => panel.VerticalScrollbar != null);
+        partyHeaderCount = widgets.Count(widget => widget.Id == PartyScoreToggleWidgetId);
+        partyDetails = widgets.Where(widget => widget.Id == PartyDetailsWidgetId).ToList();
+        return scrollablePanel != null;
     }
 
     private static string FormatPartyNames(IEnumerable<PartyBase> parties)
@@ -164,67 +263,46 @@ Lists the map-event parties and the party rows currently loaded by the battle sc
         return names.Length == 0 ? "<none>" : string.Join(", ", names);
     }
 
-    private sealed class ScoreboardTabHoldBehavior : MissionLogic
+    private sealed class ScoreboardInputContext : IInputContext
     {
-        private IInputContext _originalInputContext;
-        private IInputContext _scoreboardInputContext;
+        public IInputContext Inner { get; }
 
-        public override void OnCreated()
+        public ScoreboardInputContext(IInputContext inner)
         {
-            base.OnCreated();
-            _originalInputContext = Mission.InputManager;
-            _scoreboardInputContext = new ScoreboardTabInputContext(_originalInputContext);
-            Mission.InputManager = _scoreboardInputContext;
+            Inner = inner;
         }
 
-        public override void OnRemoveBehavior()
-        {
-            if (ReferenceEquals(Mission.InputManager, _scoreboardInputContext))
-                Mission.InputManager = _originalInputContext;
-
-            base.OnRemoveBehavior();
-        }
-    }
-
-    private sealed class ScoreboardTabInputContext : IInputContext
-    {
-        private readonly IInputContext _inner;
-
-        public ScoreboardTabInputContext(IInputContext inner)
-        {
-            _inner = inner;
-        }
-
-        public int GetPointerX() => _inner.GetPointerX();
-        public int GetPointerY() => _inner.GetPointerY();
-        public System.Numerics.Vector2 GetPointerPosition() => _inner.GetPointerPosition();
-        public bool IsGameKeyDown(int gameKey) => _inner.IsGameKeyDown(gameKey);
-        public bool IsGameKeyDownImmediate(int gameKey) => _inner.IsGameKeyDownImmediate(gameKey);
-        public bool IsGameKeyPressed(int gameKey) => _inner.IsGameKeyPressed(gameKey);
-        public bool IsGameKeyReleased(int gameKey) => _inner.IsGameKeyReleased(gameKey);
-        public float GetGameKeyAxis(string gameAxisKey) => _inner.GetGameKeyAxis(gameAxisKey);
-        public bool IsHotKeyDown(string hotKey) => hotKey == "HoldShow" || _inner.IsHotKeyDown(hotKey);
-        public bool IsHotKeyReleased(string hotKey) => _inner.IsHotKeyReleased(hotKey);
-        public bool IsHotKeyPressed(string hotKey) => _inner.IsHotKeyPressed(hotKey);
-        public bool IsHotKeyDoublePressed(string hotKey) => _inner.IsHotKeyDoublePressed(hotKey);
-        public Vec2 GetKeyState(InputKey key) => _inner.GetKeyState(key);
-        public bool IsKeyDown(InputKey key) => _inner.IsKeyDown(key);
-        public bool IsKeyPressed(InputKey key) => _inner.IsKeyPressed(key);
-        public bool IsKeyReleased(InputKey key) => _inner.IsKeyReleased(key);
-        public float GetMouseMoveX() => _inner.GetMouseMoveX();
-        public float GetMouseMoveY() => _inner.GetMouseMoveY();
-        public bool GetIsMouseActive() => _inner.GetIsMouseActive();
-        public Vec2 GetMousePositionPixel() => _inner.GetMousePositionPixel();
-        public float GetDeltaMouseScroll() => _inner.GetDeltaMouseScroll();
-        public bool GetIsControllerConnected() => _inner.GetIsControllerConnected();
-        public Vec2 GetMousePositionRanged() => _inner.GetMousePositionRanged();
-        public float GetMouseSensitivity() => _inner.GetMouseSensitivity();
-        public bool IsControlDown() => _inner.IsControlDown();
-        public bool IsShiftDown() => _inner.IsShiftDown();
-        public bool IsAltDown() => _inner.IsAltDown();
-        public Vec2 GetControllerRightStickState() => _inner.GetControllerRightStickState();
-        public Vec2 GetControllerLeftStickState() => _inner.GetControllerLeftStickState();
-        public InputKey[] GetClickKeys() => _inner.GetClickKeys();
+        public int GetPointerX() => Inner.GetPointerX();
+        public int GetPointerY() => Inner.GetPointerY();
+        public System.Numerics.Vector2 GetPointerPosition() => Inner.GetPointerPosition();
+        public bool IsGameKeyDown(int gameKey) => Inner.IsGameKeyDown(gameKey);
+        public bool IsGameKeyDownImmediate(int gameKey) => Inner.IsGameKeyDownImmediate(gameKey);
+        public bool IsGameKeyPressed(int gameKey) => Inner.IsGameKeyPressed(gameKey);
+        public bool IsGameKeyReleased(int gameKey) => Inner.IsGameKeyReleased(gameKey);
+        public float GetGameKeyAxis(string gameAxisKey) => Inner.GetGameKeyAxis(gameAxisKey);
+        public bool IsHotKeyDown(string hotKey) =>
+            hotKey == ScoreboardHotKeyCategory.HoldShow || Inner.IsHotKeyDown(hotKey);
+        public bool IsHotKeyReleased(string hotKey) => Inner.IsHotKeyReleased(hotKey);
+        public bool IsHotKeyPressed(string hotKey) => Inner.IsHotKeyPressed(hotKey);
+        public bool IsHotKeyDoublePressed(string hotKey) => Inner.IsHotKeyDoublePressed(hotKey);
+        public Vec2 GetKeyState(InputKey key) => Inner.GetKeyState(key);
+        public bool IsKeyDown(InputKey key) => Inner.IsKeyDown(key);
+        public bool IsKeyPressed(InputKey key) => Inner.IsKeyPressed(key);
+        public bool IsKeyReleased(InputKey key) => Inner.IsKeyReleased(key);
+        public float GetMouseMoveX() => Inner.GetMouseMoveX();
+        public float GetMouseMoveY() => Inner.GetMouseMoveY();
+        public bool GetIsMouseActive() => Inner.GetIsMouseActive();
+        public Vec2 GetMousePositionPixel() => Inner.GetMousePositionPixel();
+        public float GetDeltaMouseScroll() => Inner.GetDeltaMouseScroll();
+        public bool GetIsControllerConnected() => Inner.GetIsControllerConnected();
+        public Vec2 GetMousePositionRanged() => Inner.GetMousePositionRanged();
+        public float GetMouseSensitivity() => Inner.GetMouseSensitivity();
+        public bool IsControlDown() => Inner.IsControlDown();
+        public bool IsShiftDown() => Inner.IsShiftDown();
+        public bool IsAltDown() => Inner.IsAltDown();
+        public Vec2 GetControllerRightStickState() => Inner.GetControllerRightStickState();
+        public Vec2 GetControllerLeftStickState() => Inner.GetControllerLeftStickState();
+        public InputKey[] GetClickKeys() => Inner.GetClickKeys();
     }
 
     private const string LeaveBattleUsage =
