@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Utils;
 using HarmonyLib;
 using System;
@@ -54,6 +54,16 @@ internal static class KingdomCollectionSync
         {
             SetField<Clan, Kingdom>(clan, nameof(Clan._kingdom), null, publish);
         }
+    }
+
+    public static void RepublishMembershipCollections(Kingdom kingdom)
+    {
+        if (kingdom == null) return;
+
+        Republish(kingdom, nameof(Kingdom._clans), kingdom._clans);
+        Republish(kingdom, nameof(Kingdom._fiefsCache), kingdom._fiefsCache);
+        Republish(kingdom, nameof(Kingdom._townsCache), kingdom._townsCache);
+        Republish(kingdom, nameof(Kingdom._settlementsCache), kingdom._settlementsCache);
     }
 
     public static void AddFief(Kingdom kingdom, Town town, bool publish)
@@ -204,6 +214,13 @@ internal static class KingdomCollectionSync
             : GenericPatchHelpers.CollectionRemoveInterceptCache;
 
         return cache.TryGetValue(field, out intercept);
+    }
+
+    private static void Republish<T>(Kingdom kingdom, string fieldName, MBList<T> list)
+        where T : class
+    {
+        var snapshot = list == null ? new MBList<T>() : new MBList<T>(list);
+        SetField(kingdom, fieldName, snapshot, publish: true);
     }
 
     private static Settlement GetSettlement(Town town)

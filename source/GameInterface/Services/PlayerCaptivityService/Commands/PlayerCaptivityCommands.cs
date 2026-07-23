@@ -1,25 +1,35 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Utils.Commands;
+using Common.Network;
 using GameInterface.Services.MapEventParties;
+using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Utils.Commands;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.PlayerCaptivityService.Commands;
@@ -27,6 +37,9 @@ namespace GameInterface.Services.PlayerCaptivityService.Commands;
 internal class PlayerCaptivityCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<PlayerCaptivityCommands>();
+    private static CaptivityRosterFixture pendingRosterFixture;
+
+    private static LiveTestFixtureSnapshot liveTestFixtureSnapshot;
 
     private const string RandomCapturePlayerUsage =
 @"Usage:
@@ -109,6 +122,179 @@ a co-op registry id or a local StringId.";
         return CaptureHero(hero, newCaptor);
     }
 
+    private const string CapturePlayerFixtureUsage =
+@"Usage:
+  coop.debug.player_captivity.capture_player_fixture <heroId> <mobilePartyId>
+
+Example:
+  coop.debug.player_captivity.capture_player_fixture Hero_Player2863 MobileParty_Player
+
+Captures a registered co-op player through the real captivity path and records the transferred regular
+troops for separate fixture cleanup. This is intended for automated tests.";
+
+    [CommandLineArgumentFunction("capture_player_fixture", "coop.debug.player_captivity")]
+    public static string CapturePlayerFixture(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "capture_player_fixture",
+            CapturePlayerFixtureUsage,
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(2, out error))
+            return error;
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
+            return error;
+
+        if (!ctx.TryGetArg(1, "mobilePartyId", out var captorPartyId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to capture hero fixture: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to capture hero fixture: " + error;
+
+        if (!objectManager.TryGetObject(captorPartyId, out MobileParty captorParty)
+            && !CommandHelpers.TryGetMobileParty(captorPartyId, out captorParty, out error))
+            return "Failed to capture hero fixture: " + error;
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return "Failed to capture hero fixture: could not resolve PlayerManager.";
+
+        var player = playerManager.Players.SingleOrDefault(candidate => candidate.HeroId == heroId);
+        if (player == null)
+            return $"Failed to capture hero fixture: hero '{GetHeroDisplayName(hero)}' is not a registered co-op player.";
+
+        if (!objectManager.TryGetObject(player.MobilePartyId, out MobileParty playerParty))
+            return $"Failed to capture hero fixture: player party '{player.MobilePartyId}' is not registered.";
+
+        if (hero.IsPrisoner)
+            return CaptureHero(hero, captorParty);
+
+        if (hero.PartyBelongedTo != playerParty)
+            return "Failed to capture hero fixture: the hero does not belong to the registered player party.";
+
+        if (captorParty == playerParty)
+            return "Failed to capture hero fixture: the player party cannot capture its own hero.";
+
+        if (!playerParty.IsActive)
+            return "Failed to capture hero fixture: the player party is not active.";
+
+        if (pendingRosterFixture != null)
+            return "Failed to capture hero fixture: another roster fixture is pending cleanup.";
+
+        var regularTroops = SnapshotRegularTroops(playerParty.MemberRoster);
+        if (HasOtherHero(playerParty.MemberRoster, hero))
+            return "Failed to capture hero fixture: the player party contains another hero.";
+
+        pendingRosterFixture = new CaptivityRosterFixture(hero, playerParty, captorParty, regularTroops);
+        var captureResult = CaptureHero(hero, captorParty);
+        if (!hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != captorParty.Party)
+        {
+            pendingRosterFixture = null;
+            return captureResult;
+        }
+
+        if (playerParty.IsActive)
+        {
+            pendingRosterFixture = null;
+            return captureResult + "\nFailed to record fixture regular troops: the captivity handler did not park the player party.";
+        }
+
+        return captureResult + "\nFixture regular troops recorded for cleanup: " +
+            regularTroops.Sum(troop => troop.Number).ToString(CultureInfo.InvariantCulture);
+    }
+
+    private const string RestoreRosterFixtureUsage =
+@"Usage:
+  coop.debug.player_captivity.restore_roster_fixture <heroId>
+
+Example:
+  coop.debug.player_captivity.restore_roster_fixture Hero_Player2863
+
+Restores the regular troops recorded by capture_player_fixture after the player has left captivity.";
+
+    [CommandLineArgumentFunction("restore_roster_fixture", "coop.debug.player_captivity")]
+    public static string RestoreRosterFixture(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "restore_roster_fixture",
+            RestoreRosterFixtureUsage,
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(1, out error))
+            return error;
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to restore roster fixture: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to restore roster fixture: " + error;
+
+        var fixture = pendingRosterFixture;
+        if (fixture == null)
+            return "No roster fixture is pending cleanup.";
+
+        if (fixture.PlayerHero != hero)
+            return $"Failed to restore roster fixture: the pending fixture belongs to '{GetHeroDisplayName(fixture.PlayerHero)}'.";
+
+        if (hero.IsPrisoner)
+            return "Failed to restore roster fixture: the player hero is still a prisoner.";
+
+        var playerHeroIndex = fixture.PlayerParty.MemberRoster.FindIndexOfTroop(fixture.PlayerHero.CharacterObject);
+        if (fixture.PlayerParty.MemberRoster.TotalManCount != 1 ||
+            playerHeroIndex < 0 ||
+            fixture.PlayerParty.MemberRoster.GetTroopCount(fixture.PlayerHero.CharacterObject) != 1)
+            return "Failed to restore roster fixture: the player party is not the released hero's party of one.";
+
+        foreach (var troop in fixture.RegularTroops)
+        {
+            var captorIndex = fixture.CaptorParty.PrisonRoster.FindIndexOfTroop(troop.Character);
+            var availableTotal = captorIndex < 0
+                ? 0
+                : fixture.CaptorParty.PrisonRoster.GetTroopCount(troop.Character);
+            var availableWounded = captorIndex < 0
+                ? 0
+                : fixture.CaptorParty.PrisonRoster.GetElementWoundedNumber(captorIndex);
+            var availableHealthy = availableTotal - availableWounded;
+            var recordedHealthy = troop.Number - troop.WoundedNumber;
+            if (availableWounded < troop.WoundedNumber || availableHealthy < recordedHealthy)
+                return $"Failed to restore roster fixture: captor no longer holds the recorded '{troop.Character.StringId}' troops.";
+        }
+
+        foreach (var troop in fixture.RegularTroops)
+        {
+            fixture.CaptorParty.PrisonRoster.AddToCounts(
+                troop.Character,
+                -troop.Number,
+                false,
+                -troop.WoundedNumber,
+                0,
+                true);
+            fixture.PlayerParty.MemberRoster.AddToCounts(
+                troop.Character,
+                troop.Number,
+                false,
+                troop.WoundedNumber,
+                troop.Xp,
+                true);
+        }
+
+        pendingRosterFixture = null;
+        return "Restored fixture regular troops: " +
+            fixture.RegularTroops.Sum(troop => troop.Number).ToString(CultureInfo.InvariantCulture);
+    }
+
     private const string ReleasePlayerUsage =
 @"Usage:
   coop.debug.player_captivity.release_player <heroId>
@@ -161,6 +347,170 @@ Releases the given player hero from captivity.";
                 $"Failed to release hero '{GetHeroDisplayName(hero)}'",
                 ex);
         }
+    }
+
+    private const string PrepareVisualTestFixtureUsage =
+@"Usage:
+  coop.debug.player_captivity.prepare_visual_test_fixture <heroId> <captorPartyId>
+
+Snapshots the player's party, removes its non-hero members, and moves it beside the captor. Server only.";
+
+    [CommandLineArgumentFunction("prepare_visual_test_fixture", "coop.debug.player_captivity")]
+    public static string PrepareVisualTestFixture(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "prepare_visual_test_fixture",
+            PrepareVisualTestFixtureUsage,
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(2, out error))
+            return error;
+
+        if (liveTestFixtureSnapshot != null)
+            return "A visual test fixture is already prepared.";
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error) ||
+            !ctx.TryGetArg(1, "captorPartyId", out var captorPartyId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to prepare visual test fixture: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to prepare visual test fixture: " + error;
+
+        if (!objectManager.TryGetObject(captorPartyId, out MobileParty captorParty) &&
+            !CommandHelpers.TryGetMobileParty(captorPartyId, out captorParty, out error))
+            return "Failed to prepare visual test fixture: " + error;
+
+        var playerParty = hero.PartyBelongedTo;
+        if (playerParty == null || playerParty == captorParty)
+            return "Failed to prepare visual test fixture: player and captor parties must be distinct.";
+
+        if (hero.IsPrisoner || playerParty.PrisonRoster.TotalManCount != 0)
+            return "Failed to prepare visual test fixture: player must be free and their prison roster empty.";
+
+        if (!playerParty.IsActive ||
+            playerParty.LeaderHero != hero ||
+            playerParty.MemberRoster.GetTroopCount(hero.CharacterObject) != 1)
+            return "Failed to prepare visual test fixture: player must lead an active party containing them exactly once.";
+
+        if (playerParty.IsCurrentlyAtSea != captorParty.IsCurrentlyAtSea ||
+            playerParty.Position.IsOnLand != captorParty.Position.IsOnLand)
+            return "Failed to prepare visual test fixture: player and captor parties must use the same navigation layer.";
+
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+            !behaviorSnapshot.TryCreate(playerParty, out var behavior))
+            return "Failed to prepare visual test fixture: unable to snapshot player party behavior.";
+
+        var snapshot = new LiveTestFixtureSnapshot(
+            playerParty,
+            hero.CharacterObject,
+            playerParty.MemberRoster.GetTroopRoster().ToArray(),
+            behavior);
+        liveTestFixtureSnapshot = snapshot;
+
+        foreach (var element in snapshot.MemberRoster.Where(element => element.Character != snapshot.PlayerCharacter))
+        {
+            playerParty.MemberRoster.AddToCounts(
+                element.Character,
+                -element.Number,
+                false,
+                -element.WoundedNumber,
+                -element.Xp);
+        }
+
+        playerParty.Position = new CampaignVec2(
+            new TaleWorlds.Library.Vec2(captorParty.Position.X + 1f, captorParty.Position.Y),
+            captorParty.Position.IsOnLand);
+        playerParty.SetMoveModeHold();
+        playerParty.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(PlayerCaptivityCommands),
+            new PartyBehaviorChangeAttempted(
+                playerParty,
+                forcePosition: true,
+                isCurrentlyAtSea: playerParty.IsCurrentlyAtSea,
+                resetMovementToHold: true));
+
+        return
+            "Visual test fixture prepared.\n" +
+            $"Player party: {playerParty.StringId}\n" +
+            $"Original member count: {snapshot.MemberRoster.Sum(element => element.Number)}\n" +
+            $"Prepared position: {playerParty.Position.X:R},{playerParty.Position.Y:R}";
+    }
+
+    [CommandLineArgumentFunction("restore_visual_test_fixture", "coop.debug.player_captivity")]
+    public static string RestoreVisualTestFixture(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "restore_visual_test_fixture",
+            "Usage: coop.debug.player_captivity.restore_visual_test_fixture",
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(0, out error))
+            return error;
+
+        var snapshot = liveTestFixtureSnapshot;
+        if (snapshot == null)
+            return "No visual test fixture is prepared.";
+
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            return "Failed to restore visual test fixture: unable to resolve party behavior snapshot service.";
+
+        var playerParty = snapshot.PlayerParty;
+        var playerHero = snapshot.PlayerCharacter.HeroObject;
+        if (playerHero == null ||
+            playerHero.IsPrisoner ||
+            !playerParty.IsActive ||
+            playerHero.PartyBelongedTo != playerParty ||
+            playerParty.LeaderHero != playerHero)
+            return "Failed to restore visual test fixture: player must be free in their active party.";
+
+        if (!behaviorSnapshot.CanApply(playerParty, snapshot.Behavior))
+            return "Failed to restore visual test fixture: unable to resolve the party behavior snapshot.";
+
+        foreach (var element in playerParty.MemberRoster.GetTroopRoster()
+                     .Where(element => element.Character != snapshot.PlayerCharacter)
+                     .ToArray())
+        {
+            playerParty.MemberRoster.AddToCounts(
+                element.Character,
+                -element.Number,
+                false,
+                -element.WoundedNumber,
+                -element.Xp);
+        }
+
+        foreach (var element in snapshot.MemberRoster.Where(element => element.Character != snapshot.PlayerCharacter))
+            playerParty.MemberRoster.Add(element);
+
+        playerParty.Position = snapshot.Behavior.PartyPosition;
+        playerParty.IsCurrentlyAtSea = snapshot.Behavior.IsCurrentlyAtSea;
+        if (!behaviorSnapshot.TryApply(playerParty, snapshot.Behavior, out _))
+            return "Failed to restore visual test fixture: unable to apply the party behavior snapshot.";
+
+        MessageBroker.Instance.Publish(
+            typeof(PlayerCaptivityCommands),
+            new PartyBehaviorChangeAttempted(
+                playerParty,
+                forcePosition: true,
+                isCurrentlyAtSea: playerParty.IsCurrentlyAtSea,
+                resetMovementToHold: false));
+
+        liveTestFixtureSnapshot = null;
+        return
+            "Visual test fixture restored.\n" +
+            $"Player party: {playerParty.StringId}\n" +
+            $"Member count: {playerParty.MemberRoster.TotalManCount}\n" +
+            $"Position: {playerParty.Position.X:R},{playerParty.Position.Y:R}\n" +
+            $"Move mode: {playerParty.PartyMoveMode}";
     }
 
     private const string LiberatePrisonerUsage =
@@ -389,8 +739,11 @@ Reports captivity and registered party state without mutating it.";
         {
             output.AppendLine($"PartyActive: {registeredParty.IsActive}");
             output.AppendLine($"PartyVisible: {registeredParty.IsVisible}");
+            output.AppendLine($"PartyVisualPresent: {registeredParty.Party.GetPartyVisual() != null}");
             output.AppendLine($"PartyLeaderId: {registeredParty.LeaderHero?.StringId ?? "<none>"}");
             output.AppendLine($"HeroMemberCount: {registeredParty.MemberRoster.GetTroopCount(hero.CharacterObject)}");
+            output.AppendLine($"PartyMemberCount: {registeredParty.MemberRoster.TotalManCount}");
+            output.AppendLine($"PartyPrisonerCount: {registeredParty.PrisonRoster.TotalManCount}");
             output.AppendLine($"PartyPosition: {registeredParty.Position.X:R},{registeredParty.Position.Y:R}");
             output.AppendLine($"PartyIsOnLand: {registeredParty.Position.IsOnLand}");
             output.AppendLine($"PartyMoveMode: {registeredParty.PartyMoveMode}");
@@ -399,6 +752,195 @@ Reports captivity and registered party state without mutating it.";
 
         output.AppendLine($"CaptorPrisonerCount: {captorParty?.PrisonRoster.GetTroopCount(hero.CharacterObject) ?? 0}");
         return output.ToString();
+    }
+
+    private const string RansomPlayerAtSettlementUsage =
+@"Usage:
+  coop.debug.player_captivity.ransom_player_at_settlement <heroId>
+
+Example:
+  coop.debug.player_captivity.ransom_player_at_settlement Player
+
+Ransoms the captive player hero for zero gold and releases them at a nearby neutral or allied settlement.";
+
+    [CommandLineArgumentFunction("ransom_player_at_settlement", "coop.debug.player_captivity")]
+    public static string RansomPlayerAtSettlement(List<string> args)
+    {
+        var ctx = new CommandContext(
+            "ransom_player_at_settlement",
+            RansomPlayerAtSettlementUsage,
+            args);
+
+        if (!ctx.RequireServer(out var error))
+            return error;
+
+        if (!ctx.RequireArgCount(1, out error))
+            return error;
+
+        if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to ransom hero: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            return "Failed to ransom hero: " + error;
+
+        if (!hero.IsPrisoner || hero.PartyBelongedToAsPrisoner == null)
+            return $"Hero '{GetHeroDisplayName(hero)}' is not a prisoner.";
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.Contains(hero))
+            return $"Hero '{GetHeroDisplayName(hero)}' is not a registered co-op player.";
+
+        var captorParty = hero.PartyBelongedToAsPrisoner;
+        var currentSettlement = captorParty.MobileParty?.CurrentSettlement;
+        if (currentSettlement == null)
+            return $"Captor for '{GetHeroDisplayName(hero)}' is not in a settlement.";
+
+        if (!ContainerProvider.TryResolve<IPrisonerSaleProcessor>(out var prisonerSaleProcessor))
+            return "Failed to ransom hero: could not resolve PrisonerSaleProcessor.";
+
+        if (!ContainerProvider.TryResolve<IPlayerRansomReleaseSettlementProvider>(out var releaseSettlementProvider))
+            return "Failed to ransom hero: could not resolve PlayerRansomReleaseSettlementProvider.";
+
+        var releaseSettlement = releaseSettlementProvider.GetReleaseSettlement(captorParty, hero);
+        var playerFaction = hero.MapFaction;
+        var releaseFaction = releaseSettlement.MapFaction;
+        var releaseSettlementHostile = playerFaction != null && releaseFaction != null &&
+            FactionManager.IsAtWarAgainstFaction(playerFaction, releaseFaction);
+
+        var requestedPrisoners = new TroopRoster();
+        requestedPrisoners.AddToCounts(hero.CharacterObject, 1);
+        var seller = captorParty.LeaderHero;
+        var sellerGoldBefore = seller?.Gold ?? 0;
+
+        prisonerSaleProcessor.Sell(captorParty, requestedPrisoners);
+
+        var sellerGoldAfter = seller?.Gold ?? 0;
+        return
+            "Hero ransomed successfully.\n" +
+            $"Hero: {GetHeroDisplayName(hero)}\n" +
+            $"Ransom settlement: {currentSettlement.Name} ({currentSettlement.StringId})\n" +
+            $"Release settlement: {releaseSettlement.Name} ({releaseSettlement.StringId})\n" +
+            $"Player faction: {playerFaction?.StringId ?? "none"}\n" +
+            $"Release settlement faction: {releaseFaction?.StringId ?? "none"}\n" +
+            $"Release settlement hostile: {releaseSettlementHostile}\n" +
+            $"Release gate X: {releaseSettlement.GatePosition.X.ToString(CultureInfo.InvariantCulture)}\n" +
+            $"Release gate Y: {releaseSettlement.GatePosition.Y.ToString(CultureInfo.InvariantCulture)}\n" +
+            $"Seller gold change: {sellerGoldAfter - sellerGoldBefore}";
+    }
+
+    [CommandLineArgumentFunction("captivity_state", "coop.debug.player_captivity")]
+    public static string CaptivityState(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.player_captivity.captivity_state <heroId>";
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error))
+            return "Failed to inspect captivity: " + error;
+
+        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error))
+            return "Failed to inspect captivity: " + error;
+
+        MobileParty playerParty = null;
+        if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+        {
+            var player = playerManager.Players.SingleOrDefault(candidate => candidate.HeroId == args[0]);
+            if (player != null)
+                objectManager.TryGetObject(player.MobilePartyId, out playerParty);
+        }
+
+        var result = new StringBuilder();
+        result.AppendLine("HeroId=" + hero.StringId);
+        result.AppendLine("IsPrisoner=" + hero.IsPrisoner);
+        result.AppendLine("CaptorPartyId=" + (hero.PartyBelongedToAsPrisoner?.MobileParty?.StringId ?? "none"));
+        result.AppendLine("PlayerPartyId=" + (playerParty?.StringId ?? "none"));
+        result.AppendLine("PlayerPartyActive=" + (playerParty?.IsActive.ToString() ?? "none"));
+        result.AppendLine("PlayerPartyLeaderHeroId=" + (playerParty?.LeaderHero?.StringId ?? "none"));
+        result.AppendLine("PlayerPartyMemberCount=" + (playerParty?.MemberRoster.TotalManCount.ToString(CultureInfo.InvariantCulture) ?? "none"));
+        result.AppendLine("PlayerPartyX=" + FormatCoordinate(playerParty?.Position.X));
+        result.AppendLine("PlayerPartyY=" + FormatCoordinate(playerParty?.Position.Y));
+        result.AppendLine("PlayerPartyIsOnLand=" + (playerParty?.Position.IsOnLand.ToString() ?? "none"));
+        result.AppendLine("PlayerPartySettlementId=" + (playerParty?.CurrentSettlement?.StringId ?? "none"));
+        return result.ToString();
+    }
+
+    [CommandLineArgumentFunction("party_fixture_state", "coop.debug.player_captivity")]
+    public static string PartyFixtureState(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.player_captivity.party_fixture_state <partyId>";
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error))
+            return "Failed to inspect party: " + error;
+
+        if (!TryResolveMobileParty(objectManager, args[0], out var party, out error))
+            return "Failed to inspect party: " + error;
+
+        var result = new StringBuilder();
+        result.AppendLine("PartyId=" + party.StringId);
+        result.AppendLine("IsActive=" + party.IsActive);
+        result.AppendLine("PositionX=" + FormatCoordinate(party.Position.X));
+        result.AppendLine("PositionY=" + FormatCoordinate(party.Position.Y));
+        result.AppendLine("IsOnLand=" + party.Position.IsOnLand);
+        result.AppendLine("SettlementId=" + (party.CurrentSettlement?.StringId ?? "none"));
+        result.AppendLine("LeaderHeroId=" + (party.LeaderHero?.StringId ?? "none"));
+        result.AppendLine("LeaderGold=" + (party.LeaderHero?.Gold.ToString(CultureInfo.InvariantCulture) ?? "none"));
+        result.AppendLine("MemberCount=" + party.MemberRoster.TotalManCount.ToString(CultureInfo.InvariantCulture));
+        result.AppendLine("PrisonerCount=" + party.PrisonRoster.TotalManCount.ToString(CultureInfo.InvariantCulture));
+        return result.ToString();
+    }
+
+    [CommandLineArgumentFunction("restore_party_fixture_state", "coop.debug.player_captivity")]
+    public static string RestorePartyFixtureState(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.player_captivity.restore_party_fixture_state <partyId> <settlementId|none> <x> <y> <isOnLand> <isActive>";
+        var ctx = new CommandContext("restore_party_fixture_state", usage, args);
+        if (!ctx.RequireServer(out var error))
+            return error;
+        if (!ctx.RequireArgCount(6, out error))
+            return error;
+
+        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            return "Failed to restore party: " + error;
+        if (!TryResolveMobileParty(objectManager, args[0], out var party, out error))
+            return "Failed to restore party: " + error;
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+            return "Failed to restore party: could not resolve Network.";
+        if (!objectManager.TryGetIdWithLogging(party, out var partyId))
+            return "Failed to restore party: the party is not registered.";
+        if (!float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
+            !float.TryParse(args[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var y) ||
+            !bool.TryParse(args[4], out var isOnLand) ||
+            !bool.TryParse(args[5], out var isActive))
+            return usage;
+
+        if (args[1] == "none")
+        {
+            if (party.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(party);
+
+            party.Position = new CampaignVec2(new Vec2(x, y), isOnLand);
+        }
+        else
+        {
+            var settlement = Settlement.Find(args[1]);
+            if (settlement == null)
+                return $"Failed to restore party: settlement '{args[1]}' not found.";
+
+            if (party.CurrentSettlement != settlement)
+            {
+                if (party.CurrentSettlement != null)
+                    LeaveSettlementAction.ApplyForParty(party);
+                EnterSettlementAction.ApplyForParty(party, settlement);
+            }
+        }
+
+        party.IsActive = isActive;
+        network.SendAll(new NetworkPlayerCaptivityReleasePositionSet(partyId, party.Position));
+
+        return "Restored party fixture state.\n" + PartyFixtureState(new List<string> { args[0] });
     }
 
     private static bool TryGetRandomCaptor(out MobileParty newCaptor, out string error)
@@ -435,6 +977,69 @@ Reports captivity and registered party state without mutating it.";
 
         error = "Could not find a valid captor party.";
         return false;
+    }
+
+    private static bool TryResolveMobileParty(
+        IObjectManager objectManager,
+        string partyId,
+        out MobileParty party,
+        out string error)
+    {
+        if (objectManager.TryGetObject(partyId, out party))
+        {
+            error = null;
+            return true;
+        }
+
+        return CommandHelpers.TryGetMobileParty(partyId, out party, out error);
+    }
+
+    private static string FormatCoordinate(float? coordinate) =>
+        coordinate?.ToString("R", CultureInfo.InvariantCulture) ?? "none";
+
+    private static List<TroopRosterElement> SnapshotRegularTroops(TroopRoster roster)
+    {
+        var troops = new List<TroopRosterElement>();
+        for (var i = 0; i < roster.Count; i++)
+        {
+            var element = roster.GetElementCopyAtIndex(i);
+            if (element.Character?.IsHero == false && element.Number > 0)
+                troops.Add(element);
+        }
+
+        return troops;
+    }
+
+    private static bool HasOtherHero(TroopRoster roster, Hero playerHero)
+    {
+        for (var i = 0; i < roster.Count; i++)
+        {
+            var element = roster.GetElementCopyAtIndex(i);
+            if (element.Number > 0 && element.Character?.IsHero == true && element.Character.HeroObject != playerHero)
+                return true;
+        }
+
+        return false;
+    }
+
+    private sealed class CaptivityRosterFixture
+    {
+        public Hero PlayerHero { get; }
+        public MobileParty PlayerParty { get; }
+        public MobileParty CaptorParty { get; }
+        public List<TroopRosterElement> RegularTroops { get; }
+
+        public CaptivityRosterFixture(
+            Hero playerHero,
+            MobileParty playerParty,
+            MobileParty captorParty,
+            List<TroopRosterElement> regularTroops)
+        {
+            PlayerHero = playerHero;
+            PlayerParty = playerParty;
+            CaptorParty = captorParty;
+            RegularTroops = regularTroops;
+        }
     }
 
     private static string CaptureHero(Hero hero, MobileParty newCaptor)
@@ -496,5 +1101,25 @@ Reports captivity and registered party state without mutating it.";
             return name;
 
         return hero.StringId ?? "unknown";
+    }
+
+    private sealed class LiveTestFixtureSnapshot
+    {
+        public readonly MobileParty PlayerParty;
+        public readonly CharacterObject PlayerCharacter;
+        public readonly TroopRosterElement[] MemberRoster;
+        public readonly PartyBehaviorUpdateData Behavior;
+
+        public LiveTestFixtureSnapshot(
+            MobileParty playerParty,
+            CharacterObject playerCharacter,
+            TroopRosterElement[] memberRoster,
+            PartyBehaviorUpdateData behavior)
+        {
+            PlayerParty = playerParty;
+            PlayerCharacter = playerCharacter;
+            MemberRoster = memberRoster;
+            Behavior = behavior;
+        }
     }
 }

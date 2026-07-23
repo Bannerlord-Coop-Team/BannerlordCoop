@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.MobileParties.Messages;
@@ -36,6 +37,9 @@ internal class SaveDataHandler : IHandler
         // arrived and the server world has not loaded yet. It is ended once the campaign
         // is ready (see LoadingState.Handle_CampaignLoaded).
         saveDataMessage = obj.What;
+
+        // Send options on server not part of the save game to clients
+        messageBroker.Publish(this, new InitializeServerOptionsOnClient(saveDataMessage.ServerOptions));
 
         messageBroker.Publish(this, new InitializeClientCraftingData(saveDataMessage.CraftingPlayerData));
         messageBroker.Publish(this, new InitializeClientWorkshopData(saveDataMessage.WorkshopPlayerData));

@@ -1,23 +1,21 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.SiegeEngines;
 using HarmonyLib;
 using SandBox.View.Map.Visuals;
 using Serilog;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.Settlements.Patches;
 
 /// <summary>
-/// [Client] Validates the siege data the settlement visual is about to deref. Tick has no null guards and
-/// its NRE escapes to Game.OnTick, so one hole in the replicated siege graph freezes campaign time and
-/// menus every frame. Heals a deployed ranged engine missing its bombardment state, dirties the visual
-/// when a cached entity's backing slot is gone (the sequential refresh rebuilds the caches), skips
-/// the tick when the graph is unreadable, and skips the icon rebuild while the siege graph is still
-/// replicating.
+/// [Client] Keeps settlement map visuals from reading a partially replicated siege graph. It also repairs
+/// missing bombardment state and dirties stale caches so the next sequential refresh rebuilds them.
 /// </summary>
 [HarmonyPatch]
 internal class SettlementVisualSiegePatches
@@ -27,21 +25,38 @@ internal class SettlementVisualSiegePatches
     // Tick runs in a TWParallel.For worker, so log terminal states once per settlement, not per frame.
     private static readonly ConcurrentDictionary<string, byte> loggedSkips = new ConcurrentDictionary<string, byte>();
 
-    // The rebuild derefs both siege sides' engine containers; during the SiegeEvent constructor's
-    // replication window the event exists before its camp and containers do. Skip the rebuild —
-    // the next visual-dirty re-runs it against the completed graph.
-    [HarmonyPatch(typeof(SettlementVisual), nameof(SettlementVisual.AddSiegeIconComponents))]
+    // RefreshPartyIcon clears the dirty flag before dereferencing both siege sides, so skip the whole refresh
+    // while the separately replicated camp and containers are incomplete. Vanilla then retries next frame.
+    [HarmonyPatch(typeof(SettlementVisual), nameof(SettlementVisual.RefreshPartyIcon))]
     [HarmonyPrefix]
-    private static bool AddSiegeIconComponentsPrefix(PartyBase party)
+    private static bool RefreshPartyIconPrefix(SettlementVisual __instance)
+    {
+        if (ModInformation.IsServer) return true;
+
+        var siegeEvent = __instance.MapEntity?.Settlement?.SiegeEvent;
+        if (siegeEvent == null) return true;
+
+        return SiegeContainerLookup.IsGraphComplete(siegeEvent);
+    }
+
+    [HarmonyPatch(typeof(SettlementVisual), nameof(SettlementVisual.RefreshSiegePreparations))]
+    [HarmonyPrefix]
+    private static bool RefreshSiegePreparationsPrefix(PartyBase party)
     {
         if (ModInformation.IsServer) return true;
 
         var siegeEvent = party?.Settlement?.SiegeEvent;
-        if (siegeEvent == null) return true;
+        return siegeEvent == null || SiegeContainerLookup.IsGraphComplete(siegeEvent);
+    }
 
-        return siegeEvent.BesiegerCamp != null
-            && siegeEvent.GetSiegeEventSide(BattleSideEnum.Attacker)?.SiegeEngines != null
-            && siegeEvent.GetSiegeEventSide(BattleSideEnum.Defender)?.SiegeEngines != null;
+    [HarmonyPatch(typeof(SettlementVisual), nameof(SettlementVisual.OnMapHoverSiegeEngine))]
+    [HarmonyPrefix]
+    private static bool OnMapHoverSiegeEnginePrefix()
+    {
+        if (ModInformation.IsServer) return true;
+
+        var siegeEvent = PlayerSiege.PlayerSiegeEvent;
+        return siegeEvent == null || SiegeContainerLookup.IsGraphComplete(siegeEvent);
     }
 
     [HarmonyPatch(typeof(SettlementVisual), nameof(SettlementVisual.Tick))]

@@ -37,17 +37,11 @@ public class AgentMovementHandler : IAgentMovementHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
-    // Max agents per movement packet. The host has authority over every AI troop, so its batch can be
-    // dozens of agents — one packet for all of them overflows the unreliable MTU ceiling (LiteNetLib
-    // throws TooBigPacketException on oversized non-fragmentable sends). The MTU can stay near its ~1 KB floor
-    // (no negotiation up over P2P), and a mounted/well-equipped agent can run a few hundred bytes, so keep the
-    // chunk small enough that the common case fits one unreliable packet; the send path promotes any chunk that
-    // still overflows to a fragmentable reliable channel.
-    private const int MaxAgentsPerMovementPacket = 4;
+    // Movement is strictly droppable, so keep even mounted snapshots below the 1 KB unreliable ceiling.
+    private const int MaxAgentsPerMovementPacket = 3;
 
-    // Keep the old movement-send ceiling after moving capture onto the game thread. High-FPS clients can tick
-    // faster than the old poller, and sending every frame would raise battle bandwidth.
-    private const float MovementPollingIntervalSeconds = 0.01f;
+    // Forty updates per second keeps locally authoritative agents responsive.
+    private const float MovementPollingIntervalSeconds = 0.025f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -134,21 +128,15 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public PacketType PacketType => PacketType.Movement;
 
-    // Broadcast the movement of every agent the local node currently has authority over: its own party,
-    // plus any party it has assumed control of as host.
+    // Broadcast every locally authoritative agent.
     public void PollMovement(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
         movementPollElapsed += dt;
         if (movementPollElapsed < MovementPollingIntervalSeconds) return;
-        movementPollElapsed = 0f;
+        movementPollElapsed %= MovementPollingIntervalSeconds;
 
-        // Collect every agent we have authority over, then broadcast them in MTU-safe chunks. One packet
-        // per agent floods the mesh and the receiver's game-thread queue at battle scale (the GameThread
-        // lockup); one packet for ALL of them overflows the unreliable MTU ceiling. The single registry pass
-        // partitions the two movement streams: troops as AgentData, masterless registered horses as
-        // standalone AgentMountData (a ridden horse's pose rides inside its rider's AgentData instead).
         var ids = new List<Guid>();
         var data = new List<AgentData>();
         List<Guid> mountIds = null;
@@ -158,8 +146,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             Agent agent = agentInfo.Agent;
             // Skip agents whose native object is already gone (dead/removed but not yet deregistered):
-            // building the snapshot calls into the agent (GetCurrentActionType, etc.), which throws an
-            // AccessViolationException on a freed agent. Mirrors the IsActive() guard on the apply path.
+            // building the snapshot calls into the agent, which can access-violate after native teardown.
             if (agent == null || agent.Mission == null || !agent.IsActive()) continue;
 
             EnsureLocallyDrivenMountController(agent);
