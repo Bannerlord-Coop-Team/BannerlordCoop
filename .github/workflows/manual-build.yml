@@ -1,5 +1,5 @@
 name: Manual Build
-run-name: Manual build ${{ inputs.commit_sha }}
+run-name: Manual client ${{ inputs.commit_sha }} for server ${{ inputs.server_sha }}
 
 on:
   workflow_dispatch:
@@ -8,14 +8,25 @@ on:
         description: Full 40-character commit SHA to build
         required: true
         type: string
+      server_sha:
+        description: Full dedicated-server commit SHA paired with this client
+        required: true
+        type: string
+      build_id:
+        description: Discord interaction id used as the temporary R2 identity
+        required: true
+        type: string
 
 permissions:
   actions: read
   contents: read
 
 concurrency:
-  group: manual-build-${{ inputs.commit_sha }}
+  group: manual-build-${{ inputs.build_id }}
   cancel-in-progress: false
+
+env:
+  R2_PRIVATE_BUCKET: bannerlordcoop-build-inputs
 
 jobs:
   build:
@@ -34,10 +45,14 @@ jobs:
       - name: Trust and validate checkout
         env:
           REQUESTED_SHA: ${{ inputs.commit_sha }}
+          SERVER_SHA: ${{ inputs.server_sha }}
+          BUILD_ID: ${{ inputs.build_id }}
         run: |
           set -eu
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           printf '%s' "$REQUESTED_SHA" | grep -Eq '^[a-f0-9]{40}$'
+          printf '%s' "$SERVER_SHA" | grep -Eq '^[a-f0-9]{40}$'
+          printf '%s' "$BUILD_ID" | grep -Eq '^[0-9]{17,20}$'
           test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
 
       - name: Link Bannerlord assemblies
@@ -93,6 +108,8 @@ jobs:
         env:
           FILE_NAME: ${{ steps.artifact.outputs.file_name }}
           HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
+          SERVER_SHA: ${{ inputs.server_sha }}
+          BUILD_ID: ${{ inputs.build_id }}
         run: |
           set -eu
           apk add --no-cache 7zip >/dev/null
@@ -133,8 +150,41 @@ jobs:
             exit 1
           fi
 
-          printf '{"kind":"manual-build","fileName":"%s","headSha":"%s"}\n' \
-            "$FILE_NAME" "$HEAD_SHA" > artifact/manifest.json
+          archive_bytes=$(stat -c %s "artifact/$FILE_NAME")
+          archive_sha256=$(sha256sum "artifact/$FILE_NAME" | cut -d' ' -f1)
+          expires_at=$(date -u -d '+24 hours' +%Y-%m-%dT%H:%M:%SZ)
+          r2_key="manual/$BUILD_ID/client/Coop.7z"
+          printf '{"kind":"manual-build","buildId":"%s","fileName":"%s","headSha":"%s","serverSha":"%s","expiresAt":"%s","serverInput":{"bucket":"%s","key":"%s","bytes":%s,"sha256":"%s"}}\n' \
+            "$BUILD_ID" "$FILE_NAME" "$HEAD_SHA" "$SERVER_SHA" "$expires_at" \
+            "$R2_PRIVATE_BUCKET" "$r2_key" "$archive_bytes" "$archive_sha256" \
+            > artifact/manifest.json
+
+      - name: Publish temporary dedicated-server client input
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          FILE_NAME: ${{ steps.artifact.outputs.file_name }}
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
+          BUILD_ID: ${{ inputs.build_id }}
+        run: |
+          set -eu
+          apk add --no-cache rclone >/dev/null
+          test -n "$R2_ACCOUNT_ID"
+          export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          prefix="manual/$BUILD_ID/client"
+          archive="artifact/$FILE_NAME"
+          archive_bytes=$(stat -c %s "$archive")
+
+          # The manifest is uploaded last and acts as the completed handoff marker.
+          rclone copyto "$archive" "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          remote_bytes=$(rclone lsl "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | awk '{print $1}')
+          test "$remote_bytes" = "$archive_bytes"
+          rclone copyto artifact/manifest.json "r2:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
       - name: Upload manual build artifact
         uses: actions/upload-artifact@v7
@@ -143,4 +193,4 @@ jobs:
           path: artifact/*
           compression-level: 0
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 1
