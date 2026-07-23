@@ -83,10 +83,52 @@ jobs:
 
       # Restore recreates the NuGet assets (obj/) that --no-build project evaluation needs;
       # the binaries under bin/ come from the build job's artifact, so nothing is recompiled.
-      - name: Restore
+      - name: Restore Test Assets
         working-directory: source
         run: dotnet restore CoopTests.slnf
 
       - name: Run Unit Tests
         working-directory: source
-        run: dotnet test CoopTests.slnf -c Release --no-build --consoleLoggerParameters:ErrorsOnly
+        run: dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly
+
+  e2e:
+    name: E2E Tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63]
+
+    container:
+      image: garrettluskey/bannerlordcoop:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Link Game Assemblies Folder
+        run: ln -s /home/mb2 mb2
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ github.workspace }}/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('source/**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Download Build Output
+        uses: actions/download-artifact@v8
+        with:
+          name: build-output
+          path: source
+
+      - name: Restore Test Assets
+        working-directory: source
+        run: dotnet restore CoopTests.slnf
+
+      - name: Run E2E Test Shard
+        working-directory: source
+        run: bash ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 64
