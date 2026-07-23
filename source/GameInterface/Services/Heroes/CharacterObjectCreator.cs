@@ -8,26 +8,24 @@ namespace GameInterface.Services.Heroes;
 /// </summary>
 internal interface ICharacterObjectCreator
 {
-    CharacterObject Create(string stringId);
-    CharacterObject CreateFrom(CharacterObject template);
-    void InitializeFrom(CharacterObject characterObject, CharacterObject template);
+    CharacterObject CreateUnregistered(string stringId);
+    void RegisterAndInitializeFrom(CharacterObject characterObject, CharacterObject template);
 }
 
 /// <inheritdoc cref="ICharacterObjectCreator"/>
 internal class CharacterObjectCreator : ICharacterObjectCreator
 {
-    public CharacterObject Create(string stringId)
+    public CharacterObject CreateUnregistered(string stringId)
     {
-        return MBObjectManager.Instance.CreateObject<CharacterObject>(stringId);
+        return new CharacterObject
+        {
+            StringId = stringId,
+        };
     }
 
-    public CharacterObject CreateFrom(CharacterObject template)
+    public void RegisterAndInitializeFrom(CharacterObject characterObject, CharacterObject template)
     {
-        return CharacterObject.CreateFrom(template);
-    }
-
-    public void InitializeFrom(CharacterObject characterObject, CharacterObject template)
-    {
+        MBObjectManager.Instance.RegisterObject(characterObject);
         characterObject._originCharacter = template;
         characterObject.InitializeHeroCharacterOnAfterLoad();
     }

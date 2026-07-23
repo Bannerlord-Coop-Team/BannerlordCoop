@@ -37,27 +37,13 @@ internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
         if (hero == null) throw new System.ArgumentNullException(nameof(hero));
         if (hero.CharacterObject != null) return false;
 
-        var culture = FindUsableCulture(hero);
-        var template = culture?.BasicTroop;
-        CharacterObject characterObject;
-        if (template != null)
-        {
-            characterObject = characterObjectCreator.CreateFrom(template);
-            hero.Culture = culture;
-            logger.Warning("Repaired missing CharacterObject for hero {HeroId} using {TemplateId} from culture {CultureId}",
-                hero.StringId,
-                template.StringId,
-                culture.StringId);
-        }
-        else
-        {
-            characterObject = characterObjectCreator.Create($"{DeferredCharacterObjectPrefix}{hero.StringId}");
-            logger.Warning("Repaired missing CharacterObject for hero {HeroId}; template initialization is deferred until cultures are ready",
-                hero.StringId);
-        }
-
+        var characterObject = characterObjectCreator.CreateUnregistered(
+            $"{DeferredCharacterObjectPrefix}{hero.StringId}");
         characterObject.HeroObject = hero;
         hero._characterObject = characterObject;
+
+        logger.Warning("Repaired missing CharacterObject for hero {HeroId}; registration and template initialization are deferred until load initialization completes",
+            hero.StringId);
         return true;
     }
 
@@ -78,7 +64,7 @@ internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
         var template = culture?.BasicTroop;
         if (template == null) return false;
 
-        characterObjectCreator.InitializeFrom(characterObject, template);
+        characterObjectCreator.RegisterAndInitializeFrom(characterObject, template);
         hero.Culture = culture;
 
         logger.Warning("Initialized repaired CharacterObject for hero {HeroId} using {TemplateId} from culture {CultureId}",

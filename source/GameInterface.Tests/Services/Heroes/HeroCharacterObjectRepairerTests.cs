@@ -14,7 +14,7 @@ public class HeroCharacterObjectRepairerTests
     private readonly Mock<ILogger> logger = new();
 
     [Fact]
-    public void TryRepair_MissingCharacterObject_RestoresBothReferences()
+    public void TryRepair_MissingCharacterObject_DefersRegistrationAndRestoresBothReferences()
     {
         var template = ObjectHelper.SkipConstructor<CharacterObject>();
         var replacement = ObjectHelper.SkipConstructor<CharacterObject>();
@@ -28,9 +28,12 @@ public class HeroCharacterObjectRepairerTests
         var repaired = repairer.TryRepair(hero);
 
         Assert.True(repaired);
-        Assert.Same(template, characterObjectCreator.Template);
+        Assert.Null(characterObjectCreator.InitializationTemplate);
         Assert.Same(replacement, hero.CharacterObject);
         Assert.Same(hero, replacement.HeroObject);
+        Assert.Equal(
+            $"{HeroCharacterObjectRepairer.DeferredCharacterObjectPrefix}{hero.StringId}",
+            characterObjectCreator.StringId);
     }
 
     [Fact]
@@ -46,7 +49,7 @@ public class HeroCharacterObjectRepairerTests
 
         Assert.False(repaired);
         Assert.Same(existing, hero.CharacterObject);
-        Assert.Null(characterObjectCreator.Template);
+        Assert.Null(characterObjectCreator.StringId);
     }
 
     [Fact]
@@ -66,7 +69,7 @@ public class HeroCharacterObjectRepairerTests
         Assert.Equal(
             $"{HeroCharacterObjectRepairer.DeferredCharacterObjectPrefix}{hero.StringId}",
             characterObjectCreator.StringId);
-        Assert.Null(characterObjectCreator.Template);
+        Assert.Null(characterObjectCreator.InitializationTemplate);
     }
 
     [Fact]
@@ -111,7 +114,7 @@ public class HeroCharacterObjectRepairerTests
     }
 
     [Fact]
-    public void TryRepair_MissingHeroCulture_UsesClanCulture()
+    public void TryHydrate_MissingHeroCulture_UsesClanCulture()
     {
         var template = ObjectHelper.SkipConstructor<CharacterObject>();
         var replacement = ObjectHelper.SkipConstructor<CharacterObject>();
@@ -124,15 +127,16 @@ public class HeroCharacterObjectRepairerTests
         var characterObjectCreator = new FakeCharacterObjectCreator(replacement);
         var repairer = CreateRepairer(characterObjectCreator);
 
-        var repaired = repairer.TryRepair(hero);
+        Assert.True(repairer.TryRepair(hero));
+        var hydrated = repairer.TryHydrate(hero);
 
-        Assert.True(repaired);
+        Assert.True(hydrated);
         Assert.Same(culture, hero.Culture);
-        Assert.Same(template, characterObjectCreator.Template);
+        Assert.Same(template, characterObjectCreator.InitializationTemplate);
     }
 
     [Fact]
-    public void TryRepair_MissingRelatedCulture_UsesLoadedCulture()
+    public void TryHydrate_MissingRelatedCulture_UsesLoadedCulture()
     {
         var template = ObjectHelper.SkipConstructor<CharacterObject>();
         var replacement = ObjectHelper.SkipConstructor<CharacterObject>();
@@ -142,11 +146,12 @@ public class HeroCharacterObjectRepairerTests
         var characterObjectCreator = new FakeCharacterObjectCreator(replacement);
         var repairer = CreateRepairer(characterObjectCreator, culture);
 
-        var repaired = repairer.TryRepair(hero);
+        Assert.True(repairer.TryRepair(hero));
+        var hydrated = repairer.TryHydrate(hero);
 
-        Assert.True(repaired);
+        Assert.True(hydrated);
         Assert.Same(culture, hero.Culture);
-        Assert.Same(template, characterObjectCreator.Template);
+        Assert.Same(template, characterObjectCreator.InitializationTemplate);
     }
 
     private HeroCharacterObjectRepairer CreateRepairer(
@@ -186,7 +191,6 @@ public class HeroCharacterObjectRepairerTests
         private readonly CharacterObject replacement;
 
         public string? StringId { get; private set; }
-        public CharacterObject? Template { get; private set; }
         public CharacterObject? InitializedCharacterObject { get; private set; }
         public CharacterObject? InitializationTemplate { get; private set; }
 
@@ -195,20 +199,14 @@ public class HeroCharacterObjectRepairerTests
             this.replacement = replacement;
         }
 
-        public CharacterObject Create(string stringId)
+        public CharacterObject CreateUnregistered(string stringId)
         {
             StringId = stringId;
             replacement.StringId = stringId;
             return replacement;
         }
 
-        public CharacterObject CreateFrom(CharacterObject template)
-        {
-            Template = template;
-            return replacement;
-        }
-
-        public void InitializeFrom(CharacterObject characterObject, CharacterObject template)
+        public void RegisterAndInitializeFrom(CharacterObject characterObject, CharacterObject template)
         {
             InitializedCharacterObject = characterObject;
             InitializationTemplate = template;
