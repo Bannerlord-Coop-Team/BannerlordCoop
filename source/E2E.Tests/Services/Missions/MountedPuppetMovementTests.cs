@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using Common.PacketHandlers;
 using Common.Serialization;
+using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using Missions;
 using Missions.Agents;
@@ -229,6 +230,80 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         Assert.Equal(
             expected,
             AgentMountData.GetTurnDirection(actionName, animationName));
+    }
+
+    [Theory]
+    [InlineData(0f, 1f, -1f, 0f, AgentMountData.TurnLeft)]
+    [InlineData(0f, 1f, 1f, 0f, AgentMountData.TurnRight)]
+    [InlineData(0f, 1f, 0.001f, 1f, AgentMountData.NoTurn)]
+    [InlineData(0f, 1f, 0f, -1f, AgentMountData.TurnRight)]
+    public void GetTurnDirection_DerivesStationaryTurnsFromFacingChanges(
+        float previousX,
+        float previousY,
+        float currentX,
+        float currentY,
+        int expected)
+    {
+        Assert.Equal(
+            expected,
+            AgentMountData.GetTurnDirection(
+                new Vec2(previousX, previousY),
+                new Vec2(currentX, currentY)));
+    }
+
+    [Fact]
+    public void PollMovement_StartsAndBroadcastsAStationaryTurnWhenFacingChangesDuringIdle()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var horseId = Guid.NewGuid();
+
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceHorseMirror.MovementDirection = Vec2.Forward;
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(1f, 0f, 0f);
+            sourceHorseMirror.Action0Index = 101;
+            Assert.True(registry.TryRegisterAgent("peer", horseId, sourceHorse));
+
+            component.AgentMovementHandler.PollMovement(0f);
+            sourceHorseMirror.RealGlobalVelocity = Vec3.Zero;
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Equal(0, sourceHorseMirror.SetActionChannelCalls);
+            network.NetworkSentPackets.Packets.Clear();
+
+            sourceHorseMirror.MovementDirection = new Vec2(-0.007f, 0.999975f);
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Equal(0, sourceHorseMirror.SetActionChannelCalls);
+            sourceHorseMirror.MovementDirection = new Vec2(-0.014f, 0.999902f);
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Equal(0, sourceHorseMirror.SetActionChannelCalls);
+            network.NetworkSentPackets.Packets.Clear();
+
+            sourceHorseMirror.MovementDirection = new Vec2(-0.021f, 0.99978f);
+            component.AgentMovementHandler.PollMovement(0.025f);
+
+            int turnActionIndex = ActionIndexCache.Create("act_horse_turn_left").Index;
+            Assert.Equal(turnActionIndex, sourceHorseMirror.Action0Index);
+            Assert.Equal(1, sourceHorseMirror.SetActionChannelCalls);
+
+            AgentMountData sentMount = Assert.Single(
+                Assert.Single(network.NetworkSentPackets.GetPackets<MountMovementPacket>())
+                    .Mounts);
+            Assert.Equal(AgentMountData.TurnLeft, sentMount.MountAction0TurnDirection);
+            Assert.Equal(turnActionIndex, sentMount.MountAction0TurnActionIndex);
+
+            sourceHorseMirror.MovementDirection = new Vec2(-0.2f, 0.98f);
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Equal(1, sourceHorseMirror.SetActionChannelCalls);
+        });
     }
 
     [Theory]

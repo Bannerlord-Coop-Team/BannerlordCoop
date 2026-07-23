@@ -54,6 +54,10 @@ public class AgentMovementHandler : IAgentMovementHandler
     // (this handler is transient), so it can't leak across missions.
     private readonly Dictionary<Agent, Agent> _dismountedHorses = new Dictionary<Agent, Agent>();
 
+    // Vanilla can rotate a stopped AI mount's facing without selecting a turn action. Remember the previous
+    // authoritative direction so PollMovement can start the native turn action before it snapshots the mount.
+    private readonly Dictionary<Agent, Vec2> _lastMountDirections = new Dictionary<Agent, Vec2>();
+
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
     private readonly AgentPositionInterpolator _interpolator = new AgentPositionInterpolator();
@@ -115,6 +119,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         _interpolator.Clear();
+        _lastMountDirections.Clear();
 
         packetManager.RemovePacketHandler(this);
         packetManager.RemovePacketHandler(_mountMovementApplier);
@@ -154,22 +159,36 @@ public class AgentMovementHandler : IAgentMovementHandler
 
             if (agent.IsMount)
             {
+                int turnDirection = EnsureStationaryMountTurnAnimation(
+                    agent,
+                    out int turnActionIndex);
                 (mountIds ??= new List<Guid>()).Add(agentInfo.AgentId);
                 (mountData ??= new List<AgentMountData>()).Add(new AgentMountData(
                     agent,
-                    mountAction0Speed: AgentMountData.GetRenderedAction0Speed(agent)));
+                    mountAction0Speed: AgentMountData.GetRenderedAction0Speed(agent),
+                    mountAction0TurnDirection: turnDirection == AgentMountData.NoTurn
+                        ? (int?)null
+                        : turnDirection,
+                    mountAction0TurnActionIndex: turnDirection == AgentMountData.NoTurn
+                        ? (int?)null
+                        : turnActionIndex));
             }
             else
             {
                 ids.Add(agentInfo.AgentId);
                 Agent mount = agent.MountAgent;
+                int turnDirection = EnsureStationaryMountTurnAnimation(
+                    mount,
+                    out int turnActionIndex);
                 float? mountAction0Speed = mount != null && mount.IsActive()
                     ? AgentMountData.GetRenderedAction0Speed(mount)
                     : null;
                 data.Add(new AgentData(
                     agent,
                     GetRegisteredMountId(agent),
-                    mountAction0Speed));
+                    mountAction0Speed,
+                    turnDirection == AgentMountData.NoTurn ? (int?)null : turnDirection,
+                    turnDirection == AgentMountData.NoTurn ? (int?)null : turnActionIndex));
             }
         }
 
@@ -194,6 +213,53 @@ public class AgentMovementHandler : IAgentMovementHandler
             mountData.CopyTo(start, dataChunk, 0, count);
             client.SendAll(new MountMovementPacket(idChunk, dataChunk));
         }
+    }
+
+    private int EnsureStationaryMountTurnAnimation(Agent mount, out int turnActionIndex)
+    {
+        turnActionIndex = ActionIndexCache.act_none.Index;
+        if (mount == null || !mount.IsActive()) return AgentMountData.NoTurn;
+
+        Vec2 currentDirection = mount.GetMovementDirection();
+        if (mount.GetRealGlobalVelocity().AsVec2.Length > AgentMountData.StationarySpeedThreshold)
+        {
+            _lastMountDirections.Remove(mount);
+            return AgentMountData.NoTurn;
+        }
+
+        if (!_lastMountDirections.TryGetValue(mount, out Vec2 previousDirection))
+        {
+            _lastMountDirections[mount] = currentDirection;
+            return AgentMountData.NoTurn;
+        }
+
+        int turnDirection = AgentMountData.GetTurnDirection(previousDirection, currentDirection);
+        if (turnDirection == AgentMountData.NoTurn) return AgentMountData.NoTurn;
+
+        string desiredActionName = AgentMountData.GetStationaryTurnActionName(
+            null,
+            mount.Monster?.MonsterUsage,
+            turnDirection);
+        ActionIndexCache desiredAction = ActionIndexCache.Create(desiredActionName);
+        turnActionIndex = desiredAction.Index;
+        if (mount.GetCurrentAction(0).Index == desiredAction.Index)
+        {
+            _lastMountDirections[mount] = currentDirection;
+            return turnDirection;
+        }
+
+        bool actionStarted = mount.SetActionChannel(
+            0,
+            desiredAction,
+            ignorePriority: true);
+        if (actionStarted)
+        {
+            _lastMountDirections[mount] = currentDirection;
+            return turnDirection;
+        }
+
+        turnActionIndex = ActionIndexCache.act_none.Index;
+        return AgentMountData.NoTurn;
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)

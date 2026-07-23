@@ -191,6 +191,26 @@ namespace Missions.Agents.Packets
                 : GetTurnDirection(null, animationName);
         }
 
+        internal static int GetTurnDirection(Vec2 previousDirection, Vec2 currentDirection)
+        {
+            if (!IsFinite(previousDirection)
+                || !IsFinite(currentDirection)
+                || previousDirection.LengthSquared <= 0.0001f
+                || currentDirection.LengthSquared <= 0.0001f)
+                return NoTurn;
+
+            previousDirection.Normalize();
+            currentDirection.Normalize();
+            float dot = (previousDirection.X * currentDirection.X)
+                + (previousDirection.Y * currentDirection.Y);
+            if (dot >= 0.9999f)
+                return NoTurn;
+
+            float cross = (previousDirection.X * currentDirection.Y)
+                - (previousDirection.Y * currentDirection.X);
+            return cross > 0f ? TurnLeft : TurnRight;
+        }
+
         internal static int ResolveAction0Index(
             int actionIndex,
             float speed,
@@ -213,6 +233,14 @@ namespace Missions.Agents.Packets
 
             return value.IndexOf($"turn_{direction}", StringComparison.OrdinalIgnoreCase) >= 0
                 || value.IndexOf($"rotate_{direction}", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsFinite(Vec2 value)
+        {
+            return !float.IsNaN(value.X)
+                && !float.IsInfinity(value.X)
+                && !float.IsNaN(value.Y)
+                && !float.IsInfinity(value.Y);
         }
 
         internal static string GetStationaryTurnActionName(

@@ -12,7 +12,9 @@ namespace Missions.Agents.Packets
         public AgentData(
             Agent agent,
             System.Guid mountId = default,
-            float? mountAction0Speed = null)
+            float? mountAction0Speed = null,
+            int? mountAction0TurnDirection = null,
+            int? mountAction0TurnActionIndex = null)
         {
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
@@ -29,7 +31,12 @@ namespace Missions.Agents.Packets
             Agent mount = agent.MountAgent;
             if (mount != null && mount.IsActive())
             {
-                MountData = new AgentMountData(mount, mountId, mountAction0Speed);
+                MountData = new AgentMountData(
+                    mount,
+                    mountId,
+                    mountAction0Speed,
+                    mountAction0TurnDirection: mountAction0TurnDirection,
+                    mountAction0TurnActionIndex: mountAction0TurnActionIndex);
             }
             else
             {
