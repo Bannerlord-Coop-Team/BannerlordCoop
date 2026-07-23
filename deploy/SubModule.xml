@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Module>
-    <Name value="${name}"/>
-    <Id value="${name}"/>
+    <Name value="Bannerlord Coop"/>
+    <Id value="Bannerlord Coop"/>
     <Version value="${version}"/>
     <SingleplayerModule value="true"/>
     <MultiplayerModule value="false"/>
@@ -14,8 +14,8 @@
     </DependedModules>
     <SubModules>
         <SubModule>
-            <Name value="${name}"/>
-            <DLLName value="${name}.dll"/>
+            <Name value="Coop"/>
+            <DLLName value="Coop.dll"/>
             <SubModuleClassType value="${name}.${main_class}"/>
             <Tags>
                 <Tag key="DedicatedServerType" value="none" />
