@@ -80,6 +80,7 @@ public class CompanionDismissalSyncTests : IDisposable
         Assert.IsType<NetworkTroopRosterSetNumber>(orderedTail[0]);
         Assert.IsType<NetworkTroopRosterRemoveZeroCounts>(orderedTail[1]);
         Assert.IsType<FireCompanionCompleted>(orderedTail[2]);
+        Assert.Single(Server.NetworkSentImmediateMessages.OfType<FireCompanionCompleted>());
 
         Server.Resolve<INetwork>().Send(requester.NetPeer,
             new FireCompanionCompleted(completion.Value.RequestId, context.HeroId, true, null));

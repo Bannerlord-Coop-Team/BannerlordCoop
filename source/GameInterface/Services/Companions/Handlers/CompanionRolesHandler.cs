@@ -185,6 +185,8 @@ internal class CompanionRolesHandler : IHandler
 
             network.SendAll(new FireCompanion(requestId, oneToOneConversationHeroId,
                 expectedClanId, expectedPartyId));
+            logger.Information("Sent companion dismissal request {RequestId} for {HeroId}",
+                requestId, oneToOneConversationHeroId);
         }
         catch (Exception exception)
         {
@@ -274,6 +276,10 @@ internal class CompanionRolesHandler : IHandler
     private void Handle_FireCompanionCompleted(MessagePayload<FireCompanionCompleted> obj)
     {
         var data = obj.What;
+        logger.Information(
+            "Received companion dismissal completion {RequestId} for {HeroId}; pending request {PendingRequestId} for {PendingHeroId}; game-thread queue {QueueDepth}",
+            data.RequestId, data.OneToOneConversationHeroId, pendingFireCompanionRequestId,
+            pendingFireCompanionHeroId, GameThread.Instance.QueueLength);
 
         // Roster corrections and this acknowledgement share the reliable ordered stream. Deferring all of
         // them to the game thread preserves that FIFO before the player can open the party screen.
@@ -311,7 +317,14 @@ internal class CompanionRolesHandler : IHandler
 
     private void SendCompletion(NetPeer requester, string requestId, string heroId, bool success, string error)
     {
-        network.Send(requester, new FireCompanionCompleted(requestId, heroId, success, error));
+        logger.Information(
+            "Sending immediate companion dismissal completion {RequestId} for {HeroId} to peer {PeerId}; success {Success}",
+            requestId, heroId, requester.Id, success);
+
+        // SendImmediate first flushes every message already buffered for this peer and then writes the
+        // completion directly on the same reliable ordered stream. The acknowledgement therefore cannot
+        // remain in the network aggregation buffer after the roster corrections it confirms.
+        network.SendImmediate(requester, new FireCompanionCompleted(requestId, heroId, success, error));
     }
 
     internal static void ReconcileDismissedCompanionRoster(TroopRoster memberRoster, CharacterObject character,
