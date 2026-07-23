@@ -59,7 +59,7 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
             using (new AllowedThread())
                 Hero.MainHero.Gold = 1000;
 
-            BarterClientPresentation.SynchronizeMainHeroGold(authoritativeGold);
+            client.Resolve<IBarterClientPresentation>().SynchronizeMainHeroGold(authoritativeGold);
             Assert.Equal(authoritativeGold, Hero.MainHero.Gold);
         });
     }

@@ -133,7 +133,19 @@ internal sealed class ConversationPartyTracker : IHandler
         lock (stateLock)
         {
             if (disposed) return false;
-            if (engagements.TryGetValue(engagerKey, out var current)) return current.PartyId == partyId;
+            if (engagements.TryGetValue(engagerKey, out var current))
+            {
+                if (current.PartyId != partyId) return false;
+
+                engagements[engagerKey] = new Engagement(
+                    engagerKey,
+                    engagerPartyId,
+                    partyId,
+                    current.EngagerIsDefender || engagerIsDefender,
+                    current.WasAiDisabled);
+                return true;
+            }
+
             var existing = engagements.Values.FirstOrDefault(x => x.PartyId == partyId);
             if (existing.PartyId != null) wasAiDisabled = existing.WasAiDisabled;
 

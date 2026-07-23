@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Bandits.Patches;
+using GameInterface.Services.Barters;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -41,6 +42,7 @@ internal sealed class BanditBarterHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly ISessionInteractionsPlayerDataInterface interactions;
+    private readonly IBarterClientPresentation barterClientPresentation;
     private readonly ISendCoalescer sendCoalescer;
 
     public BanditBarterHandler(
@@ -50,6 +52,7 @@ internal sealed class BanditBarterHandler : IHandler
         IPlayerManager playerManager,
         ConversationPartyTracker conversationPartyTracker,
         ISessionInteractionsPlayerDataInterface interactions,
+        IBarterClientPresentation barterClientPresentation,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -58,6 +61,7 @@ internal sealed class BanditBarterHandler : IHandler
         this.playerManager = playerManager;
         this.conversationPartyTracker = conversationPartyTracker;
         this.interactions = interactions;
+        this.barterClientPresentation = barterClientPresentation;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<NetworkRequestBanditBarter>(HandleRequest);
@@ -92,7 +96,7 @@ internal sealed class BanditBarterHandler : IHandler
 
         var result = payload.What;
         GameThread.RunSafe(
-            () => BanditBarterPatch.CompleteRequest(result),
+            () => BanditBarterPatch.CompleteRequest(result, barterClientPresentation),
             context: nameof(NetworkBanditBarterResult));
     }
 

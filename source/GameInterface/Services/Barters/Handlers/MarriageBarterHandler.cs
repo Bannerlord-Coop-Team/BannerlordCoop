@@ -43,6 +43,7 @@ internal sealed class MarriageBarterHandler : IHandler
     private readonly IRomanceAuthority romanceAuthority;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly LocationConversationTracker locationConversationTracker;
+    private readonly IBarterClientPresentation barterClientPresentation;
     private readonly ISendCoalescer sendCoalescer;
     private readonly Dictionary<NetPeer, MarriageAuthorization> authorizations =
         new Dictionary<NetPeer, MarriageAuthorization>();
@@ -55,6 +56,7 @@ internal sealed class MarriageBarterHandler : IHandler
         IRomanceAuthority romanceAuthority,
         ConversationPartyTracker conversationPartyTracker,
         LocationConversationTracker locationConversationTracker,
+        IBarterClientPresentation barterClientPresentation,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -64,6 +66,7 @@ internal sealed class MarriageBarterHandler : IHandler
         this.romanceAuthority = romanceAuthority;
         this.conversationPartyTracker = conversationPartyTracker;
         this.locationConversationTracker = locationConversationTracker;
+        this.barterClientPresentation = barterClientPresentation;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<NetworkAuthorizeMarriageBarter>(HandleAuthorization);
@@ -131,7 +134,7 @@ internal sealed class MarriageBarterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (MarriageBarterPatch.CompleteRequest(payload.What) && !payload.What.Accepted)
+            if (MarriageBarterPatch.CompleteRequest(payload.What, barterClientPresentation) && !payload.What.Accepted)
                 network.SendAll(new NetworkRequestRomanceStateSync());
         }, context: nameof(NetworkMarriageBarterResult));
     }

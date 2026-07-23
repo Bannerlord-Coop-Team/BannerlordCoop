@@ -10,13 +10,11 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using HarmonyLib;
 using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
@@ -31,8 +29,6 @@ namespace GameInterface.Services.Barters.Handlers;
 internal sealed class PeaceBarterHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PeaceBarterHandler>();
-    private static readonly FieldInfo ReleasedPrisonerField =
-        AccessTools.Field(typeof(SetPrisonerFreeBarterable), "_prisonerCharacter");
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -40,6 +36,7 @@ internal sealed class PeaceBarterHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly LocationConversationTracker locationConversationTracker;
+    private readonly IBarterClientPresentation barterClientPresentation;
     private readonly ISendCoalescer sendCoalescer;
 
     public PeaceBarterHandler(
@@ -49,6 +46,7 @@ internal sealed class PeaceBarterHandler : IHandler
         IPlayerManager playerManager,
         ConversationPartyTracker conversationPartyTracker,
         LocationConversationTracker locationConversationTracker,
+        IBarterClientPresentation barterClientPresentation,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -57,6 +55,7 @@ internal sealed class PeaceBarterHandler : IHandler
         this.playerManager = playerManager;
         this.conversationPartyTracker = conversationPartyTracker;
         this.locationConversationTracker = locationConversationTracker;
+        this.barterClientPresentation = barterClientPresentation;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<NetworkRequestPeaceBarter>(HandleRequest);
@@ -91,7 +90,7 @@ internal sealed class PeaceBarterHandler : IHandler
 
         var result = payload.What;
         GameThread.RunSafe(
-            () => PeaceBarterPatch.CompleteRequest(result),
+            () => PeaceBarterPatch.CompleteRequest(result, barterClientPresentation),
             context: nameof(NetworkPeaceBarterResult));
     }
 
@@ -375,7 +374,7 @@ internal sealed class PeaceBarterHandler : IHandler
                        MatchesPrisoner(prisonerBarterable._prisonerCharacter, term);
             case PeaceBarterTermType.ReleasePrisoner:
                 return barterable is SetPrisonerFreeBarterable releasedPrisoner &&
-                       MatchesPrisoner(ReleasedPrisonerField?.GetValue(releasedPrisoner) as Hero, term);
+                       MatchesPrisoner(releasedPrisoner._prisonerCharacter, term);
             default:
                 return false;
         }

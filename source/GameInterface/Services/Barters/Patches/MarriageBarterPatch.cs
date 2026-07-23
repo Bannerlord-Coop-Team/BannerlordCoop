@@ -8,7 +8,6 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
@@ -20,9 +19,6 @@ namespace GameInterface.Services.Barters.Patches;
 [HarmonyPatch(typeof(BarterManager))]
 internal static class MarriageBarterPatch
 {
-    private static readonly MethodInfo HandleHeroCooldownMethod =
-        AccessTools.Method(typeof(BarterManager), "HandleHeroCooldown");
-
     private static BarterData authorizedBarter;
     private static bool requestPending;
     private static bool pendingUiActive;
@@ -109,7 +105,9 @@ internal static class MarriageBarterPatch
         return true;
     }
 
-    internal static bool CompleteRequest(NetworkMarriageBarterResult result)
+    internal static bool CompleteRequest(
+        NetworkMarriageBarterResult result,
+        IBarterClientPresentation barterClientPresentation)
     {
         if (!requestPending ||
             authorizedBarter == null ||
@@ -126,16 +124,19 @@ internal static class MarriageBarterPatch
         ClearPendingRequest();
         if (!result.Accepted)
         {
+            if (shouldCompleteUi)
+                TryReauthorize(completedBarter);
+
             ShowMessage(string.IsNullOrWhiteSpace(result.Reason)
                 ? "The server rejected the marriage barter."
                 : result.Reason);
             return true;
         }
 
-        BarterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
+        barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
         if (shouldCompleteUi && BarterManager.Instance != null)
         {
-            HandleHeroCooldownMethod?.Invoke(BarterManager.Instance, new object[] { completedBarter.OtherHero });
+            BarterManager.Instance.HandleHeroCooldown(completedBarter.OtherHero);
             BarterManager.Instance.LastBarterIsAccepted = true;
             BarterManager.Instance.Close();
         }
@@ -188,6 +189,13 @@ internal static class MarriageBarterPatch
             heroBeingProposedToId,
             proposingHeroId));
         return true;
+    }
+
+    private static void TryReauthorize(BarterData barterData)
+    {
+        var marriageBarterable = barterData.GetBarterables().OfType<MarriageBarterable>().FirstOrDefault();
+        if (marriageBarterable != null)
+            TryAuthorize(barterData, marriageBarterable);
     }
 
     private static void CancelAuthorization()

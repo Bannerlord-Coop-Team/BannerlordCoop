@@ -5,9 +5,14 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Barters;
 
-internal static class BarterClientPresentation
+internal interface IBarterClientPresentation
 {
-    public static void SynchronizeMainHeroGold(int gold)
+    void SynchronizeMainHeroGold(int gold);
+}
+
+internal sealed class BarterClientPresentation : IBarterClientPresentation
+{
+    public void SynchronizeMainHeroGold(int gold)
     {
         if (Hero.MainHero == null) return;
 

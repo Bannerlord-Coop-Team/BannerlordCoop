@@ -8,7 +8,6 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
@@ -22,11 +21,6 @@ namespace GameInterface.Services.Barters.Patches;
 [HarmonyPatch(typeof(BarterManager))]
 internal static class PeaceBarterPatch
 {
-    private static readonly FieldInfo ReleasedPrisonerField =
-        AccessTools.Field(typeof(SetPrisonerFreeBarterable), "_prisonerCharacter");
-    private static readonly MethodInfo HandleHeroCooldownMethod =
-        AccessTools.Method(typeof(BarterManager), "HandleHeroCooldown");
-
     private static BarterData pendingBarter;
     private static bool pendingUiActive;
     private static string pendingRequestId;
@@ -107,7 +101,9 @@ internal static class PeaceBarterPatch
         return true;
     }
 
-    internal static void CompleteRequest(NetworkPeaceBarterResult result)
+    internal static void CompleteRequest(
+        NetworkPeaceBarterResult result,
+        IBarterClientPresentation barterClientPresentation)
     {
         if (pendingBarter == null ||
             pendingRequestId != result.RequestId ||
@@ -126,7 +122,7 @@ internal static class PeaceBarterPatch
             return;
         }
 
-        BarterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
+        barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
         var encounterIsActive = shouldCompleteUi && completedContext == PeaceConversationContext.MapParty &&
             PlayerEncounter.Current != null &&
             completedBarter.OtherParty == MobileParty.ConversationParty?.Party;
@@ -135,7 +131,7 @@ internal static class PeaceBarterPatch
 
         if (shouldCompleteUi && BarterManager.Instance != null)
         {
-            HandleHeroCooldownMethod?.Invoke(BarterManager.Instance, new object[] { completedBarter.OtherHero });
+            BarterManager.Instance.HandleHeroCooldown(completedBarter.OtherHero);
             BarterManager.Instance.LastBarterIsAccepted = true;
             BarterManager.Instance.Close();
         }
@@ -260,10 +256,9 @@ internal static class PeaceBarterPatch
                     objectManager,
                     out term);
             case SetPrisonerFreeBarterable releasedPrisoner:
-                var releasedHero = ReleasedPrisonerField?.GetValue(releasedPrisoner) as Hero;
                 return TryCreatePrisonerTerm(
                     PeaceBarterTermType.ReleasePrisoner,
-                    releasedHero?.CharacterObject,
+                    releasedPrisoner._prisonerCharacter?.CharacterObject,
                     ownerHeroId,
                     barterable.CurrentAmount,
                     objectManager,

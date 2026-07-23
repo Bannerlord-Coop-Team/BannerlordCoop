@@ -98,7 +98,9 @@ internal static class BanditBarterPatch
         return true;
     }
 
-    internal static void CompleteRequest(NetworkBanditBarterResult result)
+    internal static void CompleteRequest(
+        NetworkBanditBarterResult result,
+        IBarterClientPresentation barterClientPresentation)
     {
         if (pendingBarter == null ||
             pendingBanditPartyId != result.BanditPartyId ||
@@ -117,7 +119,7 @@ internal static class BanditBarterPatch
             return;
         }
 
-        BarterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
+        barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
 
         var encounterIsActive = shouldCompleteUi && PlayerEncounter.Current != null &&
             completedBarter.OtherParty == MobileParty.ConversationParty?.Party;
