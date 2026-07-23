@@ -108,6 +108,56 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void AbandonedJoin_LeavesLobbyAndAllowsRejoin()
+        {
+            SetupLobby(42);
+            api.RaiseLobbyJoinRequested(42);
+
+            // Canceling the password prompt abandons the attempt without a session.
+            messageBroker.Publish(this, new SessionJoinAbandoned());
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
+
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Equal(2, resolved.Count);
+            Assert.True(listener.IsInLobby);
+            Assert.Empty(failed);
+        }
+
+        [Fact]
+        public void RejoinRequestWhileStillMember_ResolvesAgain()
+        {
+            SetupLobby(42);
+
+            api.RaiseLobbyJoinRequested(42);
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.Equal(2, resolved.Count);
+            Assert.Empty(failed);
+            Assert.True(listener.IsInLobby);
+            Assert.DoesNotContain(42UL, api.LeftLobbies);
+        }
+
+        [Fact]
+        public void RejoinRequestWhileStillMember_ReadThrows_LeavesLobbyAndReportsFailure()
+        {
+            SetupLobby(42);
+            api.RaiseLobbyJoinRequested(42);
+            Assert.True(listener.IsInLobby);
+
+            // A lobby read throwing on the re-resolve must not strand the join in the lobby:
+            // release the membership and surface the failure, same as the OnLobbyEntered path.
+            api.ThrowOnGetLobbyData = true;
+            api.RaiseLobbyJoinRequested(42);
+
+            Assert.False(listener.IsInLobby);
+            Assert.Contains(42UL, api.LeftLobbies);
+            Assert.Single(failed);
+        }
+
+        [Fact]
         public void ConnectString_JoinsReferencedLobby()
         {
             SetupLobby(42);
