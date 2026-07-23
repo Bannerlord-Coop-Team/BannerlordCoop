@@ -47,6 +47,43 @@ public class MapEventCollectionTests : MapEventTestBase
     }
 
     [Fact]
+    public void Client_RunAfterCommit_RunsAfterPartySidesAreAssigned()
+    {
+        var staged = CreateServerMapEvent(commit: false);
+        var callbacksRan = Clients.ToDictionary(client => client, _ => false);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+                client.Resolve<IMapEventInitializationBarrier>().RunAfterCommit(mapEvent, () =>
+                {
+                    Assert.All(mapEvent.InvolvedParties, party => Assert.Same(mapEvent, party.MapEvent));
+                    callbacksRan[client] = true;
+                });
+                Assert.False(callbacksRan[client]);
+            });
+        }
+
+        Server.Call(() => Campaign.Current.MapEventManager.OnMapEventCreated(
+            Get<MapEvent>(Server, staged.MapEventId)), MapEventDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(callbacksRan[client]);
+                var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+                bool immediateCallbackRan = false;
+                client.Resolve<IMapEventInitializationBarrier>()
+                    .RunAfterCommit(mapEvent, () => immediateCallbackRan = true);
+                Assert.True(immediateCallbackRan);
+            });
+        }
+    }
+
+    [Fact]
     public void Server_MapEvent_AbortDestroysStagedGraph()
     {
         Server.NetworkSentMessages.Clear();

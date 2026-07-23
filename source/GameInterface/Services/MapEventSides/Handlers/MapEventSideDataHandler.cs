@@ -22,6 +22,7 @@ internal class MapEventSideDataHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IMapEventInitializationBarrier initializationBarrier;
+    private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
 
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDataHandler>();
 
@@ -29,12 +30,14 @@ internal class MapEventSideDataHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IMapEventInitializationBarrier initializationBarrier)
+        IMapEventInitializationBarrier initializationBarrier,
+        IEncounterMenuConditionRefresher encounterMenuConditionRefresher)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.initializationBarrier = initializationBarrier;
+        this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
 
         messageBroker.Subscribe<MapEventPartyRemoved>(Handle);
         messageBroker.Subscribe<NetworkRemoveMapEventParty>(Handle);
@@ -160,7 +163,7 @@ internal class MapEventSideDataHandler : IHandler
                 initializationBarrier.AttachClient(
                     mapEventSide,
                     mapEventParty,
-                    () => SwitchRaiderToEncounterIfNeeded(mapEventSide.MapEvent));
+                    () => AfterClientPartyAttached(mapEventSide.MapEvent));
             }
             catch (Exception e)
             {
@@ -169,11 +172,17 @@ internal class MapEventSideDataHandler : IHandler
         });
     }
 
-    private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
+    private void AfterClientPartyAttached(MapEvent mapEvent)
     {
         if (ModInformation.IsServer)
             return;
 
+        SwitchRaiderToEncounterIfNeeded(mapEvent);
+        encounterMenuConditionRefresher.RefreshForMapEvent(mapEvent);
+    }
+
+    private static void SwitchRaiderToEncounterIfNeeded(MapEvent mapEvent)
+    {
         if (!mapEvent.IsRaidHostileAction() || mapEvent.IsActiveSlowVillageRaid())
             return;
 

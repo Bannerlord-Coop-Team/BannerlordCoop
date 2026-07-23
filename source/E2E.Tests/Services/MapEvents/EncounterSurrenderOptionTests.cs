@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
@@ -156,6 +157,54 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    /// <summary>
+    /// Native shows "Leave it to the others" when an ally has healthy troops, then disables it from the empty
+    /// main party's morale. Coop must leave the option enabled so the allied force can be simulated.
+    /// </summary>
+    [Fact]
+    public void IncapacitatedDefender_WithHealthyAlliedParty_CanLeaveBattleToOthers()
+    {
+        var (ctx, client) = SetupIncapacitatedDefenderInBattle(
+            withHealthyAllyOnSide: true,
+            effectiveMorale: 0f);
+        SetDefenderPlayerEncounter(client, ctx);
+
+        client.Call(() =>
+        {
+            var (shown, args) = InvokeOrderAttackCondition();
+
+            Assert.True(shown);
+            Assert.True(args.IsEnabled, "healthy allied troops should be allowed to simulate the field battle");
+            Assert.Equal(GameMenuOption.LeaveType.OrderTroopsToAttack, args.optionLeaveType);
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>The existing mission claim still takes precedence over the allied-force exception.</summary>
+    [Fact]
+    public void IncapacitatedDefender_WithHealthyAlliedParty_CannotSimulateWhileMissionOwnsEvent()
+    {
+        var (ctx, client) = SetupIncapacitatedDefenderInBattle(
+            withHealthyAllyOnSide: true,
+            effectiveMorale: 0f);
+        SetDefenderPlayerEncounter(client, ctx);
+
+        client.Call(() =>
+        {
+            BattleModeRegistry.Begin(ctx.MapEventId, BattleStartMode.Mission);
+            try
+            {
+                var (shown, args) = InvokeOrderAttackCondition();
+
+                Assert.True(shown);
+                Assert.False(args.IsEnabled);
+            }
+            finally
+            {
+                BattleModeRegistry.End();
+            }
+        }, MapEventDisabledMethods);
+    }
+
     // ------------------------------------------------------------------
     // Drivers
     // ------------------------------------------------------------------
@@ -201,6 +250,19 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
         return (shown, args);
     }
 
+    /// <summary>Runs the real (Harmony-patched) order-attack menu condition in the calling instance's scope.</summary>
+    private static (bool shown, MenuCallbackArgs args) InvokeOrderAttackCondition()
+    {
+        var behavior = new EncounterGameMenuBehavior();
+        var args = new MenuCallbackArgs((MenuContext)null, null);
+
+        var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_encounter_order_attack_on_condition");
+        Assert.NotNull(method);
+
+        var shown = (bool)method.Invoke(behavior, new object[] { args });
+        return (shown, args);
+    }
+
     // ------------------------------------------------------------------
     // Setup
     // ------------------------------------------------------------------
@@ -210,7 +272,9 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
     /// state the surrender condition reads. Optionally reinforces the defender side with a server-created
     /// party carrying healthy troops — the "side still counts healthy members" shape of the soft-lock.
     /// </summary>
-    private (MapEventContext ctx, EnvironmentInstance client) SetupDefenderInBattle(bool withHealthyAllyOnSide)
+    private (MapEventContext ctx, EnvironmentInstance client) SetupDefenderInBattle(
+        bool withHealthyAllyOnSide,
+        float effectiveMorale = 50f)
     {
         var ctx = CreateServerMapEvent();
         var client = Clients.First();
@@ -223,18 +287,37 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
         }
 
         SetMainPartyInBattle(client, ctx.DefenderPartyId);
-        EnsureClientMenuModels(client);
+        EnsureClientMenuModels(client, effectiveMorale);
 
         return (ctx, client);
     }
 
     /// <summary>Defender battle state plus the incapacitation: wounded main hero, no healthy member left in
     /// the main party — the reported soft-lock state.</summary>
-    private (MapEventContext ctx, EnvironmentInstance client) SetupIncapacitatedDefenderInBattle(bool withHealthyAllyOnSide)
+    private (MapEventContext ctx, EnvironmentInstance client) SetupIncapacitatedDefenderInBattle(
+        bool withHealthyAllyOnSide,
+        float effectiveMorale = 50f)
     {
-        var (ctx, client) = SetupDefenderInBattle(withHealthyAllyOnSide);
+        var (ctx, client) = SetupDefenderInBattle(withHealthyAllyOnSide, effectiveMorale);
         MakeMainPartyIncapacitated(client);
         return (ctx, client);
+    }
+
+    private void SetDefenderPlayerEncounter(EnvironmentInstance client, MapEventContext ctx)
+    {
+        SetMockPlayerEncounter(client, ctx.AttackerPartyId, ctx.MapEventId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(ctx.AttackerPartyId, out var attacker));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(ctx.DefenderPartyId, out var defender));
+
+            var encounter = PlayerEncounter.Current;
+            encounter._attackerParty = attacker.Party;
+            encounter._defenderParty = defender.Party;
+            encounter.PlayerSide = BattleSideEnum.Defender;
+            encounter.OpponentSide = BattleSideEnum.Attacker;
+        }, MapEventDisabledMethods);
     }
 
     /// <summary>Makes <paramref name="partyId"/> the client's <see cref="MobileParty.MainParty"/> and asserts
@@ -289,7 +372,7 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
     /// reproduces (base 50, battle penalties not landed), high enough that the broken-morale branch stays
     /// false without walking the default model's food/wage/party-size dependencies.
     /// </summary>
-    private void EnsureClientMenuModels(EnvironmentInstance client)
+    private void EnsureClientMenuModels(EnvironmentInstance client, float effectiveMorale)
     {
         client.Call(() =>
         {
@@ -298,7 +381,7 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
             var models = new List<GameModel>
             {
                 new DefaultCharacterStatsModel(),
-                new FixedPartyMoraleModel(),
+                new FixedPartyMoraleModel(effectiveMorale),
             };
 
             var gameModels = client.GameInstance.Game.AddGameModelsManager<GameModels>(models);
@@ -308,6 +391,13 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
 
     private sealed class FixedPartyMoraleModel : PartyMoraleModel
     {
+        private readonly float effectiveMorale;
+
+        public FixedPartyMoraleModel(float effectiveMorale)
+        {
+            this.effectiveMorale = effectiveMorale;
+        }
+
         public override float HighMoraleValue => 70f;
         public override int GetDailyStarvationMoralePenalty(PartyBase party) => 0;
         public override int GetDailyNoWageMoralePenalty(MobileParty party) => 0;
@@ -315,6 +405,6 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
         public override float GetVictoryMoraleChange(PartyBase party) => 0f;
         public override float GetDefeatMoraleChange(PartyBase party) => 0f;
         public override ExplainedNumber GetEffectivePartyMorale(MobileParty party, bool includeDescription = false)
-            => new ExplainedNumber(50f, includeDescription);
+            => new ExplainedNumber(effectiveMorale, includeDescription);
     }
 }
