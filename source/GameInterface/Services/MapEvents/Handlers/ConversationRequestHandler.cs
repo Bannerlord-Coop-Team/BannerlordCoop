@@ -254,6 +254,16 @@ internal class ConversationRequestHandler : IHandler
                 request.AttackerId, request.DefenderId);
             return true;
         }
+
+        if (attackerIsPlayer && defenderIsPlayer &&
+            (IsInSiege(attacker.MobileParty) || IsInSiege(defender.MobileParty)))
+        {
+            Logger.Debug(
+                "Rejecting PvP conversation: a player is participating in a siege. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
+            return false;
+        }
         
         // PvP: two human players are allowed to open the encounter so they can fight each other. Neither side is AI,
         // so there is nothing to hold; the defending player is shown a "hold on" popup instead.
@@ -424,6 +434,9 @@ internal class ConversationRequestHandler : IHandler
     /// <paramref name="allowedPartnerId"/> (so the same pair re-requesting is still allowed).</summary>
     private bool IsConversingWithOther(string partyId, string allowedPartnerId)
         => conversationPartyTracker.TryGetPvpPartner(partyId, out var partner) && partner != allowedPartnerId;
+
+    private static bool IsInSiege(MobileParty party)
+        => party.BesiegerCamp != null || party.CurrentSettlement?.IsUnderSiege == true;
 
     /// <summary>
     /// [Server] Ends the given attacker's PvP interaction (the attacker left before any battle), telling the
