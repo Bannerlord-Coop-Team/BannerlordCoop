@@ -1,8 +1,10 @@
 ﻿using GameInterface.Extentions;
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.ObjectManager.Extensions;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Heroes.Patches
 {
@@ -35,15 +37,15 @@ namespace GameInterface.Services.Heroes.Patches
         }
     }
 
-    [HarmonyPatch(typeof(Campaign), nameof(Campaign.OnDataLoadFinished))]
+    [HarmonyPatch(typeof(TroopRoster), nameof(TroopRoster.CalculateCachedStatsOnLoad))]
     internal static class CampaignHeroPatches
     {
         [HarmonyPrefix]
-        private static void OnDataLoadFinishedPrefix(Campaign __instance)
+        private static void CalculateCachedStatsOnLoadPrefix()
         {
             if (!ContainerProvider.TryResolve<IHeroCharacterObjectRepairer>(out var repairer)) return;
 
-            foreach (var hero in __instance.ObjectManager.GetObjectTypeList<Hero>())
+            foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes())
             {
                 if (hero.CharacterObject != null) continue;
 
