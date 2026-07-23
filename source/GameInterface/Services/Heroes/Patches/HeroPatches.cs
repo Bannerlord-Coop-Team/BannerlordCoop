@@ -35,11 +35,11 @@ namespace GameInterface.Services.Heroes.Patches
         }
     }
 
-    [HarmonyPatch(typeof(Campaign), "OnGameLoaded")]
+    [HarmonyPatch(typeof(Campaign), nameof(Campaign.OnDataLoadFinished))]
     internal static class CampaignHeroPatches
     {
         [HarmonyPrefix]
-        private static void OnGameLoadedPrefix(Campaign __instance)
+        private static void OnDataLoadFinishedPrefix(Campaign __instance)
         {
             if (!ContainerProvider.TryResolve<IHeroCharacterObjectRepairer>(out var repairer)) return;
 
