@@ -21,9 +21,6 @@ namespace GameInterface.Services.MapEvents.Patches;
     new[] { typeof(int), typeof(bool) })]
 internal class MissionSpawnCapacityPatch
 {
-    private static readonly AccessTools.FieldRef<MissionBattleSideSpawnContext, List<IAgentOriginBase>> ReservedTroops =
-        AccessTools.FieldRefAccess<MissionBattleSideSpawnContext, List<IAgentOriginBase>>("_reservedTroops");
-
     [HarmonyPrefix]
     private static void Prefix(MissionBattleSideSpawnContext __instance, ref int number)
     {
@@ -31,7 +28,7 @@ internal class MissionSpawnCapacityPatch
         if (!ContainerProvider.TryResolve<IBattleAgentBudget>(out var budget)) return;
 
         number = ClampSpawnNumber(Mission.Current, budget, number,
-            ReservedTroops(__instance), __instance.SpawnWithHorses, __instance.ForceSpawnPlayerMounted);
+            __instance._reservedTroops, __instance.SpawnWithHorses, __instance.ForceSpawnPlayerMounted);
     }
 
     /// <summary>Clamp a native drip of <paramref name="number"/> troops to the mission's live remaining
