@@ -33,15 +33,21 @@ namespace GameInterface.Services.Stances.Patches
                 return false;
             }
 
-            MessageBroker.Instance.Publish(faction1,
-                new FactionPeaceMade(faction1, faction2, dailyTributeFrom1To2, dailyTributeDuration, (int)detail));
             return true;
         }
 
-        public static void Postfix(IFaction faction1, IFaction faction2)
+        public static void Postfix(
+            IFaction faction1,
+            IFaction faction2,
+            int dailyTributeFrom1To2,
+            int dailyTributeDuration,
+            MakePeaceAction.MakePeaceDetail detail)
         {
             if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed())
                 return;
+
+            MessageBroker.Instance.Publish(faction1,
+                new FactionPeaceMade(faction1, faction2, dailyTributeFrom1To2, dailyTributeDuration, (int)detail));
 
             if (!ContainerProvider.TryResolve<IPeacePursuitCleaner>(out var pursuitCleaner))
             {

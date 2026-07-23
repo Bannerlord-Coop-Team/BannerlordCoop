@@ -18,7 +18,7 @@ namespace Coop.Core.Server.Services.Time.Handlers;
 /// reliable message — so the clock heartbeat stays live even while the reliable world-sync stream is
 /// congested (see the packet's remarks).
 /// </remarks>
-public class CampaignTimeSyncHandler : IHandler
+public class CampaignTimeSyncHandler : IHandler, IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CampaignTimeSyncHandler>();
 

@@ -40,11 +40,66 @@ internal readonly struct DoClanNameSelection : ICommand
 public readonly struct FireCompanion : IEvent
 {
     [ProtoMember(1)]
+    public readonly string RequestId;
+
+    [ProtoMember(2)]
     public readonly string OneToOneConversationHeroId;
 
-    public FireCompanion(string oneToOneConversationHeroId)
+    [ProtoMember(3)]
+    public readonly string ExpectedClanId;
+
+    [ProtoMember(4)]
+    public readonly string ExpectedPartyId;
+
+    public FireCompanion(string requestId, string oneToOneConversationHeroId,
+        string expectedClanId, string expectedPartyId)
     {
+        RequestId = requestId;
         OneToOneConversationHeroId = oneToOneConversationHeroId;
+        ExpectedClanId = expectedClanId;
+        ExpectedPartyId = expectedPartyId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct FireCompanionCompleted : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string RequestId;
+
+    [ProtoMember(2)]
+    public readonly string OneToOneConversationHeroId;
+
+    [ProtoMember(3)]
+    public readonly bool Success;
+
+    [ProtoMember(4)]
+    public readonly string Error;
+
+    public FireCompanionCompleted(string requestId, string oneToOneConversationHeroId,
+        bool success, string error)
+    {
+        RequestId = requestId;
+        OneToOneConversationHeroId = oneToOneConversationHeroId;
+        Success = success;
+        Error = error;
+    }
+}
+
+internal readonly struct CompanionDismissalCompleted : IEvent
+{
+    public readonly string RequestId;
+    public readonly string OneToOneConversationHeroId;
+    public readonly bool Success;
+    public readonly string Error;
+
+    public CompanionDismissalCompleted(string requestId, string oneToOneConversationHeroId,
+        bool success, string error)
+    {
+        RequestId = requestId;
+        OneToOneConversationHeroId = oneToOneConversationHeroId;
+        Success = success;
+        Error = error;
     }
 }
 

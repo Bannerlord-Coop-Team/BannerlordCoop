@@ -5,7 +5,6 @@ using GameInterface.Services.Time.Interfaces;
 using Moq;
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Time;
@@ -38,22 +37,32 @@ public class CampaignTimeSyncHandlerTests
 
         Assert.True(sendStarted.Wait(TimeSpan.FromSeconds(5)));
 
-        var disposeTask = Task.Run(() =>
+        Exception disposeException = null;
+        var disposeThread = new Thread(() =>
         {
-            disposeStarted.Set();
-            handler.Dispose();
+            try
+            {
+                disposeStarted.Set();
+                handler.Dispose();
+            }
+            catch (Exception ex)
+            {
+                disposeException = ex;
+            }
         });
+        disposeThread.Start();
 
         try
         {
             Assert.True(disposeStarted.Wait(TimeSpan.FromSeconds(5)));
-            Assert.False(disposeTask.Wait(TimeSpan.FromMilliseconds(250)));
+            Assert.False(disposeThread.Join(TimeSpan.FromMilliseconds(250)));
         }
         finally
         {
             releaseSend.Set();
+            Assert.True(disposeThread.Join(TimeSpan.FromSeconds(5)));
         }
 
-        Assert.True(disposeTask.Wait(TimeSpan.FromSeconds(5)));
+        Assert.Null(disposeException);
     }
 }
