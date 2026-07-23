@@ -38,15 +38,18 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
+    private readonly IBattleAgentBudget agentBudget;
 
     public CoopSiegeBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ICoopBattleBehaviorAttacher behaviorAttacher)
+        ICoopBattleBehaviorAttacher behaviorAttacher,
+        IBattleAgentBudget agentBudget)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
+        this.agentBudget = agentBudget;
     }
 
     public Mission OpenCoopSiegeBattle(MissionInitializerRecord rec, float[] wallHitPointRatios,
@@ -84,8 +87,8 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
 
         var mission = MissionState.OpenNew("SiegeMissionWithDeployment", rec, (InitializeMissionBehaviorsDelegate)delegate
         {
-            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager);
-            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager);
+            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager, agentBudget);
+            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager, agentBudget);
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
@@ -44,7 +45,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
     /// take the simple (party-less) path through the removal prefix.</summary>
     private static CoopTroopSupplier CreateSuppliedSupplier(IObjectManager objectManager, string characterId, int reserveCount)
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, objectManager);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, objectManager, new BattleAgentBudget());
         supplier.SetReserve(new[] { new PartyReserve("unresolvable-party", 0, Entries(characterId, reserveCount)) });
         return supplier;
     }
@@ -58,7 +59,7 @@ public class BattleReinforcementCasualtyQuotaTests : MissionTestEnvironment
 
         client.Call(() =>
         {
-            var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, client.ObjectManager);
+            var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, client.ObjectManager, new BattleAgentBudget());
             supplier.SetReserve(new[]
             {
                 new PartyReserve("unresolvable-party", suppliedCount: 10, entries: Entries(characterId, count: 10)),
