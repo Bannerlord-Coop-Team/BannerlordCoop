@@ -1661,6 +1661,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetId(playerHero.CharacterObject, out var playerCharacterId));
             Assert.True(Server.ObjectManager.TryGetId(targetHero.CharacterObject, out var targetCharacterId));
 
             playerHero.Gold = initialPlayerGold;
@@ -1669,6 +1670,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
             Assert.True(Server.Resolve<LocationConversationTracker>().TryBeginEngagement(
                 client.NetPeer,
+                LocationConversationTracker.ComposeKey(locationId, playerCharacterId),
                 LocationConversationTracker.ComposeKey(locationId, targetCharacterId)));
         });
         TestEnvironment.FlushCoalescer();
@@ -1747,6 +1749,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetId(playerHero.CharacterObject, out var playerCharacterId));
             Assert.True(Server.ObjectManager.TryGetId(targetHero.CharacterObject, out var targetCharacterId));
 
             playerHero.Gold = initialPlayerGold;
@@ -1754,6 +1757,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
             Assert.True(Server.Resolve<LocationConversationTracker>().TryBeginEngagement(
                 client.NetPeer,
+                LocationConversationTracker.ComposeKey(activeLocationId, playerCharacterId),
                 LocationConversationTracker.ComposeKey(activeLocationId, targetCharacterId)));
         });
         TestEnvironment.FlushCoalescer();
