@@ -39,6 +39,7 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
         lobbyApi.ConnectStringReceived += OnConnectStringReceived;
 
         messageBroker.Subscribe<JoinSteamLobby>(Handle);
+        messageBroker.Subscribe<SessionJoinAbandoned>(Handle);
     }
 
     /// <summary>
@@ -64,6 +65,13 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
         OnLobbyJoinRequested(payload.What.LobbyId);
     }
 
+    private void Handle(MessagePayload<SessionJoinAbandoned> payload)
+    {
+        // Keeping the membership would hold one of the host's lobby slots and make the
+        // next join request for the same lobby a no-op; give it up so retries start fresh.
+        LeaveSessionLobby();
+    }
+
     private void OnConnectStringReceived(string connectString)
     {
         if (!TryParseConnectLobby(connectString, out var lobbyId)) return;
@@ -83,7 +91,19 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
 
     private void BeginLobbyJoin(ulong lobbyId, bool resolveJoinInfo)
     {
-        if (lobbyId == 0 || activeLobbyId == lobbyId) return;
+        if (lobbyId == 0) return;
+
+        if (activeLobbyId == lobbyId)
+        {
+            // Still a member from an earlier attempt whose join never produced a session
+            // (e.g. an abandoned password prompt). The lobby data is readable while a
+            // member, so restart the attempt from the resolve step instead of no-oping.
+            if (resolveJoinInfo)
+            {
+                ResolveJoinInfo(lobbyId);
+            }
+            return;
+        }
 
         // A second JoinLobby would silently unregister the first pending call result.
         if (joinInFlight)
@@ -169,35 +189,47 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
 
     private void ResolveJoinInfo(ulong lobbyId)
     {
-        bool decoded = LobbyDataCodec.TryDecode(key => lobbyApi.GetLobbyData(lobbyId, key), out var info, out var error);
+        try
+        {
+            bool decoded = LobbyDataCodec.TryDecode(key => lobbyApi.GetLobbyData(lobbyId, key), out var info, out var error);
 
-        // A standalone server advertises its own game-server identity to tunnel to; otherwise the
-        // lobby owner runs the tunnel. Either is only readable while still a member of the lobby.
-        if (decoded && info.HasServerSteamId)
-        {
-            info.HostSteamId = info.ServerSteamId;
-        }
-        else if (decoded && info.Version >= SessionJoinInfo.MinTunnelVersion)
-        {
-            info.HostSteamId = lobbyApi.GetLobbyOwner(lobbyId);
-        }
+            // A standalone server advertises its own game-server identity to tunnel to; otherwise the
+            // lobby owner runs the tunnel. Either is only readable while still a member of the lobby.
+            if (decoded && info.HasServerSteamId)
+            {
+                info.HostSteamId = info.ServerSteamId;
+            }
+            else if (decoded && info.Version >= SessionJoinInfo.MinTunnelVersion)
+            {
+                info.HostSteamId = lobbyApi.GetLobbyOwner(lobbyId);
+            }
 
-        if (!decoded)
+            if (!decoded)
+            {
+                LeaveActiveLobby();
+                messageBroker.Publish(this, new SessionJoinFailed(error));
+                return;
+            }
+
+            if (!info.HasAddress && !info.HasHostSteamId)
+            {
+                LeaveActiveLobby();
+                messageBroker.Publish(this, new SessionJoinFailed(
+                    "The host has not set a public address on their co-op screen, so this session cannot be joined yet"));
+                return;
+            }
+
+            messageBroker.Publish(this, new SessionJoinInfoResolved(info));
+        }
+        catch (Exception ex)
         {
+            // GetLobbyData/GetLobbyOwner can throw; both callers (OnLobbyEntered and the
+            // rejoin-while-still-member path) rely on this releasing the membership and
+            // reporting the failure instead of stranding the join silently in the lobby.
             LeaveActiveLobby();
-            messageBroker.Publish(this, new SessionJoinFailed(error));
-            return;
+            Logger.Error(ex, "Failed to read Steam lobby {LobbyId}", lobbyId.ToString());
+            messageBroker.Publish(this, new SessionJoinFailed("Could not read the Steam lobby"));
         }
-
-        if (!info.HasAddress && !info.HasHostSteamId)
-        {
-            LeaveActiveLobby();
-            messageBroker.Publish(this, new SessionJoinFailed(
-                "The host has not set a public address on their co-op screen, so this session cannot be joined yet"));
-            return;
-        }
-
-        messageBroker.Publish(this, new SessionJoinInfoResolved(info));
     }
 
     public void LeaveSessionLobby()
@@ -256,6 +288,7 @@ public class SteamJoinListener : IDisposable, ISteamLobbyMembership
     {
         LeaveSessionLobby();
         messageBroker.Unsubscribe<JoinSteamLobby>(Handle);
+        messageBroker.Unsubscribe<SessionJoinAbandoned>(Handle);
         lobbyApi.LobbyJoinRequested -= OnLobbyJoinRequested;
         lobbyApi.ConnectStringReceived -= OnConnectStringReceived;
     }

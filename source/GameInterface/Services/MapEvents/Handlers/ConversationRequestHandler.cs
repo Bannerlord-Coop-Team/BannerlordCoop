@@ -147,7 +147,8 @@ internal class ConversationRequestHandler : IHandler
                 attackerId,
                 request.ForcePlayerOutFromSettlement,
                 request.Source,
-                false));
+                false),
+            serverDetected: true);
     }
 
     /// <summary>[Server] Validate the request; reply to allow, or stay silent to reject.</summary>
@@ -164,11 +165,14 @@ internal class ConversationRequestHandler : IHandler
         }
 
         GameThread.RunSafe(
-            () => ProcessConversationRequest(requestingPeer, request),
+            () => ProcessConversationRequest(requestingPeer, request, serverDetected: false),
             context: nameof(Handle_NetworkRequestConversation));
     }
 
-    private void ProcessConversationRequest(NetPeer requestingPeer, NetworkRequestConversation request)
+    private void ProcessConversationRequest(
+        NetPeer requestingPeer,
+        NetworkRequestConversation request,
+        bool serverDetected)
     {
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.AttackerId, out var attacker)) return;
         if (!objectManager.TryGetObjectWithLogging<PartyBase>(request.DefenderId, out var defender)) return;
@@ -189,7 +193,7 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId);
+        HoldAndApprove(requestingPeer, request, aiPartyId, playerPartyId, serverDetected);
     }
 
     /// <summary>
@@ -249,6 +253,16 @@ internal class ConversationRequestHandler : IHandler
                 "Allowing conversation: joining an existing battle. AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
             return true;
+        }
+
+        if (attackerIsPlayer && defenderIsPlayer &&
+            (IsInSiege(attacker.MobileParty) || IsInSiege(defender.MobileParty)))
+        {
+            Logger.Debug(
+                "Rejecting PvP conversation: a player is participating in a siege. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.AttackerId, request.DefenderId);
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
+            return false;
         }
         
         // PvP: two human players are allowed to open the encounter so they can fight each other. Neither side is AI,
@@ -323,7 +337,12 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>
     /// [Server, game thread] Holds the AI party and replies to allow.
     /// </summary>
-    private void HoldAndApprove(NetPeer requestingPeer, NetworkRequestConversation request, string aiPartyId, string playerPartyId)
+    private void HoldAndApprove(
+        NetPeer requestingPeer,
+        NetworkRequestConversation request,
+        string aiPartyId,
+        string playerPartyId,
+        bool serverDetected)
     {
         if (!objectManager.TryGetObject(aiPartyId, out PartyBase aiPartyBase) || aiPartyBase.MobileParty == null)
         {
@@ -360,7 +379,13 @@ internal class ConversationRequestHandler : IHandler
         }
 
         // A requester may share this hostile target but cannot replace its own live engagement with another target.
-        if (!ConversationPartyHold.TryEngage(conversationPartyTracker, requestingPeer, playerPartyId, aiPartyBase.MobileParty, aiPartyId))
+        if (!ConversationPartyHold.TryEngage(
+                conversationPartyTracker,
+                requestingPeer,
+                playerPartyId,
+                aiPartyBase.MobileParty,
+                aiPartyId,
+                serverDetected && request.DefenderId == playerPartyId))
         {
             Logger.Debug(
                 "Rejecting conversation request: the party or the requester is already engaged. PartyId={PartyId}",
@@ -409,6 +434,9 @@ internal class ConversationRequestHandler : IHandler
     /// <paramref name="allowedPartnerId"/> (so the same pair re-requesting is still allowed).</summary>
     private bool IsConversingWithOther(string partyId, string allowedPartnerId)
         => conversationPartyTracker.TryGetPvpPartner(partyId, out var partner) && partner != allowedPartnerId;
+
+    private static bool IsInSiege(MobileParty party)
+        => party.BesiegerCamp != null || party.CurrentSettlement?.IsUnderSiege == true;
 
     /// <summary>
     /// [Server] Ends the given attacker's PvP interaction (the attacker left before any battle), telling the

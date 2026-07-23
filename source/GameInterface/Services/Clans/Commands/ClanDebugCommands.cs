@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Linq;
@@ -319,6 +320,68 @@ namespace GameInterface.Services.GameDebug.Commands
             ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom);
 
             return $"{clan.Name} joined {kingdom.Name}";
+        }
+
+        // coop.debug.clan.leave_kingdom Player12
+        [CommandLineArgumentFunction("leave_kingdom", "coop.debug.clan")]
+        public static string LeaveKingdom(List<string> args)
+        {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
+            if (args.Count != 1)
+                return "Usage: coop.debug.clan.leave_kingdom <clanId>";
+
+            if (!TryGetObjectManager(out IObjectManager objectManager))
+                return "Unable to resolve ObjectManager";
+
+            if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
+                return $"Unable to get Clan with {args[0]}";
+
+            if (clan.Kingdom == null)
+                return $"{clan.Name} does not belong to a kingdom";
+
+            if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+                return $"Unable to get {nameof(IKingdomMembershipState)}";
+
+            Kingdom previousKingdom = clan.Kingdom;
+            string kingdomName = previousKingdom.Name.ToString();
+            if (clan.IsUnderMercenaryService)
+                ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan);
+            else
+                ChangeKingdomAction.ApplyByLeaveKingdom(clan);
+
+            kingdomMembershipState.MoveClanToKingdom(
+                previousKingdom,
+                kingdom: null,
+                clan: clan,
+                publishCollectionChanges: true,
+                republishExistingCollections: true);
+
+            return $"{clan.Name} left {kingdomName}";
+        }
+
+        // coop.debug.clan.membership Player12
+        [CommandLineArgumentFunction("membership", "coop.debug.clan")]
+        public static string Membership(List<string> args)
+        {
+            if (args.Count != 1)
+                return "Usage: coop.debug.clan.membership <clanId>";
+
+            if (!TryGetObjectManager(out IObjectManager objectManager))
+                return "Unable to resolve ObjectManager";
+
+            if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
+                return $"Unable to get Clan with {args[0]}";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"ClanId={clan.StringId}");
+            sb.AppendLine($"KingdomId={clan.Kingdom?.StringId ?? "none"}");
+            sb.AppendLine($"IsUnderMercenaryService={clan.IsUnderMercenaryService}");
+            sb.AppendLine($"Tier={clan.Tier}");
+            sb.AppendLine($"VassalEligibleTier={Campaign.Current.Models.ClanTierModel.VassalEligibleTier}");
+            sb.AppendLine($"Influence={clan.Influence}");
+            return sb.ToString();
         }
 
         // coop.debug.clan.give_influence Player12 500

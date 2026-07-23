@@ -7,10 +7,13 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Scoreboard;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MapEvents.Commands;
@@ -24,6 +27,41 @@ namespace GameInterface.Services.MapEvents.Commands;
 internal class BattleTeamKillCommands
 {
     public static readonly ILogger Logger = LogManager.GetLogger<BattleTeamKillCommands>();
+
+    private const string ScoreboardMovieName = "SPScoreboard";
+    private const string PartyScoreToggleWidgetId = "PartyScoreToggleWidget";
+    private const string PartyDetailsWidgetId = "PartyDetails";
+
+    private const string ClickDeploymentReadyUsage =
+@"Usage:
+  coop.debug.mapevent.click_deployment_ready
+
+Activates the deployment Ready button's native UI callback.";
+
+    [CommandLineArgumentFunction("click_deployment_ready", "coop.debug.mapevent")]
+    public static string ClickDeploymentReady(List<string> args)
+    {
+        var ctx = new CommandContext("click_deployment_ready", ClickDeploymentReadyUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission is null)
+            return "Failed: no active mission.";
+
+        var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+        if (deploymentController == null)
+            return "No active deployment.";
+        if (!deploymentController.TeamSetupOver)
+            return "Failed: deployment team setup is not complete.";
+
+        var orderUi = mission.GetMissionBehavior<MissionGauntletSingleplayerOrderUIHandler>();
+        if (orderUi == null)
+            return "Failed: no deployment order UI.";
+
+        orderUi.OnBeginMission();
+        return "Clicked deployment Ready through the native UI callback.";
+    }
 
     private const string FinishDeploymentUsage =
 @"Usage:
@@ -89,11 +127,48 @@ Holds or releases the native scoreboard input without requiring window focus.";
         return "Holding the native scoreboard input.";
     }
 
+    private const string CollapseScoreboardPartiesUsage =
+@"Usage:
+  coop.debug.mapevent.collapse_scoreboard_parties
+
+Collapses every native scoreboard party roster and returns the scroll position to the top.";
+
+    [CommandLineArgumentFunction("collapse_scoreboard_parties", "coop.debug.mapevent")]
+    public static string CollapseScoreboardParties(List<string> args)
+    {
+        var ctx = new CommandContext("collapse_scoreboard_parties", CollapseScoreboardPartiesUsage, args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var scoreboard = Mission.Current?.GetMissionBehavior<MissionGauntletBattleScore>();
+        var dataSource = scoreboard?.DataSource;
+        if (dataSource == null)
+            return "Failed: no battle scoreboard UI.";
+
+        if (!TryGetScoreboardWidgets(scoreboard, out var scrollablePanel, out var partyHeaderCount, out var partyDetails))
+            return "Failed: native scoreboard widgets are not loaded.";
+
+        var expectedPartyCount = dataSource.Attackers.Parties.Count + dataSource.Defenders.Parties.Count;
+        if (partyHeaderCount != expectedPartyCount || partyDetails.Count != expectedPartyCount)
+            return $"Failed: found {partyHeaderCount} native party headers and {partyDetails.Count} party detail panels, " +
+                   $"expected {expectedPartyCount} each.";
+
+        var verticalScrollbar = scrollablePanel.VerticalScrollbar;
+
+        foreach (var partyDetail in partyDetails)
+            partyDetail.IsVisible = false;
+
+        scrollablePanel.ResetTweenSpeed();
+        verticalScrollbar.ValueFloat = verticalScrollbar.MinValue;
+        scrollablePanel.SetVerticalScrollTarget(verticalScrollbar.MinValue, 0f);
+        return $"Collapsed native party details: {partyHeaderCount}/{expectedPartyCount}.";
+    }
+
     private const string ScoreboardStateUsage =
 @"Usage:
   coop.debug.mapevent.scoreboard_state
 
-Lists the player parties and party rows currently loaded by the battle scoreboard.";
+Lists the map-event parties and party rows currently loaded by the battle scoreboard.";
 
     [CommandLineArgumentFunction("scoreboard_state", "coop.debug.mapevent")]
     public static string ScoreboardState(List<string> args)
@@ -130,12 +205,56 @@ Lists the player parties and party rows currently loaded by the battle scoreboar
             .OfType<PartyBase>()
             .Distinct()
             .ToArray();
+        var missingParties = expectedParties.Except(scoreboardParties).ToArray();
         var missingPlayerParties = expectedPlayerParties.Except(scoreboardParties).ToArray();
+        var expandedPartyDetails = 0;
+        var scrollTop = false;
+        var nativeWidgetsLoaded = TryGetScoreboardWidgets(
+            scoreboard,
+            out var scrollablePanel,
+            out var partyHeaderCount,
+            out var partyDetails);
+        if (nativeWidgetsLoaded)
+        {
+            expandedPartyDetails = partyDetails.Count(details => details.IsVisible);
+            var scrollbar = scrollablePanel.VerticalScrollbar;
+            scrollTop = Math.Abs(scrollbar.ValueFloat - scrollbar.MinValue) < 0.01f;
+        }
 
         return $"Visible: {dataSource.ShowScoreboard}; " +
+               $"Expected parties ({expectedParties.Length}): {FormatPartyNames(expectedParties)}; " +
                $"Expected player parties ({expectedPlayerParties.Length}): {FormatPartyNames(expectedPlayerParties)}; " +
                $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
-               $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}";
+               $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}; " +
+               $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}; " +
+               $"Native widgets loaded: {nativeWidgetsLoaded}; " +
+               $"Party headers ({partyHeaderCount}); Expanded party details ({expandedPartyDetails}); Scroll top: {scrollTop}";
+    }
+
+    private static bool TryGetScoreboardWidgets(
+        MissionGauntletBattleScore scoreboard,
+        out ScrollablePanel scrollablePanel,
+        out int partyHeaderCount,
+        out List<Widget> partyDetails)
+    {
+        scrollablePanel = null;
+        partyHeaderCount = 0;
+        partyDetails = new List<Widget>();
+
+        var rootWidget = scoreboard.MissionScreen?.Layers
+            .OfType<GauntletLayer>()
+            .Select(layer => layer.GetMovieIdentifier(ScoreboardMovieName))
+            .FirstOrDefault(identifier => identifier?.Movie?.RootWidget != null)?
+            .Movie.RootWidget;
+        if (rootWidget == null)
+            return false;
+
+        var widgets = rootWidget.GetAllChildrenRecursive();
+        scrollablePanel = widgets.OfType<ScrollablePanel>()
+            .FirstOrDefault(panel => panel.VerticalScrollbar != null);
+        partyHeaderCount = widgets.Count(widget => widget.Id == PartyScoreToggleWidgetId);
+        partyDetails = widgets.Where(widget => widget.Id == PartyDetailsWidgetId).ToList();
+        return scrollablePanel != null;
     }
 
     private static string FormatPartyNames(IEnumerable<PartyBase> parties)
