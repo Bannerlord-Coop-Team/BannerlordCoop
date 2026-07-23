@@ -3,6 +3,7 @@ using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using Helpers;
@@ -13,6 +14,7 @@ using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -177,6 +179,9 @@ public class SiegeLeaveMenuTests : IDisposable
         {
             AssertBesiegerCamp(client, partyId, expectCamp: false);
         }
+
+        // The lambda holds the party after PlayerEncounter.Finish; the prefix reissues that hold.
+        AssertPartyHeld(leavingClient, partyId);
     }
 
     [Fact]
@@ -205,6 +210,56 @@ public class SiegeLeaveMenuTests : IDisposable
         {
             AssertBesiegerCamp(client, partyId, expectCamp: false);
         }
+
+        // Native holds the party after the (approval-deferred) Finish; the prefix reissues that hold.
+        AssertPartyHeld(leavingClient, partyId);
+
+        // No map-event side was wired, so the battle-leave branch stays quiet (see the map-event-side test).
+        Assert.Empty(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+    }
+
+    [Fact]
+    public void ClientBreakInLeave_WhileOnMapEventSide_RoutesBattleLeave()
+    {
+        // Arrange: a besieger that a nearby sally-out/relief battle also pulled onto a map-event side.
+        // Native's break_in_leave clears MapEventSide before the camp; that single-party removal is not
+        // auto-synced, so the prefix must route it or the party stays in that battle on the server. The side
+        // is wired on the leaving client only (the branch just reads MobileParty.MapEventSide); the returning
+        // removal's native RemovePartyInternal is suppressed so the stand-in side is never dereferenced.
+        var leavingClient = Clients.First();
+        var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
+        string? partyBaseId = null;
+        leavingClient.Call(() =>
+        {
+            Assert.True(leavingClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            party.Party._mapEventSide = ObjectHelper.SkipConstructor<MapEventSide>();
+            // The battle-leave request carries the PartyBase id (a separate registered object from the MobileParty).
+            Assert.True(leavingClient.ObjectManager.TryGetId(party.Party, out partyBaseId));
+        });
+        Assert.NotNull(partyBaseId);
+
+        // Act: join_siege_event's "Don't get involved." consequence.
+        var disabledMethods = LeaveRoundTripDisabledMethods
+            .Append(AccessTools.Method(typeof(MapEventSide), "RemovePartyInternal"))
+            .ToList();
+        leavingClient.Call(() =>
+        {
+            InvokePatchedBreakInLeave();
+        }, disabledMethods);
+
+        // Assert: the battle-side removal was routed, not applied locally — exactly one leave-battle request
+        // named the leaver, and only from the leaver.
+        var leaveRequest = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+        Assert.Equal(partyBaseId, leaveRequest.PartyId);
+        Assert.Empty(Clients.Last().NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+
+        // ...and the camp break still routes alongside it.
+        var breakRequest = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
+        Assert.Equal(partyId, breakRequest.PartyId);
+        AssertBesiegerCamp(Server, partyId, expectCamp: false);
+
+        // The leaver is still held.
+        AssertPartyHeld(leavingClient, partyId);
     }
 
     [Fact]
@@ -523,6 +578,22 @@ public class SiegeLeaveMenuTests : IDisposable
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Campaign.Current.MainParty = party;
             Assert.Same(party, MobileParty.MainParty);
+        });
+    }
+
+    /// <summary>
+    /// Asserts the party was held on the given instance. break_in_leave_consequence and the join_encounter
+    /// leave lambda end with an unconditional <see cref="MobileParty.SetMoveModeHold"/> after
+    /// <see cref="PlayerEncounter.Finish"/>; the approval performs that Finish under an AllowedThread, so
+    /// <c>PlayerEncounterPatches.FinishPostfix</c> skips its hold and the prefix must reissue it.
+    /// </summary>
+    private static void AssertPartyHeld(EnvironmentInstance instance, string partyId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.Equal(AiBehavior.Hold, party.DefaultBehavior);
+            Assert.Equal(AiBehavior.Hold, party.ShortTermBehavior);
         });
     }
 
