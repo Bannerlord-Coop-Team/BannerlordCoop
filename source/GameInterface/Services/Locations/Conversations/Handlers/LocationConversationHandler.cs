@@ -1,12 +1,9 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.Heroes.Extensions;
-#if DEBUG
-using GameInterface.Services.Locations.Conversations.Commands;
-#endif
 using GameInterface.Services.Locations.Conversations.Patches;
 using GameInterface.Services.Locations.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -76,9 +73,6 @@ internal class LocationConversationHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
 
         waitingPartyByInitiator.Clear();
-#if DEBUG
-        LocationConversationLiveTestProbe.Disable();
-#endif
     }
 
     /// <summary>[Client] Forward the request to the server.</summary>
@@ -133,9 +127,6 @@ internal class LocationConversationHandler : IHandler
         if (ModInformation.IsServer) return;
 
         var generation = payload.What.Generation;
-#if DEBUG
-        LocationConversationLiveTestProbe.RecordAllowed(generation);
-#endif
         GameThread.Run(() => LocationConversationPatches.StartApprovedConversation(generation));
     }
 
@@ -145,18 +136,11 @@ internal class LocationConversationHandler : IHandler
         if (ModInformation.IsServer) return;
 
         var generation = payload.What.Generation;
-#if DEBUG
-        LocationConversationLiveTestProbe.RecordDenied(generation);
-#endif
         GameThread.Run(() =>
         {
             // Only explain the refusal if this denial still matches our current pending request; a stale denial
             // (the player left and started another) neither clears the new pending nor pops a message.
-            var shouldShowBlockedMessage = LocationConversationPatches.CancelPending(generation);
-#if DEBUG
-            shouldShowBlockedMessage |= LocationConversationLiveTestProbe.Enabled;
-#endif
-            if (shouldShowBlockedMessage)
+            if (LocationConversationPatches.CancelPending(generation))
             {
                 ShowInteractionBlockedMessage();
             }

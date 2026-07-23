@@ -1,12 +1,9 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Conversations;
-#if DEBUG
-using GameInterface.Services.Locations.Conversations.Commands;
-#endif
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -84,14 +81,7 @@ internal class PvPInteractionClientHandler : IHandler
         GameThread.Run(() =>
         {
             if (Campaign.Current == null) return;
-            if (message.IsLocationInteraction && !LocationMissionTracker.IsLocationMission(Mission.Current))
-            {
-#if DEBUG
-                if (!LocationConversationLiveTestProbe.Enabled) return;
-#else
-                return;
-#endif
-            }
+            if (message.IsLocationInteraction && !LocationMissionTracker.IsLocationMission(Mission.Current)) return;
 
             // Already showing the popup for this party (a rate-limited retry re-broadcast): nothing to do.
             if (shownDefenderPartyId == message.DefenderPartyId &&
