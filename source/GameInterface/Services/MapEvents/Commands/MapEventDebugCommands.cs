@@ -293,6 +293,8 @@ public class MapEventDebugCommands
 
         MenuHelper.EncounterAttackConsequence(new MenuCallbackArgs(menuContext, null));
         return "Requested entry into the current battle.";
+    }
+
     // coop.debug.mapevent.finish_player_encounter PlayerOne
     /// <summary>
     /// Requests the connected client's encounter close through the existing authoritative leave message.
