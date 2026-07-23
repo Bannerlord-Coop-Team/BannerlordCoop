@@ -18,6 +18,7 @@ internal class HeroBuilder : IObjectBuilder
         characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
 
         var hero = HeroCreator.CreateSpecialHero(characterObject);
+        hero.Culture = characterObject.Culture;
         hero.ChangeState(CharacterStates.Active);
         hero.Clan = clan;
 
