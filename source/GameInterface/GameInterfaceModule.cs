@@ -8,6 +8,7 @@ using GameInterface.AutoSync;
 using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
+using GameInterface.Services.Barters;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Kingdoms;
@@ -49,6 +50,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
+        builder.RegisterType<BarterClientPresentation>().As<IBarterClientPresentation>().InstancePerDependency();
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();

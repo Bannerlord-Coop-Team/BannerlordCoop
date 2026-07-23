@@ -3,15 +3,23 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using GameInterface.Services.Barters.Messages;
+using GameInterface.CoopSessionData;
+using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.Locations.Conversations;
+using GameInterface.Services.Locations.Messages.Conversation;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Stances.Messages;
@@ -22,6 +30,8 @@ using Missions.Messages;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -29,6 +39,7 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
@@ -1441,6 +1452,623 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void NpcPeaceBarter_ActiveHostileEncounter_AppliesPaymentPeaceAndReleasesConversation()
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int initialTargetGold = 40;
+        const int offeredGold = 500_000;
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var (targetHeroId, targetMobilePartyId, targetPartyId) = CreateAiPartyWithRegisteredLeader();
+        var (playerClanId, targetClanId) = MakePartiesHostile(playerPartyId, targetPartyId);
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(targetMobilePartyId, out var targetParty));
+
+            playerHero.Gold = initialPlayerGold;
+            targetHero.Gold = initialTargetGold;
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
+            targetParty.SetMoveEngageParty(playerParty, MobileParty.NavigationType.Default);
+            Assert.True(ConversationPartyHold.TryEngage(
+                Server.Resolve<ConversationPartyTracker>(),
+                client.NetPeer,
+                playerPartyId,
+                targetParty,
+                targetPartyId,
+                engagerIsDefender: true));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
+        });
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestPeaceBarter(
+            targetHeroId,
+            PeaceConversationContext.MapParty,
+            targetPartyId,
+            new[]
+            {
+                new PeaceBarterTerm(
+                    PeaceBarterTermType.Gold,
+                    playerHeroId,
+                    objectId: null,
+                    itemModifierId: null,
+                    itemModifierNull: true,
+                    amount: offeredGold),
+            },
+            requestId: "map-peace-success")));
+
+        var result = Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>().Single();
+        Assert.True(result.Accepted, result.Reason);
+        Assert.Equal(targetPartyId, result.ContextId);
+        Assert.Equal("map-peace-success", result.RequestId);
+        Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
+
+        foreach (var environmentClient in Clients)
+        {
+            environmentClient.Call(() =>
+            {
+                Assert.True(environmentClient.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                Assert.Equal(initialPlayerGold - offeredGold, playerHero.Gold);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(targetMobilePartyId, out var targetParty));
+            Assert.Equal(initialPlayerGold - offeredGold, playerHero.Gold);
+            Assert.Equal(initialTargetGold + offeredGold, targetHero.Gold);
+
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.False(tracker.TryGetEngagement(client.NetPeer, out _));
+            Assert.False(targetParty.Ai.IsDisabled);
+        });
+
+        var peaceMade = Server.NetworkSentMessages.GetMessages<NetworkMakePeace>().Single();
+        Assert.Equal(playerClanId, peaceMade.Faction1Id);
+        Assert.Equal(targetClanId, peaceMade.Faction2Id);
+        AssertPeaceMade(Server, playerClanId, targetClanId);
+        foreach (var environmentClient in Clients)
+            AssertPeaceMade(environmentClient, playerClanId, targetClanId);
+    }
+
+    [Fact]
+    public void NpcPeaceBarter_DifferentEngagedParty_RejectsWithoutEffects()
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int initialRequestedTargetGold = 40;
+        const int offeredGold = 500_000;
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var (_, activeTargetMobilePartyId, activeTargetPartyId) = CreateAiPartyWithRegisteredLeader();
+        var (requestedTargetHeroId, requestedTargetMobilePartyId, requestedTargetPartyId) = CreateAiPartyWithRegisteredLeader();
+        var (playerClanId, _) = MakePartiesHostile(playerPartyId, activeTargetPartyId);
+        var requestedTargetClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(requestedTargetClanId, out var requestedTargetClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(requestedTargetHeroId, out var requestedTargetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(activeTargetMobilePartyId, out var activeTargetParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(requestedTargetMobilePartyId, out var requestedTargetParty));
+
+            requestedTargetHero.Clan = requestedTargetClan;
+            requestedTargetClan.SetLeader(requestedTargetHero);
+            requestedTargetParty.ActualClan = requestedTargetClan;
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerClan, requestedTargetClan);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, requestedTargetHero.MapFaction));
+
+            playerHero.Gold = initialPlayerGold;
+            requestedTargetHero.Gold = initialRequestedTargetGold;
+            activeTargetParty.SetMoveEngageParty(playerParty, MobileParty.NavigationType.Default);
+            EncounterManager.StartPartyEncounter(activeTargetParty.Party, playerParty.Party);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
+        Assert.Equal(activeTargetPartyId, allowed.AttackerId);
+        Assert.Equal(playerPartyId, allowed.DefenderId);
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestPeaceBarter(
+            requestedTargetHeroId,
+            PeaceConversationContext.MapParty,
+            requestedTargetPartyId,
+            new[]
+            {
+                new PeaceBarterTerm(
+                    PeaceBarterTermType.Gold,
+                    playerHeroId,
+                    objectId: null,
+                    itemModifierId: null,
+                    itemModifierNull: true,
+                    amount: offeredGold),
+            },
+            requestId: "map-peace-mismatch")));
+
+        var result = Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>().Single();
+        Assert.False(result.Accepted);
+        Assert.Equal(requestedTargetPartyId, result.ContextId);
+        Assert.Equal("map-peace-mismatch", result.RequestId);
+        Assert.Equal(initialPlayerGold, result.PlayerGold);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(requestedTargetHeroId, out var requestedTargetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(activeTargetMobilePartyId, out var activeTargetParty));
+            Assert.Equal(initialPlayerGold, playerHero.Gold);
+            Assert.Equal(initialRequestedTargetGold, requestedTargetHero.Gold);
+
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryGetEngagement(client.NetPeer, out var engagement));
+            Assert.Equal(activeTargetPartyId, engagement.PartyId);
+            Assert.True(activeTargetParty.Ai.IsDisabled);
+        });
+        AssertWarDeclared(Server, playerClanId, requestedTargetClanId);
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+    }
+
+    [Fact]
+    public void NpcPeaceBarter_ActiveLocationConversation_AppliesPaymentAndPeace()
+    {
+        const string locationId = "e2e_peace_location";
+        const string requestId = "location-peace-success";
+        const int initialPlayerGold = 1_000_000;
+        const int initialTargetGold = 40;
+        const int offeredGold = 500_000;
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var (targetHeroId, _, targetPartyId) = CreateAiPartyWithRegisteredLeader();
+        var (playerClanId, targetClanId) = MakePartiesHostile(playerPartyId, targetPartyId);
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetId(targetHero.CharacterObject, out var targetCharacterId));
+
+            playerHero.Gold = initialPlayerGold;
+            targetHero.Gold = initialTargetGold;
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
+            Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
+            Assert.True(Server.Resolve<LocationConversationTracker>().TryBeginEngagement(
+                client.NetPeer,
+                LocationConversationTracker.ComposeKey(locationId, targetCharacterId)));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestPeaceBarter(
+            targetHeroId,
+            PeaceConversationContext.Location,
+            locationId,
+            new[]
+            {
+                new PeaceBarterTerm(
+                    PeaceBarterTermType.Gold,
+                    playerHeroId,
+                    objectId: null,
+                    itemModifierId: null,
+                    itemModifierNull: true,
+                    amount: offeredGold),
+            },
+            requestId)));
+
+        var result = Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>().Single();
+        Assert.True(result.Accepted, result.Reason);
+        Assert.Equal(locationId, result.ContextId);
+        Assert.Equal(requestId, result.RequestId);
+        Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.Equal(initialPlayerGold - offeredGold, playerHero.Gold);
+            Assert.Equal(initialTargetGold + offeredGold, targetHero.Gold);
+            Assert.True(Server.Resolve<LocationConversationTracker>().TryGetEngagement(client.NetPeer, out var npcKey));
+            Assert.StartsWith(locationId + "|", npcKey);
+        });
+
+        var peaceMade = Server.NetworkSentMessages.GetMessages<NetworkMakePeace>().Single();
+        Assert.Equal(playerClanId, peaceMade.Faction1Id);
+        Assert.Equal(targetClanId, peaceMade.Faction2Id);
+        AssertPeaceMade(Server, playerClanId, targetClanId);
+        foreach (var environmentClient in Clients)
+        {
+            environmentClient.Call(() =>
+            {
+                Assert.True(environmentClient.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                Assert.Equal(initialPlayerGold - offeredGold, playerHero.Gold);
+            });
+            AssertPeaceMade(environmentClient, playerClanId, targetClanId);
+        }
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+    }
+
+    [Fact]
+    public void NpcPeaceBarter_DifferentLocation_RejectsWithoutEffects()
+    {
+        const string activeLocationId = "e2e_active_peace_location";
+        const string requestedLocationId = "e2e_wrong_peace_location";
+        const string requestId = "location-peace-mismatch";
+        const int initialPlayerGold = 1_000_000;
+        const int initialTargetGold = 40;
+        const int offeredGold = 500_000;
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var (targetHeroId, _, targetPartyId) = CreateAiPartyWithRegisteredLeader();
+        var (playerClanId, targetClanId) = MakePartiesHostile(playerPartyId, targetPartyId);
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetId(targetHero.CharacterObject, out var targetCharacterId));
+
+            playerHero.Gold = initialPlayerGold;
+            targetHero.Gold = initialTargetGold;
+            VillageHostileFactionStanceHelper.ApplyWarStance(playerHero.MapFaction, targetHero.MapFaction);
+            Assert.True(Server.Resolve<LocationConversationTracker>().TryBeginEngagement(
+                client.NetPeer,
+                LocationConversationTracker.ComposeKey(activeLocationId, targetCharacterId)));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestPeaceBarter(
+            targetHeroId,
+            PeaceConversationContext.Location,
+            requestedLocationId,
+            new[]
+            {
+                new PeaceBarterTerm(
+                    PeaceBarterTermType.Gold,
+                    playerHeroId,
+                    objectId: null,
+                    itemModifierId: null,
+                    itemModifierNull: true,
+                    amount: offeredGold),
+            },
+            requestId)));
+
+        var result = Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>().Single();
+        Assert.False(result.Accepted);
+        Assert.Equal(requestedLocationId, result.ContextId);
+        Assert.Equal(requestId, result.RequestId);
+        Assert.Equal(initialPlayerGold, result.PlayerGold);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.Equal(initialPlayerGold, playerHero.Gold);
+            Assert.Equal(initialTargetGold, targetHero.Gold);
+            Assert.True(Server.Resolve<LocationConversationTracker>().TryGetEngagement(client.NetPeer, out var npcKey));
+            Assert.StartsWith(activeLocationId + "|", npcKey);
+        });
+        AssertWarListsContainEachOther(Server, playerClanId, targetClanId);
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+    }
+
+    [Fact]
+    public void BanditSafePassage_ActiveEncounter_AppliesPaymentAndSurvivesConversationRelease()
+    {
+        const int initialPlayerGold = 1000;
+        const int initialBanditGold = 40;
+        const int offeredGold = 250;
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var banditMobilePartyId = CreateBanditParty();
+        var joiningBanditMobilePartyId = CreateBanditParty("E2EBanditSafePassageJoiner");
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joiningBanditMobilePartyId, out var joiningBanditParty));
+
+            Server.Resolve<ISessionInteractionsPlayerDataInterface>().AddPlayerKeys(playerHeroId);
+            playerHero.Gold = initialPlayerGold;
+            banditParty.PartyTradeGold = initialBanditGold;
+            VillageHostileFactionStanceHelper.ApplyWarStance(
+                banditParty.MapFaction,
+                playerParty.MapFaction);
+            VillageHostileFactionStanceHelper.ApplyWarStance(
+                joiningBanditParty.MapFaction,
+                playerParty.MapFaction);
+            Assert.True(joiningBanditParty.MapFaction.IsAtWarWith(playerParty.MapFaction));
+            Assert.False(joiningBanditParty.MapFaction.IsAtWarWith(banditParty.MapFaction));
+            joiningBanditParty.AttachedTo = banditParty;
+            Assert.Same(banditParty, joiningBanditParty.AttachedTo);
+            Assert.Contains(joiningBanditParty, banditParty.AttachedParties);
+            banditParty.SetMoveEngageParty(playerParty, MobileParty.NavigationType.Default);
+            joiningBanditParty.SetMoveEngageParty(playerParty, MobileParty.NavigationType.Default);
+
+            Assert.False(banditParty.Ai.IsDisabled);
+            EncounterManager.StartPartyEncounter(banditParty.Party, playerParty.Party);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
+        Assert.Equal(GetPartyBaseId(Server, banditMobilePartyId), allowed.AttackerId);
+        Assert.Equal(playerPartyId, allowed.DefenderId);
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestBanditBarter(
+            banditMobilePartyId,
+            offeredGold,
+            Array.Empty<ItemRosterElementData>(),
+            Array.Empty<TroopRosterElementData>(),
+            "bandit-payment")));
+
+        var result = Server.NetworkSentMessages.GetMessages<NetworkBanditBarterResult>().Single();
+        Assert.True(result.Accepted, result.Reason);
+        Assert.Equal(banditMobilePartyId, result.BanditPartyId);
+        Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
+
+        foreach (var environmentClient in Clients)
+        {
+            environmentClient.Call(() =>
+            {
+                Assert.True(environmentClient.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                Assert.Equal(initialPlayerGold - offeredGold, playerHero.Gold);
+            });
+        }
+
+        TestEnvironment.FlushCoalescer();
+        AssertBanditBarterGold(Server, playerHeroId, banditMobilePartyId, initialPlayerGold - offeredGold, initialBanditGold + offeredGold);
+        foreach (var environmentClient in Clients)
+            AssertBanditBarterGold(environmentClient, playerHeroId, banditMobilePartyId, initialPlayerGold - offeredGold, initialBanditGold + offeredGold);
+
+        Server.Call(() =>
+        {
+            var interactions = Server.Resolve<ICoopSessionProvider>().CoopSession.InteractionsPlayerData;
+            Assert.Equal(
+                (int)BanditInteractionsCampaignBehavior.PlayerInteraction.PaidOffParty,
+                interactions.PlayerInteractedBandits[playerHeroId][banditMobilePartyId]);
+
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joiningBanditMobilePartyId, out var joiningBanditParty));
+            Assert.True(DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.TryGetValue(
+                banditParty.Ai,
+                out var disabledAttackTimes));
+            Assert.True(disabledAttackTimes.ContainsKey(playerParty));
+            Assert.True(DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.TryGetValue(
+                joiningBanditParty.Ai,
+                out var joiningBanditDisabledAttackTimes));
+            Assert.True(joiningBanditDisabledAttackTimes.ContainsKey(playerParty));
+            Assert.Equal(AiBehavior.Hold, joiningBanditParty.DefaultBehavior);
+            Assert.Null(joiningBanditParty.TargetParty);
+
+            // HoursFromNow is stubbed to Zero by the E2E bootstrap; use a future deadline for the release assertion.
+            DefaultMobilePartyAIModelPatches.PreventAttacksUntil(
+                banditParty,
+                playerParty,
+                Campaign.Current.MapTimeTracker.Now + CampaignTime.Hours(32));
+            DefaultMobilePartyAIModelPatches.PreventAttacksUntil(
+                joiningBanditParty,
+                playerParty,
+                Campaign.Current.MapTimeTracker.Now + CampaignTime.Hours(32));
+        });
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joiningBanditMobilePartyId, out var joiningBanditParty));
+
+                Assert.False(ConversationPartyHold.IsInPlayerConversation(banditParty));
+                Assert.False(banditParty.Ai.IsDisabled);
+                Assert.True(DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.TryGetValue(
+                    banditParty.Ai,
+                    out var disabledAttackTimes));
+                Assert.True(disabledAttackTimes.ContainsKey(playerParty));
+                Assert.False(disabledAttackTimes[playerParty].IsPast);
+                Assert.True(DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.TryGetValue(
+                    joiningBanditParty.Ai,
+                    out var joiningBanditDisabledAttackTimes));
+                Assert.True(joiningBanditDisabledAttackTimes.ContainsKey(playerParty));
+                Assert.False(joiningBanditDisabledAttackTimes[playerParty].IsPast);
+            });
+        }
+        finally
+        {
+            Server.Call(() =>
+            {
+                if (Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty))
+                    DefaultMobilePartyAIModelPatches.RemoveAttackProtectionsForParty(banditParty);
+                if (Server.ObjectManager.TryGetObject<MobileParty>(joiningBanditMobilePartyId, out var joiningBanditParty))
+                    DefaultMobilePartyAIModelPatches.RemoveAttackProtectionsForParty(joiningBanditParty);
+            });
+        }
+    }
+
+    [Fact]
+    public void BanditSafePassage_Underpayment_IsRejectedWithoutEffects()
+    {
+        const int initialPlayerGold = 1000;
+        const int initialBanditGold = 40;
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var banditMobilePartyId = CreateBanditParty();
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+
+            Server.Resolve<ISessionInteractionsPlayerDataInterface>().AddPlayerKeys(playerHeroId);
+            playerHero.Gold = initialPlayerGold;
+            banditParty.PartyTradeGold = initialBanditGold;
+            banditParty.SetMoveEngageParty(playerParty, MobileParty.NavigationType.Default);
+            EncounterManager.StartPartyEncounter(banditParty.Party, playerParty.Party);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
+        Assert.Equal(GetPartyBaseId(Server, banditMobilePartyId), allowed.AttackerId);
+        Assert.Equal(playerPartyId, allowed.DefenderId);
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestBanditBarter(
+            banditMobilePartyId,
+            playerGold: 1,
+            Array.Empty<ItemRosterElementData>(),
+            Array.Empty<TroopRosterElementData>(),
+            "bandit-underpayment")));
+
+        var result = Server.NetworkSentMessages.GetMessages<NetworkBanditBarterResult>().Single();
+        Assert.False(result.Accepted);
+        Assert.Equal("bandit-underpayment", result.RequestId);
+        Assert.Equal(initialPlayerGold, result.PlayerGold);
+
+        TestEnvironment.FlushCoalescer();
+        AssertBanditBarterGold(Server, playerHeroId, banditMobilePartyId, initialPlayerGold, initialBanditGold);
+        foreach (var environmentClient in Clients)
+            AssertBanditBarterGold(environmentClient, playerHeroId, banditMobilePartyId, initialPlayerGold, initialBanditGold);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+            var interactions = Server.Resolve<ICoopSessionProvider>().CoopSession.InteractionsPlayerData;
+
+            Assert.DoesNotContain(banditMobilePartyId, interactions.PlayerInteractedBandits[playerHeroId].Keys);
+            Assert.True(Server.Resolve<ConversationPartyTracker>().TryGetEngagement(client.NetPeer, out var engagement));
+            Assert.Equal(GetPartyBaseId(Server, banditMobilePartyId), engagement.PartyId);
+            Assert.True(banditParty.Ai.IsDisabled);
+            Assert.False(DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.TryGetValue(
+                banditParty.Ai,
+                out var disabledAttackTimes) && disabledAttackTimes.ContainsKey(playerParty));
+        });
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+    }
+
+    [Fact]
+    public void BanditSafePassage_PlayerAttackedBandit_IsRejectedWithoutEffects()
+    {
+        const int initialPlayerGold = 1000;
+        const int initialBanditGold = 40;
+
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerPartyWithRegisteredLeader("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var banditMobilePartyId = CreateBanditParty();
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+
+            Server.Resolve<ISessionInteractionsPlayerDataInterface>().AddPlayerKeys(playerHeroId);
+            playerHero.Gold = initialPlayerGold;
+            banditParty.PartyTradeGold = initialBanditGold;
+            playerParty.SetMoveEngageParty(banditParty, MobileParty.NavigationType.Default);
+            EncounterManager.StartPartyEncounter(playerParty.Party, banditParty.Party);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
+        Assert.Equal(playerPartyId, allowed.AttackerId);
+        Assert.Equal(GetPartyBaseId(Server, banditMobilePartyId), allowed.DefenderId);
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestBanditBarter(
+            banditMobilePartyId,
+            playerGold: 250,
+            Array.Empty<ItemRosterElementData>(),
+            Array.Empty<TroopRosterElementData>(),
+            "bandit-wrong-side")));
+
+        var result = Server.NetworkSentMessages.GetMessages<NetworkBanditBarterResult>().Single();
+        Assert.False(result.Accepted);
+
+        TestEnvironment.FlushCoalescer();
+        AssertBanditBarterGold(Server, playerHeroId, banditMobilePartyId, initialPlayerGold, initialBanditGold);
+        foreach (var environmentClient in Clients)
+            AssertBanditBarterGold(environmentClient, playerHeroId, banditMobilePartyId, initialPlayerGold, initialBanditGold);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+            var interactions = Server.Resolve<ICoopSessionProvider>().CoopSession.InteractionsPlayerData;
+
+            Assert.DoesNotContain(banditMobilePartyId, interactions.PlayerInteractedBandits[playerHeroId].Keys);
+            Assert.False(DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.TryGetValue(
+                banditParty.Ai,
+                out var disabledAttackTimes) && disabledAttackTimes.ContainsKey(playerParty));
+        });
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+    }
+
+    [Fact]
     public void ExistingBattleJoin_WithMissionMember_UsesExistingAllowPath()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
@@ -1559,6 +2187,82 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     {
         var mobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         return GetPartyBaseId(Server, mobilePartyId);
+    }
+
+    private (string heroId, string mobilePartyId) CreatePlayerPartyWithRegisteredLeader(string controllerId)
+    {
+        var mobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        string? heroId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.NotNull(party.LeaderHero);
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out heroId));
+        });
+
+        Assert.NotNull(heroId);
+        RegisterAsPlayerParty(controllerId, heroId!, mobilePartyId);
+        return (heroId!, mobilePartyId);
+    }
+
+    private (string heroId, string mobilePartyId, string partyId) CreateAiPartyWithRegisteredLeader()
+    {
+        var mobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        string? heroId = null;
+        string? partyId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.NotNull(party.LeaderHero);
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out heroId));
+            Assert.True(Server.ObjectManager.TryGetId(party.Party, out partyId));
+        });
+
+        Assert.NotNull(heroId);
+        Assert.NotNull(partyId);
+        return (heroId!, mobilePartyId, partyId!);
+    }
+
+    private string CreateBanditParty(string stringId = "E2EBanditSafePassage")
+    {
+        string? banditPartyId = null;
+
+        Server.Call(() =>
+        {
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+            var banditParty = BanditPartyComponent.CreateBanditParty(
+                stringId,
+                clan,
+                hideout,
+                isBossParty: false,
+                pt: null,
+                new CampaignVec2(Vec2.Zero, true));
+
+            Assert.True(Server.ObjectManager.TryGetId(banditParty, out banditPartyId));
+            Assert.True(banditParty.IsBandit);
+        });
+
+        Assert.NotNull(banditPartyId);
+        return banditPartyId!;
+    }
+
+    private static void AssertBanditBarterGold(
+        EnvironmentInstance instance,
+        string playerHeroId,
+        string banditPartyId,
+        int expectedPlayerGold,
+        int expectedBanditGold)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(banditPartyId, out var banditParty));
+            Assert.Equal(expectedPlayerGold, playerHero.Gold);
+            Assert.Equal(expectedBanditGold, banditParty.PartyTradeGold);
+        });
     }
 
     private void PreparePlayerPartyForCapture(string heroId, string partyId)
@@ -1857,6 +2561,20 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(
                 VillageHostileFactionStanceHelper.HasWarStance(initiatorMapFaction, responderMapFaction),
                 $"Expected {GetFactionDebugName(instance, initiatorMapFaction)} to be at war with {GetFactionDebugName(instance, responderMapFaction)}. InitiatorWarsContainsResponder={initiatorMapFaction.FactionsAtWarWith?.Contains(responderMapFaction) == true}, ResponderWarsContainsInitiator={responderMapFaction.FactionsAtWarWith?.Contains(initiatorMapFaction) == true}");
+        });
+    }
+
+    private static void AssertWarListsContainEachOther(
+        EnvironmentInstance instance,
+        string initiatorFactionId,
+        string responderFactionId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(TryGetFaction(instance, initiatorFactionId, out var initiatorFaction));
+            Assert.True(TryGetFaction(instance, responderFactionId, out var responderFaction));
+            Assert.Contains(responderFaction!.MapFaction, initiatorFaction!.MapFaction.FactionsAtWarWith);
+            Assert.Contains(initiatorFaction.MapFaction, responderFaction.MapFaction.FactionsAtWarWith);
         });
     }
 

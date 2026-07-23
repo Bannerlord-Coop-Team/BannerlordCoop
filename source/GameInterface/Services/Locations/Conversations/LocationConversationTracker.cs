@@ -112,6 +112,17 @@ internal sealed class LocationConversationTracker : IHandler
         }
     }
 
+    public bool TryGetEngagement(object engagerKey, out string npcKey)
+    {
+        npcKey = null;
+        if (engagerKey == null) return false;
+
+        lock (stateLock)
+        {
+            return npcKeyByEngager.TryGetValue(engagerKey, out npcKey);
+        }
+    }
+
     /// <summary>True when the NPC is engaged by a player other than <paramref name="engagerKey"/>.</summary>
     public bool IsEngagedByOther(string npcKey, object engagerKey)
     {

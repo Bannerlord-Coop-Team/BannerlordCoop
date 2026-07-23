@@ -57,15 +57,9 @@ internal class MarriageActionPatches
 {
     [HarmonyPatch(nameof(MarriageAction.Apply))]
     [HarmonyPrefix]
-    private static bool ApplyPrefix(Hero firstHero, Hero secondHero)
+    private static bool ApplyPrefix()
     {
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (firstHero.IsControlledByThisInstance() || secondHero.IsControlledByThisInstance())
-        {
-            MessageBroker.Instance.Publish(firstHero, new MarriageActionRequested(firstHero, secondHero));
-        }
-
         return false;
     }
 }
