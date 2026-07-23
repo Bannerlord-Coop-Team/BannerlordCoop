@@ -30,6 +30,7 @@ using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
@@ -79,6 +80,48 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
             responderParty.MobileParty.IsActive = false;
+        });
+        Server.NetworkSentMessages.Clear();
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+
+        var denied = Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>().Single();
+        Assert.Equal(ConversationDeniedReason.PlayerUnavailable, denied.Reason);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+    }
+
+    [Fact]
+    public void ClientRequest_BesiegingPlayer_DeniesWithoutStartingDialog()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            responderParty.MobileParty._besiegerCamp = ObjectHelper.SkipConstructor<BesiegerCamp>();
+        });
+        Server.NetworkSentMessages.Clear();
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+
+        var denied = Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>().Single();
+        Assert.Equal(ConversationDeniedReason.PlayerUnavailable, denied.Reason);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+    }
+
+    [Fact]
+    public void ClientRequest_PlayerDefendingBesiegedSettlement_DeniesWithoutStartingDialog()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            settlement.SiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
+            initiatorParty.MobileParty._currentSettlement = settlement;
         });
         Server.NetworkSentMessages.Clear();
 
