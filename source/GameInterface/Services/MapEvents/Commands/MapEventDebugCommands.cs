@@ -1,6 +1,9 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using Common.Network;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
@@ -43,6 +46,17 @@ public class MapEventDebugCommands
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out objectManager);
+    }
+
+    private static bool MatchesPartyId(IObjectManager objectManager, MobileParty party, string id)
+    {
+        if (party == null || string.IsNullOrEmpty(id)) return false;
+        if (party.StringId == id) return true;
+        if (objectManager.TryGetId(party, out string mobilePartyId) && mobilePartyId == id) return true;
+
+        return party.Party != null &&
+               objectManager.TryGetId(party.Party, out string partyBaseId) &&
+               partyBaseId == id;
     }
 
     /// <summary>
@@ -155,7 +169,7 @@ public class MapEventDebugCommands
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
     }
 
-    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
+    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne [excludedPartyId]
     /// <summary>
     /// Starts a server-authoritative bandit attack encounter against a connected player.
     /// </summary>
@@ -167,45 +181,22 @@ public class MapEventDebugCommands
             return "Run this command on the server.";
         }
 
-        if (args.Count != 1)
+        if (args.Count < 1 || args.Count > 2)
         {
-            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId>";
+            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId> [excludedPartyId]";
         }
 
-        if (!TryGetObjectManager(out var objectManager))
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
         {
-            return "Unable to resolve ObjectManager";
+            return error;
         }
 
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
-        {
-            return "Unable to resolve PlayerManager";
-        }
-
-        if (!playerManager.TryGetPlayer(args[0], out var player))
-        {
-            return $"No registered player has controller id {args[0]}.";
-        }
-
-        if (!playerManager.IsConnected(player))
-        {
-            return $"Player {args[0]} is not connected.";
-        }
-
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
-        {
-            return $"Unable to resolve player party {player.MobilePartyId}.";
-        }
-
-        if (playerParty.MapEvent != null)
-        {
-            return $"Player {args[0]} is already in a map event.";
-        }
-
+        var excludedPartyId = args.Count == 2 ? args[1] : null;
         var playerPosition = playerParty.Position.ToVec2();
         var banditParty = MobileParty.All
             .Where(p => p.IsActive && p.IsBandit && p != playerParty
-                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0)
+                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0
+                        && !MatchesPartyId(objectManager, p, excludedPartyId))
             .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
             .FirstOrDefault();
 
@@ -219,9 +210,70 @@ public class MapEventDebugCommands
         var partyId = objectManager.TryGetId(banditParty, out string registryId)
             ? registryId
             : banditParty.StringId;
+        var partyBaseId = objectManager.TryGetId(banditParty.Party, out string partyBaseRegistryId)
+            ? partyBaseRegistryId
+            : "<unregistered>";
 
-        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
+        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, " +
+               $"registry id {partyId}, PartyBase id {partyBaseId}) " +
                $"against player {args[0]}.";
+    }
+
+    // coop.debug.mapevent.finish_player_encounter PlayerOne
+    /// <summary>
+    /// Requests the connected client's encounter close through the existing authoritative leave message.
+    /// </summary>
+    [CommandLineArgumentFunction("finish_player_encounter", "coop.debug.mapevent")]
+    public static string FinishPlayerEncounter(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.finish_player_encounter <controllerId>";
+        }
+
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+        {
+            return "Unable to resolve Network";
+        }
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+        {
+            return error;
+        }
+
+        if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var partyBaseId))
+        {
+            return $"Unable to resolve PartyBase for player {args[0]}.";
+        }
+
+        network.SendAll(new NetworkPartyLeftBattle(partyBaseId));
+        return $"Requested encounter finish for player {args[0]} (PartyBase id {partyBaseId}).";
+    }
+
+    // coop.debug.mapevent.conversation_hold_state <partyBaseId>
+    /// <summary>
+    /// Reports whether the server currently holds an AI PartyBase for a conversation.
+    /// </summary>
+    [CommandLineArgumentFunction("conversation_hold_state", "coop.debug.mapevent")]
+    public static string ConversationHoldState(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.conversation_hold_state <partyBaseId>";
+        }
+
+        var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
+        return $"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.";
     }
 
     // coop.debug.mapevent.peace_pursuit_fixture PlayerOne
@@ -617,9 +669,9 @@ public class MapEventDebugCommands
         {
             sb.AppendLine($"\tBattle:           {FormatMapEvent(PlayerEncounter.Battle, objectManager)}");
             sb.AppendLine($"\t_mapEvent:        {FormatMapEvent(encounter._mapEvent, objectManager)}");
-            sb.AppendLine($"\tEncounteredParty: {FormatPartyBase(PlayerEncounter.EncounteredParty)}");
-            sb.AppendLine($"\t_attackerParty:   {FormatPartyBase(encounter._attackerParty)}");
-            sb.AppendLine($"\t_defenderParty:   {FormatPartyBase(encounter._defenderParty)}");
+            sb.AppendLine($"\tEncounteredParty: {FormatPartyBaseWithId(PlayerEncounter.EncounteredParty, objectManager)}");
+            sb.AppendLine($"\t_attackerParty:   {FormatPartyBaseWithId(encounter._attackerParty, objectManager)}");
+            sb.AppendLine($"\t_defenderParty:   {FormatPartyBaseWithId(encounter._defenderParty, objectManager)}");
         }
 
         var mainParty = MobileParty.MainParty;
@@ -629,7 +681,7 @@ public class MapEventDebugCommands
         if (side == null)
             sb.AppendLine("MainParty.MapEventSide:  <null>");
         else
-            sb.AppendLine($"MainParty.MapEventSide:  leader={FormatPartyBase(side.LeaderParty)} mainPartyIsLeader={side.LeaderParty == mainParty?.Party}");
+            sb.AppendLine($"MainParty.MapEventSide:  leader={FormatPartyBaseWithId(side.LeaderParty, objectManager)} mainPartyIsLeader={side.LeaderParty == mainParty?.Party}");
 
         sb.AppendLine($"CurrentMenu:             {Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>"}");
         sb.AppendLine($"CurrentBattleSimulation: {(PlayerEncounter.CurrentBattleSimulation == null ? "<null>" : "PRESENT")}");
@@ -1041,6 +1093,18 @@ public class MapEventDebugCommands
         var name = party.Name?.ToString() ?? "<no name>";
 
         return name;
+    }
+
+    private static string FormatPartyBaseWithId(PartyBase party, IObjectManager objectManager)
+    {
+        if (party == null)
+            return "<null>";
+
+        var partyBaseId = objectManager != null && objectManager.TryGetId(party, out string resolvedPartyBaseId)
+            ? resolvedPartyBaseId
+            : "<unregistered>";
+
+        return $"{FormatPartyBase(party)} (PartyBase id {partyBaseId})";
     }
 
     private static string GetFriendlyTypeName(Type type)
