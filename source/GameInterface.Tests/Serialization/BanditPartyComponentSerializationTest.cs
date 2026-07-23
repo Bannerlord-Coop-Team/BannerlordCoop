@@ -14,6 +14,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
+    [Collection(HideoutSerializationCollection.Name)]
     public class BanditPartyComponentSerializationTest
     {
         readonly IContainer container;
@@ -48,7 +49,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Hideout hideout = (Hideout)FormatterServices.GetUninitializedObject(typeof(Hideout));
 
-            // TODO make atomic to not interfere with other tests that use Hideout.All
             MBList<Hideout> allhideouts = Campaign.Current?._hideouts ?? new MBList<Hideout>();
 
             allhideouts.Add(hideout);

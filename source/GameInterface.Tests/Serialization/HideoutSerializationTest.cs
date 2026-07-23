@@ -11,6 +11,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
+    [Collection(HideoutSerializationCollection.Name)]
     public class HideoutSerializationTest
     {
         IContainer container;
