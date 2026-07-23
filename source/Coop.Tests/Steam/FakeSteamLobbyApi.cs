@@ -27,6 +27,7 @@ namespace Coop.Tests.Steam
         public bool ThrowOnListRequest;
         public bool ThrowOnFriendLobbyRequest;
         public bool ThrowOnLobbyDataRequest;
+        public bool ThrowOnGetLobbyData;
 
         public readonly List<ulong> LeftLobbies = new List<ulong>();
         public readonly List<ulong> InviteDialogsOpened = new List<ulong>();
@@ -149,6 +150,8 @@ namespace Coop.Tests.Steam
 
         public string GetLobbyData(ulong lobbyId, string key)
         {
+            if (ThrowOnGetLobbyData) throw new InvalidOperationException("scripted get-lobby-data failure");
+
             if (LobbyData.TryGetValue(lobbyId, out var data) && data.TryGetValue(key, out var value)) return value;
 
             return string.Empty;
