@@ -15,11 +15,6 @@ internal sealed class LocationPlayerInteractionWaitingOverlay : GlobalLayer
 
     public static LocationPlayerInteractionWaitingOverlay Instance => instance ??= new LocationPlayerInteractionWaitingOverlay();
 
-#if DEBUG
-    internal bool IsShownForLiveTest => isShown;
-    internal string WaitingTextForLiveTest => dataSource?.WaitingText;
-#endif
-
     public void Show(string otherPlayerName)
     {
         if (isShown) return;
