@@ -14,13 +14,16 @@ using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -629,11 +632,106 @@ public class MapEventDebugCommands
             sb.AppendLine($"MainParty.MapEventSide:  leader={FormatPartyBase(side.LeaderParty)} mainPartyIsLeader={side.LeaderParty == mainParty?.Party}");
 
         sb.AppendLine($"CurrentMenu:             {Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>"}");
+        sb.AppendLine($"CurrentBattleSimulation: {(PlayerEncounter.CurrentBattleSimulation == null ? "<null>" : "PRESENT")}");
         sb.AppendLine($"MissionState.Current:    {(MissionState.Current == null ? "<null>" : "PRESENT")}");
 
         var result = sb.ToString();
         Logger.Debug("{EncounterState}", result);
         return result;
+    }
+
+    /// <summary>Shows, closes, or reports the live retreat confirmation for automated battle-exit testing.</summary>
+    [CommandLineArgumentFunction("retreat_confirmation", "coop.debug.mapevent")]
+    public static string RetreatConfirmation(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client in a battle mission.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.retreat_confirmation <show|accept|cancel|state>";
+
+        var handler = Mission.Current?.GetMissionBehavior<BasicMissionHandler>();
+        if (handler == null)
+            return "No active battle retreat handler.";
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "show":
+                if (handler.IsWarningWidgetOpened)
+                    return "Retreat confirmation already open: true";
+
+                handler.CreateWarningWidgetForResult(BattleEndLogic.ExitResult.NeedsPlayerConfirmation);
+                return $"Retreat confirmation open: {handler.IsWarningWidgetOpened}";
+            case "accept":
+                if (!handler.IsWarningWidgetOpened)
+                    return "Retreat confirmation is not open.";
+
+                InformationManager.HideInquiry();
+                handler.OnEventAcceptSelectionWidget();
+                return "Retreat confirmation accepted.";
+            case "cancel":
+                if (!handler.IsWarningWidgetOpened)
+                    return "Retreat confirmation is not open.";
+
+                InformationManager.HideInquiry();
+                handler.OnEventCancelSelectionWidget();
+                return $"Retreat confirmation open: {handler.IsWarningWidgetOpened}";
+            case "state":
+                return $"Retreat confirmation open: {handler.IsWarningWidgetOpened}";
+            default:
+                return "Usage: coop.debug.mapevent.retreat_confirmation <show|accept|cancel|state>";
+        }
+    }
+
+    /// <summary>Closes the current encounter conversation so vanilla can advance to battle choices.</summary>
+    [CommandLineArgumentFunction("complete_encounter_meeting", "coop.debug.mapevent")]
+    public static string CompleteEncounterMeeting(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client at the encounter meeting.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.complete_encounter_meeting";
+
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "encounter_meeting")
+            return "The encounter meeting is not active.";
+
+        var conversationManager = Campaign.Current.ConversationManager;
+        if (!conversationManager.IsConversationInProgress)
+            return "The encounter conversation is not active.";
+
+        conversationManager.EndConversation();
+        return "Encounter meeting completed.";
+    }
+
+    /// <summary>Runs the encounter menu's mission or simulation consequence for automated battle testing.</summary>
+    [CommandLineArgumentFunction("choose_battle_mode", "coop.debug.mapevent")]
+    public static string ChooseBattleMode(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client at the encounter menu.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.choose_battle_mode <mission|simulation>";
+
+        if (PlayerEncounter.Current == null)
+            return "No active player encounter.";
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<EncounterGameMenuBehavior>();
+        if (behavior == null)
+            return "Encounter menu behavior is unavailable.";
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "mission":
+                behavior.game_menu_encounter_attack_on_consequence(null);
+                return "Mission battle requested.";
+            case "simulation":
+                behavior.game_menu_encounter_order_attack_on_consequence(null);
+                return "Battle simulation requested.";
+            default:
+                return "Usage: coop.debug.mapevent.choose_battle_mode <mission|simulation>";
+        }
     }
 
     private static string FormatMapEvent(MapEvent mapEvent, IObjectManager objectManager)
