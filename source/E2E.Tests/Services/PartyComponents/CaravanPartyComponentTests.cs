@@ -45,6 +45,7 @@ public class CaravanPartyComponentTests : SyncTestBase
             var culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
             var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
             settlement.Culture = culture;
+            settlement.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Town>());
             var newParty = CaravanPartyComponent.CreateCaravanParty(owner, settlement, template, caravanLeader: owner);
 
             Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
