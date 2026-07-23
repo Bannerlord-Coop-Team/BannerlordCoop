@@ -432,7 +432,7 @@ namespace Coop.Core
         // LoadGame must follow PatchAll (the LoadPatches postfix publishes GameLoaded), so it runs here, after patching, not at the caller
         private void StartServerLogic(string saveName)
         {
-            container.Resolve<ILogic>().Start();
+            container.Resolve<IServerLogic>().Start(saveName);
 
             if (saveName != null)
             {

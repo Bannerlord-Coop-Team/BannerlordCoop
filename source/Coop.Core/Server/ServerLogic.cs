@@ -16,6 +16,8 @@ public interface IServerLogic : ILogic, IServerState
     /// Server-side state
     /// </summary>
     IServerState State { get; }
+    string InitialSaveName { get; }
+    void Start(string saveName);
     TState SetState<TState>() where TState : IServerState;
 }
 
@@ -40,6 +42,7 @@ public class ServerLogic : IServerLogic
     }
 
     public bool RunningState => _state is not InitialServerState;
+    public string InitialSaveName { get; private set; }
 
     private IServerState _state;
 
@@ -57,6 +60,12 @@ public class ServerLogic : IServerLogic
 
     public void Start()
     {
+        State.Start();
+    }
+
+    public void Start(string saveName)
+    {
+        InitialSaveName = saveName;
         State.Start();
     }
 
