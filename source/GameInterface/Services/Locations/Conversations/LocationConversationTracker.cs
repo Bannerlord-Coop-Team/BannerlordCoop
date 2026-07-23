@@ -138,7 +138,12 @@ internal sealed class LocationConversationTracker : IHandler
 
         lock (stateLock)
         {
-            return npcKeyByEngager.TryGetValue(engagerKey, out npcKey);
+            if (engagementByEngager.TryGetValue(engagerKey, out var engagement))
+            {
+                npcKey = engagement.TargetNpcKey;
+                return true;
+            }
+            return false;       
         }
     }
 
