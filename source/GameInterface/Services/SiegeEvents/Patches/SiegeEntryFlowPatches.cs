@@ -4,11 +4,17 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Helpers;
+using System.Linq;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -160,6 +166,183 @@ internal class SiegeEntryFlowPatches
         if (MobileParty.MainParty.BesiegerCamp == null) return true;
 
         MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
+        return false;
+    }
+
+    // The join_siege_event menu's "Don't get involved." drops an army follower out of its army, removes the
+    // party from any battle it is on a side of, clears the camp, then holds the party. Suppress-and-route like
+    // the leave menus above; the army exit and the battle-side removal each replicate through their own co-op
+    // flow (neither MobileParty.Army nor a single-party MapEventSide removal is auto-synced), the camp write
+    // routes through the server, and the hold is reissued here (see HoldAfterSiegeLeave).
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.break_in_leave_consequence))]
+    [HarmonyPrefix]
+    private static bool BreakInLeavePrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.BesiegerCamp == null) return true;
+
+        var army = mainParty.Army;
+        if (army != null && army.LeaderParty != mainParty)
+        {
+            MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
+            using (new AllowedThread())
+            {
+                ArmyPatches.RemoveMobilePartyInArmy(mainParty, army, mainParty);
+            }
+        }
+
+        // A besieger prompted into join_siege_event can already sit on a side of the sally-out/relief map
+        // event; native removes it there before clearing the camp. That single-party removal is not
+        // auto-synced, so route it or the party stays in that battle on the server.
+        if (mainParty.Party.MapEventSide != null)
+        {
+            MessageBroker.Instance.Publish(mainParty, new PlayerLeaveBattleAttempted(mainParty.Party));
+        }
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(mainParty));
+        HoldAfterSiegeLeave(mainParty);
+        return false;
+    }
+
+    // Try-to-get-away accept: the camp write sits between the troop/item sacrifice and the debrief menu,
+    // all of which must keep running locally, so the native body cannot be suppressed. Route the camp
+    // removal and clear it locally up front under AllowedThread (applied without forwarding or the
+    // client-write error log); the native guarded write then sees null and skips itself. The approval
+    // must not touch the menus — the native flow continues into the debrief on its own.
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_encounter_leave_your_soldiers_behind_accept_on_consequence))]
+    [HarmonyPrefix]
+    private static bool LeaveSoldiersBehindAcceptPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+        if (MobileParty.MainParty.BesiegerCamp == null) return true;
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty, finishLocalMenus: false));
+        using (new AllowedThread())
+        {
+            MobileParty.MainParty.BesiegerCamp = null;
+        }
+        return true;
+    }
+
+    // A besieger defeated in a real-time mission unwinds through the native defeat state machine
+    // (PlayerEncounter.Update still sees a live PlayerMapEvent; the coop battle-results path only forces
+    // the encounter state once the server's commit replicates), and DoPlayerDefeat clears the camp
+    // client-locally on that path. Neither the captivity flow nor the field-battle finalize converges the
+    // camp on the server, so route it; native must keep running for Finish and the taken-prisoner menu.
+    // Pre-nulling also drops the stale continue_siege_after_attack branch inside Finish (it keys on
+    // BesiegedSettlement), which native would otherwise show for a retreat-ended defeat with the camp
+    // already gone.
+    [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.DoPlayerDefeat))]
+    [HarmonyPrefix]
+    private static bool PlayerDefeatPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+        if (MobileParty.MainParty.BesiegerCamp == null) return true;
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty, finishLocalMenus: false));
+        using (new AllowedThread())
+        {
+            MobileParty.MainParty.BesiegerCamp = null;
+        }
+        return true;
+    }
+
+    // Safe-passage barter: accepting "let me go" while besieging abandons the siege via a camp write
+    // buried mid-Apply. The native body must keep running (AI holds, LeaveEncounter). Branch A — the
+    // besieger GRANTING passage to sallying defenders — keeps the siege, so it must never route a break;
+    // it is re-evaluated here, before the pre-null, because it reads OriginalParty.SiegeEvent, which the
+    // pre-null would clear when the original party is the main party.
+    [HarmonyPatch(typeof(SafePassageBarterable), nameof(SafePassageBarterable.Apply))]
+    [HarmonyPrefix]
+    private static bool SafePassageApplyPrefix(SafePassageBarterable __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+        if (PlayerEncounter.Current == null) return true;
+        if (MobileParty.MainParty.BesiegerCamp == null) return true;
+
+        var originalParty = __instance.OriginalParty;
+        if (originalParty?.SiegeEvent != null
+            && originalParty.SiegeEvent.BesiegerCamp.HasInvolvedPartyForEventType(originalParty)
+            && __instance._otherParty != null
+            && originalParty.SiegeEvent.BesiegedSettlement.HasInvolvedPartyForEventType(__instance._otherParty))
+            return true;
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty, finishLocalMenus: false));
+        using (new AllowedThread())
+        {
+            MobileParty.MainParty.BesiegerCamp = null;
+        }
+        return true;
+    }
+
+    // break_in_leave_consequence and the join_encounter leave lambda both call MobileParty.SetMoveModeHold
+    // after PlayerEncounter.Finish (the other routed leave menus do not). The approval runs Finish under an
+    // AllowedThread, so PlayerEncounterPatches.FinishPostfix short-circuits and never reissues the hold. Do it
+    // here: hold locally, then publish through the gated AI-behavior channel so the server clears the party's
+    // stale besiege order and re-broadcasts the hold to every client — a bare local write is dropped by dynamic
+    // sync, leaving the party moving under its old order on the server (same reasoning as FinishPostfix).
+    internal static void HoldAfterSiegeLeave(MobileParty party)
+    {
+        party.SetMoveModeHold();
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
+    }
+}
+
+/// <summary>
+/// The join_encounter menu's leave option is a compiler-generated lambda in
+/// <see cref="EncounterGameMenuBehavior.AddGameMenus"/> that clears <see cref="MobileParty.BesiegerCamp"/>,
+/// finishes the encounter, then holds the party, so it needs IL-based target resolution instead of a name. It
+/// is the only lambda in that behavior touching the camp setter. Camp write routes through the server; the
+/// hold is reissued locally (see <see cref="SiegeEntryFlowPatches.HoldAfterSiegeLeave"/>).
+/// </summary>
+[HarmonyPatch]
+internal class JoinEncounterLeaveLambdaPatches
+{
+    private static MethodBase joinEncounterLeaveConsequence;
+
+    internal static MethodBase ResolveJoinEncounterLeaveConsequence()
+    {
+        if (joinEncounterLeaveConsequence != null) return joinEncounterLeaveConsequence;
+
+        var campSetter = AccessTools.PropertySetter(typeof(MobileParty), nameof(MobileParty.BesiegerCamp));
+
+        foreach (var nested in typeof(EncounterGameMenuBehavior).GetNestedTypes(AccessTools.all))
+        {
+            foreach (var method in AccessTools.GetDeclaredMethods(nested))
+            {
+                if (!method.Name.Contains(nameof(EncounterGameMenuBehavior.AddGameMenus))) continue;
+                if (method.GetMethodBody() == null) continue;
+
+                if (PatchProcessor.ReadMethodBody(method).Any(op => Equals(op.Value, campSetter)))
+                {
+                    joinEncounterLeaveConsequence = method;
+                    return method;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static MethodBase TargetMethod() => ResolveJoinEncounterLeaveConsequence();
+
+    [HarmonyPrefix]
+    private static bool JoinEncounterLeavePrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.BesiegerCamp == null) return true;
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(mainParty));
+        SiegeEntryFlowPatches.HoldAfterSiegeLeave(mainParty);
         return false;
     }
 }
