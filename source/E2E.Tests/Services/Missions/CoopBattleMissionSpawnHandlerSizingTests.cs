@@ -1,5 +1,6 @@
-﻿using Missions.Battles;
+﻿using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
+using Missions.Battles;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
@@ -52,8 +53,9 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     [Fact]
     public void EnemyOnlyReserve_DoesNotOpenDeploymentWithoutLocalPlayerOrigin()
     {
-        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null);
-        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null);
+        var agentBudget = new BattleAgentBudget();
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null, agentBudget);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null, agentBudget);
         attacker.SetReserve(Array.Empty<PartyReserve>());
         defender.SetReserve(new[]
         {
@@ -74,8 +76,9 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     [Fact]
     public void LocalPartyHeroOrigin_AllowsDeploymentSizing()
     {
-        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null);
-        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null);
+        var agentBudget = new BattleAgentBudget();
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null, agentBudget);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null, agentBudget);
         attacker.SetReserve(new[]
         {
             new PartyReserve("player-party", 0, new[]
@@ -92,8 +95,9 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     [Fact]
     public void LocalPartyWithoutHero_AllowsLeaderlessDeployment()
     {
-        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null);
-        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null);
+        var agentBudget = new BattleAgentBudget();
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null, agentBudget);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null, agentBudget);
         attacker.SetReserve(new[]
         {
             new PartyReserve("player-party", suppliedCount: 0, new[]
@@ -110,8 +114,9 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     [Fact]
     public void ExhaustedLocalParty_DoesNotOpenDeployment()
     {
-        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null);
-        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null);
+        var agentBudget = new BattleAgentBudget();
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null, agentBudget);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null, agentBudget);
         attacker.SetReserve(new[]
         {
             new PartyReserve("player-party", suppliedCount: 1, new[]
