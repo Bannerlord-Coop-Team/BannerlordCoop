@@ -1,10 +1,19 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections;
@@ -16,6 +25,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -31,6 +42,20 @@ namespace GameInterface.Services.Villages.Commands;
 public class MapEventDebugCommands
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
+    private static WoundedAlliedFixture woundedAlliedFixture;
+
+    private sealed class WoundedAlliedFixture
+    {
+        public string ControllerId;
+        public Hero PlayerHero;
+        public MobileParty PlayerParty;
+        public MapEvent MapEvent;
+        public PartyBase[] InvolvedParties;
+        public int OriginalHitPoints;
+        public float OriginalRecentEventsMorale;
+        public TroopRosterElement[] OriginalRoster;
+        public CampaignVec2 OriginalPosition;
+    }
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -43,6 +68,17 @@ public class MapEventDebugCommands
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out objectManager);
+    }
+
+    private static bool MatchesPartyId(IObjectManager objectManager, MobileParty party, string id)
+    {
+        if (party == null || string.IsNullOrEmpty(id)) return false;
+        if (party.StringId == id) return true;
+        if (objectManager.TryGetId(party, out string mobilePartyId) && mobilePartyId == id) return true;
+
+        return party.Party != null &&
+               objectManager.TryGetId(party.Party, out string partyBaseId) &&
+               partyBaseId == id;
     }
 
     /// <summary>
@@ -155,7 +191,7 @@ public class MapEventDebugCommands
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
     }
 
-    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne
+    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne [excludedPartyId]
     /// <summary>
     /// Starts a server-authoritative bandit attack encounter against a connected player.
     /// </summary>
@@ -167,45 +203,22 @@ public class MapEventDebugCommands
             return "Run this command on the server.";
         }
 
-        if (args.Count != 1)
+        if (args.Count < 1 || args.Count > 2)
         {
-            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId>";
+            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId> [excludedPartyId]";
         }
 
-        if (!TryGetObjectManager(out var objectManager))
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
         {
-            return "Unable to resolve ObjectManager";
+            return error;
         }
 
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
-        {
-            return "Unable to resolve PlayerManager";
-        }
-
-        if (!playerManager.TryGetPlayer(args[0], out var player))
-        {
-            return $"No registered player has controller id {args[0]}.";
-        }
-
-        if (!playerManager.IsConnected(player))
-        {
-            return $"Player {args[0]} is not connected.";
-        }
-
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
-        {
-            return $"Unable to resolve player party {player.MobilePartyId}.";
-        }
-
-        if (playerParty.MapEvent != null)
-        {
-            return $"Player {args[0]} is already in a map event.";
-        }
-
+        var excludedPartyId = args.Count == 2 ? args[1] : null;
         var playerPosition = playerParty.Position.ToVec2();
         var banditParty = MobileParty.All
             .Where(p => p.IsActive && p.IsBandit && p != playerParty
-                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0)
+                        && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0
+                        && !MatchesPartyId(objectManager, p, excludedPartyId))
             .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
             .FirstOrDefault();
 
@@ -219,9 +232,421 @@ public class MapEventDebugCommands
         var partyId = objectManager.TryGetId(banditParty, out string registryId)
             ? registryId
             : banditParty.StringId;
+        var partyBaseId = objectManager.TryGetId(banditParty.Party, out string partyBaseRegistryId)
+            ? partyBaseRegistryId
+            : "<unregistered>";
 
-        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, registry id {partyId}) " +
+        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, " +
+               $"registry id {partyId}, PartyBase id {partyBaseId}) " +
                $"against player {args[0]}.";
+    }
+
+    // coop.debug.mapevent.wounded_allied_fixture_start PlayerOne
+    /// <summary>Creates the wounded, troop-less player plus healthy allied force field encounter from #2097.</summary>
+    [CommandLineArgumentFunction("wounded_allied_fixture_start", "coop.debug.mapevent")]
+    public static string StartWoundedAlliedFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.wounded_allied_fixture_start <controllerId>";
+
+        if (woundedAlliedFixture != null)
+            return $"Fixture already active for {woundedAlliedFixture.ControllerId}.";
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+            return error;
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPlayer(args[0], out var player) ||
+            !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero))
+        {
+            return $"Unable to resolve player hero for {args[0]}.";
+        }
+
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+            return "Unable to resolve network.";
+
+        if (playerParty.PartyMoveMode != MoveModeType.Hold)
+            return $"Player party {playerParty.StringId} must be holding before the fixture starts.";
+
+        var playerPosition = playerParty.Position.ToVec2();
+        var banditParty = MobileParty.All
+            .Where(p => p.IsActive && p.IsBandit && p.MapEvent == null && p.CurrentSettlement == null &&
+                        p.MemberRoster.TotalHealthyCount > 0)
+            .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
+            .FirstOrDefault();
+        if (banditParty == null)
+            return "No active healthy bandit party is available.";
+
+        var alliedParty = MobileParty.All
+            .Where(p => p.IsActive && !p.IsBandit && !p.IsPlayerParty() && p != playerParty &&
+                        p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalHealthyCount > 0 &&
+                        p.MapFaction != null &&
+                        !VillageHostileFactionStanceHelper.HasWarStance(playerParty.MapFaction, p.MapFaction) &&
+                        VillageHostileFactionStanceHelper.HasWarStance(banditParty.MapFaction, p.MapFaction))
+            .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
+            .FirstOrDefault();
+        if (alliedParty == null)
+            return "No active healthy AI party is available for the allied side.";
+
+        var fixture = new WoundedAlliedFixture
+        {
+            ControllerId = args[0],
+            PlayerHero = playerHero,
+            PlayerParty = playerParty,
+            OriginalHitPoints = playerHero.HitPoints,
+            OriginalRecentEventsMorale = playerParty.RecentEventsMorale,
+            OriginalRoster = playerParty.MemberRoster.GetTroopRoster().ToArray(),
+            OriginalPosition = playerParty.Position,
+        };
+
+        try
+        {
+            playerHero.HitPoints = 1;
+            RemoveHealthyPlayerTroops(fixture);
+            playerParty.RecentEventsMorale = -1000f;
+
+            fixture.MapEvent = MapEventBattleFactory.CreateMapEvent(
+                banditParty.Party,
+                playerParty.Party,
+                default);
+            if (fixture.MapEvent == null)
+                throw new InvalidOperationException("The bandit encounter did not create a map event.");
+
+            alliedParty.Party.MapEventSide = playerParty.Party.MapEventSide;
+            fixture.InvolvedParties = fixture.MapEvent.InvolvedParties.ToArray();
+
+            if (!objectManager.TryGetId(banditParty.Party, out string banditPartyId) ||
+                !objectManager.TryGetId(playerParty.Party, out string playerPartyId) ||
+                !objectManager.TryGetId(fixture.MapEvent, out string fixtureMapEventId))
+            {
+                throw new InvalidOperationException("Unable to resolve the fixture's network ids.");
+            }
+
+            network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
+                $"debug-2097-{Guid.NewGuid():N}",
+                banditPartyId,
+                playerPartyId,
+                fixtureMapEventId));
+            woundedAlliedFixture = fixture;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to create wounded allied force fixture");
+            woundedAlliedFixture = fixture;
+            if (TryRestoreWoundedAlliedFixture(fixture, out var restoreError))
+                woundedAlliedFixture = null;
+            else
+                return $"Fixture setup failed: {e.Message}. Cleanup failed: {restoreError}. Run the restore command.";
+
+            return $"Fixture setup failed: {e.Message}";
+        }
+
+        objectManager.TryGetId(fixture.MapEvent, out string mapEventId);
+        return $"Wounded allied fixture started: controller={args[0]}, mapEvent={mapEventId}, " +
+               $"playerHealthy={playerParty.Party.NumberOfHealthyMembers}, alliedParty={alliedParty.StringId}, " +
+               $"alliedHealthy={alliedParty.Party.NumberOfHealthyMembers}, banditParty={banditParty.StringId}.";
+    }
+
+    // coop.debug.mapevent.wounded_allied_fixture_state PlayerOne
+    /// <summary>Reports the #2097 fixture state and the local patched order-attack option when applicable.</summary>
+    [CommandLineArgumentFunction("wounded_allied_fixture_state", "coop.debug.mapevent")]
+    public static string GetWoundedAlliedFixtureState(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.wounded_allied_fixture_state <controllerId>";
+
+        if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var playerParty, out var error))
+            return error;
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPlayer(args[0], out var player) ||
+            !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero))
+        {
+            return $"Unable to resolve player hero for {args[0]}.";
+        }
+
+        var mapEvent = playerParty.MapEvent;
+        var side = playerParty.Party.MapEventSide;
+        var alliedHealthy = side?.Parties
+            .Where(p => p.Party != playerParty.Party)
+            .Sum(p => p.Party.NumberOfHealthyMembers) ?? 0;
+
+        var option = "not-local";
+        if (ModInformation.IsClient && playerParty == MobileParty.MainParty && PlayerEncounter.Current != null)
+        {
+            var callbackArgs = new MenuCallbackArgs((MenuContext)null, null);
+            var shown = new EncounterGameMenuBehavior()
+                .game_menu_encounter_order_attack_on_condition(callbackArgs);
+            var renderedOption = Campaign.Current?.CurrentMenuContext?.GameMenu?.MenuOptions
+                .FirstOrDefault(menuOption => menuOption.IdString == "str_order_attack");
+            option = $"conditionShown={shown},conditionEnabled={callbackArgs.IsEnabled}," +
+                     $"leaveType={callbackArgs.optionLeaveType},renderedRegistered={renderedOption != null}," +
+                     $"renderedEnabled={renderedOption?.IsEnabled ?? false}";
+        }
+
+        objectManager.TryGetId(mapEvent, out string mapEventId);
+        return $"Wounded allied fixture state: controller={args[0]}, local={playerParty == MobileParty.MainParty}, " +
+               $"hitPoints={playerHero.HitPoints}, wounded={playerHero.IsWounded}, " +
+               $"roster={playerParty.MemberRoster.TotalManCount}, playerHealthy={playerParty.Party.NumberOfHealthyMembers}, " +
+               $"morale={playerParty.Morale:0.##}, recentEventsMorale={playerParty.RecentEventsMorale:0.##}, " +
+               $"position={playerParty.Position.X:R}|{playerParty.Position.Y:R}, moveMode={playerParty.PartyMoveMode}, " +
+               $"alliedHealthy={alliedHealthy}, mapEvent={mapEventId ?? "none"}, " +
+               $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "none"}, option={option}.";
+    }
+
+    // coop.debug.mapevent.wounded_allied_fixture_restore PlayerOne
+    /// <summary>Finalizes the #2097 fixture and restores the player's original hero, morale, and roster state.</summary>
+    [CommandLineArgumentFunction("wounded_allied_fixture_restore", "coop.debug.mapevent")]
+    public static string RestoreWoundedAlliedFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.wounded_allied_fixture_restore <controllerId>";
+
+        if (woundedAlliedFixture == null || woundedAlliedFixture.ControllerId != args[0])
+            return $"No active fixture exists for {args[0]}.";
+
+        var fixture = woundedAlliedFixture;
+        if (!TryRestoreWoundedAlliedFixture(fixture, out var error))
+            return $"Fixture restore failed: {error}. Retry the restore command.";
+
+        woundedAlliedFixture = null;
+
+        return $"Wounded allied fixture restored: controller={args[0]}, hitPoints={fixture.PlayerHero.HitPoints}, " +
+               $"roster={fixture.PlayerParty.MemberRoster.TotalManCount}.";
+    }
+
+    private static void RemoveHealthyPlayerTroops(WoundedAlliedFixture fixture)
+    {
+        var roster = fixture.PlayerParty.MemberRoster;
+        for (int i = roster.Count - 1; i >= 0; i--)
+        {
+            var element = roster.GetElementCopyAtIndex(i);
+            if (element.Character == fixture.PlayerHero.CharacterObject)
+            {
+                var woundedToAdd = element.Number - element.WoundedNumber;
+                if (woundedToAdd > 0)
+                    roster.AddToCounts(element.Character, 0, false, woundedToAdd);
+                continue;
+            }
+
+            roster.AddToCountsAtIndex(i, -element.Number, -element.WoundedNumber, 0, false);
+        }
+    }
+
+    private static void RestoreWoundedAlliedFixture(WoundedAlliedFixture fixture)
+    {
+        if (fixture.MapEvent != null)
+        {
+            if (!fixture.MapEvent.IsFinalized)
+                fixture.MapEvent.FinalizeEvent();
+
+            if (HasAttachedFixtureParties(fixture))
+                RecoverPartiallyFinalizedMapEvent(fixture);
+        }
+
+        fixture.PlayerHero.HitPoints = fixture.OriginalHitPoints;
+        fixture.PlayerParty.RecentEventsMorale = fixture.OriginalRecentEventsMorale;
+        fixture.PlayerParty.Position = fixture.OriginalPosition;
+        fixture.PlayerParty.SetMoveModeHold();
+        fixture.PlayerParty.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(MapEventDebugCommands),
+            new PartyBehaviorChangeAttempted(
+                fixture.PlayerParty,
+                forcePosition: true,
+                isCurrentlyAtSea: fixture.PlayerParty.IsCurrentlyAtSea,
+                resetMovementToHold: true));
+
+        var roster = fixture.PlayerParty.MemberRoster;
+        for (int i = roster.Count - 1; i >= 0; i--)
+        {
+            var element = roster.GetElementCopyAtIndex(i);
+            roster.AddToCountsAtIndex(i, -element.Number, -element.WoundedNumber, 0, false);
+        }
+
+        foreach (var element in fixture.OriginalRoster)
+        {
+            roster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, true);
+        }
+    }
+
+    private static bool HasAttachedFixtureParties(WoundedAlliedFixture fixture) =>
+        fixture.InvolvedParties?.Any(p => p?._mapEventSide?.MapEvent == fixture.MapEvent) == true ||
+        fixture.MapEvent.AttackerSide?.Parties.Count > 0 ||
+        fixture.MapEvent.DefenderSide?.Parties.Count > 0;
+
+    private static void RecoverPartiallyFinalizedMapEvent(WoundedAlliedFixture fixture)
+    {
+        foreach (var party in fixture.InvolvedParties ?? Array.Empty<PartyBase>())
+        {
+            if (party?._mapEventSide?.MapEvent != fixture.MapEvent) continue;
+
+            party._mapEventSide = null;
+            if (party.MobileParty != null)
+                party.MobileParty.EventPositionAdder = TaleWorlds.Library.Vec2.Zero;
+            party.SetVisualAsDirty();
+        }
+
+        fixture.MapEvent.AttackerSide?.Clear();
+        fixture.MapEvent.DefenderSide?.Clear();
+        if (HasAttachedFixtureParties(fixture))
+            throw new InvalidOperationException("The partially finalized fixture still has attached parties.");
+
+        MessageBroker.Instance.Publish(fixture.MapEvent, new MapEventFinalized(fixture.MapEvent));
+        MessageBroker.Instance.Publish(fixture.MapEvent, new InstanceDestroyed<MapEvent>(fixture.MapEvent));
+    }
+
+    private static bool TryRestoreWoundedAlliedFixture(WoundedAlliedFixture fixture, out string error)
+    {
+        try
+        {
+            RestoreWoundedAlliedFixture(fixture);
+            error = null;
+            return true;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to restore wounded allied force fixture");
+            error = e.Message;
+            return false;
+        }
+    }
+
+    [CommandLineArgumentFunction("leave_settlement", "coop.debug.mapevent")]
+    public static string LeaveSettlement(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.leave_settlement <controllerId>";
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return "Unable to resolve PlayerManager";
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+            return $"No registered player has controller id {args[0]}.";
+
+        if (!playerManager.IsConnected(player))
+            return $"Player {args[0]} is not connected.";
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+            return $"Unable to resolve player party {player.MobilePartyId}.";
+
+        var settlement = playerParty.CurrentSettlement;
+        if (settlement == null)
+            return $"Player {args[0]} is already outside a settlement.";
+
+        LeaveSettlementAction.ApplyForParty(playerParty);
+        return $"Moved player {args[0]} out of {settlement.Name}.";
+    }
+
+    [CommandLineArgumentFunction("finish_current_encounter", "coop.debug.mapevent")]
+    public static string FinishCurrentEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.finish_current_encounter";
+
+        if (PlayerEncounter.Current == null)
+            return "No active encounter.";
+
+        PlayerEncounter.Finish();
+        return "Finished the current local encounter.";
+    }
+
+    [CommandLineArgumentFunction("enter_current_battle", "coop.debug.mapevent")]
+    public static string EnterCurrentBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.enter_current_battle";
+
+        if (PlayerEncounter.Current == null)
+            return "No active encounter.";
+
+        if (PlayerEncounter.Battle == null)
+        {
+            if (PlayerEncounter.StartBattle() == null)
+                return "Unable to start the current battle.";
+
+            GameMenu.SwitchToMenu("encounter");
+        }
+
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext == null)
+            return "No active encounter menu.";
+
+        MenuHelper.EncounterAttackConsequence(new MenuCallbackArgs(menuContext, null));
+        return "Requested entry into the current battle.";
+    }
+
+    // coop.debug.mapevent.finish_player_encounter PlayerOne
+    /// <summary>
+    /// Requests the connected client's encounter close through the existing authoritative leave message.
+    /// </summary>
+    [CommandLineArgumentFunction("finish_player_encounter", "coop.debug.mapevent")]
+    public static string FinishPlayerEncounter(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.finish_player_encounter <controllerId>";
+        }
+
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+        {
+            return "Unable to resolve Network";
+        }
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+        {
+            return error;
+        }
+
+        if (!objectManager.TryGetIdWithLogging(playerParty.Party, out var partyBaseId))
+        {
+            return $"Unable to resolve PartyBase for player {args[0]}.";
+        }
+
+        network.SendAll(new NetworkPartyLeftBattle(partyBaseId));
+        return $"Requested encounter finish for player {args[0]} (PartyBase id {partyBaseId}).";
+    }
+
+    // coop.debug.mapevent.conversation_hold_state <partyBaseId>
+    /// <summary>
+    /// Reports whether the server currently holds an AI PartyBase for a conversation.
+    /// </summary>
+    [CommandLineArgumentFunction("conversation_hold_state", "coop.debug.mapevent")]
+    public static string ConversationHoldState(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Run this command on the server.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.conversation_hold_state <partyBaseId>";
+        }
+
+        var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
+        return $"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.";
     }
 
     // coop.debug.mapevent.peace_pursuit_fixture PlayerOne
@@ -617,9 +1042,9 @@ public class MapEventDebugCommands
         {
             sb.AppendLine($"\tBattle:           {FormatMapEvent(PlayerEncounter.Battle, objectManager)}");
             sb.AppendLine($"\t_mapEvent:        {FormatMapEvent(encounter._mapEvent, objectManager)}");
-            sb.AppendLine($"\tEncounteredParty: {FormatPartyBase(PlayerEncounter.EncounteredParty)}");
-            sb.AppendLine($"\t_attackerParty:   {FormatPartyBase(encounter._attackerParty)}");
-            sb.AppendLine($"\t_defenderParty:   {FormatPartyBase(encounter._defenderParty)}");
+            sb.AppendLine($"\tEncounteredParty: {FormatPartyBaseWithId(PlayerEncounter.EncounteredParty, objectManager)}");
+            sb.AppendLine($"\t_attackerParty:   {FormatPartyBaseWithId(encounter._attackerParty, objectManager)}");
+            sb.AppendLine($"\t_defenderParty:   {FormatPartyBaseWithId(encounter._defenderParty, objectManager)}");
         }
 
         var mainParty = MobileParty.MainParty;
@@ -629,7 +1054,7 @@ public class MapEventDebugCommands
         if (side == null)
             sb.AppendLine("MainParty.MapEventSide:  <null>");
         else
-            sb.AppendLine($"MainParty.MapEventSide:  leader={FormatPartyBase(side.LeaderParty)} mainPartyIsLeader={side.LeaderParty == mainParty?.Party}");
+            sb.AppendLine($"MainParty.MapEventSide:  leader={FormatPartyBaseWithId(side.LeaderParty, objectManager)} mainPartyIsLeader={side.LeaderParty == mainParty?.Party}");
 
         sb.AppendLine($"CurrentMenu:             {Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>"}");
         sb.AppendLine($"CurrentBattleSimulation: {(PlayerEncounter.CurrentBattleSimulation == null ? "<null>" : "PRESENT")}");
@@ -739,7 +1164,7 @@ public class MapEventDebugCommands
         if (mapEvent == null) return "<null>";
 
         var id = "<no id>";
-        if (objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
+        if (!mapEvent.IsFinalized && objectManager != null && objectManager.TryGetId(mapEvent, out var resolved))
             id = resolved;
 
         return $"id={id} finalized={mapEvent.IsFinalized} state={mapEvent.BattleState} winner={mapEvent.WinningSide}";
@@ -1041,6 +1466,18 @@ public class MapEventDebugCommands
         var name = party.Name?.ToString() ?? "<no name>";
 
         return name;
+    }
+
+    private static string FormatPartyBaseWithId(PartyBase party, IObjectManager objectManager)
+    {
+        if (party == null)
+            return "<null>";
+
+        var partyBaseId = objectManager != null && objectManager.TryGetId(party, out string resolvedPartyBaseId)
+            ? resolvedPartyBaseId
+            : "<unregistered>";
+
+        return $"{FormatPartyBase(party)} (PartyBase id {partyBaseId})";
     }
 
     private static string GetFriendlyTypeName(Type type)
