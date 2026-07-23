@@ -1,0 +1,24 @@
+﻿using ProtoBuf;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
+
+namespace GameInterface.Services.Heroes.Data;
+
+[ProtoContract(SkipConstructor = true)]
+public record HeroChangeNameData
+{
+    public HeroChangeNameData(Hero instance, TextObject name, TextObject firstName)
+    {
+        // TODO use object manager or autosync
+        HeroStringId = instance.StringId;
+        FullName = name.ToString();
+        FirstName = firstName.ToString();
+    }
+
+    [ProtoMember(1)]
+    public string HeroStringId { get; }
+    [ProtoMember(2)]
+    public string FullName { get; }
+    [ProtoMember(3)]
+    public string FirstName { get; }
+}

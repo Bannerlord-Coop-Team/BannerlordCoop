@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Module>
+    <Name value="Coop"/>
+    <Id value="Coop"/>
+    <Version value="${version}"/>
+    <SingleplayerModule value="true"/>
+    <MultiplayerModule value="false"/>
+    <DependedModules>
+        <DependedModule Id="Native" DependentVersion="${game_version}"/>
+        <DependedModule Id="SandBoxCore" DependentVersion="${game_version}"/>
+        <DependedModule Id="Sandbox" DependentVersion="${game_version}"/>
+        <DependedModule Id="CustomBattle" DependentVersion="${game_version}"/>
+        <DependedModule Id="StoryMode" DependentVersion="${game_version}"/>
+    </DependedModules>
+    <SubModules>
+        <SubModule>
+            <Name value="Coop"/>
+            <DLLName value="Coop.dll"/>
+            <SubModuleClassType value="Coop.${main_class}"/>
+            <Tags>
+                <Tag key="DedicatedServerType" value="none" />
+                <Tag key="IsNoRenderModeElement" value="false" />
+            </Tags>
+        </SubModule>
+    </SubModules>
+    <Xmls>
+        <XmlNode>
+            <XmlName id="Items" path="tournament_spectator_throwables" />
+            <IncludedGameTypes>
+                <GameType value="Campaign" />
+                <GameType value="CampaignStoryMode" />
+                <GameType value="CustomGame" />
+                <GameType value="EditorGame" />
+            </IncludedGameTypes>
+        </XmlNode>
+    </Xmls>
+</Module>

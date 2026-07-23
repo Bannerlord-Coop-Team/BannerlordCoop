@@ -1,0 +1,30 @@
+﻿using Common.Messaging;
+using Common.Network;
+using Common.Network.Coalescing;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
+using Serilog;
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using GameInterface.AutoSync;
+using Common.Logging;
+using Common.Util;
+using HarmonyLib;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace AutoSync;
+
+public class {{DeclaringTypeName}}_Handler : GenericHandler<{{DeclaringTypeName}}_Handler, {{DeclaringType}}>
+{
+    private readonly static ILogger Logger = LogManager.GetLogger<{{DeclaringTypeName}}_Handler>();
+
+    public {{DeclaringTypeName}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, AutoSyncRegistry AutoSyncRegistry, ISendCoalescer sendCoalescer) : base(messageBroker, objectManager, network)
+    {
+        {{~ for subscription in Subscriptions ~}}
+        {{ subscription }}
+        {{~ end ~}}
+    }
+}

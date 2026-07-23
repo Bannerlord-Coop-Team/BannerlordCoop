@@ -1,0 +1,302 @@
+﻿using Autofac;
+using Common;
+using GameInterface.CoopSessionData;
+using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.ObjectManager;
+using System.Collections.Generic;
+using System.Text;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Localization;
+using TaleWorlds.SaveSystem;
+using static TaleWorlds.Library.CommandLineFunctionality;
+
+namespace GameInterface.Services.Workshops.Commands
+{
+    public class WorkshopDebugCommand
+    {
+        private static bool TryGetObjectManager(out IObjectManager objectManager)
+        {
+            objectManager = null;
+            if (ContainerProvider.TryGetContainer(out var container) == false) return false;
+
+            return container.TryResolve(out objectManager);
+        }
+
+        public static Workshop GetWorkshopBySettlementAndType(Settlement settlement, WorkshopType workshopType)
+        {
+            foreach (var workshop in settlement.Town.Workshops)
+            {
+                if (workshop.WorkshopType == workshopType)
+                {
+                    return workshop;
+                }
+            }
+            return null;
+        }
+
+        internal static Hero ResolveHero(string heroId, IObjectManager objectManager)
+        {
+            if (objectManager.TryGetObject<Hero>(heroId, out var registeredHero))
+            {
+                return registeredHero;
+            }
+
+            return Hero.FindFirst(hero => hero.StringId == heroId || hero.Name?.ToString() == heroId);
+        }
+
+        internal static void ApplyOwnerChange(Workshop workshop, Hero newOwner)
+        {
+            ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(
+                workshop,
+                newOwner,
+                workshop.WorkshopType,
+                1000,
+                0);
+        }
+
+        [CommandLineArgumentFunction("set_workshop_custom_name", "coop.debug.workshop")]
+        public static string SetWorkshopCustomName(List<string> args)
+        {
+            if (args.Count != 3)
+            {
+                return "Usage: coop.debug.workshop.set_custom_name <settlementName> <workshopType> <newCustomName>";
+            }
+
+            string settlementName = args[0];
+            string workshopType = args[1];
+            string newCustomName = args[2];
+
+            Settlement settlement = Settlement.Find(settlementName);
+            if (settlement == null)
+            {
+                return $"Settlement with name: '{settlementName}' not found";
+            }
+
+            WorkshopType type = WorkshopType.Find(workshopType); // Ensure this method or logic to find WorkshopType exists
+            if (type == null)
+            {
+                return $"Workshop type: '{workshopType}' not found";
+            }
+
+            Workshop workshop = GetWorkshopBySettlementAndType(settlement, type);
+            if (workshop == null)
+            {
+                return $"Workshop of type '{workshopType}' not found in settlement '{settlementName}'";
+            }
+
+            // Change the custom name
+            workshop.SetCustomName(new TextObject(value: newCustomName));
+
+            return $"Workshop custom name has been changed to: {workshop._customName}";
+        }
+
+        [CommandLineArgumentFunction("set_workshop_owner", "coop.debug.workshop")]
+        public static string SetWorkshopOwner(List<string> args)
+        {
+            // Expect three arguments: settlement name, workshop type, and new owner (hero ID or name)
+            if (args.Count != 3)
+            {
+                return "Usage: coop.debug.workshop.set_workshop_owner <settlementName> <workshopType> <newOwnerId>";
+            }
+
+            string settlementName = args[0];
+            string workshopType = args[1];
+            string newOwnerId = args[2];
+
+            // Find the settlement
+            Settlement settlement = Settlement.Find(settlementName);
+            if (settlement == null)
+            {
+                return $"Settlement with name: '{settlementName}' not found";
+            }
+
+            // Find the workshop type (ensure the workshop type is valid)
+            WorkshopType type = WorkshopType.Find(workshopType); // Ensure this method exists in your codebase or mod
+            if (type == null)
+            {
+                return $"Workshop type: '{workshopType}' not found";
+            }
+
+            // Find the workshop by settlement and type
+            Workshop workshop = GetWorkshopBySettlementAndType(settlement, type);
+            if (workshop == null)
+            {
+                return $"Workshop of type '{workshopType}' not found in settlement '{settlementName}'";
+            }
+
+            // Find the new owner (Hero) by ID or name
+            if (!TryGetObjectManager(out var objectManager))
+            {
+                return "Unable to resolve ObjectManager";
+            }
+
+            Hero newOwner = ResolveHero(newOwnerId, objectManager);
+            if (newOwner == null)
+            {
+                return $"Hero with ID or Name: '{newOwnerId}' not found (use the registry id from coop.debug.alley.my_hero_id on the owning client)";
+            }
+
+            // Use the same action path as normal workshop purchases so ownership-dependent
+            // campaign behavior and client warehouse data are updated too.
+            ApplyOwnerChange(workshop, newOwner);
+
+            return $"Workshop owner has been changed to: {newOwner.Name} with the type {workshop.WorkshopType} and with a capital of {workshop.Capital}";
+        }
+
+        /// <summary>
+        /// View workshop owners in a settlement
+        /// </summary>
+        [CommandLineArgumentFunction("owners_in_settlement", "coop.debug.workshop")]
+        public static string OwnersInSettlementCommand(List<string> strings)
+        {
+            if (strings.Count == 0) return "Usage: coop.debug.workshop.owners_in_settlement <settlementId>";
+
+            StringBuilder stringBuilder = new StringBuilder();
+            Settlement settlement = Settlement.Find(strings[0]);
+            if (settlement == null)
+            {
+                return $"Settlement with id: '{strings[0]}' not found";
+            }
+
+            stringBuilder.AppendLine($"{settlement.Name}");
+            foreach (var workshop in settlement.Town.Workshops)
+            {
+                stringBuilder.AppendLine($"{workshop.Name}: {workshop.Owner.Name} ({workshop.Owner.StringId})");
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return result;
+            }
+            return "No workshop owners were found";
+        }
+
+        /// <summary>
+        /// View workshops a hero owns
+        /// </summary>
+        [CommandLineArgumentFunction("hero_owned_workshops", "coop.debug.workshop")]
+        public static string HeroOwnedWorkshopsCommand(List<string> strings)
+        {
+            if (strings.Count == 0) return "Usage: coop.debug.workshop.hero_owned_workshops <heroId>";
+
+            StringBuilder stringBuilder = new StringBuilder();
+            Hero hero = Hero.Find(strings[0]);
+            if (hero == null)
+            {
+                return $"Hero with id: '{strings[0]}' not found";
+            }
+
+            stringBuilder.AppendLine($"{hero.Name}");
+            foreach (var workshop in hero.OwnedWorkshops)
+            {
+                stringBuilder.AppendLine($"{workshop.Name} ({workshop.Settlement.Name})");
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return result;
+            }
+            return "No owned workshops were found";
+        }
+
+        /// <summary>
+        /// View warehouse rosters for all players on server and for current player on client
+        /// </summary>
+        [CommandLineArgumentFunction("view_warehouse_rosters", "coop.debug.workshop")]
+        public static string ViewWarehouseRostersCommand(List<string> strings)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            if (ModInformation.IsServer)
+            {
+                if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
+
+                foreach (var playerWarehouseData in coopSessionProvider.CoopSession.WorkshopPlayerData.PlayerWarehouseRosterPerSettlement)
+                {
+                    if (playerWarehouseData.Key == null || playerWarehouseData.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{playerWarehouseData.Key}");
+                    foreach (var warehouseData in playerWarehouseData.Value)
+                    {
+                        if (warehouseData.Key == null || warehouseData.Value == null) continue;
+
+                        stringBuilder.AppendLine($"{warehouseData.Key}");
+                        foreach (var item in warehouseData.Value)
+                        {
+                            if (item.ItemObjectData.ItemObjectId == null) continue;
+                            stringBuilder.AppendLine($"{item.ItemObjectData.ItemObjectId} ({item.Amount})");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                stringBuilder.AppendLine($"{Hero.MainHero.Name}");
+                foreach (var warehouseRoster in Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>()._warehouseRosterPerSettlement)
+                {
+                    if (warehouseRoster.Key == null || warehouseRoster.Value == null) continue;
+
+                    stringBuilder.AppendLine($"{warehouseRoster.Key.Name}");
+                    foreach (var item in warehouseRoster.Value)
+                    {
+                        stringBuilder.AppendLine($"{item.EquipmentElement.Item.Name} ({item.Amount})");
+                    }
+                } 
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return result;
+            }
+            return "Failed to retrieve warehouse rosters";
+        }
+
+        /// <summary>
+        /// View information about workshops in a settlement
+        /// </summary>
+        [CommandLineArgumentFunction("workshop_info", "coop.debug.workshop")]
+        public static string ViewWorkshopInfoCommand(List<string> strings)
+        {
+            if (strings.Count == 0) return "Usage: coop.debug.workshop.workshop_info <settlementId>";
+
+            StringBuilder stringBuilder = new StringBuilder();
+            Settlement settlement = Settlement.Find(strings[0]);
+            if (settlement == null)
+            {
+                return $"Settlement with id: '{strings[0]}' not found";
+            }
+
+            stringBuilder.AppendLine($"{settlement.Name}");
+            foreach (var workshop in settlement.Town.Workshops)
+            {
+                stringBuilder.AppendLine($"Name: {workshop.Name}");
+                stringBuilder.AppendLine($"Owner: {workshop.Owner.StringId} ({workshop.Owner.Name})");
+                stringBuilder.AppendLine($"Type: {workshop.WorkshopType}");
+
+                var workshopData = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>().GetDataOfWorkshop(workshop);
+                if (workshopData == null)
+                {
+                    stringBuilder.AppendLine($"{workshop.Name} had no workshop data.");
+                    continue;
+                }
+                stringBuilder.AppendLine($"WorkshopData:");
+                stringBuilder.AppendLine($"IsGettingInputsFromWarehouse: {workshopData.IsGettingInputsFromWarehouse}");
+                stringBuilder.AppendLine($"ProductionProgressForWarehouse: {workshopData.ProductionProgressForWarehouse}");
+                stringBuilder.AppendLine($"ProductionProgressForTown: {workshopData.ProductionProgressForTown}");
+                stringBuilder.AppendLine($"StockProductionInWarehouseRatio: {workshopData.StockProductionInWarehouseRatio}");
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return result;
+            }
+            return "No workshop owners were found";
+        }
+    }
+}

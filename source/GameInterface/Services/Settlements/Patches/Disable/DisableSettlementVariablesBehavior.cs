@@ -1,0 +1,13 @@
+﻿using Common;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+
+namespace GameInterface.Services.Settlements.Patches.Disable;
+
+
+[HarmonyPatch(typeof(SettlementVariablesBehavior))]
+internal class DisableSettlementVariablesBehavior
+{
+    [HarmonyPatch(nameof(SettlementVariablesBehavior.RegisterEvents))]
+    static bool Prefix() => ModInformation.IsServer;
+}

@@ -1,0 +1,64 @@
+﻿using Autofac;
+using Common.Serialization;
+using GameInterface.Serialization;
+using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using TaleWorlds.CampaignSystem;
+using Xunit;
+
+namespace GameInterface.Tests.Serialization.SerializerTests
+{
+    public class CampaignTimeSerializationTest
+    {
+        IContainer container;
+        public CampaignTimeSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
+        [Fact]
+        public void CampaignTime_Serialize()
+        {
+            CampaignTime CampaignTime = new CampaignTime();
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            CampaignTimeBinaryPackage package = new CampaignTimeBinaryPackage(CampaignTime, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+
+            Assert.NotEmpty(bytes);
+        }
+
+        [Fact]
+        public void CampaignTime_Full_Serialization()
+        {
+            CampaignTime CampaignTime = new CampaignTime(1111);
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            CampaignTimeBinaryPackage package = new CampaignTimeBinaryPackage(CampaignTime, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+
+            Assert.NotEmpty(bytes);
+
+            object obj = BinaryPackageSerializer.Deserialize(bytes);
+
+            Assert.IsType<CampaignTimeBinaryPackage>(obj);
+
+            CampaignTimeBinaryPackage returnedPackage = (CampaignTimeBinaryPackage)obj;
+
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CampaignTime newCampaignTime = returnedPackage.Unpack<CampaignTime>(deserializeFactory);
+
+            Assert.Equal(CampaignTime.NumTicks, newCampaignTime.NumTicks);
+        }
+    }
+}

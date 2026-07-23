@@ -1,0 +1,24 @@
+﻿using System;
+using TaleWorlds.Core;
+
+namespace GameInterface.Serialization.External
+{
+    [Serializable]
+    public class ItemCategoryBinaryPackage : BinaryPackageBase<ItemCategory>
+    {
+        public string stringId;
+
+        public ItemCategoryBinaryPackage(ItemCategory obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        {
+
+        }
+        protected override void PackInternal()
+        {
+            stringId = ResolveId(Object);
+        }
+        protected override void UnpackInternal()
+        {
+            Object = ResolveObject<ItemCategory>(stringId);
+        }
+    }
+}

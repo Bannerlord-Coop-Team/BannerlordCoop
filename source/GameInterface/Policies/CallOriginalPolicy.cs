@@ -1,0 +1,26 @@
+﻿using Common.Logging;
+using Common.Util;
+using Serilog;
+
+namespace GameInterface.Policies;
+
+public class CallOriginalPolicy
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<CallOriginalPolicy>();
+
+    public static bool IsOriginalAllowed()
+    {
+        // While using allowed thread, allow original call
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+
+        if (ContainerProvider.TryResolve<ISyncPolicy>(out var syncPolicy) == false)
+        {
+            Logger.Error("Unable to resolve {name}", nameof(ISyncPolicy));
+            return true;
+        }
+
+        if (syncPolicy.AllowOriginal()) return true;
+
+        return false;
+    }
+}

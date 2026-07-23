@@ -1,43 +1,34 @@
 # Bannerlord Coop
-Mod to enjoy the Mount & Blade II: Bannerlord campaign with other players.
 
-## Current state
-Very early in development. There's is absolutely no gameplay so far. [Video created on commit d86c24c](https://youtu.be/Y_htoMXQGqU).
+## Summary
 
-Implemented:
-- Establish a network connection between 2 game instances.
-- Send the initial world state from host to client.
-- Load the initial world state on client.
-- Sync of time control (pause, play, fastforward) & main party movement (move to position only).
+***The Bannerlord Coop mod is not playable in its current state. We will make an announcement in Discord/Reddit when we're ready for the community to begin bug hunting.***
 
-Next:
-- Streamline harmony patches
-- Evaluate feasibility of running all clients in lock step with synced RNG. It would require a lot less hooks into the currently very unstable game DLLs, but might end up in desync hell.
-- Evaluate feasibility of a headless server (run only the game simulation, patch out everything else).
+Mod to enjoy the original Mount & Blade II: Bannerlord campaign with other players. Our intent is to keep true to the original code as much as possible.
 
-## How to build & deploy
-1. Set the path to your Bannerlord modules folder in `config.json`.
-2. Open the `Coop.sln` in Visual Studio.
-3. Build.
-4. If everything was successful, your Bannerlord mod folder now contains the Coop mod. Enable it through the launcher or launch directly from Visual Studio.
+## Social Links
+[Discord](https://discord.gg/VXqGyT8)
 
-## How to host a coop game
-1. Start the game with the Coop mod enabled.
-2. Load any save game.
-3. Open the console using the hotkey `` Ctrl + ` ``.
-4. Execute the command `coop.start_local_server`.
-5. `coop.info` will print some debug information about the server.
-The game is now running a local coop server and is connected to it with a local client. Additional players can now join.
+[Reddit](https://www.reddit.com/r/BannerlordCoop/)
 
-## How to join a coop game
-1. Start the game with the Coop mod enabled.``
-2. Open the console using the hotkey `` Ctrl + ` ``.
-3. Execute the command `coop.connect_to 127.0.0.1 4201`. 
-4. The client connect to server, download a save game and load it locally. It takes quite a long time until a loading screen pops up (~30s).
-Only works in LAN, never tested it in WAN.
+## Current State
+***There is absolutely no gameplay so far***.
 
-## Contributing
-If anyone is interested in contributing to this project, please feel free to open an issue and request additional documentation & information. Until then i'm treating this as a personal project and will not actively communicate any issues, TODOs or design decisions.
+Very early in development.  [Video created on commit d86c24c](https://youtu.be/Y_htoMXQGqU).
+
+# Contributing
+
+Get started [here!](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Getting-Started-as-a-Contributor) Also join our [Discord](https://discord.gg/VXqGyT8) for direct questions and collaboration.
+
+By submitting a contribution to BannerlordCoop, you agree that your contribution
+may be used, modified, distributed, sublicensed, and relicensed by the
+BannerlordCoop project maintainers as part of the BannerlordCoop project.
+
+You also confirm that you have the right to submit the contribution and that it
+does not knowingly include code copied from another project without permission.
+
+## FAQ
+Please read through [the #faq channel in our discord server](https://discord.gg/VXqGyT8).
 
 ## Acknowledgments
 - Zetrith for [Multiplayer](https://github.com/Zetrith/Multiplayer).

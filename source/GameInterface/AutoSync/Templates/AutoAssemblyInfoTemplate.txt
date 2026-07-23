@@ -1,0 +1,21 @@
+﻿using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+{{~ for assm in Assemblies ~}}
+[assembly: System.Runtime.CompilerServices.IgnoresAccessChecksTo("{{ assm }}")]
+{{~ end ~}}
+
+[assembly: InternalsVisibleTo("GameInterface")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+namespace System.Runtime.CompilerServices
+{
+    [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+    internal sealed class IgnoresAccessChecksToAttribute : Attribute
+    {
+        internal IgnoresAccessChecksToAttribute(string assemblyName)
+        {
+        }
+    }
+}

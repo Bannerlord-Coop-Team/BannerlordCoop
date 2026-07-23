@@ -1,0 +1,63 @@
+﻿using Common.Messaging;
+using Helpers;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+
+namespace GameInterface.Services.Inventory.Messages;
+
+public readonly struct TradeAttempted : IEvent
+{
+    public readonly ItemRoster FromRoster;
+    public readonly ItemRoster ToRoster;
+    public readonly bool IsTrading;
+    public readonly bool CanGainXpFromDiscarding;
+    public readonly InventoryScreenHelper.InventoryMode InventoryMode;
+    public readonly Hero Hero;
+    public readonly CharacterObject InitialCharacterEquipment;
+    public readonly int TotalAmount;
+    public readonly int MerchantGold;
+    public readonly MobileParty OwnerParty;
+    public readonly MobileParty CurrentMobileParty;
+    public readonly SettlementComponent CurrentSettlementComponent;
+    public readonly List<(ItemRosterElement, int)> BoughtItems;
+    public readonly List<(ItemRosterElement, int)> SoldItems;
+    public readonly TroopRoster TroopRoster;
+
+    public TradeAttempted(
+        ItemRoster fromRoster,
+        ItemRoster toRoster,
+        bool isTrading,
+        bool canGainXpFromDiscarding,
+        InventoryScreenHelper.InventoryMode inventoryMode,
+        Hero hero,
+        CharacterObject initialCharacterEquipment,
+    int totalAmount,
+        int merchantGold,
+        MobileParty ownerParty,
+        MobileParty currentMobileParty,
+        SettlementComponent currentSettlementComponent,
+        List<(ItemRosterElement, int)> boughtItems,
+        List<(ItemRosterElement, int)> soldItems,
+        TroopRoster troopRoster)
+    {
+        FromRoster = fromRoster;
+        ToRoster = toRoster;
+        IsTrading = isTrading;
+        CanGainXpFromDiscarding = canGainXpFromDiscarding;
+        InventoryMode = inventoryMode;
+        Hero = hero;
+        InitialCharacterEquipment = initialCharacterEquipment;
+        TotalAmount = totalAmount;
+        MerchantGold = merchantGold;
+        OwnerParty = ownerParty;
+        CurrentMobileParty = currentMobileParty;
+        CurrentSettlementComponent = currentSettlementComponent;
+        BoughtItems = boughtItems;
+        SoldItems = soldItems;
+        TroopRoster = troopRoster;
+    }
+}

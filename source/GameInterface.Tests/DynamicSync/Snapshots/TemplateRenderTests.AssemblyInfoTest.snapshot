@@ -1,0 +1,23 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+[assembly: IgnoresAccessChecksTo("Assembly1")]
+[assembly: IgnoresAccessChecksTo("Assembly2")]
+
+
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+namespace System.Runtime.CompilerServices
+{
+    [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+    public class IgnoresAccessChecksToAttribute : Attribute
+    {
+        public IgnoresAccessChecksToAttribute(string assemblyName)
+        {
+            AssemblyName = assemblyName;
+        }
+
+        public string AssemblyName { get; }
+    }
+}

@@ -1,0 +1,48 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Policies;
+using GameInterface.Services.Settlements.Messages;
+using HarmonyLib;
+using Serilog;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace GameInterface.Services.Settlements.Patches
+{
+    /// <summary>
+    /// Patch for <see cref="SettlementComponent.Gold"/>
+    /// </summary>
+    [HarmonyPatch(typeof(SettlementComponent))]
+    public static class GoldSettlementComponentPatch
+    {
+        private static ILogger Logger = LogManager.GetLogger<SettlementComponent>();
+        [HarmonyPatch(nameof(SettlementComponent.Gold), MethodType.Setter)]
+        public static bool Prefix(SettlementComponent __instance, int value)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client created managed {name}", typeof(SettlementComponent));
+                return false;
+            }
+
+            var message = new SettlementComponentGoldChanged(__instance, value);
+
+            MessageBroker.Instance.Publish(__instance, message);
+            return true;
+        }
+
+        internal static void RunSettlementComponentGoldChanged(SettlementComponent settlementComp, int gold)
+        {
+            GameThread.Run(() =>
+            {
+                using (new AllowedThread())
+                {
+                    settlementComp.Gold = gold;
+                }
+            });
+        }
+    }
+}

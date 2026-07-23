@@ -1,0 +1,18 @@
+﻿using Common.Messaging;
+
+namespace GameInterface.Services.Settlements.Messages;
+
+/// <summary>
+/// Change Garrison Wage Limit once approved by server
+/// </summary>
+public record ChangeSettlementGarrisonWagePaymentLimit : ICommand
+{
+    public string SettlementId { get; }
+    public int GarrisonWagePaymentLimit { get; }
+
+    public ChangeSettlementGarrisonWagePaymentLimit(string settlementId, int garrisonWagePaymentLimit)
+    {
+        SettlementId = settlementId;
+        GarrisonWagePaymentLimit = garrisonWagePaymentLimit;
+    }
+}

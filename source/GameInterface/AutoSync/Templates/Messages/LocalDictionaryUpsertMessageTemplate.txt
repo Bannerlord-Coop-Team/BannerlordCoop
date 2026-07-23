@@ -1,0 +1,16 @@
+using GameInterface.Utils.LocalEvents;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace AutoSync
+{
+    // Published by both the Add and the indexer set intercepts - the two operations converge to an
+    // upsert on the receiving side.
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertLocalMessage : GenericPairEvent<{{ MemberDeclaringType }}, {{ KeyType }}, {{ ValueType }}>
+    {
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_UpsertLocalMessage({{ MemberDeclaringType }} instance, {{ KeyType }} key, {{ ValueType }} value) : base(instance, key, value)
+        {
+        }
+    }
+}

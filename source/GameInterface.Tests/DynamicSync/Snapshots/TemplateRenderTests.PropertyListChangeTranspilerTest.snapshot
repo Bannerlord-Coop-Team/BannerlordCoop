@@ -1,0 +1,2 @@
+        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> TestPropertyListChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListPropertyChangeTranspiler<float, AddListPropertyMessage, RemoveListPropertyMessage>(instructions, "TestPropertyList");

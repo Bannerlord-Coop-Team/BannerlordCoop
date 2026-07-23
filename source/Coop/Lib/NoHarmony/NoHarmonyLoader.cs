@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.IO;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
-namespace NoHarmony
+namespace Coop.Lib.NoHarmony
 {
     public abstract class NoHarmonyLoader : MBSubModuleBase
     {
@@ -74,21 +74,24 @@ namespace NoHarmony
         protected override void OnSubModuleLoad()
         {
             base.OnSubModuleLoad();
-            NoHarmonyInit();
-            if (UseConfFile)
+            var myLock = new object();
+            lock (myLock)
             {
-                LoadConf();
-            }
+                NoHarmonyInit();
+                if (UseConfFile)
+                {
+                    LoadConf();
+                }
 
-            Log(LogLvl.Info, "NoHarmony initilized successfully.");
-            NoHarmonyLoad();
-            Log(
-                LogLvl.Info,
-                "Pending tasks : " +
-                ModelDelegates.Count +
-                " models, " +
-                BehaviorDelegates.Count +
-                " behaviors.");
+                Log(LogLvl.Info, "NoHarmony initialized successfully.");
+                NoHarmonyLoad();
+                Log(LogLvl.Info,
+                    "Pending tasks : " +
+                    ModelDelegates.Count +
+                    " models, " +
+                    BehaviorDelegates.Count +
+                    " behaviors.");
+            }
         }
 
         /// <summary>
@@ -298,11 +301,11 @@ namespace NoHarmony
             where AddType : CampaignBehaviorBase, new()
         {
             CampaignBehaviorManager cbm =
-                (CampaignBehaviorManager) campaign.CampaignBehaviorManager;
+                (CampaignBehaviorManager)campaign.CampaignBehaviorManager;
             if (mode != TaskMode.Add)
             {
                 RemoveType cgb = campaign.GetCampaignBehavior<RemoveType>();
-                CampaignEvents.RemoveListeners(cgb);
+                CampaignEventDispatcher.Instance.RemoveListeners(cgb);
                 cbm.RemoveBehavior<RemoveType>();
             }
 
@@ -341,11 +344,14 @@ namespace NoHarmony
                     message = "[Track] " + message;
                     break;
             }
-
-            using (StreamWriter sw = new StreamWriter(LogFile, true))
+            try
             {
-                sw.WriteLine(DateTime.Now.ToString(LogDateFormat) + " > " + message);
+                using (StreamWriter sw = new StreamWriter(LogFile, true))
+                {
+                    sw.WriteLine(DateTime.Now.ToString(LogDateFormat) + " > " + message);
+                }
             }
+            catch (IOException) { }
         }
 
         public void LoadConf()

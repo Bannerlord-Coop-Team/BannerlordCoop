@@ -1,0 +1,76 @@
+﻿using Common.Logging;
+using HarmonyLib;
+using SandBox.View.Map.Managers;
+using Serilog;
+using System;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+
+namespace GameInterface.Services.PartyVisuals.Patches
+{
+    [HarmonyPatch(typeof(MobilePartyVisualManager))]
+    public class MobilePartyVisualManagerPatches
+    {
+        private static ILogger Logger = LogManager.GetLogger<MobilePartyVisualManagerPatches>();
+
+        [HarmonyPatch(nameof(MobilePartyVisualManager.OnTick))]
+        [HarmonyPrefix]
+        private static bool Prefix(MobilePartyVisualManager __instance, float realDt, float dt)
+        {
+            if (Mission.Current != null) return false;
+
+            __instance._dirtyPartyVisualCount = -1;
+            TWParallel.For(0, __instance._visualsFlattened.Count, delegate (int startInclusive, int endExclusive)
+            {
+                for (int i = startInclusive; i < endExclusive; i++)
+                {
+                    if (i >= __instance._visualsFlattened.Count)
+                    {
+                        Logger.Warning("Index {index} was out of bounds for visuals flattened list of size {size}", i, __instance._visualsFlattened.Count);
+                        continue;
+                    }
+
+                    // Skip a visual whose party has been removed (IsActive == false) or unhooked: its native
+                    // scene entity is already freed, so the native Tick below throws AccessViolationException —
+                    // a corrupted-state exception the try/catch cannot catch, so it hard-crashes the game.
+                    var visual = __instance._visualsFlattened[i];
+                    var party = visual?.MapEntity?.MobileParty;  
+                    if (party == null || !party.IsActive)
+                        continue;
+
+                    try
+                    {
+                        visual.Tick(dt, realDt, ref __instance._dirtyPartyVisualCount, ref __instance._dirtyPartiesList);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex, "Failed to tick party visual");
+                    }
+                }
+            });
+            for (int num = 0; num < __instance._dirtyPartyVisualCount + 1; num++)
+            {
+                try
+                {
+                    __instance._dirtyPartiesList[num].ValidateIsDirty();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to validate is party visual dirty");
+                }
+            }
+            for (int num2 = __instance._fadingPartiesFlatten.Count - 1; num2 >= 0; num2--)
+            {
+                try {
+                    __instance._fadingPartiesFlatten[num2].TickFadingState(realDt, dt);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to tick fading state");
+                }
+            }
+
+            return false;
+        }
+    }
+}

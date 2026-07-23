@@ -1,0 +1,232 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{BE74C4D9-6541-4043-8745-8ED1F030802C}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>MissionTestMod</RootNamespace>
+    <AssemblyName>MissionTestMod</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <Version>0.0.0</Version>
+    <AssemblyVersion>0.0.*</AssemblyVersion>
+    <Deterministic>false</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject />
+  </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony, Version=2.4.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Lib.Harmony.2.4.2\lib\net472\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="Autofac, Version=8.2.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.8.2.0\lib\netstandard2.0\Autofac.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.8.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil, Version=0.11.4.0, Culture=neutral, PublicKeyToken=50cebf1cceb9d05e, processorArchitecture=MSIL">
+      <HintPath>..\packages\Mono.Cecil.0.11.4\lib\net40\Mono.Cecil.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Mdb, Version=0.11.4.0, Culture=neutral, PublicKeyToken=50cebf1cceb9d05e, processorArchitecture=MSIL">
+      <HintPath>..\packages\Mono.Cecil.0.11.4\lib\net40\Mono.Cecil.Mdb.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Pdb, Version=0.11.4.0, Culture=neutral, PublicKeyToken=50cebf1cceb9d05e, processorArchitecture=MSIL">
+      <HintPath>..\packages\Mono.Cecil.0.11.4\lib\net40\Mono.Cecil.Pdb.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Rocks, Version=0.11.4.0, Culture=neutral, PublicKeyToken=50cebf1cceb9d05e, processorArchitecture=MSIL">
+      <HintPath>..\packages\Mono.Cecil.0.11.4\lib\net40\Mono.Cecil.Rocks.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoMod.RuntimeDetour, Version=22.7.31.1, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MonoMod.RuntimeDetour.22.7.31.1\lib\net452\MonoMod.RuntimeDetour.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoMod.Utils, Version=22.7.31.1, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MonoMod.Utils.22.7.31.1\lib\net452\MonoMod.Utils.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.3.2.26\lib\net462\protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net.Core, Version=3.0.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\packages\protobuf-net.Core.3.2.26\lib\net462\protobuf-net.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox.ViewModelCollection, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog, Version=4.2.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.4.2.0\lib\net471\Serilog.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog.Enrichers.Process, Version=3.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.Enrichers.Process.3.0.0\lib\net471\Serilog.Enrichers.Process.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog.Sinks.Debug, Version=3.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.Sinks.Debug.3.0.0\lib\net471\Serilog.Sinks.Debug.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog.Sinks.File, Version=6.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.Sinks.File.6.0.0\lib\net471\Serilog.Sinks.File.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable, Version=7.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.7.0.0\lib\net462\System.Collections.Immutable.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=8.0.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.8.0.1\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.0.0\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Channels, Version=8.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Channels.8.0.0\lib\net462\System.Threading.Channels.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+    <Reference Include="TaleWorlds.CampaignSystem, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Core, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.DotNet">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Engine, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Engine.GauntletUI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.GauntletUI.Data, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+    <Reference Include="TaleWorlds.InputSystem, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+    <Reference Include="TaleWorlds.Library, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Localization, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ModuleManager, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View">
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ObjectSystem, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
+    <Reference Include="TaleWorlds.PSAI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PSAI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.SaveSystem, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ScreenSystem, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.TwoDimension, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AssemblyHellscape.cs" />
+    <Compile Include="GameManagers\ArenaTestGameManager.cs" />
+    <Compile Include="GameManagers\BattlesTestGameManager.cs" />
+    <Compile Include="GameManagers\IMissionGameManager.cs" />
+    <Compile Include="GameManagers\TavernsGameManager.cs" />
+    <Compile Include="TestMod.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{3DE1F959-54AB-435F-BDE4-A8132BA18E6E}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\GameInterface\GameInterface.csproj">
+      <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
+      <Name>GameInterface</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Missions\Missions.csproj">
+      <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
+      <Name>Missions</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Deploy module into the Bannerlord install (mb2 junction). See Deploy.targets. -->
+  <PropertyGroup>
+    <ModName>MissionTestMod</ModName>
+    <MainClass>TestMod</MainClass>
+    <ModVersion>v0.0.1</ModVersion>
+    <GameVersion>v1.3.12</GameVersion>
+  </PropertyGroup>
+  <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />
+</Project>

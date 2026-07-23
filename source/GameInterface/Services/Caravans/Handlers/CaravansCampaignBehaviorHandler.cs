@@ -1,0 +1,324 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.Caravans.Data;
+using GameInterface.Services.Caravans.Interfaces;
+using GameInterface.Services.Caravans.Messages;
+using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.ObjectManager;
+using static GameInterface.Services.ObjectManager.ObjectManager;
+using Serilog;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace GameInterface.Services.Caravans.Handlers;
+
+internal class CaravansCampaignBehaviorHandler : IHandler
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<CaravansCampaignBehaviorHandler>();
+
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+    private readonly ISessionCaravansPlayerDataInterface sessionCaravansPlayerDataInterface;
+    private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+
+    public CaravansCampaignBehaviorHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network,
+        ISessionCaravansPlayerDataInterface sessionCaravansPlayerDataInterface,
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+    {
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        this.network = network;
+        this.sessionCaravansPlayerDataInterface = sessionCaravansPlayerDataInterface;
+        this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        messageBroker.Subscribe<CaravansKingdomDestroyed>(Handle_CaravansKingdomDestroyed);
+        messageBroker.Subscribe<NetworkCaravansKingdomDestroyed>(Handle_NetworkCaravansKingdomDestroyed);
+
+        messageBroker.Subscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
+        messageBroker.Subscribe<NetworkCaravanPartyDestroyed>(Handle_NetworkCaravanPartyDestroyed);
+
+        messageBroker.Subscribe<DeleteExpiredTradeRumorTakenCaravans>(Handle_DeleteExpiredTradeRumorTakenCaravans);
+        messageBroker.Subscribe<NetworkDeleteExpiredTradeRumorTakenCaravans>(Handle_NetworkDeleteExpiredTradeRumorTakenCaravans);
+
+        messageBroker.Subscribe<DeleteExpiredLootedCaravans>(Handle_DeleteExpiredLootedCaravans);
+        messageBroker.Subscribe<NetworkDeleteExpiredLootedCaravans>(Handle_NetworkDeleteExpiredLootedCaravans);
+
+        messageBroker.Subscribe<UpdateTradeActionLogsForParty>(Handle_UpdateTradeActionLogsForParty);
+        messageBroker.Subscribe<NetworkUpdateTradeActionLogsForParty>(Handle_NetworkUpdateTradeActionLogsForParty);
+
+        messageBroker.Subscribe<NetworkAddToLootedCaravans>(Handle_NetworkAddToLootedCaravans);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<CaravansKingdomDestroyed>(Handle_CaravansKingdomDestroyed);
+        messageBroker.Unsubscribe<NetworkCaravansKingdomDestroyed>(Handle_NetworkCaravansKingdomDestroyed);
+
+        messageBroker.Unsubscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
+        messageBroker.Unsubscribe<NetworkCaravanPartyDestroyed>(Handle_NetworkCaravanPartyDestroyed);
+
+        messageBroker.Unsubscribe<DeleteExpiredTradeRumorTakenCaravans>(Handle_DeleteExpiredTradeRumorTakenCaravans);
+        messageBroker.Unsubscribe<NetworkDeleteExpiredTradeRumorTakenCaravans>(Handle_NetworkDeleteExpiredTradeRumorTakenCaravans);
+        
+        messageBroker.Unsubscribe<DeleteExpiredLootedCaravans>(Handle_DeleteExpiredLootedCaravans);
+        messageBroker.Unsubscribe<NetworkDeleteExpiredLootedCaravans>(Handle_NetworkDeleteExpiredLootedCaravans);
+
+        messageBroker.Unsubscribe<UpdateTradeActionLogsForParty>(Handle_UpdateTradeActionLogsForParty);
+        messageBroker.Unsubscribe<NetworkUpdateTradeActionLogsForParty>(Handle_NetworkUpdateTradeActionLogsForParty);
+
+        messageBroker.Unsubscribe<NetworkAddToLootedCaravans>(Handle_NetworkAddToLootedCaravans);
+    }
+
+    private void Handle_CaravansKingdomDestroyed(MessagePayload<CaravansKingdomDestroyed> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.DestroyedKingdom, out var destroyedKingdomId)) return;
+
+        // Update CoopSession data on server
+        sessionCaravansPlayerDataInterface.RemoveProhibitedKingdomForAllPlayers(destroyedKingdomId);
+
+        var message = new NetworkCaravansKingdomDestroyed(destroyedKingdomId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkCaravansKingdomDestroyed(MessagePayload<NetworkCaravansKingdomDestroyed> obj)
+    {
+        // Update data on all clients
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.DestroyedKingdomId, out var destroyedKingdom)) return;
+
+            if (caravansBehavior._prohibitedKingdomsForPlayerCaravans.Contains(destroyedKingdom))
+            {
+                caravansBehavior._prohibitedKingdomsForPlayerCaravans.Remove(destroyedKingdom);
+            }
+        });
+    }
+
+    private void Handle_MobilePartyDestroyed(MessagePayload<MobilePartyDestroyed> obj)
+    {
+        // Don't process anything for destroyed mobile parties that aren't caravans
+        if (!obj.What.MobileParty.IsCaravan) return;
+
+        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+
+        // Update CoopSession data on server
+        sessionInteractionsPlayerDataInterface.RemoveInteractedCaravanForAllPlayers(mobilePartyId);
+
+        var message = new NetworkCaravanPartyDestroyed(mobilePartyId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkCaravanPartyDestroyed(MessagePayload<NetworkCaravanPartyDestroyed> obj)
+    {
+        // Don't need to run the full OnMobilePartyDestroyed logic on clients, only need to update these two dictionaries
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
+            if (caravansBehavior._interactedCaravans.ContainsKey(mobileParty))
+            {
+                caravansBehavior._interactedCaravans.Remove(mobileParty);
+            }
+            if (caravansBehavior._tradeActionLogs.ContainsKey(mobileParty))
+            {
+                caravansBehavior._tradeActionLogs.Remove(mobileParty);
+            }
+        });
+    }
+
+    private void Handle_DeleteExpiredTradeRumorTakenCaravans(MessagePayload<DeleteExpiredTradeRumorTakenCaravans> obj)
+    {
+        // Update CoopSession and send changes to clients to update local instances of _tradeRumorTakenCaravans
+        sessionCaravansPlayerDataInterface.DeleteExpiredTradeRumorTakenCaravans(out var playerExpiredCaravansRemovalLists);
+
+        network.SendAll(new NetworkDeleteExpiredTradeRumorTakenCaravans(playerExpiredCaravansRemovalLists));
+    }
+
+    private void Handle_NetworkDeleteExpiredTradeRumorTakenCaravans(MessagePayload<NetworkDeleteExpiredTradeRumorTakenCaravans> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+            if (!objectManager.TryGetIdWithLogging(Hero.MainHero, out var mainHeroId)) return;
+
+            foreach (var playerList in obj.What.PlayerExpiredCaravansRemovalLists)
+            {
+                // Only use data associated with this playerHero to update _tradeRumorTakenCaravans
+                if (playerList.Key != mainHeroId) continue;
+
+                foreach (var removedCaravanId in playerList.Value)
+                {
+                    if (!objectManager.TryGetObjectWithLogging<MobileParty>(removedCaravanId, out var removedCaravan)) continue;
+                    caravansBehavior._tradeRumorTakenCaravans.Remove(removedCaravan);
+                }
+                break;
+            }
+        });
+    }
+
+    private void Handle_DeleteExpiredLootedCaravans(MessagePayload<DeleteExpiredLootedCaravans> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+
+            // Vanilla implementation, need to send list to clients
+            List<MobileParty> list = new List<MobileParty>();
+            foreach (KeyValuePair<MobileParty, CampaignTime> keyValuePair in caravansBehavior._lootedCaravans)
+            {
+                if (CampaignTime.Now - keyValuePair.Value >= CampaignTime.Days(10f))
+                {
+                    list.Add(keyValuePair.Key);
+                }
+            }
+            foreach (MobileParty key in list)
+            {
+                caravansBehavior._lootedCaravans.Remove(key);
+            }
+
+            // Update changes to _lootedCaravans on clients
+            List<string> deletedLootedCaravansIdsList = new();
+            foreach (var deletedCaravan in list)
+            {
+                if (!objectManager.TryGetIdWithLogging(deletedCaravan, out var caravanPartyId)) continue;
+
+                deletedLootedCaravansIdsList.Add(caravanPartyId);
+            }
+            if (deletedLootedCaravansIdsList.Count == 0) return;
+
+            network.SendAll(new NetworkDeleteExpiredLootedCaravans(deletedLootedCaravansIdsList));
+        });
+    }
+
+    private void Handle_NetworkDeleteExpiredLootedCaravans(MessagePayload<NetworkDeleteExpiredLootedCaravans> obj)
+    {
+        if (obj.What.DeletedLootedCaravansIdsList == null) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+
+            foreach (var deletedCaravanId in obj.What.DeletedLootedCaravansIdsList)
+            {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(deletedCaravanId, out var deletedCaravan)) continue;
+
+                caravansBehavior._lootedCaravans.Remove(deletedCaravan);
+            }
+        });
+    }
+
+    private void Handle_UpdateTradeActionLogsForParty(MessagePayload<UpdateTradeActionLogsForParty> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+        mobilePartyId = Compact(mobilePartyId, typeof(MobileParty));
+
+        var tradeActionLogsData = new List<TradeActionLogData>();
+        foreach (var tradeActionLog in obj.What.TradeActionLogs)
+        {
+            if (!PackTradeActionLog(tradeActionLog, out var tradeActionLogData)) continue;
+
+            tradeActionLogsData.Add(tradeActionLogData);
+        }
+
+        network.SendAll(new NetworkUpdateTradeActionLogsForParty(mobilePartyId, tradeActionLogsData));
+    }
+
+    private void Handle_NetworkUpdateTradeActionLogsForParty(MessagePayload<NetworkUpdateTradeActionLogsForParty> obj)
+    {
+        if (obj.What.TradeActionLogsData == null) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
+            var tradeActionLogs = new List<CaravansCampaignBehavior.TradeActionLog>();
+            foreach (var tradeActionLogData in obj.What.TradeActionLogsData)
+            {
+                if (!UnpackTradeActionLogData(tradeActionLogData, out var tradeActionLog)) continue;
+
+                tradeActionLogs.Add(tradeActionLog);
+            }
+
+            caravansBehavior._tradeActionLogs[mobileParty] = tradeActionLogs;
+        });
+    }
+
+    private void Handle_NetworkAddToLootedCaravans(MessagePayload<NetworkAddToLootedCaravans> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.CaravanPartyId, out var caravanParty)) return;
+
+            caravansBehavior._lootedCaravans.Add(caravanParty, obj.What.CampaignTime);
+        });
+    }
+
+    private bool PackTradeActionLog(CaravansCampaignBehavior.TradeActionLog tradeActionLog, out TradeActionLogData tradeActionLogData)
+    {
+        tradeActionLogData = new();
+
+        string boughtSettlementId = null;
+        if (tradeActionLog.BoughtSettlement != null && !objectManager.TryGetIdWithLogging(tradeActionLog.BoughtSettlement, out boughtSettlementId)) return false;
+
+        string soldSettlementId = null;
+        if (tradeActionLog.SoldSettlement != null && !objectManager.TryGetIdWithLogging(tradeActionLog.SoldSettlement, out soldSettlementId)) return false;
+
+        boughtSettlementId = Compact(boughtSettlementId, typeof(Settlement));
+        soldSettlementId = Compact(soldSettlementId, typeof(Settlement));
+
+        tradeActionLogData = new TradeActionLogData(
+            boughtSettlementId,
+            tradeActionLog.BuyPrice,
+            tradeActionLog.SellPrice,
+            tradeActionLog.ItemRosterElement,
+            soldSettlementId,
+            tradeActionLog.BoughtTime);
+
+        return true;
+    }
+
+    private bool UnpackTradeActionLogData(TradeActionLogData tradeActionLogData, out CaravansCampaignBehavior.TradeActionLog tradeActionLog)
+    {
+        tradeActionLog = new();
+
+        Settlement boughtSettlement = null;
+        if (tradeActionLogData.BoughtSettlementId != null && !objectManager.TryGetObjectWithLogging(tradeActionLogData.BoughtSettlementId, out boughtSettlement)) return false;
+
+        Settlement soldSettlement = null;
+        if (tradeActionLogData.SoldSettlementId != null && !objectManager.TryGetObjectWithLogging(tradeActionLogData.SoldSettlementId, out soldSettlement)) return false;
+
+        tradeActionLog = new CaravansCampaignBehavior.TradeActionLog()
+        {
+            BoughtSettlement = boughtSettlement,
+            BuyPrice = tradeActionLogData.BuyPrice,
+            SellPrice = tradeActionLogData.SellPrice,
+            ItemRosterElement = tradeActionLogData.ItemRosterElement,
+            SoldSettlement = soldSettlement,
+            BoughtTime = tradeActionLogData.BoughtTime
+        };
+
+        return true;
+    }
+
+    private bool TryGetCaravansBehavior(out CaravansCampaignBehavior caravansBehavior)
+    {
+        caravansBehavior = Campaign.Current?.GetCampaignBehavior<CaravansCampaignBehavior>();
+        if (caravansBehavior != null) return true;
+
+        Logger.Debug("Skipping caravan update because the campaign behavior is unavailable");
+        return false;
+    }
+}

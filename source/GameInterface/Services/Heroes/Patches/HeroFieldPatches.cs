@@ -1,0 +1,415 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using GameInterface.Policies;
+using GameInterface.Services.Heroes.Messages;
+using HarmonyLib;
+using Serilog;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Localization;
+
+namespace GameInterface.Services.Heroes.Patches
+{
+    [HarmonyPatch]
+    internal class HeroFieldPatches
+    {
+        private static readonly ILogger Logger = LogManager.GetLogger<HeroFieldPatches>();
+
+        public static IEnumerable<MethodBase> TargetMethods()
+        {
+            foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
+            {
+                yield return method;
+            }
+            yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel));
+            yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel));
+            yield return AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal));
+            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver));
+            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringToDeliver));
+            yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero));
+            yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring));
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> LastTimeStampForActivityTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var lastTimeStampField = AccessTools.Field(typeof(Hero), nameof(Hero.LastTimeStampForActivity));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(LastTimeStampForActivityIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(lastTimeStampField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void LastTimeStampForActivityIntercept(Hero instance, int newTimestamp)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance.LastTimeStampForActivity = newTimestamp;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero.LastTimeStampForActivity));
+                instance.LastTimeStampForActivity = newTimestamp;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new LastTimeStampChanged(newTimestamp, instance));
+
+            instance.LastTimeStampForActivity = newTimestamp;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> CharacterObjectTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var characterObjectField = AccessTools.Field(typeof(Hero), nameof(Hero._characterObject));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(CharacterObjectIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(characterObjectField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void CharacterObjectIntercept(Hero instance, CharacterObject newCharacterObject)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._characterObject = newCharacterObject;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero._characterObject));
+                instance._characterObject = newCharacterObject;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject, instance));
+
+            instance._characterObject = newCharacterObject;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(firstNameField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void FirstNameIntercept(Hero instance, TextObject newName)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._firstName = newName;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero._firstName));
+                instance._firstName = newName;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance));
+
+            instance._firstName = newName;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(nameField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void NameIntercept(Hero instance, TextObject newName)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._name = newName;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero._name));
+                instance._name = newName;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance));
+
+            instance._name = newName;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> HeroStateTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var heroStateField = AccessTools.Field(typeof(Hero), nameof(Hero._heroState));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HeroStateIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(heroStateField))
+                {
+                    CodeInstruction codeInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    codeInst.labels = instruction.labels;
+                    yield return codeInst;
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._heroState = newState;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero._heroState));
+                instance._heroState = newState;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance));
+
+            instance._heroState = newState;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> DefaultAgeTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._defaultAge));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(DefaultAgeIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(valueField))
+                {
+                    CodeInstruction codeInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    codeInst.labels = instruction.labels;
+                    yield return codeInst;
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void DefaultAgeIntercept(Hero instance, float age)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._defaultAge = age;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero._defaultAge));
+                instance._defaultAge = age;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance));
+
+            instance._defaultAge = age;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> BirthDayTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._birthDay));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(BirthDayIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(valueField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void BirthDayIntercept(Hero instance, CampaignTime birthDay)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._birthDay = birthDay;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero._birthDay));
+                instance._birthDay = birthDay;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance));
+
+            instance._birthDay = birthDay;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._power));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(PowerIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(valueField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void PowerIntercept(Hero instance, float power)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._power = power;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero._power));
+                instance._power = power;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new PowerChanged(power, instance));
+
+            instance._power = power;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> HomeSettlementTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._homeSettlement));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HomeSettlementIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(valueField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void HomeSettlementIntercept(Hero instance, Settlement settlement)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._homeSettlement = settlement;
+                return;
+            }
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero.HomeSettlement));
+                instance._homeSettlement = settlement;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement, instance));
+
+            instance._homeSettlement = settlement;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> PregnantTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero.IsPregnant));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(PregnantIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(valueField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void PregnantIntercept(Hero instance, bool isPregnant)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance.IsPregnant = isPregnant;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero.IsPregnant));
+                instance.IsPregnant = isPregnant;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new PregnantChanged(instance, isPregnant));
+
+            instance.IsPregnant = isPregnant;
+        }
+    }
+}

@@ -1,0 +1,2 @@
+        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> TestFieldTranspiler(IEnumerable<CodeInstruction> instructions) => FieldTranspiler<int, TestFieldSet>(instructions, "TestField");

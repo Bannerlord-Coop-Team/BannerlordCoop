@@ -1,0 +1,18 @@
+﻿using GameInterface.Services.Equipments.Messages;
+using GameInterface.Utils;
+using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection;
+using TaleWorlds.Core;
+
+namespace GameInterface.Services.Equipments.Patches;
+
+[HarmonyPatch]
+internal class EquipmentCollectionPatches : GenericPatches<EquipmentCollectionPatches, Equipment>
+{
+    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(Equipment));
+    
+    [HarmonyTranspiler]
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        => ArrayFieldChangeTranspiler<EquipmentElement, ItemSlotsArrayUpdated>(instructions, nameof(Equipment._itemSlots));
+}

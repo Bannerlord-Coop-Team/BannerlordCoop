@@ -1,0 +1,28 @@
+﻿SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringTypeName }}_{{ MemberName }}_QueueClear> payload) =>
+{
+    var data = payload.What;
+
+    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId))
+        return;
+
+    {{~ if Debug ~}}
+    Logger.Debug("[Server] Broadcasting clear queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+    {{~ end ~}}
+    network.SendAll(new Network_{{ MemberDeclaringTypeName }}_{{ MemberName }}_ClearQueue(instanceId));
+});
+
+SubscribeTracked((MessagePayload<Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_ClearQueue> payload) =>
+{
+    var data = payload.What;
+
+    MarshalApply(() =>
+    {
+        if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberDeclaringType }} instance))
+            return;
+
+        {{~ if Debug ~}}
+        Logger.Debug("[Client] Clearing Queue {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
+        {{~ end ~}}
+        instance.{{ MemberName }}.Clear();
+    });
+});

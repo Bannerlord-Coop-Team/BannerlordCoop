@@ -1,0 +1,14 @@
+﻿using GameInterface.Utils.LocalEvents;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace AutoSync
+{
+    public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
+    {
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} value) : base(instance, value)
+        {
+        }
+    }
+}

@@ -1,0 +1,24 @@
+﻿using System;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace GameInterface.Serialization.External
+{
+    [Serializable]
+    public class SettlementBinaryPackage : BinaryPackageBase<Settlement>
+    {
+        public string StringId;
+
+        public SettlementBinaryPackage(Settlement obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        {
+
+        }
+        protected override void PackInternal()
+        {
+            StringId = ResolveId(Object);
+        }
+        protected override void UnpackInternal()
+        {
+            Object = ResolveObject<Settlement>(StringId);
+        }
+    }
+}

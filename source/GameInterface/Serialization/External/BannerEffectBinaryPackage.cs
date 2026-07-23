@@ -1,0 +1,25 @@
+﻿using System;
+using TaleWorlds.Core;
+
+namespace GameInterface.Serialization.External
+{
+    [Serializable]
+    public class BannerEffectBinaryPackage : BinaryPackageBase<BannerEffect>
+    {
+        public string stringId;
+
+        public BannerEffectBinaryPackage(BannerEffect obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        {
+        }
+
+        protected override void PackInternal()
+        {
+            stringId = ResolveId(Object);
+        }
+
+        protected override void UnpackInternal()
+        {
+            Object = ResolveObject<BannerEffect>(stringId);
+        }
+    }
+}

@@ -1,0 +1,10 @@
+﻿using GameInterface.Utils.LocalEvents;
+using TaleWorlds.Core;
+
+namespace GameInterface.Services.Equipments.Messages;
+internal record ItemSlotsArrayUpdated : GenericArrayChangedEvent<Equipment, EquipmentElement>
+{
+    public ItemSlotsArrayUpdated(Equipment instance, EquipmentElement value, int index) : base(instance, value, index)
+    {
+    }
+}

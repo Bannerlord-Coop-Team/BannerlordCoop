@@ -1,0 +1,46 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Policies;
+using GameInterface.Services.Clans.Messages;
+using HarmonyLib;
+using Serilog;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
+
+namespace GameInterface.Services.Clans.Patches
+{
+    [HarmonyPatch(typeof(Clan), nameof(Clan.ChangeClanName))]
+    public class ClanNameChangePatch
+    {
+        private static ILogger Logger = LogManager.GetLogger<ClanNameChangePatch>();
+
+        // TODO fix
+        static bool Prefix(ref Clan __instance, TextObject name, TextObject informalName)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if(Campaign.Current.MainParty.ActualClan == __instance)
+            {
+                // TODO use network ID
+                MessageBroker.Instance.Publish(null, new ClanNameChanged(Campaign.Current.MainParty.ActualClan.StringId, name.ToString(), informalName.ToString()));
+                return false;
+            }
+
+            if (ModInformation.IsServer) return true;
+
+            return true;
+        }
+
+        public static void RunOriginalChangeClanName(Clan clan, TextObject name, TextObject informalName)
+        {
+            if (clan == null) return;
+
+            using (new AllowedThread())
+            {
+                clan.ChangeClanName(name, informalName);
+            }
+        }
+    }
+}

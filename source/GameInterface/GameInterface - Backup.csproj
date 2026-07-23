@@ -1,0 +1,367 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>GameInterface</RootNamespace>
+    <AssemblyName>GameInterface</AssemblyName>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <LangVersion>10</LangVersion>
+    <Platforms>x64</Platforms>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+    <WarningsAsErrors>NU1605</WarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="DynamicSync\Dummy\**" />
+    <EmbeddedResource Remove="DynamicSync\Dummy\**" />
+    <None Remove="DynamicSync\Dummy\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="DynamicSync\Templates\DynamicAssemblyInfo.cs" />
+    <Compile Remove="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\DynamicPatchTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomSetValue.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeGenericSetReference.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeGenericSetValue.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericMessageTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkReferenceEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldArrayTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldListTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldMbListTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldQueueTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyArrayTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyListTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyMBListTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyQueueTranspilerTemplate.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="SandBox">
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox.GauntletUI">
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox.View">
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
+    </Reference>
+    <Reference Include="SandBox.ViewModelCollection">
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.AchievementSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.AchievementSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ActivitySystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ActivitySystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.CampaignSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Core">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Core.ViewModelCollection">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.ViewModelCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Diamond">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Diamond.AccessProvider.Epic">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Epic.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Diamond.AccessProvider.GDK">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.GDK.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Diamond.AccessProvider.GOG">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.GOG.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Diamond.AccessProvider.Steam">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Steam.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Diamond.AccessProvider.Test">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Test.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Diamond.ChatSystem.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.ChatSystem.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.DotNet">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.DotNet.AutoGenerated">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.AutoGenerated.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Engine">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Engine.AutoGenerated">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.AutoGenerated.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Engine.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.GauntletUI.Data">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.GauntletUI.ExtraWidgets">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.ExtraWidgets.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.GauntletUI.PrefabSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.PrefabSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.GauntletUI.TooltipExtensions">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.TooltipExtensions.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.InputSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.LinQuick">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.LinQuick.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Localization">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ModuleManager">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.AutoGenerated">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.AutoGenerated.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.Diamond">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Diamond.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI">
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.Helpers">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Helpers.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.Launcher.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Launcher.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.Launcher.Steam">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.Launcher.Steam.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.NavigationSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.NavigationSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Network">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Network.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ObjectSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.PlatformService">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.PlatformService.Epic">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Epic.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.PlatformService.GOG">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.GOG.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.PlatformService.Steam">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlatformService.Steam.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.PlayerServices">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PlayerServices.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.PSAI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.PSAI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.SaveSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.ScreenSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Starter.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Starter.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.TwoDimension">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.TwoDimension.Standalone">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.Standalone.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="8.2.0" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Lib.Harmony" Version="2.3.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.3" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Scriban" Version="6.0.0" />
+    <PackageReference Include="Scrutor" Version="6.0.1" />
+  </ItemGroup>
+    <ItemGroup>
+	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+		    <_Parameter1>E2E.Tests</_Parameter1>
+	    </AssemblyAttribute>
+    </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </EmbeddedResource>
+    </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfo.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicPatchTemplate.cs">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomSetValue.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValue.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetReference.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkReferenceEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyQueueTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyMBListTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyListTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyArrayTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldArrayTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldQueueTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldMBListTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldListTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldTranspilerTemplate.cs">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </EmbeddedResource>
+    </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericMessageTemplate.cs">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </EmbeddedResource>
+    </ItemGroup>
+  <ItemGroup>
+    <Publicize Include="SandBox" />
+    <Publicize Include="SandBox.GauntletUI" />                             
+    <Publicize Include="SandBox.View" />                                   
+    <!--<Publicize Include="SandBox.ViewModelCollection"/>                    -->
+    <!--<Publicize Include="TaleWorlds.AchievementSystem"/>                   -->
+    <!--<Publicize Include="TaleWorlds.ActivitySystem"/>-->
+    <Publicize Include="TaleWorlds.CampaignSystem" />
+    <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />                                                     
+    <Publicize Include="TaleWorlds.Core" />                                                                                   
+    <!--<Publicize Include="TaleWorlds.Core.ViewModelCollection"/>                                                               -->
+    <!--<Publicize Include="TaleWorlds.Diamond"/>                                                                                -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Epic"/>                                                            -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.GDK"/>                                                             -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.GOG"/>                                                             -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Steam"/>                                                           -->
+    <!--<Publicize Include="TaleWorlds.Diamond.AccessProvider.Test"/>                                                            -->
+    <!--<Publicize Include="TaleWorlds.Diamond.ChatSystem.Library"/>                                                             -->
+    <!--<Publicize Include="TaleWorlds.DotNet"/>                                                                                 -->
+    <!--<Publicize Include="TaleWorlds.DotNet.AutoGenerated"/>                                                                   -->
+    <!--<Publicize Include="TaleWorlds.Engine"/>                                                                                 -->
+    <!--<Publicize Include="TaleWorlds.Engine.AutoGenerated"/>                                                                   -->
+    <!--<Publicize Include="TaleWorlds.Engine.GauntletUI"/>                                                                      -->
+    <Publicize Include="TaleWorlds.GauntletUI" />                                                                             
+    <!--<Publicize Include="TaleWorlds.GauntletUI.Data"/>                                                                        -->
+    <!--<Publicize Include="TaleWorlds.GauntletUI.ExtraWidgets"/>                                                                -->
+    <!--<Publicize Include="TaleWorlds.GauntletUI.PrefabSystem"/>                                                                -->
+    <!--<Publicize Include="TaleWorlds.GauntletUI.TooltipExtensions"/>                                                           -->
+    <!--<Publicize Include="TaleWorlds.InputSystem"/>                                                                            -->
+    <!--<Publicize Include="TaleWorlds.Library"/>                                                                                -->
+    <!--<Publicize Include="TaleWorlds.LinQuick"/>                                                                               -->
+    <!--<Publicize Include="TaleWorlds.Localization"/>                                                                           -->
+    <!--<Publicize Include="TaleWorlds.ModuleManager"/>                                                                          -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade"/>                                                                          -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.AutoGenerated"/>                                                            -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.Diamond"/>                                                                  -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.GauntletUI"/>                                                               -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets"/>                                                       -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.Helpers"/>                                                                  -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library"/>                                                         -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Steam"/>                                                           -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64"/>      -->
+    <!--<Publicize Include="TaleWorlds.MountAndBlade.ViewModelCollection"/>                                                      -->
+    <!--<Publicize Include="TaleWorlds.NavigationSystem"/>                                                                       -->
+    <!--<Publicize Include="TaleWorlds.Network"/>                                                                                -->
+    <Publicize Include="TaleWorlds.ObjectSystem" />                                                                           
+    <!--<Publicize Include="TaleWorlds.PlatformService"/>                                                                        -->
+    <!--<Publicize Include="TaleWorlds.PlatformService.Epic"/>                                                                   -->
+    <!--<Publicize Include="TaleWorlds.PlatformService.GOG"/>                                                                    -->
+    <!--<Publicize Include="TaleWorlds.PlatformService.Steam"/>                                                                  -->
+    <!--<Publicize Include="TaleWorlds.PlayerServices"/>                                                                         -->
+    <!--<Publicize Include="TaleWorlds.PSAI"/>                                                                                   -->
+    <Publicize Include="TaleWorlds.SaveSystem" />                                                                             
+    <!--<Publicize Include="TaleWorlds.Starter.Library"/>                                                                        -->
+    <!--<Publicize Include="TaleWorlds.TwoDimension"/>                                                                           -->
+    <!--<Publicize Include="TaleWorlds.TwoDimension.Standalone"/>                                                             -->
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Services\Kingdoms\Commands\" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,24 @@
+﻿using System;
+using TaleWorlds.Core;
+
+namespace GameInterface.Serialization.External
+{
+    [Serializable]
+    public class BasicCultureObjectBinaryPackage : BinaryPackageBase<BasicCultureObject>
+    {
+        public string stringId;
+
+        public BasicCultureObjectBinaryPackage(BasicCultureObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        {
+
+        }
+        protected override void PackInternal()
+        {
+            stringId = ResolveId(Object);
+        }
+        protected override void UnpackInternal()
+        {
+            Object = ResolveObject<BasicCultureObject>(stringId);
+        }
+    }
+}

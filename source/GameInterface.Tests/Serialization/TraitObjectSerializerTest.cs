@@ -1,0 +1,62 @@
+﻿using Autofac;
+using Common.Serialization;
+using GameInterface.Serialization;
+using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using Xunit;
+
+namespace GameInterface.Tests.Serialization.SerializerTests
+{
+    public class TraitObjectSerializationTest
+    {
+        IContainer container;
+        public TraitObjectSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
+        [Fact]
+        public void TraitObject_Serialize()
+        {
+            TraitObject testTraitObject = (TraitObject)FormatterServices.GetUninitializedObject(typeof(TraitObject));
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            TraitObjectBinaryPackage package = new TraitObjectBinaryPackage(testTraitObject, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+
+            Assert.NotEmpty(bytes);
+        }
+
+        [Fact]
+        public void TraitObject_Full_Serialization()
+        {
+            TraitObject testTraitObject = (TraitObject)FormatterServices.GetUninitializedObject(typeof(TraitObject));
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            TraitObjectBinaryPackage package = new TraitObjectBinaryPackage(testTraitObject, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+
+            Assert.NotEmpty(bytes);
+
+            object obj = BinaryPackageSerializer.Deserialize(bytes);
+
+            Assert.IsType<TraitObjectBinaryPackage>(obj);
+
+            TraitObjectBinaryPackage returnedPackage = (TraitObjectBinaryPackage)obj;
+
+            Assert.Equal(returnedPackage.StringId, package.StringId);
+        }
+    }
+}

@@ -1,0 +1,64 @@
+﻿using Autofac;
+using Common.Serialization;
+using GameInterface.Serialization;
+using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using TaleWorlds.Core;
+using Xunit;
+
+namespace GameInterface.Tests.Serialization.SerializerTests
+{
+    public class WeaponComponentSerializationTest
+    {
+        IContainer container;
+        public WeaponComponentSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
+        [Fact]
+        public void WeaponComponent_Serialize()
+        {
+            WeaponComponent weaponComponent = new WeaponComponent(new ItemObject());
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            WeaponComponentBinaryPackage package = new WeaponComponentBinaryPackage(weaponComponent, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            
+            Assert.NotEmpty(bytes);
+        }
+
+        [Fact]
+        public void WeaponComponent_Full_Serialization()
+        {
+            WeaponComponent weaponComponent = new WeaponComponent(new ItemObject());
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            WeaponComponentBinaryPackage package = new WeaponComponentBinaryPackage(weaponComponent, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+                
+            Assert.NotEmpty(bytes);
+
+            object obj = BinaryPackageSerializer.Deserialize(bytes);
+
+            Assert.IsType<WeaponComponentBinaryPackage>(obj);
+
+            WeaponComponentBinaryPackage returnedPackage = (WeaponComponentBinaryPackage)obj;
+
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WeaponComponent newWeaponComponent = returnedPackage.Unpack<WeaponComponent>(deserializeFactory);
+
+            Assert.Equal(weaponComponent.Weapons, newWeaponComponent.Weapons);
+        }
+    }
+}

@@ -1,0 +1,85 @@
+﻿using E2E.Tests.Util.ObjectBuilders;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
+
+namespace E2E.Tests.Util;
+
+internal class GameObjectCreator
+{
+    private static readonly Dictionary<Type, IObjectBuilder> ObjectBuilders = new Dictionary<Type, IObjectBuilder>
+    {
+        { typeof(CharacterObject), new CharacterObjectBuilder() },
+        { typeof(Settlement), new SettlementBuilder() },
+        { typeof(Kingdom), new KingdomBuilder() },
+        { typeof(Clan), new ClanBuilder() },
+        { typeof(Hero), new HeroBuilder() },
+        { typeof(HeroDeveloper), new HeroDeveloperBuilder() },
+        { typeof(LordPartyComponent), new LordPartyComponentBuilder() },
+        { typeof(Hideout), new HideoutBuilder() },
+        { typeof(CultureObject), new CultureBuilder() },
+        { typeof(PartyTemplateObject), new PartyTemplateObjectBuilder() },
+        { typeof(Town), new TownBuilder() },
+        { typeof(Village), new VillageBuilder() },
+        { typeof(MobileParty), new MobilePartyBuilder() },
+        { typeof(BanditPartyComponent), new BanditPartyComponentBuilder() },
+        { typeof(CustomPartyComponent), new CustomPartyComponentBuilder() },
+        { typeof(MapEvent), new MapEventBuilder() },
+        { typeof(MapEventSide), new MapEventSideBuilder() },
+        { typeof(MapEventParty), new MapEventPartyBuilder() },
+        { typeof(BesiegerCamp), new BesiegerCampBuilder() },
+        { typeof(SiegeEvent), new SiegeEventBuilder() },
+        { typeof(SiegeStrategy), new SiegeStrategyBuilder() },
+        { typeof(SiegeEnginesContainer), new SiegeEnginesBuilder() },
+        { typeof(Workshop), new WorkshopBuilder() },
+        { typeof(WorkshopType), new WorkshopTypeBuilder() },
+        { typeof(MilitiaPartyComponent), new MilitiaPartyComponentBuilder() },
+        { typeof(ItemRoster), new ItemRosterBuilder() },
+        { typeof(Building), new BuildingBuilder() },
+        { typeof(ItemCategory), new ItemCategoryBuilder() },
+        { typeof(TroopRoster), new TroopRosterBuilder() },
+        { typeof(EquipmentElement), new EquipmentElementBuilder() },
+        { typeof(ItemObject), new ItemObjectBuilder() },
+        { typeof(Alley), new AlleyBuilder() },
+        { typeof(Location), new LocationBuilder() },
+        { typeof(Equipment), new EquipmentBuilder() },
+        { typeof(MBCharacterSkills), new DefaultBuilder<MBCharacterSkills>() },
+        { typeof(MBEquipmentRoster), new DefaultBuilder<MBEquipmentRoster>() },
+        { typeof(MobilePartyAi), new MobilePartyAiBuilder() },
+        { typeof(VillageMarketData), new VillageMarketDataBuilder() },
+        { typeof(PartyBase), new PartyBaseBuilder() },
+        { typeof(CaravanPartyComponent), new CaravanPartyComponentBuilder() },
+        { typeof(GarrisonPartyComponent), new GarrisonPartyComponentBuilder() },
+        { typeof(VillageType), new VillageTypeBuilder() },
+        { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
+        { typeof(TraitObject), new TraitObjectBuilder() },
+        { typeof(PerkObject), new PerkObjectBuilder() },
+        { typeof(CharacterAttribute), new CharacterAttributeBuilder() },
+        { typeof(SkillObject), new SkillObjectBuilder() },
+        { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() },
+        { typeof(SiegeEngineType), new SiegeEngineTypeBuilder() },
+        { typeof(SiegeEngineConstructionProgress), new SiegeEngineConstructionProgressBuilder()  },
+    };
+
+    public static T CreateInitializedObject<T>()
+    {
+        if (ObjectBuilders.ContainsKey(typeof(T)) == false)
+        {
+            throw new KeyNotFoundException(
+                $"{typeof(T)} does not have a builder assigned, please create a builder " +
+                $"and add it to {nameof(GameObjectCreator)}.{nameof(ObjectBuilders)}");
+        }
+
+        return (T)ObjectBuilders[typeof(T)].Build();
+    }
+}

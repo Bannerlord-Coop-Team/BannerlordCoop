@@ -1,0 +1,68 @@
+﻿using Autofac;
+using Common.Serialization;
+using GameInterface.Serialization;
+using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using System.Runtime.Serialization;
+using TaleWorlds.Core;
+using Xunit;
+
+namespace GameInterface.Tests.Serialization.SerializerTests
+{
+    public class WeaponDesignElementSerializationTest
+    {
+        IContainer container;
+        public WeaponDesignElementSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
+        [Fact]
+        public void WeaponDesignElement_Serialize()
+        {
+            WeaponDesignElement weaponDesignElement = (WeaponDesignElement)FormatterServices.GetUninitializedObject(typeof(WeaponDesignElement));
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            WeaponDesignElementBinaryPackage package = new WeaponDesignElementBinaryPackage(weaponDesignElement, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+
+            Assert.NotEmpty(bytes);
+        }
+
+        [Fact]
+        public void WeaponDesignElement_Full_Serialization()
+        {
+            WeaponDesignElement weaponDesignElement = (WeaponDesignElement)FormatterServices.GetUninitializedObject(typeof(WeaponDesignElement));
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            WeaponDesignElementBinaryPackage package = new WeaponDesignElementBinaryPackage(weaponDesignElement, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+
+            Assert.NotEmpty(bytes);
+
+            object obj = BinaryPackageSerializer.Deserialize(bytes);
+
+            Assert.IsType<WeaponDesignElementBinaryPackage>(obj);
+
+            WeaponDesignElementBinaryPackage returnedPackage = (WeaponDesignElementBinaryPackage)obj;
+
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WeaponDesignElement newWeaponDesignElement = returnedPackage.Unpack<WeaponDesignElement>(deserializeFactory);
+
+            Assert.Equal(weaponDesignElement.ScaleFactor, newWeaponDesignElement.ScaleFactor);
+            Assert.Equal(weaponDesignElement.ScalePercentage, newWeaponDesignElement.ScalePercentage);
+            Assert.Equal(weaponDesignElement.CraftingPiece, newWeaponDesignElement.CraftingPiece);
+
+        }
+    }
+}

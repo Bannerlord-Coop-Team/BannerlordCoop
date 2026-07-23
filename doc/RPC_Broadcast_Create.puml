@@ -1,0 +1,37 @@
+@startuml RPC Broadcast Create
+GameLogic -> CoopSyncServer: Broadcast(invokable, instance, args)
+CoopSyncServer -> ArgumentFactory: Create(instance)
+return rpcInstance :=
+loop foreach arg in args
+    CoopSyncServer -> ArgumentFactory: Create(arg)
+
+    alt small object
+        ArgumentFactory -> Argument: new Argument(arg)
+        note left:small objects are transfered by value and serialized as part of the RPC itself 
+        return rpcArgs +=
+        ArgumentFactory --> CoopSyncServer
+
+    else large object
+        ArgumentFactory -> IStore: Insert(arg)
+        note left: large objects are instead transfered through the store
+        return storeId
+        ArgumentFactory -> Argument: new Argument(storeId)
+        note left: the RPC argument only holds an id to the object in the store
+        return rpcArgs +=
+        ArgumentFactory --> CoopSyncServer
+    end
+end
+
+CoopSyncServer -> MethodCall: new MethodCall(invokable, rpcInstance, rpcArgs)
+return call :=
+
+CoopSyncServer -> RailServerRoom: CreateEvent(call)
+return evt :=
+
+queue EventBroadcastingQueue
+CoopSyncServer -> EventBroadcastingQueue: Add(room, evt)
+return
+
+CoopSyncServer -> GameLogic
+
+@enduml

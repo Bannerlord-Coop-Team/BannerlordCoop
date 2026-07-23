@@ -1,0 +1,49 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Policies;
+using GameInterface.Services.Settlements.Messages;
+using HarmonyLib;
+using Serilog;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace GameInterface.Services.Settlements.Patches;
+
+/// <summary>
+/// When the Militia Is Set
+/// </summary>
+[HarmonyPatch(typeof(Settlement))]
+public class MilitiaSettlementPatch
+{
+    private static ILogger Logger = LogManager.GetLogger<Settlement>();
+
+    [HarmonyPatch(nameof(Settlement.Militia), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static bool MilitiaPrefix(ref Settlement __instance, ref float value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created managed {name}", typeof(Settlement));
+            return true;
+        }
+
+        var message = new SettlementChangedMilitia(__instance, value);
+
+        MessageBroker.Instance.Publish(__instance, message);
+        return true;
+    }
+
+    internal static void RunMiltiaChange(Settlement settlement, float militia)
+    {
+        GameThread.Run(() =>
+        {
+            using (new AllowedThread())
+            {
+                settlement._readyMilitia = militia;
+            }
+        });
+    }
+}

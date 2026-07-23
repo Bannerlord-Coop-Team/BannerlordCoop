@@ -1,0 +1,28 @@
+﻿using System;
+using TaleWorlds.Core;
+
+namespace GameInterface.Serialization.External
+{
+    /// <summary>
+    /// Binary package for Monster
+    /// </summary>
+    [Serializable]
+    public class MonsterBinaryPackage : BinaryPackageBase<Monster>
+    {
+        public string StringId;
+
+        public MonsterBinaryPackage(Monster obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        {
+        }
+
+        protected override void PackInternal()
+        {
+            StringId = ResolveId(Object);
+        }
+
+        protected override void UnpackInternal()
+        {
+            ResolveObject<Monster>(StringId);
+        }
+    }
+}

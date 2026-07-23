@@ -1,0 +1,65 @@
+@startuml RPC Broadcast Create
+participant Server
+participant CoopSyncServer
+queue EventBroadcastingQueue as eventQueue
+participant Call
+participant RailServerRoom
+participant RemoteStoreServer
+entity "RemoteStore client0" as store0
+entity "RemoteStore client1" as store1
+
+== Initialization ==
+Server -> eventQueue: new EventBroadcastingQueue(store)
+hnote over eventQueue
+    Creation of eventqueue is simplified in this diagram
+endhnote
+eventQueue -> RemoteStoreServer: register for event OnObjectAvailable
+return
+eventQueue --> Server
+
+== RPC broadcast ==
+note over CoopSyncServer, RemoteStoreServer
+    Store insert is simplified here. See RPC_Broadcast_Create.puml for more information.
+endnote
+CoopSyncServer -> RemoteStoreServer: insert large object RPC arguments
+RemoteStoreServer --> store0: Send(EPacket.StoreInsert, ...)
+RemoteStoreServer --> store1: Send(EPacket.255690477a9256fcf8e5c28ddd4bfd765e70c562, ...)
+RemoteStoreServer --> CoopSyncServer
+CoopSyncServer -> eventQueue: Add(room, evt)
+eventQueue -> Call: new Call(room, evt)
+Call -> Call: SetObjectsToBeDistributed
+note left: The call keeps a list of all arguments that are transferred through a store
+Call -> eventQueue: call :=
+eventQueue -> eventQueue: addToQueue(call)
+eventQueue --> CoopSyncServer 
+
+== Server update loop ==
+loop while server running
+    Server -> eventQueue: Update()
+        loop for call in Queue
+            eventQueue -> Call: TryBroadcast()
+            Call -> Call: call.IsReadyToBeSent()
+            note left: Checks call.ObjectsToBeDistributed == 0
+            alt call is ready
+                Call -> RailServerRoom: room.BroadcastEvent(evt)
+                return
+                Call --> eventQueue
+                eventQueue -> eventQueue: removeFromQueue(call)
+            else
+                Call --> eventQueue
+            end
+        end
+    eventQueue --> Server
+end
+
+== Store events ==
+store0 --> RemoteStoreServer: Send(EPacket.StoreInsertAck, ...)
+store1 --> RemoteStoreServer: Send(EPacket.StoreInsertAck, ...)
+alt if transferred to all remote stores
+RemoteStoreServer -> eventQueue: OnObjectAvailable
+eventQueue -> Call: --call.ObjectsToBeDistributed
+return
+eventQueue --> RemoteStoreServer
+end
+
+@enduml

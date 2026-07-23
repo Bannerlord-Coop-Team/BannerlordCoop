@@ -1,0 +1,11 @@
+﻿using HarmonyLib;
+using SandBox.Issues;
+
+namespace GameInterface.Services.Villages.Patches;
+
+[HarmonyPatch(typeof(FamilyFeudIssueBehavior))]
+internal class DisableFamilyFeudIssueBehavior
+{
+    [HarmonyPatch(nameof(FamilyFeudIssueBehavior.RegisterEvents))]
+    static bool Prefix() => false;
+}

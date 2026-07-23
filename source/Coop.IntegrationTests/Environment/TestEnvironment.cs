@@ -1,0 +1,146 @@
+﻿using Autofac;
+using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.Serialization;
+using Common.Tests.Utils;
+using Coop.Core.Client;
+using Coop.Core.Server;
+using Coop.IntegrationTests.Environment.Instance;
+using Coop.IntegrationTests.Environment.Mock;
+using GameInterface;
+using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Settlements.Interfaces;
+using Moq;
+using Serilog;
+
+namespace Coop.IntegrationTests.Environment;
+
+/// <summary>
+/// Environment used for integration testing
+/// </summary>
+public class TestEnvironment
+{
+    private readonly TestNetworkRouter networkOrchestrator;
+
+    public readonly ILogger Logger = LogManager.GetLogger<TestEnvironment>();
+
+
+    /// <summary>
+    /// Constructor for TestEnvironment
+    /// </summary>
+    /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
+    public TestEnvironment(int numClients = 2)
+    {
+        // Setup test network
+        networkOrchestrator = new TestNetworkRouter();
+
+        Server = CreateServer();
+
+        var serverNetwork = Server.Container.Resolve<MockServer>();
+
+        var clients = new EnvironmentInstance[numClients];
+        for (int i = 0; i < numClients; i++)
+        {
+            clients[i] = CreateClient();
+            serverNetwork.AddPeer(clients[i].NetPeer);
+        }
+
+        Clients = clients;
+    }
+
+    public IEnumerable<EnvironmentInstance> Clients { get; }
+    public EnvironmentInstance Server { get; }
+
+    private EnvironmentInstance CreateClient()
+    {
+        var builder = new ContainerBuilder();
+
+        builder.RegisterModule<ClientModule>();
+        builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientInstance>().AsSelf();
+
+        AddSharedDependencies(builder);
+
+        var container = builder.Build();
+
+        var instance = container.Resolve<ClientInstance>()!;
+
+        networkOrchestrator.AddClient(instance);
+
+        return instance;
+    }
+
+    private EnvironmentInstance CreateServer()
+    {
+        var builder = new ContainerBuilder();
+
+        builder.RegisterModule<ServerModule>();
+        builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
+        builder.RegisterType<ServerInstance>().AsSelf();
+
+        AddSharedDependencies(builder);
+
+        var container = builder.Build();
+
+        var instance = container.Resolve<ServerInstance>()!;
+
+        networkOrchestrator.AddServer(instance);
+
+        return instance;
+    }
+
+    private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
+    {
+        builder.RegisterModule<GameInterfaceModule>();
+
+        builder.RegisterInstance(Logger).As<ILogger>().SingleInstance();
+        builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
+
+        builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
+        builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
+
+        RegisterMock<ISettlementInterface>(builder);
+
+        return builder;
+    }
+
+    private void RegisterMock<T>(ContainerBuilder builder) where T : class
+    {
+        var mock = new Mock<T>();
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
+    }
+
+    public void RegisterObjectInNetwork<T>(T obj, string? stringId = null)
+    {
+        if (stringId == null)
+        {
+            Server.Call(() =>
+            {
+                var objectManager = Server.Resolve<IObjectManager>();
+                objectManager.AddNewObject(obj, out stringId);
+            });
+        }
+        else
+        {
+            Server.Call(() =>
+            {
+                var objectManager = Server.Resolve<IObjectManager>();
+                objectManager.AddExisting(stringId, obj);
+            });
+        }
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var objectManager = client.Resolve<IObjectManager>();
+                objectManager.AddExisting(stringId, obj);
+            });
+        }
+    }
+}
+

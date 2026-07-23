@@ -1,0 +1,54 @@
+﻿using GameInterface.Utils;
+using HarmonyLib;
+using Helpers;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Text;
+using Common;
+using Common.Logging;
+using Common.Messaging;
+using Serilog;
+using System.Linq;
+using System.Reflection.Emit;
+using GameInterface.Policies;
+using GameInterface;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+
+namespace AutoSync;
+
+[HarmonyPatch]
+{{~ if PatchCategory ~}}
+[HarmonyPatchCategory("{{PatchCategory}}")]
+{{~ end ~}}
+public class {{PatchClassName}} : GenericPatches<{{PatchClassName}}, {{DeclaringType}}>
+{
+    private readonly static ILogger Logger = LogManager.GetLogger<{{PatchClassName}}>();
+
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        {{~ if IncludeDeclaredMethods ~}}
+        foreach (var ctor in AccessTools.GetDeclaredConstructors(typeof({{DeclaringType}})))
+        {
+            yield return ctor;
+        }
+
+        foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})).Where(m => !m.IsAbstract))
+        {
+            yield return method;
+        }
+        {{~ end ~}}
+        {{~ for targetMethod in TargetMethods ~}}
+        yield return AccessTools.Method(typeof({{targetMethod.DeclaringType}}), "{{targetMethod.Name}}");
+        {{~ end ~}}
+    }
+    {{~ for transpiler in Transpilers ~}}
+    {{ transpiler }}
+    {{~ end ~}}
+}
+{{~ for prefix in Prefixes ~}}
+{{ prefix }}
+{{~ end ~}}

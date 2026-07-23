@@ -1,0 +1,259 @@
+﻿using Autofac;
+using Common.Messaging;
+using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Connections.States;
+using Coop.Tests.Mocks;
+using GameInterface.Services.Modules;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using LiteNetLib;
+using Moq;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Coop.Tests.Server.Connections.States
+{
+    public class ResolveCharacterStateTests
+    {
+        private readonly IConnectionLogic connectionLogic;
+        private readonly NetPeer playerPeer;
+        private readonly NetPeer differentPeer;
+        private readonly ServerTestComponent serverComponent;
+
+        public ResolveCharacterStateTests(ITestOutputHelper output)
+        {
+            serverComponent = new ServerTestComponent(output);
+
+            var container = serverComponent.Container;
+
+            var network = container.Resolve<TestNetwork>();
+
+            playerPeer = network.CreatePeer();
+            differentPeer = network.CreatePeer();
+            connectionLogic = container.Resolve<ConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
+        }
+
+        [Fact]
+        public void CreateCharacterMethod_TransitionState_CreateCharacterState()
+        {
+            // Arrange
+            connectionLogic.SetState<ResolveCharacterState>();
+
+            // Act
+            connectionLogic.CreateCharacter();
+
+            // Assert
+            Assert.IsType<CreateCharacterState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void TransferSaveMethod_TransitionState_LoadingState()
+        {
+            // Arrange
+            connectionLogic.SetState<ResolveCharacterState>();
+
+            // Act
+            connectionLogic.TransferSave();
+
+            // Assert — TransferSave sends the save (TransferSaveState) then immediately advances to
+            // LoadingState to await the client entering the campaign.
+            Assert.IsType<LoadingState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void UnusedStatesMethods_DoNothing()
+        {
+            // Arrange
+            connectionLogic.SetState<ResolveCharacterState>();
+
+            // Act
+            connectionLogic.Load();
+            connectionLogic.EnterCampaign();
+            connectionLogic.EnterMission();
+
+            // Assert
+            Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+        }
+        
+        [Fact]
+        public void NetworkModuleVersionsValidate_ModulesMatches()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            // Community (non-official) modules — official modules are exempt from module
+            // matching, so they would not exercise the comparison at all.
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", false, false, new ApplicationVersion()) };
+
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
+                .Setup(mip => mip.GetModuleInfos())
+                .Returns(modules);
+
+            // Act
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(modules));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            // Assert
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            Assert.IsType<NetworkModuleVersionsValidated>(message);
+
+            var castedMessage = (NetworkModuleVersionsValidated)message;
+            Assert.True(castedMessage.Matches);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ModulesMismatch()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            // Community (non-official) modules — official modules are exempt from module
+            // matching (a dedicated server's official module set differs from a client's),
+            // so only community modules can produce a mismatch.
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
+                .Setup(mip => mip.GetModuleInfos())
+                .Returns(
+                    new List<ModuleInfo> { new ModuleInfo("1", false, false, new ApplicationVersion()) }
+                );
+
+            // Act
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("MismatchedModule", false, false, new ApplicationVersion())}));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            // Assert
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            Assert.IsType<NetworkModuleVersionsValidated>(message);
+
+            var castedMessage = (NetworkModuleVersionsValidated)message;
+            Assert.False(castedMessage.Matches);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_FromDifferentPeer_Ignored()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", true, false, new ApplicationVersion()) };
+
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
+                .Setup(mip => mip.GetModuleInfos())
+                .Returns(modules);
+
+            // Act — another connection's validate request must not be answered by this connection;
+            // without the peer guard every concurrent joiner was also answered with a result
+            // computed from another client's module list.
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                differentPeer, new NetworkModuleVersionsValidate(modules));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            // Assert — no response was sent to anyone.
+            Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ValidationThrows_RespondsDenied()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            serverComponent.Container
+                .Resolve<Mock<IModuleInfoProvider>>()
+                .Setup(mip => mip.GetModuleInfos())
+                .Throws(new System.InvalidOperationException("boom"));
+
+            // Act — a throw used to die in the network poller, so the joiner never got an answer
+            // and sat on the "Validating modules..." loading screen forever.
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo>()));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            // Assert — the client must receive a denial with a reason instead of silence.
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            var castedMessage = Assert.IsType<NetworkModuleVersionsValidated>(message);
+            Assert.False(castedMessage.Matches);
+            Assert.Contains("failed to validate", castedMessage.Reason);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_ValidPlayerId()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            
+
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+
+            var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+
+            playerManagerMock
+                .Setup(i => i.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
+                .Callback((string id, out Player returnedPlayer) =>
+                {
+                    returnedPlayer = player;
+                })
+                .Returns(true);
+
+            var objectManager = serverComponent.Container.Resolve<IObjectManager>();
+            var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Assert.True(objectManager.AddExisting(player.HeroId, hero));
+
+            // Act
+            var payload = new MessagePayload<NetworkClientValidate>(
+                playerPeer, new NetworkClientValidate(player.ControllerId));
+            currentState.Handle_ClientValidate(payload);
+
+            // Assert
+            var messages = serverComponent.TestNetwork.SentNetworkMessages[playerPeer.Id];
+
+            var validated = messages.OfType<NetworkClientValidated>();
+
+            var message = Assert.Single(validated);
+
+            Assert.True(message.HeroExists);
+            Assert.Equal(player, message.Player);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_InvalidPlayerId()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            string playerId = "MyPlayer";
+
+            serverComponent.Container
+                .Resolve<Mock<IPlayerManager>>()
+                .Setup(i => i.TryGetPlayer(playerId, out It.Ref<Player>.IsAny))
+                .Callback((string id, out Player? returnedPlayer) =>
+                {
+                    returnedPlayer = null;
+                })
+                .Returns(false);
+
+            // Act
+            var payload = new MessagePayload<NetworkClientValidate>(
+                differentPeer, new NetworkClientValidate(playerId));
+            currentState.Handle_ClientValidate(payload);
+
+            // Assert
+            var messages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
+
+            Assert.Empty(messages.OfType<NetworkClientValidated>());
+        }
+    }
+}

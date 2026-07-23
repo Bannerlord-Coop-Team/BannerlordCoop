@@ -1,0 +1,25 @@
+﻿using GameInterface.Serialization.Generics;
+using System;
+using System.Collections.Generic;
+using TaleWorlds.Library;
+
+namespace GameInterface.Serialization.Native
+{
+    public class NativeBinaryPackageCollection
+    {
+        public static Dictionary<Type, Type> Types = new Dictionary<Type, Type>
+        {
+            { typeof(Array), typeof(EnumerableBinaryPackage) },
+            { typeof(List<>), typeof(EnumerableBinaryPackage) },
+            { typeof(HashSet<>), typeof(EnumerableBinaryPackage) },
+
+            { typeof(Dictionary<,>), typeof(DictionaryBinaryPackage) },
+            { typeof(KeyValuePair<,>), typeof(KeyValuePairBinaryPackage) },
+            { typeof(ValueTuple<,>), typeof(ValueTupleBinaryPackage) },
+            { typeof(Tuple<uint, float>), typeof(UInt32FloatTupleBinaryPackage) },
+
+            { typeof(MBReadOnlyList<>), typeof(MBReadOnlyListBinaryPackage) },
+            { typeof(MBList<>), typeof(MBReadOnlyListBinaryPackage) },
+        };
+    }
+}

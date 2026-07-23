@@ -1,0 +1,59 @@
+﻿using Common.Serialization;
+using GameInterface.CoopSessionData.Save.Data;
+using GameInterface.Services.Caravans;
+using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.MobileParties;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.Smithing;
+using GameInterface.Services.Workshops;
+using GameInterface.Services.Alleys;
+using Xunit;
+using Xunit.Abstractions;
+using GameInterface.Services.Inventory.TradeSkills;
+
+namespace Coop.Tests.Server.Services.Save
+{
+    public class JSONSessionTests
+    {
+        private const string SAVE_PATH = "./saves/";
+
+        private readonly ITestOutputHelper output;
+
+        public JSONSessionTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        [Fact]
+        public void SaveLoadSessions()
+        {
+            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
+
+            var players = new Player[]
+            {
+                new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter")
+            };
+
+            var sessionData = new CoopSession(
+                "TestId",
+                players,
+                new CraftingPlayerData(new(), new(), new()),
+                new WorkshopPlayerData(new()),
+                new CaravansPlayerData(new(), new()),
+                new AlleyPlayerData(new()),
+                new InteractionsPlayerData(new(), new(), new(), new()),
+                new TradePlayerData(new()));
+
+            string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
+
+            var fileIO = new JsonFileIO();
+
+            fileIO.WriteToFile(saveFile, sessionData);
+
+            var resolvedSessions = fileIO.ReadFromFile<CoopSession>(saveFile);
+
+            Assert.NotNull(resolvedSessions);
+            Assert.Equal(sessionData.UniqueGameId, resolvedSessions.UniqueGameId);
+        }
+    }
+}

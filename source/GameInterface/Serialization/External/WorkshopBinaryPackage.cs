@@ -1,0 +1,37 @@
+﻿using System;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Library;
+
+namespace GameInterface.Serialization.External
+{
+    /// <summary>
+    /// Binary package for Workshop
+    /// </summary>
+    [Serializable]
+    public class WorkshopBinaryPackage : BinaryPackageBase<Workshop>
+    {
+        string townId;
+        int workshopIndex;
+
+        public WorkshopBinaryPackage(Workshop obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        {
+        }
+
+        protected override void PackInternal()
+        {
+            Town town = Object.Settlement.Town;
+            townId = ResolveId(town);
+            if (townId == null) throw new Exception("Town does not have required StringId");
+
+            workshopIndex = town.Workshops.FindIndex(w => w == Object);
+        }
+
+        protected override void UnpackInternal()
+        {
+            Town town = ResolveObject<Town>(townId);
+
+            Object = town.Workshops[workshopIndex];
+        }
+    }
+}

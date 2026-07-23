@@ -1,0 +1,2 @@
+﻿[HarmonyTranspiler]
+static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ArrayFieldChangeTranspiler<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_ChangeLocalMessage>(instructions, "{{MemberName}}");

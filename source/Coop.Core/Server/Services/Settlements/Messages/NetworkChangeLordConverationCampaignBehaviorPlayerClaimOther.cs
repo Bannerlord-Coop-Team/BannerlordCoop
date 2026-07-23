@@ -1,0 +1,22 @@
+﻿using Common.Messaging;
+using ProtoBuf;
+
+namespace Coop.Core.Server.Services.Settlements.Messages;
+
+/// <summary>
+/// Server notifies other clients of request.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+public record NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther : IEvent
+{
+    [ProtoMember(1)]
+    public string SettlementId { get; }
+    [ProtoMember(2)]
+    public string HeroId { get; }
+
+    public NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther(string settlementId, string heroId)
+    {
+        SettlementId = settlementId;
+        HeroId = heroId;
+    }
+}

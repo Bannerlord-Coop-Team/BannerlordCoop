@@ -1,0 +1,119 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.Library;
+
+namespace GameInterface.Services.Modules;
+
+[Serializable]
+public struct ModuleInfo
+{
+    public string Id { get; set; }
+    public bool IsOfficial { get; set; }
+    /// <summary>
+    /// True if this module is official optional content (DLC). Coop does not support DLC,
+    /// so these must be disabled on both the server and all connecting clients.
+    /// </summary>
+    public bool IsDlc { get; set; }
+    public ApplicationVersion Version { get; set; }
+
+    public ModuleInfo(string id, bool isOfficial, bool isDlc, ApplicationVersion version)
+    {
+        Id = id;
+        IsOfficial = isOfficial;
+        IsDlc = isDlc;
+        Version = version;
+    }
+}
+
+public interface IModuleInfoProvider
+{
+    IEnumerable<ModuleInfo> GetModuleInfos();
+}
+
+// TODO move to module interface
+public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
+{
+    public IEnumerable<ModuleInfo> GetModuleInfos()
+    {
+        var modules = TaleWorlds.ModuleManager.ModuleHelper.GetActiveModules();
+        foreach (TaleWorlds.ModuleManager.ModuleInfo moduleInfo in modules)
+        {
+            bool isDlc = moduleInfo.Type == TaleWorlds.ModuleManager.ModuleType.OfficialOptional;
+            yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, isDlc, moduleInfo.Version);
+        }
+    }
+}
+public class CompatibilityInfo
+{
+    public List<ModuleInfo> Modules { get; private set; } = new List<ModuleInfo>();
+    public static IModuleInfoProvider ModuleProvider { get; set; }
+
+    static CompatibilityInfo()
+    {
+        ModuleProvider = new TaleWorldsModuleInfoProvider();
+    }
+
+    public static CompatibilityInfo Get()
+    {
+        CompatibilityInfo info = new CompatibilityInfo();
+
+        if (ModuleProvider == null)
+            return info;
+
+        foreach (ModuleInfo moduleInfo in ModuleProvider.GetModuleInfos())
+        {
+            info.AddModule(moduleInfo);
+        }
+
+        return info;
+    }
+
+    public ApplicationVersion GameVersion()
+    {
+        return Modules.Find(m => m.IsOfficial).Version;
+    }
+
+    public bool CompatibleWith(CompatibilityInfo other)
+    {
+        foreach (ModuleInfo ourModule in Modules)
+        {
+            if (!other.Modules.Contains(ourModule))
+                return false;
+        }
+        return true;
+    }
+
+    public bool GameVersionMatches(CompatibilityInfo other)
+    {
+        return GameVersion().Equals(other.GameVersion());
+    }
+
+    public override bool Equals(object obj)
+    {
+        if (obj is CompatibilityInfo == false) return false;
+
+        return CompatibleWith(obj as CompatibilityInfo);
+    }
+
+    public override int GetHashCode()
+    {
+        var hashCode = 0;
+        if (Modules == null || !Modules.Any())
+        {
+            return hashCode;
+        }
+
+        foreach (var module in Modules)
+        {
+            hashCode += module.GetHashCode();
+        }
+
+        return hashCode;
+    }
+
+    private void AddModule(ModuleInfo moduleInfo)
+    {
+        Modules.Add(moduleInfo);
+    }
+}
