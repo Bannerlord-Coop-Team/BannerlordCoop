@@ -47,6 +47,11 @@ internal class PlayerCaptivityAttackProtectionPersistencePatches
                         protection.AttackerParty,
                         protection.TargetParty,
                         protection.DisabledUntil))
+                    .Concat(DefaultMobilePartyAIModelPatches.GetPersistedFactionAttackProtections()
+                        .Select(protection => new PlayerCaptivityAttackProtectionSaveData(
+                            protection.AttackerParty,
+                            protection.TargetFaction,
+                            protection.DisabledUntil)))
                     .ToList();
         }
 
@@ -59,18 +64,28 @@ internal class PlayerCaptivityAttackProtectionPersistencePatches
         var now = currentTime ?? CampaignTime.Now;
         foreach (var protection in saveData)
         {
-            if (protection?.AttackerParty?.Ai == null
+            if (protection?.AttackerParty == null
                 || protection.AttackerParty.IsActive != true
-                || protection.TargetParty?.IsActive != true
                 || now > protection.DisabledUntil)
             {
                 continue;
             }
 
-            DefaultMobilePartyAIModelPatches.PreventAttacksUntil(
-                protection.AttackerParty,
-                protection.TargetParty,
-                protection.DisabledUntil);
+            if (protection.TargetFaction != null)
+            {
+                DefaultMobilePartyAIModelPatches.PreventFactionAttacksUntil(
+                    protection.AttackerParty,
+                    protection.TargetFaction,
+                    protection.DisabledUntil);
+            }
+            else if (protection.AttackerParty.Ai != null &&
+                     protection.TargetParty?.IsActive == true)
+            {
+                DefaultMobilePartyAIModelPatches.PreventAttacksUntil(
+                    protection.AttackerParty,
+                    protection.TargetParty,
+                    protection.DisabledUntil);
+            }
         }
     }
 }

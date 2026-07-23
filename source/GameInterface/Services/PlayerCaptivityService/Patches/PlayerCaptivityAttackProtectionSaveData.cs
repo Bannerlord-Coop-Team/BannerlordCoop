@@ -19,6 +19,13 @@ internal sealed class PlayerCaptivityAttackProtectionSaveData
     [SaveableField(3)]
     internal CampaignTime DisabledUntil;
 
+    [SaveableField(4)]
+    internal Kingdom TargetKingdom;
+
+    [SaveableField(5)]
+    internal Clan TargetClan;
+
+    internal IFaction TargetFaction => (IFaction)TargetKingdom ?? TargetClan;
     private PlayerCaptivityAttackProtectionSaveData()
     {
     }
@@ -30,6 +37,17 @@ internal sealed class PlayerCaptivityAttackProtectionSaveData
     {
         AttackerParty = attackerParty;
         TargetParty = targetParty;
+        DisabledUntil = disabledUntil;
+    }
+
+    internal PlayerCaptivityAttackProtectionSaveData(
+        MobileParty attackerParty,
+        IFaction targetFaction,
+        CampaignTime disabledUntil)
+    {
+        AttackerParty = attackerParty;
+        TargetKingdom = targetFaction as Kingdom;
+        TargetClan = targetFaction as Clan;
         DisabledUntil = disabledUntil;
     }
 }

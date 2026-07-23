@@ -61,6 +61,31 @@ public sealed class PlayerCaptivityAttackProtectionPersistenceTests : IDisposabl
     }
 
     [Fact]
+    public void SyncData_RoundTripsServerFactionAttackProtection()
+    {
+        var attackerParty = CreateMobileParty();
+        var targetFaction = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
+        var disabledUntil = new CampaignTime(1200);
+        var currentTime = new CampaignTime(1000);
+        var records = new Dictionary<string, object>();
+        DefaultMobilePartyAIModelPatches.PreventFactionAttacksUntil(
+            attackerParty,
+            targetFaction,
+            disabledUntil);
+
+        PlayerCaptivityAttackProtectionPersistencePatches.SyncAttackProtections(
+            new TestDataStore(isSaving: true, records), isClient: false, currentTime);
+        DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections();
+        PlayerCaptivityAttackProtectionPersistencePatches.SyncAttackProtections(
+            new TestDataStore(isSaving: false, records), isClient: false, currentTime);
+
+        var restored = Assert.Single(DefaultMobilePartyAIModelPatches.GetPersistedFactionAttackProtections());
+        Assert.Same(attackerParty, restored.AttackerParty);
+        Assert.Same(targetFaction, restored.TargetFaction);
+        Assert.Equal(disabledUntil, restored.DisabledUntil);
+    }
+
+    [Fact]
     public void SyncData_PrunesExpiredProtectionBeforeSave()
     {
         var records = new Dictionary<string, object>();
