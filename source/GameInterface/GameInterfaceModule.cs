@@ -56,6 +56,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<CultureObjectProvider>().As<ICultureObjectProvider>().InstancePerDependency();
         builder.RegisterType<HeroCharacterObjectRepairer>().As<IHeroCharacterObjectRepairer>().InstancePerDependency();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<PrisonerSaleValidator>().As<IPrisonerSaleValidator>().InstancePerDependency();
         builder.RegisterType<PlayerRansomReleaseSettlementProvider>().As<IPlayerRansomReleaseSettlementProvider>().InstancePerDependency();
