@@ -138,6 +138,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
         Prefix(typeof(Agent), nameof(Agent.SetCurrentActionProgress), nameof(Agent_SetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetCurrentActionSpeed), nameof(Agent_SetCurrentActionSpeed));
         Prefix(typeof(Agent), nameof(Agent.SetActionChannel), nameof(Agent_SetActionChannel));
         Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
         Prefix(typeof(Agent), "set_MovementFlags", nameof(Agent_set_MovementFlags));
@@ -779,11 +780,26 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_SetCurrentActionSpeed(
+        Agent __instance,
+        int channelNo,
+        float speed)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            m.Action0Speed = speed;
+            m.SetCurrentActionSpeedCalls++;
+        }
+        return false;
+    }
+
     private static bool Agent_SetActionChannel(
         Agent __instance,
         int channelNo,
         ref ActionIndexCache actionIndexCache,
         AnimFlags additionalFlags,
+        float actionSpeed,
         float blendInPeriod,
         float startProgress,
         ref bool __result)
@@ -794,6 +810,7 @@ public sealed class MissionEngineFixture : IDisposable
             m.Action0Index = actionIndexCache.Index;
             m.Action0Flags = additionalFlags;
             m.Action0Progress = startProgress;
+            m.Action0Speed = actionSpeed;
             if (m.HasVisualSkeleton)
             {
                 m.SkeletonAction0Index = actionIndexCache.Index;

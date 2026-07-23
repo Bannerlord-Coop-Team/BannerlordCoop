@@ -67,6 +67,8 @@ public sealed class MirrorAgent
     public int SetActionChannelCalls { get; set; }
     public int LastSetActionChannel { get; set; } = -1;
     public float LastSetActionBlendInPeriod { get; set; }
+    public float Action0Speed { get; set; } = 1f;
+    public int SetCurrentActionSpeedCalls { get; set; }
     public bool HasVisualSkeleton { get; set; }
     public int SkeletonAction0Index { get; set; } = -1;
     public int SkeletonAction1Index { get; set; } = -1;
