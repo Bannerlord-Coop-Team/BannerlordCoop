@@ -47,15 +47,18 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
     // objects without hitting the service locator each call. Null only in tests that don't exercise that path.
     private readonly IObjectManager objectManager;
+    // BR-110: the engine agent budget clamps wave/initial allocation to the mission's render capacity.
+    private readonly IBattleAgentBudget agentBudget;
 
     public string MapEventId { get; }
     public BattleSideEnum Side { get; }
 
-    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager)
+    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager, IBattleAgentBudget agentBudget)
     {
         MapEventId = mapEventId;
         Side = side;
         this.objectManager = objectManager;
+        this.agentBudget = agentBudget;
     }
 
     /// <summary>
@@ -261,25 +264,51 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     public IEnumerable<IAgentOriginBase> SupplyTroops(int numberToAllocate)
     {
+        // BR-110: allocate no more troops than the engine has RENDER-SLOT capacity for — a mounted troop needs
+        // two slots (rider + horse). The unallocated remainder stays UNSUPPLIED (wave-eligible), so the native
+        // wave logic re-requests it as casualties free slots; the supplied pointer stays aligned with what can
+        // actually field. A null budget (the service-locator fallback path could not resolve one) means no
+        // clamp, matching the no-mission behaviour. The native drip is additionally re-checked at spawn time by
+        // MissionSpawnCapacityPatch, so this clamp is a pre-filter, not the sole guard.
+        int slotBudget = agentBudget != null
+            ? agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current))
+            : int.MaxValue;
+
         var origins = new List<IAgentOriginBase>();
+        int supplied = 0;
         lock (gate)
         {
-            int remaining = numberToAllocate;
+            bool stop = false;
             foreach (var party in parties)
             {
-                while (remaining > 0 && party.Supplied < party.Entries.Length)
+                while (!stop && supplied < numberToAllocate && party.Supplied < party.Entries.Length)
                 {
                     var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
+                    int slots = SlotsForOrigin(origin);
+                    // Stop rather than skip: the supplied pointer advances sequentially, so a troop that does
+                    // not fit now must remain unsupplied (wave-eligible) instead of being jumped over.
+                    if (slots > slotBudget) { stop = true; break; }
+
                     party.Supplied++;
-                    remaining--;
+                    supplied++;
+                    slotBudget -= slots;
                     if (origin != null) origins.Add(origin);
                 }
-                if (remaining == 0) break;
+                if (stop || supplied >= numberToAllocate) break;
             }
         }
-        Logger.Information("[TroopSupply] {MapEvent} side {Side}: SupplyTroops({Req}) -> {Ret} origins, {Remaining} remaining",
-            MapEventId, Side, numberToAllocate, origins.Count, NumTroopsNotSupplied);
+        Logger.Information("[TroopSupply] {MapEvent} side {Side}: SupplyTroops({Req}) -> {Ret} origins ({Withheld} withheld at the engine agent limit), {Remaining} remaining",
+            MapEventId, Side, numberToAllocate, origins.Count, numberToAllocate - supplied, NumTroopsNotSupplied);
         return origins;
+    }
+
+    // BR-110: render slots one supplied origin will consume when spawned — a mounted troop spawns a rider and a
+    // horse (2), an unmounted troop one (1), a null/unresolvable origin none (0, so it advances the supplied
+    // pointer without charging the budget). Falls back to 1 when no budget is available (the null-budget path).
+    private int SlotsForOrigin(IAgentOriginBase origin)
+    {
+        if (origin == null) return 0;
+        return agentBudget == null ? 1 : agentBudget.SlotsForOrigin(origin);
     }
 
     public IAgentOriginBase SupplyOneTroop()

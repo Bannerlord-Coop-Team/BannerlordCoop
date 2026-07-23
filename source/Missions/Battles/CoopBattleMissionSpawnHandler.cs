@@ -1,4 +1,6 @@
 ﻿using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using SandBox.Missions.MissionLogics;
@@ -18,6 +20,7 @@ namespace Missions.Battles;
 public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopBattleMissionSpawnHandler>();
+    internal const string InvalidPlayerReserveMessage = "Unable to start the battle because your party's troop reserve was not received. Returning to the campaign map.";
 
     // Hold this long for a still-in-flight reserve before sizing with whatever landed. A dropped or server-rejected
     // reserve request would otherwise never populate a supplier, and the deployment controller (which gates on
@@ -27,22 +30,29 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
     private readonly CoopTroopSupplier _defenderSupplier;
     private readonly CoopTroopSupplier _attackerSupplier;
+    private readonly IMessageBroker _messageBroker;
+    private readonly BattleSideEnum _playerSide;
+    private readonly string _playerPartyId;
 
     // Latched once the sides are sized jointly; both are held at zero until then.
     private bool _sized;
 
     // Time spent holding both sides while a reserve is in flight (only accrues on the held path).
     private float _heldSeconds;
-    private bool _emptyBattleAbortRequested;
+    private bool _invalidBattleAbortRequested;
 
     // Gated on by CoopBattleDeploymentMissionController: a game-thread latch, not the suppliers' network-thread
     // IsPopulated (which could read true mid-frame before Init has actually sized).
     public bool IsSized => _sized;
 
-    public CoopBattleMissionSpawnHandler(CoopTroopSupplier defenderSupplier, CoopTroopSupplier attackerSupplier)
+    public CoopBattleMissionSpawnHandler(CoopTroopSupplier defenderSupplier, CoopTroopSupplier attackerSupplier,
+        IMessageBroker messageBroker, BattleSideEnum playerSide, string playerPartyId)
     {
         _defenderSupplier = defenderSupplier;
         _attackerSupplier = attackerSupplier;
+        _messageBroker = messageBroker;
+        _playerSide = playerSide;
+        _playerPartyId = playerPartyId;
     }
 
     public override void AfterStart()
@@ -54,7 +64,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         if (sizing.Ready)
         {
-            if (sizing.SizeNow)
+            if (sizing.SizeNow && HasLocalPlayerOrigin())
             {
                 // On-time (common): both reserves present, so size before the first tick.
                 RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
@@ -63,11 +73,10 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
                 return;
             }
 
-            // Both authoritative responses arrived but neither contains a combatant. There is no valid 0/0
-            // spawn setup (Init divides the joint cap by the total), and latching IsSized would open an empty
-            // deployment forever. Keep a safe held phase until the timeout ends the mission normally.
+            // Keep deployment held when the authoritative response cannot produce the local player agent.
+            // OnMissionTick ends the invalid mission without allowing native SetupTeams to run.
             AddHeldPhases();
-            Logger.Error("[BattleSync] Both battle reserves arrived empty; holding briefly before aborting the invalid mission");
+            Logger.Error("[BattleSync] Battle reserves cannot produce the local player origin; holding deployment before aborting the invalid mission");
             return;
         }
 
@@ -84,15 +93,15 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
-        if (_sized || _emptyBattleAbortRequested) return;
+        if (_sized || _invalidBattleAbortRequested) return;
 
         _heldSeconds += dt;
         var sizing = ReadSizing();
         if (ShouldContinueHolding(sizing)) return;
 
-        if (!sizing.HasAnyOwnedTroops)
+        if (!HasLocalPlayerOrigin())
         {
-            AbortEmptyBattle(sizing);
+            AbortInvalidBattle(sizing);
             return;
         }
 
@@ -111,15 +120,27 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
             && (!sizing.Ready || !sizing.HasAnyOwnedTroops);
     }
 
-    // A zero-troop mission has no safe sizing or deployment path. Reserves had the full hold window to
-    // arrive/recover; terminate through Mission.EndMission so the attached coop lifecycle releases the
-    // spawn gate and returns to campaign instead of leaving the loading screen gated forever.
-    private void AbortEmptyBattle(SideSizing sizing)
+    // The native deployment controller dereferences InitialPlayerAgent after spawning. Without the local
+    // player's authoritative origin, keep IsSized false and end through the attached mission lifecycle.
+    private void AbortInvalidBattle(SideSizing sizing)
     {
-        _emptyBattleAbortRequested = true;
-        Logger.Error("[BattleSync] No battle troops arrived within {Sec}s (Def populated={DefP}, Atk populated={AtkP}); ending invalid mission",
-            ReserveHoldDeadlineSeconds, sizing.DefenderPopulated, sizing.AttackerPopulated);
+        _invalidBattleAbortRequested = true;
+        Logger.Error("[BattleSync] Local player origin missing from battle reserves (side={Side}, party={PartyId}, Def populated={DefP}, Atk populated={AtkP}); ending invalid mission",
+            _playerSide, _playerPartyId, sizing.DefenderPopulated, sizing.AttackerPopulated);
+        _messageBroker.Publish(this, new SendInformationMessage(InvalidPlayerReserveMessage));
         base.Mission.EndMission();
+    }
+
+    private bool HasLocalPlayerOrigin()
+    {
+        return HasLocalPlayerOrigin(_playerSide, _playerPartyId, _defenderSupplier, _attackerSupplier);
+    }
+
+    internal static bool HasLocalPlayerOrigin(BattleSideEnum playerSide, string playerPartyId,
+        CoopTroopSupplier defenderSupplier, CoopTroopSupplier attackerSupplier)
+    {
+        var playerSupplier = playerSide == BattleSideEnum.Attacker ? attackerSupplier : defenderSupplier;
+        return playerSupplier.GetRemainingForParty(playerPartyId) > 0;
     }
 
     // This is the one point where an empty side becomes intentional rather than merely late. Record exactly
