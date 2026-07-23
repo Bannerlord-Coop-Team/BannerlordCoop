@@ -52,13 +52,19 @@ internal static class ConversationPartyHold
     /// <summary>
     /// Marks the party as engaged and holds it in place. The tracker decides whether the engagement can be shared.
     /// </summary>
-    public static bool TryEngage(ConversationPartyTracker tracker, object engagerKey, string engagerPartyId, MobileParty party, string partyId)
+    public static bool TryEngage(
+        ConversationPartyTracker tracker,
+        object engagerKey,
+        string engagerPartyId,
+        MobileParty party,
+        string partyId,
+        bool engagerIsDefender)
     {
         if (tracker == null || party == null) return false;
 
         var wasAiDisabled = party.Ai?.IsDisabled != false;
 
-        if (!tracker.TryBeginEngagement(engagerKey, engagerPartyId, partyId, wasAiDisabled))
+        if (!tracker.TryBeginEngagement(engagerKey, engagerPartyId, partyId, wasAiDisabled, engagerIsDefender))
             return false;
 
         if (!wasAiDisabled)
