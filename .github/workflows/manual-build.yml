@@ -152,7 +152,8 @@ jobs:
 
           archive_bytes=$(stat -c %s "artifact/$FILE_NAME")
           archive_sha256=$(sha256sum "artifact/$FILE_NAME" | cut -d' ' -f1)
-          expires_at=$(date -u -d '+24 hours' +%Y-%m-%dT%H:%M:%SZ)
+          now=$(date +%s)
+          expires_at=$(date -u -d "@$((now + 86400))" +%Y-%m-%dT%H:%M:%SZ)
           r2_key="manual/$BUILD_ID/client/Coop.7z"
           printf '{"kind":"manual-build","buildId":"%s","fileName":"%s","headSha":"%s","serverSha":"%s","expiresAt":"%s","serverInput":{"bucket":"%s","key":"%s","bytes":%s,"sha256":"%s"}}\n' \
             "$BUILD_ID" "$FILE_NAME" "$HEAD_SHA" "$SERVER_SHA" "$expires_at" \
