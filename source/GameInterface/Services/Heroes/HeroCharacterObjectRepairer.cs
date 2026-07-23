@@ -10,11 +10,14 @@ namespace GameInterface.Services.Heroes;
 internal interface IHeroCharacterObjectRepairer
 {
     bool TryRepair(Hero hero);
+    bool TryHydrate(Hero hero);
 }
 
 /// <inheritdoc cref="IHeroCharacterObjectRepairer"/>
 internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
 {
+    internal const string DeferredCharacterObjectPrefix = "CoopMissingHero_";
+
     private readonly ILogger logger;
     private readonly ICharacterObjectCreator characterObjectCreator;
     private readonly ICultureObjectProvider cultureObjectProvider;
@@ -34,8 +37,61 @@ internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
         if (hero == null) throw new System.ArgumentNullException(nameof(hero));
         if (hero.CharacterObject != null) return false;
 
+        var culture = FindUsableCulture(hero);
+        var template = culture?.BasicTroop;
+        CharacterObject characterObject;
+        if (template != null)
+        {
+            characterObject = characterObjectCreator.CreateFrom(template);
+            hero.Culture = culture;
+            logger.Warning("Repaired missing CharacterObject for hero {HeroId} using {TemplateId} from culture {CultureId}",
+                hero.StringId,
+                template.StringId,
+                culture.StringId);
+        }
+        else
+        {
+            characterObject = characterObjectCreator.Create($"{DeferredCharacterObjectPrefix}{hero.StringId}");
+            logger.Warning("Repaired missing CharacterObject for hero {HeroId}; template initialization is deferred until cultures are ready",
+                hero.StringId);
+        }
+
+        characterObject.HeroObject = hero;
+        hero._characterObject = characterObject;
+        return true;
+    }
+
+    public bool TryHydrate(Hero hero)
+    {
+        if (hero == null) throw new System.ArgumentNullException(nameof(hero));
+
+        var characterObject = hero.CharacterObject;
+        if (characterObject == null ||
+            characterObject.OriginalCharacter != null ||
+            string.IsNullOrEmpty(characterObject.StringId) ||
+            !characterObject.StringId.StartsWith(DeferredCharacterObjectPrefix, System.StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var culture = FindUsableCulture(hero);
+        var template = culture?.BasicTroop;
+        if (template == null) return false;
+
+        characterObjectCreator.InitializeFrom(characterObject, template);
+        hero.Culture = culture;
+
+        logger.Warning("Initialized repaired CharacterObject for hero {HeroId} using {TemplateId} from culture {CultureId}",
+            hero.StringId,
+            template.StringId,
+            culture.StringId);
+        return true;
+    }
+
+    private CultureObject FindUsableCulture(Hero hero)
+    {
         var availableCultures = cultureObjectProvider.GetAll();
-        var culture = GetUsableCulture(hero.Culture)
+        return GetUsableCulture(hero.Culture)
             ?? GetUsableCulture(hero.Clan?.Culture)
             ?? GetUsableCulture(hero.OriginClan?.Culture)
             ?? GetUsableCulture(hero.CurrentSettlement?.Culture)
@@ -43,24 +99,6 @@ internal class HeroCharacterObjectRepairer : IHeroCharacterObjectRepairer
             ?? availableCultures.FirstOrDefault(candidate =>
                 candidate?.IsMainCulture == true && candidate.BasicTroop != null)
             ?? availableCultures.FirstOrDefault(candidate => candidate?.BasicTroop != null);
-
-        var template = culture?.BasicTroop;
-        if (template == null)
-        {
-            logger.Error("Unable to repair missing CharacterObject for hero {HeroId}: no culture basic troop was available", hero.StringId);
-            return false;
-        }
-
-        var characterObject = characterObjectCreator.CreateFrom(template);
-        characterObject.HeroObject = hero;
-        hero._characterObject = characterObject;
-        hero.Culture = culture;
-
-        logger.Warning("Repaired missing CharacterObject for hero {HeroId} using {TemplateId} from culture {CultureId}",
-            hero.StringId,
-            template.StringId,
-            culture.StringId);
-        return true;
     }
 
     private static CultureObject GetUsableCulture(CultureObject culture)

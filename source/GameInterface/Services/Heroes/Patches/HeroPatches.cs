@@ -35,6 +35,16 @@ namespace GameInterface.Services.Heroes.Patches
             __result = __instance.CompanionOf != null && __instance.CompanionOf.IsPlayerClan();
             return false;
         }
+
+        [HarmonyPatch("OnLoad")]
+        [HarmonyPostfix]
+        private static void OnLoadPostfix(Hero __instance)
+        {
+            if (__instance.CharacterObject != null) return;
+            if (!ContainerProvider.TryResolve<IHeroCharacterObjectRepairer>(out var repairer)) return;
+
+            repairer.TryRepair(__instance);
+        }
     }
 
     [HarmonyPatch(typeof(TroopRoster), nameof(TroopRoster.CalculateCachedStatsOnLoad))]
@@ -47,9 +57,12 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes())
             {
-                if (hero.CharacterObject != null) continue;
+                if (hero.CharacterObject == null)
+                {
+                    repairer.TryRepair(hero);
+                }
 
-                repairer.TryRepair(hero);
+                repairer.TryHydrate(hero);
             }
         }
     }

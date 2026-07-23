@@ -50,17 +50,64 @@ public class HeroCharacterObjectRepairerTests
     }
 
     [Fact]
-    public void TryRepair_MissingCultureTemplate_DoesNotCreateCharacterObject()
+    public void TryRepair_MissingCultureTemplate_CreatesDeferredCharacterObject()
     {
+        var replacement = ObjectHelper.SkipConstructor<CharacterObject>();
         var hero = ObjectHelper.SkipConstructor<Hero>();
-        var characterObjectCreator = new FakeCharacterObjectCreator(ObjectHelper.SkipConstructor<CharacterObject>());
+        hero.StringId = "Created_2878";
+        var characterObjectCreator = new FakeCharacterObjectCreator(replacement);
         var repairer = CreateRepairer(characterObjectCreator);
 
         var repaired = repairer.TryRepair(hero);
 
-        Assert.False(repaired);
-        Assert.Null(hero.CharacterObject);
+        Assert.True(repaired);
+        Assert.Same(replacement, hero.CharacterObject);
+        Assert.Same(hero, replacement.HeroObject);
+        Assert.Equal(
+            $"{HeroCharacterObjectRepairer.DeferredCharacterObjectPrefix}{hero.StringId}",
+            characterObjectCreator.StringId);
         Assert.Null(characterObjectCreator.Template);
+    }
+
+    [Fact]
+    public void TryHydrate_DeferredCharacterObject_InitializesFromLoadedCulture()
+    {
+        var template = ObjectHelper.SkipConstructor<CharacterObject>();
+        var replacement = ObjectHelper.SkipConstructor<CharacterObject>();
+        var culture = ObjectHelper.SkipConstructor<CultureObject>();
+        culture.BasicTroop = template;
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        hero.StringId = "Created_2878";
+        var cultures = new List<CultureObject>();
+        var characterObjectCreator = new FakeCharacterObjectCreator(replacement);
+        var repairer = CreateRepairer(characterObjectCreator, cultures);
+
+        Assert.True(repairer.TryRepair(hero));
+        cultures.Add(culture);
+
+        var hydrated = repairer.TryHydrate(hero);
+
+        Assert.True(hydrated);
+        Assert.Same(template, characterObjectCreator.InitializationTemplate);
+        Assert.Same(replacement, characterObjectCreator.InitializedCharacterObject);
+        Assert.Same(culture, hero.Culture);
+        Assert.False(repairer.TryHydrate(hero));
+    }
+
+    [Fact]
+    public void TryHydrate_NormalCharacterObject_DoesNothing()
+    {
+        var characterObject = ObjectHelper.SkipConstructor<CharacterObject>();
+        characterObject.StringId = "normal_character";
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        hero._characterObject = characterObject;
+        var characterObjectCreator = new FakeCharacterObjectCreator(characterObject);
+        var repairer = CreateRepairer(characterObjectCreator);
+
+        var hydrated = repairer.TryHydrate(hero);
+
+        Assert.False(hydrated);
+        Assert.Null(characterObjectCreator.InitializationTemplate);
     }
 
     [Fact]
@@ -106,6 +153,13 @@ public class HeroCharacterObjectRepairerTests
         ICharacterObjectCreator characterObjectCreator,
         params CultureObject[] cultures)
     {
+        return CreateRepairer(characterObjectCreator, (IEnumerable<CultureObject>)cultures);
+    }
+
+    private HeroCharacterObjectRepairer CreateRepairer(
+        ICharacterObjectCreator characterObjectCreator,
+        IEnumerable<CultureObject> cultures)
+    {
         return new HeroCharacterObjectRepairer(
             logger.Object,
             characterObjectCreator,
@@ -131,17 +185,34 @@ public class HeroCharacterObjectRepairerTests
     {
         private readonly CharacterObject replacement;
 
+        public string? StringId { get; private set; }
         public CharacterObject? Template { get; private set; }
+        public CharacterObject? InitializedCharacterObject { get; private set; }
+        public CharacterObject? InitializationTemplate { get; private set; }
 
         public FakeCharacterObjectCreator(CharacterObject replacement)
         {
             this.replacement = replacement;
         }
 
+        public CharacterObject Create(string stringId)
+        {
+            StringId = stringId;
+            replacement.StringId = stringId;
+            return replacement;
+        }
+
         public CharacterObject CreateFrom(CharacterObject template)
         {
             Template = template;
             return replacement;
+        }
+
+        public void InitializeFrom(CharacterObject characterObject, CharacterObject template)
+        {
+            InitializedCharacterObject = characterObject;
+            InitializationTemplate = template;
+            characterObject._originCharacter = template;
         }
     }
 }
