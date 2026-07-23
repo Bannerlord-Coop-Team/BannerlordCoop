@@ -86,33 +86,8 @@ internal class GameStateInterface : IGameStateInterface
                 return;
             }
 
-#if DEBUG
-            if (IsAutoConnectLaunch(Environment.GetCommandLineArgs()))
-            {
-                Logger.Information(
-                    "[AutoConnect] Loading save {SaveName} without interactive compatibility inquiries",
-                    saveName);
-
-                var loadResult = MBSaveLoad.LoadSaveGameData(save.Name);
-                if (loadResult == null)
-                {
-                    Logger.Error("[AutoConnect] Failed to load save data for {SaveName}", saveName);
-                    return;
-                }
-
-                StartGame(loadResult);
-                return;
-            }
-#endif
-
             SandBoxSaveHelper.TryLoadSave(save, StartGame, null);
         }, blocking: true);
-    }
-
-    internal static bool IsAutoConnectLaunch(string[] arguments)
-    {
-        return arguments.Any(argument =>
-            string.Equals(argument, "/autoconnect", StringComparison.OrdinalIgnoreCase));
     }
 
     private void StartGame(LoadResult loadResult)
