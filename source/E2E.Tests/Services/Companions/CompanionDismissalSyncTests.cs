@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -57,6 +58,7 @@ public class CompanionDismissalSyncTests : IDisposable
                 requester.Resolve<IMessageBroker>().Publish(this, new CompanionFired(companion));
             },
             new[] { CreateObituaryMethod });
+        Assert.False(Server.Resolve<ISendCoalescer>().HasPending);
         testEnvironment.FlushCoalescer();
 
         Assert.NotNull(completion);

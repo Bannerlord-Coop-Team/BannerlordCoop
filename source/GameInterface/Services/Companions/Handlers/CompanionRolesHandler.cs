@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
@@ -30,17 +31,20 @@ internal class CompanionRolesHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISendCoalescer sendCoalescer;
     private string pendingFireCompanionRequestId;
     private string pendingFireCompanionHeroId;
 
     public CompanionRolesHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<ClanNameSelectionDone>(Handle_ClanNameSelectionDone);
         messageBroker.Subscribe<DoClanNameSelection>(Handle_DoClanNameSelection);
@@ -246,8 +250,10 @@ internal class CompanionRolesHandler : IHandler
                     if (memberRoster != null)
                     {
                         ReconcileDismissedCompanionRoster(memberRoster, oneToOneConversationHero.CharacterObject,
-                            memberRosterId, characterId, network);
+                            memberRosterId, characterId, network, sendCoalescer);
                     }
+                    else
+                        sendCoalescer?.Flush(network);
                 }
 
                 success = true;
@@ -309,7 +315,7 @@ internal class CompanionRolesHandler : IHandler
     }
 
     internal static void ReconcileDismissedCompanionRoster(TroopRoster memberRoster, CharacterObject character,
-        string memberRosterId, string characterId, INetwork network)
+        string memberRosterId, string characterId, INetwork network, ISendCoalescer sendCoalescer = null)
     {
         int index = memberRoster.FindIndexOfTroop(character);
         if (index >= 0)
@@ -323,6 +329,11 @@ internal class CompanionRolesHandler : IHandler
         }
 
         memberRoster.RemoveZeroCounts();
+
+        // Flush the ordinary coalesced deltas before the absolute correction and correlated completion.
+        // All of them share the reliable ordered stream, so the client cannot observe the acknowledgement
+        // while a stale roster delta from this dismissal is still pending for the next server tick.
+        sendCoalescer?.Flush(network);
 
         // Send an absolute correction after the ordinary deltas. This is idempotent and repairs clients
         // that entered the dismissal with duplicate companion counts.
