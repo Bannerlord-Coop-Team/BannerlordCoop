@@ -56,6 +56,11 @@ internal static class KingdomCollectionSync
         }
     }
 
+    public static void SetRulingClan(Kingdom kingdom, Clan clan, bool publish)
+    {
+        SetField(kingdom, nameof(Kingdom._rulingClan), clan, publish);
+    }
+
     public static void RepublishMembershipCollections(Kingdom kingdom)
     {
         if (kingdom == null) return;

@@ -394,6 +394,260 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void AddDecision_UsesRegisteredPlayerClanWhenPartyClanPointsElsewhere()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var unrelatedClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var unrelatedKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(unrelatedClanId, unrelatedKingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(unrelatedKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(unrelatedClanId, out var unrelatedClan));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var playerParty));
+
+            using (new AllowedThread())
+            {
+                playerParty.ActualClan = unrelatedClan;
+            }
+
+            kingdom.AddDecision(new DeclareWarDecision(playerClan, targetKingdom));
+
+            Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+    }
+
+    [Fact]
+    public void KingdomDecisionVotes_MissingVoteTimesOutAfterVotingWindow()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+
+        DeclareWarDecision decision = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
+
+            decision = new DeclareWarDecision(playerClan, targetKingdom);
+            kingdom.AddDecision(decision);
+
+            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+
+            Assert.Same(decision, Assert.Single(kingdom.UnresolvedDecisions));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+
+            decision.TriggerTime = CampaignTime.HoursFromNow(-1);
+            CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
+
+            Assert.Empty(kingdom.UnresolvedDecisions);
+        });
+
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId && message.DecisionIndex == 0);
+    }
+
+    [Fact]
+    public void ProcessDecisionDuringHourlySweep_LeavesOtherDueDecisionsUntouched()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var processedTargetId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var untouchedTargetId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(processedTargetId);
+        EnsureKingdomRegisteredEverywhere(untouchedTargetId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(processedTargetId, out var processedTarget));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(untouchedTargetId, out var untouchedTarget));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
+
+            var processedDecision = new DeclareWarDecision(playerClan, processedTarget);
+            var untouchedDecision = new DeclareWarDecision(playerClan, untouchedTarget);
+            kingdom.AddDecision(processedDecision);
+            kingdom.AddDecision(untouchedDecision);
+            processedDecision.TriggerTime = CampaignTime.HoursFromNow(-1);
+            untouchedDecision.TriggerTime = CampaignTime.HoursFromNow(-1);
+
+            CoopKingdomDecisionProposalBehaviorPatch.ProcessDecisionDuringHourlySweep(
+                kingdom,
+                processedDecision);
+
+            Assert.Same(untouchedDecision, Assert.Single(kingdom.UnresolvedDecisions));
+            Assert.False(kingdom.IsAtWarWith(untouchedTarget));
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+    }
+
+    [Fact]
+    public void SetRulingClan_PublishesToEveryClient()
+    {
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var rulingClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        ConfigureClanInKingdom(rulingClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(rulingClanId, out var rulingClan));
+
+            KingdomCollectionSync.SetRulingClan(kingdom, rulingClan, publish: true);
+            Assert.Same(rulingClan, kingdom.RulingClan);
+        });
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(rulingClanId, out var rulingClan));
+                Assert.Same(rulingClan, kingdom.RulingClan);
+            });
+        }
+    }
+
+#if DEBUG
+    [Fact]
+    public void DebugNoWarTimeoutOutcome_PreparesAiSupportWithoutRulerChoice()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var aiClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(aiClanId, out var aiClan));
+
+            var decision = new DeclareWarDecision(playerClan, targetKingdom);
+            kingdom.AddDecision(decision);
+
+            // Add the synthetic AI clan only after the real election exists. Test clans
+            // do not have the campaign barter data used while Bannerlord builds elections.
+            using (new AllowedThread())
+            {
+                aiClan.Kingdom = kingdom;
+                kingdom._clans ??= new MBList<Clan>();
+                kingdom._clans.Add(aiClan);
+            }
+
+            var voteManager = GetConcreteVoteManager(Server);
+            Assert.True(voteManager.TryPrepareNoWarTimeoutOutcome(decision, aiClan));
+            var decisionStates = (System.Collections.IDictionary)AccessTools
+                .Field(typeof(KingdomDecisionVoteManager), "DecisionStates")
+                .GetValue(voteManager);
+            object state = decisionStates[decision];
+            var election = (KingdomElection)AccessTools
+                .Property(state.GetType(), "Election")
+                .GetValue(state);
+            Assert.Null(election._chosenOutcome);
+
+            var noWarOutcome = Assert.Single(
+                election._possibleOutcomes.OfType<DeclareWarDecision.DeclareWarDecisionOutcome>(),
+                outcome => !outcome.ShouldWarBeDeclared);
+            var supporter = Assert.Single(noWarOutcome.SupporterList);
+            Assert.Same(aiClan, supporter.Clan);
+            Assert.Equal(Supporter.SupportWeights.FullyPush, supporter.SupportWeight);
+            Assert.False(kingdom.IsAtWarWith(targetKingdom));
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+    }
+
+    [Fact]
+    public void DebugNoWarTimeoutOutcome_RejectsRecordedRulerPreviewVote()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var aiClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(aiClanId, out var aiClan));
+
+            var decision = new DeclareWarDecision(playerClan, targetKingdom);
+            kingdom.AddDecision(decision);
+
+            var voteManager = GetConcreteVoteManager(Server);
+            Assert.True(voteManager.HandleVoteRequest(
+                ControllerId,
+                CreateDeclareWarVote(kingdomId, isFinal: false)));
+
+            using (new AllowedThread())
+            {
+                aiClan.Kingdom = kingdom;
+                kingdom._clans ??= new MBList<Clan>();
+                kingdom._clans.Add(aiClan);
+            }
+
+            Assert.False(voteManager.TryPrepareNoWarTimeoutOutcome(decision, aiClan));
+
+            var decisionStates = (System.Collections.IDictionary)AccessTools
+                .Field(typeof(KingdomDecisionVoteManager), "DecisionStates")
+                .GetValue(voteManager);
+            object state = decisionStates[decision];
+            var election = (KingdomElection)AccessTools
+                .Property(state.GetType(), "Election")
+                .GetValue(state);
+            var chosenOutcome = Assert.IsType<DeclareWarDecision.DeclareWarDecisionOutcome>(
+                election._chosenOutcome);
+
+            Assert.True(chosenOutcome.ShouldWarBeDeclared);
+            Assert.Contains(chosenOutcome.SupporterList, supporter => supporter.Clan == playerClan);
+        });
+    }
+#endif
+
+    [Fact]
     public void KingdomDecisionVoteArrivingBeforeDecision_ReplaysWhenDecisionIsAdded()
     {
         var client1 = Clients.First();

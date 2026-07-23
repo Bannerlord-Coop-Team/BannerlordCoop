@@ -1,7 +1,7 @@
 using Common;
 using Common.Logging;
 using GameInterface;
-using GameInterface.Extentions;
+using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -55,11 +55,9 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (ModInformation.IsClient) return false;
 
-            // Mirrors vanilla's `clan == Clan.PlayerClan` skip: never auto-propose for
-            // a connected player's own clan. Clan.PlayerClan is the vestigial launcher clan on the
-            // dedicated host, so the player set is the replicated GetPlayerMobileParties registry.
-            // Proposing here would spend the player's influence and author a decision in their name.
-            if (Campaign.Current.CampaignObjectManager.GetPlayerMobileParties().Any(party => party.ActualClan == clan))
+            // Mirrors vanilla's `clan == Clan.PlayerClan` skip. Proposing for a registered
+            // player clan would spend that player's influence and author a decision in their name.
+            if (clan.IsPlayerClan())
             {
                 return false;
             }
@@ -152,34 +150,7 @@ namespace GameInterface.Services.Kingdoms.Patches
                 {
                     try
                     {
-                        if (decision.ShouldBeCancelled())
-                        {
-                            kingdom.RemoveDecision(decision);
-                            bool isPlayerInvolved =
-                                (decision.DetermineChooser()?.Leader?.IsHumanPlayerCharacter ?? false)
-                                || decision.DetermineSupporters().Any(supporter => supporter.IsPlayer);
-                            CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, isPlayerInvolved);
-                        }
-                        else if (decision.TriggerTime.IsPast)
-                        {
-                            if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
-                                voteManager.TryResolveDecision(decision, force: true))
-                            {
-                                continue;
-                            }
-
-                            // Resolves AI-side; ApplyChosenOutcome calls Kingdom.RemoveDecision,
-                            // which replicates the removal by index through the live patch.
-                            new KingdomElection(decision).StartElectionWithoutPlayer();
-
-                            // Guaranteed drain: an election that did not conclude (e.g.
-                            // OnShowDecision returned false) leaves the decision queued. Force
-                            // its removal so the queue cannot wedge.
-                            if (kingdom._unresolvedDecisions.Contains(decision))
-                            {
-                                kingdom.RemoveDecision(decision);
-                            }
-                        }
+                        ProcessDecisionDuringHourlySweep(kingdom, decision);
                     }
                     catch (Exception ex)
                     {
@@ -193,6 +164,40 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
 
             return false;
+        }
+
+        internal static void ProcessDecisionDuringHourlySweep(Kingdom kingdom, KingdomDecision decision)
+        {
+            if (kingdom == null || decision == null) return;
+
+            if (decision.ShouldBeCancelled())
+            {
+                kingdom.RemoveDecision(decision);
+                bool isPlayerInvolved =
+                    (decision.DetermineChooser()?.Leader?.IsHumanPlayerCharacter ?? false)
+                    || decision.DetermineSupporters().Any(supporter => supporter.IsPlayer);
+                CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, isPlayerInvolved);
+            }
+            else if (decision.TriggerTime.IsPast)
+            {
+                if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
+                    voteManager.TryResolveDecision(decision, force: true))
+                {
+                    return;
+                }
+
+                // Resolves AI-side; ApplyChosenOutcome calls Kingdom.RemoveDecision,
+                // which replicates the removal by index through the live patch.
+                new KingdomElection(decision).StartElectionWithoutPlayer();
+
+                // Guaranteed drain: an election that did not conclude (e.g.
+                // OnShowDecision returned false) leaves the decision queued. Force
+                // its removal so the queue cannot wedge.
+                if (kingdom._unresolvedDecisions.Contains(decision))
+                {
+                    kingdom.RemoveDecision(decision);
+                }
+            }
         }
     }
 }

@@ -107,6 +107,45 @@ namespace GameInterface.Services.Kingdoms.Extentions
             return this._chosenOutcome;
         }
 
+#if DEBUG
+        internal bool TryPrepareNoWarAiSupport(Clan aiSupporter)
+        {
+            if (aiSupporter == null ||
+                aiSupporter == this._chooser ||
+                this._chosenOutcome != null ||
+                this._possibleOutcomes.Any(outcome =>
+                    outcome.SupporterList.Any(supporter => supporter.Clan == this._chooser)))
+            {
+                return false;
+            }
+
+            var noWarOutcome = this._possibleOutcomes
+                .OfType<DeclareWarDecision.DeclareWarDecisionOutcome>()
+                .SingleOrDefault(outcome => !outcome.ShouldWarBeDeclared);
+            if (noWarOutcome == null) return false;
+
+            foreach (DecisionOutcome outcome in this._possibleOutcomes)
+            {
+                foreach (Supporter supporter in outcome.SupporterList.ToList())
+                {
+                    outcome.ResetSupport(supporter);
+                }
+            }
+
+            var safeAiSupporter = new Supporter(aiSupporter)
+            {
+                SupportWeight = Supporter.SupportWeights.FullyPush,
+            };
+            noWarOutcome.AddSupport(safeAiSupporter);
+
+            // A deterministic low random value prevents the AI fallback from overriding
+            // its supported result without manufacturing a choice for the player ruler.
+            this.randomFloat = 0f;
+            this.DetermineOfficialSupport();
+            return true;
+        }
+#endif
+
         public void ApplyChosenOutcomeCoop()
         {
             if (this._decision.OnShowDecision())
