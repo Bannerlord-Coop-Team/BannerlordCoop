@@ -1,8 +1,10 @@
-﻿using Common;
+using Common;
 using HarmonyLib;
 using System;
+using System.Diagnostics;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -28,28 +30,28 @@ internal class MapEventVisibilityClientPatch
         var mapEventManager = Campaign.Current?.MapEventManager;
         if (mapEventManager == null) return;
 
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null) return;
+
+        float seeingRange = mainParty.SeeingRange;
+        if (seeingRange <= 0f) return;
+
+        var mainPosition = mainParty.Position.ToVec2();
+        float seeingRangeSquared = seeingRange * seeingRange;
+
         foreach (var mapEvent in mapEventManager.MapEvents)
         {
-            // Skip events whose sides are not both assigned yet. On the client a map event is created
-            // first and its sides are wired up afterwards via separate messages, so during that window
-            // enumerating InvolvedParties would dereference an unassigned side.
-            if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) continue;
+            if (mapEvent == null) continue;
 
-            bool shouldBeVisible = AnyInvolvedPartyVisible(mapEvent);
+            // Involved-party IsVisible cannot be trusted here: the server forces every party visible
+            // (PartyVisibilityServerPatches) and vanilla only refreshes visibility for parties near the
+            // local main party, so distant parties stay visible forever on the client. Clamp the icon
+            // by distance to the local player instead, mirroring PartyNameplateVisibilityPatch.
+            bool shouldBeVisible = mapEvent.IsPlayerMapEvent ||
+                mapEvent.Position.ToVec2().DistanceSquared(mainPosition) <= seeingRangeSquared;
+
             if (mapEvent.IsVisible != shouldBeVisible)
                 SetIsVisible(mapEvent, shouldBeVisible);
         }
-    }
-
-    // Mirrors vanilla MapEvent.PartyVisibilityChanged: the icon is visible while any involved party is.
-    private static bool AnyInvolvedPartyVisible(MapEvent mapEvent)
-    {
-        foreach (var party in mapEvent.InvolvedParties)
-        {
-            if (party != null && party.IsVisible)
-                return true;
-        }
-
-        return false;
     }
 }
