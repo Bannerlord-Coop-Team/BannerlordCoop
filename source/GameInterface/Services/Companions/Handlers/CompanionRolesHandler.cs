@@ -188,7 +188,6 @@ internal class CompanionRolesHandler : IHandler
         }
     }
 
-
     private void Handle_FireCompanion(MessagePayload<FireCompanion> obj)
     {
         var data = obj.What;
