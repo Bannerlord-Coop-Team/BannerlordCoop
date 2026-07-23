@@ -1,5 +1,6 @@
 ﻿using ProtoBuf;
 using System;
+using System.Collections.Concurrent;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -8,9 +9,17 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public class AgentMountData
     {
+        internal const float StationarySpeedThreshold = 0.05f;
+        private static readonly ConcurrentDictionary<int, bool> locomotionActionCache =
+            new ConcurrentDictionary<int, bool>();
+
         // The parameter is the MOUNT agent itself (callers pass rider.MountAgent), so read it directly —
         // mirroring ApplyMount. Dereferencing .MountAgent here was reading the mount's own (null) mount → NRE.
-        public AgentMountData(Agent mountAgent, Guid mountId = default)
+        public AgentMountData(
+            Agent mountAgent,
+            Guid mountId = default,
+            float? mountAction0Speed = null,
+            bool? mountAction0IsLocomotion = null)
         {
             MountInputVector = mountAgent.MovementInputVector;
             MountAction0Flag = (ulong)mountAgent.GetCurrentAnimationFlag(0);
@@ -23,6 +32,11 @@ namespace Missions.Agents.Packets
             MountMovementDirection = mountAgent.GetMovementDirection();
             MountPosition = mountAgent.Position;
             MountSpeed = mountAgent.GetRealGlobalVelocity().AsVec2.Length;
+            MountAction0Speed = mountAction0Speed ?? GetRenderedAction0Speed(mountAgent);
+            MountAction0IsLocomotion = mountAction0IsLocomotion
+                ?? IsLocomotionAction(
+                    MountAction0Index,
+                    GetRenderedAction0Animation(mountAgent));
             MountId = mountId;
         }
 
@@ -34,15 +48,28 @@ namespace Missions.Agents.Packets
 
             // Channel 0 is the horse's GAIT (walk/trot/canter/gallop). A Controller.None puppet has no controller
             // to select it, so without replicating the owner's gait action the horse slides with no leg animation.
-            if (mountAgent.GetCurrentAction(0) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(0).Index != MountAction0Index)
+            bool clearStoppedGait = MountAction0Index == ActionIndexCache.act_none.Index
+                || (MountSpeed <= StationarySpeedThreshold && MountAction0IsLocomotion);
+            if (clearStoppedGait)
+            {
+                if (mountAgent.GetCurrentAction(0) != ActionIndexCache.act_none)
+                    mountAgent.SetActionChannel(0, ActionIndexCache.act_none);
+            }
+            else if (mountAgent.GetCurrentAction(0) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(0).Index != MountAction0Index)
             {
                 string gaitActionName = AgentActionData.GetActionNameWithCode(MountAction0Index);
                 if (gaitActionName != null)
-                    mountAgent.SetActionChannel(0, ActionIndexCache.Create(gaitActionName), additionalFlags: (AnimFlags)MountAction0Flag, startProgress: MountAction0Progress);
+                    mountAgent.SetActionChannel(
+                        0,
+                        ActionIndexCache.Create(gaitActionName),
+                        additionalFlags: (AnimFlags)MountAction0Flag,
+                        actionSpeed: MountAction0Speed,
+                        startProgress: MountAction0Progress);
             }
             else
             {
                 mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
+                mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
             }
 
             //Currently not doing anything afaik
@@ -57,11 +84,75 @@ namespace Missions.Agents.Packets
                 mountAgent.SetCurrentActionProgress(1, MountAction1Progress);
             }
             mountAgent.LookDirection = MountLookDirection;
-            mountAgent.MovementInputVector = MountInputVector;
+            mountAgent.MovementInputVector = MountSpeed <= StationarySpeedThreshold
+                ? Vec2.Zero
+                : MountInputVector;
 
             // Controller.None still lets native horse motion persist between replicated position corrections.
             // Cap that motion to the owner's real speed so a stopped owner also stops its puppet horse.
             mountAgent.SetMaximumSpeedLimit(MountSpeed, isMultiplier: false);
+        }
+
+        internal static float GetRenderedAction0Speed(Agent mountAgent)
+        {
+            if (mountAgent == null) return 0f;
+
+            TaleWorlds.Engine.Skeleton skeleton;
+            try
+            {
+                skeleton = mountAgent.AgentVisuals?.GetSkeleton();
+            }
+            catch (NullReferenceException)
+            {
+                return 1f;
+            }
+            if (skeleton == null) return 1f;
+
+            float animationSpeed = skeleton.GetAnimationSpeedAtChannel(0);
+            return float.IsNaN(animationSpeed) || float.IsInfinity(animationSpeed)
+                ? 1f
+                : Math.Max(0f, animationSpeed);
+        }
+
+        private static string GetRenderedAction0Animation(Agent mountAgent)
+        {
+            try
+            {
+                return mountAgent?.AgentVisuals?.GetSkeleton()?.GetAnimationAtChannel(0);
+            }
+            catch (NullReferenceException)
+            {
+                return null;
+            }
+        }
+
+        internal static bool IsLocomotionAnimation(string animationName)
+        {
+            if (string.IsNullOrEmpty(animationName)) return false;
+
+            return animationName.IndexOf("walk", StringComparison.OrdinalIgnoreCase) >= 0
+                || animationName.IndexOf("trot", StringComparison.OrdinalIgnoreCase) >= 0
+                || animationName.IndexOf("canter", StringComparison.OrdinalIgnoreCase) >= 0
+                || animationName.IndexOf("gallop", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        internal static bool IsLocomotionAction(string actionName, string animationName)
+        {
+            return IsLocomotionAnimation(actionName)
+                || IsLocomotionAnimation(animationName);
+        }
+
+        internal static bool IsLocomotionAction(int actionIndex, string animationName)
+        {
+            bool actionIsLocomotion = locomotionActionCache.GetOrAdd(
+                actionIndex,
+                IsLocomotionActionIndex);
+            return actionIsLocomotion || IsLocomotionAnimation(animationName);
+        }
+
+        private static bool IsLocomotionActionIndex(int actionIndex)
+        {
+            return IsLocomotionAnimation(AgentActionData.GetActionNameWithCode(actionIndex));
         }
 
         [ProtoMember(1)]
@@ -92,5 +183,11 @@ namespace Missions.Agents.Packets
         /// <summary>The owner's horizontal mount speed, used as the puppet's absolute native speed limit.</summary>
         [ProtoMember(12)]
         public float MountSpeed { get; }
+        /// <summary>The owner's rendered gait playback speed for action channel zero.</summary>
+        [ProtoMember(13)]
+        public float MountAction0Speed { get; }
+        /// <summary>Whether the owner's rendered channel-zero animation is a locomotion gait.</summary>
+        [ProtoMember(14)]
+        public bool MountAction0IsLocomotion { get; }
     }
 }

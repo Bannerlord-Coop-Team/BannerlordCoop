@@ -478,6 +478,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             remoteMirror.LookDirection = new Vec3(0f, 1f, 0f);
             remoteMirror.MovementDirection = new Vec2(0.6f, 0.8f);
             remoteMirror.InputVector = new Vec2(0.3f, 0.7f);
+            remoteMirror.RealGlobalVelocity = new Vec3(3f, 4f, 0f);
 
             var packet = new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(remoteHorse) });
             component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);

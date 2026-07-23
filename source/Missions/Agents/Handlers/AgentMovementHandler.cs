@@ -155,12 +155,21 @@ public class AgentMovementHandler : IAgentMovementHandler
             if (agent.IsMount)
             {
                 (mountIds ??= new List<Guid>()).Add(agentInfo.AgentId);
-                (mountData ??= new List<AgentMountData>()).Add(new AgentMountData(agent));
+                (mountData ??= new List<AgentMountData>()).Add(new AgentMountData(
+                    agent,
+                    mountAction0Speed: AgentMountData.GetRenderedAction0Speed(agent)));
             }
             else
             {
                 ids.Add(agentInfo.AgentId);
-                data.Add(new AgentData(agent, GetRegisteredMountId(agent)));
+                Agent mount = agent.MountAgent;
+                float? mountAction0Speed = mount != null && mount.IsActive()
+                    ? AgentMountData.GetRenderedAction0Speed(mount)
+                    : null;
+                data.Add(new AgentData(
+                    agent,
+                    GetRegisteredMountId(agent),
+                    mountAction0Speed));
             }
         }
 

@@ -100,6 +100,94 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ApplyMount_SettlesAStationaryPuppetGaitAndClearsItsInput()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            sourceHorseMirror.RealGlobalVelocity = Vec3.Zero;
+            sourceHorseMirror.Action0Index = 101;
+            sourceHorseMirror.InputVector = Vec2.Forward;
+            puppetHorseMirror.Action0Index = 101;
+            puppetHorseMirror.InputVector = Vec2.Forward;
+
+            new AgentMountData(
+                sourceHorse,
+                mountAction0Speed: 1f,
+                mountAction0IsLocomotion: true).ApplyMount(puppetHorse);
+
+            Assert.Equal(ActionIndexCache.act_none.Index, puppetHorseMirror.Action0Index);
+            Assert.Equal(Vec2.Zero, puppetHorseMirror.InputVector);
+            Assert.Equal(1, puppetHorseMirror.SetActionChannelCalls);
+            Assert.Equal(0, puppetHorseMirror.LastSetActionChannel);
+        });
+    }
+
+    [Fact]
+    public void ApplyMount_ClearsThePuppetGaitWhenTheOwnerActionIsNone()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            sourceHorseMirror.RealGlobalVelocity = Vec3.Zero;
+            sourceHorseMirror.Action0Index = ActionIndexCache.act_none.Index;
+            puppetHorseMirror.Action0Index = 101;
+
+            new AgentMountData(sourceHorse).ApplyMount(puppetHorse);
+
+            Assert.Equal(ActionIndexCache.act_none.Index, puppetHorseMirror.Action0Index);
+            Assert.Equal(1, puppetHorseMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void ApplyMount_UpdatesThePlaybackSpeedOfAnExistingMovingGait()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(3f, 4f, 0f);
+            sourceHorseMirror.Action0Index = 101;
+            puppetHorseMirror.Action0Index = 101;
+
+            new AgentMountData(sourceHorse, mountAction0Speed: 0.65f).ApplyMount(puppetHorse);
+
+            Assert.Equal(0.65f, puppetHorseMirror.Action0Speed);
+            Assert.Equal(1, puppetHorseMirror.SetCurrentActionSpeedCalls);
+            Assert.Equal(0, puppetHorseMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void IsLocomotionAction_RecognizesWalkStrafeActionsWithCrossAnimations()
+    {
+        Assert.True(AgentMountData.IsLocomotionAction(
+            "act_horse_forward_walk_strafe_right",
+            "horse_strafe_r_cross_fast"));
+    }
+
+    [Fact]
     public void MountMovementPacket_RoundTripsHorizontalMountSpeed()
     {
         using var fixture = new MissionEngineFixture();
@@ -117,10 +205,12 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             byte[] wire = serializer.Serialize(
                 new MountMovementPacket(
                     new[] { horseId },
-                    new[] { new AgentMountData(sourceHorse, horseId) }));
+                    new[] { new AgentMountData(sourceHorse, horseId, 0.7f, true) }));
             var result = Assert.IsType<MountMovementPacket>(serializer.Deserialize<IPacket>(wire));
 
             Assert.Equal(5f, Assert.Single(result.Mounts).MountSpeed);
+            Assert.Equal(0.7f, Assert.Single(result.Mounts).MountAction0Speed);
+            Assert.True(Assert.Single(result.Mounts).MountAction0IsLocomotion);
         });
     }
 

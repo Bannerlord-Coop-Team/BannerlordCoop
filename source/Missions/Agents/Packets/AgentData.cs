@@ -9,7 +9,10 @@ namespace Missions.Agents.Packets
     {
         // mountId: the mount's registry id (resolved by the caller — this ctor has no registry access), carried
         // so the receiver can attach the puppet to the exact horse; Guid.Empty when unregistered/unmounted.
-        public AgentData(Agent agent, System.Guid mountId = default)
+        public AgentData(
+            Agent agent,
+            System.Guid mountId = default,
+            float? mountAction0Speed = null)
         {
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
@@ -26,7 +29,7 @@ namespace Missions.Agents.Packets
             Agent mount = agent.MountAgent;
             if (mount != null && mount.IsActive())
             {
-                MountData = new AgentMountData(mount, mountId);
+                MountData = new AgentMountData(mount, mountId, mountAction0Speed);
             }
             else
             {
