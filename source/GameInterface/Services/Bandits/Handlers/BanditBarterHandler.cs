@@ -430,7 +430,7 @@ internal sealed class BanditBarterHandler : IHandler
         var wealth = (float)Math.Max(0L, totalWealth);
 
         var wealthFactor = strengthRatio < 1f
-            ? 0.05f + (1f - strengthRatio) * 0.2f
+            ? 0.05f + ((1f - strengthRatio) * 0.2f)
             : 0.1f;
         if (playerParty.MapEvent != null || playerParty.SiegeEvent != null)
             wealthFactor *= 1.2f;
@@ -441,7 +441,7 @@ internal sealed class BanditBarterHandler : IHandler
                 (50f + banditParty.MapFaction.Leader.GetRelation(playerHero)) / 50f,
                 0.05f,
                 1.1f);
-        var price = (int)(wealth * wealthFactor + 1000f) / 8;
+        var price = (int)((wealth * wealthFactor) + 1000f) / 8;
         if (playerHero.GetPerkValue(DefaultPerks.Roguery.SweetTalker) && !playerParty.IsCurrentlyAtSea)
             price += MathF.Round(price * DefaultPerks.Roguery.SweetTalker.PrimaryBonus);
         if (playerHero.GetPerkValue(DefaultPerks.Trade.MarketDealer))

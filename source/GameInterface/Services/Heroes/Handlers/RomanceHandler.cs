@@ -332,5 +332,4 @@ internal class RomanceHandler : IHandler
         reason = null;
         return true;
     }
-
 }

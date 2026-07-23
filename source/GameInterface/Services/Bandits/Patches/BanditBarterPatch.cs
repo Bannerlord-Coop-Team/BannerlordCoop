@@ -260,5 +260,4 @@ internal static class BanditBarterPatch
 
     private static void ShowMessage(string message)
         => InformationManager.DisplayMessage(new InformationMessage(message));
-
 }

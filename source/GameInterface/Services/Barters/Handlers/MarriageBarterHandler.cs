@@ -624,7 +624,7 @@ internal sealed class MarriageBarterHandler : IHandler
         var relationBonus = 0f;
         for (var currentRelation = relation; currentRelation < maximumRelation; currentRelation++)
         {
-            var cost = 1000 + 100 * currentRelation * currentRelation;
+            var cost = 1000 + ((100 * currentRelation) * currentRelation);
             if (overpayAmount >= cost)
             {
                 overpayAmount -= cost;
