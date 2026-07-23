@@ -306,6 +306,47 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void PollMovement_StartsAStationaryTurnWhenFacingChangesAsTheMountStops()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var horseId = Guid.NewGuid();
+
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceHorseMirror.MovementDirection = Vec2.Forward;
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(1f, 0f, 0f);
+            sourceHorseMirror.Action0Index = 101;
+            Assert.True(registry.TryRegisterAgent("peer", horseId, sourceHorse));
+
+            component.AgentMovementHandler.PollMovement(0f);
+            network.NetworkSentPackets.Packets.Clear();
+
+            sourceHorseMirror.MovementDirection = new Vec2(-1f, 0f);
+            sourceHorseMirror.RealGlobalVelocity = Vec3.Zero;
+            component.AgentMovementHandler.PollMovement(0.025f);
+
+            int turnActionIndex = ActionIndexCache.Create("act_horse_turn_left").Index;
+            Assert.Equal(turnActionIndex, sourceHorseMirror.Action0Index);
+            Assert.Equal(1, sourceHorseMirror.SetActionChannelCalls);
+
+            AgentMountData sentMount = Assert.Single(
+                Assert.Single(network.NetworkSentPackets.GetPackets<MountMovementPacket>())
+                    .Mounts);
+            Assert.Equal(AgentMountData.TurnLeft, sentMount.MountAction0TurnDirection);
+            Assert.Equal(turnActionIndex, sentMount.MountAction0TurnActionIndex);
+        });
+    }
+
     [Theory]
     [InlineData("", "horse", AgentMountData.TurnRight, "act_horse_turn_right")]
     [InlineData("", "horse", AgentMountData.TurnLeft, "act_horse_turn_left")]

@@ -223,7 +223,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         Vec2 currentDirection = mount.GetMovementDirection();
         if (mount.GetRealGlobalVelocity().AsVec2.Length > AgentMountData.StationarySpeedThreshold)
         {
-            _lastMountDirections.Remove(mount);
+            // Keep the final moving facing so a turn completed between polls is still visible when the
+            // first stationary snapshot arrives.
+            _lastMountDirections[mount] = currentDirection;
             return AgentMountData.NoTurn;
         }
 
