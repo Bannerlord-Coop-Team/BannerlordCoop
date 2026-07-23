@@ -124,7 +124,42 @@ internal class PlayerStartCaptivityPatches
                 captorParty = captorParty.MobileParty.HomeSettlement.Party;
             }
             TakePrisonerAction.Apply(captorParty, playerHero);
+
+            ScheduleBesiegerCampClear(defeatedParty);
         }
+    }
+
+    /// <summary>
+    /// Removes the captured player's party from its besieger camp — the defeat side effect native runs in
+    /// <c>PlayerEncounter.DoPlayerDefeat</c>, which a server-committed defeat never reaches (the defeated
+    /// client's encounter is staged straight to <c>PlayerEncounterState.End</c>), and which neither
+    /// <see cref="TakePrisonerAction"/> nor the coop park performs — so the prisoner's party kept besieging
+    /// on the server. The write runs with patches live, so the cleared auto-synced
+    /// <see cref="MobileParty.BesiegerCamp"/> replicates to every client.
+    /// <para>
+    /// Deferred to the next game-thread drain rather than cleared inline: the capture runs inside the battle
+    /// result commit, and when the captured party is the LAST besieger the clear cascades into
+    /// <c>SiegeEvent.FinalizeSiegeEvent</c>, which re-finalizes the besieged settlement's live map event —
+    /// the very event being committed when the defeat is a wall assault. Native sequences this clear outside
+    /// the commit too: the player's runs in <c>DoPlayerDefeat</c> after <c>Finish()</c> tore the event down,
+    /// and a defeated AI party's runs in <c>MobileParty.RemoveParty</c> on a later tick.
+    /// </para>
+    /// </summary>
+    private static void ScheduleBesiegerCampClear(MobileParty defeatedParty)
+    {
+        if (defeatedParty.BesiegerCamp == null) return;
+
+        Logger.Debug("Scheduling besieger camp clear for captured player party {PartyId}", defeatedParty.StringId);
+
+        GameThread.EnqueueSafe(() =>
+        {
+            // The camp can already be gone when the queue drains (the defeated client's native defeat
+            // clear may have reached the server first, or the siege was torn down with the battle); the
+            // clear must not resurrect the cascade then.
+            if (defeatedParty.BesiegerCamp == null) return;
+
+            defeatedParty.BesiegerCamp = null;
+        }, context: nameof(ScheduleBesiegerCampClear));
     }
 
     private static bool TryResolveCaptorParty(MBReadOnlyList<MapEventParty> winnerParties, out PartyBase captorParty)
