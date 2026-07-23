@@ -35,16 +35,20 @@ namespace GameInterface.Services.Heroes.Patches
         }
     }
 
-    [HarmonyPatch(typeof(Hero), nameof(Hero.PreAfterLoad))]
-    internal static class HeroPreAfterLoadPatches
+    [HarmonyPatch(typeof(Campaign), "OnGameLoaded")]
+    internal static class CampaignHeroPatches
     {
         [HarmonyPrefix]
-        private static void PreAfterLoadPrefix(Hero __instance)
+        private static void OnGameLoadedPrefix(Campaign __instance)
         {
-            if (__instance.CharacterObject != null) return;
             if (!ContainerProvider.TryResolve<IHeroCharacterObjectRepairer>(out var repairer)) return;
 
-            repairer.TryRepair(__instance);
+            foreach (var hero in __instance.ObjectManager.GetObjectTypeList<Hero>())
+            {
+                if (hero.CharacterObject != null) continue;
+
+                repairer.TryRepair(hero);
+            }
         }
     }
 }
