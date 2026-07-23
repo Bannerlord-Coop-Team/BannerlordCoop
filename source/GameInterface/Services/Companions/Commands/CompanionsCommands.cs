@@ -30,6 +30,7 @@ internal class CompanionsCommands
     private static CompanionDismissalFixture pendingDismissalFixture;
     private static CompanionDismissalCompleted? lastDismissalCompletion;
     private static DismissalEncounterObservation lastDismissalEncounterObservation;
+    private static Action<MessagePayload<CompanionDismissalCompleted>> dismissalCompletionHandler;
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -154,17 +155,21 @@ internal class CompanionsCommands
 
         lastDismissalCompletion = null;
         lastDismissalEncounterObservation = new DismissalEncounterObservation();
-        Action<MessagePayload<CompanionDismissalCompleted>> completionHandler = null;
-        completionHandler = payload =>
+        if (dismissalCompletionHandler != null)
+        {
+            MessageBroker.Instance.Unsubscribe(dismissalCompletionHandler);
+        }
+        dismissalCompletionHandler = payload =>
         {
             if (payload.What.OneToOneConversationHeroId != args[0]) return;
             lastDismissalCompletion = payload.What;
             lastDismissalEncounterObservation.EncounterActiveAtCompletion = PlayerEncounter.Current != null;
             lastDismissalEncounterObservation.LeaveAtCompletion =
                 PlayerEncounter.Current != null && PlayerEncounter.LeaveEncounter;
-            MessageBroker.Instance.Unsubscribe(completionHandler);
+            MessageBroker.Instance.Unsubscribe(dismissalCompletionHandler);
+            dismissalCompletionHandler = null;
         };
-        MessageBroker.Instance.Subscribe(completionHandler);
+        MessageBroker.Instance.Subscribe(dismissalCompletionHandler);
 
         try
         {
@@ -196,7 +201,8 @@ internal class CompanionsCommands
         }
         catch (Exception exception)
         {
-            MessageBroker.Instance.Unsubscribe(completionHandler);
+            MessageBroker.Instance.Unsubscribe(dismissalCompletionHandler);
+            dismissalCompletionHandler = null;
             if (Campaign.Current.ConversationManager.IsConversationInProgress)
                 Campaign.Current.ConversationManager.EndConversation();
             Campaign.Current.PlayerEncounter = null;
