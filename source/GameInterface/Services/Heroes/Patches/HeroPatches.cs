@@ -34,7 +34,6 @@ namespace GameInterface.Services.Heroes.Patches
             __result = __instance.CompanionOf != null && __instance.CompanionOf.IsPlayerClan();
             return false;
         }
-
     }
 
     [HarmonyPatch(typeof(MBObjectManager), nameof(MBObjectManager.PreAfterLoad))]
