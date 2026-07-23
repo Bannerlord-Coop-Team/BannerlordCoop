@@ -11,10 +11,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.Bandits.Handlers;
 
@@ -123,7 +120,6 @@ internal class BanditInteractionsHandler : IHandler
     {
         var data = obj.What;
 
-        // Don't need to run the full OnMobilePartyDestroyed logic on clients, only need to update these two dictionaries
         GameThread.RunSafe(() =>
         {
             if (!TryGetBanditInteractionsBehavior(out var banditInteractionsBehavior)) return;
@@ -157,7 +153,6 @@ internal class BanditInteractionsHandler : IHandler
 
     private void Handle_NetworkBanditPartyScreenDoneCondition(MessagePayload<NetworkBanditPartyScreenDoneCondition> obj)
     {
-        // Don't need to run the full OnMobilePartyDestroyed logic on clients, only need to update these two dictionaries
         GameThread.RunSafe(() =>
         {
             foreach (var characterId in obj.What.CharactersIds)

@@ -80,7 +80,9 @@ internal class BanditInteractionsCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool GetMemberAndPrisonerRostersFromPartiesPrefix(BanditInteractionsCampaignBehavior __instance, List<MobileParty> parties, ref TroopRoster troopsTakenAsMember, ref TroopRoster troopsTakenAsPrisoner, bool doBanditsJoinPlayerSide)
     {
-        // doBanditsJoinPlayerSide is always true. TaleWorlds code implements logic to create a troopsTakenAsPrisoner roster but it doesn't do anything
+        // Re-implement the parts of this method safe to run on clients.
+        // Even in TaleWorlds' code doBanditsJoinPlayerSide is always true so troopsTakenAsPrisoner is never used.
+        // This patch keeps this behavior to remain similar to the original in case of changes in future versions.
         foreach (MobileParty mobileParty in parties)
         {
             for (int i = 0; i < mobileParty.MemberRoster.Count; i++)
@@ -107,7 +109,7 @@ internal class BanditInteractionsCampaignBehaviorPatches
             }
         }
 
-        // Apply actions on server
+        // Run rest of this method on the server to sync actions properly
         var message = new GetBanditMemberAndPrisonerRosters(Clan.PlayerClan, MobileParty.MainParty, parties, doBanditsJoinPlayerSide);
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -119,7 +121,7 @@ internal class BanditInteractionsCampaignBehaviorPatches
     public static bool OpenRosterScreenAfterBanditEncounterPrefix(BanditInteractionsCampaignBehavior __instance, MobileParty conversationParty, bool doBanditsJoinPlayerSide)
     {
         // Run enemy surrender logic on the server to properly start and end a map event
-        // Opening and closing a map event involved with involved looters is needed to apply 
+        // Opening and closing a map event with involved looters is needed to apply 
         // certain affects like increasing security around settlements.
         if (!doBanditsJoinPlayerSide)
         {
