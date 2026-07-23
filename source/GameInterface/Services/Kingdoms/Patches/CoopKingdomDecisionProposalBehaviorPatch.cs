@@ -150,7 +150,34 @@ namespace GameInterface.Services.Kingdoms.Patches
                 {
                     try
                     {
-                        ProcessDecisionDuringHourlySweep(kingdom, decision);
+                        if (decision.ShouldBeCancelled())
+                        {
+                            kingdom.RemoveDecision(decision);
+                            bool isPlayerInvolved =
+                                (decision.DetermineChooser()?.Leader?.IsHumanPlayerCharacter ?? false)
+                                || decision.DetermineSupporters().Any(supporter => supporter.IsPlayer);
+                            CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, isPlayerInvolved);
+                        }
+                        else if (decision.TriggerTime.IsPast)
+                        {
+                            if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
+                                voteManager.TryResolveDecision(decision, force: true))
+                            {
+                                continue;
+                            }
+
+                            // Resolves AI-side; ApplyChosenOutcome calls Kingdom.RemoveDecision,
+                            // which replicates the removal by index through the live patch.
+                            new KingdomElection(decision).StartElectionWithoutPlayer();
+
+                            // Guaranteed drain: an election that did not conclude (e.g.
+                            // OnShowDecision returned false) leaves the decision queued. Force
+                            // its removal so the queue cannot wedge.
+                            if (kingdom._unresolvedDecisions.Contains(decision))
+                            {
+                                kingdom.RemoveDecision(decision);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -164,40 +191,6 @@ namespace GameInterface.Services.Kingdoms.Patches
             }
 
             return false;
-        }
-
-        internal static void ProcessDecisionDuringHourlySweep(Kingdom kingdom, KingdomDecision decision)
-        {
-            if (kingdom == null || decision == null) return;
-
-            if (decision.ShouldBeCancelled())
-            {
-                kingdom.RemoveDecision(decision);
-                bool isPlayerInvolved =
-                    (decision.DetermineChooser()?.Leader?.IsHumanPlayerCharacter ?? false)
-                    || decision.DetermineSupporters().Any(supporter => supporter.IsPlayer);
-                CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, isPlayerInvolved);
-            }
-            else if (decision.TriggerTime.IsPast)
-            {
-                if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
-                    voteManager.TryResolveDecision(decision, force: true))
-                {
-                    return;
-                }
-
-                // Resolves AI-side; ApplyChosenOutcome calls Kingdom.RemoveDecision,
-                // which replicates the removal by index through the live patch.
-                new KingdomElection(decision).StartElectionWithoutPlayer();
-
-                // Guaranteed drain: an election that did not conclude (e.g.
-                // OnShowDecision returned false) leaves the decision queued. Force
-                // its removal so the queue cannot wedge.
-                if (kingdom._unresolvedDecisions.Contains(decision))
-                {
-                    kingdom.RemoveDecision(decision);
-                }
-            }
         }
     }
 }

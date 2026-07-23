@@ -317,46 +317,6 @@ namespace GameInterface.Services.Kingdoms
             return GetEligibleClanIds(decision).Count > 0;
         }
 
-#if DEBUG
-        public bool TryPrepareNoWarTimeoutOutcome(KingdomDecision decision, Clan aiSupporter)
-        {
-            if (decision is not DeclareWarDecision ||
-                aiSupporter == null ||
-                aiSupporter.Kingdom != decision.Kingdom)
-            {
-                return false;
-            }
-
-            KingdomDecisionVoteState state = GetOrCreateState(decision);
-            state.RefreshEligibleClanIds(GetEligibleClanIds(decision));
-            ApplyPendingRemoteVotes(state);
-            if (TryGetClanId(aiSupporter, out string aiClanId) &&
-                state.EligibleClanIds.Contains(aiClanId))
-            {
-                return false;
-            }
-
-            Clan rulingClan = decision.Kingdom.RulingClan;
-            if (rulingClan == null ||
-                state.Election._chooser != rulingClan ||
-                !TryGetClanId(rulingClan, out string rulingClanId) ||
-                !state.EligibleClanIds.Contains(rulingClanId) ||
-                state.Election._chosenOutcome != null ||
-                state.Votes.ContainsKey(rulingClanId) ||
-                state.FinalVotes.ContainsKey(rulingClanId) ||
-                LocalSubmittedDecisions.Contains(decision) ||
-                PendingRemoteVotes.Any(vote =>
-                    vote.ClanId == rulingClanId &&
-                    vote.VoteData.KingdomId == state.KingdomId &&
-                    vote.VoteData.DecisionIndex == state.DecisionIndex))
-            {
-                return false;
-            }
-
-            return state.Election.TryPrepareNoWarAiSupport(aiSupporter);
-        }
-#endif
-
         public IReadOnlyList<KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom)
         {
             List<KingdomDecisionDebugInfo> decisionInfos = new List<KingdomDecisionDebugInfo>();
