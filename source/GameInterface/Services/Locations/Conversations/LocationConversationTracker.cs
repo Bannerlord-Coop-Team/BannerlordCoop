@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 
@@ -19,6 +19,18 @@ namespace GameInterface.Services.Locations.Conversations;
 /// </remarks>
 internal sealed class LocationConversationTracker : IHandler
 {
+    private readonly struct Engagement
+    {
+        public readonly string EngagerNpcKey;
+        public readonly string TargetNpcKey;
+
+        public Engagement(string engagerNpcKey, string targetNpcKey)
+        {
+            EngagerNpcKey = engagerNpcKey;
+            TargetNpcKey = targetNpcKey;
+        }
+    }
+
     /// <summary>
     /// DI-wired instance, statically accessible so (static) Harmony patches can reach the object manager.
     /// Set on construction by the auto-activated handler registration.
@@ -27,7 +39,7 @@ internal sealed class LocationConversationTracker : IHandler
 
     private readonly object stateLock = new object();
     private readonly Dictionary<string, object> engagerByNpcKey = new Dictionary<string, object>();
-    private readonly Dictionary<object, string> npcKeyByEngager = new Dictionary<object, string>();
+    private readonly Dictionary<object, Engagement> engagementByEngager = new Dictionary<object, Engagement>();
 
     private volatile bool isEmpty = true;
 
@@ -51,7 +63,7 @@ internal sealed class LocationConversationTracker : IHandler
         lock (stateLock)
         {
             engagerByNpcKey.Clear();
-            npcKeyByEngager.Clear();
+            engagementByEngager.Clear();
             isEmpty = true;
         }
 
@@ -65,28 +77,33 @@ internal sealed class LocationConversationTracker : IHandler
     public static string ComposeKey(string locationId, string characterId) => $"{locationId}|{characterId}";
 
     /// <summary>
-    /// Begins (or refreshes) <paramref name="engagerKey"/>'s engagement of the given NPC. Fails when
-    /// another player currently talks to that NPC, or when this player still has a live engagement with a
-    /// different NPC (first approval wins; the old one is released when that conversation ends).
+    /// Begins (or refreshes) <paramref name="engagerKey"/>'s engagement of the given NPC. Both the
+    /// initiating player's character and the target NPC are reserved so neither participant can enter a
+    /// second location conversation until this one ends.
     /// </summary>
-    public bool TryBeginEngagement(object engagerKey, string npcKey)
+    public bool TryBeginEngagement(object engagerKey, string engagerNpcKey, string targetNpcKey)
     {
-        if (engagerKey == null || npcKey == null) return false;
+        if (engagerKey == null || engagerNpcKey == null || targetNpcKey == null) return false;
 
         lock (stateLock)
         {
-            if (engagerByNpcKey.TryGetValue(npcKey, out var existing) && !Equals(existing, engagerKey))
-                return false;
-
-            if (npcKeyByEngager.TryGetValue(engagerKey, out var currentNpcKey))
+            if (engagementByEngager.TryGetValue(engagerKey, out var currentEngagement))
             {
-                // Already holds this exact NPC: idempotent success. A different NPC: refuse - a player holds
-                // at most one engagement, and overwriting it would orphan (permanently lock) the first NPC.
-                return currentNpcKey == npcKey;
+                return currentEngagement.EngagerNpcKey == engagerNpcKey &&
+                       currentEngagement.TargetNpcKey == targetNpcKey;
             }
 
-            engagerByNpcKey[npcKey] = engagerKey;
-            npcKeyByEngager[engagerKey] = npcKey;
+            if (engagerByNpcKey.TryGetValue(engagerNpcKey, out var existingEngager) &&
+                !Equals(existingEngager, engagerKey))
+                return false;
+
+            if (engagerByNpcKey.TryGetValue(targetNpcKey, out var existingTarget) &&
+                !Equals(existingTarget, engagerKey))
+                return false;
+
+            engagerByNpcKey[engagerNpcKey] = engagerKey;
+            engagerByNpcKey[targetNpcKey] = engagerKey;
+            engagementByEngager[engagerKey] = new Engagement(engagerNpcKey, targetNpcKey);
             isEmpty = false;
             return true;
         }
@@ -101,14 +118,32 @@ internal sealed class LocationConversationTracker : IHandler
 
         lock (stateLock)
         {
-            if (!npcKeyByEngager.TryGetValue(engagerKey, out npcKey))
+            if (!engagementByEngager.TryGetValue(engagerKey, out var engagement))
                 return false;
 
-            npcKeyByEngager.Remove(engagerKey);
-            engagerByNpcKey.Remove(npcKey);
+            npcKey = engagement.TargetNpcKey;
+            engagementByEngager.Remove(engagerKey);
+            engagerByNpcKey.Remove(engagement.EngagerNpcKey);
+            engagerByNpcKey.Remove(engagement.TargetNpcKey);
 
-            isEmpty = engagerByNpcKey.Count == 0;
+            isEmpty = engagementByEngager.Count == 0;
             return true;
+        }
+    }
+
+    public bool TryGetEngagement(object engagerKey, out string npcKey)
+    {
+        npcKey = null;
+        if (engagerKey == null) return false;
+
+        lock (stateLock)
+        {
+            if (engagementByEngager.TryGetValue(engagerKey, out var engagement))
+            {
+                npcKey = engagement.TargetNpcKey;
+                return true;
+            }
+            return false;       
         }
     }
 

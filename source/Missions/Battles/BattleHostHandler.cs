@@ -67,20 +67,18 @@ internal class BattleHostHandler : IHandler
     // (election and migration both run under GameThread.RunSafe).
     private readonly Dictionary<string, int> issuedEpochs = new Dictionary<string, int>();
 
-    // [Server] Per battle: members explicitly marked absent without withdrawing and not yet re-entered.
-    // Player registrations survive that absence, so reserve ownership alone cannot see it — this set makes
-    // the member's parties fall to the HOST's reserve scope (the reserve half of the BR-031 adoption:
-    // the host's adoption-time re-request is served them at the current ledger pointers). Cleared per
-    // controller on its re-entry (BR-033 — see HandleControllerReturn) and per battle on full teardown.
-    // Game thread only (all mutation sites run under GameThread.RunSafe).
-    private readonly Dictionary<string, HashSet<string>> absentControllers = new Dictionary<string, HashSet<string>>();
+    // [Server] Mutable state that lives exactly as long as one battle mission instance. The epoch watermark
+    // stays separate because it must survive teardown and increase when the same MapEvent is entered again.
+    private readonly Dictionary<string, BattleRuntimeState> battleRuntimeStates = new Dictionary<string, BattleRuntimeState>();
 
-    // [Server] The current host's live peer per battle, captured from the host's own election/reserve
-    // requests (the promoted host's adoption re-request refreshes it after a migration). Used to push the
-    // host its SHRUNK owned set when a dropped member returns — without that refresh the host's supplier
-    // would keep the returned parties and their reinforcements could be fielded twice. Validated against the
-    // current assignment at use, so a stale entry (an old host that migrated away) is never used. Game thread only.
-    private readonly Dictionary<string, HostEndpoint> hostPeers = new Dictionary<string, HostEndpoint>();
+    private sealed class BattleRuntimeState
+    {
+        public readonly HashSet<string> AbsentControllers = new HashSet<string>();
+        public readonly HashSet<string> PresentControllers = new HashSet<string>();
+        public readonly HashSet<string> HostOwnedOfflineControllers = new HashSet<string>();
+        public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
+        public HostEndpoint HostEndpoint;
+    }
 
     private sealed class HostEndpoint
     {
@@ -96,15 +94,13 @@ internal class BattleHostHandler : IHandler
     /// </summary>
     internal TimeSpan FlushAckDeadline { get; set; } = TimeSpan.FromSeconds(2.5);
 
-    // [Server] Per battle: return grants DEFERRED behind the shrunk host's flush acks (BR-033 handshake).
+    // [Server] Return grants are deferred behind the shrunk host's flush acks (BR-033 handshake).
     // The ledger only holds the host's last THROTTLED progress report, so the returner must not be served
     // until the host flushed its true local pointers for the parties the shrink refresh dropped. One entry
     // per outstanding returner, completed FIFO as the acks arrive (the refreshes travel one reliable-ordered
     // stream and every flagged side message produces exactly one ack, so ack order matches refresh order),
     // or by the fallbacks: the host's departure serves them, the tick deadline serves them, teardown drops
     // them. Game thread only (all mutation sites run under GameThread.RunSafe or on the campaign tick).
-    private readonly Dictionary<string, List<PendingReturn>> pendingReturns = new Dictionary<string, List<PendingReturn>>();
-
     private sealed class PendingReturn
     {
         public string MapEventId;
@@ -140,6 +136,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<NetworkRequestBattleHost>(Handle_NetworkRequestBattleHost);
         messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Subscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
+        messageBroker.Subscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -152,6 +149,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestBattleHost>(Handle_NetworkRequestBattleHost);
         messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_NetworkBattleHostAssigned);
         messageBroker.Unsubscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
+        messageBroker.Unsubscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
@@ -212,6 +210,8 @@ internal class BattleHostHandler : IHandler
                 return;
             }
 
+            MarkPresent(mapEventId, requesterId);
+
             if (hostRegistry.TryGet(mapEventId, out var existing))
             {
                 // Host already elected. Record this player in the successor line in join order (idempotent),
@@ -248,7 +248,8 @@ internal class BattleHostHandler : IHandler
             // return's flush handshake is (still) in flight, the grant is deferred: fold this election-time
             // request into the pending grant (upgrading it to carry explicit empties) instead of serving
             // early from a ledger the host has not caught up yet.
-            bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester, includeEmptySides: true);
+            bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester,
+                includeEmptySides: true);
             RememberHostPeer(mapEventId, requesterId, requester);
             if (deferred || TryDeferToPendingReturn(mapEventId, requesterId, requester, includeEmptySides: true))
                 return;
@@ -278,6 +279,15 @@ internal class BattleHostHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
+
+            if (string.IsNullOrEmpty(requesterId) || !IsRequesterInBattle(mapEvent, requesterId))
+            {
+                Logger.Warning("[BattleHost] Ignoring reserve request for {MapEventId} from '{Requester}' (not a participant)",
+                    mapEventId, requesterId);
+                return;
+            }
+
+            MarkPresent(mapEventId, requesterId);
 
             // A request from a member that had DROPPED is its re-entry (BR-033): take its parties back out
             // of the host's reserve scope BEFORE computing the reply — the returner's grant below must carry
@@ -314,17 +324,35 @@ internal class BattleHostHandler : IHandler
     // [Server, game thread] The per-side reserve messages a requester's grant/refresh consists of, at the
     // current ledger pointers. Split from the send so the BR-033 shrink refresh knows how many flush acks
     // to await BEFORE any flagged message goes out.
-    private List<SideReserve> BuildOwnedReserves(string mapEventId, MapEvent mapEvent, string requesterId, bool includeEmptySides)
+    private List<SideReserve> BuildOwnedReserves(string mapEventId, MapEvent mapEvent, string requesterId,
+        bool includeEmptySides)
     {
         bool isHost = hostRegistry.TryGet(mapEventId, out var assignment)
             && assignment.HostControllerId == requesterId;
 
         // The parties of DROPPED members fall into the host's scope until they return (reserve half of the
         // BR-031 adoption); the builder treats their owners as absent.
-        absentControllers.TryGetValue(mapEventId, out var absent);
+        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState);
+        var absent = runtimeState?.AbsentControllers;
+
+        var present = runtimeState != null
+            ? new HashSet<string>(runtimeState.PresentControllers)
+            : new HashSet<string>();
+        foreach (var player in playerManager.Players)
+            if (playerManager.IsConnected(player))
+                present.Add(player.ControllerId);
+        present.Add(requesterId);
+        if (assignment != null)
+        {
+            present.Add(assignment.HostControllerId);
+            foreach (var successor in assignment.SuccessorControllerIds)
+                present.Add(successor);
+        }
+        if (isHost)
+            TrackOfflineControllersInHostScope(mapEventId, mapEvent, present);
 
         var sides = new List<SideReserve>();
-        foreach (var sideReserve in reserveBuilder.GetOwnedReserves(mapEvent, requesterId, isHost, absent))
+        foreach (var sideReserve in reserveBuilder.GetOwnedReserves(mapEvent, requesterId, isHost, absent, present))
         {
             if (!includeEmptySides && (sideReserve.Parties == null || sideReserve.Parties.Length == 0))
                 continue;
@@ -349,12 +377,17 @@ internal class BattleHostHandler : IHandler
         if (!hostRegistry.TryGet(mapEventId, out var assignment) || assignment.HostControllerId != requesterId)
             return;
 
-        hostPeers[mapEventId] = new HostEndpoint { ControllerId = requesterId, Peer = requester };
+        GetOrCreateRuntimeState(mapEventId).HostEndpoint = new HostEndpoint
+        {
+            ControllerId = requesterId,
+            Peer = requester,
+        };
     }
 
     /// <summary>
-    /// [Server, game thread] The requester is back inside a battle it had DROPPED from: its parties leave the
-    /// host's reserve scope (BR-033). Because nothing else tells the holder to let go, the current host is
+    /// [Server, game thread] The requester became present in a battle: its parties leave the host's reserve
+    /// scope (BR-033). This also covers a player who was offline before mission membership, whose party the
+    /// host may already hold. Because nothing else tells the holder to let go, the current host is
     /// RE-FED its owned set — now without the returned parties, with explicit empties so a side that became
     /// empty is cleared — using the same NetworkBattleTroopReserve REPLACE semantics migration re-feeds use.
     /// The refresh is sent with <c>FlushRequested</c>: the ledger only holds the host's last THROTTLED
@@ -368,19 +401,21 @@ internal class BattleHostHandler : IHandler
     /// server game thread against one ledger snapshot; server→host messages are reliable-ordered on the
     /// host's stream, so this refresh can never be overtaken by an earlier, fatter grant; and pointers can
     /// never rewind — the refresh carries the ledger's monotonic pointers and the supplier resumes from
-    /// max(local, server). A no-op for members that never dropped, so a duplicate request changes nothing.
+    /// max(local, server). A duplicate request changes nothing.
     /// </summary>
     /// <returns>True when the requester's grant is handled through a pending return (deferred behind the
     /// host's flush acks — possibly already completed inline) so the caller must not also serve it.</returns>
-    private bool HandleControllerReturn(string mapEventId, MapEvent mapEvent, string requesterId, NetPeer requesterPeer, bool includeEmptySides)
+    private bool HandleControllerReturn(string mapEventId, MapEvent mapEvent, string requesterId,
+        NetPeer requesterPeer, bool includeEmptySides)
     {
         if (string.IsNullOrEmpty(requesterId)) return false;
-        if (!absentControllers.TryGetValue(mapEventId, out var absent) || !absent.Remove(requesterId))
-            return false;
-        if (absent.Count == 0)
-            absentControllers.Remove(mapEventId);
+        if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)) return false;
 
-        Logger.Information("[BattleHost] {Controller} returned to battle {MapEventId}; its parties leave the host's reserve scope",
+        bool returnedFromAbsence = runtimeState.AbsentControllers.Remove(requesterId);
+        bool reclaimedOfflineParty = runtimeState.HostOwnedOfflineControllers.Remove(requesterId);
+        if (!returnedFromAbsence && !reclaimedOfflineParty) return false;
+
+        Logger.Information("[BattleHost] {Controller} became present in battle {MapEventId}; its parties leave the host's reserve scope",
             requesterId, mapEventId);
 
         if (!hostRegistry.TryGet(mapEventId, out var assignment))
@@ -388,7 +423,8 @@ internal class BattleHostHandler : IHandler
         if (assignment.HostControllerId == requesterId)
             return false; // the returner IS the current host — the grant it is about to receive is the refresh
 
-        if (!hostPeers.TryGetValue(mapEventId, out var host) || host.ControllerId != assignment.HostControllerId)
+        var host = runtimeState.HostEndpoint;
+        if (host == null || host.ControllerId != assignment.HostControllerId)
         {
             // A promoted host that has not re-requested yet has no live peer recorded — and needs no refresh:
             // its own upcoming adoption re-request is already served the post-return scope. With no holder to
@@ -422,12 +458,7 @@ internal class BattleHostHandler : IHandler
             AwaitedAcks = refresh.Count,
             DeadlineUtc = DateTime.UtcNow + FlushAckDeadline,
         };
-        if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
-        {
-            pendings = new List<PendingReturn>();
-            pendingReturns[mapEventId] = pendings;
-        }
-        pendings.Add(pending);
+        runtimeState.PendingReturns.Add(pending);
 
         SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: true);
         Logger.Information("[BattleHost] Refreshed host {Host}'s reserve scope for {MapEventId} after {Controller} returned; the return grant awaits {Acks} flush ack(s)",
@@ -443,10 +474,10 @@ internal class BattleHostHandler : IHandler
     /// idempotent: one grant serves them all once the acks (or a fallback) land.</summary>
     private bool TryDeferToPendingReturn(string mapEventId, string requesterId, NetPeer requesterPeer, bool includeEmptySides)
     {
-        if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
+        if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState))
             return false;
 
-        foreach (var pending in pendings)
+        foreach (var pending in runtimeState.PendingReturns)
         {
             if (pending.ReturnerControllerId != requesterId)
                 continue;
@@ -486,16 +517,16 @@ internal class BattleHostHandler : IHandler
                 foreach (var entry in message.Entries)
                     ledger.ReportSupplied(message.MapEventId, entry.PartyId, entry.SuppliedCount);
 
-            if (!pendingReturns.TryGetValue(message.MapEventId, out var pendings) || pendings.Count == 0)
+            if (!battleRuntimeStates.TryGetValue(message.MapEventId, out var runtimeState)
+                || runtimeState.PendingReturns.Count == 0)
                 return;
 
+            var pendings = runtimeState.PendingReturns;
             var pending = pendings[0];
             if (--pending.AwaitedAcks > 0)
                 return;
 
             pendings.RemoveAt(0);
-            if (pendings.Count == 0)
-                pendingReturns.Remove(message.MapEventId);
 
             ServePendingReturn(pending, "the host's flush acks caught the ledger up");
         });
@@ -509,24 +540,20 @@ internal class BattleHostHandler : IHandler
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsClient) return;
-        if (pendingReturns.Count == 0) return;
+        if (battleRuntimeStates.Count == 0) return;
 
         var now = DateTime.UtcNow;
         List<PendingReturn> expired = null;
-        foreach (var pendings in pendingReturns.Values)
-            foreach (var pending in pendings)
+        foreach (var runtimeState in battleRuntimeStates.Values)
+            foreach (var pending in runtimeState.PendingReturns)
                 if (now >= pending.DeadlineUtc)
                     (expired ??= new List<PendingReturn>()).Add(pending);
         if (expired == null) return;
 
         foreach (var pending in expired)
         {
-            if (pendingReturns.TryGetValue(pending.MapEventId, out var pendings))
-            {
-                pendings.Remove(pending);
-                if (pendings.Count == 0)
-                    pendingReturns.Remove(pending.MapEventId);
-            }
+            if (battleRuntimeStates.TryGetValue(pending.MapEventId, out var runtimeState))
+                runtimeState.PendingReturns.Remove(pending);
 
             Logger.Warning("[BattleHost] Host {Host} never acked the reserve flush for {MapEventId} within {Deadline}; serving {Controller}'s return grant from the current ledger",
                 pending.HostControllerId, pending.MapEventId, FlushAckDeadline, pending.ReturnerControllerId);
@@ -556,9 +583,10 @@ internal class BattleHostHandler : IHandler
     // last throttled report is lost with it; the pre-handshake race is accepted over stranding a returner).
     private void ServePendingReturnsAwaitingHost(string mapEventId, string departedHostId)
     {
-        if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
+        if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState))
             return;
 
+        var pendings = runtimeState.PendingReturns;
         var toServe = new List<PendingReturn>();
         for (int i = pendings.Count - 1; i >= 0; i--)
         {
@@ -567,9 +595,6 @@ internal class BattleHostHandler : IHandler
             toServe.Insert(0, pendings[i]);
             pendings.RemoveAt(i);
         }
-        if (pendings.Count == 0)
-            pendingReturns.Remove(mapEventId);
-
         foreach (var pending in toServe)
             ServePendingReturn(pending, "the host departed before its flush ack");
     }
@@ -578,9 +603,10 @@ internal class BattleHostHandler : IHandler
     // is no one to serve, and its next return restarts the handshake against the then-current scope.
     private void CancelPendingReturns(string mapEventId, string returnerControllerId)
     {
-        if (!pendingReturns.TryGetValue(mapEventId, out var pendings))
+        if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState))
             return;
 
+        var pendings = runtimeState.PendingReturns;
         for (int i = pendings.Count - 1; i >= 0; i--)
         {
             if (pendings[i].ReturnerControllerId != returnerControllerId)
@@ -589,8 +615,6 @@ internal class BattleHostHandler : IHandler
             Logger.Information("[BattleHost] Cancelled the pending return grant of {Controller} to {MapEventId}: it departed again before the flush ack",
                 returnerControllerId, mapEventId);
         }
-        if (pendings.Count == 0)
-            pendingReturns.Remove(mapEventId);
     }
 
     /// <summary>[Server] A member departed a battle: promote the next successor if it was the host (host
@@ -610,6 +634,8 @@ internal class BattleHostHandler : IHandler
         // Mutates the shared assignment, so run on the main thread (serializes with election).
         GameThread.RunSafe(() =>
         {
+            MarkDeparted(mapEventId, controllerId);
+
             // BR-017: no players remain in the mission instance — destroy the battle instance record
             // outright, regardless of whether the departed controller was the recorded host. Keying on the
             // server-observed empty instance (not on who left last) also covers a successor emptying the
@@ -647,14 +673,16 @@ internal class BattleHostHandler : IHandler
             // an existing host assignment orphaned a member that dropped BEFORE any election: the eventual
             // first-ready host's reserve build never saw the drop, so it never inherited that still-registered
             // party.
+            objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent);
+            bool newlyAbsent = false;
             if (payload.What.WasRetreat)
             {
-                if (objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent))
+                if (mapEvent != null)
                     reserveBuilder.ForgetController(mapEvent, controllerId);
             }
             else
             {
-                MarkAbsent(mapEventId, controllerId);
+                newlyAbsent = MarkAbsent(mapEventId, controllerId);
             }
 
             // If the departed member had a return grant pending (it re-entered and dropped AGAIN before the
@@ -685,7 +713,8 @@ internal class BattleHostHandler : IHandler
                     Logger.Warning("[BattleHost] Host {Host} left battle {MapEventId} with no ready successors (players still loading); re-flattening reserves but keeping the departed host absent so the eventual host inherits its party",
                         controllerId, mapEventId);
                     hostRegistry.Remove(mapEventId);
-                    hostPeers.Remove(mapEventId); // the departed host's recorded peer is stale
+                    if (battleRuntimeStates.TryGetValue(mapEventId, out var hostlessRuntimeState))
+                        hostlessRuntimeState.HostEndpoint = null; // the departed host's recorded peer is stale
 
                     if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
                         reserveBuilder.ForgetMapEvent(abandonedEvent);
@@ -699,7 +728,8 @@ internal class BattleHostHandler : IHandler
 
                 // The departed host's recorded peer is stale; the promoted host's own adoption re-request
                 // (its sweep) re-captures the live one. Validated-at-use anyway — this is hygiene.
-                hostPeers.Remove(mapEventId);
+                if (battleRuntimeStates.TryGetValue(mapEventId, out var migratingRuntimeState))
+                    migratingRuntimeState.HostEndpoint = null;
 
                 // Promote the earliest-joined successor still present (the line is kept current as members leave).
                 // BR-102: the host CHANGED, so the promotion opens the next hosting generation (epoch + 1).
@@ -729,7 +759,31 @@ internal class BattleHostHandler : IHandler
 
                 network.SendAll(ToMessage(mapEventId, updated));
             }
+
+            if (newlyAbsent && mapEvent != null && assignment.HostControllerId != controllerId)
+                RefreshHostAfterMemberDrop(mapEventId, mapEvent, assignment.HostControllerId, controllerId);
         });
+    }
+
+    // The party-visibility handler still has the peer-to-player mapping when a disconnect begins. This signal
+    // covers a player whose party is in the MapEvent but who dropped before joining the mission instance.
+    private void Handle_PlayerDisconnectedFromMapEvent(MessagePayload<PlayerDisconnectedFromMapEvent> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var controllerId = payload.What.ControllerId;
+        var mapEvent = payload.What.MapEvent;
+        if (mapEvent == null || !objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
+        bool hasAssignment = hostRegistry.TryGet(mapEventId, out var assignment);
+        if (!battleRuntimeStates.ContainsKey(mapEventId) && !hasAssignment) return;
+
+        MarkDeparted(mapEventId, controllerId);
+        bool newlyAbsent = MarkAbsent(mapEventId, controllerId);
+        CancelPendingReturns(mapEventId, controllerId);
+        if (!newlyAbsent || !hasAssignment) return;
+        if (assignment.HostControllerId == controllerId) return;
+
+        RefreshHostAfterMemberDrop(mapEventId, mapEvent, assignment.HostControllerId, controllerId);
     }
 
     /// <summary>[Client] Store the server's host assignment for this battle.</summary>
@@ -811,21 +865,72 @@ internal class BattleHostHandler : IHandler
         return true;
     }
 
+    private BattleRuntimeState GetOrCreateRuntimeState(string mapEventId)
+    {
+        if (battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState))
+            return runtimeState;
+
+        runtimeState = new BattleRuntimeState();
+        battleRuntimeStates[mapEventId] = runtimeState;
+        return runtimeState;
+    }
+
     // [Server, game thread] A member was marked absent without withdrawing: its parties fall into the host's
     // reserve scope until it returns (see HandleControllerReturn).
-    private void MarkAbsent(string mapEventId, string controllerId)
+    private bool MarkAbsent(string mapEventId, string controllerId)
     {
-        if (string.IsNullOrEmpty(controllerId)) return;
+        if (string.IsNullOrEmpty(controllerId)) return false;
 
-        if (!absentControllers.TryGetValue(mapEventId, out var absent))
-        {
-            absent = new HashSet<string>();
-            absentControllers[mapEventId] = absent;
-        }
-
-        if (absent.Add(controllerId))
+        bool added = GetOrCreateRuntimeState(mapEventId).AbsentControllers.Add(controllerId);
+        if (added)
             Logger.Information("[BattleHost] {Controller} was marked absent from battle {MapEventId}; its parties fall to the host's reserve scope until it returns",
                 controllerId, mapEventId);
+        return added;
+    }
+
+    private void MarkPresent(string mapEventId, string controllerId)
+    {
+        GetOrCreateRuntimeState(mapEventId).PresentControllers.Add(controllerId);
+    }
+
+    private void TrackOfflineControllersInHostScope(string mapEventId, MapEvent mapEvent,
+        ISet<string> present)
+    {
+        BattleRuntimeState runtimeState = null;
+        foreach (var player in playerManager.Players)
+        {
+            if (present.Contains(player.ControllerId) || !IsRequesterInBattle(mapEvent, player.ControllerId))
+                continue;
+
+            runtimeState ??= GetOrCreateRuntimeState(mapEventId);
+            runtimeState.HostOwnedOfflineControllers.Add(player.ControllerId);
+        }
+    }
+
+    private void MarkDeparted(string mapEventId, string controllerId)
+    {
+        if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)) return;
+        runtimeState.PresentControllers.Remove(controllerId);
+    }
+
+    private void RefreshHostAfterMemberDrop(string mapEventId, MapEvent mapEvent, string hostControllerId,
+        string droppedControllerId)
+    {
+        if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)
+            || runtimeState.HostEndpoint == null
+            || runtimeState.HostEndpoint.ControllerId != hostControllerId)
+        {
+            Logger.Warning("[BattleHost] Cannot push reserve adoption for {Dropped} in {MapEventId}: no live peer recorded for host {Host}",
+                droppedControllerId, mapEventId, hostControllerId);
+            return;
+        }
+
+        var host = runtimeState.HostEndpoint;
+        network.Send(host.Peer, new NetworkBattleReserveOwnershipExpanded(mapEventId));
+        var refresh = BuildOwnedReserves(mapEventId, mapEvent, hostControllerId, includeEmptySides: true);
+        SendSideReserves(host.Peer, mapEventId, refresh, flushRequested: false);
+        Logger.Information("[BattleHost] Pushed {Dropped}'s remaining reserves to host {Host} in {MapEventId}",
+            droppedControllerId, hostControllerId, mapEventId);
     }
 
     // [Server, game thread] The battle instance ended (empty, or abandoned with no successors): drop its
@@ -835,9 +940,7 @@ internal class BattleHostHandler : IHandler
     // issuedEpochs).
     private void ClearBattleRecords(string mapEventId)
     {
-        absentControllers.Remove(mapEventId);
-        hostPeers.Remove(mapEventId);
-        pendingReturns.Remove(mapEventId);
+        battleRuntimeStates.Remove(mapEventId);
     }
 
     // [Server] Issue the battle's next host epoch (BR-102): one past the highest ever issued for this map
