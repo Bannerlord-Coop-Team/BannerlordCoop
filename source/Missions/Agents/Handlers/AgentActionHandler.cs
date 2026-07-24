@@ -65,7 +65,8 @@ public class AgentActionHandler : IAgentActionHandler
         public int Action1;
         public Agent.MovementControlFlag DefendFlags;
         public Agent.GuardMode GuardMode;
-        public bool WasDiscrete;
+        public bool Action0WasDiscrete;
+        public bool Action1WasDiscrete;
         public long Sequence;
     }
 
@@ -140,29 +141,44 @@ public class AgentActionHandler : IAgentActionHandler
                 guardChanged = AgentActionData.IsGuardMode(guardMode);
             }
 
-            if (hadState && state.Action0 == action0 && state.Action1 == action1
+            bool action0Changed = !hadState || state.Action0 != action0;
+            bool action1Changed = !hadState || state.Action1 != action1;
+            if (!action0Changed && !action1Changed
                 && !defendChanged && !guardChanged)
                 continue;
 
-            bool nowDiscrete = IsDiscreteAction(agent.GetCurrentActionType(0))
-                            || IsDiscreteAction(agent.GetCurrentActionType(1));
+            bool action0Discrete =
+                IsDiscreteAction(agent.GetCurrentActionType(0));
+            bool action1Discrete =
+                IsDiscreteAction(agent.GetCurrentActionType(1));
 
             // Native command actions are untyped, so recognize the main agent's order gesture by action name.
-            if (!nowDiscrete && agent == Mission.Current.MainAgent)
+            if (agent == Mission.Current.MainAgent)
             {
-                nowDiscrete = IsOrderGesture(AgentActionData.GetActionNameWithCode(action0))
-                           || IsOrderGesture(AgentActionData.GetActionNameWithCode(action1));
+                action0Discrete |= IsOrderGesture(
+                    AgentActionData.GetActionNameWithCode(action0));
+                action1Discrete |= IsOrderGesture(
+                    AgentActionData.GetActionNameWithCode(action1));
             }
 
             // Defend input and realized guard state can change before the animation index, so send them explicitly too.
-            bool broadcast = defendChanged || guardChanged || nowDiscrete || (hadState && state.WasDiscrete);
+            bool discreteActionChanged =
+                (action0Changed
+                    && (action0Discrete
+                        || (hadState && state.Action0WasDiscrete)))
+                || (action1Changed
+                    && (action1Discrete
+                        || (hadState && state.Action1WasDiscrete)));
+            bool broadcast =
+                defendChanged || guardChanged || discreteActionChanged;
 
             state.HasObservation = true;
             state.Action0 = action0;
             state.Action1 = action1;
             state.DefendFlags = defendFlags;
             state.GuardMode = guardMode;
-            state.WasDiscrete = nowDiscrete;
+            state.Action0WasDiscrete = action0Discrete;
+            state.Action1WasDiscrete = action1Discrete;
             _localAgentStates[info.AgentId] = state;
             if (!broadcast)
                 continue;

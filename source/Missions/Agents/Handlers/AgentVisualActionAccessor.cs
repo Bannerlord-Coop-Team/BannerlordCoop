@@ -14,7 +14,8 @@ public interface IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress);
+        float progress,
+        bool replaceCurrentVisual);
 }
 
 public class AgentVisualActionAccessor : IAgentVisualActionAccessor
@@ -57,7 +58,8 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress)
+        float progress,
+        bool replaceCurrentVisual)
     {
         Skeleton skeleton = null;
         try
@@ -66,21 +68,28 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             if (ReferenceEquals(skeleton, null)) return;
 
             ActionIndexCache visualAction = skeleton.GetActionAtChannel(channel);
-            if (visualAction != ActionIndexCache.act_none
-                && visualAction != action)
-            {
-                return;
-            }
-
             int animationIndex = MBActionSet.GetAnimationIndexOfAction(
                 agent.ActionSet,
                 in action);
             if (animationIndex < 0) return;
 
             int visualAnimation = skeleton.GetAnimationIndexAtChannel(channel);
+            if (visualAnimation == animationIndex)
+            {
+                skeleton.SetAnimationParameterAtChannel(channel, progress);
+                return;
+            }
+
             if (visualAction == ActionIndexCache.act_none
                 && visualAnimation >= 0
-                && visualAnimation != animationIndex)
+                && !replaceCurrentVisual)
+            {
+                return;
+            }
+
+            if (visualAction != ActionIndexCache.act_none
+                && visualAction != action
+                && !replaceCurrentVisual)
             {
                 return;
             }

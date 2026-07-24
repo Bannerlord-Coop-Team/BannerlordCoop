@@ -32,7 +32,8 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress)
+        float progress,
+        bool replaceCurrentVisual)
     {
         if (!AgentMirror.TryGet(agent, out MirrorAgent mirror)
             || !mirror.HasVisualSkeleton)
@@ -43,18 +44,35 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         int visualAction = channel == 0
             ? mirror.SkeletonAction0Index
             : mirror.SkeletonAction1Index;
-        if (visualAction != ActionIndexCache.act_none.Index
-            && visualAction != action.Index)
+        int rawVisualAction = channel == 0
+            ? mirror.RawVisualAction0Index
+            : mirror.RawVisualAction1Index;
+        if (rawVisualAction == action.Index)
+        {
+            if (channel == 0)
+            {
+                mirror.RawVisualAction0Progress = progress;
+            }
+            else
+            {
+                mirror.RawVisualAction1Progress = progress;
+            }
+
+            mirror.AdvanceRawVisualActionCalls++;
+            mirror.AdvanceExistingRawVisualActionCalls++;
+            return;
+        }
+
+        if (visualAction == ActionIndexCache.act_none.Index
+            && rawVisualAction >= 0
+            && !replaceCurrentVisual)
         {
             return;
         }
 
-        int rawVisualAction = channel == 0
-            ? mirror.RawVisualAction0Index
-            : mirror.RawVisualAction1Index;
-        if (visualAction == ActionIndexCache.act_none.Index
-            && rawVisualAction >= 0
-            && rawVisualAction != action.Index)
+        if (visualAction != ActionIndexCache.act_none.Index
+            && visualAction != action.Index
+            && !replaceCurrentVisual)
         {
             return;
         }
@@ -71,5 +89,6 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         }
 
         mirror.AdvanceRawVisualActionCalls++;
+        mirror.InstallRawVisualActionCalls++;
     }
 }
