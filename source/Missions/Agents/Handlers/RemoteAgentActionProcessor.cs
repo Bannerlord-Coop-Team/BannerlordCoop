@@ -18,7 +18,7 @@ public interface IRemoteAgentActionProcessor : IDisposable
     int GetOutgoingBattleHostEpoch();
     void ClearForLocalAgent(Guid agentId, Agent agent);
     void ApplyRemoteGuardStates();
-    void ReassertRemoteDefendStates(float dt, bool mountedOnly);
+    void ReassertRemoteDefendStates(float dt);
     void Receive(AgentActionPacket packet);
     void HandleBattleHostAssigned(NetworkBattleHostAssigned message);
 }
@@ -77,6 +77,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public readonly int GuardActionChannel;
         public readonly ActionIndexCache GuardAction;
         public readonly bool IsGuardActionCyclic;
+        public readonly bool DrivesMountedPresentation;
         public float GuardActionProgress;
         public bool HasGuardCommand;
         public Agent.GuardMode LastCommandedGuardMode;
@@ -99,6 +100,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     : 0UL);
             IsGuardActionCyclic =
                 (guardActionFlags & AnimFlags.anf_cyclic) != 0;
+            DrivesMountedPresentation =
+                GetMountedGuardPresentationChannel(action.Data) >= 0;
             GuardActionProgress = guardActionChannel == 0
                 ? action.Data.Action0Progress
                 : action.Data.Action1Progress;
@@ -119,6 +122,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             GuardActionChannel = retainedGuard.GuardActionChannel;
             GuardAction = retainedGuard.GuardAction;
             IsGuardActionCyclic = retainedGuard.IsGuardActionCyclic;
+            DrivesMountedPresentation =
+                retainedGuard.DrivesMountedPresentation;
             GuardActionProgress = retainedGuard.GuardActionProgress;
             HasGuardCommand = retainedGuard.HasGuardCommand;
             LastCommandedGuardMode = retainedGuard.LastCommandedGuardMode;
@@ -247,26 +252,21 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         ApplyPendingRemoteActions();
         ApplyRetainedRemoteGuardStates(
             replayGuardAction: false,
-            dt: 0f,
-            mountedOnly: false);
+            dt: 0f);
     }
 
-    public void ReassertRemoteDefendStates(
-        float dt,
-        bool mountedOnly)
+    public void ReassertRemoteDefendStates(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
         ApplyRetainedRemoteGuardStates(
             replayGuardAction: true,
-            dt: dt,
-            mountedOnly: mountedOnly);
+            dt: dt);
     }
 
     private void ApplyRetainedRemoteGuardStates(
         bool replayGuardAction,
-        float dt,
-        bool mountedOnly)
+        float dt)
     {
         if (_disposed || Mission.Current == null) return;
         if (_retainedGuardAgentIds.Count == 0) return;
@@ -300,9 +300,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
-                if (mountedOnly && !agent.HasMount)
-                    continue;
-
                 RemoteGuardState guardState = state.RetainedGuard.Value;
                 if (!IsCurrentActionAuthority(
                     info,
@@ -774,7 +771,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
         if (defendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(guardMode)
-            || (HasMountedGuardPresentation(guardState.Action.Data)
+            || (guardState.DrivesMountedPresentation
                 && guardState.GuardAction != ActionIndexCache.act_none))
         {
             RemoteAgentActionState retainedState = GetOrCreateAgentState(agentId);
@@ -823,15 +820,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && guardState.LastCommandedMountIndex != mountIndex;
         bool guardModeChanged = guardState.HasGuardCommand
             && guardState.LastCommandedGuardMode != guardMode;
-        bool mountedGuardLost = mountIndex >= 0
-            && guardState.HasGuardCommand
-            && agent.CurrentGuardMode != guardMode;
 
         if (mountIndex < 0
             || !guardState.HasGuardCommand
             || mountChanged
-            || guardModeChanged
-            || mountedGuardLost)
+            || guardModeChanged)
         {
             AgentActionData.ApplyGuardState(
                 agent,
@@ -855,7 +848,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         in RemoteGuardState guardState)
     {
         bool retainGuardReactions =
-            HasMountedGuardPresentation(guardState.Action.Data);
+            guardState.DrivesMountedPresentation;
         return IsInterruptingGuardAction(
                 agent.GetCurrentActionType(0),
                 retainGuardReactions)
@@ -901,20 +894,26 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         ActionIndexCache currentAction = agent.GetCurrentAction(channel);
         bool hasRetainedAgentAction =
             currentAction == guardState.GuardAction;
+        bool drivesMountedPresentation =
+            guardState.DrivesMountedPresentation;
         bool restoreGuardActionProgress =
             guardState.GuardActionProgressNeedsRestore;
-        if (hasRetainedAgentAction && !restoreGuardActionProgress)
+        if (hasRetainedAgentAction
+            && !restoreGuardActionProgress
+            && !drivesMountedPresentation)
         {
             guardState.GuardActionProgress =
                 agent.GetCurrentActionProgress(channel);
         }
 
-        if (HasGuardReactionAction(agent))
+        if (HasGuardReactionAction(agent)
+            && !hasRetainedAgentAction)
         {
             return;
         }
 
-        if (hasRetainedAgentAction
+        if (!drivesMountedPresentation
+            && hasRetainedAgentAction
             && !restoreGuardActionProgress
             && agentVisualActionAccessor.IsActionVisible(
                 agent,
@@ -969,7 +968,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             channel,
             guardState.GuardAction,
             guardState.GuardActionProgress,
-            replaceCurrentVisual: agent.HasMount);
+            replaceCurrentVisual: drivesMountedPresentation);
         guardState.GuardActionProgressNeedsRestore = false;
     }
 

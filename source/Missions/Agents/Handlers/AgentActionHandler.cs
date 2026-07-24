@@ -27,7 +27,7 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     void CatchUpJoiner(string controllerId);
 
     /// <summary>[Game thread] Reassert received puppet defend state immediately before the display snapshot.</summary>
-    void ReassertRemoteDefendStates(float dt = 0f, bool mountedOnly = false);
+    void ReassertRemoteDefendStates(float dt = 0f);
 
     /// <summary>[Game thread] Apply queued remote actions and refresh their retained defend state.</summary>
     void ApplyRemoteGuardStates();
@@ -377,11 +377,9 @@ public class AgentActionHandler : IAgentActionHandler
         remoteActionProcessor.ApplyRemoteGuardStates();
     }
 
-    public void ReassertRemoteDefendStates(
-        float dt = 0f,
-        bool mountedOnly = false)
+    public void ReassertRemoteDefendStates(float dt = 0f)
     {
-        remoteActionProcessor.ReassertRemoteDefendStates(dt, mountedOnly);
+        remoteActionProcessor.ReassertRemoteDefendStates(dt);
     }
 
     private void Handle_BattleHostAssigned(

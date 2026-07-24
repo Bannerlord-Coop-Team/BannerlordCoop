@@ -25,8 +25,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
 {
     private static readonly ILogger Logger =
         LogManager.GetLogger<AgentVisualActionAccessor>();
-    private const float OnFootRetainedGuardAnimationBlendPeriod = -1f;
-    private const float MountedRetainedGuardAnimationBlendPeriod = -0.2f;
+    private const float RetainedGuardAnimationBlendPeriod = -1f;
     private const float ReplayLogIntervalSeconds = 1f;
 
     private readonly Dictionary<long, float> _lastReplayLogTimes =
@@ -50,11 +49,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             int visualAnimation =
                 skeleton.GetAnimationIndexAtChannel(channel);
             if (visualAction == action)
-            {
-                return !agent.HasMount
-                    || animationIndex < 0
-                    || visualAnimation == animationIndex;
-            }
+                return true;
             if (visualAction != ActionIndexCache.act_none) return false;
 
             return animationIndex >= 0 && visualAnimation == animationIndex;
@@ -90,47 +85,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             if (animationIndex < 0) return;
 
             int visualAnimation = skeleton.GetAnimationIndexAtChannel(channel);
-            if (!agent.HasMount)
-            {
-                if (visualAnimation == animationIndex)
-                {
-                    skeleton.SetAnimationParameterAtChannel(channel, progress);
-                    return;
-                }
-
-                if (visualAction != ActionIndexCache.act_none
-                    && visualAction != action)
-                {
-                    return;
-                }
-
-                if (visualAction == ActionIndexCache.act_none
-                    && visualAnimation >= 0)
-                {
-                    return;
-                }
-
-                LogVisualReplay(
-                    agent,
-                    channel,
-                    action,
-                    visualAction,
-                    animationIndex,
-                    visualAnimation);
-
-                // Native can drop an on-foot puppet's action metadata while its authored guard
-                // should remain visible. Keep the known-working raw clip independent of that state.
-                skeleton.SetAnimationAtChannel(
-                    animationIndex,
-                    channel,
-                    animationSpeedMultiplier: 1f,
-                    blendInPeriod: OnFootRetainedGuardAnimationBlendPeriod,
-                    startProgress: progress);
-                return;
-            }
-
-            if (visualAction == action
-                && visualAnimation == animationIndex)
+            if (visualAnimation == animationIndex)
             {
                 skeleton.SetAnimationParameterAtChannel(channel, progress);
                 return;
@@ -158,15 +113,14 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
                 animationIndex,
                 visualAnimation);
 
-            // Keep the authored agent action layer, including its mounted blending, instead of forcing
-            // the action's raw animation over the rider pose selected by the horse pace.
-            skeleton.SetAgentActionChannel(
+            // Native can replace the puppet action before display. Present the retained clip at its
+            // existing timeline without restarting another authored blend.
+            skeleton.SetAnimationAtChannel(
+                animationIndex,
                 channel,
-                in action,
-                channelParameter: progress,
-                blendPeriodOverride: MountedRetainedGuardAnimationBlendPeriod,
-                forceFaceMorphRestart: false);
-            skeleton.TickActionChannels();
+                animationSpeedMultiplier: 1f,
+                blendInPeriod: RetainedGuardAnimationBlendPeriod,
+                startProgress: progress);
         }
         catch
         {
