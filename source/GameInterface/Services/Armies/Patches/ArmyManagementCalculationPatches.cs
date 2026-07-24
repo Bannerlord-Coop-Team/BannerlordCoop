@@ -68,7 +68,7 @@ internal class ArmyManagementCalculationPatches
                                     {
                                         int num2 = Campaign.Current.Models.ArmyManagementCalculationModel.CalculatePartyInfluenceCost(mobileParty, mobileParty2);
                                         float estimatedStrength = mobileParty2.Party.EstimatedStrength;
-                                        float num3 = 1f - (float)mobileParty2.Party.MemberRoster.TotalWounded / (float)mobileParty2.Party.MemberRoster.TotalManCount;
+                                        float num3 = 1f - ((float)mobileParty2.Party.MemberRoster.TotalWounded / (float)mobileParty2.Party.MemberRoster.TotalManCount);
                                         float item = estimatedStrength / ((float)num2 + 0.1f) * num3;
                                         list.Add(new ValueTuple<MobileParty, float, int>(mobileParty2, item, num2));
                                     }
@@ -80,7 +80,7 @@ internal class ArmyManagementCalculationPatches
                 list = list.OrderByQ((ValueTuple<MobileParty, float, int> x) => x.Item2).ToListQ<ValueTuple<MobileParty, float, int>>();
                 int count = kingdom.WarPartyComponents.Count;
                 int num4 = kingdom.Armies.SumQ((Army x) => x.Parties.Count);
-                int num5 = MathF.Ceiling((float)count * 0.7f - (float)num4);
+                int num5 = MathF.Ceiling(((float)count * 0.7f) - (float)num4);
                 if (num5 > 0)
                 {
                     if (num5 < list.Count)
