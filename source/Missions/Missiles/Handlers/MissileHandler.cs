@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
@@ -308,8 +308,13 @@ public class MissileHandler : IMissileHandler
 
         Logger.Debug("Reconstructed missile sequence {sequence}, source {sourceIndex}, as local {localIndex}",
             shot.ShotSequence, shot.MissileIndex, index);
-        messageBroker.Publish(this, new MissileReconstructed(shot.AgentId, shot.ShotSequence, position,
-            replay.Speed, replay.RemainingFlightSeconds));
+        messageBroker.Publish(this, new MissileReconstructed(
+            shot.AgentId,
+            shot.ShotSequence,
+            shot.MissileItemId,
+            position,
+            replay.Speed,
+            replay.RemainingFlightSeconds));
         return true;
     }
 

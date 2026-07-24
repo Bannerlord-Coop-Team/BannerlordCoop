@@ -654,23 +654,31 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         _agentStates.TryGetValue(
             agentId,
             out RemoteAgentActionState existingState);
-        bool retainsGuard = action.Data.DefendFlags != Agent.MovementControlFlag.None
-            || AgentActionData.IsGuardMode(action.Data.GuardMode);
-
+        int guardActionChannel = action.Data.GuardPresentationChannel;
+        if (guardActionChannel < 0 || guardActionChannel > 1)
+            guardActionChannel = -1;
         action.Data.Apply(agent);
-        int guardActionChannel = -1;
-        if (AgentActionData.IsDefendingAction(agent.GetCurrentActionType(1)))
+        if (guardActionChannel < 0
+            && AgentActionData.IsGuardPresentationAction(
+                agent.GetCurrentActionType(1)))
         {
             guardActionChannel = 1;
         }
-        else if (AgentActionData.IsDefendingAction(agent.GetCurrentActionType(0)))
+        else if (guardActionChannel < 0
+            && AgentActionData.IsGuardPresentationAction(
+                agent.GetCurrentActionType(0)))
         {
             guardActionChannel = 0;
         }
 
-        ActionIndexCache guardAction = guardActionChannel >= 0
-            ? agent.GetCurrentAction(guardActionChannel)
-            : ActionIndexCache.act_none;
+        ActionIndexCache guardAction = guardActionChannel == 0
+            ? new ActionIndexCache(action.Data.Action0Index)
+            : guardActionChannel == 1
+                ? new ActionIndexCache(action.Data.Action1Index)
+                : ActionIndexCache.act_none;
+        bool retainsGuard = action.Data.DefendFlags != Agent.MovementControlFlag.None
+            || AgentActionData.IsGuardMode(action.Data.GuardMode)
+            || guardAction != ActionIndexCache.act_none;
         RemoteGuardState? previousGuard = existingState?.RetainedGuard;
         RemoteGuardState appliedGuardState;
         if (retainsGuard
@@ -747,7 +755,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         Agent.GuardMode guardMode = guardState.Action.Data.GuardMode;
 
         if (defendFlags != Agent.MovementControlFlag.None
-            || AgentActionData.IsGuardMode(guardMode))
+            || AgentActionData.IsGuardMode(guardMode)
+            || guardState.GuardAction != ActionIndexCache.act_none)
         {
             RemoteAgentActionState retainedState = GetOrCreateAgentState(agentId);
             retainedState.RetainedGuard = guardState;
@@ -814,7 +823,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private static bool IsInterruptingGuardAction(Agent.ActionCodeType actionType) =>
         actionType != Agent.ActionCodeType.Other
         && actionType != Agent.ActionCodeType.Idle
-        && !AgentActionData.IsDefendingAction(actionType);
+        && !AgentActionData.IsGuardPresentationAction(actionType);
 
     private void ReplayRetainedGuardAction(
         Agent agent,
