@@ -118,6 +118,9 @@ public class MissionModule : Module
         builder.RegisterType<TournamentCombatFixture>()
             .As<ITournamentCombatFixture>()
             .InstancePerDependency();
+        builder.RegisterType<BattleGuardFixture>()
+            .As<IBattleGuardFixture>()
+            .InstancePerDependency();
 #endif
 
         builder.RegisterType<TournamentSpectatorAgentManagerFactory>()

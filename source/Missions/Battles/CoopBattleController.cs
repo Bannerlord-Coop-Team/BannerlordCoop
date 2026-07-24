@@ -1,6 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+#if DEBUG
+using Common;
+using GameInterface.Services.Battles.Messages;
+using System.Collections.Generic;
+#endif
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
@@ -69,6 +74,9 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
     private readonly IBattleHostRegistry hostRegistryRef;
+#if DEBUG
+    private readonly IBattleGuardFixture guardFixture;
+#endif
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
@@ -87,7 +95,11 @@ public class CoopBattleController : CoopMissionController
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
         IHostEpochPolicy hostEpochPolicy,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget
+#if DEBUG
+        , IBattleGuardFixture guardFixture
+#endif
+        )
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -119,6 +131,11 @@ public class CoopBattleController : CoopMissionController
         Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry);
         siegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
+#if DEBUG
+        this.guardFixture = guardFixture;
+        messageBroker.Subscribe<NetworkBattleGuardFixtureCommand>(
+            Handle_BattleGuardFixtureCommand);
+#endif
 
         // Decode order clips during battle setup so the first issued order does not hitch.
         coopMissionComponent.AgentVoiceHandler.WarmUp();
@@ -140,6 +157,11 @@ public class CoopBattleController : CoopMissionController
         siegeMachineState.Dispose();
         siegeWeaponFire.Dispose();
         Deployment.Dispose();
+#if DEBUG
+        messageBroker.Unsubscribe<NetworkBattleGuardFixtureCommand>(
+            Handle_BattleGuardFixtureCommand);
+        guardFixture.Reset(coopMissionComponent.AgentRegistry);
+#endif
 
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
@@ -223,13 +245,42 @@ public class CoopBattleController : CoopMissionController
         // BR-025: expire the local deployment time limit (auto-finishes deployment via the native Start
         // Battle path when the game-configured limit elapses; a no-op once deployment has finished).
         Deployment.Tick(dt);
+#if DEBUG
+        guardFixture.Tick(dt, coopMissionComponent.AgentRegistry);
+#endif
     }
 
     public override void OnPreDisplayMissionTick(float dt)
     {
         base.OnPreDisplayMissionTick(dt);
         damageRouter.Tick(dt);
+#if DEBUG
+        guardFixture.SampleFinalDisplayedState(dt, coopMissionComponent.AgentRegistry);
+#endif
     }
+
+#if DEBUG
+    internal string GetGuardFixtureState() =>
+        guardFixture.GetState(coopMissionComponent.AgentRegistry);
+
+    internal string GetGuardFixtureCandidates(List<string> args) =>
+        guardFixture.GetCandidates(coopMissionComponent.AgentRegistry, args);
+
+    private void Handle_BattleGuardFixtureCommand(
+        MessagePayload<NetworkBattleGuardFixtureCommand> payload)
+    {
+        NetworkBattleGuardFixtureCommand command = payload.What;
+        GameThread.RunSafe(
+            () =>
+            {
+                if (command.BattleInstanceId != Session.InstanceId)
+                    return;
+
+                guardFixture.Apply(command, coopMissionComponent.AgentRegistry);
+            },
+            context: nameof(Handle_BattleGuardFixtureCommand));
+    }
+#endif
 
     // A side counts as fielded once some team of it has a live human agent (puppets qualify; they join
     // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.

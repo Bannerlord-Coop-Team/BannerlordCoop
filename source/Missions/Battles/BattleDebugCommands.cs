@@ -70,4 +70,25 @@ internal static class BattleDebugCommands
             $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
             $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyMovedSinceLast={moved}";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("guard_fixture_state", "coop.debug.battle")]
+    public static string GuardFixtureState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.guard_fixture_state";
+
+        CoopBattleController controller =
+            Mission.Current?.GetMissionBehavior<CoopBattleController>();
+        return controller?.GetGuardFixtureState() ?? "No active coop battle mission";
+    }
+
+    [CommandLineArgumentFunction("guard_fixture_candidates", "coop.debug.battle")]
+    public static string GuardFixtureCandidates(List<string> args)
+    {
+        CoopBattleController controller =
+            Mission.Current?.GetMissionBehavior<CoopBattleController>();
+        return controller?.GetGuardFixtureCandidates(args) ?? "No active coop battle mission";
+    }
+#endif
 }
