@@ -20,7 +20,6 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ScreenSystem;
 
@@ -289,7 +288,6 @@ namespace Coop.LiveTesting
                 commandRegistryReady,
                 activeState,
                 topScreen,
-                inquiryActive = InformationManager.IsAnyInquiryActive(),
                 activeMenu,
                 campaignLoaded,
                 missionActive,
