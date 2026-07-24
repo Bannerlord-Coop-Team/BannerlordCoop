@@ -264,7 +264,7 @@ internal class BattleMissionStartHandler : IHandler
         MapEventHostileActionConsequences.Apply(mapEvent, attackerMobileParty.Party, "attack");
     }
 
-    private bool RemoveWoundedNonInitiatorParties(MapEvent mapEvent, string initiatingPartyId)
+    internal bool RemoveWoundedNonInitiatorParties(MapEvent mapEvent, string initiatingPartyId)
     {
         foreach (var player in playerManager.Players)
         {
@@ -276,12 +276,17 @@ internal class BattleMissionStartHandler : IHandler
                 !objectManager.TryGetId(mobileParty.Party, out var partyId))
                 continue;
 
+            bool leaveSiege = mapEvent.IsSiegeAssault && mobileParty.Party.Side == BattleSideEnum.Attacker;
             mobileParty.Party.MapEventSide = null;
 
             if (mapEvent.IsFinalized)
                 return false;
 
-            network.SendAll(new NetworkPartyLeftBattle(partyId));
+            // Preserve the client's PlayerSiege reference until its explicit cleanup runs.
+            network.SendAll(new NetworkPartyLeftBattle(partyId, leaveSiege));
+
+            if (leaveSiege && mobileParty.BesiegerCamp != null)
+                mobileParty.BesiegerCamp = null;
         }
 
         return true;

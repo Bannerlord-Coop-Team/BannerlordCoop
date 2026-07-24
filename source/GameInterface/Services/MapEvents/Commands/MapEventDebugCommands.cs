@@ -624,7 +624,7 @@ public class MapEventDebugCommands
             return $"Unable to resolve PartyBase for player {args[0]}.";
         }
 
-        network.SendAll(new NetworkPartyLeftBattle(partyBaseId));
+        network.SendAll(new NetworkPartyLeftBattle(partyBaseId, false));
         return $"Requested encounter finish for player {args[0]} (PartyBase id {partyBaseId}).";
     }
 

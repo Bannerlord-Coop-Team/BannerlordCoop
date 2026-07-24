@@ -367,7 +367,7 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         // Out of the battle first, so the capture below is a plain out-of-battle capture.
         playerParty.Party.MapEventSide = null;
-        network.SendAll(new NetworkPartyLeftBattle(surrenderedPartyId));
+        network.SendAll(new NetworkPartyLeftBattle(surrenderedPartyId, false));
 
         TakePrisonerAction.Apply(captorParty, playerHero);
     }
