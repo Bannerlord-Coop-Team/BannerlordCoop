@@ -146,6 +146,11 @@ internal class PartyDoneLogicHandler : IHandler
             var releasedPlayerCaptivityEvents = new List<PlayerCaptivityEndedByServer>();
             var leftPrisonerRosterData = message.LeftPrisonerRosterData;
             var rightPrisonerRosterData = message.RightPrisonerRosterData;
+            // Validate the client-reported release/take history against the signed delta before
+            // removing player-prisoner releases from the apply delta. Player releases are handled
+            // by PlayerCaptivityServerHandler rather than by a roster mutation, so validating the
+            // filtered delta would always reject a legitimate dismissal (the -1 entry is gone).
+            var signedRightPrisonerRosterData = rightPrisonerRosterData;
             // SellPrisonersHandler owns ransom releases so the same player is not released twice.
             if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
             {
@@ -166,7 +171,7 @@ internal class PartyDoneLogicHandler : IHandler
                 TryValidatePrisonerActionRosters(
                     releasedPrisonersRoster,
                     takenPrisonersRoster,
-                    rightPrisonerRosterData,
+                    signedRightPrisonerRosterData,
                     out takenHeroCharacterIds);
             if (!actionRostersAreValid)
             {
