@@ -605,9 +605,20 @@ internal class PlayerCaptivityServerHandler : IHandler
         // PartyBelongedToAsPrisoner via the engine hook; do this regardless of whether the captor is still
         // active, since a captor defeated in battle may already be inactive. If the roster no longer holds
         // the hero, null it directly so the cleared state still auto-syncs to the owning client.
-        if (captorParty != null && captorParty.PrisonRoster.Contains(playerHero.CharacterObject))
+        if (captorParty != null)
         {
-            captorParty.PrisonRoster.RemoveTroop(playerHero.CharacterObject);
+            // Publish absolute zeroes so clients converge even when their stale count differs from the server.
+            var prisonRoster = captorParty.PrisonRoster;
+            int prisonerIndex = prisonRoster.FindIndexOfTroop(playerHero.CharacterObject);
+            if (prisonerIndex >= 0)
+            {
+                if (prisonRoster.GetElementWoundedNumber(prisonerIndex) != 0)
+                {
+                    prisonRoster.SetElementWoundedNumber(prisonerIndex, 0);
+                }
+                prisonRoster.SetElementNumber(prisonerIndex, 0);
+                prisonRoster.RemoveZeroCounts();
+            }
         }
         if (playerHero.PartyBelongedToAsPrisoner != null)
         {

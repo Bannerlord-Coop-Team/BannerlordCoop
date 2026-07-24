@@ -1,11 +1,17 @@
-﻿using Common.Network;
+﻿using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.MapEventParties;
+using GameInterface.Services.Party.Data;
+using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.TroopRosters.Interfaces;
 using HarmonyLib;
 using Helpers;
 using Moq;
@@ -609,6 +615,78 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Releases a captured player through the same normal Party-screen command that the captor sends after
+    /// moving the player prisoner into the dummy left-hand dismissal roster.
+    /// </summary>
+    protected void ReleasePlayerByPartyScreenDiscard(string captorHeroId, string captorPartyId, string prisonerHeroId)
+    {
+        var disabledMethods = MapEventDisabledMethods
+            // A release from an active captor separates the restored party with campaign-map pathfinding.
+            // The headless environment has no map scene; the existing escape helper suppresses this same
+            // visual/navigation boundary while retaining the authoritative release state transition.
+            .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(captorHeroId, out var captorHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(prisonerHeroId, out var prisonerHero));
+            Assert.True(Server.ObjectManager.TryGetId(prisonerHero.CharacterObject, out var prisonerCharacterId));
+
+            var emptyRosterDelta = new TroopRosterData(Array.Empty<TroopRosterElementData>());
+            var message = new NetworkCompleteDoneLogic(
+                captorHeroId,
+                Array.Empty<FlattenedTroop>(),
+                Array.Empty<FlattenedTroop>(),
+                Array.Empty<FlattenedTroop>(),
+                emptyRosterDelta,
+                new TroopRosterData(new[]
+                {
+                    new TroopRosterElementData(prisonerCharacterId, 1, 0, 0),
+                }),
+                emptyRosterDelta,
+                new TroopRosterData(new[]
+                {
+                    new TroopRosterElementData(prisonerCharacterId, -1, 0, 0),
+                }),
+                captorParty.ItemRoster.ToArray(),
+                new UpgradedTroopHistoryData(new()),
+                null,
+                null,
+                0,
+                0,
+                0,
+                true,
+                captorParty.Position,
+                PartyScreenHelper.PartyScreenMode.Normal,
+                Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster));
+
+            Server.Resolve<IMessageBroker>().Publish(this, message);
+        }, disabledMethods);
+    }
+
+    /// <summary>
+    /// Adds a prisoner count locally to one instance without replication, allowing tests to construct
+    /// malformed and divergent player-prisoner counts.
+    /// </summary>
+    protected void SeedPartyPrisoner(EnvironmentInstance instance, string partyId, string heroId, int count)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            using (new AllowedThread())
+            {
+                int index = party.PrisonRoster.FindIndexOfTroop(hero.CharacterObject);
+                Assert.True(index >= 0);
+                party.PrisonRoster.AddToCountsAtIndex(index, count);
+            }
+        });
+    }
+
+    /// <summary>
     /// Asserts the prison roster of the party with <paramref name="partyId"/> holds exactly
     /// <paramref name="expected"/> prisoners on the given <paramref name="instance"/>. Guards the
     /// captor's side of a capture: the prisoner must be counted once everywhere — a replicated add
@@ -623,6 +701,19 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(
                 expected == party.PrisonRoster.TotalManCount,
                 $"[{instance.GetType().Name}] party {partyId} should have {expected} prisoners, has {party.PrisonRoster.TotalManCount}");
+        });
+    }
+
+    /// <summary>
+    /// Asserts the exact count of one player hero in a party's prison roster.
+    /// </summary>
+    protected void AssertPlayerPrisonerCount(EnvironmentInstance instance, string partyId, string heroId, int expected)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.Equal(expected, party.PrisonRoster.GetTroopCount(hero.CharacterObject));
         });
     }
 

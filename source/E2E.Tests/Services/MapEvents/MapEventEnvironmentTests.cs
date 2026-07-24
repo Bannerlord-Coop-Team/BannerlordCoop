@@ -549,6 +549,64 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void PartyScreenDiscard_DuplicatedPlayerPrisoner_ClearsEveryCopyAndRestoresPartyOnce()
+    {
+        // Arrange — create both player parties and attach the captor hero to its authoritative party so
+        // NetworkCompleteDoneLogic resolves the Party screen's right-hand owner and rosters.
+        var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
+        var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(captorHeroId, out var captorHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                captorParty.MemberRoster.AddToCounts(captorHero.CharacterObject, 1);
+                captorHero.PartyBelongedTo = captorParty;
+            }
+        });
+
+        DefeatPlayerPartyInBattle(playerHeroId, playerPartyId, captorPartyId);
+        TestEnvironment.FlushCoalescer();
+
+        // Reproduce both possible forms of the malformed live state: a duplicated authoritative count and
+        // a client with one additional stale copy. A relative removal cannot reconcile both states.
+        SeedPartyPrisoner(Server, captorPartyId, playerHeroId, 1);
+        foreach (var client in Clients)
+        {
+            SeedPartyPrisoner(client, captorPartyId, playerHeroId, 2);
+        }
+        int unrelatedPrisoners = GetPartyPrisonerCount(Server, captorPartyId) - 2;
+        Assert.True(unrelatedPrisoners >= 0);
+
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 2);
+        foreach (var client in Clients)
+        {
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 3);
+        }
+
+        // Act — the captor moves the player to the normal Party screen's dummy left dismissal roster.
+        ReleasePlayerByPartyScreenDiscard(captorHeroId, captorPartyId, playerHeroId);
+
+        // Assert — one dismissal clears every stale copy while preserving every unrelated prisoner and
+        // restoring the released party exactly once on the server and clients.
+        AssertCaptivity(Server, playerHeroId, null);
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 0);
+        AssertPartyPrisonerCount(Server, captorPartyId, unrelatedPrisoners);
+        AssertPlayerPartyRestored(Server, playerHeroId, playerPartyId);
+
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, playerHeroId, null);
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 0);
+            AssertPartyPrisonerCount(client, captorPartyId, unrelatedPrisoners);
+            AssertHeroInPartyRoster(client, playerHeroId, playerPartyId);
+        }
+    }
+
+    [Fact]
     public void ServerEndCaptivity_OfPlayerHero_SyncAllClients()
     {
         // Arrange
