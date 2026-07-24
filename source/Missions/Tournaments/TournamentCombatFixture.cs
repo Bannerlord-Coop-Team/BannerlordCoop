@@ -271,8 +271,10 @@ public class TournamentCombatFixture : ITournamentCombatFixture
                 out TournamentAgentSpawnData playerOneData,
                 out Agent playerOne))
             return $"Initialize-TournamentCombatFixture: active fighter {command.PlayerOneControllerId} was not found";
-        if (!TryResolveControllerAgent(
+        if (!TryResolvePlayerAgent(
                 command.PlayerTwoControllerId,
+                snapshot,
+                manifest,
                 agentRegistry,
                 out CoopAgentInfo playerTwoInfo))
             return $"Initialize-TournamentCombatFixture: player opponent {command.PlayerTwoControllerId} was not found";
@@ -601,17 +603,32 @@ public class TournamentCombatFixture : ITournamentCombatFixture
                 !candidate.IsReplaced) == true;
     }
 
-    private static bool TryResolveControllerAgent(
+    private static bool TryResolvePlayerAgent(
         string controllerId,
+        TournamentSessionSnapshot snapshot,
+        TournamentSpawnManifestData manifest,
         INetworkAgentRegistry agentRegistry,
         out CoopAgentInfo agentInfo)
     {
+        if (TryResolveHumanAgent(
+                controllerId,
+                snapshot,
+                manifest,
+                agentRegistry,
+                out TournamentAgentSpawnData humanData,
+                out _) &&
+            agentRegistry.TryGetAgentInfo(humanData.AgentId, out agentInfo))
+            return true;
+
         agentInfo = agentRegistry?
             .GetAgents(controllerId)
             .FirstOrDefault(candidate =>
                 candidate?.Agent != null &&
                 candidate.Agent.IsActive() &&
-                candidate.Agent.Mission == Mission.Current);
+                candidate.Agent.Mission == Mission.Current &&
+                manifest?.Agents?.Any(data =>
+                    data?.AgentId == candidate.AgentId ||
+                    data?.MountAgentId == candidate.AgentId) != true);
         return agentInfo != null;
     }
 
