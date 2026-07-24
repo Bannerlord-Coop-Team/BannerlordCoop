@@ -240,7 +240,15 @@ public class PuppetSpawner : IPuppetSpawner
             agent.SetIsAIPaused(false);
         }
 
-        registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent);
+        registry.TryRegisterAgent(
+            data.OwnerControllerId,
+            data.OriginalOwnerControllerId,
+            data.MovementScopeId,
+            data.AgentId,
+            data.MovementId,
+            agent);
+        if (data.HasCurrentEquipment)
+            data.CurrentEquipment.Apply(agent);
 
         // The owner registered its cavalry's horse with its own network id; our engine spawned a matching
         // horse implicitly (same equipment) inside SpawnAgent. Register OUR copy under the same id, so mount
@@ -250,7 +258,13 @@ public class PuppetSpawner : IPuppetSpawner
         if (data.MountAgentId != Guid.Empty)
         {
             if (agent.MountAgent is Agent mount)
-                registry.TryRegisterAgent(data.OwnerControllerId, data.MountAgentId, mount);
+                registry.TryRegisterAgent(
+                    data.OwnerControllerId,
+                    data.MountOriginalOwnerControllerId,
+                    data.MountMovementScopeId,
+                    data.MountAgentId,
+                    data.MountMovementId,
+                    mount);
             else
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
         }

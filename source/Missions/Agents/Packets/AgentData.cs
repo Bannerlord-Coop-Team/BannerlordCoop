@@ -7,17 +7,17 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public struct AgentData
     {
-        // mountId: the mount's registry id (resolved by the caller — this ctor has no registry access), carried
-        // so the receiver can attach the puppet to the exact horse; Guid.Empty when unregistered/unmounted.
-        public AgentData(Agent agent, System.Guid mountId = default)
+        public AgentData(
+            Agent agent,
+            ushort mountMovementId = 0,
+            string mountIdentityScopeId = null,
+            System.Guid mountAgentId = default)
         {
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
             LookDirection = agent.LookDirection;
             InputVector = agent.MovementInputVector;
             Speed = agent.GetRealGlobalVelocity().AsVec2.Length;
-
-            AgentEquipment = new AgentEquipmentData(agent);
 
             // The rider can be active while its mount is mid-teardown (e.g. right after a battle concludes):
             // reading the mount's native state (MovementInputVector, etc.) then access-violates. Only capture
@@ -26,12 +26,18 @@ namespace Missions.Agents.Packets
             Agent mount = agent.MountAgent;
             if (mount != null && mount.IsActive())
             {
-                MountData = new AgentMountData(mount, mountId);
+                MountData = new AgentMountData(
+                    mount, mountMovementId, mountIdentityScopeId, mountAgentId);
             }
             else
             {
                 MountData = null;
             }
+        }
+
+        public AgentData(Agent agent, System.Guid mountAgentId)
+            : this(agent, 0, null, mountAgentId)
+        {
         }
 
         public void Apply(Agent agent)
@@ -69,9 +75,6 @@ namespace Missions.Agents.Packets
                     : new Vec2(0f, throttle);
             }
 
-            // Update equipment
-            AgentEquipment.Apply(agent);
-
             // NOTE: actions/animations are NOT applied here anymore. They are events, not continuous state, so
             // they are synced separately and on-change by AgentActionHandler (reliable-ordered), not polled with
             // movement. This keeps the movement packet purely continuous state.
@@ -91,9 +94,8 @@ namespace Missions.Agents.Packets
         public Vec3 LookDirection { get; }
         [ProtoMember(4)]
         public Vec2 MovementDirection { get; }
-        [ProtoMember(5)]
-        public AgentEquipmentData AgentEquipment { get; }
-        // 6 was ActionData — actions moved to the event-driven AgentActionHandler; tag left unused for wire stability.
+        // 5 was AgentEquipmentData — wield state moved to reliable on-change updates.
+        // 6 was ActionData — actions moved to the event-driven AgentActionHandler.
         [ProtoMember(7)]
         public AgentMountData MountData { get; }
         /// <summary>The owner's real ground speed, m/s — drives the on-foot puppet's locomotion throttle.</summary>
