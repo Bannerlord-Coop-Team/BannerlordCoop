@@ -1,12 +1,9 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
-using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Players;
-using GameInterface.Services.UI;
-using System;
 using System.Linq;
 
 namespace Coop.Core.Server.Services.Players.Handlers;
@@ -29,7 +26,6 @@ internal sealed class DisconnectedPlayersServerHandler : IHandler
         this.timeControlInterface = timeControlInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(HandlePlayerDisconnected);
-
     }
 
     private void HandlePlayerDisconnected(MessagePayload<PlayerDisconnected> _)

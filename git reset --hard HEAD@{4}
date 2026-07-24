@@ -1,0 +1,64 @@
+[33m71fc4319c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32m#1785-Pause-Map-When-all-ClientsDisconnectNEW[m[33m, [m[1;31morigin/#1785-Pause-Map-When-all-ClientsDisconnect[m[33m)[m HEAD@{0}: reset: moving to 71fc4319c8eaec0531196d8a1c2575e46e64a1ef
+[33me8d9dcce3[m HEAD@{1}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to #1785-Pause-Map-When-all-ClientsDisconnectNEW
+[33m473bced68[m[33m ([m[1;31morigin/development[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32m#1785-Pause-Map-When-all-ClientsDisconnect[m[33m)[m HEAD@{2}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnectNEW to #1785-Pause-Map-When-all-ClientsDisconnect
+[33me8d9dcce3[m HEAD@{3}: pull --progress --no-edit --no-stat --recurse-submodules=no origin: Merge made by the 'ort' strategy.
+[33ma426073fe[m HEAD@{4}: commit: Tests passing & Live game test passing as well
+[33m6284e0afc[m HEAD@{5}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to #1785-Pause-Map-When-all-ClientsDisconnectNEW
+[33m6e54d9f80[m HEAD@{6}: reset: moving to HEAD
+[33m6e54d9f80[m HEAD@{7}: checkout: moving from activeplayer_counter to #1785-Pause-Map-When-all-ClientsDisconnect
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{8}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to activeplayer_counter
+[33m6e54d9f80[m HEAD@{9}: commit: logic & test
+[33m71fc4319c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32m#1785-Pause-Map-When-all-ClientsDisconnectNEW[m[33m, [m[1;31morigin/#1785-Pause-Map-When-all-ClientsDisconnect[m[33m)[m HEAD@{10}: checkout: moving from development to #1785-Pause-Map-When-all-ClientsDisconnect
+[33m1b6e8479e[m[33m ([m[1;32mdevelopment[m[33m)[m HEAD@{11}: checkout: moving from tempname to development
+[33ma2d04e8e2[m[33m ([m[1;32mtempname[m[33m, [m[1;32mtemp[m[33m)[m HEAD@{12}: checkout: moving from 9a25bca62a338767e1fe8488c6eadffe048aa0db to tempname
+[33m9a25bca62[m HEAD@{13}: revert: Revert "Init"
+[33m2a824214c[m HEAD@{14}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to 2a824214c2f63d255e37e1e587579d412e17fc22
+[33m71fc4319c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32m#1785-Pause-Map-When-all-ClientsDisconnectNEW[m[33m, [m[1;31morigin/#1785-Pause-Map-When-all-ClientsDisconnect[m[33m)[m HEAD@{15}: reset: moving to 71fc4319c8eaec0531196d8a1c2575e46e64a1ef
+[33m71fc4319c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32m#1785-Pause-Map-When-all-ClientsDisconnectNEW[m[33m, [m[1;31morigin/#1785-Pause-Map-When-all-ClientsDisconnect[m[33m)[m HEAD@{16}: checkout: moving from #1785-Pause-Map-When-all-Clients-Disconnect to #1785-Pause-Map-When-all-ClientsDisconnect
+[33m28bbcf28a[m HEAD@{17}: reset: moving to HEAD
+[33m28bbcf28a[m HEAD@{18}: commit: commit test & handler
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{19}: reset: moving to 5aad100ab911ef5756e5dae0ae95d6039080f514
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{20}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to #1785-Pause-Map-When-all-Clients-Disconnect
+[33m71fc4319c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32m#1785-Pause-Map-When-all-ClientsDisconnectNEW[m[33m, [m[1;31morigin/#1785-Pause-Map-When-all-ClientsDisconnect[m[33m)[m HEAD@{21}: checkout: moving from #1785-Pause-Map-When-all-Clients-Disconnect to #1785-Pause-Map-When-all-ClientsDisconnect
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{22}: reset: moving to HEAD
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{23}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to #1785-Pause-Map-When-all-Clients-Disconnect
+[33m71fc4319c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32m#1785-Pause-Map-When-all-ClientsDisconnectNEW[m[33m, [m[1;31morigin/#1785-Pause-Map-When-all-ClientsDisconnect[m[33m)[m HEAD@{24}: checkout: moving from activeplayer_counter to #1785-Pause-Map-When-all-ClientsDisconnect
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{25}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to activeplayer_counter
+[33m71fc4319c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32m#1785-Pause-Map-When-all-ClientsDisconnectNEW[m[33m, [m[1;31morigin/#1785-Pause-Map-When-all-ClientsDisconnect[m[33m)[m HEAD@{26}: commit: temp
+[33m0ea76c9c6[m HEAD@{27}: checkout: moving from 50e617e715892d3f4c15f81781e70698a3264a56 to #1785-Pause-Map-When-all-ClientsDisconnect
+[33m50e617e71[m HEAD@{28}: commit: commit all
+[33m3c25d271a[m HEAD@{29}: commit: commit pause when no connected player
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{30}: checkout: moving from activeplayer_counter to d8400bf924d74f6c37f29b2c29e0adee2b428eef
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{31}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to activeplayer_counter
+[33m0ea76c9c6[m HEAD@{32}: commit: temp
+[33m2a824214c[m HEAD@{33}: checkout: moving from d8400bf924d74f6c37f29b2c29e0adee2b428eef to #1785-Pause-Map-When-all-ClientsDisconnect
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{34}: checkout: moving from activeplayer_counter to d8400bf924d74f6c37f29b2c29e0adee2b428eef
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{35}: checkout: moving from #1785-Pause-Map-When-all-Clients-Disconnect to activeplayer_counter
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{36}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to #1785-Pause-Map-When-all-Clients-Disconnect
+[33m2a824214c[m HEAD@{37}: checkout: moving from #1785-Pause-Map-When-all-Clients-Disconnect to #1785-Pause-Map-When-all-ClientsDisconnect
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{38}: reset: moving to HEAD
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{39}: checkout: moving from activeplayer_counter to #1785-Pause-Map-When-all-Clients-Disconnect
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{40}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to activeplayer_counter
+[33m2a824214c[m HEAD@{41}: checkout: moving from #1785-Pause-Map-When-all-Clients-Disconnect to #1785-Pause-Map-When-all-ClientsDisconnect
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{42}: checkout: moving from activeplayer_counter to #1785-Pause-Map-When-all-Clients-Disconnect
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{43}: checkout: moving from #1785-Pause-Map-When-all-Clients-Disconnect to activeplayer_counter
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{44}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to #1785-Pause-Map-When-all-Clients-Disconnect
+[33m2a824214c[m HEAD@{45}: checkout: moving from #1785-Pause-Map-When-all-Clients-Disconnect to #1785-Pause-Map-When-all-ClientsDisconnect
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{46}: checkout: moving from #1785-Pause-Map-When-all-ClientsDisconnect to #1785-Pause-Map-When-all-Clients-Disconnect
+[33m2a824214c[m HEAD@{47}: commit: Init
+[33ma2d04e8e2[m[33m ([m[1;32mtempname[m[33m, [m[1;32mtemp[m[33m)[m HEAD@{48}: checkout: moving from #1785-Pause-Map-When-all-Clients-Disconnect to #1785-Pause-Map-When-all-ClientsDisconnect
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{49}: reset: moving to HEAD
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{50}: checkout: moving from activeplayer_counter to #1785-Pause-Map-When-all-Clients-Disconnect
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{51}: reset: moving to HEAD
+[33md8400bf92[m[33m ([m[1;32mactiveplayer_counter[m[33m)[m HEAD@{52}: commit: activePlayer counter via options menu & connectedPlayer Pause when equals 0
+[33m304896b3d[m[33m ([m[1;31morigin/1906/fix-mercenary-conversation[m[33m)[m HEAD@{53}: checkout: moving from 304896b3d879fb4e2318dbc5deefbe057a8e8466 to activeplayer_counter
+[33m304896b3d[m[33m ([m[1;31morigin/1906/fix-mercenary-conversation[m[33m)[m HEAD@{54}: checkout: moving from development to 304896b3d879fb4e2318dbc5deefbe057a8e8466
+[33m1b6e8479e[m[33m ([m[1;32mdevelopment[m[33m)[m HEAD@{55}: checkout: moving from 5ae93a361e61c3ec09426476f7157dcb95d16c04 to development
+[33m5ae93a361[m HEAD@{56}: checkout: moving from developmentNEW to 5ae93a361e61c3ec09426476f7157dcb95d16c04
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{57}: reset: moving to HEAD
+[33m5aad100ab[m[33m ([m[1;32mdevelopmentNEW[m[33m)[m HEAD@{58}: checkout: moving from development to developmentNEW
+[33m1b6e8479e[m[33m ([m[1;32mdevelopment[m[33m)[m HEAD@{59}: pull --progress --no-edit --no-stat --recurse-submodules=no origin: Merge made by the 'ort' strategy.
+[33m6d8ef5d0b[m HEAD@{60}: pull --progress --no-edit --no-stat --recurse-submodules=no origin: Merge made by the 'ort' strategy.
+[33m556972580[m HEAD@{61}: checkout: moving from development to development
+[33m556972580[m HEAD@{62}: checkout: moving from Sync-1106-EquipmentElementLifetime to development
+[33m56eb2996e[m[33m ([m[1;32mSync-1106-EquipmentElementLifetime[m[33m)[m HEAD@{63}: reset: moving to HEAD
