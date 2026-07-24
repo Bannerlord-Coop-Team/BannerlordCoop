@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
@@ -692,7 +693,7 @@ Run this on the client that controls the captor after opening the Party screen."
         // PartyCharacterVM.ApplyTransfer is patched with this same scope. Drive PartyScreenLogic directly
         // so the automation exercises the real transfer history, both Done handlers, network messages,
         // rollback, and state close without synthesizing either wire payload.
-        using (new Common.Util.AllowedThread())
+        using (new AllowedThread())
         {
             partyScreenLogic.AddCommand(command);
             partyScreenLogic.RemoveZeroCounts();
