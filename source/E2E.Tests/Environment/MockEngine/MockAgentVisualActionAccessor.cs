@@ -23,7 +23,7 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
             ? mirror.RawVisualAction0Index
             : mirror.RawVisualAction1Index;
         if (visualAction == action.Index)
-            return rawVisualAction == action.Index;
+            return !agent.HasMount || rawVisualAction == action.Index;
         if (visualAction != ActionIndexCache.act_none.Index) return false;
 
         return rawVisualAction == action.Index;
@@ -48,6 +48,52 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         int rawVisualAction = channel == 0
             ? mirror.RawVisualAction0Index
             : mirror.RawVisualAction1Index;
+        if (!agent.HasMount)
+        {
+            if (rawVisualAction == action.Index)
+            {
+                if (channel == 0)
+                {
+                    mirror.RawVisualAction0Progress = progress;
+                }
+                else
+                {
+                    mirror.RawVisualAction1Progress = progress;
+                }
+
+                mirror.AdvanceRawVisualActionCalls++;
+                mirror.AdvanceExistingRawVisualActionCalls++;
+                return;
+            }
+
+            if (visualAction != ActionIndexCache.act_none.Index
+                && visualAction != action.Index)
+            {
+                return;
+            }
+
+            if (visualAction == ActionIndexCache.act_none.Index
+                && rawVisualAction >= 0)
+            {
+                return;
+            }
+
+            if (channel == 0)
+            {
+                mirror.RawVisualAction0Index = action.Index;
+                mirror.RawVisualAction0Progress = progress;
+            }
+            else
+            {
+                mirror.RawVisualAction1Index = action.Index;
+                mirror.RawVisualAction1Progress = progress;
+            }
+
+            mirror.AdvanceRawVisualActionCalls++;
+            mirror.InstallRawVisualActionCalls++;
+            return;
+        }
+
         if (visualAction == action.Index
             && rawVisualAction == action.Index)
         {

@@ -25,7 +25,8 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
 {
     private static readonly ILogger Logger =
         LogManager.GetLogger<AgentVisualActionAccessor>();
-    private const float RetainedGuardAnimationBlendPeriod = -0.2f;
+    private const float OnFootRetainedGuardAnimationBlendPeriod = -1f;
+    private const float MountedRetainedGuardAnimationBlendPeriod = -0.2f;
     private const float ReplayLogIntervalSeconds = 1f;
 
     private readonly Dictionary<long, float> _lastReplayLogTimes =
@@ -49,7 +50,11 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             int visualAnimation =
                 skeleton.GetAnimationIndexAtChannel(channel);
             if (visualAction == action)
-                return animationIndex < 0 || visualAnimation == animationIndex;
+            {
+                return !agent.HasMount
+                    || animationIndex < 0
+                    || visualAnimation == animationIndex;
+            }
             if (visualAction != ActionIndexCache.act_none) return false;
 
             return animationIndex >= 0 && visualAnimation == animationIndex;
@@ -85,6 +90,45 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             if (animationIndex < 0) return;
 
             int visualAnimation = skeleton.GetAnimationIndexAtChannel(channel);
+            if (!agent.HasMount)
+            {
+                if (visualAnimation == animationIndex)
+                {
+                    skeleton.SetAnimationParameterAtChannel(channel, progress);
+                    return;
+                }
+
+                if (visualAction != ActionIndexCache.act_none
+                    && visualAction != action)
+                {
+                    return;
+                }
+
+                if (visualAction == ActionIndexCache.act_none
+                    && visualAnimation >= 0)
+                {
+                    return;
+                }
+
+                LogVisualReplay(
+                    agent,
+                    channel,
+                    action,
+                    visualAction,
+                    animationIndex,
+                    visualAnimation);
+
+                // Native can drop an on-foot puppet's action metadata while its authored guard
+                // should remain visible. Keep the known-working raw clip independent of that state.
+                skeleton.SetAnimationAtChannel(
+                    animationIndex,
+                    channel,
+                    animationSpeedMultiplier: 1f,
+                    blendInPeriod: OnFootRetainedGuardAnimationBlendPeriod,
+                    startProgress: progress);
+                return;
+            }
+
             if (visualAction == action
                 && visualAnimation == animationIndex)
             {
@@ -120,7 +164,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
                 channel,
                 in action,
                 channelParameter: progress,
-                blendPeriodOverride: RetainedGuardAnimationBlendPeriod,
+                blendPeriodOverride: MountedRetainedGuardAnimationBlendPeriod,
                 forceFaceMorphRestart: false);
             skeleton.TickActionChannels();
         }

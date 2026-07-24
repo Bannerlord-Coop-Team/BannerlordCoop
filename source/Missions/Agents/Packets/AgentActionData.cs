@@ -167,6 +167,9 @@ namespace Missions.Agents.Packets
 
         private static int GetGuardPresentationChannel(Agent agent)
         {
+            if (!agent.HasMount)
+                return -1;
+
             Agent.ActionCodeType action1Type = agent.GetCurrentActionType(1);
             Agent.ActionCodeType action0Type = agent.GetCurrentActionType(0);
             if (IsGuardReactionAction(action1Type))

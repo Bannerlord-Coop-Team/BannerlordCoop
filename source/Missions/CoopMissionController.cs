@@ -66,7 +66,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
         // Mounted interpolation can replace the rider's visual action after the pre-display pass. Restore it
         // here without advancing its progress, so the movement correction and guard do not alternate by frame.
-        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates();
+        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates(
+            mountedOnly: true);
         coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
     }
