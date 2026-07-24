@@ -5,7 +5,6 @@ using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MobileParties;
