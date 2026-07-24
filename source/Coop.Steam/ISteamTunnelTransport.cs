@@ -36,6 +36,9 @@ public static class SteamTunnel
     /// <summary>Ceiling for Steam's send pacing, headroom above the floor.</summary>
     public const int SendRateMaxBytesPerSecond = 20 * 1024 * 1024;
 
+    /// <summary>Established connections may recover from a brief route interruption.</summary>
+    public const int ConnectedTimeoutMilliseconds = 60 * 1000;
+
     /// <summary>
     /// Kernel buffers on the pump sockets. Must absorb what LiteNetLib keeps in flight
     /// while a full Steam send buffer parks the pump, or the kernel silently drops there.

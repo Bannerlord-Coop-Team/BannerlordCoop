@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Coop.Core.Common.Session;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
@@ -75,8 +76,11 @@ public class InitialServerState : ServerStateBase
     public override void Start()
     {
 #if DEBUG
-        loadingInterface.ShowLoadingScreen();
-        gameStateInterface.LoadGame("MP");
+        if (!ManagedServerConfig.HasAutoLoadSave)
+        {
+            loadingInterface.ShowLoadingScreen();
+            gameStateInterface.LoadGame("MP");
+        }
 #endif
     }
 

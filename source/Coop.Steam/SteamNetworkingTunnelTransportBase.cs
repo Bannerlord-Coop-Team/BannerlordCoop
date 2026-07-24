@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 using Steamworks;
 using System;
 using System.Collections.Generic;
@@ -89,6 +89,8 @@ public abstract class SteamNetworkingTunnelTransportBase :
     private void ApplyGlobalTunnelConfig()
     {
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_TimeoutConnected, SteamTunnel.ConnectedTimeoutMilliseconds);
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global, IntPtr.Zero,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond);
@@ -116,8 +118,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
     public virtual uint ConnectToHost(ulong hostSteamId, int virtualPort)
     {
-        var identity = new SteamNetworkingIdentity();
-        identity.SetSteamID64(hostSteamId);
+        var identity = CreateSteamIdentity(hostSteamId);
 
         var options = TunnelConnectionOptions();
         var connection = ConnectP2P(ref identity, virtualPort, options.Length, options);
@@ -133,6 +134,13 @@ public abstract class SteamNetworkingTunnelTransportBase :
         }
 
         return connection.m_HSteamNetConnection;
+    }
+
+    protected virtual SteamNetworkingIdentity CreateSteamIdentity(ulong steamId)
+    {
+        var identity = new SteamNetworkingIdentity();
+        identity.SetSteamID64(steamId);
+        return identity;
     }
 
     public void ListenForClients(int virtualPort)
@@ -177,6 +185,8 @@ public abstract class SteamNetworkingTunnelTransportBase :
         // the global values (it stayed pinned at the 256 KB/s default), while connection
         // scope provably works, so the config is applied straight onto it.
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
+            ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_TimeoutConnected, SteamTunnel.ConnectedTimeoutMilliseconds);
+        SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes);
         SetConfigInt32(ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, (IntPtr)connection,
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond);
@@ -184,8 +194,9 @@ public abstract class SteamNetworkingTunnelTransportBase :
             ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond);
 
         // Read-back separates "stored but the pacer ignores it" from "never stored".
-        Logger.Information("Tunnel connection {Connection} config: sendRateMin={Min} sendRateMax={Max} sendBuffer={Buffer}",
+        Logger.Information("Tunnel connection {Connection} config: connectedTimeout={Timeout} sendRateMin={Min} sendRateMax={Max} sendBuffer={Buffer}",
             connection,
+            ReadConfigInt32(connection, ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_TimeoutConnected),
             ReadConfigInt32(connection, ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin),
             ReadConfigInt32(connection, ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax),
             ReadConfigInt32(connection, ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize));
@@ -269,6 +280,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
     {
         return new[]
         {
+            Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_TimeoutConnected, SteamTunnel.ConnectedTimeoutMilliseconds),
             Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendBufferSize, SteamTunnel.SendBufferBytes),
             Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin, SteamTunnel.SendRateMinBytesPerSecond),
             Int32Option(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax, SteamTunnel.SendRateMaxBytesPerSecond),

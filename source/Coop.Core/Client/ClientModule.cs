@@ -31,7 +31,15 @@ public class ClientModule : CommonModule
 
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
-        builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<CoopClient>()
+            .As<ICoopClient>()
+            .As<INetwork>()
+            .As<IRelayNetwork>()
+            .As<INetEventListener>()
+#if DEBUG
+            .As<IDebugNetworkTrafficControl>()
+#endif
+            .InstancePerLifetimeScope();
 
         // Policies
         builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
