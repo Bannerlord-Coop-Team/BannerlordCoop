@@ -10,16 +10,9 @@ using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Party.Handlers;
 
-/// <summary>
-/// Relay for prisoner execution. Currently dormant: execution is disabled in coop
-/// (<see href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/2310">issue #2310</see>) —
-/// <see cref="Patches.PartyScreenLogicPatches"/> skips the native execute flow, so nothing publishes
-/// <see cref="HeroExecuted"/>. Kept for a future server-validated execution sync; the death cascade
-/// (clan/ruler succession, kingdom destruction) must be synced before rewiring this.
-/// </summary>
 internal class ExecuteTroopHandler : IHandler
 {
-    private static readonly ILogger logger = LogManager.GetLogger<ExecuteTroopHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<ExecuteTroopHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -46,20 +39,23 @@ internal class ExecuteTroopHandler : IHandler
 
     private void Handle_HeroExecuted(MessagePayload<HeroExecuted> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.ExecutedHero, out var executedHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.Executor, out var executorId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.ExecutedHero, out var executedHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Executor, out var executorId)) return;
 
-        var message = new ExecuteHero(executedHeroId, executorId);
-        network.SendAll(message);
+            var message = new ExecuteHero(executedHeroId, executorId);
+            network.SendAll(message);
+        });
     }
 
     private void Handle_ExecuteHero(MessagePayload<ExecuteHero> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutedHeroId, out var executedHero)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutorId, out var executor)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutedHeroId, out var executedHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.ExecutorId, out var executor)) return;
+
             KillCharacterAction.ApplyByExecution(executedHero, executor, true, false);
         });
     }
