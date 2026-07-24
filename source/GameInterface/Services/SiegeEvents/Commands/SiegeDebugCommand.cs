@@ -2,7 +2,9 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
@@ -47,6 +49,9 @@ public class SiegeDebugCommand
         public IFaction DefenderFaction;
         public bool WasAtWar;
         public PartyFixtureState[] Parties;
+        public bool RequiresRecoveryMessages;
+        public bool RecoveryFinalizedPublished;
+        public bool RecoveryDestroyedPublished;
     }
 
     private sealed class PartyFixtureState
@@ -236,10 +241,12 @@ public class SiegeDebugCommand
             ? 0
             : mapEvent.InvolvedParties.Count(party => party.MobileParty?.Army == reliefArmy);
         bool reliefEncounterActive = mapEvent != null && reliefArmy != null;
+        bool fixtureMapEventFinalized = armyReliefFixture?.MapEvent?.IsFinalized == true;
         return $"siege={siegeActive} playerBesieger={playerBesieger} " +
             $"reliefArmyParties={involvedReliefParties} reliefArmyMembers={reliefArmy?.Parties.Count ?? 0} " +
             $"reliefEncounter={reliefEncounterActive} " +
-            $"playerMapEvent={mapEvent != null} fixtureActive={armyReliefFixture != null}";
+            $"playerMapEvent={mapEvent != null} fixtureActive={armyReliefFixture != null} " +
+            $"fixtureMapEventFinalized={fixtureMapEventFinalized}";
     }
 
     [CommandLineArgumentFunction("army_relief_restore", "coop.debug.siege")]
@@ -250,9 +257,9 @@ public class SiegeDebugCommand
             return "This command can only be used by the server";
         }
 
-        if (args.Count != 2)
+        if (args.Count < 2 || args.Count > 3 || (args.Count == 3 && args[2] != "force"))
         {
-            return "Usage: coop.debug.siege.army_relief_restore <controllerId> <settlementId>";
+            return "Usage: coop.debug.siege.army_relief_restore <controllerId> <settlementId> [force]";
         }
 
         var fixture = armyReliefFixture;
@@ -264,7 +271,10 @@ public class SiegeDebugCommand
 
         if (fixture.MapEvent != null && !fixture.MapEvent.IsFinalized)
         {
-            return "Army relief fixture is still in an active map event; leave the battle on both clients first";
+            if (args.Count != 3)
+            {
+                return "Army relief fixture is still in an active map event; leave the battle on both clients first";
+            }
         }
 
         if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
@@ -274,6 +284,20 @@ public class SiegeDebugCommand
 
         try
         {
+            if (fixture.MapEvent != null && !fixture.MapEvent.IsFinalized)
+            {
+                try
+                {
+                    fixture.MapEvent.FinalizeEvent();
+                }
+                catch
+                {
+                    fixture.RequiresRecoveryMessages = fixture.MapEvent.IsFinalized;
+                    throw;
+                }
+            }
+            RecoverPartiallyFinalizedMapEvent(fixture);
+
             if (fixture.PlayerParty.BesiegerCamp != null &&
                 fixture.Settlement.SiegeEvent != null)
             {
@@ -305,6 +329,67 @@ public class SiegeDebugCommand
             Logger.Error(e, "Failed to restore the army relief fixture");
             return $"Army relief fixture restore failed: {e.Message}. The fixture remains active for one retry.";
         }
+    }
+
+    private static void RecoverPartiallyFinalizedMapEvent(ArmyReliefFixture fixture)
+    {
+        if (fixture.MapEvent == null)
+            return;
+
+        var attachedParties = GetAttachedParties(fixture);
+        bool hasAttachedParties = attachedParties.Length > 0 ||
+            fixture.MapEvent.AttackerSide?.Parties.Count > 0 ||
+            fixture.MapEvent.DefenderSide?.Parties.Count > 0;
+        if (hasAttachedParties)
+        {
+            fixture.RequiresRecoveryMessages = true;
+            foreach (var party in attachedParties)
+            {
+                if (party?._mapEventSide?.MapEvent != fixture.MapEvent)
+                    continue;
+
+                party._mapEventSide = null;
+                if (party.MobileParty != null)
+                    party.MobileParty.EventPositionAdder = TaleWorlds.Library.Vec2.Zero;
+                party.SetVisualAsDirty();
+            }
+
+            fixture.MapEvent.AttackerSide?.Clear();
+            fixture.MapEvent.DefenderSide?.Clear();
+            if (GetAttachedParties(fixture).Length > 0 ||
+                fixture.MapEvent.AttackerSide?.Parties.Count > 0 ||
+                fixture.MapEvent.DefenderSide?.Parties.Count > 0)
+            {
+                throw new InvalidOperationException("The partially finalized army relief fixture still has attached parties");
+            }
+        }
+
+        if (!fixture.RequiresRecoveryMessages)
+            return;
+
+        if (!fixture.RecoveryFinalizedPublished)
+        {
+            MessageBroker.Instance.Publish(fixture.MapEvent, new MapEventFinalized(fixture.MapEvent));
+            fixture.RecoveryFinalizedPublished = true;
+        }
+        if (!fixture.RecoveryDestroyedPublished)
+        {
+            MessageBroker.Instance.Publish(fixture.MapEvent, new InstanceDestroyed<MapEvent>(fixture.MapEvent));
+            fixture.RecoveryDestroyedPublished = true;
+        }
+    }
+
+    private static PartyBase[] GetAttachedParties(ArmyReliefFixture fixture)
+    {
+        var sideParties = fixture.MapEvent._sides
+            .Where(side => side != null)
+            .SelectMany(side => side.Parties ?? Enumerable.Empty<MapEventParty>())
+            .Select(mapEventParty => mapEventParty.Party);
+        return sideParties
+            .Concat(fixture.Parties.Select(state => state.Party))
+            .Where(party => party?._mapEventSide?.MapEvent == fixture.MapEvent)
+            .Distinct()
+            .ToArray();
     }
 
     private static PartyFixtureState CapturePartyState(PartyBase party)
