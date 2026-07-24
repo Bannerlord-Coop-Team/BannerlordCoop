@@ -4,6 +4,7 @@ using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Helpers;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -16,6 +17,18 @@ namespace GameInterface.Services.Party.Patches;
 internal class PartyScreenHelperPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenHelperPatches>();
+    [ThreadStatic]
+    private static bool _releasedAndTakenPrisonerActionsRequested;
+
+    internal static void ResetReleasedAndTakenPrisonerActionsRequest()
+        => _releasedAndTakenPrisonerActionsRequested = false;
+
+    internal static bool ConsumeReleasedAndTakenPrisonerActionsRequest()
+    {
+        var requested = _releasedAndTakenPrisonerActionsRequested;
+        _releasedAndTakenPrisonerActionsRequested = false;
+        return requested;
+    }
 
     [HarmonyPatch(nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroPartyScreenClosed))]
     [HarmonyPrefix]
@@ -102,9 +115,10 @@ internal class PartyScreenHelperPatches
     [HarmonyPrefix]
     public static bool HandleReleasedAndTakenPrisonersPrefix(FlattenedTroopRoster takenPrisonerRoster, FlattenedTroopRoster releasedPrisonerRoster)
     {
-        var message = new PrisonersReleasedAndTaken(releasedPrisonerRoster, takenPrisonerRoster);
-        MessageBroker.Instance.Publish(null, message);
-
+        // PartyDoneLogicAttempted carries both histories with the authoritative roster deltas. The server
+        // applies those deltas first, then runs the vanilla release/take side effects. Sending a second command
+        // here made the semantic action mutate the roster before the same PartyDone delta was applied.
+        _releasedAndTakenPrisonerActionsRequested = true;
         return false;
     }
 }

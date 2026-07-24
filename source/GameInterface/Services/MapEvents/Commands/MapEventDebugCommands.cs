@@ -7,12 +7,14 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
+using GameInterface.Utils.Commands;
 using Helpers;
 using Serilog;
 using System;
@@ -43,6 +45,7 @@ public class MapEventDebugCommands
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
     private static WoundedAlliedFixture woundedAlliedFixture;
+    private static PlayerFieldBattleFixture playerFieldBattleFixture;
 
     private sealed class WoundedAlliedFixture
     {
@@ -55,6 +58,15 @@ public class MapEventDebugCommands
         public float OriginalRecentEventsMorale;
         public TroopRosterElement[] OriginalRoster;
         public CampaignVec2 OriginalPosition;
+    }
+
+    private sealed class PlayerFieldBattleFixture
+    {
+        public MobileParty AttackerParty;
+        public MobileParty DefenderParty;
+        public IFaction AttackerFaction;
+        public IFaction DefenderFaction;
+        public bool WasAtWar;
     }
 
     /// <summary>
@@ -79,6 +91,245 @@ public class MapEventDebugCommands
         return party.Party != null &&
                objectManager.TryGetId(party.Party, out string partyBaseId) &&
                partyBaseId == id;
+    }
+
+    [CommandLineArgumentFunction("start_player_field_battle", "coop.debug.mapevent")]
+    public static string StartPlayerFieldBattle(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.start_player_field_battle <attackerMobilePartyId> <defenderMobilePartyId>";
+
+        if (playerFieldBattleFixture != null)
+            return "A player field-battle fixture is already pending restoration.";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+
+        var attackerError = string.Empty;
+        if ((!objectManager.TryGetObject(args[0], out MobileParty attacker) &&
+             !CommandHelpers.TryGetMobileParty(args[0], out attacker, out attackerError)) ||
+            attacker?.Party == null)
+            return "Unable to resolve attacker party: " + attackerError;
+
+        var defenderError = string.Empty;
+        if ((!objectManager.TryGetObject(args[1], out MobileParty defender) &&
+             !CommandHelpers.TryGetMobileParty(args[1], out defender, out defenderError)) ||
+            defender?.Party == null)
+            return "Unable to resolve defender party: " + defenderError;
+
+        if (attacker == defender)
+            return "Attacker and defender parties must be distinct.";
+
+        if (!attacker.IsActive || !defender.IsActive || attacker.MapEvent != null || defender.MapEvent != null)
+            return "Both player parties must be active and outside a map event.";
+
+        if (attacker.CurrentSettlement != null || defender.CurrentSettlement != null)
+            return "Both player parties must be outside settlements.";
+
+        var attackerFaction = attacker.MapFaction;
+        var defenderFaction = defender.MapFaction;
+        if (attackerFaction == null || defenderFaction == null || attackerFaction == defenderFaction)
+            return "Player parties must belong to distinct map factions.";
+
+        if (!objectManager.TryGetId(attacker, out var attackerMobilePartyId) ||
+            !objectManager.TryGetId(defender, out var defenderMobilePartyId) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            return "Unable to resolve the registered player-party identities.";
+
+        var attackerPlayer = playerManager.Players.FirstOrDefault(player =>
+            player.MobilePartyId == attackerMobilePartyId);
+        var defenderPlayer = playerManager.Players.FirstOrDefault(player =>
+            player.MobilePartyId == defenderMobilePartyId);
+        if (attackerPlayer == null || defenderPlayer == null ||
+            !playerManager.IsConnected(attackerPlayer) || !playerManager.IsConnected(defenderPlayer))
+            return "Both parties must belong to connected players.";
+
+        if (!objectManager.TryGetId(attacker.Party, out var attackerPartyBaseId) ||
+            !objectManager.TryGetId(defender.Party, out var defenderPartyBaseId))
+            return "Unable to resolve the registered PartyBase ids.";
+
+        if (!ContainerProvider.TryResolve<IPlayerPartyHostileEncounterService>(out var encounterService))
+            return "Unable to resolve the player hostile-encounter service.";
+
+        var fixture = new PlayerFieldBattleFixture
+        {
+            AttackerParty = attacker,
+            DefenderParty = defender,
+            AttackerFaction = attackerFaction,
+            DefenderFaction = defenderFaction,
+            WasAtWar = AreFactionsAtWar(attackerFaction, defenderFaction),
+        };
+        playerFieldBattleFixture = fixture;
+
+        var sessionId = "live-test-" + Guid.NewGuid().ToString("N");
+        if (!encounterService.TryStartHostileEncounter(
+                sessionId,
+                attackerPartyBaseId,
+                defenderPartyBaseId,
+                responderSurrenders: false))
+        {
+            var partiallyCreatedMapEvent = attacker.MapEvent;
+            if (partiallyCreatedMapEvent != null &&
+                partiallyCreatedMapEvent == defender.MapEvent &&
+                !partiallyCreatedMapEvent.IsFinalized)
+                partiallyCreatedMapEvent.FinalizeEvent();
+
+            var peaceRestored = RestoreFixtureWarState(fixture);
+            playerFieldBattleFixture = null;
+            return $"Failed to start the player field-battle fixture. PeaceRestored: {peaceRestored}";
+        }
+
+        var mapEvent = attacker.MapEvent;
+        var mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out var resolvedMapEventId)
+            ? resolvedMapEventId
+            : "<unresolved>";
+
+        return
+            "Player field-battle fixture started.\n" +
+            $"MapEventId: {mapEventId}\n" +
+            $"AttackerPartyId: {args[0]}\n" +
+            $"DefenderPartyId: {args[1]}\n" +
+            $"OriginalWarState: {fixture.WasAtWar}";
+    }
+
+    [CommandLineArgumentFunction("restore_player_field_battle", "coop.debug.mapevent")]
+    public static string RestorePlayerFieldBattle(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.restore_player_field_battle";
+
+        var fixture = playerFieldBattleFixture;
+        if (fixture == null)
+            return "No player field-battle fixture is pending restoration.";
+
+        if (fixture.AttackerParty.MapEvent != null || fixture.DefenderParty.MapEvent != null)
+            return "Cannot restore the player field-battle fixture while its map event is active.";
+
+        var peaceRestored = RestoreFixtureWarState(fixture);
+
+        playerFieldBattleFixture = null;
+        return $"Player field-battle fixture restored. PeaceRestored: {peaceRestored}";
+    }
+
+    private static bool RestoreFixtureWarState(PlayerFieldBattleFixture fixture)
+    {
+        if (fixture.WasAtWar || !AreFactionsAtWar(fixture.AttackerFaction, fixture.DefenderFaction))
+            return false;
+
+        MakePeaceAction.Apply(fixture.AttackerFaction, fixture.DefenderFaction);
+        return true;
+    }
+
+    [CommandLineArgumentFunction("request_player_field_battle", "coop.debug.mapevent")]
+    public static string RequestPlayerFieldBattle(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+            return "Run this command on the attacking client.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.request_player_field_battle <defenderMobilePartyId>";
+
+        var attacker = MobileParty.MainParty;
+        if (attacker?.Party == null || !attacker.IsActive || attacker.MapEvent != null)
+            return "The local player must lead an active party outside a map event.";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+
+        var defenderError = string.Empty;
+        if ((!objectManager.TryGetObject(args[0], out MobileParty defender) &&
+             !CommandHelpers.TryGetMobileParty(args[0], out defender, out defenderError)) ||
+            defender?.Party == null)
+            return "Unable to resolve defender party: " + defenderError;
+
+        if (defender == attacker || !defender.IsActive || defender.MapEvent != null)
+            return "The defender must be a distinct active party outside a map event.";
+
+        if (attacker.CurrentSettlement != null || defender.CurrentSettlement != null)
+            return "Both player parties must be outside settlements.";
+
+        if (attacker.MapFaction == null || defender.MapFaction == null ||
+            attacker.MapFaction == defender.MapFaction)
+            return "Player parties must belong to distinct map factions.";
+
+        if (!objectManager.TryGetId(defender, out var defenderMobilePartyId) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.Players.Any(player => player.MobilePartyId == defenderMobilePartyId))
+            return "The defender must belong to a registered player.";
+
+        if (!objectManager.TryGetId(attacker.Party, out var attackerPartyId) ||
+            !objectManager.TryGetId(defender.Party, out var defenderPartyId))
+            return "Unable to resolve the registered PartyBase ids.";
+
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+            return "Unable to resolve the client network.";
+
+        network.SendAll(new NetworkRequestConversation(
+            defenderPartyId,
+            attackerPartyId,
+            forcePlayerOutFromSettlement: false,
+            ConversationRestartSource.PlayerEncounter,
+            armyTalkEncounter: false));
+
+        return
+            "Player field-battle interaction requested through the production conversation path.\n" +
+            $"AttackerPartyId: {attacker.StringId}\n" +
+            $"DefenderPartyId: {defender.StringId}";
+    }
+
+    [CommandLineArgumentFunction("player_interaction_state", "coop.debug.mapevent")]
+    public static string PlayerInteractionState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.player_interaction_state";
+
+        return
+            $"Active: {PlayerPartyInteractionDialogState.HasActiveState}\n" +
+            $"SessionId: {PlayerPartyInteractionDialogState.SessionId ?? "none"}\n" +
+            $"PartyId: {PlayerPartyInteractionDialogState.PartyId ?? "none"}\n" +
+            $"OtherPartyId: {PlayerPartyInteractionDialogState.OtherPartyId ?? "none"}\n" +
+            $"Phase: {PlayerPartyInteractionDialogState.Phase}\n" +
+            $"Proposal: {PlayerPartyInteractionDialogState.Proposal}";
+    }
+
+    [CommandLineArgumentFunction("submit_player_interaction", "coop.debug.mapevent")]
+    public static string SubmitPlayerInteraction(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+            return "Run this command on a player client.";
+
+        if (args.Count != 1 ||
+            !Enum.TryParse(args[0], ignoreCase: true, out PlayerPartyInteractionOption option) ||
+            option == PlayerPartyInteractionOption.None)
+            return "Usage: coop.debug.mapevent.submit_player_interaction <option>";
+
+        if (!PlayerPartyInteractionDialogState.HasActiveState)
+            return "No player-party interaction is active.";
+
+        if (!PlayerPartyInteractionDialogState.IsOptionEnabled(option))
+            return $"Player-party interaction option '{option}' is not enabled.";
+
+        var sessionId = PlayerPartyInteractionDialogState.SessionId;
+        PlayerPartyInteractionDialogState.Submit(option);
+        return $"Submitted player-party interaction option '{option}' for session '{sessionId}'.";
+    }
+
+    private static bool AreFactionsAtWar(IFaction first, IFaction second)
+    {
+        try
+        {
+            return FactionManager.IsAtWarAgainstFaction(first, second);
+        }
+        catch (NullReferenceException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
