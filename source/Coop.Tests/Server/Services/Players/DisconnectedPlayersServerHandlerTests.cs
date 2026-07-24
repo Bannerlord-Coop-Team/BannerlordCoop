@@ -10,7 +10,6 @@ using Moq;
 using System.Collections.Generic;
 using Xunit;
 
-
 namespace Coop.Tests.Server.Services.Players;
 
 public class DisconnectedPlayersServerHandlerTests
