@@ -7,6 +7,7 @@ using Moq;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using Xunit;
 
 namespace Coop.Tests.Network;
@@ -22,15 +23,19 @@ public class CoopNetworkBaseTests
         config.SetupGet(value => value.NetworkPollInterval).Returns(TimeSpan.FromMilliseconds(25));
         config.SetupGet(value => value.UpdateTime).Returns(TimeSpan.FromMilliseconds(15));
 
-        using var network = new TestNetwork(config.Object, Mock.Of<ICommonSerializer>());
+        using var sessionCancellation = new CancellationTokenSource();
+        using var network = new TestNetwork(config.Object, Mock.Of<ICommonSerializer>(), sessionCancellation);
 
         Assert.Equal(60_000, network.AppliedDisconnectTimeout);
     }
 
     private sealed class TestNetwork : CoopNetworkBase
     {
-        public TestNetwork(INetworkConfig config, ICommonSerializer serializer)
-            : base(config, serializer)
+        public TestNetwork(
+            INetworkConfig config,
+            ICommonSerializer serializer,
+            CancellationTokenSource sessionCancellation)
+            : base(config, serializer, sessionCancellation)
         {
         }
 
