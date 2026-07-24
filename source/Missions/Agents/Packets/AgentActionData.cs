@@ -45,13 +45,12 @@ namespace Missions.Agents.Packets
             if (defendFlags != Agent.MovementControlFlag.None)
                 return defendFlags;
 
-            // Rider pace can replace the mounted guard action while the native defend direction remains held.
-            // Read that state before requiring a defending action so gait changes do not look like releases.
             if (agent.HasMount)
             {
                 defendFlags = GetDefendMovementFlags(
                     agent.GetDefendMovementFlag());
-                if (defendFlags != Agent.MovementControlFlag.None)
+                // Mounted aim reports a defend direction even while idle. DefendBlock is the held-input bit.
+                if ((defendFlags & Agent.MovementControlFlag.DefendBlock) != 0)
                     return defendFlags;
             }
 

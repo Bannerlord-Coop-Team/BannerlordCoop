@@ -239,6 +239,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
             context.Network.NetworkSentPackets.Packets.Clear();
 
+            mirror.MovementFlags = Agent.MovementControlFlag.None;
+            mirror.DefendMovementFlag = Agent.MovementControlFlag.DefendRight;
             mirror.Action0Index = 101;
             mirror.Action0CodeType = Agent.ActionCodeType.Other;
             context.Component.AgentActionHandler.PollActions();
@@ -257,6 +259,40 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             AgentActionPacket attackPacket = Assert.Single(
                 context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
             Assert.Equal(2L, Assert.Single(attackPacket.Sequences));
+        });
+    }
+
+    [Fact]
+    public void PollActions_MountedLocomotionNativeDirection_DoesNotStartGuard()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+
+            mirror.Action0Index = 174;
+            mirror.Action0CodeType = Agent.ActionCodeType.Other;
+            mirror.DefendMovementFlag = Agent.MovementControlFlag.DefendLeft;
+            context.Component.AgentActionHandler.PollActions();
+
+            mirror.Action0Index = 175;
+            mirror.DefendMovementFlag = Agent.MovementControlFlag.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+
+            mirror.Action0Index = 176;
+            mirror.DefendMovementFlag = Agent.MovementControlFlag.DefendUp;
+            context.Component.AgentActionHandler.PollActions();
+
+            mirror.Action0Index = 177;
+            mirror.DefendMovementFlag = Agent.MovementControlFlag.DefendDown;
+            context.Component.AgentActionHandler.PollActions();
+
+            Assert.Empty(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
         });
     }
 
@@ -286,7 +322,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
             context.Network.NetworkSentPackets.Packets.Clear();
 
-            // Horse pace temporarily owns the same channel, but native still reports held defend.
             mirror.GuardMode = Agent.GuardMode.None;
             mirror.MovementFlags = Agent.MovementControlFlag.None;
             mirror.Action1Index = 303;
@@ -303,7 +338,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Empty(
                 context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
 
-            // A genuinely different defend action is still a discrete parry transition.
             mirror.Action1Index = 204;
             context.Component.AgentActionHandler.PollActions();
 
