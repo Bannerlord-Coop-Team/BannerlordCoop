@@ -3,7 +3,9 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
+using Missions.Agents;
 using Missions.Agents.Packets;
+using Missions.Battles;
 using Missions.Missiles.Message;
 using System;
 using System.Collections.Generic;
@@ -22,7 +24,8 @@ public interface ITournamentCombatFixture : IDisposable
         ITournamentMissionSession session,
         TournamentSessionSnapshot snapshot,
         TournamentSpawnManifestData manifest,
-        INetworkAgentRegistry agentRegistry);
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator agentPositionInterpolator);
 
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
 
@@ -67,6 +70,9 @@ public class TournamentCombatFixture : ITournamentCombatFixture
     private Agent.MovementControlFlag originalPlayerTwoMovementFlags;
     private Agent.GuardMode originalGuardMode;
     private AgentControllerType originalAiController;
+    private string originalAiAuthority;
+    private bool aiAuthorityTransferred;
+    private IAgentPositionInterpolator agentPositionInterpolator;
     private Team originalPlayerTwoTeam;
     private Agent originalAiTarget;
     private bool originalAllowAiTicking;
@@ -85,6 +91,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
     private bool playerStrikeObserved;
     private FixtureStrike activeStrike;
     private bool drivesActiveStrike;
+    private bool attackersPositioned;
     private float strikeElapsed;
     private bool javelinRequested;
     private bool javelinVisibleObserved;
@@ -134,15 +141,25 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         ITournamentMissionSession session,
         TournamentSessionSnapshot snapshot,
         TournamentSpawnManifestData manifest,
-        INetworkAgentRegistry agentRegistry)
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator agentPositionInterpolator)
     {
-        if (command == null || session == null || agentRegistry == null)
+        if (command == null ||
+            session == null ||
+            agentRegistry == null ||
+            agentPositionInterpolator == null)
             return "Tournament combat fixture command was invalid";
 
         return command.Action switch
         {
             TournamentCombatFixtureAction.Initialize =>
-                Initialize(command, session, snapshot, manifest, agentRegistry),
+                Initialize(
+                    command,
+                    session,
+                    snapshot,
+                    manifest,
+                    agentRegistry,
+                    agentPositionInterpolator),
             TournamentCombatFixtureAction.AiShieldStrike =>
                 ApplyAiShieldStrike(command, session, snapshot, manifest, agentRegistry),
             TournamentCombatFixtureAction.PlayerShieldStrike =>
@@ -185,7 +202,11 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         }
 
         PauseTournamentAi(agentRegistry);
-        PositionAttackers(agentRegistry, playerOne);
+        if (!attackersPositioned)
+        {
+            PositionAttackers(agentRegistry, playerOne);
+            attackersPositioned = true;
+        }
 
         if (!drivesActiveStrike || activeStrike == FixtureStrike.None)
             return;
@@ -234,7 +255,8 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         ITournamentMissionSession session,
         TournamentSessionSnapshot snapshot,
         TournamentSpawnManifestData manifest,
-        INetworkAgentRegistry agentRegistry)
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator agentPositionInterpolator)
     {
         if (active)
             return $"Initialize-TournamentCombatFixture: already active on {session.OwnControllerId}";
@@ -286,6 +308,9 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         originalPlayerTwoMovementFlags = playerTwoInfo.Agent.MovementFlags;
         originalGuardMode = playerOne.CurrentGuardMode;
         originalAiController = aiInfo.Agent.Controller;
+        originalAiAuthority = aiInfo.CurrentAuthority;
+        aiAuthorityTransferred = false;
+        this.agentPositionInterpolator = agentPositionInterpolator;
         originalPlayerTwoTeam = playerTwoInfo.Agent.Team;
         originalAiTarget = aiInfo.Agent.GetTargetAgent();
         originalAllowAiTicking = Mission.Current.AllowAiTicking;
@@ -303,6 +328,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         playerStrikeObserved = false;
         activeStrike = FixtureStrike.None;
         drivesActiveStrike = false;
+        attackersPositioned = false;
         strikeElapsed = 0f;
         javelinRequested = false;
         javelinVisibleObserved = false;
@@ -375,12 +401,15 @@ public class TournamentCombatFixture : ITournamentCombatFixture
             .FirstOrDefault(candidate => candidate?.AgentId == aiAgentId);
         if (aiData == null)
             return "Invoke-AiShieldStrike: tournament AI attacker was not found";
+        if (!TryTransferAiAuthority(session, agentRegistry))
+            return "Invoke-AiShieldStrike: tournament AI authority could not be transferred";
 
         aiStrikeBaselineShieldHitPoints = GetShieldHitPoints(playerOne);
         aiStrikeRequested = true;
         aiStrikeObserved = false;
         activeStrike = FixtureStrike.Ai;
-        drivesActiveStrike = session.IsLocalHost;
+        drivesActiveStrike = session.OwnControllerId == playerTwoControllerId;
+        attackersPositioned = false;
         strikeElapsed = 0f;
         if (!drivesActiveStrike)
             return null;
@@ -407,6 +436,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         playerStrikeObserved = false;
         activeStrike = FixtureStrike.Player;
         drivesActiveStrike = session.OwnControllerId == playerTwoControllerId;
+        attackersPositioned = false;
         strikeElapsed = 0f;
         if (!drivesActiveStrike)
             return null;
@@ -727,13 +757,45 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         }
         if (TryGetActiveAgent(agentRegistry, aiAgentId, out Agent ai))
         {
+            agentPositionInterpolator?.Forget(ai);
             ai.SetTargetAgent(null);
             ai.SetIsAIPaused(true);
             if (ai.Controller != originalAiController)
                 ai.Controller = originalAiController;
         }
+        if (aiAuthorityTransferred &&
+            agentRegistry.TryTransferAuthority(originalAiAuthority, aiAgentId))
+            aiAuthorityTransferred = false;
         if (Mission.Current != null)
             Mission.Current.AllowAiTicking = originalAllowAiTicking;
+    }
+
+    private bool TryTransferAiAuthority(
+        ITournamentMissionSession session,
+        INetworkAgentRegistry agentRegistry)
+    {
+        if (string.IsNullOrEmpty(originalAiAuthority) ||
+            !TryGetActiveAgent(agentRegistry, aiAgentId, out Agent ai) ||
+            !agentRegistry.TryTransferAuthority(playerTwoControllerId, aiAgentId))
+            return false;
+
+        bool ownsAi = session.OwnControllerId == playerTwoControllerId;
+        agentPositionInterpolator.Forget(ai);
+        using (new AllowedThread())
+        {
+            if (ownsAi)
+            {
+                ai.Controller = AgentControllerType.AI;
+                AgentAiWaker.Wake(ai);
+            }
+            else
+            {
+                ai.SetIsAIPaused(true);
+                ai.Controller = AgentControllerType.None;
+            }
+        }
+        aiAuthorityTransferred = true;
+        return true;
     }
 
     private void PositionAttackers(
@@ -823,6 +885,9 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         originalPlayerTwoMovementFlags = Agent.MovementControlFlag.None;
         originalGuardMode = Agent.GuardMode.None;
         originalAiController = AgentControllerType.None;
+        originalAiAuthority = null;
+        aiAuthorityTransferred = false;
+        agentPositionInterpolator = null;
         originalPlayerTwoTeam = null;
         originalAiTarget = null;
         originalAllowAiTicking = false;
@@ -841,6 +906,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         playerStrikeObserved = false;
         activeStrike = FixtureStrike.None;
         drivesActiveStrike = false;
+        attackersPositioned = false;
         strikeElapsed = 0f;
         javelinRequested = false;
         javelinVisibleObserved = false;

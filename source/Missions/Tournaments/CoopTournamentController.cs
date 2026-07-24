@@ -1883,7 +1883,8 @@ public class CoopTournamentController : CoopMissionController
                 session,
                 snapshot,
                 latestManifest,
-                coopMissionComponent.AgentRegistry);
+                coopMissionComponent.AgentRegistry,
+                coopMissionComponent.AgentMovementHandler.Interpolator);
             if (!string.IsNullOrEmpty(result))
                 Logger.Information("[TournamentFixture] {Result}", result);
         }, context: nameof(Handle_CombatFixtureCommand));
