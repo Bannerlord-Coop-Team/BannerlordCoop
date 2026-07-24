@@ -93,7 +93,11 @@ internal class MapEventPartyPatches
         // A teamkill contributes nothing (the original early-outs), so don't bother the server with it.
         if (isTeamKill) return false;
 
-        MessageBroker.Instance.Publish(__instance, new OnTroopScoreHitAttempted(__instance, attackerTroopDesc.UniqueSeed, attackedTroop, damage, isFatal, isSimulatedHit));
+        if (__instance.Troops?._elementDictionary.TryGetValue(attackerTroopDesc, out var attackerElement) != true)
+            return false;
+
+        MessageBroker.Instance.Publish(__instance, new OnTroopScoreHitAttempted(
+            __instance, attackerElement.Troop, attackedTroop, damage, isFatal, isSimulatedHit));
 
         return false;
     }

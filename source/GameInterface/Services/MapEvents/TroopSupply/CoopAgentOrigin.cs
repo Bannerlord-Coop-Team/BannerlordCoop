@@ -158,9 +158,8 @@ public class CoopAgentOrigin : IAgentOriginBase
     // (the native PartyGroupAgentOrigin → supplier chain is substituted away), so this is where they are
     // reported. Fires exactly once per blow across the mesh — a blow is applied only on the victim owner's
     // client (BattleBlowInterceptPatch routes the rest), and that client's BattleAgentLogic.OnAgentHit calls
-    // the ATTACKER's origin, ours for troops and puppets alike. The server accounts the hit against the
-    // authoritative roster (the descriptor seed is server-minted, so it resolves there) and the resulting
-    // ContributionToBattle comes back through autosync.
+    // the ATTACKER's origin, ours for troops and puppets alike. Character identity survives any server roster
+    // re-flatten, so the server can resolve the current descriptor before accounting the hit.
     void IAgentOriginBase.OnScoreHit(BasicCharacterObject victim, BasicCharacterObject formationCaptain, int damage, bool isFatal, bool isTeamKill, WeaponComponentData attackerWeapon)
     {
         if (isTeamKill || damage <= 0) return;
@@ -170,7 +169,7 @@ public class CoopAgentOrigin : IAgentOriginBase
         if (mapEventParty == null) return;
 
         MessageBroker.Instance.Publish(this, new OnTroopScoreHitAttempted(
-            mapEventParty, _descriptor.UniqueSeed, attackedTroop, damage, isFatal, isSimulatedHit: false));
+            mapEventParty, _troop, attackedTroop, damage, isFatal, isSimulatedHit: false));
     }
 
     // The map event party this troop fights under, resolved lazily: the origin outlives battle setup, and

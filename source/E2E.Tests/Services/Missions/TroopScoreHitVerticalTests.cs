@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -34,7 +35,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     [Fact]
     public void ReportedTroopScoreHit_UpdatesContributionEverywhere()
     {
-        var (partyId, troopSeed, victimId) = SetupScoredBattleOnServer();
+        var (partyId, _, victimId) = SetupScoredBattleOnServer();
 
         int serverContribution = 0;
 
@@ -42,12 +43,13 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
             var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
+            Assert.True(Server.ObjectManager.TryGetId(attacker, out string attackerId));
 
             int before = party.ContributionToBattle;
 
             // The blow-applying client reports the hit; the server accounts it.
             Server.Resolve<IMessageBroker>().Publish(this,
-                new NetworkTroopScoreHit(partyId, troopSeed, victimId, damage: 30, isFatal: true, isSimulatedHit: false));
+                new NetworkTroopScoreHit(partyId, attackerId, victimId, damage: 30, isFatal: true, isSimulatedHit: false));
 
             Assert.True(party.ContributionToBattle > before,
                 $"Server contribution did not increase (before={before}, after={party.ContributionToBattle})");
@@ -65,9 +67,37 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void LiveBattleScoreHit_ClientOriginReport_AppliesOnceOnServerAndConverges()
+    public void LiveBattleScoreHit_AfterServerRosterReflatten_AppliesOnceWithCurrentDescriptorAndConverges()
     {
-        var (partyId, troopSeed, victimId) = SetupScoredBattleOnServer();
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+        int contributionBefore = 0;
+        int xpBefore = 0;
+        int expectedXp = 0;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+            var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+
+            // Battle setup can re-flatten after the reserve descriptor was handed to the spawning client.
+            party.Update();
+            Assert.DoesNotContain(party.Troops, element => element.Descriptor.UniqueSeed == troopSeed);
+
+            contributionBefore = party.ContributionToBattle;
+            xpBefore = party.Troops
+                .Where(element => element.Troop == attacker)
+                .Sum(element => element.XpGained);
+            expectedXp = Campaign.Current.Models.CombatXpModel.GetXpFromHit(
+                attacker,
+                null,
+                victim,
+                party.Party,
+                30,
+                true,
+                CombatXpModel.MissionTypeEnum.Battle).RoundedResultNumber;
+            Assert.True(expectedXp > 0, "The fixture hit must produce XP");
+        });
 
         var reporter = Clients.First();
 
@@ -86,8 +116,8 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
             var attacker = reporter.GetRegisteredObject<CharacterObject>("e2e_attacker");
             var victim = reporter.GetRegisteredObject<CharacterObject>("e2e_victim");
 
-            // What BattleAgentLogic.OnAgentHit invokes on the client that applied the blow. The replicated
-            // battle set PartyBase.MapEventSide (MapEventSideDataHandler), so the origin resolves its party.
+            // The origin still carries the old spawn descriptor. The report must use attacker character
+            // identity so the server selects the replacement descriptor from its current roster.
             IAgentOriginBase origin = new CoopAgentOrigin(attacker, clientParty.Party, 0, null, new UniqueTroopDescriptor(troopSeed));
 
             origin.OnScoreHit(victim, null, damage: 30, isFatal: true, isTeamKill: false, attackerWeapon: null);
@@ -110,7 +140,13 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
-            Assert.True(party.ContributionToBattle > 1, "Server did not account the client-reported hit");
+            var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
+            Assert.Equal(contributionBefore + expectedXp, party.ContributionToBattle);
+            Assert.Equal(
+                xpBefore + expectedXp,
+                party.Troops
+                    .Where(element => element.Troop == attacker)
+                    .Sum(element => element.XpGained));
             serverContribution = party.ContributionToBattle;
         });
 
@@ -121,7 +157,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     [Fact]
     public void SimulatedScoreHit_OnServer_AppliesNativelyAndBroadcasts()
     {
-        var (partyId, troopSeed, victimId) = SetupScoredBattleOnServer();
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
 
         int serverContribution = 0;
 
