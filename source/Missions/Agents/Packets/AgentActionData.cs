@@ -142,6 +142,36 @@ namespace Missions.Agents.Packets
                 || actionType == Agent.ActionCodeType.Guard;
         }
 
+        internal static bool IsGuardPresentationAction(
+            Agent.ActionCodeType actionType)
+        {
+            return IsDefendingAction(actionType)
+                || IsGuardReactionAction(actionType);
+        }
+
+        internal static bool IsGuardReactionAction(
+            Agent.ActionCodeType actionType)
+        {
+            return actionType == Agent.ActionCodeType.ParriedMelee
+                || actionType == Agent.ActionCodeType.BlockedMelee;
+        }
+
+        private static int GetGuardPresentationChannel(Agent agent)
+        {
+            Agent.ActionCodeType action1Type = agent.GetCurrentActionType(1);
+            Agent.ActionCodeType action0Type = agent.GetCurrentActionType(0);
+            if (IsGuardReactionAction(action1Type))
+                return 1;
+            if (IsGuardReactionAction(action0Type))
+                return 0;
+            if (IsDefendingAction(action1Type))
+                return 1;
+            if (IsDefendingAction(action0Type))
+                return 0;
+
+            return -1;
+        }
+
         private static Agent.GuardMode GetGuardModeFromDefendDirection(
             Agent.UsageDirection direction) =>
             direction switch
@@ -208,6 +238,7 @@ namespace Missions.Agents.Packets
             Action1Index = cache1.Index;
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
+            GuardPresentationChannel = GetGuardPresentationChannel(agent);
         }
 
         public void Apply(Agent agent)
@@ -273,6 +304,8 @@ namespace Missions.Agents.Packets
         public bool CrouchMode { get; }
         [ProtoMember(10)]
         public int GuardState { get; }
+        [ProtoMember(11)]
+        public int GuardPresentationChannel { get; }
         internal Agent.MovementControlFlag DefendFlags =>
             GetDefendMovementFlags((Agent.MovementControlFlag)MovementFlag);
         internal Agent.GuardMode GuardMode => FromWireGuardState(GuardState);

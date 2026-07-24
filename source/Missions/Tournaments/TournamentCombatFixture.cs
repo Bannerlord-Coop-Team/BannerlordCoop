@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
@@ -41,6 +42,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
     private const string JavelinItemId = "eastern_javelin_1_t2_blunt";
     private const string ShieldItemId = "eastern_wicker_sparring_shield";
     private const string SwordItemId = "empire_sword_1_t2_blunt";
+    private const string PolearmItemId = "empire_lance_1_t3_blunt";
     private const Agent.MovementControlFlag AttackFlags =
         Agent.MovementControlFlag.AttackDown |
         Agent.MovementControlFlag.AttackUp |
@@ -51,6 +53,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
     private readonly List<AiPauseState> aiPauseStates = new();
     private bool active;
     private bool disposed;
+    private string ownControllerId;
     private string playerOneControllerId;
     private string playerTwoControllerId;
     private Guid playerOneAgentId;
@@ -95,6 +98,16 @@ public class TournamentCombatFixture : ITournamentCombatFixture
     private float strikeElapsed;
     private bool javelinRequested;
     private bool javelinVisibleObserved;
+    private readonly HashSet<int> mountedPolearmPlayerOneVisualAnimations = new();
+    private readonly HashSet<int> mountedPolearmPlayerTwoVisualAnimations = new();
+    private bool mountedPolearmGuardRequested;
+    private bool mountedPolearmStrikeRequested;
+    private bool mountedPolearmReactionObserved;
+    private int mountedPolearmGuardActionIndex = -1;
+    private int mountedPolearmGuardAnimationIndex = -1;
+    private int mountedPolearmReactionActionIndex = -1;
+    private int mountedPolearmReactionAnimationIndex = -1;
+    private float mountedPolearmBaselineHealth;
 
     public TournamentCombatFixture(IMessageBroker messageBroker)
     {
@@ -166,6 +179,10 @@ public class TournamentCombatFixture : ITournamentCombatFixture
                 ApplyPlayerShieldStrike(command, session, agentRegistry),
             TournamentCombatFixtureAction.JavelinThrow =>
                 ThrowJavelin(command, session, agentRegistry),
+            TournamentCombatFixtureAction.MountedPolearmGuard =>
+                ApplyMountedPolearmGuard(command, session, agentRegistry),
+            TournamentCombatFixtureAction.MountedPolearmStrike =>
+                ApplyMountedPolearmStrike(command, session, agentRegistry),
             TournamentCombatFixtureAction.Restore =>
                 Restore(session, agentRegistry),
             _ => "Tournament combat fixture command was not recognized"
@@ -177,10 +194,15 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         if (!active || !TryGetPlayerOneAgent(agentRegistry, out Agent playerOne))
             return;
 
-        AgentActionData.ApplyDefendMovementFlags(
-            playerOne,
-            Agent.MovementControlFlag.DefendBlock | Agent.MovementControlFlag.DefendUp);
-        AgentActionData.ApplyGuardState(playerOne, Agent.GuardMode.Up, force: true);
+        if (ownControllerId == playerOneControllerId)
+        {
+            AgentActionData.ApplyDefendMovementFlags(
+                playerOne,
+                Agent.MovementControlFlag.DefendBlock | Agent.MovementControlFlag.DefendUp);
+            AgentActionData.ApplyGuardState(playerOne, Agent.GuardMode.Up, force: true);
+        }
+        if (mountedPolearmGuardRequested)
+            ObserveMountedPolearmState(agentRegistry, playerOne);
 
         int shieldHitPoints = GetShieldHitPoints(playerOne);
         if (aiStrikeRequested &&
@@ -193,7 +215,10 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         bool strikeObserved =
             activeStrike == FixtureStrike.Ai
                 ? aiStrikeObserved
-                : activeStrike == FixtureStrike.Player && playerStrikeObserved;
+                : activeStrike == FixtureStrike.Player
+                    ? playerStrikeObserved
+                    : activeStrike == FixtureStrike.Polearm
+                        && mountedPolearmReactionObserved;
         if (strikeObserved)
         {
             StopActiveStrike(agentRegistry);
@@ -227,7 +252,8 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         {
             return $"fixtureActive=false local={localControllerId} " +
                 "Assert-AiShieldBlocked=false Assert-PlayerShieldBlocked=false " +
-                "Assert-ShieldBlocked=false Assert-JavelinVisible=false";
+                "Assert-ShieldBlocked=false Assert-JavelinVisible=false " +
+                "Assert-MountedPolearmBlocked=false";
         }
 
         int shieldHitPoints = GetShieldHitPoints(playerOne);
@@ -238,6 +264,21 @@ public class TournamentCombatFixture : ITournamentCombatFixture
             playerStrikeRequested && playerStrikeObserved && healthUnchanged;
         bool shieldBlocked =
             playerStrikeRequested ? playerShieldBlocked : aiShieldBlocked;
+        bool mountedPolearmHealthUnchanged =
+            Math.Abs(playerOne.Health - mountedPolearmBaselineHealth) < 0.001f;
+        bool mountedPolearmBlocked =
+            mountedPolearmStrikeRequested
+            && mountedPolearmReactionObserved
+            && mountedPolearmHealthUnchanged;
+        string playerOneVisualAnimations =
+            FormatAnimationIndexes(mountedPolearmPlayerOneVisualAnimations);
+        string playerTwoVisualAnimations =
+            FormatAnimationIndexes(mountedPolearmPlayerTwoVisualAnimations);
+        string playerOneWeapon =
+            playerOne.Equipment[EquipmentIndex.Weapon0].Item?.StringId ?? "none";
+        bool playerTwoMounted =
+            TryGetActiveAgent(agentRegistry, playerTwoAgentId, out Agent playerTwo)
+            && playerTwo.HasMount;
 
         return $"fixtureActive=true local={localControllerId} player1={playerOneControllerId} " +
             $"player2={playerTwoControllerId} health={playerOne.Health:0.##} " +
@@ -247,7 +288,17 @@ public class TournamentCombatFixture : ITournamentCombatFixture
             $"playerStrikeBaselineShieldHp={playerStrikeBaselineShieldHitPoints} " +
             $"activeStrike={activeStrike} Assert-AiShieldBlocked={aiShieldBlocked} " +
             $"Assert-PlayerShieldBlocked={playerShieldBlocked} " +
-            $"Assert-ShieldBlocked={shieldBlocked} Assert-JavelinVisible={javelinVisibleObserved}";
+            $"Assert-ShieldBlocked={shieldBlocked} Assert-JavelinVisible={javelinVisibleObserved} " +
+            $"player1Mounted={playerOne.HasMount} player2Mounted={playerTwoMounted} " +
+            $"player1Weapon={playerOneWeapon} mountedPolearmGuardRequested={mountedPolearmGuardRequested} " +
+            $"mountedPolearmStrikeRequested={mountedPolearmStrikeRequested} " +
+            $"mountedPolearmGuardAction={mountedPolearmGuardActionIndex} " +
+            $"mountedPolearmGuardAnimation={mountedPolearmGuardAnimationIndex} " +
+            $"mountedPolearmReactionAction={mountedPolearmReactionActionIndex} " +
+            $"mountedPolearmReactionAnimation={mountedPolearmReactionAnimationIndex} " +
+            $"mountedPolearmPlayer1VisualAnimations={playerOneVisualAnimations} " +
+            $"mountedPolearmPlayer2VisualAnimations={playerTwoVisualAnimations} " +
+            $"Assert-MountedPolearmBlocked={mountedPolearmBlocked}";
     }
 
     private string Initialize(
@@ -291,6 +342,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
                 out ItemObject sword))
             return $"Initialize-TournamentCombatFixture: {JavelinItemId}, {ShieldItemId}, or {SwordItemId} was not found";
 
+        ownControllerId = session.OwnControllerId;
         playerOneControllerId = command.PlayerOneControllerId;
         playerTwoControllerId = command.PlayerTwoControllerId;
         playerOneAgentId = playerOneData.AgentId;
@@ -334,6 +386,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         strikeElapsed = 0f;
         javelinRequested = false;
         javelinVisibleObserved = false;
+        ResetMountedPolearmState();
         CaptureAiPauseStates(manifest, snapshot, agentRegistry);
 
         using (new AllowedThread())
@@ -491,6 +544,86 @@ public class TournamentCombatFixture : ITournamentCombatFixture
 
         return $"Invoke-TournamentJavelinThrow: local={session.OwnControllerId} " +
             $"shooter={playerOneAgentId}";
+    }
+
+    private string ApplyMountedPolearmGuard(
+        NetworkTournamentCombatFixtureCommand command,
+        ITournamentMissionSession session,
+        INetworkAgentRegistry agentRegistry)
+    {
+        if (!MatchesActiveFixture(
+                command.PlayerOneControllerId,
+                command.PlayerTwoControllerId))
+            return "Invoke-MountedPolearmGuard: fixture is not active for these controllers";
+        if (!TryGetPlayerOneAgent(agentRegistry, out Agent playerOne))
+            return "Invoke-MountedPolearmGuard: fighter agent was not found";
+        if (!playerOne.HasMount)
+            return "Invoke-MountedPolearmGuard: fighter is not mounted";
+        if (activeStrike != FixtureStrike.None)
+            return $"Invoke-MountedPolearmGuard: {activeStrike} strike is still active";
+
+        ItemObject polearm =
+            MBObjectManager.Instance.GetObject<ItemObject>(PolearmItemId);
+        if (polearm == null)
+            return $"Invoke-MountedPolearmGuard: {PolearmItemId} was not found";
+
+        using (new AllowedThread())
+        {
+            var polearmWeapon = new MissionWeapon(polearm, null, null);
+            ReplaceWeapon(playerOne, EquipmentIndex.Weapon0, polearmWeapon);
+            ReplaceWeapon(
+                playerOne,
+                EquipmentIndex.Weapon1,
+                MissionWeapon.Invalid);
+            playerOne.SetWieldedItemIndexAsClient(
+                Agent.HandIndex.MainHand,
+                EquipmentIndex.Weapon0,
+                false,
+                false,
+                0);
+        }
+
+        ResetMountedPolearmState();
+        mountedPolearmGuardRequested = true;
+        mountedPolearmBaselineHealth = playerOne.Health;
+        attackersPositioned = false;
+        Tick(0f, agentRegistry);
+
+        return $"Invoke-MountedPolearmGuard: local={session.OwnControllerId} " +
+            $"fighter={playerOneAgentId} mount={playerOne.MountAgent.Index} " +
+            $"weapon={PolearmItemId}";
+    }
+
+    private string ApplyMountedPolearmStrike(
+        NetworkTournamentCombatFixtureCommand command,
+        ITournamentMissionSession session,
+        INetworkAgentRegistry agentRegistry)
+    {
+        if (!MatchesActiveFixture(
+                command.PlayerOneControllerId,
+                command.PlayerTwoControllerId))
+            return "Invoke-MountedPolearmStrike: fixture is not active for these controllers";
+        if (!mountedPolearmGuardRequested)
+            return "Invoke-MountedPolearmStrike: mounted polearm guard is not active";
+        if (!TryGetPlayerOneAgent(agentRegistry, out Agent playerOne))
+            return "Invoke-MountedPolearmStrike: fighter agent was not found";
+        if (activeStrike != FixtureStrike.None)
+            return $"Invoke-MountedPolearmStrike: {activeStrike} strike is still active";
+
+        mountedPolearmStrikeRequested = true;
+        mountedPolearmReactionObserved = false;
+        mountedPolearmReactionActionIndex = -1;
+        mountedPolearmReactionAnimationIndex = -1;
+        mountedPolearmBaselineHealth = playerOne.Health;
+        activeStrike = FixtureStrike.Polearm;
+        drivesActiveStrike = session.OwnControllerId == playerTwoControllerId;
+        attackersPositioned = false;
+        strikeElapsed = 0f;
+        if (!drivesActiveStrike)
+            return null;
+
+        return $"Invoke-MountedPolearmStrike: local={session.OwnControllerId} " +
+            $"attacker={playerTwoControllerId} victim={playerOneAgentId} nativeAttack=true";
     }
 
     private string Restore(
@@ -681,6 +814,103 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         return shield.IsEmpty ? 0 : shield.HitPoints;
     }
 
+    private void ObserveMountedPolearmState(
+        INetworkAgentRegistry agentRegistry,
+        Agent playerOne)
+    {
+        ObserveVisualAnimations(
+            playerOne,
+            mountedPolearmPlayerOneVisualAnimations);
+        CapturePresentationAction(
+            playerOne,
+            AgentActionData.IsDefendingAction,
+            ref mountedPolearmGuardActionIndex,
+            ref mountedPolearmGuardAnimationIndex);
+
+        if (!TryGetActiveAgent(
+                agentRegistry,
+                playerTwoAgentId,
+                out Agent playerTwo))
+            return;
+
+        ObserveVisualAnimations(
+            playerTwo,
+            mountedPolearmPlayerTwoVisualAnimations);
+        if (CapturePresentationAction(
+                playerOne,
+                IsBlockReaction,
+                ref mountedPolearmReactionActionIndex,
+                ref mountedPolearmReactionAnimationIndex))
+        {
+            mountedPolearmReactionObserved = true;
+        }
+    }
+
+    private static bool CapturePresentationAction(
+        Agent agent,
+        Func<Agent.ActionCodeType, bool> predicate,
+        ref int actionIndex,
+        ref int animationIndex)
+    {
+        for (int channel = 1; channel >= 0; channel--)
+        {
+            if (!predicate(agent.GetCurrentActionType(channel)))
+                continue;
+
+            ActionIndexCache action = agent.GetCurrentAction(channel);
+            if (action == ActionIndexCache.act_none)
+                continue;
+
+            actionIndex = action.Index;
+            animationIndex = MBActionSet.GetAnimationIndexOfAction(
+                agent.ActionSet,
+                in action);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsBlockReaction(Agent.ActionCodeType actionType)
+    {
+        return actionType == Agent.ActionCodeType.ParriedMelee
+            || actionType == Agent.ActionCodeType.BlockedMelee;
+    }
+
+    private static void ObserveVisualAnimations(
+        Agent agent,
+        HashSet<int> observedAnimations)
+    {
+        Skeleton skeleton = null;
+        try
+        {
+            MBAgentVisuals visuals = agent.AgentVisuals;
+            if (ReferenceEquals(visuals, null) || !visuals.IsValid())
+                return;
+
+            skeleton = visuals.GetSkeleton();
+            if (ReferenceEquals(skeleton, null))
+                return;
+
+            for (int channel = 0; channel <= 1; channel++)
+            {
+                int animationIndex =
+                    skeleton.GetAnimationIndexAtChannel(channel);
+                if (animationIndex >= 0)
+                    observedAnimations.Add(animationIndex);
+            }
+        }
+        catch
+        {
+            // Agent visuals can disappear while the tournament is ending.
+        }
+        finally
+        {
+            if (!ReferenceEquals(skeleton, null))
+                skeleton.ManualInvalidate();
+        }
+    }
+
     private static bool TryGetActiveAgent(
         INetworkAgentRegistry agentRegistry,
         Guid agentId,
@@ -825,11 +1055,14 @@ public class TournamentCombatFixture : ITournamentCombatFixture
             forward = new Vec3(0f, 1f, 0f);
         forward.Normalize();
         Vec3 right = new Vec3(-forward.y, forward.x, 0f);
-        float playerTwoOffset = activeStrike == FixtureStrike.Player ? 0f : -0.75f;
+        bool playerStrike =
+            activeStrike == FixtureStrike.Player
+            || activeStrike == FixtureStrike.Polearm;
+        float playerTwoOffset = playerStrike ? 0f : -0.75f;
         float aiOffset = activeStrike == FixtureStrike.Ai ? 0f : 0.75f;
         if (activeStrike == FixtureStrike.Ai)
             playerTwoOffset = -2.5f;
-        else if (activeStrike == FixtureStrike.Player)
+        else if (playerStrike)
             aiOffset = 2.5f;
 
         PositionAgent(
@@ -883,6 +1116,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
     private void Reset()
     {
         active = false;
+        ownControllerId = null;
         playerOneControllerId = null;
         playerTwoControllerId = null;
         playerOneAgentId = Guid.Empty;
@@ -927,14 +1161,38 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         strikeElapsed = 0f;
         javelinRequested = false;
         javelinVisibleObserved = false;
+        ResetMountedPolearmState();
         aiPauseStates.Clear();
+    }
+
+    private void ResetMountedPolearmState()
+    {
+        mountedPolearmPlayerOneVisualAnimations.Clear();
+        mountedPolearmPlayerTwoVisualAnimations.Clear();
+        mountedPolearmGuardRequested = false;
+        mountedPolearmStrikeRequested = false;
+        mountedPolearmReactionObserved = false;
+        mountedPolearmGuardActionIndex = -1;
+        mountedPolearmGuardAnimationIndex = -1;
+        mountedPolearmReactionActionIndex = -1;
+        mountedPolearmReactionAnimationIndex = -1;
+        mountedPolearmBaselineHealth = 0f;
+    }
+
+    private static string FormatAnimationIndexes(
+        HashSet<int> animationIndexes)
+    {
+        return animationIndexes.Count == 0
+            ? "none"
+            : string.Join(",", animationIndexes.OrderBy(value => value));
     }
 
     private enum FixtureStrike
     {
         None,
         Ai,
-        Player
+        Player,
+        Polearm
     }
 
     private sealed class AiPauseState

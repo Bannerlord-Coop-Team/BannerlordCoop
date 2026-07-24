@@ -10,6 +10,8 @@ public enum TournamentCombatFixtureAction
     AiShieldStrike,
     PlayerShieldStrike,
     JavelinThrow,
+    MountedPolearmGuard,
+    MountedPolearmStrike,
     Restore
 }
 

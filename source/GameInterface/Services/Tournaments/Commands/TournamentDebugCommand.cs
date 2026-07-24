@@ -432,6 +432,34 @@ public class TournamentDebugCommand
             "Invoke-TournamentJavelinThrow");
     }
 
+    [CommandLineArgumentFunction("combat_fixture_mounted_polearm_guard", "coop.debug.tournaments")]
+    public static string InvokeMountedPolearmGuard(List<string> args)
+    {
+        if (args.Count != 2)
+            return "Usage: coop.debug.tournaments.combat_fixture_mounted_polearm_guard player1-controller-id player2-controller-id";
+
+        return DispatchCombatFixture(
+            new NetworkTournamentCombatFixtureCommand(
+                TournamentCombatFixtureAction.MountedPolearmGuard,
+                args[0],
+                args[1]),
+            "Invoke-MountedPolearmGuard");
+    }
+
+    [CommandLineArgumentFunction("combat_fixture_mounted_polearm_strike", "coop.debug.tournaments")]
+    public static string InvokeMountedPolearmStrike(List<string> args)
+    {
+        if (args.Count != 2)
+            return "Usage: coop.debug.tournaments.combat_fixture_mounted_polearm_strike player1-controller-id player2-controller-id";
+
+        return DispatchCombatFixture(
+            new NetworkTournamentCombatFixtureCommand(
+                TournamentCombatFixtureAction.MountedPolearmStrike,
+                args[0],
+                args[1]),
+            "Invoke-MountedPolearmStrike");
+    }
+
     [CommandLineArgumentFunction("combat_fixture_restore", "coop.debug.tournaments")]
     public static string RestoreCombatFixture(List<string> args)
     {
