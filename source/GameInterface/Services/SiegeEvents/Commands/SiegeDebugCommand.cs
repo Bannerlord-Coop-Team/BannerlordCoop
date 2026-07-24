@@ -8,6 +8,7 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Commands;
 using GameInterface.Services.Players;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
@@ -19,8 +20,11 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
@@ -221,6 +225,71 @@ public class SiegeDebugCommand
 
         MessageBroker.Instance.Publish(null, new AssaultSiegeAttempted(MobileParty.MainParty, settlement));
         return $"Requested that the local player party assault {settlement.Name}";
+    }
+
+    [CommandLineArgumentFunction("join_active_assault", "coop.debug.siege")]
+    public static string JoinActiveAssault(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.join_active_assault <settlementId>";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            || !ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface)
+            || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Unable to resolve the settlement encounter for {args[0]}";
+        }
+
+        var mapEvent = settlement.Party.MapEvent;
+        if (mapEvent?.IsSiegeAssault != true)
+        {
+            return $"{settlement.Name} does not have an active siege assault";
+        }
+
+        if (!mapEvent.CanPartyJoinBattle(PartyBase.MainParty, BattleSideEnum.Attacker))
+        {
+            return $"The local player party cannot join the assault at {settlement.Name}";
+        }
+
+        settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        if (PlayerEncounter.Current == null)
+        {
+            return $"Unable to start the local encounter at {settlement.Name}";
+        }
+
+        PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
+        GameMenu.SwitchToMenu("menu_siege_strategies");
+        MobileParty.MainParty.SetMoveModeHold();
+        return $"Joined the active siege assault at {settlement.Name}";
+    }
+
+    [CommandLineArgumentFunction("leave", "coop.debug.siege")]
+    public static string Leave(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.siege.leave";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (MobileParty.MainParty == null)
+        {
+            return "The local player party is unavailable";
+        }
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
+        return "Requested that the local player party leave its siege";
     }
 
     [CommandLineArgumentFunction("leave_settlement", "coop.debug.siege")]
@@ -465,6 +534,36 @@ public class SiegeDebugCommand
 
         return $"Joined {joined.Count} connected player parties to the siege of {settlement.Name}:\n" +
             string.Join(Environment.NewLine, joined);
+    }
+
+    [CommandLineArgumentFunction("player_state", "coop.debug.siege")]
+    public static string PlayerState(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.player_state <partyId>";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<MobileParty>(args[0], out var party))
+        {
+            return $"Party with id {args[0]} not found";
+        }
+
+        var mapEvent = party.MapEvent;
+        var mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out string id) ? id : "none";
+        var camp = party.BesiegerCamp?.SiegeEvent?.BesiegedSettlement?.StringId ?? "none";
+        var army = party.Army?.LeaderParty?.StringId ?? "none";
+        var heroHitPoints = party.LeaderHero?.HitPoints.ToString() ?? "none";
+        bool isMainParty = party == MobileParty.MainParty;
+
+        return $"party={party.StringId} mapEvent={mapEventId} siegeAssault={mapEvent?.IsSiegeAssault == true} " +
+            $"side={party.Party.Side} besiegerCamp={camp} army={army} heroHitPoints={heroHitPoints} " +
+            $"playerSiege={isMainParty && PlayerSiege.PlayerSiegeEvent != null} encounter={isMainParty && PlayerEncounter.Current != null}";
     }
 
     [CommandLineArgumentFunction("stage_machines", "coop.debug.siege")]
