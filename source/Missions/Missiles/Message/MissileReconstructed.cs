@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using System;
 using TaleWorlds.Library;
 
@@ -11,15 +11,17 @@ public readonly struct MissileReconstructed : IEvent
 {
     public Guid AgentId { get; }
     public long ShotSequence { get; }
+    public string MissileItemId { get; }
     public Vec3 Position { get; }
     public float Speed { get; }
     public float RemainingFlightSeconds { get; }
 
-    public MissileReconstructed(Guid agentId, long shotSequence, Vec3 position, float speed,
-        float remainingFlightSeconds)
+    public MissileReconstructed(Guid agentId, long shotSequence, string missileItemId,
+        Vec3 position, float speed, float remainingFlightSeconds)
     {
         AgentId = agentId;
         ShotSequence = shotSequence;
+        MissileItemId = missileItemId;
         Position = position;
         Speed = speed;
         RemainingFlightSeconds = remainingFlightSeconds;

@@ -15,6 +15,7 @@ using Missions.Services.Network;
 using Missions.Taverns;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
+using System.Collections.Generic;
 
 namespace Missions;
 
@@ -27,18 +28,15 @@ namespace Missions;
 public class MissionModule : Module
 {
     internal const string MissilePatchCategory = "CoopMissilePatches";
+    internal const string ShieldDamagePatchCategory = "CoopShieldDamagePatches";
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
 
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
 
-        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
-            typeof(AddMissileAuxPatch).Assembly,
-            MissilePatchCategory));
-        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
-            typeof(AgentVoicePatch).Assembly,
-            AgentVoicePatchCategory));
+        foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
+            builder.RegisterInstance(registration);
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
         builder.RegisterType<MovementPacketCompressor>()
@@ -116,6 +114,12 @@ public class MissionModule : Module
             .AsSelf()
             .InstancePerDependency();
 
+#if DEBUG
+        builder.RegisterType<TournamentCombatFixture>()
+            .As<ITournamentCombatFixture>()
+            .InstancePerDependency();
+#endif
+
         builder.RegisterType<TournamentSpectatorAgentManagerFactory>()
             .As<ITournamentSpectatorAgentManagerFactory>()
             .InstancePerLifetimeScope();
@@ -164,5 +168,18 @@ public class MissionModule : Module
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
+    }
+
+    internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()
+    {
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(AddMissileAuxPatch).Assembly,
+            MissilePatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(ShieldDamagePatch).Assembly,
+            ShieldDamagePatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(AgentVoicePatch).Assembly,
+            AgentVoicePatchCategory);
     }
 }

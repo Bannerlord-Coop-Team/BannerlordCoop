@@ -1,7 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface;
-using GameInterface.Services.Locations;
-using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Missions.Agents.Extensions;
 using Missions.Missiles.Message;
@@ -79,8 +77,10 @@ namespace Missions.Missiles.Patches
         private static bool capturingAgentShot;
 
         internal static bool IsCapturingAgentShot => capturingAgentShot;
-        internal static bool IsCoopMissionActive =>
-            BattleSpawnGate.IsCoopBattleActive || LocationMissionTracker.IsLocationMission(Mission.Current);
+        internal static bool IsCoopMissionActive => IsCoopMission(Mission.Current);
+
+        internal static bool IsCoopMission(Mission mission) =>
+            mission?.MissionBehaviors?.Exists(behavior => behavior is CoopMissionController) == true;
 
         internal static void PublishAgentShot(int missileIndex, Agent shooter, Vec3 direction, Vec3 position,
             Mat3 orientation, float baseSpeed, float speed, bool hasRigidBody, MissionWeapon weapon)
