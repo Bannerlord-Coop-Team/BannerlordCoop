@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections;
-using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
@@ -114,9 +113,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
     private List<NetPeer> GetStalledJoiningPeers(IEnumerable<NetPeer> finalCatchUpPeers, DateTime utcNow) =>
         finalCatchUpPeers
-            .Where(peer => utcNow - finalCatchUpStartedUtc[peer] > JoinCatchUpPauseDelay)
-            .Where(peer => connectionMessageQueue.TryGetCatchUpPacketsRemaining(peer, out int packetsRemaining) &&
-                           packetsRemaining > NetworkJoinSync.CompletionPacketThreshold)
+            .Where(peer => utcNow - finalCatchUpStartedUtc[peer] >= JoinCatchUpPauseDelay)
             .ToList();
 
     private int GetReportedQueueDepth(NetPeer peer) =>
