@@ -31,7 +31,7 @@ public static class SteamTunnel
     /// Effective send-rate floor. This Steam build stays near its minimum while saturated, so the
     /// elevated floor keeps large join saves from taking minutes.
     /// </summary>
-    public const int SendRateMinBytesPerSecond = 2 * 1024 * 1024;
+    public const int SendRateMinBytesPerSecond = 4 * 1024 * 1024;
 
     /// <summary>Ceiling for Steam's send pacing, headroom above the floor.</summary>
     public const int SendRateMaxBytesPerSecond = 20 * 1024 * 1024;

@@ -420,6 +420,54 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void JoinerReplay_CarriesTakenMountsSeparateMovementIdentity()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var joiner = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(joiner, "joiner");
+
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var riderId = Guid.NewGuid();
+        var mountId = Guid.NewGuid();
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            mock.SpawnMounted = true;
+            var controller = owner.Resolve<CoopBattleController>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+
+            Assert.True(owner.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            var rider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
+            var mount = rider.MountAgent;
+            Assert.NotNull(mount);
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "rider-origin", "rider-origin:epoch-1",
+                riderId, 21, rider));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "mount-origin", "mount-origin:epoch-4",
+                mountId, 9, mount));
+
+            owner.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("joiner", null));
+
+            var record = joiner.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Last().Agents.Single();
+            Assert.Equal(riderId, record.AgentId);
+            Assert.Equal("rider-origin", record.OriginalOwnerControllerId);
+            Assert.Equal("rider-origin:epoch-1", record.MovementScopeId);
+            Assert.Equal((ushort)21, record.MovementId);
+            Assert.Equal(mountId, record.MountAgentId);
+            Assert.Equal("mount-origin", record.MountOriginalOwnerControllerId);
+            Assert.Equal("mount-origin:epoch-4", record.MountMovementScopeId);
+            Assert.Equal((ushort)9, record.MountMovementId);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
     /// <summary>The owner broadcasts a registered horse's OWN movement only while nothing rides it — a ridden
     /// horse's pose travels in its rider's MountData, but a masterless one has no other driver.</summary>
     [Fact]
