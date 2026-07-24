@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using HarmonyLib;
 using Missions.Agents.Messages;
+using Missions.Agents.Packets;
 using Missions.Tournaments;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -19,7 +20,13 @@ namespace Missions.Agents.Patches
             if (controller?.IsSpectatorAgent(__instance) == true) return;
 
             MissionWeapon weapon = spawnedItemEntity.WeaponCopy;
-            WeaponPickedup message = new WeaponPickedup(__instance, weaponPickUpSlotIndex, weapon.Item, weapon.ItemModifier, weapon.Banner);
+            WeaponPickedup message = new WeaponPickedup(
+                __instance,
+                weaponPickUpSlotIndex,
+                weapon.Item,
+                weapon.ItemModifier,
+                weapon.Banner,
+                new AgentEquipmentData(__instance));
             MessageBroker.Instance.Publish(__instance, message);
         }
     }

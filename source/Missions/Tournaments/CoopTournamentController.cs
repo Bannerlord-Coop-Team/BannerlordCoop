@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments.Data;
@@ -9,6 +10,7 @@ using GameInterface.Services.Tournaments.Messages;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Agents;
+using Missions.Agents.Packets;
 using Missions.Agents.Patches;
 using Missions.Battles;
 using Missions.Messages;
@@ -1259,7 +1261,8 @@ public class CoopTournamentController : CoopMissionController
         runtime = new TournamentAgentRuntimeData(
             agentId,
             agent.Health,
-            equipment);
+            equipment,
+            agent.IsMount ? (AgentEquipmentData?)null : new AgentEquipmentData(agent));
         return true;
     }
 
@@ -1307,13 +1310,28 @@ public class CoopTournamentController : CoopMissionController
             if (agent != null && agent.IsActive())
             {
                 agent.Health = runtime.Health;
-                ReconcileRuntimeEquipment(agent, runtime.Equipment);
+                ReconcileRuntimeAgentEquipment(info, runtime);
             }
             return;
         }
 
         if (agent != null && agent.IsActive()) agent.FadeOut(false, true);
         registry.RemoveAgent(agentId);
+    }
+
+    internal void ReconcileRuntimeAgentEquipment(
+        CoopAgentInfo agentInfo,
+        TournamentAgentRuntimeData runtime)
+    {
+        Agent agent = agentInfo.Agent;
+        using (new AllowedThread())
+        {
+            ReconcileRuntimeEquipment(agent, runtime.Equipment);
+            if (agentInfo.TryGetAuthoritativeEquipment(out AgentEquipmentData currentEquipment))
+                currentEquipment.Apply(agent);
+            else if (runtime.HasCurrentEquipment)
+                runtime.CurrentEquipment.Apply(agent);
+        }
     }
 
     private bool TrySerializeRuntimeEquipment(
