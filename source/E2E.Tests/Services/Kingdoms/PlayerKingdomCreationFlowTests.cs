@@ -122,6 +122,88 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void CreateKingdomDebugCommand_OnServer_CreatesKingdomAndSyncsClients()
+    {
+        var player = CreateSyncedPlayerContext();
+        var fiefId = CreateSyncedClanFief(player.ClanId);
+        SetClanCultureEverywhere(player.ClanId, player.CultureId);
+
+        string output = null;
+        Server.Call(() =>
+        {
+            output = KingdomDebugCommand.CreateKingdomCommand(
+                new List<string> { player.HeroId, "Real", "Kingdom" });
+        });
+
+        Assert.StartsWith("Created kingdom", output);
+
+        var created = Assert.Single(Server.InternalMessages.GetMessages<PlayerKingdomCreated>());
+        Assert.Equal(ControllerId, created.ControllerId);
+        Assert.Equal(KingdomName, created.KingdomName);
+        Assert.Equal(player.ClanId, created.ClanId);
+        Assert.Equal(player.CultureId, created.CultureId);
+        Assert.False(string.IsNullOrWhiteSpace(created.KingdomId));
+
+        AssertKingdomCreatedOnServer(created.KingdomId, player.ClanId, player.CultureId, fiefId);
+        foreach (var environmentClient in Clients)
+        {
+            AssertKingdomSyncedToClient(environmentClient, created.KingdomId, player.ClanId, player.CultureId, fiefId);
+        }
+
+        var notification = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerKingdomCreated>());
+        Assert.Equal(created.KingdomId, notification.KingdomId);
+        Assert.Equal(KingdomName, notification.KingdomName);
+        Assert.Equal(player.ClanId, notification.ClanId);
+    }
+
+    [Fact]
+    public void CreateKingdomDebugCommand_OnClient_IsRejected()
+    {
+        var player = CreateSyncedPlayerContext();
+        var client = Clients.First();
+
+        string output = null;
+        client.Call(() =>
+        {
+            output = KingdomDebugCommand.CreateKingdomCommand(
+                new List<string> { player.HeroId, "Real", "Kingdom" });
+        });
+
+        Assert.Equal("This command can only be run on the server.", output);
+        Assert.Empty(Server.InternalMessages.GetMessages<PlayerKingdomCreated>());
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
+    }
+
+    [Fact]
+    public void CreateKingdomDebugCommand_RejectsHeroThatDoesNotLeadItsClan()
+    {
+        var player = CreateSyncedPlayerContext();
+        SetClanCultureEverywhere(player.ClanId, player.CultureId);
+        var followerId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(followerId, out var follower));
+
+            using (new AllowedThread())
+            {
+                follower.Clan = clan;
+            }
+        });
+
+        string output = null;
+        Server.Call(() =>
+        {
+            output = KingdomDebugCommand.CreateKingdomCommand(
+                new List<string> { followerId, "Real", "Kingdom" });
+        });
+
+        Assert.Contains("does not lead clan", output);
+        Assert.Empty(Server.InternalMessages.GetMessages<PlayerKingdomCreated>());
+    }
+
+    [Fact]
     public void ForcePlayerJoinKingdom_UpdatesKingdomManagementCollections()
     {
         var player = CreateSyncedPlayerContext();
@@ -1997,6 +2079,33 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             ConfigureClanInKingdom(client, clanId, kingdomId);
         }
+    }
+
+    /// <summary>
+    /// The debug create command inherits the new kingdom's culture from the ruling clan, which the shared
+    /// player context leaves unset.
+    /// </summary>
+    private void SetClanCultureEverywhere(string clanId, string cultureId)
+    {
+        SetClanCulture(Server, clanId, cultureId);
+        foreach (var client in Clients)
+        {
+            SetClanCulture(client, clanId, cultureId);
+        }
+    }
+
+    private static void SetClanCulture(EnvironmentInstance instance, string clanId, string cultureId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+            Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(cultureId, out var culture));
+
+            using (new AllowedThread())
+            {
+                clan.Culture = culture;
+            }
+        });
     }
 
     private void SetClanTierEverywhere(string clanId, int tier)
