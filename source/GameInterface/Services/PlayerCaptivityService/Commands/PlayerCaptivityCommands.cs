@@ -8,14 +8,11 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
-using GameInterface.Services.Party.Data;
-using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
-using GameInterface.Services.TroopRosters.Data;
-using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Utils.Commands;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -25,6 +22,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -608,7 +606,8 @@ Reports the hero's current captivity state on this process.";
 @"Usage:
   coop.debug.player_captivity.discard_player_from_party_screen <heroId> <captorPartyId>
 
-Simulates the normal party screen's dummy-left prisoner discard for a captured player.";
+Moves a captured player into the active normal Party screen's left dismissal roster and presses Done.
+Run this on the client that controls the captor after opening the Party screen.";
 
     [CommandLineArgumentFunction("discard_player_from_party_screen", "coop.debug.player_captivity")]
     public static string DiscardPlayerFromPartyScreen(List<string> args)
@@ -617,6 +616,9 @@ Simulates the normal party screen's dummy-left prisoner discard for a captured p
             "discard_player_from_party_screen",
             DiscardPlayerFromPartyScreenUsage,
             args);
+
+        if (!ModInformation.IsClient)
+            return "Run this command on the client that controls the captor party.";
 
         if (!ctx.RequireArgCount(2, out var error))
             return error;
@@ -641,63 +643,77 @@ Simulates the normal party screen's dummy-left prisoner discard for a captured p
         if (captor.LeaderHero == null)
             return $"Captor party '{captor.StringId}' has no leader hero.";
 
-        if (!objectManager.TryGetId(captor.LeaderHero, out var captorHeroId) ||
-            !objectManager.TryGetId(prisoner.CharacterObject, out var prisonerCharacterId))
-            return "Failed to resolve the registered captor or prisoner id.";
+        if (MobileParty.MainParty != captor)
+            return "Run this command on the client that controls the captor party.";
 
-        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
-            !ContainerProvider.TryResolve<INetwork>(out var network) ||
-            !ContainerProvider.TryResolve<ITroopRosterInterface>(out var troopRosterInterface))
-            return "Failed to resolve party-screen synchronization services.";
+        if (Game.Current?.GameStateManager?.ActiveState is not PartyState partyState ||
+            partyState.PartyScreenLogic == null)
+            return "Open the normal Party screen before running this command.";
 
-        var emptyRosterDelta = new TroopRosterData(Array.Empty<TroopRosterElementData>());
-        var leftDummyDiscardDelta = new TroopRosterData(new[]
+        if (partyState.PartyScreenMode != PartyScreenHelper.PartyScreenMode.Normal)
+            return $"The active Party screen is '{partyState.PartyScreenMode}', not Normal.";
+
+        var partyScreenLogic = partyState.PartyScreenLogic;
+        var leftPrisonerRoster =
+            partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left];
+        if (partyScreenLogic.LeftOwnerParty != null ||
+            leftPrisonerRoster.OwnerParty != null ||
+            objectManager.TryGetId(leftPrisonerRoster, out _) ||
+            partyScreenLogic.RightOwnerParty?.MobileParty != captor ||
+            partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right] != captor.PrisonRoster)
+            return "The active Party screen is not the captor's prisoner-dismissal screen.";
+
+        var rightPrisonerRoster =
+            partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right];
+        var rightIndex = rightPrisonerRoster.FindIndexOfTroop(prisoner.CharacterObject);
+        if (rightIndex < 0)
+            return $"The active Party screen does not contain '{GetHeroDisplayName(prisoner)}' as a prisoner.";
+
+        var prisonerElement = rightPrisonerRoster.GetElementCopyAtIndex(rightIndex);
+        if (!partyScreenLogic.IsTroopTransferable(
+                PartyScreenLogic.TroopType.Prisoner,
+                prisoner.CharacterObject,
+                (int)PartyScreenLogic.PartyRosterSide.Right))
+            return $"The active Party screen does not allow '{GetHeroDisplayName(prisoner)}' to be transferred.";
+
+        var targetIndex = partyScreenLogic.GetIndexToInsertTroop(
+            PartyScreenLogic.PartyRosterSide.Left,
+            PartyScreenLogic.TroopType.Prisoner,
+            prisonerElement);
+        var command = new PartyScreenLogic.PartyCommand();
+        command.FillForTransferTroop(
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Prisoner,
+            prisoner.CharacterObject,
+            prisonerElement.Number,
+            prisonerElement.WoundedNumber,
+            targetIndex);
+
+        // PartyCharacterVM.ApplyTransfer is patched with this same scope. Drive PartyScreenLogic directly
+        // so the automation exercises the real transfer history, both Done handlers, network messages,
+        // rollback, and state close without synthesizing either wire payload.
+        using (new Common.Util.AllowedThread())
         {
-            new TroopRosterElementData(prisonerCharacterId, 1, 0, 0),
-        });
-        var rightPrisonerDelta = new TroopRosterData(new[]
-        {
-            new TroopRosterElementData(prisonerCharacterId, -1, 0, 0),
-        });
-
-        var message = new NetworkCompleteDoneLogic(
-            captorHeroId,
-            Array.Empty<FlattenedTroop>(),
-            Array.Empty<FlattenedTroop>(),
-            Array.Empty<FlattenedTroop>(),
-            emptyRosterDelta,
-            leftDummyDiscardDelta,
-            emptyRosterDelta,
-            rightPrisonerDelta,
-            captor.ItemRoster.ToArray(),
-            new UpgradedTroopHistoryData(new()),
-            null,
-            null,
-            0,
-            0,
-            0,
-            true,
-            captor.Position,
-            Helpers.PartyScreenHelper.PartyScreenMode.Normal,
-            troopRosterInterface.PackTroopRosterOrderData(captor.MemberRoster));
-
-        if (ModInformation.IsClient)
-        {
-            if (MobileParty.MainParty != captor)
-                return "Run this command on the client that controls the captor party.";
-
-            network.SendAll(message);
+            partyScreenLogic.AddCommand(command);
+            partyScreenLogic.RemoveZeroCounts();
         }
-        else
-        {
-            messageBroker.Publish(typeof(PlayerCaptivityCommands), message);
-        }
+
+        var movedCount = leftPrisonerRoster.GetTroopCount(prisoner.CharacterObject);
+        if (movedCount != prisonerElement.Number ||
+            rightPrisonerRoster.GetTroopCount(prisoner.CharacterObject) != 0)
+            return "PartyScreenLogic did not move the complete prisoner stack to the dismissal roster.";
+
+        PartyScreenHelper.CloseScreen(isForced: false);
+        var screenClosed = Game.Current.GameStateManager.ActiveState != partyState;
 
         return
-            "Player prisoner discard submitted.\n" +
+            "Player prisoner discarded through the active Party screen.\n" +
             $"Hero: {GetHeroDisplayName(prisoner)}\n" +
             $"Captor StringId: {captor.StringId}\n" +
-            $"SubmissionSide: {(ModInformation.IsClient ? "client-network" : "server-local")}";
+            $"TransferredCount: {movedCount}\n" +
+            $"ActionPath: {nameof(PartyScreenLogic)}.{nameof(PartyScreenLogic.AddCommand)} -> " +
+            $"{nameof(PartyScreenHelper)}.{nameof(PartyScreenHelper.CloseScreen)}\n" +
+            $"ScreenClosed: {screenClosed}";
     }
 
     private const string ObservePlayerUsage =

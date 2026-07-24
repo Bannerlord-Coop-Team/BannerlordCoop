@@ -11,8 +11,8 @@ namespace GameInterface.Services.Party.Messages;
 public readonly struct PartyDoneLogicAttempted : IEvent
 {
     public readonly Hero MainHero;
+    public readonly FlattenedTroopRoster ReleasedPrisonersRoster;
     public readonly FlattenedTroopRoster TakenPrisonersRoster;
-    public readonly FlattenedTroopRoster DonatedPrisonersRoster;
     public readonly FlattenedTroopRoster RecruitedPrisonersRoster;
     public readonly TroopRoster LeftMemberRoster;
     public readonly TroopRoster LeftPrisonerRoster;
@@ -32,11 +32,12 @@ public readonly struct PartyDoneLogicAttempted : IEvent
     public readonly int PartyMoraleChangeAmount;
     public readonly bool DoNotApplyGoldTransactions;
     public readonly PartyScreenHelper.PartyScreenMode PartyScreenMode;
+    public readonly bool ApplyReleasedAndTakenPrisonerActions;
 
     public PartyDoneLogicAttempted(
         Hero mainHero,
+        FlattenedTroopRoster releasedPrisonersRoster,
         FlattenedTroopRoster takenPrisonersRoster,
-        FlattenedTroopRoster donatedPrisonersRoster,
         FlattenedTroopRoster recruitedPrisonersRoster,
         TroopRoster leftMemberRoster,
         TroopRoster leftPrisonerRoster,
@@ -53,11 +54,12 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         int partyInfluenceChangeAmount,
         int partyMoraleChangeAmount,
         bool doNotApplyGoldTransactions,
-        PartyScreenHelper.PartyScreenMode partyScreenMode)
+        PartyScreenHelper.PartyScreenMode partyScreenMode,
+        bool applyReleasedAndTakenPrisonerActions = false)
     {
         MainHero = mainHero;
+        ReleasedPrisonersRoster = releasedPrisonersRoster;
         TakenPrisonersRoster = takenPrisonersRoster;
-        DonatedPrisonersRoster = donatedPrisonersRoster;
         RecruitedPrisonersRoster = recruitedPrisonersRoster;
         LeftMemberRoster = leftMemberRoster;
         LeftPrisonerRoster = leftPrisonerRoster;
@@ -75,5 +77,6 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         PartyMoraleChangeAmount = partyMoraleChangeAmount;
         DoNotApplyGoldTransactions = doNotApplyGoldTransactions;
         PartyScreenMode = partyScreenMode;
+        ApplyReleasedAndTakenPrisonerActions = applyReleasedAndTakenPrisonerActions;
     }
 }

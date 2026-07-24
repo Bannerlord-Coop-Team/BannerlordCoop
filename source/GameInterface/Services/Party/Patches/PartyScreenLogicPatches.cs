@@ -37,22 +37,25 @@ internal class PartyScreenLogicPatches
             return false;
         }
 
+        FlattenedTroopRoster releasedPrisonersRoster = new FlattenedTroopRoster(4);
         FlattenedTroopRoster takenPrisonersRoster = new FlattenedTroopRoster(4);
-        FlattenedTroopRoster donatedPrisonersRoster = new FlattenedTroopRoster(4);
         foreach (Tuple<CharacterObject, int> tuple in __instance.CurrentData.TransferredPrisonersHistory)
         {
             int number = MathF.Abs(tuple.Item2);
             if (tuple.Item2 < 0)
             {
-                takenPrisonersRoster.Add(tuple.Item1, number, 0);
+                releasedPrisonersRoster.Add(tuple.Item1, number, 0);
             }
             else if (tuple.Item2 > 0)
             {
-                donatedPrisonersRoster.Add(tuple.Item1, number, 0);
+                takenPrisonersRoster.Add(tuple.Item1, number, 0);
             }
         }
 
-        bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], donatedPrisonersRoster, takenPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+        PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
+        bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+        bool applyReleasedAndTakenPrisonerActions =
+            PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
         if (flag)
         {
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
@@ -69,8 +72,8 @@ internal class PartyScreenLogicPatches
 
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
+                releasedPrisonersRoster,
                 takenPrisonersRoster,
-                donatedPrisonersRoster,
                 recruitedPrisonersRoster,
                 __instance.MemberRosters[0],
                 __instance.PrisonerRosters[0],
@@ -87,7 +90,8 @@ internal class PartyScreenLogicPatches
                 __instance.CurrentData.PartyInfluenceChangeAmount.Item2,
                 __instance.CurrentData.PartyMoraleChangeAmount,
                 __instance.DoNotApplyGoldTransactions,
-                partyScreenMode
+                partyScreenMode,
+                applyReleasedAndTakenPrisonerActions
             );
 
             MessageBroker.Instance.Publish(__instance, message);
@@ -116,8 +120,10 @@ internal class PartyScreenLogicPatches
                     // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
                     // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
                     // For example, the left member roster when creating a new clan party is not managed on the server but the server does need this data.
-                    __instance.MemberRosters[0] = duplicateLeftMemberRoster;
-                    __instance.PrisonerRosters[1] = duplicateLeftPrisonerRoster;
+                    RestoreLeftRostersAfterCommit(
+                        __instance,
+                        duplicateLeftMemberRoster,
+                        duplicateLeftPrisonerRoster);
                 }
                 finally
                 {
@@ -127,6 +133,15 @@ internal class PartyScreenLogicPatches
         }
         __result = flag;
         return false;
+    }
+
+    internal static void RestoreLeftRostersAfterCommit(
+        PartyScreenLogic partyScreenLogic,
+        TroopRoster leftMemberRoster,
+        TroopRoster leftPrisonerRoster)
+    {
+        partyScreenLogic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftMemberRoster;
+        partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
     }
 
     /// <summary>
