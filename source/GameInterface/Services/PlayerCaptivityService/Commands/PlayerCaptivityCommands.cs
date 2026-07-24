@@ -608,7 +608,7 @@ Reports the hero's current captivity state on this process.";
 @"Usage:
   coop.debug.player_captivity.discard_player_from_party_screen <heroId> <captorPartyId>
 
-Simulates the normal party screen's dummy-left prisoner discard for a captured player. Server only.";
+Simulates the normal party screen's dummy-left prisoner discard for a captured player.";
 
     [CommandLineArgumentFunction("discard_player_from_party_screen", "coop.debug.player_captivity")]
     public static string DiscardPlayerFromPartyScreen(List<string> args)
@@ -618,10 +618,7 @@ Simulates the normal party screen's dummy-left prisoner discard for a captured p
             DiscardPlayerFromPartyScreenUsage,
             args);
 
-        if (!ctx.RequireServer(out var error))
-            return error;
-
-        if (!ctx.RequireArgCount(2, out error))
+        if (!ctx.RequireArgCount(2, out var error))
             return error;
 
         if (!ctx.TryGetArg(0, "heroId", out var heroId, out error) ||
@@ -649,6 +646,7 @@ Simulates the normal party screen's dummy-left prisoner discard for a captured p
             return "Failed to resolve the registered captor or prisoner id.";
 
         if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
+            !ContainerProvider.TryResolve<INetwork>(out var network) ||
             !ContainerProvider.TryResolve<ITroopRosterInterface>(out var troopRosterInterface))
             return "Failed to resolve party-screen synchronization services.";
 
@@ -683,12 +681,23 @@ Simulates the normal party screen's dummy-left prisoner discard for a captured p
             Helpers.PartyScreenHelper.PartyScreenMode.Normal,
             troopRosterInterface.PackTroopRosterOrderData(captor.MemberRoster));
 
-        messageBroker.Publish(typeof(PlayerCaptivityCommands), message);
+        if (ModInformation.IsClient)
+        {
+            if (MobileParty.MainParty != captor)
+                return "Run this command on the client that controls the captor party.";
+
+            network.SendAll(message);
+        }
+        else
+        {
+            messageBroker.Publish(typeof(PlayerCaptivityCommands), message);
+        }
 
         return
             "Player prisoner discard submitted.\n" +
             $"Hero: {GetHeroDisplayName(prisoner)}\n" +
-            $"Captor StringId: {captor.StringId}";
+            $"Captor StringId: {captor.StringId}\n" +
+            $"SubmissionSide: {(ModInformation.IsClient ? "client-network" : "server-local")}";
     }
 
     private const string ObservePlayerUsage =

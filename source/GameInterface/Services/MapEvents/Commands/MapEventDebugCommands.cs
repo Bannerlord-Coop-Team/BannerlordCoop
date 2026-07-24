@@ -226,6 +226,100 @@ public class MapEventDebugCommands
         return true;
     }
 
+    [CommandLineArgumentFunction("request_player_field_battle", "coop.debug.mapevent")]
+    public static string RequestPlayerFieldBattle(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+            return "Run this command on the attacking client.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.request_player_field_battle <defenderMobilePartyId>";
+
+        var attacker = MobileParty.MainParty;
+        if (attacker?.Party == null || !attacker.IsActive || attacker.MapEvent != null)
+            return "The local player must lead an active party outside a map event.";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+
+        var defenderError = string.Empty;
+        if ((!objectManager.TryGetObject(args[0], out MobileParty defender) &&
+             !CommandHelpers.TryGetMobileParty(args[0], out defender, out defenderError)) ||
+            defender?.Party == null)
+            return "Unable to resolve defender party: " + defenderError;
+
+        if (defender == attacker || !defender.IsActive || defender.MapEvent != null)
+            return "The defender must be a distinct active party outside a map event.";
+
+        if (attacker.CurrentSettlement != null || defender.CurrentSettlement != null)
+            return "Both player parties must be outside settlements.";
+
+        if (attacker.MapFaction == null || defender.MapFaction == null ||
+            attacker.MapFaction == defender.MapFaction)
+            return "Player parties must belong to distinct map factions.";
+
+        if (!objectManager.TryGetId(defender, out var defenderMobilePartyId) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.Players.Any(player => player.MobilePartyId == defenderMobilePartyId))
+            return "The defender must belong to a registered player.";
+
+        if (!objectManager.TryGetId(attacker.Party, out var attackerPartyId) ||
+            !objectManager.TryGetId(defender.Party, out var defenderPartyId))
+            return "Unable to resolve the registered PartyBase ids.";
+
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+            return "Unable to resolve the client network.";
+
+        network.SendAll(new NetworkRequestConversation(
+            defenderPartyId,
+            attackerPartyId,
+            forcePlayerOutFromSettlement: false,
+            ConversationRestartSource.PlayerEncounter,
+            armyTalkEncounter: false));
+
+        return
+            "Player field-battle interaction requested through the production conversation path.\n" +
+            $"AttackerPartyId: {attacker.StringId}\n" +
+            $"DefenderPartyId: {defender.StringId}";
+    }
+
+    [CommandLineArgumentFunction("player_interaction_state", "coop.debug.mapevent")]
+    public static string PlayerInteractionState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.player_interaction_state";
+
+        return
+            $"Active: {PlayerPartyInteractionDialogState.HasActiveState}\n" +
+            $"SessionId: {PlayerPartyInteractionDialogState.SessionId ?? "none"}\n" +
+            $"PartyId: {PlayerPartyInteractionDialogState.PartyId ?? "none"}\n" +
+            $"OtherPartyId: {PlayerPartyInteractionDialogState.OtherPartyId ?? "none"}\n" +
+            $"Phase: {PlayerPartyInteractionDialogState.Phase}\n" +
+            $"Proposal: {PlayerPartyInteractionDialogState.Proposal}";
+    }
+
+    [CommandLineArgumentFunction("submit_player_interaction", "coop.debug.mapevent")]
+    public static string SubmitPlayerInteraction(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+            return "Run this command on a player client.";
+
+        if (args.Count != 1 ||
+            !Enum.TryParse(args[0], ignoreCase: true, out PlayerPartyInteractionOption option) ||
+            option == PlayerPartyInteractionOption.None)
+            return "Usage: coop.debug.mapevent.submit_player_interaction <option>";
+
+        if (!PlayerPartyInteractionDialogState.HasActiveState)
+            return "No player-party interaction is active.";
+
+        if (!PlayerPartyInteractionDialogState.IsOptionEnabled(option))
+            return $"Player-party interaction option '{option}' is not enabled.";
+
+        var sessionId = PlayerPartyInteractionDialogState.SessionId;
+        PlayerPartyInteractionDialogState.Submit(option);
+        return $"Submitted player-party interaction option '{option}' for session '{sessionId}'.";
+    }
+
     private static bool AreFactionsAtWar(IFaction first, IFaction second)
     {
         try
