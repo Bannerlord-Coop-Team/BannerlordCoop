@@ -213,6 +213,35 @@ public class MapEventDebugCommands
             return error;
         }
 
+        const int maximumFixtureTroops = 8;
+        var remainingFixtureTroops = maximumFixtureTroops;
+        var removedTroops = 0;
+        for (var index = playerParty.MemberRoster.Count - 1; index >= 0; index--)
+        {
+            var element = playerParty.MemberRoster.GetElementCopyAtIndex(index);
+            if (element.Character.IsHero)
+                continue;
+
+            var kept = Math.Min(element.Number, remainingFixtureTroops);
+            var removed = element.Number - kept;
+            if (removed > 0)
+            {
+                playerParty.MemberRoster.AddToCountsAtIndex(
+                    index,
+                    -removed,
+                    -Math.Min(element.WoundedNumber, removed),
+                    removeDepleted: false);
+                removedTroops += removed;
+            }
+            remainingFixtureTroops -= kept;
+        }
+        playerParty.MemberRoster.RemoveZeroCounts();
+
+        if (playerParty.CurrentSettlement != null)
+        {
+            LeaveSettlementAction.ApplyForParty(playerParty);
+        }
+
         var excludedPartyId = args.Count == 2 ? args[1] : null;
         var playerPosition = playerParty.Position.ToVec2();
         var banditParty = MobileParty.All
@@ -227,7 +256,7 @@ public class MapEventDebugCommands
             return "No active bandit/looter party found on the map.";
         }
 
-        EncounterManager.StartPartyEncounter(banditParty.Party, playerParty.Party);
+        StartBattleAction.Apply(banditParty.Party, playerParty.Party);
 
         var partyId = objectManager.TryGetId(banditParty, out string registryId)
             ? registryId
@@ -238,7 +267,62 @@ public class MapEventDebugCommands
 
         return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, " +
                $"registry id {partyId}, PartyBase id {partyBaseId}) " +
-               $"against player {args[0]}.";
+               $"against player {args[0]} after removing {removedTroops} excess fixture troops.";
+    }
+
+    [CommandLineArgumentFunction("finish_non_battle_encounter", "coop.debug.mapevent")]
+    public static string FinishNonBattleEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.finish_non_battle_encounter";
+
+        if (PlayerEncounter.Current == null)
+            return "No player encounter is active.";
+        if (PlayerEncounter.Battle != null || MobileParty.MainParty?.MapEvent != null)
+            return "Refusing to finish a battle encounter.";
+
+        PlayerEncounter.Finish();
+        return "Finished the current non-battle encounter.";
+    }
+
+    [CommandLineArgumentFunction("join_existing", "coop.debug.mapevent")]
+    public static string JoinExistingBattle(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 2 ||
+            !Enum.TryParse(args[1], true, out BattleSideEnum side) ||
+            (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender))
+        {
+            return "Usage: coop.debug.mapevent.join_existing <mapEventId> <Attacker|Defender>";
+        }
+
+        if (PlayerEncounter.Current != null)
+            return "A player encounter is already active.";
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(args[0], out var mapEvent))
+            return $"Unable to resolve map event {args[0]}.";
+        if (mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None)
+            return $"Map event {args[0]} is already concluded.";
+
+        var opposingParty = mapEvent.GetLeaderParty(
+            side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
+        if (opposingParty == null)
+            return $"Map event {args[0]} has no opposing leader party.";
+
+        PlayerEncounter.Start();
+        if (side == BattleSideEnum.Attacker)
+            PlayerEncounter.Current.SetupFields(MobileParty.MainParty.Party, opposingParty);
+        else
+            PlayerEncounter.Current.SetupFields(opposingParty, MobileParty.MainParty.Party);
+        PlayerEncounter.JoinBattle(side);
+
+        return $"Started the {side} join encounter for map event {args[0]}.";
     }
 
     // coop.debug.mapevent.wounded_allied_fixture_start PlayerOne

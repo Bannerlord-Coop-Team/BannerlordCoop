@@ -1,3 +1,4 @@
+﻿using Common;
 using Common.Network.Session;
 using Common.Tests.Utils;
 using Coop.Core.Common.Session;
@@ -100,6 +101,31 @@ public class ServerMissionMembershipHandlerTests
         });
     }
 
+    [Fact]
+    public void MissionEntered_PublishesPostMembershipFirstMemberState()
+    {
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51007), 7);
+        var messageBroker = new TestMessageBroker();
+        var missionManager = new Mock<IMissionManager>();
+        IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers =
+            Array.Empty<(string, NetPeer)>();
+        var isFirstMember = true;
+        missionManager
+            .Setup(manager => manager.TryEnterMission(
+                peer, "first", InstanceId, out existingMembers, out isFirstMember))
+            .Returns(true);
+        MissionMemberEntered? entered = null;
+        messageBroker.Subscribe<MissionMemberEntered>(payload => entered = payload.What);
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager.Object, new TestNetwork());
+
+        messageBroker.Publish(peer, new NetworkMissionEntered("first", InstanceId));
+        DrainGameThread();
+
+        Assert.True(entered.HasValue);
+        Assert.True(entered.Value.IsFirstMember);
+    }
+
     private static TestNetwork PublishEntry(
         NetPeer newcomer,
         string newcomerControllerId,
@@ -109,20 +135,31 @@ public class ServerMissionMembershipHandlerTests
     {
         var messageBroker = new TestMessageBroker();
         var missionManager = new Mock<IMissionManager>();
+        IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers =
+            new List<(string controllerId, NetPeer peer)>
+        {
+            (existingControllerId, existing),
+        };
+        var isFirstMember = false;
         missionManager
-            .Setup(manager => manager.EnterMission(newcomer, newcomerControllerId, InstanceId))
-            .Returns(new List<(string controllerId, NetPeer peer)>
-            {
-                (existingControllerId, existing),
-            });
+            .Setup(manager => manager.TryEnterMission(
+                newcomer,
+                newcomerControllerId,
+                InstanceId,
+                out existingMembers,
+                out isFirstMember))
+            .Returns(true);
 
         var network = new TestNetwork();
         using var handler = new ServerMissionMembershipHandler(
             messageBroker, missionManager.Object, network, tunnelHost);
 
         messageBroker.Publish(newcomer, new NetworkMissionEntered(newcomerControllerId, InstanceId));
+        DrainGameThread();
         return network;
     }
+
+    private static void DrainGameThread() => GameThread.Run(() => { }, blocking: true);
 
     private static NetPeer CreatePeer(IPEndPoint endpoint, int id)
         => (NetPeer)PeerConstructor.Invoke(new object[] { new NetManager(null), endpoint, id });

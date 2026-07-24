@@ -518,13 +518,14 @@ public class VillageHostileActionTests : MapEventTestBase
             "RaidRequest",
             attackerPartyId,
             target.SettlementPartyId,
-            RaidFlags())));
+            RaidFlags(),
+            null)));
 
         Assert.Null(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>()).MapEventId);
     }
 
     [Fact]
-    public void FieldMapEventCreation_OverlappingRequest_JoinsFreePartyToExistingBattle()
+    public void FieldMapEventCreation_OverlappingRequest_JoinsActiveBattleAndRejectsStaleBattleId()
     {
         var firstClient = Clients.First();
         var secondClient = Clients.Skip(1).First();
@@ -558,12 +559,27 @@ public class VillageHostileActionTests : MapEventTestBase
         Server.NetworkSentMessages.Clear();
 
         firstClient.Call(() => firstClient.Resolve<INetwork>().SendAll(
-            new NetworkRequestCreateMapEvent("FirstBattle", firstPartyId, aiPartyId, default)), MapEventDisabledMethods);
+            new NetworkRequestCreateMapEvent("FirstBattle", firstPartyId, aiPartyId, default, null)), MapEventDisabledMethods);
         var firstReply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>());
         Server.NetworkSentMessages.Clear();
+        bool? reservationPrecededJoinCommit = null;
+        Server.Resolve<IMessageBroker>().Subscribe<BattleJoinAccepted>(payload =>
+        {
+            if (payload.What.ControllerId != "PlayerTwo" || reservationPrecededJoinCommit != null)
+                return;
+
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(secondPartyId, out var secondParty));
+            reservationPrecededJoinCommit = secondParty.MapEventSide == null;
+        });
 
         secondClient.Call(() => secondClient.Resolve<INetwork>().SendAll(
-            new NetworkRequestCreateMapEvent("OverlappingBattle", secondPartyId, aiPartyId, default)), MapEventDisabledMethods);
+            new NetworkRequestCreateMapEvent(
+                "OverlappingBattle",
+                secondPartyId,
+                aiPartyId,
+                default,
+                firstReply.MapEventId)), MapEventDisabledMethods);
+        Assert.True(reservationPrecededJoinCommit);
         var secondReply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>());
         var pending = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventPartyPending>());
         Assert.Equal(firstReply.MapEventId, pending.MapEventId);
@@ -580,6 +596,25 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(secondPlayerId, out var secondPlayer));
             Assert.Same(mapEvent, secondPlayer.MapEvent);
             Assert.Same(mapEvent.AttackerSide, secondPlayer.MapEventSide);
+        });
+
+        DestroyServerMapEvent(firstReply.MapEventId);
+        RequestConversation(secondClient, secondPartyId, aiPartyId);
+        Server.NetworkSentMessages.Clear();
+
+        secondClient.Call(() => secondClient.Resolve<INetwork>().SendAll(
+            new NetworkRequestCreateMapEvent(
+                "StaleBattle",
+                secondPartyId,
+                aiPartyId,
+                default,
+                firstReply.MapEventId)), MapEventDisabledMethods);
+
+        Assert.Null(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>()).MapEventId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(secondPlayerId, out var secondPlayer));
+            Assert.Null(secondPlayer.MapEvent);
         });
     }
 
@@ -1876,6 +1911,8 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         Assert.NotNull(woundedPartyId);
+        BattleJoinCancelled? cancelled = null;
+        Server.Resolve<IMessageBroker>().Subscribe<BattleJoinCancelled>(payload => cancelled = payload.What);
         Server.NetworkSentMessages.Clear();
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
@@ -1886,6 +1923,9 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
         Assert.Equal(woundedPartyId, left.PartyId);
+        Assert.True(cancelled.HasValue);
+        Assert.Equal(hostileAction.MapEventId, cancelled.Value.InstanceId);
+        Assert.Equal("PlayerTwo", cancelled.Value.ControllerId);
 
         AssertHostileActionJoinerLeft(Server, hostileAction.MapEventId, hostileAction.AttackerPartyId, woundedPartyId!);
         foreach (var syncedClient in Clients)

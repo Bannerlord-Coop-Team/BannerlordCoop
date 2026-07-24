@@ -1,6 +1,7 @@
 ﻿using Coop.Core.Server.Services.Instances;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Missions;
 using Missions.Messages;
@@ -14,6 +15,7 @@ namespace Coop.IntegrationTests.Missions;
 /// join and leave an instance. Each client's view excludes its own controller id, so "equivalent" means: the
 /// server lists every present controller, and each client lists exactly the others.
 /// </summary>
+[Collection(KingdomSyncGameThreadCollection.Name)]
 public class MissionMembershipTests
 {
     private const string InstanceId = "Settlement|Location";
@@ -111,11 +113,17 @@ public class MissionMembershipTests
 
     /// <summary>Simulates the server receiving a MissionEntered over the member's connection.</summary>
     private void Join(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.ControllerId, InstanceId));
+        GameThreadTestRunner.Run(() =>
+            TestEnvironment.Server.SimulateMessage(
+                member.Instance.NetPeer,
+                new NetworkMissionEntered(member.ControllerId, InstanceId)));
 
     /// <summary>Simulates the server receiving a MissionLeft over the member's connection.</summary>
     private void Leave(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionLeft(member.ControllerId, InstanceId));
+        GameThreadTestRunner.Run(() =>
+            TestEnvironment.Server.SimulateMessage(
+                member.Instance.NetPeer,
+                new NetworkMissionLeft(member.ControllerId, InstanceId)));
 
     /// <summary>
     /// Asserts the server's instance controllers equal the present members, and each present member's

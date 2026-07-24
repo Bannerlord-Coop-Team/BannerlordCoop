@@ -218,10 +218,9 @@ internal class BattleHostHandler : IHandler
                 // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
                 if (TryAppendSuccessor(existing, requesterId, out var updated))
                 {
-                    hostRegistry.Set(mapEventId, updated);
+                    SetServerAssignment(mapEventId, updated);
                     Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
                         requesterId, mapEventId, string.Join(", ", updated.SuccessorControllerIds));
-                    network.SendAll(ToMessage(mapEventId, updated));
                 }
                 else if (requester != null)
                 {
@@ -234,12 +233,10 @@ internal class BattleHostHandler : IHandler
                 // battle, or one past the last generation if this map event was abandoned and re-entered.
                 var epoch = NextEpoch(mapEventId);
                 var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
-                hostRegistry.Set(mapEventId, assignment);
+                SetServerAssignment(mapEventId, assignment);
 
                 Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
                     requesterId, mapEventId, epoch);
-
-                network.SendAll(ToMessage(mapEventId, assignment));
             }
 
             // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
@@ -736,12 +733,10 @@ internal class BattleHostHandler : IHandler
                 var newHost = successors[0];
                 successors.RemoveAt(0);
                 var promoted = new BattleHostAssignment(newHost, successors, NextEpoch(mapEventId, assignment.Epoch));
-                hostRegistry.Set(mapEventId, promoted);
+                SetServerAssignment(mapEventId, promoted);
 
                 Logger.Information("[BattleHost] Host {Old} left battle {MapEventId}; promoted {New} at epoch {Epoch} (successors: {Successors})",
                     controllerId, mapEventId, newHost, promoted.Epoch, string.Join(", ", successors));
-
-                network.SendAll(ToMessage(mapEventId, promoted));
 
                 // The departed host can no longer ack a reserve flush: serve any return grant that was
                 // pending on it from the current ledger. AFTER the promotion, so the grant is scoped
@@ -752,12 +747,10 @@ internal class BattleHostHandler : IHandler
             {
                 // Successor-line cleanup: the host did not change, so the epoch is unchanged (BR-102).
                 var updated = new BattleHostAssignment(assignment.HostControllerId, successors, assignment.Epoch);
-                hostRegistry.Set(mapEventId, updated);
+                SetServerAssignment(mapEventId, updated);
 
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
                     controllerId, mapEventId, string.Join(", ", successors));
-
-                network.SendAll(ToMessage(mapEventId, updated));
             }
 
             if (newlyAbsent && mapEvent != null && assignment.HostControllerId != controllerId)
@@ -795,6 +788,7 @@ internal class BattleHostHandler : IHandler
 
         // Capture the host we knew before applying the update, so we can detect a migration TO us.
         string previousHost = null;
+        bool wasLocalHost = false;
         if (hostRegistry.TryGet(message.MapEventId, out var previous))
         {
             // BR-102: assignments are ordered by their host epoch. One LOWER than what we already hold is a
@@ -808,6 +802,7 @@ internal class BattleHostHandler : IHandler
             }
 
             previousHost = previous.HostControllerId;
+            wasLocalHost = previous.HostControllerId == controllerIdProvider.ControllerId;
         }
 
         var assignment = new BattleHostAssignment(
@@ -815,6 +810,10 @@ internal class BattleHostHandler : IHandler
             message.SuccessorControllerIds ?? Array.Empty<string>(),
             message.Epoch);
         hostRegistry.Set(message.MapEventId, assignment);
+
+        bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
+        if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))
+            messageBroker.Publish(this, new BattleHostAuthorityAcquired(message.MapEventId));
 
         Logger.Information("[BattleHost] Battle {MapEventId} host is {Host}{IsMe} at epoch {Epoch} (successors: {Successors})",
             message.MapEventId,
@@ -827,7 +826,7 @@ internal class BattleHostHandler : IHandler
         // battle continues uninterrupted (the controller does the actual adoption with the live mission).
         if (previousHost != null
             && previousHost != message.HostControllerId
-            && message.HostControllerId == controllerIdProvider.ControllerId)
+            && isLocalHost)
         {
             Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
             messageBroker.Publish(this, new BattleHostMigrated(message.MapEventId, previousHost));
@@ -962,5 +961,12 @@ internal class BattleHostHandler : IHandler
             successors[i] = assignment.SuccessorControllerIds[i];
 
         return new NetworkBattleHostAssigned(mapEventId, assignment.HostControllerId, successors, assignment.Epoch);
+    }
+
+    private void SetServerAssignment(string mapEventId, BattleHostAssignment assignment)
+    {
+        hostRegistry.Set(mapEventId, assignment);
+        network.SendAll(ToMessage(mapEventId, assignment));
+        messageBroker.Publish(this, new BattleHostAssignmentChanged(mapEventId));
     }
 }

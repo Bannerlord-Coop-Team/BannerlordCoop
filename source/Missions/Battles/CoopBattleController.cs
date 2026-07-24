@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -35,7 +36,7 @@ namespace Missions.Battles;
 /// <item><see cref="BattleDamageRouter"/> — puppet hits routed to and applied by the owner.</item>
 /// <item><see cref="BattleAuthorityMigrator"/> — player-party withdrawal and host migration.</item>
 /// <item><see cref="ReinforcementFielder"/> — the host fields new AI parties mid-battle.</item>
-/// <item><see cref="SupplyProgressReporter"/> / <see cref="BattleResultCommitter"/> — server ledger + result commit.</item>
+/// <item><see cref="SupplyProgressReporter"/> / <see cref="BattleResultCommitter"/> — server ledger + result report.</item>
 /// <item><see cref="BattleDeploymentCoordinator"/> — deployment activation ("any client" NPC release) and the
 /// own-party reveal gate.</item>
 /// </list>
@@ -51,8 +52,11 @@ public class CoopBattleController : CoopMissionController
     /// <summary>Deployment activation + reveal state (exposed for the join catch-up and tests).</summary>
     public IBattleDeploymentCoordinator Deployment { get; }
 
-    /// <summary>Commits a concluded battle's result to the campaign on mission end.</summary>
+    /// <summary>Reports a concluded battle's result to the campaign server.</summary>
     public IBattleResultCommitter ResultCommitter { get; }
+
+    /// <summary>Reports final siege engine state before the shared result is applied.</summary>
+    public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
 
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
@@ -67,8 +71,8 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeEngineDeploymentReplicator siegeEngineDeployment;
     private readonly ISiegeMachineStateReplicator siegeMachineState;
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
-    private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private NetworkBattleResultSnapshot? pendingResultSnapshot;
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
@@ -117,8 +121,10 @@ public class CoopBattleController : CoopMissionController
         hostRegistryRef = hostRegistry;
         Session = session;
         Deployment = deployment;
-        ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry);
-        siegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
+        ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
+        SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
+        messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
+        messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
 
         // Decode order clips during battle setup so the first issued order does not hitch.
         coopMissionComponent.AgentVoiceHandler.WarmUp();
@@ -140,6 +146,8 @@ public class CoopBattleController : CoopMissionController
         siegeMachineState.Dispose();
         siegeWeaponFire.Dispose();
         Deployment.Dispose();
+        messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
+        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
 
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
@@ -147,7 +155,6 @@ public class CoopBattleController : CoopMissionController
         SiegeMissionAuthorityGate.IsAuthorityKnown = false;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
         BattleConclusionGate.IsInCoopBattleMission = false;
-        BattleConclusionGate.IsLocalBattleHost = false;
 
         base.Dispose();
     }
@@ -160,6 +167,8 @@ public class CoopBattleController : CoopMissionController
     public override void AfterStart()
     {
         base.AfterStart();
+
+        BattleConclusionGate.IsInCoopBattleMission = true;
 
         // BR-025: the deployment time limit begins when this player becomes mission-ready — right here.
         Deployment.OnMissionReady();
@@ -183,9 +192,8 @@ public class CoopBattleController : CoopMissionController
             SiegeMissionAuthorityGate.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
         }
 
-        // Only the battle host's mission conclusion may relay to the server (every coop battle mission).
+        // Route coop mission victories through the server's result-ready completion barrier.
         BattleConclusionGate.IsInCoopBattleMission = true;
-        BattleConclusionGate.IsLocalBattleHost = Session.IsLocalHost;
 
         // Register the buffered puppet batch before the one-shot end-condition gate so it can observe both
         // sides as fielded even when a queued terminal event removes every agent on one side this tick.
@@ -298,6 +306,8 @@ public class CoopBattleController : CoopMissionController
 
         if (Deployment.OnLocalDeploymentFinished())
             replicator.BroadcastOwnDeployedTroops();
+
+        ResultCommitter.ReportAcceptedResult();
     }
 
     protected override void SendJoinInfo(string controllerId)
@@ -319,6 +329,15 @@ public class CoopBattleController : CoopMissionController
         replicator.ReplicateCurrentAgentsTo(controllerId);
         siegeEngineDeployment.CatchUpJoiner(controllerId);
         siegeMachineState.CatchUpJoiner(controllerId);
+
+        if (Session.IsLocalHost && ResultCommitter.TryGetResolvedState(out var battleState))
+        {
+            network.Send(controllerId, new NetworkBattleResultSnapshot(
+                Session.InstanceId,
+                Session.OwnControllerId,
+                Session.HostEpoch,
+                battleState));
+        }
     }
 
     protected override void HandleJoinInfo(NetPeer peer, NetworkMissionJoinInfo joinInfo)
@@ -328,16 +347,74 @@ public class CoopBattleController : CoopMissionController
         Logger.Information("[BattleSync] Received join info from {Controller} (instance {Instance})", joinInfo.ControllerId, Session.InstanceId);
     }
 
+    private void Handle_BattleResultSnapshot(MessagePayload<NetworkBattleResultSnapshot> payload)
+    {
+        var snapshot = payload.What;
+        GameThread.RunSafe(() => TryAcceptResultSnapshot(snapshot), context: nameof(Handle_BattleResultSnapshot));
+    }
+
+    private void Handle_BattleHostAssigned(MessagePayload<NetworkBattleHostAssigned> payload)
+    {
+        if (payload.What.MapEventId != Session.InstanceId)
+            return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (pendingResultSnapshot.HasValue)
+                TryAcceptResultSnapshot(pendingResultSnapshot.Value);
+        }, context: nameof(Handle_BattleHostAssigned));
+    }
+
+    private void TryAcceptResultSnapshot(NetworkBattleResultSnapshot snapshot)
+    {
+        if (snapshot.InstanceId != Session.InstanceId || Session.IsLocalHost)
+            return;
+
+        if (snapshot.HostEpoch > Session.HostEpoch)
+        {
+            if (!pendingResultSnapshot.HasValue ||
+                snapshot.HostEpoch > pendingResultSnapshot.Value.HostEpoch)
+            {
+                pendingResultSnapshot = snapshot;
+            }
+
+            return;
+        }
+
+        if (snapshot.HostEpoch != Session.HostEpoch ||
+            !Session.IsHostController(snapshot.HostControllerId))
+        {
+            ClearAppliedPendingResultSnapshot();
+            return;
+        }
+
+        ClearAppliedPendingResultSnapshot();
+        ResultCommitter.AcceptResolvedState(snapshot.BattleState);
+        if (Deployment.IsCommitted)
+            ResultCommitter.ReportAcceptedResult();
+    }
+
+    private void ClearAppliedPendingResultSnapshot()
+    {
+        if (pendingResultSnapshot.HasValue &&
+            pendingResultSnapshot.Value.HostEpoch <= Session.HostEpoch)
+        {
+            pendingResultSnapshot = null;
+        }
+    }
+
     protected override void OnLeaving()
     {
         damageRouter.FlushForMissionEnd();
 
-        // Report engine states before the commit, so the server applies them while the siege still exists.
-        siegeEngineStateReporter.ReportIfHost();
+        var missionResult = Mission.Current?.MissionResult;
+        if (missionResult?.BattleResolved == true)
+            SiegeEngineStateReporter.ReportConcludedIfHost();
+        else
+            SiegeEngineStateReporter.ReportOnLeavingIfHost();
 
-        // Commit the concluded battle's result to the campaign BEFORE tearing the instance down, so the server
-        // captures losers / awards the win and finalizes the encounter.
-        ResultCommitter.CommitResolvedResult();
+        // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
+        ResultCommitter.ReportResolvedResult(missionResult);
 
         lifecycle.Leave();
     }

@@ -9,6 +9,8 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -33,6 +35,7 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IMapEventInitializationBarrier initializationBarrier;
 
@@ -40,12 +43,14 @@ internal class BattleJoinLeaveHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         IMapEventLogger mapEventLogger,
         IMapEventInitializationBarrier initializationBarrier)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.mapEventLogger = mapEventLogger;
         this.initializationBarrier = initializationBarrier;
 
@@ -132,42 +137,60 @@ internal class BattleJoinLeaveHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var requestingPeer = payload.Who as NetPeer;
 
         GameThread.RunSafe(
             () =>
             {
-                if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
-                if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
-
-                if (party.MapEventSide != null)
+                bool joined = false;
+                var reservationId = Guid.NewGuid();
+                var reservedControllerId = ReserveJoin(requestingPeer, data.MapEventId, reservationId);
+                try
                 {
-                    Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
-                    return;
-                }
-                if (mapEvent.IsActiveSlowVillageRaid() && data.Side == BattleSideEnum.Defender)
-                {
-                    Logger.Warning("Ignoring defender join request: map event {MapEventId} is an active slow village raid", data.MapEventId);
-                    return;
-                }
-                var side = mapEvent.GetMapEventSide(data.Side);
-                if (side == null)
-                {
-                    Logger.Warning("Ignoring join request: map event {MapEventId} has no side {Side}", data.MapEventId, data.Side);
-                    return;
-                }
+                    if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+                    if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
 
-                // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
-                // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
-                party.MapEventSide = side;
-                if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
-                    MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
+                    if (mapEvent.BattleState != BattleState.None || mapEvent.IsFinalized)
+                    {
+                        Logger.Warning("Ignoring join request: map event {MapEventId} is already concluded", data.MapEventId);
+                        return;
+                    }
+                    if (party.MapEventSide != null)
+                    {
+                        Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                        return;
+                    }
+                    if (mapEvent.IsActiveSlowVillageRaid() && data.Side == BattleSideEnum.Defender)
+                    {
+                        Logger.Warning("Ignoring defender join request: map event {MapEventId} is an active slow village raid", data.MapEventId);
+                        return;
+                    }
+                    var side = mapEvent.GetMapEventSide(data.Side);
+                    if (side == null)
+                    {
+                        Logger.Warning("Ignoring join request: map event {MapEventId} has no side {Side}", data.MapEventId, data.Side);
+                        return;
+                    }
 
-                // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
-                // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
-                // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
-                // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
-                if (mapEvent.BattleObserver is ForwardingBattleObserver && !mapEvent.IsUnsupportedMultiPlayerHostileAction())
-                    network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
+                    // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+                    // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+                    party.MapEventSide = side;
+                    joined = TryGetRequestingPlayer(requestingPeer, party, out _);
+                    if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
+                        MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
+
+                    // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
+                    // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
+                    // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
+                    // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
+                    if (mapEvent.BattleObserver is ForwardingBattleObserver && !mapEvent.IsUnsupportedMultiPlayerHostileAction())
+                        network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
+                }
+                finally
+                {
+                    if (!joined && reservedControllerId != null)
+                        PublishJoinCancelled(requestingPeer, data.MapEventId, reservedControllerId, reservationId);
+                }
             },
             blocking: true,
             context: nameof(Handle_NetworkRequestJoinBattle));
@@ -189,20 +212,30 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        RemovePartyFromBattleAndBroadcast(payload.What.PartyId);
+        RemovePartyFromBattleAndBroadcast(payload.What.PartyId, payload.Who as NetPeer);
     }
 
     // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
     // collection sync), so remove authoritatively and broadcast the removal explicitly.
-    private void RemovePartyFromBattleAndBroadcast(string partyId)
+    private void RemovePartyFromBattleAndBroadcast(string partyId, NetPeer requestingPeer = null)
     {
         GameThread.RunSafe(
             () =>
             {
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
+                var mapEvent = party.MapEvent;
                 ApplyAuthoritativeLeave(party);
                 network.SendAll(new NetworkPartyLeftBattle(partyId));
+
+                if (mapEvent != null &&
+                    objectManager.TryGetId(mapEvent, out var mapEventId) &&
+                    TryGetRequestingPlayer(requestingPeer, party, out var controllerId))
+                {
+                    messageBroker.Publish(
+                        requestingPeer,
+                        new BattleJoinCancelled(mapEventId, controllerId));
+                }
             },
             blocking: true,
             context: nameof(RemovePartyFromBattleAndBroadcast));
@@ -229,6 +262,45 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         if (party.MapEventSide != null)
             party.MapEventSide = null;
+    }
+
+    private string ReserveJoin(NetPeer requestingPeer, string mapEventId, Guid reservationId)
+    {
+        if (requestingPeer == null || !playerManager.TryGetPlayer(requestingPeer, out var player))
+            return null;
+
+        messageBroker.Publish(requestingPeer,
+            new BattleJoinAccepted(mapEventId, player.ControllerId, reservationId));
+        return player.ControllerId;
+    }
+
+    private void PublishJoinCancelled(
+        NetPeer requestingPeer,
+        string mapEventId,
+        string controllerId,
+        Guid reservationId)
+    {
+        messageBroker.Publish(
+            requestingPeer,
+            new BattleJoinCancelled(mapEventId, controllerId, reservationId));
+    }
+
+    private bool TryGetRequestingPlayer(
+        NetPeer requestingPeer,
+        PartyBase party,
+        out string controllerId)
+    {
+        controllerId = null;
+        if (requestingPeer == null ||
+            !playerManager.TryGetPlayer(requestingPeer, out var player) ||
+            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) ||
+            !ReferenceEquals(playerParty.Party, party))
+        {
+            return false;
+        }
+
+        controllerId = player.ControllerId;
+        return true;
     }
 
     // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
