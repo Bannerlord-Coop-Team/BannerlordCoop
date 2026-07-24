@@ -5,12 +5,12 @@ using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
-using GameInterface.Services.Heroes.Enum;
-using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
+using ProtoBuf;
 using Serilog;
 using System;
+using System.Threading;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -21,27 +21,24 @@ namespace Coop.Core.Server.Connections.States;
 public class TransferSaveState : ConnectionStateBase
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TransferSaveState>();
+    private static int nextSaveTransferId;
 
     public TransferSaveState(
         IConnectionLogic connectionLogic,
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
-        ITimeControlInterface timeControlInterface,
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
         IServerOptionsProvider serverOptionsProvider)
         : base(connectionLogic)
     {
+        GameSaveDataPacket snapshot = default;
+        bool snapshotCreated = false;
+
         GameThread.Run(() =>
         {
-            // Pause so the save snapshot is taken from a stationary world. This is local to the
-            // save and runs before the connection has been assigned this state, so it precedes
-            // the registry's loading lock; ConnectionCollection drives the broadcast loading pause once
-            // the transition completes (see IsLoading below).
-            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-
             // Flush pending coalesced sends before the snapshot, while this peer is still Dropping: a deferred
             // delta would otherwise be both captured in the snapshot and replayed to this peer after BeginQueueing
             // (double-apply). Guarded so a throwing send can't strand this blocking GameThread.Run.
@@ -64,15 +61,17 @@ public class TransferSaveState : ConnectionStateBase
                 return;
             }
 
-            var savePacket = new GameSaveDataPacket(
-                SaveDataCompression.Compress(saveResults.Data),
+            // Clone the mutable session DTOs at the same boundary as the campaign save. Compression and
+            // packet serialization run after the game-thread action returns, while campaign ticks resume.
+            snapshot = new GameSaveDataPacket(
+                saveResults.Data,
                 saveResults.CampaignId,
-                coopSessionProvider.CoopSession?.CraftingPlayerData,
-                coopSessionProvider.CoopSession?.WorkshopPlayerData,
-                coopSessionProvider.CoopSession?.CaravansPlayerData,
-                coopSessionProvider.CoopSession?.AlleyPlayerData,
-                coopSessionProvider.CoopSession?.InteractionsPlayerData,
-                coopSessionProvider.CoopSession?.TradePlayerData,
+                Clone(coopSessionProvider.CoopSession?.CraftingPlayerData),
+                Clone(coopSessionProvider.CoopSession?.WorkshopPlayerData),
+                Clone(coopSessionProvider.CoopSession?.CaravansPlayerData),
+                Clone(coopSessionProvider.CoopSession?.AlleyPlayerData),
+                Clone(coopSessionProvider.CoopSession?.InteractionsPlayerData),
+                Clone(coopSessionProvider.CoopSession?.TradePlayerData),
                 attachmentIdMapper.BuildServerMap(),
                 serverOptionsProvider.GetServerOptions());
 
@@ -82,10 +81,61 @@ public class TransferSaveState : ConnectionStateBase
             // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
             // Dropping) from "after the save" (queued for replay).
             connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
-
-            network.SendImmediate(ConnectionLogic.Peer, savePacket);
+            snapshotCreated = true;
         }, blocking: true);
+
+        if (!snapshotCreated) return;
+
+        byte[] compressedSave = SaveDataCompression.Compress(snapshot.GameSaveData);
+        SendSaveChunks(network, snapshot, compressedSave);
     }
+
+    private void SendSaveChunks(INetwork network, GameSaveDataPacket snapshot, byte[] compressedSave)
+    {
+        int transferId = Interlocked.Increment(ref nextSaveTransferId);
+        int chunkCount = Math.Max(1, (compressedSave.Length + GameSaveDataChunkPacket.ChunkSize - 1) / GameSaveDataChunkPacket.ChunkSize);
+
+        Logger.Information(
+            "Sending join save transfer {TransferId} to peer {PeerId}: {ChunkCount} chunks, {CompressedSize:N0} compressed bytes, {UncompressedSize:N0} save bytes",
+            transferId,
+            ConnectionLogic.Peer.Id,
+            chunkCount,
+            compressedSave.Length,
+            snapshot.GameSaveData?.Length ?? 0);
+
+        for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
+        {
+            int offset = chunkIndex * GameSaveDataChunkPacket.ChunkSize;
+            int length = Math.Min(GameSaveDataChunkPacket.ChunkSize, compressedSave.Length - offset);
+            byte[] chunkData = length <= 0 ? Array.Empty<byte>() : new byte[length];
+            if (length > 0)
+            {
+                Buffer.BlockCopy(compressedSave, offset, chunkData, 0, length);
+            }
+
+            var chunkPacket = new GameSaveDataChunkPacket(
+                transferId,
+                chunkIndex,
+                chunkCount,
+                compressedSave.Length,
+                snapshot.GameSaveData?.Length ?? 0,
+                chunkData,
+                chunkIndex == 0 ? snapshot.CampaignID : null,
+                chunkIndex == 0 ? snapshot.CraftingPlayerData : null,
+                chunkIndex == 0 ? snapshot.WorkshopPlayerData : null,
+                chunkIndex == 0 ? snapshot.CaravansPlayerData : null,
+                chunkIndex == 0 ? snapshot.AlleyPlayerData : null,
+                chunkIndex == 0 ? snapshot.InteractionsPlayerData : null,
+                chunkIndex == 0 ? snapshot.TradePlayerData : null,
+                chunkIndex == 0 ? snapshot.AttachmentIdMap : null,
+                chunkIndex == 0 ? snapshot.ServerOptions : null);
+
+            network.SendImmediate(ConnectionLogic.Peer, chunkPacket);
+        }
+    }
+
+    private static T Clone<T>(T value) where T : class =>
+        value == null ? null : Serializer.DeepClone(value);
 
     public override bool IsLoading => true;
 

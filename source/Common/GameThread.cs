@@ -18,10 +18,12 @@ public class GameThread : IUpdateable
     private static readonly Lazy<GameThread> m_Instance =
         new Lazy<GameThread>(() => new GameThread());
 
-    private readonly Queue<(Action Act, EventWaitHandle Wait, string Label)> m_Queue =
-        new Queue<(Action, EventWaitHandle, string)>();
+    private readonly Queue<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> m_Queue =
+        new Queue<(Action, EventWaitHandle, string, CancellationToken)>();
 
     private readonly object m_QueueLock = new object();
+    private static readonly AsyncLocal<CancellationToken> m_AmbientCancellation =
+        new AsyncLocal<CancellationToken>();
     private int m_GameLoopThreadId;
 
     public int QueueLength
@@ -90,8 +92,8 @@ public class GameThread : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
-        List<(Action Act, EventWaitHandle Wait, string Label)> toBeRun =
-            new List<(Action, EventWaitHandle, string)>();
+        List<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> toBeRun =
+            new List<(Action, EventWaitHandle, string, CancellationToken)>();
 
         int backlog;
         lock (Instance.m_QueueLock)
@@ -105,21 +107,35 @@ public class GameThread : IUpdateable
 
         if (!Instrument)
         {
-            foreach ((Action Act, EventWaitHandle Wait, string Label) task in toBeRun)
+            foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
             {
-                task.Act?.Invoke();
-                task.Wait?.Set();
+                RunQueuedTask(task);
             }
             return;
         }
 
         long frameStart = Stopwatch.GetTimestamp();
-        foreach ((Action Act, EventWaitHandle Wait, string Label) task in toBeRun)
+        foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
         {
+            if (task.Cancellation.IsCancellationRequested)
+            {
+                task.Wait?.Set();
+                continue;
+            }
+
             long actionStart = Stopwatch.GetTimestamp();
-            task.Act?.Invoke();
+            try
+            {
+                using (ActivateCancellation(task.Cancellation))
+                {
+                    task.Act?.Invoke();
+                }
+            }
+            finally
+            {
+                task.Wait?.Set();
+            }
             long actionTicks = Stopwatch.GetTimestamp() - actionStart;
-            task.Wait?.Set();
 
             string label = task.Label ?? "(unlabeled)";
             m_PerLabel.TryGetValue(label, out (long Ticks, int Count) agg);
@@ -208,6 +224,17 @@ public class GameThread : IUpdateable
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
     {
+        CancellationToken cancellation = m_AmbientCancellation.Value;
+        if (cancellation.IsCancellationRequested)
+        {
+            if (blocking)
+            {
+                throw new OperationCanceledException(
+                    $"The game-thread session ended before the blocking {nameof(Run)} action was queued.");
+            }
+            return;
+        }
+
         if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
         {
             action();
@@ -221,15 +248,27 @@ public class GameThread : IUpdateable
             string resolved = label ?? BuildLabel(callerFile, callerMember);
             lock (Instance.m_QueueLock)
             {
-                Instance.m_Queue.Enqueue((action, ewh, resolved));
+                Instance.m_Queue.Enqueue((action, ewh, resolved, cancellation));
             }
 
-            if (ewh != null && ewh.WaitOne(BlockingTimeout) == false)
+            if (ewh == null) return;
+
+            int waitResult = !cancellation.CanBeCanceled
+                ? (ewh.WaitOne(BlockingTimeout) ? 0 : WaitHandle.WaitTimeout)
+                : WaitHandle.WaitAny(
+                    new[] { ewh, cancellation.WaitHandle },
+                    BlockingTimeout);
+            if (waitResult == WaitHandle.WaitTimeout)
             {
                 throw new TimeoutException(
                     $"A blocking {nameof(Run)} action was not processed by the game loop " +
                     $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
                     $"{nameof(GameThread)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
+            }
+            if (waitResult == 1)
+            {
+                throw new OperationCanceledException(
+                    $"The game-thread session ended before the blocking {nameof(Run)} action completed.");
             }
         }
     }
@@ -264,10 +303,13 @@ public class GameThread : IUpdateable
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
     {
+        CancellationToken cancellation = m_AmbientCancellation.Value;
+        if (cancellation.IsCancellationRequested) return;
+
         string label = context ?? BuildLabel(callerFile, callerMember);
         lock (Instance.m_QueueLock)
         {
-            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label));
+            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label, cancellation));
         }
     }
 
@@ -354,5 +396,42 @@ public class GameThread : IUpdateable
     public void UnmarkGameThread()
     {
         m_GameLoopThreadId = 0;
+    }
+
+    public static IDisposable ActivateCancellation(CancellationToken cancellation) =>
+        new CancellationScope(cancellation);
+
+    private static void RunQueuedTask(
+        (Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task)
+    {
+        try
+        {
+            if (task.Cancellation.IsCancellationRequested) return;
+
+            using (ActivateCancellation(task.Cancellation))
+            {
+                task.Act?.Invoke();
+            }
+        }
+        finally
+        {
+            task.Wait?.Set();
+        }
+    }
+
+    private sealed class CancellationScope : IDisposable
+    {
+        private readonly CancellationToken previous;
+
+        public CancellationScope(CancellationToken cancellation)
+        {
+            previous = m_AmbientCancellation.Value;
+            m_AmbientCancellation.Value = cancellation;
+        }
+
+        public void Dispose()
+        {
+            m_AmbientCancellation.Value = previous;
+        }
     }
 }
