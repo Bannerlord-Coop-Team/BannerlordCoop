@@ -226,7 +226,7 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void ThreeMountedSnapshots_FitDirectAndRelayDatagrams()
+    public void ThreeMountedSnapshots_FitAndDispatchThroughRelay()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -234,6 +234,8 @@ public class MovementTrafficTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = fixture.CreateMission(peer);
+            _ = peer.Resolve<ICoopMissionComponent>();
+            var packetManager = peer.Resolve<IPacketManager>();
             var ids = new ushort[3];
             var riders = new AgentData[3];
             var mounts = new AgentMountData[3];
@@ -254,9 +256,9 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var compressor = new MovementPacketCompressor(serializer);
-            AssertFitsRelay(serializer, compressor,
+            AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
                 new MovementPacket("76561198000000042", ids, riders));
-            AssertFitsRelay(serializer, compressor,
+            AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
                 new MountMovementPacket("76561198000000042", ids, mounts));
         });
     }
@@ -284,22 +286,46 @@ public class MovementTrafficTests : MissionTestEnvironment
             LiteNetP2PClient.SelectDeliveryMethod(ordinaryUnreliable, datagramCeiling - 1, 0));
     }
 
-    private static void AssertFitsRelay(
+    private static void AssertFitsAndDispatchesThroughRelay(
         ProtoBufSerializer serializer,
         MovementPacketCompressor compressor,
+        IPacketManager packetManager,
+        NetPeer sourcePeer,
         IPacket packet)
     {
         byte[] payload = compressor.Serialize(packet);
+        Assert.IsType<CompressedMovementPacket>(
+            serializer.Deserialize<IPacket>(payload));
         Assert.True(payload.Length <= LiteNetP2PClient.SafeSinglePacketBytes,
             $"Direct payload was {payload.Length} bytes");
 
-        byte[] relay = serializer.Serialize(new RelayPacket(
+        byte[] relayBytes = serializer.Serialize(new RelayPacket(
             packet.DeliveryMethod,
             "MapEvent_Created_0000",
             "76561198000000042",
             payload));
-        Assert.True(relay.Length <= LiteNetP2PClient.SafeSinglePacketBytes,
-            $"Relay payload was {relay.Length} bytes");
+        Assert.True(relayBytes.Length <= LiteNetP2PClient.SafeSinglePacketBytes,
+            $"Relay payload was {relayBytes.Length} bytes");
+
+        var relay = Assert.IsType<RelayPacket>(
+            serializer.Deserialize<IPacket>(relayBytes));
+        IPacket received = serializer.Deserialize<IPacket>(relay.Payload);
+
+        var restoredHandler = new RecordingPacketHandler(packet.PacketType);
+        packetManager.RegisterPacketHandler(restoredHandler);
+
+        try
+        {
+            packetManager.HandleReceive(sourcePeer, received);
+
+            Assert.Equal(1, restoredHandler.HandleCount);
+            Assert.Same(sourcePeer, restoredHandler.SourcePeer);
+            Assert.Equal(packet.GetType(), restoredHandler.Received.GetType());
+        }
+        finally
+        {
+            packetManager.RemovePacketHandler(restoredHandler);
+        }
     }
 
     private static Agent SpawnRider(MockMission mock)
@@ -335,6 +361,30 @@ public class MovementTrafficTests : MissionTestEnvironment
         {
             PacketType = packetType;
             DeliveryMethod = deliveryMethod;
+        }
+    }
+
+    private sealed class RecordingPacketHandler : IPacketHandler
+    {
+        public PacketType PacketType { get; }
+        public int HandleCount { get; private set; }
+        public NetPeer SourcePeer { get; private set; } = null!;
+        public IPacket Received { get; private set; } = null!;
+
+        public RecordingPacketHandler(PacketType packetType)
+        {
+            PacketType = packetType;
+        }
+
+        public void Dispose()
+        {
+        }
+
+        public void HandlePacket(NetPeer peer, IPacket packet)
+        {
+            HandleCount++;
+            SourcePeer = peer;
+            Received = packet;
         }
     }
 }
