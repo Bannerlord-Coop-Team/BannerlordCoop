@@ -22,7 +22,12 @@ namespace E2E.Tests.Services.Missions;
 /// <summary>Regression coverage for movement traffic and delivery selection.</summary>
 public class MovementTrafficTests : MissionTestEnvironment
 {
-    public MovementTrafficTests(ITestOutputHelper output) : base(output) { }
+    private readonly ITestOutputHelper output;
+
+    public MovementTrafficTests(ITestOutputHelper output) : base(output)
+    {
+        this.output = output;
+    }
 
     [Fact]
     public void PollMovement_UsesFortyHertzCadenceAndThreeAgentBatches()
@@ -39,7 +44,8 @@ public class MovementTrafficTests : MissionTestEnvironment
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
 
             for (int i = 0; i < 4; i++)
-                Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), SpawnRider(mock)));
+                Assert.True(registry.TryRegisterAgent(
+                    "peer", Guid.NewGuid(), (ushort)(i + 1), SpawnRider(mock)));
 
             component.AgentMovementHandler.PollMovement(0f);
             Assert.Equal(new[] { 3, 1 }, network.NetworkSentPackets
@@ -77,30 +83,146 @@ public class MovementTrafficTests : MissionTestEnvironment
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
-            var agentIds = new List<Guid>();
+            var movementIds = new List<ushort>();
 
             for (int i = 0; i < 125; i++)
             {
                 Agent agent = SpawnRider(mock);
                 Guid agentId = Guid.NewGuid();
-                Assert.True(registry.TryRegisterAgent("peer", agentId, agent));
-                agentIds.Add(agentId);
+                ushort movementId = (ushort)(i + 1);
+                Assert.True(registry.TryRegisterAgent(
+                    "peer", agentId, movementId, agent));
+                movementIds.Add(movementId);
             }
 
             component.AgentMovementHandler.PollMovement(0f);
             MovementPacket[] packets = network.NetworkSentPackets
                 .GetPackets<MovementPacket>()
                 .ToArray();
-            Assert.Equal((agentIds.Count + 2) / 3, packets.Length);
+            Assert.Equal((movementIds.Count + 2) / 3, packets.Length);
             Assert.All(packets, packet => Assert.InRange(packet.AgentIds.Length, 1, 3));
 
-            Guid[] sentAgents = packets
+            ushort[] sentAgents = packets
                 .SelectMany(packet => packet.AgentIds)
                 .ToArray();
-            Assert.Equal(agentIds.Count, sentAgents.Length);
+            Assert.Equal(movementIds.Count, sentAgents.Length);
             Assert.Equal(sentAgents.Length, sentAgents.Distinct().Count());
-            Assert.All(agentIds, id => Assert.Contains(id, sentAgents));
+            Assert.All(movementIds, id => Assert.Contains(id, sentAgents));
         });
+    }
+
+    [Fact]
+    public void PollMovement_SeedsSpawnEquipmentAndOnlySendsChanges()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent agent = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.True(registry.TryRegisterAgent(
+                "peer", Guid.NewGuid(), 1, agent));
+
+            component.AgentMovementHandler.PollMovement(0f);
+            Assert.Empty(
+                network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
+
+            network.NetworkSentPackets.Packets.Clear();
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Empty(
+                network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
+
+            mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon2;
+            component.AgentMovementHandler.PollMovement(0.025f);
+            var changed = Assert.Single(
+                network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
+            Assert.Equal("peer", changed.IdentityScopeId);
+            Assert.Equal(new ushort[] { 1 }, changed.AgentIds);
+        });
+    }
+
+    [Fact]
+    public void PollMovement_SendsInitialEquipmentForLegacyGuidAgents()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Guid agentId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("peer", agentId, SpawnRider(mock)));
+
+            component.AgentMovementHandler.PollMovement(0f);
+
+            var initial = Assert.Single(
+                network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
+            Assert.Equal(new[] { agentId }, initial.AgentGuids);
+        });
+    }
+
+    [Fact]
+    public void Lz4MovementCompression_RoundTripsRepresentativeThreeAgentPacket()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var agents = new AgentData[3];
+            for (int i = 0; i < agents.Length; i++)
+            {
+                Agent rider = SpawnRider(mock);
+                Assert.True(AgentMirror.TryGet(rider, out var mirror));
+                PopulateMovementState(mirror, i + 1);
+                agents[i] = new AgentData(rider);
+            }
+
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            var compressor = new MovementPacketCompressor(serializer);
+            var movement = new MovementPacket(
+                "76561198000000042",
+                new ushort[] { 1, 2, 3 },
+                agents);
+
+            byte[] original = serializer.Serialize(movement);
+            byte[] wire = compressor.Serialize(movement);
+            output.WriteLine(
+                $"Three-agent movement packet: {original.Length} bytes compact, {wire.Length} bytes LZ4");
+
+            Assert.True(wire.Length < original.Length,
+                $"LZ4 envelope was {wire.Length} bytes for {original.Length} input bytes");
+            IPacket envelope = serializer.Deserialize<IPacket>(wire);
+            Assert.IsType<CompressedMovementPacket>(envelope);
+            Assert.True(compressor.TryRestore(envelope, out var restored));
+
+            var roundTripped = Assert.IsType<MovementPacket>(restored);
+            Assert.Equal(movement.IdentityScopeId, roundTripped.IdentityScopeId);
+            Assert.Equal(movement.AgentIds, roundTripped.AgentIds);
+            Assert.Equal(movement.Agents.Length, roundTripped.Agents.Length);
+            Assert.True(wire.Length <= LiteNetP2PClient.SafeSinglePacketBytes);
+        });
+    }
+
+    [Fact]
+    public void Lz4MovementCompression_RejectsCorruptEnvelope()
+    {
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        var compressor = new MovementPacketCompressor(serializer);
+        var corrupt = new CompressedMovementPacket(512, new byte[] { 1, 2, 3 });
+
+        Assert.False(compressor.TryRestore(corrupt, out _));
     }
 
     [Fact]
@@ -112,7 +234,7 @@ public class MovementTrafficTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = fixture.CreateMission(peer);
-            var ids = new Guid[3];
+            var ids = new ushort[3];
             var riders = new AgentData[3];
             var mounts = new AgentMountData[3];
 
@@ -124,15 +246,18 @@ public class MovementTrafficTests : MissionTestEnvironment
                 Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
                 PopulateMovementState(riderMirror, i + 1);
                 PopulateMovementState(mountMirror, i + 1);
-                ids[i] = Guid.NewGuid();
-                var mountId = Guid.NewGuid();
+                ids[i] = (ushort)(i + 1);
+                ushort mountId = (ushort)(i + 101);
                 riders[i] = new AgentData(rider, mountId);
                 mounts[i] = new AgentMountData(mount, mountId);
             }
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-            AssertFitsRelay(serializer, new MovementPacket(ids, riders));
-            AssertFitsRelay(serializer, new MountMovementPacket(ids, mounts));
+            var compressor = new MovementPacketCompressor(serializer);
+            AssertFitsRelay(serializer, compressor,
+                new MovementPacket("76561198000000042", ids, riders));
+            AssertFitsRelay(serializer, compressor,
+                new MountMovementPacket("76561198000000042", ids, mounts));
         });
     }
 
@@ -159,9 +284,12 @@ public class MovementTrafficTests : MissionTestEnvironment
             LiteNetP2PClient.SelectDeliveryMethod(ordinaryUnreliable, datagramCeiling - 1, 0));
     }
 
-    private static void AssertFitsRelay(ProtoBufSerializer serializer, IPacket packet)
+    private static void AssertFitsRelay(
+        ProtoBufSerializer serializer,
+        MovementPacketCompressor compressor,
+        IPacket packet)
     {
-        byte[] payload = serializer.Serialize(packet);
+        byte[] payload = compressor.Serialize(packet);
         Assert.True(payload.Length <= LiteNetP2PClient.SafeSinglePacketBytes,
             $"Direct payload was {payload.Length} bytes");
 

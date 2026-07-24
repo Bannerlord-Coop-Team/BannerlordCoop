@@ -1,4 +1,5 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using Missions.Agents.Packets;
 using Missions.Data;
 using ProtoBuf;
 using System;
@@ -64,6 +65,24 @@ public class BattleAgentSpawnData
     // mirrors the owner's actual deployment split instead of a default troop-class grouping.
     [ProtoMember(14)]
     public readonly int FormationIndex;
+    // Compact identities used only by the high-frequency movement stream. The canonical Guids remain
+    // authoritative for reliable gameplay messages.
+    [ProtoMember(15)]
+    public readonly ushort MovementId;
+    [ProtoMember(16)]
+    public readonly ushort MountMovementId;
+    [ProtoMember(17)]
+    public readonly string OriginalOwnerControllerId;
+    [ProtoMember(18)]
+    public readonly AgentEquipmentData CurrentEquipment;
+    [ProtoMember(19)]
+    public readonly bool HasCurrentEquipment;
+    [ProtoMember(20)]
+    public readonly string MovementScopeId;
+    [ProtoMember(21)]
+    public readonly string MountOriginalOwnerControllerId;
+    [ProtoMember(22)]
+    public readonly string MountMovementScopeId;
 
     public BattleAgentSpawnData(
         Guid agentId,
@@ -78,7 +97,14 @@ public class BattleAgentSpawnData
         BodyProperties bodyProperties,
         MissionEquipmentData missionEquipmentData,
         Guid mountAgentId = default,
-        int formationIndex = -1)
+        int formationIndex = -1,
+        ushort movementId = 0,
+        ushort mountMovementId = 0,
+        string originalOwnerControllerId = null,
+        AgentEquipmentData? currentEquipment = null,
+        string movementScopeId = null,
+        string mountOriginalOwnerControllerId = null,
+        string mountMovementScopeId = null)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -93,5 +119,14 @@ public class BattleAgentSpawnData
         MissionEquipmentData = missionEquipmentData;
         MountAgentId = mountAgentId;
         FormationIndex = formationIndex;
+        MovementId = movementId;
+        MountMovementId = mountMovementId;
+        OriginalOwnerControllerId = originalOwnerControllerId ?? ownerControllerId;
+        MovementScopeId = movementScopeId ?? OriginalOwnerControllerId;
+        MountOriginalOwnerControllerId =
+            mountOriginalOwnerControllerId ?? OriginalOwnerControllerId;
+        MountMovementScopeId = mountMovementScopeId ?? MovementScopeId;
+        CurrentEquipment = currentEquipment.GetValueOrDefault();
+        HasCurrentEquipment = currentEquipment.HasValue;
     }
 }

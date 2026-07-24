@@ -42,6 +42,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ISteamMissionBridge steamBridge;
+    private readonly IMovementPacketCompressor movementPacketCompressor;
     private readonly Poller poller;
 
     private readonly object peerGate = new();
@@ -81,7 +82,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IControllerIdProvider controllerIdProvider,
-        ISteamMissionBridge steamBridge)
+        ISteamMissionBridge steamBridge,
+        IMovementPacketCompressor movementPacketCompressor)
     {
         Config = config;
         this.relayNetwork = relayNetwork;
@@ -91,6 +93,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.steamBridge = steamBridge;
+        this.movementPacketCompressor = movementPacketCompressor;
 
         netManager = new NetManager(this)
         {
@@ -561,9 +564,10 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void SendAll(IPacket packet)
     {
+        byte[] data = movementPacketCompressor.Serialize(packet);
         foreach (var controllerId in missionContext.ControllersInMission)
         {
-            Send(controllerId, packet);
+            Send(controllerId, packet, data);
         }
     }
 
@@ -579,24 +583,29 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void SendAllBut(string excludedId, IPacket packet)
     {
+        byte[] data = movementPacketCompressor.Serialize(packet);
         foreach (var controllerId in missionContext.ControllersInMission.Where(id => id != excludedId))
         {
-            Send(controllerId, packet);
+            Send(controllerId, packet, data);
         }
     }
 
     public void Send(string controllerId, IPacket packet)
     {
+        Send(controllerId, packet, movementPacketCompressor.Serialize(packet));
+    }
+
+    private void Send(string controllerId, IPacket packet, byte[] data)
+    {
         // Send directly to direct peer
         if (missionContext.TryGetPeer(controllerId, out var peer))
         {
-            Send(peer, packet);
+            Send(peer, packet, data);
             return;
         }
 
         // Otherwise send relay packet to the server
-        var payload = serializer.Serialize(packet);
-        relayNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, instanceId, controllerId, payload));
+        relayNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, instanceId, controllerId, data));
     }
 
     // Peer-reported MTUs can be optimistic, so cap nonfragmentable sends at a conservative ceiling.
@@ -622,7 +631,11 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void Send(NetPeer netPeer, IPacket packet)
     {
-        byte[] data = serializer.Serialize(packet);
+        Send(netPeer, packet, movementPacketCompressor.Serialize(packet));
+    }
+
+    private void Send(NetPeer netPeer, IPacket packet, byte[] data)
+    {
         DeliveryMethod? selectedMethod = SelectDeliveryMethod(
             packet,
             data.Length,
@@ -652,6 +665,11 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
+        if (!movementPacketCompressor.TryRestore(packet, out packet))
+        {
+            Logger.Warning("Discarding an invalid compressed movement packet");
+            return;
+        }
 
         packetManager.HandleReceive(peer, packet);
     }

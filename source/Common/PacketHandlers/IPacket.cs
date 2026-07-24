@@ -20,7 +20,9 @@ namespace Common.PacketHandlers
         AgentAction,
         MountMovement,
         AggregateMessage,
-        CampaignTime
+        CampaignTime,
+        AgentEquipment,
+        CompressedMovement
     }
 
     public interface IPacket
