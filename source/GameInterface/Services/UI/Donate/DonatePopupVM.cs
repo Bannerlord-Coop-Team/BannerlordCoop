@@ -21,7 +21,7 @@ public class DonatePopupVM : ViewModel
         "If you enjoy the project and would like to support its development, consider donating.";
     public string PayPalButtonText => "PayPal";
     public string BuyMeACoffeeButtonText => "Buy a Coffee";
-    public string IfdianButtonText => "ifdian";
+    public string AfdianButtonText => "Afdian";
     public string BoostyButtonText => "Boosty";
     public string CloseButtonText => "Close";
 
@@ -35,7 +35,7 @@ public class DonatePopupVM : ViewModel
         System.Diagnostics.Process.Start("https://buymeacoffee.com/bannerlordcoop");
     }
 
-    public void ActionIfdian()
+    public void ActionAfdian()
     {
         System.Diagnostics.Process.Start("https://ifdian.net/a/BannerlordCoop");
     }
