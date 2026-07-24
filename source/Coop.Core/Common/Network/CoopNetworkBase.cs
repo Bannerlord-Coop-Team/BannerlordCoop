@@ -6,6 +6,9 @@ using Common.Serialization;
 using Common.Util;
 using Coop.Core.Common.Network.Packets;
 using LiteNetLib;
+#if DEBUG
+using LiteNetLib.Layers;
+#endif
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -18,6 +21,9 @@ namespace Coop.Core.Common.Network;
 
 /// <inheritdoc cref="INetwork"/>
 public abstract class CoopNetworkBase : INetwork, INetEventListener
+#if DEBUG
+    , IDebugNetworkTrafficControl
+#endif
 {
     public INetworkConfig Config { get; }
     public abstract int Priority { get; }
@@ -34,15 +40,22 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     private bool _disposed = false;
 
     protected readonly NetManager netManager;
+#if DEBUG
+    private readonly DebugTrafficPausePacketLayer debugTrafficLayer = new DebugTrafficPausePacketLayer();
+#endif
 
     protected CoopNetworkBase(INetworkConfig configuration, ICommonSerializer serializer)
     {
         Config = configuration;
         this.serializer = serializer;
 
+#if DEBUG
+        netManager = new NetManager(this, debugTrafficLayer)
+#else
         netManager = new NetManager(this)
+#endif
         {
-            DisconnectTimeout = (int)configuration.ConnectionTimeout.TotalMilliseconds,
+            DisconnectTimeout = (int)configuration.DisconnectTimeout.TotalMilliseconds,
             // Two reliable lanes: 0 for the world-change stream, BulkChannel for large transfers.
             // Each channel has its own (small, fixed) reliable window, so a multi-MB transfer
             // saturating its own lane cannot head-of-line block world sync or be counted against
@@ -61,6 +74,60 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         poller = new Poller(Update, Config.NetworkPollInterval);
         poller.Start();
     }
+
+#if DEBUG
+    public DateTime? TrafficPausedUntilUtc => debugTrafficLayer.PausedUntilUtc;
+
+    public void PauseTraffic(TimeSpan duration) => debugTrafficLayer.Pause(duration);
+
+    public void ResumeTraffic() => debugTrafficLayer.Resume();
+
+    private sealed class DebugTrafficPausePacketLayer : PacketLayerBase
+    {
+        private long pausedUntilUtcTicks;
+
+        public DebugTrafficPausePacketLayer() : base(0)
+        {
+        }
+
+        public DateTime? PausedUntilUtc
+        {
+            get
+            {
+                var ticks = Interlocked.Read(ref pausedUntilUtcTicks);
+                return ticks > DateTime.UtcNow.Ticks
+                    ? new DateTime(ticks, DateTimeKind.Utc)
+                    : null;
+            }
+        }
+
+        public void Pause(TimeSpan duration)
+        {
+            if (duration <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(duration));
+
+            Interlocked.Exchange(ref pausedUntilUtcTicks, DateTime.UtcNow.Add(duration).Ticks);
+        }
+
+        public void Resume() => Interlocked.Exchange(ref pausedUntilUtcTicks, 0);
+
+        public override void ProcessInboundPacket(ref IPEndPoint endPoint, ref byte[] data, ref int length)
+        {
+            if (PausedUntilUtc.HasValue)
+                length = 0;
+        }
+
+        public override void ProcessOutBoundPacket(
+            ref IPEndPoint endPoint,
+            ref byte[] data,
+            ref int offset,
+            ref int length)
+        {
+            if (PausedUntilUtc.HasValue)
+                length = 0;
+        }
+    }
+#endif
 
     ~CoopNetworkBase()
     {

@@ -5,6 +5,7 @@ using Steamworks;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Xunit;
 
 namespace Coop.Tests.Steam
@@ -15,6 +16,34 @@ namespace Coop.Tests.Steam
         public void SendRateFloor_IsFourMiBPerSecond()
         {
             Assert.Equal(4 * 1024 * 1024, SteamTunnel.SendRateMinBytesPerSecond);
+        }
+
+        [Fact]
+        public void Connections_UseSixtySecondConnectedTimeout()
+        {
+            const uint acceptedConnection = 42;
+            const ulong remoteSteamId = 76561198000000042;
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
+
+            transport.EnsureRelayAccess();
+            Assert.Contains(transport.ConfiguredValues, value =>
+                value.Key == ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_TimeoutConnected &&
+                value.Scope == ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Global &&
+                value.Value == 60_000);
+
+            transport.ConnectToHost(remoteSteamId, SteamTunnel.VirtualPort);
+            AssertConnectedTimeout(transport.ConnectOptions);
+
+            transport.ListenForClients(SteamTunnel.VirtualPort);
+            AssertConnectedTimeout(transport.ListenOptions);
+
+            SeedOwnedConnection(transport, acceptedConnection, remoteSteamId);
+            transport.AcceptConnection(acceptedConnection);
+            Assert.Contains(transport.ConfiguredValues, value =>
+                value.Key == ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_TimeoutConnected &&
+                value.Scope == ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection &&
+                value.ScopeObject == (IntPtr)acceptedConnection &&
+                value.Value == 60_000);
         }
 
         [Fact]
@@ -70,6 +99,13 @@ namespace Coop.Tests.Steam
             remoteIdentities.Record(connection, remoteSteamId);
         }
 
+        private static void AssertConnectedTimeout(SteamNetworkingConfigValue_t[] options)
+        {
+            var timeout = Assert.Single(options, option =>
+                option.m_eValue == ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_TimeoutConnected);
+            Assert.Equal(60_000, timeout.m_val.m_int32);
+        }
+
         private sealed class TestSteamNetworkingTunnelTransport : SteamNetworkingTunnelTransportBase
         {
             private Callback<SteamNetConnectionStatusChangedCallback_t>.DispatchDelegate? statusChangedHandler;
@@ -80,6 +116,13 @@ namespace Coop.Tests.Steam
             }
 
             public List<uint> RawClosedConnections { get; } = new List<uint>();
+            public List<(ESteamNetworkingConfigValue Key, ESteamNetworkingConfigScope Scope, IntPtr ScopeObject, int Value)>
+                ConfiguredValues { get; } =
+                    new List<(ESteamNetworkingConfigValue, ESteamNetworkingConfigScope, IntPtr, int)>();
+            public SteamNetworkingConfigValue_t[] ConnectOptions { get; private set; } =
+                Array.Empty<SteamNetworkingConfigValue_t>();
+            public SteamNetworkingConfigValue_t[] ListenOptions { get; private set; } =
+                Array.Empty<SteamNetworkingConfigValue_t>();
 
             public void DispatchConnectionState(uint connection, ESteamNetworkingConnectionState state)
             {
@@ -118,7 +161,11 @@ namespace Coop.Tests.Steam
                 ESteamNetworkingConfigScope scope,
                 IntPtr scopeObj,
                 ESteamNetworkingConfigDataType type,
-                IntPtr arg) => true;
+                IntPtr arg)
+            {
+                ConfiguredValues.Add((key, scope, scopeObj, Marshal.ReadInt32(arg)));
+                return true;
+            }
 
             protected override ESteamNetworkingGetConfigValueResult GetConfigValue(
                 ESteamNetworkingConfigValue key,
@@ -142,12 +189,22 @@ namespace Coop.Tests.Steam
                 ref SteamNetworkingIdentity identity,
                 int virtualPort,
                 int options,
-                SteamNetworkingConfigValue_t[] optionValues) => HSteamNetConnection.Invalid;
+                SteamNetworkingConfigValue_t[] optionValues)
+            {
+                ConnectOptions = optionValues;
+                return new HSteamNetConnection { m_HSteamNetConnection = 44 };
+            }
+
+            protected override SteamNetworkingIdentity CreateSteamIdentity(ulong steamId) => default;
 
             protected override HSteamListenSocket CreateListenSocketP2P(
                 int virtualPort,
                 int options,
-                SteamNetworkingConfigValue_t[] optionValues) => HSteamListenSocket.Invalid;
+                SteamNetworkingConfigValue_t[] optionValues)
+            {
+                ListenOptions = optionValues;
+                return new HSteamListenSocket { m_HSteamListenSocket = 43 };
+            }
 
             protected override bool CloseListenSocket(HSteamListenSocket socket) => true;
 

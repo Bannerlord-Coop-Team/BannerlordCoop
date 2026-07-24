@@ -30,10 +30,17 @@ internal class GameStateInterface : IGameStateInterface
     private static readonly ILogger Logger = LogManager.GetLogger<GameStateInterface>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly Action endGame;
 
     public GameStateInterface(IMessageBroker messageBroker)
+        : this(messageBroker, () => GameThread.Run(MBGameManager.EndGame, blocking: true))
+    {
+    }
+
+    internal GameStateInterface(IMessageBroker messageBroker, Action endGame)
     {
         this.messageBroker = messageBroker;
+        this.endGame = endGame;
     }
 
     public void GoToMainMenu()
@@ -98,8 +105,8 @@ internal class GameStateInterface : IGameStateInterface
 
     public void EndGame()
     {
-        GameThread.Run(MBGameManager.EndGame, blocking: true);
-
-        messageBroker.Publish(this, new MainMenuEntered());
+        endGame();
+        // MBGameManager.EndGame is async void, so returning here does not mean InitialState is
+        // active yet. MainMenuEnteredPatch publishes once InitialState.OnActivate actually runs.
     }
 }
