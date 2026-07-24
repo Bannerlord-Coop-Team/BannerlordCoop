@@ -380,7 +380,7 @@ public class TournamentCombatFixture : ITournamentCombatFixture
         aiStrikeRequested = true;
         aiStrikeObserved = false;
         activeStrike = FixtureStrike.Ai;
-        drivesActiveStrike = session.OwnControllerId == playerTwoControllerId;
+        drivesActiveStrike = session.IsLocalHost;
         strikeElapsed = 0f;
         if (!drivesActiveStrike)
             return null;
