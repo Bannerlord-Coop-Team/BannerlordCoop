@@ -14,9 +14,11 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.TournamentGames;
+using TaleWorlds.MountAndBlade;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Tournaments.Commands;
@@ -25,6 +27,9 @@ public class TournamentDebugCommand
 {
 #if DEBUG
     private static TournamentCampaignFixture campaignFixture;
+    private static PlayerEncounter originalCombatFixtureEncounter;
+    private static PlayerEncounter installedCombatFixtureEncounter;
+    private static string combatFixtureEncounterTownId;
 #endif
 
     [CommandLineArgumentFunction("add_tournament_to_town", "coop.debug.tournaments")]
@@ -220,6 +225,14 @@ public class TournamentDebugCommand
             return "Usage: coop.debug.tournaments.combat_fixture_join town-id";
         if (!ContainerProvider.TryResolve<TournamentUIController>(out var controller))
             return "Unable to resolve TournamentUIController";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve ObjectManager";
+        if (!objectManager.TryGetObject(args[0], out Town town))
+            return $"Tournament town '{args[0]}' was not found";
+
+        string encounterError = PrepareCombatFixtureEncounter(args[0], town);
+        if (encounterError != null)
+            return encounterError;
 
         controller.RequestJoin(args[0], null, 0);
         return $"TOURNAMENT_JOIN_REQUESTED local={controller.LocalControllerId} townId={args[0]}";
@@ -334,6 +347,33 @@ public class TournamentDebugCommand
         controller.RequestLeaveActive(snapshot);
         return $"TOURNAMENT_LEAVE_REQUESTED local={controller.LocalControllerId} " +
             $"session={snapshot.SessionId} revision={snapshot.Revision}";
+    }
+
+    [CommandLineArgumentFunction("combat_fixture_restore_encounter", "coop.debug.tournaments")]
+    public static string RestoreCombatFixtureEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "This function can only be used by a client";
+        if (args.Count != 0)
+            return "Usage: coop.debug.tournaments.combat_fixture_restore_encounter";
+        if (installedCombatFixtureEncounter == null)
+            return "TOURNAMENT_ENCOUNTER_RESTORED fixtureActive=false";
+        if (Mission.Current != null)
+            return "TOURNAMENT_ENCOUNTER_RESTORE_PENDING missionActive=true";
+        if (Campaign.Current == null)
+            return "TOURNAMENT_ENCOUNTER_RESTORE_PENDING campaignLoaded=false";
+
+        PlayerEncounter currentEncounter = Campaign.Current.PlayerEncounter;
+        if (ReferenceEquals(currentEncounter, installedCombatFixtureEncounter))
+            Campaign.Current.PlayerEncounter = originalCombatFixtureEncounter;
+        else if (!ReferenceEquals(currentEncounter, originalCombatFixtureEncounter))
+            return "TOURNAMENT_ENCOUNTER_RESTORE_PENDING encounterChanged=true";
+
+        string townId = combatFixtureEncounterTownId;
+        originalCombatFixtureEncounter = null;
+        installedCombatFixtureEncounter = null;
+        combatFixtureEncounterTownId = null;
+        return $"TOURNAMENT_ENCOUNTER_RESTORED fixtureActive=false townId={townId}";
     }
 
     [CommandLineArgumentFunction("combat_fixture_setup", "coop.debug.tournaments")]
@@ -520,6 +560,45 @@ public class TournamentDebugCommand
             ControllerId = controllerId;
             Party = party;
             OriginalBehavior = originalBehavior;
+        }
+    }
+
+    private static string PrepareCombatFixtureEncounter(string townId, Town town)
+    {
+        if (Campaign.Current == null)
+            return "No campaign is currently loaded";
+        if (installedCombatFixtureEncounter != null)
+        {
+            if (!ReferenceEquals(Campaign.Current.PlayerEncounter, installedCombatFixtureEncounter) ||
+                combatFixtureEncounterTownId != townId)
+            {
+                return "A different tournament encounter fixture is already active";
+            }
+            return null;
+        }
+        if (Campaign.Current.PlayerEncounter != null)
+        {
+            if (PlayerEncounter.EncounterSettlement == town.Settlement)
+                return null;
+            return "A different player encounter is already active";
+        }
+
+        originalCombatFixtureEncounter = Campaign.Current.PlayerEncounter;
+        try
+        {
+            PlayerEncounter.Start();
+            installedCombatFixtureEncounter = PlayerEncounter.Current;
+            installedCombatFixtureEncounter.EncounterSettlementAux = town.Settlement;
+            combatFixtureEncounterTownId = townId;
+            return null;
+        }
+        catch (Exception exception)
+        {
+            Campaign.Current.PlayerEncounter = originalCombatFixtureEncounter;
+            originalCombatFixtureEncounter = null;
+            installedCombatFixtureEncounter = null;
+            combatFixtureEncounterTownId = null;
+            return $"Unable to prepare the local tournament encounter: {exception.Message}";
         }
     }
 
