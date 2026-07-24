@@ -15,6 +15,7 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
@@ -607,18 +608,33 @@ internal class PlayerCaptivityServerHandler : IHandler
         // the hero, null it directly so the cleared state still auto-syncs to the owning client.
         if (captorParty != null)
         {
-            // Publish absolute zeroes so clients converge even when their stale count differs from the server.
             var prisonRoster = captorParty.PrisonRoster;
             int prisonerIndex = prisonRoster.FindIndexOfTroop(playerHero.CharacterObject);
-            if (prisonerIndex >= 0)
+            // Apply the authoritative cleanup without letting the roster patches publish a conditional
+            // mutation. The explicit identity-keyed tombstone below must be sent even when this element
+            // was already absent on the server but remains stale on one or more clients.
+            using (new AllowedThread())
             {
-                if (prisonRoster.GetElementWoundedNumber(prisonerIndex) != 0)
+                if (prisonerIndex >= 0)
                 {
-                    prisonRoster.SetElementWoundedNumber(prisonerIndex, 0);
+                    if (prisonRoster.GetElementWoundedNumber(prisonerIndex) != 0)
+                    {
+                        prisonRoster.SetElementWoundedNumber(prisonerIndex, 0);
+                    }
+                    prisonRoster.SetElementNumber(prisonerIndex, 0);
                 }
-                prisonRoster.SetElementNumber(prisonerIndex, 0);
+                // Match the roster-wide cleanup every client applies below, including when the target
+                // player element was already absent but another depleted element remains.
                 prisonRoster.RemoveZeroCounts();
+                prisonRoster.InitializeCachedData();
             }
+
+            // Publish absolute zeroes regardless of authoritative element presence. A normal Party-screen
+            // release can arrive after another server path removed the roster element while the captor client
+            // still has a stale copy; skipping the tombstone in that state reproduces the ghost prisoner.
+            messageBroker.Publish(this, new ElementWoundedNumberSet(prisonRoster, playerHero.CharacterObject, 0));
+            messageBroker.Publish(this, new ElementNumberSet(prisonRoster, playerHero.CharacterObject, 0));
+            messageBroker.Publish(this, new ZeroCountsRemoved(prisonRoster));
         }
         if (playerHero.PartyBelongedToAsPrisoner != null)
         {

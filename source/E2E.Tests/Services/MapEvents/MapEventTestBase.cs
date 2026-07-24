@@ -705,6 +705,30 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Removes one player prisoner only from the selected instance while preserving the hero's captivity
+    /// reference. This reproduces an authority whose roster element is already absent while a client still
+    /// holds the stale prisoner entry.
+    /// </summary>
+    protected void RemovePartyPrisonerLocally(EnvironmentInstance instance, string partyId, string heroId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            using (new AllowedThread())
+            {
+                int index = party.PrisonRoster.FindIndexOfTroop(hero.CharacterObject);
+                Assert.True(index >= 0);
+                party.PrisonRoster.SetElementNumber(index, 0);
+                party.PrisonRoster.RemoveZeroCounts();
+                party.PrisonRoster.InitializeCachedData();
+                hero.PartyBelongedToAsPrisoner = party.Party;
+            }
+        });
+    }
+
+    /// <summary>
     /// Asserts the exact count of one player hero in a party's prison roster.
     /// </summary>
     protected void AssertPlayerPrisonerCount(EnvironmentInstance instance, string partyId, string heroId, int expected)

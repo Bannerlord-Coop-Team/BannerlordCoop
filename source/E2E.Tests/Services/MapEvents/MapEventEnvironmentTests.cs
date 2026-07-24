@@ -607,6 +607,52 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void PartyScreenDiscard_ServerMissingPlayerPrisoner_ClearsStaleClientCopy()
+    {
+        // Arrange — capture a player normally, then reproduce the live divergence: the server has already
+        // lost the prison-roster element while the captor client still displays it and captivity is active.
+        var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
+        var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(captorHeroId, out var captorHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                captorParty.MemberRoster.AddToCounts(captorHero.CharacterObject, 1);
+                captorHero.PartyBelongedTo = captorParty;
+            }
+        });
+
+        DefeatPlayerPartyInBattle(playerHeroId, playerPartyId, captorPartyId);
+        TestEnvironment.FlushCoalescer();
+        RemovePartyPrisonerLocally(Server, captorPartyId, playerHeroId);
+
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 0);
+        foreach (var client in Clients)
+        {
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 1);
+        }
+
+        // Act — the stale captor view submits the real normal Party-screen discard.
+        ReleasePlayerByPartyScreenDiscard(captorHeroId, captorPartyId, playerHeroId);
+
+        // Assert — the authority sends an absolute tombstone even though it had no element to mutate.
+        AssertCaptivity(Server, playerHeroId, null);
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 0);
+        AssertPlayerPartyRestored(Server, playerHeroId, playerPartyId);
+
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, playerHeroId, null);
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 0);
+            AssertHeroInPartyRoster(client, playerHeroId, playerPartyId);
+        }
+    }
+
+    [Fact]
     public void ServerEndCaptivity_OfPlayerHero_SyncAllClients()
     {
         // Arrange
