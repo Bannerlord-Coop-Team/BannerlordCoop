@@ -45,6 +45,16 @@ namespace Missions.Agents.Packets
             if (defendFlags != Agent.MovementControlFlag.None)
                 return defendFlags;
 
+            // Rider pace can replace the mounted guard action while the native defend direction remains held.
+            // Read that state before requiring a defending action so gait changes do not look like releases.
+            if (agent.HasMount)
+            {
+                defendFlags = GetDefendMovementFlags(
+                    agent.GetDefendMovementFlag());
+                if (defendFlags != Agent.MovementControlFlag.None)
+                    return defendFlags;
+            }
+
             Agent.ActionCodeType action0Type = agent.GetCurrentActionType(0);
             Agent.ActionCodeType action1Type = agent.GetCurrentActionType(1);
             if (!IsDefendingAction(action0Type) && !IsDefendingAction(action1Type))

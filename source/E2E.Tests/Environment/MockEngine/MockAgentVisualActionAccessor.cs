@@ -19,12 +19,13 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         int visualAction = channel == 0
             ? mirror.SkeletonAction0Index
             : mirror.SkeletonAction1Index;
-        if (visualAction == action.Index) return true;
-        if (visualAction != ActionIndexCache.act_none.Index) return false;
-
         int rawVisualAction = channel == 0
             ? mirror.RawVisualAction0Index
             : mirror.RawVisualAction1Index;
+        if (visualAction == action.Index)
+            return rawVisualAction == action.Index;
+        if (visualAction != ActionIndexCache.act_none.Index) return false;
+
         return rawVisualAction == action.Index;
     }
 
@@ -47,7 +48,8 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         int rawVisualAction = channel == 0
             ? mirror.RawVisualAction0Index
             : mirror.RawVisualAction1Index;
-        if (rawVisualAction == action.Index)
+        if (visualAction == action.Index
+            && rawVisualAction == action.Index)
         {
             if (channel == 0)
             {
@@ -79,16 +81,19 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
 
         if (channel == 0)
         {
+            mirror.SkeletonAction0Index = action.Index;
             mirror.RawVisualAction0Index = action.Index;
             mirror.RawVisualAction0Progress = progress;
         }
         else
         {
+            mirror.SkeletonAction1Index = action.Index;
             mirror.RawVisualAction1Index = action.Index;
             mirror.RawVisualAction1Progress = progress;
         }
 
         mirror.AdvanceRawVisualActionCalls++;
         mirror.InstallRawVisualActionCalls++;
+        mirror.InstallAgentVisualActionCalls++;
     }
 }

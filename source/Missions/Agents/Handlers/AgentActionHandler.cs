@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
@@ -6,6 +7,7 @@ using GameInterface.Services.Entity;
 using LiteNetLib;
 using Missions.Agents.Packets;
 using Missions.Messages;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
@@ -42,6 +44,9 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
+    private static readonly ILogger Logger =
+        LogManager.GetLogger<AgentActionHandler>();
+
     // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
     private const int MaxAgentsPerActionPacket = 8;
 
@@ -67,6 +72,12 @@ public class AgentActionHandler : IAgentActionHandler
         public Agent.GuardMode GuardMode;
         public bool Action0WasDiscrete;
         public bool Action1WasDiscrete;
+        public bool Action0WasDefending;
+        public bool Action1WasDefending;
+        public bool HasAction0DefendingAction;
+        public bool HasAction1DefendingAction;
+        public int Action0DefendingAction;
+        public int Action1DefendingAction;
         public long Sequence;
     }
 
@@ -115,16 +126,28 @@ public class AgentActionHandler : IAgentActionHandler
             int action0 = agent.GetCurrentAction(0).Index;
             int action1 = agent.GetCurrentAction(1).Index;
             var defendFlags = AgentActionData.GetEffectiveDefendMovementFlags(agent);
-            Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
-                agent,
-                defendFlags);
 
             _localAgentStates.TryGetValue(info.AgentId, out var state);
             bool hadState = state.HasObservation;
+            Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
+                agent,
+                defendFlags);
+            if (agent.HasMount
+                && defendFlags != Agent.MovementControlFlag.None
+                && !AgentActionData.IsGuardMode(guardMode)
+                && hadState
+                && AgentActionData.IsGuardMode(state.GuardMode))
+            {
+                guardMode = state.GuardMode;
+            }
             bool defendChanged;
             if (hadState)
             {
-                defendChanged = state.DefendFlags != defendFlags;
+                defendChanged = HasDefendStateChanged(
+                    state.DefendFlags,
+                    defendFlags,
+                    state.GuardMode,
+                    guardMode);
             }
             else
             {
@@ -151,6 +174,10 @@ public class AgentActionHandler : IAgentActionHandler
                 IsDiscreteAction(agent.GetCurrentActionType(0));
             bool action1Discrete =
                 IsDiscreteAction(agent.GetCurrentActionType(1));
+            bool action0Defending = AgentActionData.IsDefendingAction(
+                agent.GetCurrentActionType(0));
+            bool action1Defending = AgentActionData.IsDefendingAction(
+                agent.GetCurrentActionType(1));
 
             // Native command actions are untyped, so recognize the main agent's order gesture by action name.
             if (agent == Mission.Current.MainAgent)
@@ -161,16 +188,67 @@ public class AgentActionHandler : IAgentActionHandler
                     AgentActionData.GetActionNameWithCode(action1));
             }
 
+            bool heldMountedGuardUnchanged =
+                agent.HasMount
+                && hadState
+                && !defendChanged
+                && !guardChanged
+                && (defendFlags != Agent.MovementControlFlag.None
+                    || AgentActionData.IsGuardMode(guardMode));
+            bool action0GuardLocomotionChurn =
+                IsMountedGuardLocomotionChurn(
+                    heldMountedGuardUnchanged,
+                    action0Changed,
+                    action0,
+                    action0Discrete,
+                    action0Defending,
+                    state.Action0WasDefending,
+                    state.HasAction0DefendingAction,
+                    state.Action0DefendingAction);
+            bool action1GuardLocomotionChurn =
+                IsMountedGuardLocomotionChurn(
+                    heldMountedGuardUnchanged,
+                    action1Changed,
+                    action1,
+                    action1Discrete,
+                    action1Defending,
+                    state.Action1WasDefending,
+                    state.HasAction1DefendingAction,
+                    state.Action1DefendingAction);
+
             // Defend input and realized guard state can change before the animation index, so send them explicitly too.
             bool discreteActionChanged =
                 (action0Changed
+                    && !action0GuardLocomotionChurn
                     && (action0Discrete
                         || (hadState && state.Action0WasDiscrete)))
                 || (action1Changed
+                    && !action1GuardLocomotionChurn
                     && (action1Discrete
                         || (hadState && state.Action1WasDiscrete)));
             bool broadcast =
                 defendChanged || guardChanged || discreteActionChanged;
+            if (agent.HasMount
+                && (defendChanged
+                    || guardChanged
+                    || action0GuardLocomotionChurn
+                    || action1GuardLocomotionChurn))
+            {
+                Logger.Debug(
+                    "[GuardSync] Mounted owner agent={Agent} broadcast={Broadcast} " +
+                    "defend={Defend} guard={Guard} action0={Action0}/{Type0} " +
+                    "action1={Action1}/{Type1} gaitChurn={Churn0}/{Churn1}",
+                    agent.Index,
+                    broadcast,
+                    defendFlags,
+                    guardMode,
+                    action0,
+                    agent.GetCurrentActionType(0),
+                    action1,
+                    agent.GetCurrentActionType(1),
+                    action0GuardLocomotionChurn,
+                    action1GuardLocomotionChurn);
+            }
 
             state.HasObservation = true;
             state.Action0 = action0;
@@ -179,6 +257,24 @@ public class AgentActionHandler : IAgentActionHandler
             state.GuardMode = guardMode;
             state.Action0WasDiscrete = action0Discrete;
             state.Action1WasDiscrete = action1Discrete;
+            state.Action0WasDefending = action0Defending;
+            state.Action1WasDefending = action1Defending;
+            UpdateDefendingAction(
+                action0,
+                agent.GetCurrentActionType(0),
+                ref state.HasAction0DefendingAction,
+                ref state.Action0DefendingAction);
+            UpdateDefendingAction(
+                action1,
+                agent.GetCurrentActionType(1),
+                ref state.HasAction1DefendingAction,
+                ref state.Action1DefendingAction);
+            if (defendFlags == Agent.MovementControlFlag.None
+                && !AgentActionData.IsGuardMode(guardMode))
+            {
+                state.HasAction0DefendingAction = false;
+                state.HasAction1DefendingAction = false;
+            }
             _localAgentStates[info.AgentId] = state;
             if (!broadcast)
                 continue;
@@ -304,6 +400,69 @@ public class AgentActionHandler : IAgentActionHandler
     private static bool IsDiscreteAction(Agent.ActionCodeType type)
     {
         return type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle;
+    }
+
+    private static bool IsMountedGuardLocomotionChurn(
+        bool heldMountedGuardUnchanged,
+        bool actionChanged,
+        int action,
+        bool actionDiscrete,
+        bool actionDefending,
+        bool previousActionDefending,
+        bool hasDefendingAction,
+        int defendingAction)
+    {
+        if (!heldMountedGuardUnchanged || !actionChanged)
+            return false;
+
+        if (!actionDiscrete)
+            return previousActionDefending;
+
+        return actionDefending
+            && !previousActionDefending
+            && hasDefendingAction
+            && action == defendingAction;
+    }
+
+    private static bool HasDefendStateChanged(
+        Agent.MovementControlFlag previousFlags,
+        Agent.MovementControlFlag currentFlags,
+        Agent.GuardMode previousGuard,
+        Agent.GuardMode currentGuard)
+    {
+        bool wasDefending =
+            previousFlags != Agent.MovementControlFlag.None;
+        bool isDefending =
+            currentFlags != Agent.MovementControlFlag.None;
+        if (wasDefending != isDefending)
+            return true;
+
+        if (!wasDefending
+            || (AgentActionData.IsGuardMode(previousGuard)
+                && AgentActionData.IsGuardMode(currentGuard)))
+        {
+            return false;
+        }
+
+        return previousFlags != currentFlags;
+    }
+
+    private static void UpdateDefendingAction(
+        int action,
+        Agent.ActionCodeType actionType,
+        ref bool hasDefendingAction,
+        ref int defendingAction)
+    {
+        if (AgentActionData.IsDefendingAction(actionType))
+        {
+            hasDefendingAction = true;
+            defendingAction = action;
+        }
+        else if (IsDiscreteAction(actionType))
+        {
+            // A strike or reaction ended the retained episode. The next guard action must be sent.
+            hasDefendingAction = false;
+        }
     }
 
     internal static bool IsOrderGesture(string actionName)

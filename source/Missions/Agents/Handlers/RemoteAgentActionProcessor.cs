@@ -81,6 +81,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public bool HasGuardCommand;
         public Agent.GuardMode LastCommandedGuardMode;
         public int LastCommandedMountIndex;
+        public bool GuardActionProgressNeedsRestore;
 
         public RemoteGuardState(
             RemoteAction action,
@@ -106,6 +107,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 ?? Agent.GuardMode.None;
             LastCommandedMountIndex = previousGuard?.LastCommandedMountIndex
                 ?? -1;
+            GuardActionProgressNeedsRestore =
+                previousGuard?.GuardActionProgressNeedsRestore ?? false;
         }
 
         public RemoteGuardState(
@@ -120,6 +123,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             HasGuardCommand = retainedGuard.HasGuardCommand;
             LastCommandedGuardMode = retainedGuard.LastCommandedGuardMode;
             LastCommandedMountIndex = retainedGuard.LastCommandedMountIndex;
+            GuardActionProgressNeedsRestore =
+                retainedGuard.GuardActionProgressNeedsRestore;
         }
     }
 
@@ -818,6 +823,12 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 agent,
                 guardMode,
                 force: mountChanged || reacquiringGuard);
+            if (mountIndex >= 0)
+            {
+                // SetWeaponGuard can restart the rider's guard action. Restore the retained timeline
+                // during the visual replay so a moving horse cannot pin the pose at its blend-in frame.
+                guardState.GuardActionProgressNeedsRestore = true;
+            }
         }
 
         guardState.HasGuardCommand = true;
@@ -860,11 +871,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
 
         ActionIndexCache currentAction = agent.GetCurrentAction(channel);
-        if (currentAction == guardState.GuardAction)
+        bool hasRetainedAgentAction =
+            currentAction == guardState.GuardAction;
+        bool restoreGuardActionProgress =
+            guardState.GuardActionProgressNeedsRestore;
+        if (hasRetainedAgentAction && !restoreGuardActionProgress)
         {
             guardState.GuardActionProgress =
                 agent.GetCurrentActionProgress(channel);
-            return;
         }
 
         if (HasGuardReactionAction(agent))
@@ -872,7 +886,18 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
-        if (currentAction != ActionIndexCache.act_none)
+        if (hasRetainedAgentAction
+            && !restoreGuardActionProgress
+            && agentVisualActionAccessor.IsActionVisible(
+                agent,
+                channel,
+                guardState.GuardAction))
+        {
+            return;
+        }
+
+        if (!hasRetainedAgentAction
+            && currentAction != ActionIndexCache.act_none)
         {
             Agent.ActionCodeType currentActionType =
                 agent.GetCurrentActionType(channel);
@@ -902,6 +927,13 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             }
         }
 
+        if (hasRetainedAgentAction && restoreGuardActionProgress)
+        {
+            agent.SetCurrentActionProgress(
+                channel,
+                guardState.GuardActionProgress);
+        }
+
         // Native can clear a puppet guard before display. Advance its visual clip and blend
         // immediately before the display snapshot; the next native Agent tick can clear it again.
         agentVisualActionAccessor.AdvanceActionIfAvailable(
@@ -910,6 +942,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             guardState.GuardAction,
             guardState.GuardActionProgress,
             replaceCurrentVisual: agent.HasMount);
+        guardState.GuardActionProgressNeedsRestore = false;
     }
 
     private void ClearRetainedGuardAction(
