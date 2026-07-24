@@ -5,6 +5,7 @@ using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MobileParties;
@@ -36,7 +37,7 @@ public class MobilePartyBehaviorSnapshotTests
     {
         var party = CreateParty();
         var removedMoveTarget = ObjectHelper.SkipConstructor<MobileParty>();
-        removedMoveTarget.Position = new CampaignVec2(new Vec2(30f, 40f), isOnLand: true);
+        removedMoveTarget._position = new CampaignVec2(new Vec2(30f, 40f), isOnLand: true);
         party.MoveTargetParty = removedMoveTarget;
 
         var objectManager = new Mock<IObjectManager>();
