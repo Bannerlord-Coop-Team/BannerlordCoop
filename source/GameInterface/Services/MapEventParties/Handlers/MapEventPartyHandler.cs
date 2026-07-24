@@ -227,21 +227,24 @@ internal class MapEventPartyHandler : IHandler
     {
         var obj = payload.What;
 
-        // The host plays on the server process: its own live-battle hits (CoopAgentOrigin) are applied
-        // directly — there is no other machine to report to.
-        if (ModInformation.IsServer)
-        {
-            ApplyTroopScoreHit(obj.MapEventParty, obj.TroopSeed, obj.AttackedTroop, obj.Damage, obj.IsFatal, obj.IsSimulatedHit);
-            return;
-        }
+        if (ModInformation.IsServer) return;
 
         if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
+            return;
+
+        if (!objectManager.TryGetIdWithLogging(obj.AttackingTroop, out var attackingTroopId))
             return;
 
         if (!objectManager.TryGetIdWithLogging(obj.AttackedTroop, out var attackedTroopId))
             return;
 
-        network.SendAll(new NetworkTroopScoreHit(mapEventPartyId, obj.TroopSeed, attackedTroopId, obj.Damage, obj.IsFatal, obj.IsSimulatedHit));
+        network.SendAll(new NetworkTroopScoreHit(
+            mapEventPartyId,
+            attackingTroopId,
+            attackedTroopId,
+            obj.Damage,
+            obj.IsFatal,
+            obj.IsSimulatedHit));
     }
 
     private void Handle_NetworkTroopScoreHit(MessagePayload<NetworkTroopScoreHit> payload)
@@ -252,41 +255,60 @@ internal class MapEventPartyHandler : IHandler
 
         var obj = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
-                    return;
+            if (!objectManager.TryGetObjectWithLogging(obj.MapEventPartyId, out MapEventParty mapEventParty))
+                return;
 
-                if (!objectManager.TryGetObjectWithLogging(obj.AttackedTroopId, out CharacterObject attackedTroop))
-                    return;
+            if (!objectManager.TryGetObjectWithLogging(obj.AttackingTroopId, out CharacterObject attackingTroop))
+                return;
 
-                ApplyTroopScoreHit(mapEventParty, obj.TroopSeed, attackedTroop, obj.Damage, obj.IsFatal, obj.IsSimulatedHit);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error handling NetworkTroopScoreHit message for MapEventParty with ID {MapEventPartyId}", obj.MapEventPartyId);
-            }
-        });
+            if (!objectManager.TryGetObjectWithLogging(obj.AttackedTroopId, out CharacterObject attackedTroop))
+                return;
+
+            ApplyTroopScoreHit(
+                mapEventParty,
+                attackingTroop,
+                attackedTroop,
+                obj.Damage,
+                obj.IsFatal,
+                obj.IsSimulatedHit);
+        }, context: nameof(Handle_NetworkTroopScoreHit));
     }
 
-    // [Server] Run the original scorer (the prefix lets the server through): roster xp, the hero combat-hit
-    // event and ContributionToBattle, whose field store the autosync intercepts and broadcasts to every
-    // client. The attacker's weapon is not carried over the wire; null is what the native simulation path
-    // passes too, so the models tolerate it.
-    private void ApplyTroopScoreHit(MapEventParty mapEventParty, int troopSeed, CharacterObject attackedTroop, int damage, bool isFatal, bool isSimulatedHit)
+    private void ApplyTroopScoreHit(
+        MapEventParty mapEventParty,
+        CharacterObject attackingTroop,
+        CharacterObject attackedTroop,
+        int damage,
+        bool isFatal,
+        bool isSimulatedHit)
     {
-        try
+        var roster = mapEventParty.Troops;
+        if (roster != null)
         {
-            mapEventParty.OnTroopScoreHit(new UniqueTroopDescriptor(troopSeed), attackedTroop, damage, isFatal, isTeamKill: false, null, isSimulatedHit);
+            foreach (var element in roster)
+            {
+                if (element.IsKilled || element.IsWounded || element.IsRouted) continue;
+                if (element.Troop != attackingTroop) continue;
+
+                // The attacker's weapon is not carried over the wire; native simulation also passes null.
+                mapEventParty.OnTroopScoreHit(
+                    element.Descriptor,
+                    attackedTroop,
+                    damage,
+                    isFatal,
+                    isTeamKill: false,
+                    null,
+                    isSimulatedHit);
+                return;
+            }
         }
-        catch (KeyNotFoundException)
-        {
-            // The roster was re-flattened since the reporter captured the seed; a lost hit only shaves a
-            // little xp/contribution, unlike a lost casualty, so drop it rather than guess a troop.
-            Logger.Warning("Score hit for seed {TroopSeed} dropped: no matching troop in party {Party}'s roster", troopSeed, mapEventParty.Party?.Id);
-        }
+
+        Logger.Warning(
+            "Score hit for {AttackingTroop} dropped: no live matching troop in party {Party}'s current roster",
+            attackingTroop.StringId,
+            mapEventParty.Party?.Id);
     }
 
     private void Handle_OnTroopRoutedAttempted(MessagePayload<OnTroopRoutedAttempted> payload)
