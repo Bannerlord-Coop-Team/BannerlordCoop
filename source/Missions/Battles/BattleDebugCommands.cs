@@ -63,14 +63,11 @@ internal static class BattleDebugCommands
 
         bool deploymentReady = mission.GetMissionBehavior<DeploymentMissionController>()?.TeamSetupOver == true;
         int activeAgents = mission.Agents.Count(agent => agent.IsActive());
-        MissionResult result = mission.MissionResult;
 
         return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
             $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
             $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
-            $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyMovedSinceLast={moved} " +
-            $"resultReady={result?.BattleResolved == true} battleState={result?.BattleState.ToString() ?? "None"} " +
-            $"playerVictory={result?.PlayerVictory == true} enemyRetreated={result?.EnemyRetreated == true}";
+            $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyMovedSinceLast={moved}";
     }
 }

@@ -409,33 +409,6 @@ coop battle LOSS.";
         return $"Killed {killed} agent(s) on the local player team.";
     }
 
-    private const string RouteEnemyTeamUsage =
-@"Usage:
-  coop.debug.mapevent.route_enemy_team
-
-Orders every live enemy-team AI agent to retreat from the current battle.";
-
-    [CommandLineArgumentFunction("route_enemy_team", "coop.debug.mapevent")]
-    public static string RouteEnemyTeam(List<string> args)
-    {
-        var ctx = new CommandContext("route_enemy_team", RouteEnemyTeamUsage, args);
-        if (!ctx.RequireArgCount(0, out var error))
-            return error;
-
-        if (!TryGetEnemyAgents(out var agents, out var failure))
-            return failure;
-
-        int routed = 0;
-        foreach (var agent in agents)
-        {
-            if (!agent.IsAIControlled) continue;
-            agent.Retreat(agent.GetRetreatPos());
-            routed++;
-        }
-
-        return $"Ordered {routed} enemy agent(s) to retreat.";
-    }
-
     /// <summary>Live agents on any team hostile to the player (host) team.</summary>
     private static bool TryGetEnemyAgents(out List<Agent> agents, out string failure)
     {

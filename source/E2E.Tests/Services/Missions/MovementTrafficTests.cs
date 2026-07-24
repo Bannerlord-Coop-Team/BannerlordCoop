@@ -201,7 +201,6 @@ public class MovementTrafficTests : MissionTestEnvironment
             output.WriteLine(
                 $"Three-agent movement packet: {original.Length} bytes compact, {wire.Length} bytes LZ4");
 
-            Assert.Equal(wire.Length, compressor.GetSerializedLength(movement));
             Assert.True(wire.Length < original.Length,
                 $"LZ4 envelope was {wire.Length} bytes for {original.Length} input bytes");
             IPacket envelope = serializer.Deserialize<IPacket>(wire);

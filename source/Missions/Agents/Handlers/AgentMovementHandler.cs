@@ -9,7 +9,6 @@ using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Packets;
 using Missions.Messages;
-using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -43,8 +42,6 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // Forty updates per second keeps locally authoritative agents responsive.
     private const float MovementPollingIntervalSeconds = 0.025f;
-    private const float PayloadProfileIntervalSeconds = 5f;
-    private const int MaxProfileAgents = 64;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -52,7 +49,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IAgentEquipmentApplier equipmentApplier;
-    private readonly IMovementPacketCompressor movementPacketCompressor;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
 
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
@@ -74,7 +70,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     // guards against a second call (the GC finalizer, or the DI scope also disposing this transient handler).
     private bool _disposed;
     private float movementPollElapsed = MovementPollingIntervalSeconds;
-    private float payloadProfileElapsed;
 
     public AgentMovementHandler(
         IBattleNetwork client,
@@ -82,8 +77,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
-        IAgentEquipmentApplier equipmentApplier,
-        IMovementPacketCompressor movementPacketCompressor)
+        IAgentEquipmentApplier equipmentApplier)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
 
@@ -93,7 +87,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.equipmentApplier = equipmentApplier;
-        this.movementPacketCompressor = movementPacketCompressor;
 
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
@@ -169,7 +162,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         if (_disposed || Mission.Current == null) return;
 
         movementPollElapsed += dt;
-        payloadProfileElapsed += dt;
         if (movementPollElapsed < MovementPollingIntervalSeconds) return;
         movementPollElapsed %= MovementPollingIntervalSeconds;
 
@@ -243,121 +235,10 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         SendEquipment(equipmentGroups.Values);
         SendEquipment(legacyEquipment);
-        if (payloadProfileElapsed >= PayloadProfileIntervalSeconds)
-        {
-            payloadProfileElapsed %= PayloadProfileIntervalSeconds;
-            ProfileActualPayloadCapacity(
-                FindLargestBatch(movementGroups.Values, legacyMovement));
-            ProfileActualPayloadCapacity(
-                FindLargestBatch(mountGroups.Values, legacyMountMovement));
-        }
         SendMovement(movementGroups.Values);
         SendMovement(legacyMovement);
         SendMountMovement(mountGroups.Values);
         SendMountMovement(legacyMountMovement);
-    }
-
-    private static MovementBatch<T> FindLargestBatch<T>(
-        IEnumerable<MovementBatch<T>> batches,
-        MovementBatch<T> legacyBatch)
-    {
-        MovementBatch<T> largest = legacyBatch;
-        foreach (var batch in batches)
-        {
-            if (largest == null || batch.Data.Count > largest.Data.Count)
-                largest = batch;
-        }
-        return largest;
-    }
-
-    private void ProfileActualPayloadCapacity(MovementBatch<AgentData> batch)
-    {
-        if (batch == null || batch.Data.Count == 0) return;
-
-        ProfileActualPayloadCapacity(
-            "agents",
-            batch,
-            count =>
-            {
-                var data = new AgentData[count];
-                batch.Data.CopyTo(0, data, 0, count);
-                if (batch.IdentityScopeId == null)
-                {
-                    var ids = new Guid[count];
-                    batch.CanonicalIds.CopyTo(0, ids, 0, count);
-                    return new MovementPacket(ids, data);
-                }
-
-                var compactIds = new ushort[count];
-                batch.CompactIds.CopyTo(0, compactIds, 0, count);
-                return new MovementPacket(batch.IdentityScopeId, compactIds, data);
-            });
-    }
-
-    private void ProfileActualPayloadCapacity(MovementBatch<AgentMountData> batch)
-    {
-        if (batch == null || batch.Data.Count == 0) return;
-
-        ProfileActualPayloadCapacity(
-            "mounts",
-            batch,
-            count =>
-            {
-                var data = new AgentMountData[count];
-                batch.Data.CopyTo(0, data, 0, count);
-                if (batch.IdentityScopeId == null)
-                {
-                    var ids = new Guid[count];
-                    batch.CanonicalIds.CopyTo(0, ids, 0, count);
-                    return new MountMovementPacket(ids, data);
-                }
-
-                var compactIds = new ushort[count];
-                batch.CompactIds.CopyTo(0, compactIds, 0, count);
-                return new MountMovementPacket(batch.IdentityScopeId, compactIds, data);
-            });
-    }
-
-    private void ProfileActualPayloadCapacity<T>(
-        string payloadName,
-        MovementBatch<T> batch,
-        Func<int, IPacket> createPacket)
-    {
-        int sampleCount = Math.Min(batch.Data.Count, MaxProfileAgents);
-        int maxSafeAgents = 0;
-        int overCeilingStreak = 0;
-        bool foundOverCeiling = false;
-        var sizes = new List<string>();
-
-        for (int count = 1; count <= sampleCount; count++)
-        {
-            int wireBytes = movementPacketCompressor.GetSerializedLength(
-                createPacket(count));
-            sizes.Add($"{count}:{wireBytes}");
-            if (wireBytes <= LiteNetP2PClient.SafeSinglePacketBytes)
-            {
-                maxSafeAgents = count;
-                overCeilingStreak = 0;
-            }
-            else
-            {
-                foundOverCeiling = true;
-                overCeilingStreak++;
-                if (overCeilingStreak >= 3)
-                    break;
-            }
-        }
-
-        bool isLowerBound = maxSafeAgents > 0 && !foundOverCeiling;
-        Logger.Information(
-            "[BattleTraffic] Actual {PayloadName} capacity: scope={IdentityScopeId}, " +
-            "wireBytes={WireBytes}, maxSafeAgents={MaxSafeAgents}{LowerBound}, ceiling={Ceiling}",
-            payloadName,
-            batch.IdentityScopeId ?? "legacy-guid",
-            string.Join(",", sizes),
-            maxSafeAgents,
-            isLowerBound ? "+" : string.Empty,
-            LiteNetP2PClient.SafeSinglePacketBytes);
     }
 
     private static void AddToBatch<T>(
