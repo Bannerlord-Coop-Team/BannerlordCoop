@@ -86,8 +86,34 @@ internal class GameStateInterface : IGameStateInterface
                 return;
             }
 
-            SandBoxSaveHelper.TryLoadSave(save, StartGame, null);
+            ForceLoadSave(save);
         }, blocking: true);
+    }
+
+    private void ForceLoadSave(SaveGameFileInfo save)
+    {
+        LogModuleCompatibilityMismatches(save);
+
+        SandBoxSaveHelper.LoadGameAction(save, StartGame, null);
+    }
+
+    private static void LogModuleCompatibilityMismatches(SaveGameFileInfo save)
+    {
+        try
+        {
+            foreach (var mismatch in SandBoxSaveHelper.CheckMetaDataCompatibilityErrors(save.MetaData))
+            {
+                Logger.Warning(
+                    "Save {SaveName} module mismatch: {ModuleId} ({MismatchType}). Forcing load anyway.",
+                    save.Name,
+                    mismatch.ModuleId,
+                    mismatch.Type);
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Warning(e, "Unable to evaluate module compatibility for save {SaveName}. Forcing load anyway.", save.Name);
+        }
     }
 
     private void StartGame(LoadResult loadResult)

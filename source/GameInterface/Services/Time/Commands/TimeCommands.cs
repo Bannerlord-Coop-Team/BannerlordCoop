@@ -1,6 +1,8 @@
 ﻿using Common;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Time.Interfaces;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -18,6 +20,29 @@ internal class TimeCommands
         }
 
         return $"{timeControlInterface.GetTimeControl()}";
+    }
+
+    [CommandLineArgumentFunction("set_time_mode", "coop.debug")]
+    public static string SetTimeMode(List<string> strings)
+    {
+        if (!ModInformation.IsServer)
+        {
+            return "set_time_mode must be run on the server/host.";
+        }
+
+        if (strings.Count != 1 ||
+            !Enum.TryParse(strings[0], true, out TimeControlEnum timeMode))
+        {
+            return "Usage: coop.debug.set_time_mode <Pause|Play_1x|Play_2x>";
+        }
+
+        if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface))
+        {
+            return "Failed to get time control interface";
+        }
+
+        timeControlInterface.ServerSetTimeControl(timeMode);
+        return $"Time control set to {timeControlInterface.GetTimeControl()}";
     }
 
     [CommandLineArgumentFunction("advance_time", "coop.debug")]

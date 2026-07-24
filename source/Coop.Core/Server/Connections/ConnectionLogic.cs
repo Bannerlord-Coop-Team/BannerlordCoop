@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using LiteNetLib;
@@ -26,18 +26,17 @@ public class ConnectionLogic : IConnectionLogic
 
     private readonly ConnectionContext context;
     private readonly IReadOnlyDictionary<Type, Func<IConnectionState>> stateFactories;
+    private readonly object stateGate = new object();
+    private bool disposed;
 
     public IConnectionState State
     {
-        get => _state;
-        set
+        get
         {
-            Logger.Debug("Connection is changing to {state} State", value.GetType().Name);
-            _state?.Dispose();
-            _state = value;
-            // Notify after assignment so the registry observes the new state when it recomputes
-            // how many connections are loading.
-            context.MessageBroker.Publish(this, new ConnectionStateChanged());
+            lock (stateGate)
+            {
+                return _state;
+            }
         }
     }
 
@@ -51,12 +50,29 @@ public class ConnectionLogic : IConnectionLogic
         SetState<ResolveCharacterState>();
     }
 
-    public bool IsLoading => State.IsLoading;
+    public bool IsLoading => State?.IsLoading ?? false;
 
     public TState SetState<TState>() where TState : IConnectionState
     {
         TState newState = (TState)stateFactories[typeof(TState)]();
-        State = newState;
+
+        lock (stateGate)
+        {
+            if (disposed)
+            {
+                // A state constructed concurrently with disconnect must never become current.
+                newState.Dispose();
+                return newState;
+            }
+
+            Logger.Debug("Connection is changing to {state} State", newState.GetType().Name);
+            _state?.Dispose();
+            _state = newState;
+        }
+
+        // Notify after assignment so the registry observes the new state when it recomputes
+        // how many connections are loading.
+        context.MessageBroker.Publish(this, new ConnectionStateChanged());
         return newState;
     }
 
@@ -66,13 +82,27 @@ public class ConnectionLogic : IConnectionLogic
         {
             [typeof(ResolveCharacterState)] = () => new ResolveCharacterState(this, context.MessageBroker, context.Network, context.ModuleValidator, context.PlayerManager, context.ObjectManager, context.ModuleInfoProvider, context.ExistingPlayerSender),
             [typeof(CreateCharacterState)] = () => new CreateCharacterState(this, context.ObjectManager, context.MessageBroker, context.Network, context.HeroInterface, context.PlayerManager, context.ExistingPlayerSender),
-            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.Network, context.CoopSessionProvider, context.SaveInterface, context.TimeControlInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider),
-            [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker),
+            [typeof(TransferSaveState)] = () => new TransferSaveState(this, context.Network, context.CoopSessionProvider, context.SaveInterface, context.ConnectionMessageQueue, context.Coalescer, context.AttachmentIdMapper, context.ServerOptionsProvider),
+            [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.Network, context.JoinCampaignBaselineSender, context.ConnectionMessageQueue, context.Coalescer),
             [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker),
         };
 
-    public void Dispose() => State.Dispose();
+    public void Dispose()
+    {
+        IConnectionState state;
+
+        lock (stateGate)
+        {
+            if (disposed) return;
+
+            disposed = true;
+            state = _state;
+            _state = null;
+        }
+
+        state?.Dispose();
+    }
 
     public void CreateCharacter() => State.CreateCharacter();
 
