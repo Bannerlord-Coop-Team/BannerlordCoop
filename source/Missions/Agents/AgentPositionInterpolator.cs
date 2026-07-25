@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using Missions.Agents.Packets;
+using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -33,8 +34,7 @@ public interface IAgentPositionInterpolator
 /// <summary>
 /// [Game thread] Drives received puppets toward the position their owner last reported. On-foot puppets use the
 /// engine's native target-frame path; mounted puppets are eased directly onto the owner's reported mount position
-/// each frame, since a physically-seeked horse collides with the local crowd and can't reach the owner's spot.
-/// Teleport handles large spawn/desync gaps.
+/// while visible guard presentations defer that correction. Teleport handles large spawn/desync gaps.
 /// <para>
 /// All access is on the game thread — packet applies run inside <c>AgentMovementHandler</c>'s
 /// <c>GameThread.RunSafe</c> and <see cref="Tick"/> runs in <c>OnMissionTick</c>, both serialized on the game
@@ -161,10 +161,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         agent.SetTargetPositionAndDirection(in targetPosition, in targetDirection);
     }
 
-    // Position a mounted puppet by easing its HORSE directly toward the owner's reported mount position each frame.
-    // Unlike SetTargetPositionAndDirection this does NOT physically seek/collide, so the puppet tracks the owner's
-    // exact position instead of getting wedged in the local crowd, and with no seek running the synced gait action
-    // isn't clobbered. TeleportToPosition on the mount carries its rider along.
+    // Ease the horse directly toward the owner's reported position without a physical seek. A guard presentation
+    // defers this semantic teleport because TeleportToPosition also teleports the rider and resets its components.
     private static void FollowMounted(Agent rider, TargetFrame target, float dt)
     {
         Agent mount = rider.MountAgent;
@@ -173,6 +171,13 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         Vec3 mountTarget = target.HasMountSnapPosition ? target.MountSnapPosition : target.Position;
         Vec3 cur = mount.Position;
         float distance = cur.Distance(mountTarget);
+        if (HasGuardPresentation(rider) && distance <= MountSnapDistance)
+        {
+            // Defer smoothing teleports that disturb the rider's mounted guard timeline.
+            mount.SetMovementDirection(target.MovementDirection);
+            rider.SetMovementDirection(target.MountedRiderMovementDirection);
+            return;
+        }
         if (distance <= MountedPositionEpsilon)
         {
             return;
@@ -186,6 +191,20 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         // Teleporting a horse rewrites its rider's movement direction from the rider look direction. Put the
         // owner's direction back in the same frame so the puppet does not flip on every correction.
         rider.SetMovementDirection(target.MountedRiderMovementDirection);
+    }
+
+    private static bool HasGuardPresentation(Agent rider)
+    {
+        if (AgentActionData.GetDefendMovementFlags(rider.MovementFlags)
+            != Agent.MovementControlFlag.None)
+        {
+            return true;
+        }
+
+        return AgentActionData.IsGuardPresentationAction(
+                rider.GetCurrentActionType(0))
+            || AgentActionData.IsGuardPresentationAction(
+                rider.GetCurrentActionType(1));
     }
 
     private static Vec3 ResolveDirection(Agent agent, TargetFrame target)

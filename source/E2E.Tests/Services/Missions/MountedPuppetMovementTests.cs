@@ -196,6 +196,107 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void MountedFollow_HeldGuard_DoesNotTeleportTheRiderTimeline()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            riderMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendUp;
+
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetMountedRiderTarget(
+                rider,
+                new Vec3(2f, 0f, 0f),
+                new Vec2(1f, 0f),
+                new Vec2(0f, 1f),
+                new Vec3(2f, 0f, 0f));
+
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(0, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(new Vec2(0f, 1f), horseMirror.MovementDirection);
+            Assert.Equal(new Vec2(1f, 0f), riderMirror.MovementDirection);
+
+            riderMirror.MovementFlags = Agent.MovementControlFlag.None;
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(1, horseMirror.TeleportToPositionCalls);
+        });
+    }
+
+    [Fact]
+    public void MountedFollow_GuardReaction_DoesNotTeleportTheRiderTimeline()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            riderMirror.Action1CodeType =
+                Agent.ActionCodeType.BlockedMelee;
+
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetMountedRiderTarget(
+                rider,
+                new Vec3(2f, 0f, 0f),
+                Vec2.Forward,
+                Vec2.Forward,
+                new Vec3(2f, 0f, 0f));
+
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(0, horseMirror.TeleportToPositionCalls);
+        });
+    }
+
+    [Fact]
+    public void MountedFollow_HeldGuardStillSnapsALargePositionGap()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            riderMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendUp;
+
+            var target = new Vec3(13f, 0f, 0f);
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetMountedRiderTarget(
+                rider,
+                target,
+                Vec2.Forward,
+                Vec2.Forward,
+                target);
+
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(1, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(target, horseMirror.Position);
+        });
+    }
+
+    [Fact]
     public void RemoteDismount_RestoresALocallyAuthoritativeHorseController()
     {
         using var fixture = new MissionEngineFixture();
