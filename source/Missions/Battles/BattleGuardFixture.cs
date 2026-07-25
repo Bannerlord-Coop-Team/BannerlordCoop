@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using GameInterface.Services.Battles.Messages;
 using GameInterface.Services.Entity;
+using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using System;
 using System.Collections.Generic;
@@ -17,7 +18,18 @@ public interface IBattleGuardFixture
     void Apply(NetworkBattleGuardFixtureCommand command, INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
+    void SamplePreReplayDisplayedState(
+        float dt,
+        INetworkAgentRegistry agentRegistry,
+        IAgentActionHandler actionHandler);
+    void SamplePostReplayDisplayedState(INetworkAgentRegistry agentRegistry);
     void SampleFinalDisplayedState(float dt, INetworkAgentRegistry agentRegistry);
+    void ObserveScoreHit(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        bool isBlocked,
+        in AttackCollisionData collisionData,
+        float damagedHp);
     string GetState(INetworkAgentRegistry agentRegistry);
     string GetCandidates(INetworkAgentRegistry agentRegistry, List<string> args);
     void Reset(INetworkAgentRegistry agentRegistry);
@@ -156,12 +168,20 @@ public class BattleGuardFixture : IBattleGuardFixture
                 agentRegistry,
                 roles.StrikerAgentId,
                 roles.StrikerAuthority,
-                out CoopAgentInfo strikerInfo))
+                out CoopAgentInfo strikerInfo) &&
+            TryGetExactAgent(
+                agentRegistry,
+                roles.GuardAgentId,
+                roles.GuardAuthority,
+                out CoopAgentInfo attackGuardInfo))
         {
             bool drivesStriker =
                 controllerIdProvider.ControllerId == roles.StrikerAuthority &&
                 agentRegistry.IsLocallyControlled(roles.StrikerAgentId);
-            ApplyStriker(strikerInfo.Agent, drivesStriker);
+            ApplyStriker(
+                strikerInfo.Agent,
+                attackGuardInfo.Agent,
+                drivesStriker);
         }
     }
 
@@ -186,6 +206,45 @@ public class BattleGuardFixture : IBattleGuardFixture
         TickStriker(agentRegistry);
     }
 
+    public void SamplePreReplayDisplayedState(
+        float dt,
+        INetworkAgentRegistry agentRegistry,
+        IAgentActionHandler actionHandler)
+    {
+        if (roles == null ||
+            !TryGetExactAgent(
+                agentRegistry,
+                roles.GuardAgentId,
+                roles.GuardAuthority,
+                out CoopAgentInfo info))
+        {
+            sample.ReplayEvidence.ClearPre();
+            return;
+        }
+
+        ObservePreReplayDisplayedState(
+            info.Agent,
+            info.AgentId,
+            dt,
+            actionHandler);
+    }
+
+    public void SamplePostReplayDisplayedState(INetworkAgentRegistry agentRegistry)
+    {
+        if (roles == null ||
+            !TryGetExactAgent(
+                agentRegistry,
+                roles.GuardAgentId,
+                roles.GuardAuthority,
+                out CoopAgentInfo info))
+        {
+            sample.ReplayEvidence.ClearPre();
+            return;
+        }
+
+        ObservePostReplayDisplayedState(info.Agent);
+    }
+
     public void SampleFinalDisplayedState(float dt, INetworkAgentRegistry agentRegistry)
     {
         sampleElapsed += dt;
@@ -198,7 +257,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             roles.GuardAuthority,
             out CoopAgentInfo info);
         if (hasAgent)
-            ObserveFinalDisplayedState(info.Agent);
+            ObserveFinalDisplayedState(info.Agent, dt);
         if (sampleElapsed < SampleIntervalSeconds)
             return;
 
@@ -213,6 +272,30 @@ public class BattleGuardFixture : IBattleGuardFixture
         Sample(info.Agent, info.AgentId, elapsed);
     }
 
+    public void ObserveScoreHit(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        bool isBlocked,
+        in AttackCollisionData collisionData,
+        float damagedHp)
+    {
+        if (!isBlocked ||
+            guardDriver == null ||
+            strikerDriver == null ||
+            !ReferenceEquals(affectedAgent, guardDriver.Agent) ||
+            !ReferenceEquals(affectorAgent, strikerDriver.Agent) ||
+            !IsBlockedCollision(collisionData.CollisionResult))
+        {
+            return;
+        }
+
+        sample.PairBlockedHitCount++;
+        sample.PairCollisionResult =
+            collisionData.CollisionResult.ToString();
+        sample.PairBlockedDamagedHp += damagedHp;
+        strikerDriver.StopAfterReaction();
+    }
+
     public string GetState(INetworkAgentRegistry agentRegistry)
     {
         string guard = guardDriver == null
@@ -220,31 +303,73 @@ public class BattleGuardFixture : IBattleGuardFixture
             : $"{guardDriver.AgentId}:{guardDriver.Mode}:{guardDriver.Phase}:armed={guardDriver.GuardArmed}";
         string striker = strikerDriver == null
             ? "none"
-            : $"{strikerDriver.AgentId}:positioned={strikerDriver.Positioned}";
+            : $"{strikerDriver.AgentId}:state={strikerDriver.AttackState}:attempts={strikerDriver.AttackAttempts}";
         string restore = pendingGuardRestore == null
             ? "none"
             : $"{pendingGuardRestore.AgentId}:remount";
         float visiblePercent = sample.Samples == 0
             ? 0f
             : 100f * sample.VisibleSamples / sample.Samples;
+        float plateauSpeed =
+            guardDriver?.CalibratedPlateauSpeed ?? -1f;
+        string strikeState =
+            strikerDriver?.AttackState ?? "none";
+        int strikeAttempts =
+            strikerDriver?.AttackAttempts ?? 0;
         return $"fixtureGuard={guard} fixtureStriker={striker} fixtureRestore={restore} " +
             $"trackedAgent={sample.AgentId} " +
             $"samples={sample.Samples} missing={sample.MissingSamples} visiblePct={visiblePercent:0.#} " +
             $"maxMissingGap={sample.MaxMissingGapSeconds:0.###} mounted={sample.Mounted} " +
             $"speed={sample.HorizontalSpeed:0.###} peakSpeed={sample.PeakHorizontalSpeed:0.###} " +
             $"medianSpeed={sample.GetMedianSpeed():0.###} health={sample.Health:0.###} " +
+            $"plateauReady={plateauSpeed >= 0f} plateauSpeed={plateauSpeed:0.###} " +
+            $"recentSpeed={sample.SpeedEvidence.RecentMedian:0.###} " +
+            $"recentSpeedSamples={sample.SpeedEvidence.RecentSamples} " +
+            $"recentSpeedSpread={sample.SpeedEvidence.RecentSpread:0.###} " +
+            $"recentSpeedSlope={sample.SpeedEvidence.RecentSlope:0.###} " +
             $"healthDelta={sample.HealthDelta:0.###} rawAction={sample.RawActionIndex} " +
             $"rawProgress={sample.RawProgress:0.###} guardChannel={sample.LatchedChannel} " +
             $"guardAction={sample.LatchedActionIndex} guardAnimation={sample.LatchedAnimationIndex} " +
             $"visualAction={sample.VisualActionIndex} visualAnimation={sample.VisualAnimationIndex} " +
             $"visualProgress={sample.VisualProgress:0.###} visible={sample.GuardVisible} " +
+            $"guardExactPct={sample.GuardContinuityEvidence.ExactPercent:0.#} " +
+            $"guardInterruptions={sample.GuardContinuityEvidence.Interruptions} " +
+            $"guardMaxExactRun={sample.GuardContinuityEvidence.MaxExactRunSeconds:0.###} " +
             $"reaction={sample.Reaction} reactionSamples={sample.ReactionSamples} " +
             $"reactionAction={sample.ReactionActionIndex} " +
             $"reactionAnimation={sample.ReactionAnimationIndex} " +
+            $"reactionReceivedActive={sample.ReceivedReactionActive} " +
+            $"reactionReceivedProgress={sample.ReceivedReactionProgress:0.###} " +
+            $"reactionReceivedCyclic={sample.ReceivedReactionCyclic} " +
+            $"reactionActive={sample.ReactionEvidence.Active} " +
+            $"reactionCompleted={sample.ReactionEvidence.Completed} " +
+            $"reactionInterrupted={sample.ReactionEvidence.Interrupted} " +
+            $"reactionChannel={sample.ReactionEvidence.Channel} " +
+            $"reactionOnsetSpeed={sample.ReactionEvidence.OnsetSpeed:0.###} " +
+            $"reactionVisualDuration={sample.ReactionEvidence.VisualDurationSeconds:0.###} " +
+            $"reactionMaxProgress={sample.ReactionEvidence.MaxVisualProgress:0.###} " +
+            $"pairBlockedHitCount={sample.PairBlockedHitCount} " +
+            $"pairCollisionResult={sample.PairCollisionResult} " +
+            $"pairBlockedDamagedHp={sample.PairBlockedDamagedHp:0.###} " +
+            $"pairBlockedZeroDamage={sample.PairBlockedHitCount > 0 && Math.Abs(sample.PairBlockedDamagedHp) <= ProgressEpsilon} " +
             $"visualAnimations={sample.GetVisualAnimations()} visualRuns={sample.GetVisualRuns()} " +
             $"visualProgressAdvances={sample.VisualProgressAdvances} " +
             $"visualProgressStalls={sample.VisualProgressStalls} " +
-            $"visualProgressResets={sample.VisualProgressResets} error={lastError ?? "none"}";
+            $"visualProgressResets={sample.VisualProgressResets} " +
+            $"positionVisualDelta={sample.VisualRootEvidence.PositionVisualDelta:0.###} " +
+            $"maxPositionVisualDelta={sample.VisualRootEvidence.MaxPositionVisualDelta:0.###} " +
+            $"maxVisualRootStep={sample.VisualRootEvidence.MaxVisualRootStep:0.###} " +
+            $"maxVisualRootStepRate={sample.VisualRootEvidence.MaxVisualRootStepRate:0.###} " +
+            $"replayPairedFrames={sample.ReplayEvidence.PairedFrames} " +
+            $"replayAnimationChanges={sample.ReplayEvidence.AnimationChanges} " +
+            $"replayProgressRewinds={sample.ReplayEvidence.ProgressRewinds} " +
+            $"replayMaxProgressDelta={sample.ReplayEvidence.MaxProgressDelta:0.###} " +
+            $"replayMaxSpeedDelta={sample.ReplayEvidence.MaxSpeedDelta:0.###} " +
+            $"strikeState={strikeState} strikeAttempts={strikeAttempts} " +
+            "visualTraceSchema=c:a:n:r:mr:d:md:pmin:pmax:span:adv:stall:reset:maxStep:sCur:sMin:sMax:sMean " +
+            $"preVisualTraces={sample.PreReplayAnimationEvidence.GetToken()} " +
+            $"visualTraces={sample.AnimationEvidence.GetToken()} " +
+            $"error={GetTokenValue(lastError)}";
     }
 
     public string GetCandidates(INetworkAgentRegistry agentRegistry, List<string> args)
@@ -311,6 +436,18 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"ai={agent.IsAIControlled} active={agent.IsActive()}";
     }
 
+    private static string GetTokenValue(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "none";
+
+        return value
+            .Replace(' ', '_')
+            .Replace('\t', '_')
+            .Replace('\r', '_')
+            .Replace('\n', '_');
+    }
+
     public void Reset(INetworkAgentRegistry agentRegistry)
     {
         RestoreGuard(agentRegistry);
@@ -367,7 +504,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
     }
 
-    private void ApplyStriker(Agent agent, bool drivesStriker)
+    private void ApplyStriker(
+        Agent agent,
+        Agent guard,
+        bool drivesStriker)
     {
         if (strikerDriver == null)
             strikerDriver = new StrikerDriver(roles.StrikerAgentId, agent);
@@ -382,7 +522,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (!drivesStriker)
             return;
 
-        strikerDriver.AttachAttackDriver(agent);
+        strikerDriver.AttachAttackDriver(agent, guard, guardDriver);
         ClearDefendFlags(agent, strikerDriver.OriginalMovementFlags);
     }
 
@@ -443,8 +583,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             agent.HasMount;
         bool moving =
             !dismounting &&
-            driver.Mode == BattleGuardFixtureMode.Mounted &&
-            driver.Phase != BattleGuardFixturePhase.Attack;
+            driver.Mode == BattleGuardFixtureMode.Mounted;
         bool guarding =
             !dismounting &&
             driver.Phase != BattleGuardFixturePhase.Calibration;
@@ -523,11 +662,8 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         Agent striker = strikerInfo.Agent;
         Agent guard = guardInfo.Agent;
-        if (!strikerDriver.Positioned)
-        {
-            PositionStriker(striker, guard);
-            strikerDriver.Positioned = true;
-        }
+        if (IsReaction(guard))
+            strikerDriver.StopAfterReaction();
 
         if (striker.Controller != AgentControllerType.AI)
         {
@@ -553,24 +689,6 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         driver.DetachAttackDriver(agent);
         lastError = "striker authority changed during fixture";
-    }
-
-    private static void PositionStriker(Agent striker, Agent guard)
-    {
-        Vec3 forward = guard.LookDirection;
-        forward.z = 0f;
-        if (forward.LengthSquared < 0.0001f)
-            forward = new Vec3(0f, 1f, 0f);
-        forward.Normalize();
-        Vec3 position = guard.Position + (forward * 1.25f);
-        Vec3 lookDirection = guard.Position - position;
-        lookDirection.z = 0f;
-        if (lookDirection.LengthSquared > 0.0001f)
-        {
-            lookDirection.Normalize();
-            striker.LookDirection = lookDirection;
-        }
-        striker.TeleportToPosition(position);
     }
 
     private static bool EquipFixtureWeapon(Agent agent, string itemId, out string error)
@@ -1100,7 +1218,6 @@ public class BattleGuardFixture : IBattleGuardFixture
             sample.VisualAnimationIndex = skeleton.GetAnimationIndexAtChannel(channel);
             sample.VisualProgress = skeleton.GetAnimationParameterAtChannel(channel);
             sample.GuardVisible =
-                sample.VisualActionIndex == sample.LatchedActionIndex ||
                 sample.VisualAnimationIndex == sample.LatchedAnimationIndex;
             if (sample.GuardVisible)
             {
@@ -1124,28 +1241,170 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
     }
 
-    private void ObserveFinalDisplayedState(Agent agent)
+    private void ObservePreReplayDisplayedState(
+        Agent agent,
+        Guid agentId,
+        float dt,
+        IAgentActionHandler actionHandler)
     {
-        if (sample.LatchedChannel < 0)
-            LatchGuardPresentation(agent);
-        if (IsReaction(agent))
+        int reactionChannel = -1;
+        int reactionActionIndex = -1;
+        float reactionProgress = -1f;
+        bool reactionCyclic = false;
+        bool receivedReaction = actionHandler != null &&
+            actionHandler.TryGetRetainedGuardReaction(
+                agentId,
+                out reactionChannel,
+                out reactionActionIndex,
+                out reactionProgress,
+                out reactionCyclic);
+        int reactionAnimationIndex = -1;
+        if (receivedReaction)
         {
-            sample.Reaction = true;
-            sample.ReactionSamples++;
-            if (controllerIdProvider.ControllerId == roles?.GuardAuthority)
-                CaptureOwnerReaction(agent);
+            var reactionAction =
+                new ActionIndexCache(reactionActionIndex);
+            reactionAnimationIndex =
+                MBActionSet.GetAnimationIndexOfAction(
+                    agent.ActionSet,
+                    in reactionAction);
         }
+        else if (TryGetReaction(
+                     agent,
+                     out reactionChannel,
+                     out reactionActionIndex,
+                     out reactionAnimationIndex))
+        {
+            receivedReaction = true;
+            reactionProgress =
+                agent.GetCurrentActionProgress(reactionChannel);
+            reactionCyclic =
+                (agent.GetCurrentAnimationFlag(reactionChannel) &
+                 AnimFlags.anf_cyclic) != 0;
+        }
+
+        sample.ObserveReceivedReaction(
+            receivedReaction,
+            reactionChannel,
+            reactionActionIndex,
+            reactionAnimationIndex,
+            reactionProgress,
+            reactionCyclic);
 
         Skeleton skeleton = null;
         try
         {
             MBAgentVisuals visuals = agent.AgentVisuals;
             if (ReferenceEquals(visuals, null) || !visuals.IsValid())
+            {
+                sample.ReplayEvidence.ClearPre();
                 return;
+            }
 
             skeleton = visuals.GetSkeleton();
+            if (ReferenceEquals(skeleton, null))
+            {
+                sample.ReplayEvidence.ClearPre();
+                return;
+            }
+
+            BattleGuardAnimationFrame channel0 =
+                GetAnimationFrame(agent, skeleton, 0);
+            BattleGuardAnimationFrame channel1 =
+                GetAnimationFrame(agent, skeleton, 1);
+            sample.PreReplayAnimationEvidence.ObserveFrame(
+                dt,
+                channel0,
+                channel1);
+            sample.ReplayEvidence.CapturePre(channel0, channel1);
+        }
+        catch
+        {
+            sample.ReplayEvidence.ClearPre();
+        }
+        finally
+        {
             if (!ReferenceEquals(skeleton, null))
-                ObserveVisualAnimations(skeleton);
+                skeleton.ManualInvalidate();
+        }
+    }
+
+    private void ObserveFinalDisplayedState(Agent agent, float dt)
+    {
+        if (sample.LatchedChannel < 0)
+            LatchGuardPresentation(agent);
+
+        Vec3 position = agent.Position;
+        Vec3 visualPosition = agent.VisualPosition;
+        sample.VisualRootEvidence.Observe(
+            position.x,
+            position.y,
+            position.z,
+            visualPosition.x,
+            visualPosition.y,
+            visualPosition.z,
+            dt);
+
+        if (sample.ReceivedReactionActive)
+        {
+            sample.Reaction = true;
+            sample.ReactionSamples++;
+        }
+
+        Skeleton skeleton = null;
+        bool exactReactionVisual = false;
+        bool returnedToExactGuard = false;
+        float reactionVisualProgress = -1f;
+        bool guardContinuityObserved = false;
+        try
+        {
+            MBAgentVisuals visuals = agent.AgentVisuals;
+            if (!ReferenceEquals(visuals, null) && visuals.IsValid())
+            {
+                skeleton = visuals.GetSkeleton();
+                if (!ReferenceEquals(skeleton, null))
+                {
+                    BattleGuardAnimationFrame channel0 =
+                        GetAnimationFrame(agent, skeleton, 0);
+                    BattleGuardAnimationFrame channel1 =
+                        GetAnimationFrame(agent, skeleton, 1);
+                    sample.AnimationEvidence.ObserveFrame(
+                        dt,
+                        channel0,
+                        channel1);
+                    ObserveVisualAnimations(skeleton);
+
+                    if (sample.LatchedChannel >= 0)
+                    {
+                        bool guardExact =
+                            skeleton.GetAnimationIndexAtChannel(
+                                sample.LatchedChannel) ==
+                            sample.LatchedAnimationIndex;
+                        sample.GuardContinuityEvidence.Observe(
+                            guardExact,
+                            dt);
+                        guardContinuityObserved = true;
+                    }
+
+                    if (sample.ExpectedReactionChannel >= 0)
+                    {
+                        exactReactionVisual =
+                            skeleton.GetAnimationIndexAtChannel(
+                                sample.ExpectedReactionChannel) ==
+                            sample.ExpectedReactionAnimationIndex;
+                        if (exactReactionVisual)
+                        {
+                            reactionVisualProgress =
+                                skeleton.GetAnimationParameterAtChannel(
+                                    sample.ExpectedReactionChannel);
+                        }
+                        returnedToExactGuard =
+                            sample.LatchedChannel >= 0 &&
+                            skeleton.GetAnimationIndexAtChannel(
+                                sample.LatchedChannel) ==
+                            sample.LatchedAnimationIndex;
+                    }
+                }
+            }
         }
         catch
         {
@@ -1155,22 +1414,106 @@ public class BattleGuardFixture : IBattleGuardFixture
             if (!ReferenceEquals(skeleton, null))
                 skeleton.ManualInvalidate();
         }
+
+        if (sample.LatchedChannel >= 0 && !guardContinuityObserved)
+            sample.GuardContinuityEvidence.Observe(false, dt);
+        sample.ReactionEvidence.Observe(
+            sample.ReceivedReactionActive,
+            exactReactionVisual,
+            returnedToExactGuard,
+            sample.CurrentReactionChannel,
+            sample.CurrentReactionActionIndex,
+            sample.CurrentReactionAnimationIndex,
+            reactionVisualProgress,
+            sample.VisualRootEvidence.CurrentPositionSpeed,
+            dt);
     }
 
-    private void CaptureOwnerReaction(Agent agent)
+    private void ObservePostReplayDisplayedState(Agent agent)
     {
-        for (int channel = 0; channel <= 1; channel++)
+        Skeleton skeleton = null;
+        try
+        {
+            MBAgentVisuals visuals = agent.AgentVisuals;
+            if (ReferenceEquals(visuals, null) || !visuals.IsValid())
+            {
+                sample.ReplayEvidence.ClearPre();
+                return;
+            }
+
+            skeleton = visuals.GetSkeleton();
+            if (ReferenceEquals(skeleton, null))
+            {
+                sample.ReplayEvidence.ClearPre();
+                return;
+            }
+
+            BattleGuardAnimationFrame channel0 =
+                GetAnimationFrame(agent, skeleton, 0);
+            BattleGuardAnimationFrame channel1 =
+                GetAnimationFrame(agent, skeleton, 1);
+            sample.ReplayEvidence.ObservePost(
+                channel0,
+                channel1);
+        }
+        catch
+        {
+            sample.ReplayEvidence.ClearPre();
+        }
+        finally
+        {
+            if (!ReferenceEquals(skeleton, null))
+                skeleton.ManualInvalidate();
+        }
+    }
+
+    private BattleGuardAnimationFrame GetAnimationFrame(
+        Agent agent,
+        Skeleton skeleton,
+        int channel)
+    {
+        int animationIndex =
+            skeleton.GetAnimationIndexAtChannel(channel);
+        bool isCyclic =
+            (agent.GetCurrentAnimationFlag(channel) &
+             AnimFlags.anf_cyclic) != 0;
+        if (channel == sample.ExpectedReactionChannel &&
+            animationIndex == sample.ExpectedReactionAnimationIndex)
+        {
+            isCyclic = sample.ExpectedReactionCyclic;
+        }
+
+        return new BattleGuardAnimationFrame(
+            channel,
+            animationIndex,
+            skeleton.GetAnimationParameterAtChannel(channel),
+            skeleton.GetAnimationSpeedAtChannel(channel),
+            isCyclic);
+    }
+
+    private static bool TryGetReaction(
+        Agent agent,
+        out int channel,
+        out int actionIndex,
+        out int animationIndex)
+    {
+        for (channel = 0; channel <= 1; channel++)
         {
             if (!IsReaction(agent.GetCurrentActionType(channel)))
                 continue;
 
             ActionIndexCache action = agent.GetCurrentAction(channel);
-            sample.ReactionActionIndex = action.Index;
-            sample.ReactionAnimationIndex = MBActionSet.GetAnimationIndexOfAction(
+            actionIndex = action.Index;
+            animationIndex = MBActionSet.GetAnimationIndexOfAction(
                 agent.ActionSet,
                 in action);
-            return;
+            return true;
         }
+
+        channel = -1;
+        actionIndex = -1;
+        animationIndex = -1;
+        return false;
     }
 
     private void ObserveVisualAnimations(Skeleton skeleton)
@@ -1264,7 +1607,26 @@ public class BattleGuardFixture : IBattleGuardFixture
             sample.HorizontalSpeed = elapsed > 0f ? delta.Length / elapsed : 0f;
             if (sample.HorizontalSpeed > sample.PeakHorizontalSpeed)
                 sample.PeakHorizontalSpeed = sample.HorizontalSpeed;
-            sample.SpeedSamples.Add(sample.HorizontalSpeed);
+            sample.SpeedEvidence.Observe(
+                sample.HorizontalSpeed,
+                elapsed);
+            if (guardDriver != null)
+            {
+                guardDriver.CurrentHorizontalSpeed =
+                    sample.HorizontalSpeed;
+                if (delta.LengthSquared > 0.0001f)
+                {
+                    delta.Normalize();
+                    guardDriver.CurrentHorizontalDirection = delta;
+                }
+                if (guardDriver.Phase ==
+                        BattleGuardFixturePhase.Calibration &&
+                    sample.SpeedEvidence.PlateauReady)
+                {
+                    guardDriver.CalibratedPlateauSpeed =
+                        sample.SpeedEvidence.RecentMedian;
+                }
+            }
         }
         sample.PreviousPosition = agent.Position;
         sample.HasPreviousPosition = true;
@@ -1280,6 +1642,14 @@ public class BattleGuardFixture : IBattleGuardFixture
     {
         return actionType == Agent.ActionCodeType.BlockedMelee ||
             actionType == Agent.ActionCodeType.ParriedMelee;
+    }
+
+    private static bool IsBlockedCollision(
+        CombatCollisionResult collisionResult)
+    {
+        return collisionResult == CombatCollisionResult.Blocked ||
+            collisionResult == CombatCollisionResult.Parried ||
+            collisionResult == CombatCollisionResult.ChamberBlocked;
     }
 
     private sealed class AiPauseState
@@ -1419,6 +1789,9 @@ public class BattleGuardFixture : IBattleGuardFixture
         public bool Positioned { get; set; }
         public float GuardBaselineHealth { get; set; }
         public bool HasGuardBaselineHealth { get; set; }
+        public float CurrentHorizontalSpeed { get; set; }
+        public Vec3 CurrentHorizontalDirection { get; set; }
+        public float CalibratedPlateauSpeed { get; set; } = -1f;
         public bool DrivesAgent { get; private set; }
         private int guardChannel = -1;
         private int guardActionIndex = -1;
@@ -1504,10 +1877,13 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Vec3 OriginalPosition { get; }
         public Vec3 OriginalLookDirection { get; }
         public bool EquipmentReplaced { get; set; }
-        public bool Positioned { get; set; }
         public bool HasAttackDriver => attackDriver != null;
+        public string AttackState =>
+            attackDriver?.State ?? "none";
+        public int AttackAttempts =>
+            attackDriver?.Attempts ?? 0;
         private readonly bool originalHasOnAiInputSetCallback;
-        private ForcedUpwardStrikeComponent attackDriver;
+        private GuardInterceptionStrikeComponent attackDriver;
 
         public StrikerDriver(Guid agentId, Agent agent)
         {
@@ -1529,14 +1905,25 @@ public class BattleGuardFixture : IBattleGuardFixture
                 agent.GetHasOnAiInputSetCallback();
         }
 
-        public void AttachAttackDriver(Agent agent)
+        public void AttachAttackDriver(
+            Agent agent,
+            Agent guard,
+            GuardDriver guardDriver)
         {
             if (attackDriver != null)
                 return;
 
-            attackDriver = new ForcedUpwardStrikeComponent(agent);
+            attackDriver = new GuardInterceptionStrikeComponent(
+                agent,
+                guard,
+                guardDriver);
             agent.AddComponent(attackDriver);
             agent.SetHasOnAiInputSetCallback(true);
+        }
+
+        public void StopAfterReaction()
+        {
+            attackDriver?.StopAfterReaction();
         }
 
         public void DetachAttackDriver(Agent agent)
@@ -1551,22 +1938,78 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
     }
 
-    private sealed class ForcedUpwardStrikeComponent : AgentComponent
+    private sealed class GuardInterceptionStrikeComponent : AgentComponent
     {
         private const float AttackPressSeconds = 0.35f;
-        private const float AttackCycleSeconds = 1f;
-        private float attackElapsed;
+        private const float ReleaseLeadSeconds = 0.25f;
+        private const float MaximumChargeSeconds = 2.5f;
+        private const float OutcomeWaitSeconds = 1.25f;
+        private const float MaximumOutcomeWaitSeconds = 2.5f;
+        private const float RetryRecoverySeconds = 0.5f;
+        private const float LateralOffset = 1.15f;
+        private const float MinimumLeadDistance = 6f;
+        private const float MaximumLeadDistance = 10f;
+        private const int MaximumAttempts = 5;
 
-        public ForcedUpwardStrikeComponent(Agent agent)
-            : base(agent)
+        public string State => state.ToString();
+        public int Attempts { get; private set; }
+
+        private readonly Agent striker;
+        private readonly Agent guard;
+        private readonly GuardDriver guardDriver;
+        private InterceptionState state = InterceptionState.WaitingForSpeed;
+        private Vec3 laneDirection;
+        private Vec3 contactPoint;
+        private float stateElapsed;
+
+        public GuardInterceptionStrikeComponent(
+            Agent striker,
+            Agent guard,
+            GuardDriver guardDriver)
+            : base(striker)
         {
+            this.striker = striker;
+            this.guard = guard;
+            this.guardDriver = guardDriver;
         }
 
         public override void OnTick(float dt)
         {
-            attackElapsed += dt;
-            if (attackElapsed >= AttackCycleSeconds)
-                attackElapsed -= AttackCycleSeconds;
+            if (state == InterceptionState.Succeeded ||
+                state == InterceptionState.Exhausted)
+            {
+                return;
+            }
+            if (!IsActiveMissionAgent(striker) ||
+                !IsActiveMissionAgent(guard))
+            {
+                state = InterceptionState.Exhausted;
+                return;
+            }
+            if (IsReaction(guard))
+            {
+                StopAfterReaction();
+                return;
+            }
+
+            stateElapsed += Math.Max(0f, dt);
+            switch (state)
+            {
+                case InterceptionState.WaitingForSpeed:
+                    if (CanStageAttempt())
+                        StageAttempt();
+                    break;
+                case InterceptionState.Charging:
+                    TickCharging();
+                    break;
+                case InterceptionState.Released:
+                    TickReleased();
+                    break;
+                case InterceptionState.Recovery:
+                    if (stateElapsed >= RetryRecoverySeconds)
+                        BeginNextAttempt();
+                    break;
+            }
         }
 
         public override void OnAIInputSet(
@@ -1575,10 +2018,181 @@ public class BattleGuardFixture : IBattleGuardFixture
             ref Vec2 inputVector)
         {
             eventFlag = Agent.EventControlFlag.None;
-            movementFlag = attackElapsed < AttackPressSeconds
+            movementFlag = state == InterceptionState.Charging
                 ? Agent.MovementControlFlag.AttackUp
                 : Agent.MovementControlFlag.None;
             inputVector = Vec2.Zero;
+        }
+
+        public void StopAfterReaction()
+        {
+            state = InterceptionState.Succeeded;
+            stateElapsed = 0f;
+        }
+
+        private bool CanStageAttempt()
+        {
+            if (Attempts >= MaximumAttempts)
+                return false;
+            if (guardDriver.Mode != BattleGuardFixtureMode.Mounted)
+                return true;
+            if (!guard.HasMount)
+                return false;
+
+            float calibratedSpeed =
+                guardDriver.CalibratedPlateauSpeed;
+            if (calibratedSpeed <= 0f)
+                return false;
+            float minimumSpeed = calibratedSpeed * 0.95f;
+            return guardDriver.CurrentHorizontalSpeed >= minimumSpeed;
+        }
+
+        private void StageAttempt()
+        {
+            Attempts++;
+            stateElapsed = 0f;
+            if (guardDriver.Mode == BattleGuardFixtureMode.Mounted)
+                StageMountedInterception();
+            else
+                StageFootStrike();
+            state = InterceptionState.Charging;
+        }
+
+        private void StageMountedInterception()
+        {
+            laneDirection = GetHorizontalDirection(
+                guardDriver.CurrentHorizontalDirection);
+            float speed = Math.Max(
+                1f,
+                guardDriver.CurrentHorizontalSpeed);
+            float leadDistance = Math.Max(
+                MinimumLeadDistance,
+                Math.Min(MaximumLeadDistance, speed * 0.85f));
+            contactPoint = guard.Position + (laneDirection * leadDistance);
+
+            var lateral = new Vec3(
+                laneDirection.y,
+                -laneDirection.x,
+                0f);
+            Vec3 strikerPosition =
+                contactPoint + (lateral * LateralOffset);
+            SetGroundHeight(ref strikerPosition);
+            striker.TeleportToPosition(strikerPosition);
+            FacePoint(striker, contactPoint);
+        }
+
+        private void StageFootStrike()
+        {
+            laneDirection = GetHorizontalDirection(guard.LookDirection);
+            contactPoint = guard.Position;
+            Vec3 strikerPosition =
+                contactPoint + (laneDirection * 1.25f);
+            SetGroundHeight(ref strikerPosition);
+            striker.TeleportToPosition(strikerPosition);
+            FacePoint(striker, contactPoint);
+        }
+
+        private void TickCharging()
+        {
+            if (stateElapsed < AttackPressSeconds)
+                return;
+            if (guardDriver.Mode != BattleGuardFixtureMode.Mounted)
+            {
+                ReleaseAttack();
+                return;
+            }
+
+            float longitudinalDistance = GetLongitudinalDistance();
+            float speed = Math.Max(
+                0.1f,
+                guardDriver.CurrentHorizontalSpeed);
+            float timeToContact = longitudinalDistance / speed;
+            if (timeToContact <= ReleaseLeadSeconds ||
+                stateElapsed >= MaximumChargeSeconds)
+            {
+                ReleaseAttack();
+            }
+        }
+
+        private void TickReleased()
+        {
+            bool passedContact =
+                guardDriver.Mode != BattleGuardFixtureMode.Mounted ||
+                GetLongitudinalDistance() < -1f;
+            if ((stateElapsed >= OutcomeWaitSeconds && passedContact) ||
+                stateElapsed >= MaximumOutcomeWaitSeconds)
+            {
+                RecordMiss();
+            }
+        }
+
+        private void ReleaseAttack()
+        {
+            state = InterceptionState.Released;
+            stateElapsed = 0f;
+        }
+
+        private void RecordMiss()
+        {
+            state = InterceptionState.Recovery;
+            stateElapsed = 0f;
+        }
+
+        private void BeginNextAttempt()
+        {
+            if (Attempts >= MaximumAttempts)
+            {
+                state = InterceptionState.Exhausted;
+                stateElapsed = 0f;
+                return;
+            }
+
+            state = InterceptionState.WaitingForSpeed;
+            stateElapsed = 0f;
+        }
+
+        private float GetLongitudinalDistance()
+        {
+            Vec3 delta = contactPoint - guard.Position;
+            delta.z = 0f;
+            return Vec3.DotProduct(delta, laneDirection);
+        }
+
+        private static Vec3 GetHorizontalDirection(Vec3 direction)
+        {
+            direction.z = 0f;
+            if (direction.LengthSquared < 0.0001f)
+                direction = new Vec3(0f, 1f, 0f);
+            direction.Normalize();
+            return direction;
+        }
+
+        private static void SetGroundHeight(ref Vec3 position)
+        {
+            Scene scene = Mission.Current?.Scene;
+            if (scene != null)
+                position.z = scene.GetGroundHeightAtPosition(position);
+        }
+
+        private static void FacePoint(Agent agent, Vec3 point)
+        {
+            Vec3 lookDirection = point - agent.Position;
+            lookDirection.z = 0f;
+            if (lookDirection.LengthSquared < 0.0001f)
+                return;
+
+            lookDirection.Normalize();
+            agent.LookDirection = lookDirection;
+        }
+
+        private enum InterceptionState
+        {
+            WaitingForSpeed,
+            Charging,
+            Released,
+            Recovery,
+            Succeeded,
+            Exhausted
         }
     }
 
@@ -1591,7 +2205,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         public bool Mounted;
         public float HorizontalSpeed;
         public float PeakHorizontalSpeed;
-        public readonly List<float> SpeedSamples = new();
+        public readonly BattleGuardSpeedEvidence SpeedEvidence = new();
         public float Health;
         public float BaselineHealth;
         public bool HasBaselineHealth;
@@ -1612,16 +2226,63 @@ public class BattleGuardFixture : IBattleGuardFixture
         public int ReactionSamples;
         public int ReactionActionIndex = -1;
         public int ReactionAnimationIndex = -1;
+        public bool ReceivedReactionActive;
+        public int CurrentReactionChannel = -1;
+        public int CurrentReactionActionIndex = -1;
+        public int CurrentReactionAnimationIndex = -1;
+        public int ExpectedReactionChannel = -1;
+        public int ExpectedReactionActionIndex = -1;
+        public int ExpectedReactionAnimationIndex = -1;
+        public bool ExpectedReactionCyclic;
+        public float ReceivedReactionProgress = -1f;
+        public bool ReceivedReactionCyclic;
+        public int PairBlockedHitCount;
+        public string PairCollisionResult = "none";
+        public float PairBlockedDamagedHp;
         public readonly HashSet<int> VisualAnimations = new();
         public readonly Dictionary<int, int> CurrentVisualRuns = new();
         public readonly Dictionary<int, int> MaxVisualRuns = new();
         public int VisualProgressAdvances;
         public int VisualProgressStalls;
         public int VisualProgressResets;
+        public readonly BattleGuardAnimationEvidence
+            PreReplayAnimationEvidence = new();
+        public readonly BattleGuardAnimationEvidence AnimationEvidence = new();
+        public readonly BattleGuardReplayEvidence ReplayEvidence = new();
+        public readonly BattleGuardContinuityEvidence
+            GuardContinuityEvidence = new();
+        public readonly BattleGuardReactionEvidence ReactionEvidence = new();
+        public readonly BattleGuardVisualRootEvidence
+            VisualRootEvidence = new();
         public Vec3 PreviousPosition;
         public bool HasPreviousPosition;
         public float PreviousVisualProgress;
         public bool HasPreviousVisualProgress;
+
+        public void ObserveReceivedReaction(
+            bool active,
+            int channel,
+            int actionIndex,
+            int animationIndex,
+            float progress,
+            bool isCyclic)
+        {
+            ReceivedReactionActive = active;
+            CurrentReactionChannel = active ? channel : -1;
+            CurrentReactionActionIndex = active ? actionIndex : -1;
+            CurrentReactionAnimationIndex = active ? animationIndex : -1;
+            ReceivedReactionProgress = active ? progress : -1f;
+            ReceivedReactionCyclic = active && isCyclic;
+            if (!active || ExpectedReactionAnimationIndex >= 0)
+                return;
+
+            ExpectedReactionChannel = channel;
+            ExpectedReactionActionIndex = actionIndex;
+            ExpectedReactionAnimationIndex = animationIndex;
+            ExpectedReactionCyclic = isCyclic;
+            ReactionActionIndex = actionIndex;
+            ReactionAnimationIndex = animationIndex;
+        }
 
         public void MarkMissing(float elapsed)
         {
@@ -1634,15 +2295,7 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         public float GetMedianSpeed()
         {
-            if (SpeedSamples.Count == 0)
-                return 0f;
-
-            var sorted = new List<float>(SpeedSamples);
-            sorted.Sort();
-            int middle = sorted.Count / 2;
-            return sorted.Count % 2 == 0
-                ? (sorted[middle - 1] + sorted[middle]) / 2f
-                : sorted[middle];
+            return SpeedEvidence.Median;
         }
 
         public string GetVisualAnimations()

@@ -252,7 +252,17 @@ public class CoopBattleController : CoopMissionController
 
     public override void OnPreDisplayMissionTick(float dt)
     {
+#if DEBUG
+        guardFixture.SamplePreReplayDisplayedState(
+            dt,
+            coopMissionComponent.AgentRegistry,
+            coopMissionComponent.AgentActionHandler);
+#endif
         base.OnPreDisplayMissionTick(dt);
+#if DEBUG
+        guardFixture.SamplePostReplayDisplayedState(
+            coopMissionComponent.AgentRegistry);
+#endif
         damageRouter.Tick(dt);
 #if DEBUG
         guardFixture.SampleFinalDisplayedState(dt, coopMissionComponent.AgentRegistry);
@@ -338,6 +348,39 @@ public class CoopBattleController : CoopMissionController
         base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
 
         deathReporter.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+    }
+
+    public override void OnScoreHit(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        WeaponComponentData attackerWeapon,
+        bool isBlocked,
+        bool isSiegeEngineHit,
+        in Blow blow,
+        in AttackCollisionData collisionData,
+        float damagedHp,
+        float hitDistance,
+        float shotDifficulty)
+    {
+        base.OnScoreHit(
+            affectedAgent,
+            affectorAgent,
+            attackerWeapon,
+            isBlocked,
+            isSiegeEngineHit,
+            in blow,
+            in collisionData,
+            damagedHp,
+            hitDistance,
+            shotDifficulty);
+#if DEBUG
+        guardFixture.ObserveScoreHit(
+            affectedAgent,
+            affectorAgent,
+            isBlocked,
+            in collisionData,
+            damagedHp);
+#endif
     }
 
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the

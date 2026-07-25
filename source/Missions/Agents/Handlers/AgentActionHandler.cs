@@ -30,6 +30,14 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 
     /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
+#if DEBUG
+    bool TryGetRetainedGuardReaction(
+        Guid agentId,
+        out int channel,
+        out int actionIndex,
+        out float progress,
+        out bool isCyclic);
+#endif
 }
 
 /// <summary>
@@ -375,6 +383,23 @@ public class AgentActionHandler : IAgentActionHandler
     {
         remoteActionProcessor.ReplayRemoteGuardReactions(dt);
     }
+
+#if DEBUG
+    public bool TryGetRetainedGuardReaction(
+        Guid agentId,
+        out int channel,
+        out int actionIndex,
+        out float progress,
+        out bool isCyclic)
+    {
+        return remoteActionProcessor.TryGetRetainedGuardReaction(
+            agentId,
+            out channel,
+            out actionIndex,
+            out progress,
+            out isCyclic);
+    }
+#endif
 
     private void Handle_BattleHostAssigned(
         MessagePayload<NetworkBattleHostAssigned> payload)

@@ -21,6 +21,14 @@ public interface IRemoteAgentActionProcessor : IDisposable
     void ReplayRemoteGuardReactions(float dt);
     void Receive(AgentActionPacket packet);
     void HandleBattleHostAssigned(NetworkBattleHostAssigned message);
+#if DEBUG
+    bool TryGetRetainedGuardReaction(
+        Guid agentId,
+        out int channel,
+        out int actionIndex,
+        out float progress,
+        out bool isCyclic);
+#endif
 }
 
 public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
@@ -107,7 +115,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             GuardActionProgress = guardActionChannel == 0
                 ? action.Data.Action0Progress
                 : action.Data.Action1Progress;
-            HasGuardCommand = previousGuard?.HasGuardCommand ?? false;
+            HasGuardCommand = DrivesMountedReactionPresentation
+                ? false
+                : previousGuard?.HasGuardCommand ?? false;
             LastCommandedGuardMode = previousGuard?.LastCommandedGuardMode
                 ?? Agent.GuardMode.None;
             LastCommandedMountIndex = previousGuard?.LastCommandedMountIndex
@@ -263,6 +273,42 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             dt: dt);
     }
 
+#if DEBUG
+    public bool TryGetRetainedGuardReaction(
+        Guid agentId,
+        out int channel,
+        out int actionIndex,
+        out float progress,
+        out bool isCyclic)
+    {
+        channel = -1;
+        actionIndex = -1;
+        progress = -1f;
+        isCyclic = false;
+        if (!_agentStates.TryGetValue(
+                agentId,
+                out RemoteAgentActionState state) ||
+            !state.RetainedGuard.HasValue)
+        {
+            return false;
+        }
+
+        RemoteGuardState guard = state.RetainedGuard.Value;
+        if (!guard.DrivesMountedReactionPresentation ||
+            guard.GuardActionChannel < 0 ||
+            guard.GuardAction == ActionIndexCache.act_none)
+        {
+            return false;
+        }
+
+        channel = guard.GuardActionChannel;
+        actionIndex = guard.GuardAction.Index;
+        progress = guard.GuardActionProgress;
+        isCyclic = guard.IsGuardActionCyclic;
+        return true;
+    }
+#endif
+
     private void ApplyRetainedRemoteGuardStates(
         bool replayGuardAction,
         float dt)
@@ -321,6 +367,12 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                         ref guardState,
                         restoreNativeGuardState:
                             data.IsPlayerControlled || !agent.HasMount);
+                }
+
+                if (replayGuardAction
+                    && HasGuardReactionAction(agent))
+                {
+                    guardState.HasGuardCommand = false;
                 }
 
                 if (replayGuardAction
@@ -807,7 +859,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
-        if (HasGuardReactionAction(agent))
+        if (HasGuardReactionAction(agent)
+            || guardState.DrivesMountedReactionPresentation)
         {
             return;
         }
@@ -822,6 +875,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && guardState.LastCommandedGuardMode != guardMode;
         bool nativeGuardStateMissing =
             restoreNativeGuardState
+            && !agent.HasMount
             && agent.CurrentGuardMode != guardMode
             && !HasDefendingAction(agent);
 
