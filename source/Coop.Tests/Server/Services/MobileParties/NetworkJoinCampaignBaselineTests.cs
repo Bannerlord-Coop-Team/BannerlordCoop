@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Serialization;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Surrogates;
 using System;
@@ -60,11 +61,15 @@ public class NetworkJoinCampaignBaselineTests
             StartTransitionNextFrameToExitFromPort = true,
             ForceAiNoPathMode = true,
         };
-        var expected = new NetworkJoinCampaignBaseline(987654321L, new[] { state });
+        var expected = new NetworkJoinCampaignBaseline(
+            987654321L,
+            TimeControlEnum.Play_2x,
+            new[] { state });
 
         var received = RoundTrip(expected);
 
         Assert.Equal(expected.ServerTicks, received.ServerTicks);
+        Assert.Equal(expected.TimeControlMode, received.TimeControlMode);
         Assert.True(received.IsComplete);
         Assert.Single(received.PartyStates);
     }
@@ -74,6 +79,7 @@ public class NetworkJoinCampaignBaselineTests
     {
         var message = new NetworkJoinCampaignBaseline(
             123L,
+            TimeControlEnum.Play_1x,
             Array.Empty<MobilePartyJoinState>(),
             isComplete: false);
 

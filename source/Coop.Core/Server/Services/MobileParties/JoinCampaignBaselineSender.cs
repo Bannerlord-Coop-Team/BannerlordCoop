@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Network;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.Time.Interfaces;
 using LiteNetLib;
@@ -23,15 +24,18 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
     private readonly INetwork network;
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
+    private readonly ITimeControlInterface timeControlInterface;
 
     public JoinCampaignBaselineSender(
         INetwork network,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
-        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
+        ITimeControlInterface timeControlInterface)
     {
         this.network = network;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
         this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
+        this.timeControlInterface = timeControlInterface;
     }
 
     public void Send(NetPeer peer)
@@ -64,6 +68,10 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
 
         network.SendImmediate(
             peer,
-            new NetworkJoinCampaignBaseline(serverTicks, partyStates, isComplete));
+            new NetworkJoinCampaignBaseline(
+                serverTicks,
+                timeControlInterface.GetTimeControl(),
+                partyStates,
+                isComplete));
     }
 }

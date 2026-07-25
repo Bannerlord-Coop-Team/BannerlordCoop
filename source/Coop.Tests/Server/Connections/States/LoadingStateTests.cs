@@ -10,6 +10,7 @@ using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.MobileParties.Data;
 using LiteNetLib;
 using Moq;
@@ -132,7 +133,10 @@ namespace Coop.Tests.Server.Connections.States
                 .Setup(sender => sender.Send(playerPeer))
                 .Callback(() => serverComponent.TestNetwork.SendImmediate(
                     playerPeer,
-                    new NetworkJoinCampaignBaseline(123L, Array.Empty<MobilePartyJoinState>())));
+                    new NetworkJoinCampaignBaseline(
+                        123L,
+                        TimeControlEnum.Play_1x,
+                        Array.Empty<MobilePartyJoinState>())));
             StartReplay(state);
             var beforeAck = serverComponent.TestNetwork.GetPeerMessages(playerPeer).ToArray();
             Assert.Equal(
