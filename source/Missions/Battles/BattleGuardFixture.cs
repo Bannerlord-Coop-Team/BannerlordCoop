@@ -40,7 +40,8 @@ public interface IBattleGuardFixture
 public class BattleGuardFixture : IBattleGuardFixture
 {
     private const string GuardWeaponId = "empire_lance_1_t3_blunt";
-    private const string StrikerWeaponId = "empire_sword_1_t2_blunt";
+    private const string FootStrikerWeaponId = "empire_sword_1_t2_blunt";
+    private const string MountedStrikerWeaponId = "empire_menavlion_1_t3_blunt";
     private const float SampleIntervalSeconds = 0.05f;
     private const float ProgressEpsilon = 0.001f;
     private const float FixtureLaneOffset = 25f;
@@ -646,9 +647,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         Agent agent,
         bool drivesGuard)
     {
-        bool phaseChanged =
-            guardDriver != null
-            && guardDriver.Phase != command.Phase;
         if (guardDriver == null)
             guardDriver = new GuardDriver(command.GuardAgentId, command.Mode, command.Phase, agent);
         else
@@ -656,8 +654,6 @@ public class BattleGuardFixture : IBattleGuardFixture
             guardDriver.Mode = command.Mode;
             guardDriver.Phase = command.Phase;
         }
-        if (phaseChanged)
-            guardDriver.Positioned = false;
 
         if (!guardDriver.EquipmentReplaced &&
             !EquipFixtureWeapon(agent, GuardWeaponId, out string error))
@@ -691,8 +687,12 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (strikerDriver == null)
             strikerDriver = new StrikerDriver(roles.StrikerAgentId, agent);
 
+        string weaponId =
+            guardDriver.Mode == BattleGuardFixtureMode.Mounted
+                ? MountedStrikerWeaponId
+                : FootStrikerWeaponId;
         if (!strikerDriver.EquipmentReplaced &&
-            !EquipFixtureWeapon(agent, StrikerWeaponId, out string error))
+            !EquipFixtureWeapon(agent, weaponId, out string error))
         {
             lastError = error;
             return;
@@ -2246,11 +2246,13 @@ public class BattleGuardFixture : IBattleGuardFixture
     private sealed class GuardInterceptionStrikeComponent : AgentComponent
     {
         private const float AttackPressSeconds = 0.35f;
-        private const float ReleaseLeadSeconds = 0.25f;
+        private const float ReleaseLeadSeconds = 0.5f;
         private const float MaximumChargeSeconds = 2.5f;
         private const float OutcomeWaitSeconds = 1.25f;
         private const float MaximumOutcomeWaitSeconds = 2.5f;
         private const float RetryRecoverySeconds = 0.5f;
+        private const float MountedSpeedReadySeconds = 0.5f;
+        private const float MinimumMountedStrikeSpeed = 5f;
         private const float LateralOffset = 1.15f;
         private const float MinimumLeadDistance = 6f;
         private const float MaximumLeadDistance = 10f;
@@ -2301,8 +2303,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             switch (state)
             {
                 case InterceptionState.WaitingForSpeed:
-                    if (CanStageAttempt())
-                        StageAttempt();
+                    TickWaitingForSpeed();
                     break;
                 case InterceptionState.Charging:
                     TickCharging();
@@ -2335,21 +2336,25 @@ public class BattleGuardFixture : IBattleGuardFixture
             stateElapsed = 0f;
         }
 
-        private bool CanStageAttempt()
+        private void TickWaitingForSpeed()
         {
             if (Attempts >= MaximumAttempts)
-                return false;
+                return;
             if (guardDriver.Mode != BattleGuardFixtureMode.Mounted)
-                return true;
-            if (!guard.HasMount)
-                return false;
+            {
+                StageAttempt();
+                return;
+            }
+            if (!guard.HasMount ||
+                guardDriver.CurrentHorizontalSpeed <
+                    MinimumMountedStrikeSpeed)
+            {
+                stateElapsed = 0f;
+                return;
+            }
 
-            float calibratedSpeed =
-                guardDriver.CalibratedPlateauSpeed;
-            if (calibratedSpeed <= 0f)
-                return false;
-            float minimumSpeed = calibratedSpeed * 0.95f;
-            return guardDriver.CurrentHorizontalSpeed >= minimumSpeed;
+            if (stateElapsed >= MountedSpeedReadySeconds)
+                StageAttempt();
         }
 
         private void StageAttempt()

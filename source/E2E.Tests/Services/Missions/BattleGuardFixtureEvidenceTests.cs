@@ -264,6 +264,38 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(0f, evidence.RecentSlope);
     }
 
+    [Fact]
+    public void SpeedEvidence_EndpointGaitNoise_DoesNotCreateFalseSlope()
+    {
+        var evidence = new BattleGuardSpeedEvidence();
+
+        for (int index = 0; index < 40; index++)
+        {
+            float speed = index switch
+            {
+                0 => 8.4f,
+                39 => 7.6f,
+                _ => 8f
+            };
+            evidence.Observe(speed, 0.05f);
+        }
+
+        Assert.True(evidence.PlateauReady);
+        Assert.InRange(evidence.RecentSlope, -0.1f, 0.1f);
+    }
+
+    [Fact]
+    public void SpeedEvidence_SustainedTrend_DoesNotReachPlateau()
+    {
+        var evidence = new BattleGuardSpeedEvidence();
+
+        for (int index = 0; index < 40; index++)
+            evidence.Observe(8.5f - (index / 39f), 0.05f);
+
+        Assert.False(evidence.PlateauReady);
+        Assert.True(evidence.RecentSlope < -0.35f);
+    }
+
     private static BattleGuardAnimationFrame Frame(
         int channel,
         int animationIndex,

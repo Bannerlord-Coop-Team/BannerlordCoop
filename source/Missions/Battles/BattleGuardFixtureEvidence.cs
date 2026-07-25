@@ -343,10 +343,33 @@ internal sealed class BattleGuardSpeedEvidence
         {
             if (recentSpeeds.Count < 2 || recentDuration <= 0f)
                 return 0f;
-            return
-                (recentSpeeds[recentSpeeds.Count - 1].Speed -
-                 recentSpeeds[0].Speed) /
-                recentDuration;
+
+            double elapsed = 0d;
+            double sumTime = 0d;
+            double sumSpeed = 0d;
+            foreach (TimedSpeed sample in recentSpeeds)
+            {
+                elapsed += sample.Elapsed;
+                sumTime += elapsed;
+                sumSpeed += sample.Speed;
+            }
+
+            double meanTime = sumTime / recentSpeeds.Count;
+            double meanSpeed = sumSpeed / recentSpeeds.Count;
+            double covariance = 0d;
+            double timeVariance = 0d;
+            elapsed = 0d;
+            foreach (TimedSpeed sample in recentSpeeds)
+            {
+                elapsed += sample.Elapsed;
+                double timeDelta = elapsed - meanTime;
+                covariance += timeDelta * (sample.Speed - meanSpeed);
+                timeVariance += timeDelta * timeDelta;
+            }
+
+            return timeVariance <= double.Epsilon
+                ? 0f
+                : (float)(covariance / timeVariance);
         }
     }
     public bool PlateauReady =>
