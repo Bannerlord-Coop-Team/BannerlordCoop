@@ -2,6 +2,7 @@
 using GameInterface.Services;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -28,7 +29,7 @@ public readonly struct SideReserve
 /// <summary>
 /// [Server] Builds the authoritative <see cref="IBattleTroopLedger"/> for a battle by flattening every
 /// party's roster once (the server owns the resulting descriptor seeds), and resolves which reserves a given
-/// controller owns: its own party always, plus — when it is the host — every AI/enemy party that no connected
+/// controller owns: its own party always, plus — when it is the host — every AI/enemy party that no present
 /// player owns. The host handler sends those reserves to the entering client to feed its troop supplier.
 /// </summary>
 public interface IBattleTroopReserveBuilder : IGameAbstraction
@@ -36,11 +37,13 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
     /// <summary>
     /// The reserves <paramref name="controllerId"/> currently owns. A party whose resolved owning controller
     /// is in <paramref name="absentControllers"/> (a member explicitly marked absent without withdrawing) is
-    /// treated as unowned, so it falls to the host. Player registrations survive that absence, so ownership
-    /// alone cannot see it — the absent set is what re-scopes the party.
+    /// treated as unowned, so it falls to the host. <paramref name="presentControllers"/> limits player
+    /// ownership to connected or entered battle participants, preventing a stale registration from claiming
+    /// a reserve.
     /// </summary>
     IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost,
-        IReadOnlyCollection<string> absentControllers = null);
+        IReadOnlyCollection<string> absentControllers = null,
+        IReadOnlyCollection<string> presentControllers = null);
 
     /// <summary>Forget a controller's withdrawn parties: drop them from the ledger and the built-set so that,
     /// if it rejoins, its party is re-flattened fresh (supplied pointer reset) and re-spawns.</summary>
@@ -77,7 +80,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     }
 
     public IReadOnlyList<SideReserve> GetOwnedReserves(MapEvent mapEvent, string controllerId, bool isHost,
-        IReadOnlyCollection<string> absentControllers = null)
+        IReadOnlyCollection<string> absentControllers = null,
+        IReadOnlyCollection<string> presentControllers = null)
     {
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId))
             return Array.Empty<SideReserve>();
@@ -95,8 +99,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // Who fields this party: its own player; or — for an AI party in a player-led army — that army
             // leader (#3 "army leader deploys the army"); or, when no player does (including a player that
             // DROPPED from this battle and hasn't returned), the host.
-            TryGetOwningPlayer(party, out var partyOwnerController);
-            TryGetArmyLeaderPlayer(party, out var armyLeaderController);
+            TryGetOwningPlayer(party, absentControllers, presentControllers, out var partyOwnerController);
+            TryGetArmyLeaderPlayer(party, absentControllers, presentControllers, out var armyLeaderController);
             var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers);
             if (!IsOwnedByRequester(owningController, controllerId, isHost))
                 continue;
@@ -135,7 +139,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             foreach (var party in EnumerateParties(mapEvent))
             {
                 if (!objectManager.TryGetId(party, out var partyId)) continue;
-                if (!TryGetOwningPlayer(party, out var ownerControllerId) || ownerControllerId != controllerId) continue;
+                if (!IsPartyRegisteredToController(party, controllerId)) continue;
 
                 ledger.RemoveParty(mapEventId, partyId);
                 builtParties.Remove(partyId);
@@ -255,38 +259,71 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     internal static bool IsOwnedByRequester(string owningController, string requesterController, bool requesterIsHost)
         => owningController != null ? owningController == requesterController : requesterIsHost;
 
-    private bool TryGetOwningPlayer(MapEventParty party, out string controllerId)
+    private bool TryGetOwningPlayer(MapEventParty party, IReadOnlyCollection<string> absentControllers,
+        IReadOnlyCollection<string> presentControllers, out string controllerId)
     {
         controllerId = null;
         var mobileParty = party.Party?.MobileParty;
-        return mobileParty != null && TryGetPlayerController(mobileParty, out controllerId);
+        return mobileParty != null && TryGetPlayerController(mobileParty, absentControllers,
+            presentControllers, out controllerId);
     }
 
     // The controller of the player who LEADS this party's army, if the army's leader party is a player's. Null
     // when the party is not in an army, or the army is led by an AI lord.
-    private bool TryGetArmyLeaderPlayer(MapEventParty party, out string controllerId)
+    private bool TryGetArmyLeaderPlayer(MapEventParty party, IReadOnlyCollection<string> absentControllers,
+        IReadOnlyCollection<string> presentControllers, out string controllerId)
     {
         controllerId = null;
         var leaderMobileParty = party.Party?.MobileParty?.Army?.LeaderParty;
-        return leaderMobileParty != null && TryGetPlayerController(leaderMobileParty, out controllerId);
+        return leaderMobileParty != null && TryGetPlayerController(leaderMobileParty, absentControllers,
+            presentControllers, out controllerId);
     }
 
-    // The controller of the connected player whose party this is, if any.
-    private bool TryGetPlayerController(MobileParty mobileParty, out string controllerId)
+    // Present battle members win. An absent member is retained only so ResolveOwningController can hand its
+    // party to the host; unrelated stale/offline registrations do not own reserves.
+    private bool TryGetPlayerController(MobileParty mobileParty, IReadOnlyCollection<string> absentControllers,
+        IReadOnlyCollection<string> presentControllers, out string controllerId)
     {
         controllerId = null;
         if (!objectManager.TryGetId(mobileParty, out var mobilePartyId))
             return false;
 
-        foreach (var player in playerManager.Players)
+        controllerId = ResolvePlayerController(playerManager.Players, mobilePartyId,
+            presentControllers, absentControllers);
+        return controllerId != null;
+    }
+
+    internal static string ResolvePlayerController(IEnumerable<Player> players, string mobilePartyId,
+        IReadOnlyCollection<string> presentControllers = null,
+        IReadOnlyCollection<string> absentControllers = null)
+    {
+        string registeredController = null;
+        string absentController = null;
+        foreach (var player in players)
         {
-            if (player.MobilePartyId == mobilePartyId)
-            {
-                controllerId = player.ControllerId;
-                return true;
-            }
+            if (player.MobilePartyId != mobilePartyId) continue;
+            if (presentControllers?.Contains(player.ControllerId) == true) return player.ControllerId;
+            if (registeredController == null) registeredController = player.ControllerId;
+            if (absentController == null && absentControllers?.Contains(player.ControllerId) == true)
+                absentController = player.ControllerId;
         }
-        return false;
+
+        return absentController ?? (presentControllers == null ? registeredController : null);
+    }
+
+    private bool IsPartyRegisteredToController(MapEventParty party, string controllerId)
+    {
+        var mobileParty = party.Party?.MobileParty;
+        if (mobileParty == null || !objectManager.TryGetId(mobileParty, out var mobilePartyId))
+            return false;
+
+        return IsPartyRegisteredToController(playerManager.Players, mobilePartyId, controllerId);
+    }
+
+    internal static bool IsPartyRegisteredToController(IEnumerable<Player> players, string mobilePartyId,
+        string controllerId)
+    {
+        return players.Any(player => player.ControllerId == controllerId && player.MobilePartyId == mobilePartyId);
     }
 
     private static IEnumerable<MapEventParty> EnumerateParties(MapEvent mapEvent)

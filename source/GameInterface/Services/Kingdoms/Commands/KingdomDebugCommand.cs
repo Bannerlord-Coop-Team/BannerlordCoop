@@ -4,6 +4,7 @@ using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
 using GameInterface.Services.Kingdoms.Data;
@@ -52,6 +53,7 @@ public class KingdomDebugCommand
         Remove,
     }
 
+    private static readonly string CreateUsage = "Usage: coop.debug.kingdom.create <leaderHeroName> <kingdomName> (run on the server; use '_' for spaces in the hero name)";
     private static readonly string CollectionAddUsage = "Usage: coop.debug.kingdom.collection_add <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
     private static readonly string CollectionRemoveUsage = "Usage: coop.debug.kingdom.collection_remove <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <index>";
     private static readonly string RemoveUsage = "Usage: coop.debug.kingdom.remove_decision <kingdomId> <Index>";
@@ -119,6 +121,74 @@ public class KingdomDebugCommand
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out voteManager);
+    }
+
+    // coop.debug.kingdom.create Derthert Vlandia_Reborn
+    /// <summary>
+    /// Creates a kingdom ruled by the named hero's clan and replicates it to every client through the
+    /// same notification the governor "create kingdom" dialog uses. Server only.
+    /// </summary>
+    /// <param name="args">leader hero (coop id, game StringId, or name with '_' for spaces), then the kingdom name</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("create", "coop.debug.kingdom")]
+    public static string CreateKingdomCommand(List<string> args)
+    {
+        if (!ModInformation.IsServer) return "This command can only be run on the server.";
+        if (args.Count < 2) return CreateUsage;
+        if (Campaign.Current == null) return "No campaign is loaded.";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+        if (!ContainerProvider.TryResolve<IKingdomCreator>(out var kingdomCreator)) return "Unable to resolve KingdomCreator";
+
+        if (!TryGetLeaderHero(objectManager, args[0], out Hero leader, out string heroError)) return heroError;
+        if (leader.IsDead) return $"{leader.Name} ({leader.StringId}) is dead and cannot rule a kingdom.";
+
+        Clan clan = leader.Clan;
+        if (clan == null) return $"{leader.Name} ({leader.StringId}) does not belong to a clan.";
+
+        // A kingdom is ruled by its ruling clan's leader, and clan leadership changes have no sync yet,
+        // so reject rather than silently create a kingdom ruled by a different hero.
+        if (clan.Leader != leader) return $"{leader.Name} does not lead clan {clan.StringId}. Pass the clan leader instead.";
+
+        // The console splits arguments on spaces, so everything after the hero is the kingdom name.
+        string kingdomName = string.Join(" ", args.Skip(1)).Trim();
+        if (!KingdomHandler.CanCreateKingdomForClan(clan, kingdomName, out string reason))
+        {
+            return $"Unable to create kingdom {kingdomName}: {reason}.";
+        }
+
+        CultureObject culture = clan.Culture ?? leader.Culture;
+        if (culture == null) return $"Clan {clan.StringId} has no culture for the new kingdom to inherit.";
+
+        // A debug-created kingdom usually has no owning player; an empty controller id makes the
+        // notification's settlement-restore steps a no-op on the server and every client.
+        TryGetPlayerManager(out var playerManager);
+        objectManager.TryGetId(clan, out string clanId);
+        string controllerId = playerManager?.Players.FirstOrDefault(player => player.ClanId == clanId)?.ControllerId ?? string.Empty;
+
+        if (!kingdomCreator.TryCreateKingdom(clan, kingdomName, culture, controllerId, out string kingdomId, out string createError))
+        {
+            return $"Unable to create kingdom {kingdomName}: {createError}.";
+        }
+
+        return $"Created kingdom '{kingdomName}' ({kingdomId}) ruled by {leader.Name} of clan {clan.StringId}.";
+    }
+
+    /// <summary>
+    /// Resolves the leader from a coop object manager id, a game StringId, or a hero name ('_' stands in
+    /// for a space because the console splits arguments on spaces).
+    /// </summary>
+    private static bool TryGetLeaderHero(IObjectManager objectManager, string nameOrId, out Hero hero, out string error)
+    {
+        error = null;
+        if (objectManager.TryGetObject(nameOrId, out hero)) return true;
+
+        string heroName = nameOrId.Replace('_', ' ').Trim();
+        hero = Hero.AllAliveHeroes.FirstOrDefault(candidate => candidate.StringId == nameOrId)
+            ?? Hero.AllAliveHeroes.FirstOrDefault(candidate => string.Equals(candidate.Name?.ToString(), heroName, StringComparison.OrdinalIgnoreCase));
+        if (hero != null) return true;
+
+        error = $"No hero '{nameOrId}' found by coop id, game StringId, or name. Run coop.debug.hero.id <hero name> to look one up.";
+        return false;
     }
 
     // coop.debug.kingdom.list
@@ -239,6 +309,51 @@ public class KingdomDebugCommand
 
         string previousKingdomId = previousKingdom?.StringId ?? "<none>";
         return $"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.";
+    }
+
+    // coop.debug.kingdom.force_player_vassalage Player khuzait true
+    [CommandLineArgumentFunction("force_player_vassalage", "coop.debug.kingdom")]
+    public static string ForcePlayerVassalage(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be run on the server.";
+        }
+
+        if (args.Count < 2 || args.Count > 3)
+        {
+            return "Usage: coop.debug.kingdom.force_player_vassalage <controllerId> <kingdomId> [grantRewards]";
+        }
+
+        if (!TryGetPlayerManager(out var playerManager))
+        {
+            return "Unable to resolve PlayerManager";
+        }
+
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+        {
+            return $"Player not found with controller id: {args[0]}";
+        }
+
+        if (!playerManager.TryGetPeer(args[0], out var peer))
+        {
+            return $"Player {args[0]} does not have a connected peer.";
+        }
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetObject<Kingdom>(args[1], out var kingdom))
+        {
+            return $"Kingdom not found with id: {args[1]}";
+        }
+
+        bool grantRewards = true;
+        if (args.Count == 3 && !bool.TryParse(args[2], out grantRewards))
+        {
+            return $"Unable to parse {args[2]} as a boolean.";
+        }
+
+        MessageBroker.Instance.Publish(peer, new RequestVassalService(kingdom.StringId, grantRewards));
+        return $"Queued vassalage for player {player.ControllerId} in kingdom {kingdom.StringId}. GrantRewards={grantRewards}.";
     }
 
     // coop.debug.kingdom.add_decision_usage

@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Network.Data;
 using GameInterface.Services.Missions;
 using LiteNetLib;
@@ -219,6 +219,17 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         lock (gate)
         {
             return byInstanceId.Values.Any(instance => instance.TryGetPeer(controllerId, out _));
+        }
+    }
+
+    public bool IsInstanceOccupied(string instanceId)
+    {
+        if (instanceId == null)
+            return false;
+
+        lock (gate)
+        {
+            return byInstanceId.TryGetValue(instanceId, out var instance) && instance.Controllers.Count > 0;
         }
     }
 

@@ -81,6 +81,26 @@ internal class PartyCommands
     }
 
     /// <summary>
+    /// Reports an exact party position and movement mode for cross-client live-test comparisons.
+    /// </summary>
+    [CommandLineArgumentFunction("position", "coop.debug.mobileparty")]
+    public static string PositionCommand(List<string> strings)
+    {
+        if (strings.Count != 1)
+            return "Usage: coop.debug.mobileparty.position <partyId>";
+
+        MobileParty party = Campaign.Current?.CampaignObjectManager.Find<MobileParty>(strings[0]);
+        if (party == null) return $"Party with id {strings[0]} not found";
+
+        CampaignVec2 position = party.Position;
+        return
+            $"party={party.StringId}|" +
+            $"x={position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
+            $"y={position.Y.ToString("R", CultureInfo.InvariantCulture)}|" +
+            $"isOnLand={position.IsOnLand}|moveMode={party.PartyMoveMode}";
+    }
+
+    /// <summary>
     /// Issues a local player-party point movement order so automated live tests can verify that a restored
     /// party accepts client control and sends the normal behavior update to the server.
     /// </summary>

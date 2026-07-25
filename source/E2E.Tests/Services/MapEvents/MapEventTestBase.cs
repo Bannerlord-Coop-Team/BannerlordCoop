@@ -7,6 +7,7 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Helpers;
 using Moq;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
@@ -211,6 +212,10 @@ public abstract class MapEventTestBase : IDisposable
     protected string JoinNewServerPartyToSide(string mapEventId, BattleSideEnum side)
     {
         string? partyId = null;
+        var disabledMethods = MapEventDisabledMethods
+            // Synthetic party visibility has no live campaign feat model.
+            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .ToList();
 
         Server.Call(() =>
         {
@@ -220,7 +225,7 @@ public abstract class MapEventTestBase : IDisposable
             party.Party.MapEventSide = mapEvent.GetMapEventSide(side);
 
             Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
-        }, MapEventDisabledMethods);
+        }, disabledMethods);
 
         Assert.NotNull(partyId);
         return partyId!;

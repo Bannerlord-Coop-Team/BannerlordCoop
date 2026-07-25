@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.SiegeEngines;
 using HarmonyLib;
 using SandBox.View.Map.Managers;
 using TaleWorlds.CampaignSystem.Siege;
@@ -18,14 +19,6 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch]
 internal static class SiegeMapOverlayReadinessPatches
 {
-    private static bool IsGraphComplete(SiegeEvent siegeEvent)
-    {
-        var camp = siegeEvent?.BesiegerCamp;
-        if (camp?.LeaderParty == null) return false;
-        if (camp.SiegeEngines?.DeployedRangedSiegeEngines == null) return false;
-        return siegeEvent.BesiegedSettlement?.SiegeEngines?.DeployedRangedSiegeEngines != null;
-    }
-
     [HarmonyPatch(typeof(SettlementVisualManager), "RefreshMapSiegeOverlayRequired")]
     [HarmonyPrefix]
     private static bool RefreshMapSiegeOverlayRequiredPrefix()
@@ -35,7 +28,7 @@ internal static class SiegeMapOverlayReadinessPatches
         var siege = PlayerSiege.PlayerSiegeEvent;
         // No player siege: let vanilla run (it tears the overlay down). A half-synced camp: skip this frame so
         // the one-time build waits for the complete graph rather than baking dead tiles.
-        if (siege != null && !IsGraphComplete(siege)) return false;
+        if (siege != null && !SiegeContainerLookup.IsGraphComplete(siege)) return false;
         return true;
     }
 }

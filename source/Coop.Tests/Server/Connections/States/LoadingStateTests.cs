@@ -229,6 +229,55 @@ namespace Coop.Tests.Server.Connections.States
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
 
+        [Fact]
+        public void FinalCatchUpPending_StartsWithFinalBaselineAndEndsWithCampaignEntry()
+        {
+            var state = connectionLogic.SetState<LoadingState>();
+            Assert.False(state.IsFinalCatchUpPending);
+
+            StartBaseline(state);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            Assert.False(state.IsFinalCatchUpPending);
+
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+            Assert.True(state.IsFinalCatchUpPending);
+
+            SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
+            Assert.True(state.IsFinalCatchUpPending);
+
+            SendAndDrain(state, JoinSyncSignal.CatchUpApplied);
+            Assert.False(state.IsFinalCatchUpPending);
+            Assert.IsType<CampaignState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void DisconnectedLoadingState_DoesNotApplyQueuedCampaignEntry()
+        {
+            var state = connectionLogic.SetState<LoadingState>();
+            StartBaseline(state);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+            SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
+
+            WhileGameThreadBlocked(() =>
+            {
+                Signal(state, JoinSyncSignal.CatchUpApplied);
+                connectionLogic.Dispose();
+            });
+
+            Assert.Null(connectionLogic.State);
+        }
+
+        [Fact]
+        public void DisposedConnection_DoesNotInstallReplacementState()
+        {
+            connectionLogic.Dispose();
+
+            connectionLogic.SetState<CampaignState>();
+
+            Assert.Null(connectionLogic.State);
+        }
+
         [Theory]
         [InlineData(JoinSyncSignal.BaselineRequested, 1, false)]
         [InlineData(JoinSyncSignal.ReplayApplied, 0, false)]

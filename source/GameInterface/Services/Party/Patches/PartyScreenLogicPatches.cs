@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Serilog;
@@ -130,22 +129,39 @@ internal class PartyScreenLogicPatches
         return false;
     }
 
+    /// <summary>
+    /// Executing prisoner heroes is disabled in coop: the kill rides KillCharacterAction and its follow-on
+    /// death/inheritance handling, which crashes the game when it targets a lord or player
+    /// (<see href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/2310">issue #2310</see>).
+    /// Skipping the original also skips its local prisoner-roster mutation, so nothing diverges from the server.
+    /// </summary>
     [HarmonyPatch(nameof(PartyScreenLogic.ExecuteTroop))]
-    [HarmonyPostfix]
-    public static void ExecuteTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command)
-    {
-        if (!__instance.ValidateCommand(command)) return;
+    [HarmonyPrefix]
+    public static bool ExecuteTroopPrefix() => false;
 
-        // Send message to server to run KillCharacterAction.ApplyByExecution
-        var message = new HeroExecuted(command.Character.HeroObject, Hero.MainHero);
-        MessageBroker.Instance.Publish(__instance, message);
-    }
-
+    /// <summary>
+    /// Reports every prisoner as non-executable so the party screen disables the execute button and
+    /// <see cref="PartyScreenLogic.ValidateCommand"/> rejects any ExecuteTroop command (issue #2310).
+    /// </summary>
     [HarmonyPatch(nameof(PartyScreenLogic.IsExecutable))]
     [HarmonyPrefix]
-    public static bool IsExecutablePrefix(PartyScreenLogic.TroopType troopType, CharacterObject character, PartyScreenLogic.PartyRosterSide side)
+    public static bool IsExecutablePrefix(ref bool __result)
     {
-        // Executable if NOT player hero
-        return character.HeroObject?.IsPlayerHero() != true;
+        __result = false;
+        return false;
+    }
+
+    internal const string ExecutionDisabledReason = "Executing prisoners is disabled in Co-op.";
+
+    /// <summary>
+    /// The disabled execute button's tooltip; the native "Cannot execute hero right now" would suggest
+    /// execution can become available.
+    /// </summary>
+    [HarmonyPatch(nameof(PartyScreenLogic.GetExecutableReasonString))]
+    [HarmonyPrefix]
+    public static bool GetExecutableReasonStringPrefix(ref string __result)
+    {
+        __result = ExecutionDisabledReason;
+        return false;
     }
 }

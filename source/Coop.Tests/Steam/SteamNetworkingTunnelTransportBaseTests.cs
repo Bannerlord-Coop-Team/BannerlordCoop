@@ -1,4 +1,4 @@
-using Coop.Steam;
+﻿using Coop.Steam;
 using Moq;
 using Serilog;
 using Steamworks;
@@ -11,6 +11,12 @@ namespace Coop.Tests.Steam
 {
     public class SteamNetworkingTunnelTransportBaseTests
     {
+        [Fact]
+        public void SendRateFloor_IsFourMiBPerSecond()
+        {
+            Assert.Equal(4 * 1024 * 1024, SteamTunnel.SendRateMinBytesPerSecond);
+        }
+
         [Fact]
         public void ClosedSubscriberThrows_StillClosesAndForgetsConnection()
         {

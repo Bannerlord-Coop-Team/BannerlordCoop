@@ -35,6 +35,8 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
+        // The BR-110 agent budget counts the mission's live agents via Mission.Agents.
+        Prefix(typeof(Mission), "get_Agents", nameof(Mission_get_Agents));
         Prefix(typeof(Mission), "get_MainAgent", nameof(Mission_get_MainAgent));
         Prefix(typeof(Mission), "set_MainAgent", nameof(Mission_set_MainAgent));
         Prefix(typeof(Mission), nameof(Mission.FindAgentWithIndex), nameof(Mission_FindAgentWithIndex));
@@ -56,8 +58,8 @@ public sealed class MissionEngineFixture : IDisposable
             }),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(MissionTeamCollection_Add))));
         // GetMissionBehavior<T> walks the mission's behavior list, which a skip-ctor shell doesn't have (NRE).
-        // The spawn-capture and deployment paths probe for DeploymentMissionController — answer "none" for mock
-        // missions. Reference-type instantiations share one method body, so patching this one covers them all.
+        // Tests opt into a deployment-controller shell when they need to exercise pre-commit behavior.
+        // Reference-type instantiations share one method body, so patching this one covers them all.
         harmony.Patch(
             AccessTools.Method(typeof(Mission), nameof(Mission.GetMissionBehavior)).MakeGenericMethod(typeof(DeploymentMissionController)),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Mission_GetMissionBehavior))));
@@ -220,10 +222,19 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    // Returns ALL minted agents (active and not); Agent.IsActive resolves per agent via its mirror, so
+    // consumers filtering on IsActive (e.g. the BR-110 budget) see the live subset.
+    private static bool Mission_get_Agents(Mission __instance, ref TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = new TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList(mock.Agents);
+        return false;
+    }
+
     private static bool Mission_GetMissionBehavior(Mission __instance, ref DeploymentMissionController __result)
     {
-        if (!MockMission.ForShell(__instance, out _)) return true;
-        __result = null;
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DeploymentInProgress ? mock.DeploymentController : null;
         return false;
     }
 
@@ -465,10 +476,12 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_SetIsAIPaused(Agent __instance)
+    private static bool Agent_SetIsAIPaused(Agent __instance, bool isPaused)
     {
-        // No AI loop headless — accept the call so ConvertPuppetToHostAi doesn't deref the native agent.
-        return !AgentMirror.TryGet(__instance, out _);
+        // No AI loop headless — mirror the pause state without dereferencing the native agent.
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.IsAiPaused = isPaused;
+        return false;
     }
 
     private static bool Agent_SetAlarmState(Agent __instance, ref bool __result)

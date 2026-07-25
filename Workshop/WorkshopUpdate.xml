@@ -6,7 +6,7 @@
     <UpdateItem>
         <ModuleFolder Value="E:\Mod Development\BannerlordCoop\mb2\Modules\Coop"/>
         <!-- A direct path of your module -->   
-        <ChangeNotes Value="Another Bug Fix" />
+        <ChangeNotes Value="Image update" />
         <!-- Insert patch notes -->
         <Tags> 
             <!-- You can use the following tags: -->
@@ -17,7 +17,8 @@
             <Tag Value="Partial Conversion" />
             <Tag Value="Native" />
             <Tag Value="Singleplayer" />
-            <Tag Value="v1.4.6" />
+            <Tag Value="v1.4.7" />
         </Tags>
+        <Image Value="E:\Mod Development\BannerlordCoop\img\Banner.png"/>
     </UpdateItem>
 </Tasks>

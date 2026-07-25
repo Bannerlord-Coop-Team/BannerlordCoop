@@ -201,6 +201,42 @@ public class CampaignStateTests
             "Finishing synchronization..."), Times.Once);
     }
 
+    [Theory]
+    [InlineData(NetworkJoinSync.CompletionPacketThreshold + 1, false)]
+    [InlineData(NetworkJoinSync.CompletionPacketThreshold, true)]
+    public void FinalCatchUp_UsesAcceptablePacketBacklog(int packetsRemaining, bool completes)
+    {
+        var mapTimeTracker = PrepareFinalCatchUp();
+
+        PublishTimeSample(
+            mapTimeTracker,
+            completed: false,
+            refreshRequired: false,
+            packetsRemaining: packetsRemaining);
+
+        Assert.Equal(
+            completes ? 1 : 0,
+            JoinSignalCount(JoinSyncSignal.FinalBaselineApplied));
+    }
+
+    [Fact]
+    public void FinalCatchUp_RefreshesInvalidBaselineWithinPacketThreshold()
+    {
+        var mapTimeTracker = PrepareFinalCatchUp();
+        int requestsBefore = JoinSignalCount(JoinSyncSignal.BaselineRequested);
+
+        PublishTimeSample(
+            mapTimeTracker,
+            completed: true,
+            refreshRequired: true,
+            packetsRemaining: NetworkJoinSync.CompletionPacketThreshold);
+
+        Assert.Equal(
+            requestsBefore + 1,
+            JoinSignalCount(JoinSyncSignal.BaselineRequested));
+        Assert.Equal(0, JoinSignalCount(JoinSyncSignal.FinalBaselineApplied));
+    }
+
     [Fact]
     public void EnteringCampaignFromMission_DoesNotWaitForJoinCatchUpMarker()
     {
@@ -228,11 +264,28 @@ public class CampaignStateTests
     private void PublishTimeSample(
         Mock<IMapTimeTrackerInterface> tracker,
         bool completed,
-        bool refreshRequired)
+        bool refreshRequired,
+        int packetsRemaining = -1)
     {
         tracker.Setup(m => m.TryCompleteCampaignJoinCatchUp(out refreshRequired)).Returns(completed);
-        TestMessageBroker.Publish(this, new CampaignTimeSampleReceived());
+        TestMessageBroker.Publish(this, new CampaignTimeSampleReceived(packetsRemaining));
         DrainGameThread();
+    }
+
+    private Mock<IMapTimeTrackerInterface> PrepareFinalCatchUp()
+    {
+        clientComponent.TestNetwork.CreatePeer();
+        var mapTimeTracker = clientComponent.Container.Resolve<Mock<IMapTimeTrackerInterface>>();
+        _ = clientLogic.SetState<LoadingState>();
+        _ = clientLogic.SetState<CampaignState>();
+
+        PublishJoinSignal(JoinSyncSignal.ReplayComplete);
+        PublishBaseline(success: true);
+        PublishBaseline(success: true);
+        PublishTimeSample(mapTimeTracker, completed: true, refreshRequired: false);
+        PublishBaseline(success: true);
+
+        return mapTimeTracker;
     }
 
     private int JoinSignalCount(JoinSyncSignal signal) =>

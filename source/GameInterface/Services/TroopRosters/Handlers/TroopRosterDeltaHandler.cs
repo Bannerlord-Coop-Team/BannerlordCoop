@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.TroopRosters.Coalescing;
@@ -37,13 +38,15 @@ internal class TroopRosterDeltaHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISendCoalescer coalescer;
+    private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
 
     public TroopRosterDeltaHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network,
-        ISendCoalescer coalescer = null)
+        IEncounterMenuConditionRefresher encounterMenuConditionRefresher, ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
         this.coalescer = coalescer;
 
         // Authority send path: the roster patches publish these local events (server-only) with the server index.
@@ -254,12 +257,15 @@ internal class TroopRosterDeltaHandler : IHandler
         var rosterId = payload.What.RosterId;
         GameThread.RunSafe(() =>
         {
+            TroopRoster roster;
             using (new AllowedThread())
             {
-                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(rosterId, out var roster)) return;
+                if (!objectManager.TryGetObjectWithLogging(rosterId, out roster)) return;
                 roster.RemoveZeroCounts();
                 roster.InitializeCachedData();
             }
+
+            encounterMenuConditionRefresher.RefreshForRoster(roster);
         }, context: nameof(NetworkTroopRosterRemoveZeroCounts));
     }
 
@@ -273,13 +279,17 @@ internal class TroopRosterDeltaHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            TroopRoster roster;
             using (new AllowedThread())
             {
-                if (!objectManager.TryGetObjectWithLogging<TroopRoster>(rosterId, out var roster)) return;
+                if (!objectManager.TryGetObjectWithLogging(rosterId, out roster)) return;
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character)) return;
 
                 apply(roster, character);
             }
+
+            // Coalesced roster changes can land after the map event opens its encounter menu.
+            encounterMenuConditionRefresher.RefreshForRoster(roster);
         }, context: messageName);
     }
 

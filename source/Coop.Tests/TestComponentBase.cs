@@ -36,6 +36,7 @@ using Serilog;
 using System;
 using Xunit.Abstractions;
 using IGameInterface = GameInterface.IGameInterface;
+using GameInterface.Services.CampaignService.Interfaces;
 
 namespace Coop.Tests;
 
@@ -118,6 +119,7 @@ internal abstract class TestComponentBase
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
+        RegisterMock<IServerOptionsProvider>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does

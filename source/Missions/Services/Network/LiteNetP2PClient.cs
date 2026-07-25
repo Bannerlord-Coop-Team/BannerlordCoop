@@ -42,6 +42,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly IMessageBroker messageBroker;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ISteamMissionBridge steamBridge;
+    private readonly IMovementPacketCompressor movementPacketCompressor;
     private readonly Poller poller;
 
     private readonly object peerGate = new();
@@ -81,7 +82,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IControllerIdProvider controllerIdProvider,
-        ISteamMissionBridge steamBridge)
+        ISteamMissionBridge steamBridge,
+        IMovementPacketCompressor movementPacketCompressor)
     {
         Config = config;
         this.relayNetwork = relayNetwork;
@@ -91,6 +93,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.steamBridge = steamBridge;
+        this.movementPacketCompressor = movementPacketCompressor;
 
         netManager = new NetManager(this)
         {
@@ -561,9 +564,10 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void SendAll(IPacket packet)
     {
+        byte[] data = movementPacketCompressor.Serialize(packet);
         foreach (var controllerId in missionContext.ControllersInMission)
         {
-            Send(controllerId, packet);
+            Send(controllerId, packet, data);
         }
     }
 
@@ -579,49 +583,67 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void SendAllBut(string excludedId, IPacket packet)
     {
+        byte[] data = movementPacketCompressor.Serialize(packet);
         foreach (var controllerId in missionContext.ControllersInMission.Where(id => id != excludedId))
         {
-            Send(controllerId, packet);
+            Send(controllerId, packet, data);
         }
     }
 
     public void Send(string controllerId, IPacket packet)
     {
+        Send(controllerId, packet, movementPacketCompressor.Serialize(packet));
+    }
+
+    private void Send(string controllerId, IPacket packet, byte[] data)
+    {
         // Send directly to direct peer
         if (missionContext.TryGetPeer(controllerId, out var peer))
         {
-            Send(peer, packet);
+            Send(peer, packet, data);
             return;
         }
 
         // Otherwise send relay packet to the server
-        var payload = serializer.Serialize(packet);
-        relayNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, instanceId, controllerId, payload));
+        relayNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, instanceId, controllerId, data));
     }
 
-    // A conservative ceiling for a single non-fragmentable (Unreliable/Sequenced) send. netPeer
-    // .GetMaxSinglePacketSize() can read OPTIMISTICALLY high — it cleared a movement batch the send then
-    // rejected at ~1 KB (TooBigPacketException), which the Poller swallowed so movement silently stopped and
-    // every puppet froze. Capping the promote threshold here keeps the pre-check honest on links whose real
-    // single-packet limit sits near the minimum MTU; genuinely-smaller MTUs still win via the Math.Min below.
-    private const int SafeSinglePacketBytes = 1000;
+    // Peer-reported MTUs can be optimistic, so cap nonfragmentable sends at a conservative ceiling.
+    internal const int SafeSinglePacketBytes = 1000;
+
+    internal static DeliveryMethod? SelectDeliveryMethod(
+        IPacket packet,
+        int serializedLength,
+        int maxSinglePacketSize)
+    {
+        DeliveryMethod method = packet.DeliveryMethod;
+        bool fragmentable = method == DeliveryMethod.ReliableOrdered || method == DeliveryMethod.ReliableUnordered;
+        if (fragmentable || serializedLength <= Math.Min(maxSinglePacketSize, SafeSinglePacketBytes))
+        {
+            return method;
+        }
+
+        return IsMovementPacket(packet) ? null : DeliveryMethod.ReliableUnordered;
+    }
+
+    private static bool IsMovementPacket(IPacket packet) =>
+        packet.PacketType == PacketType.Movement || packet.PacketType == PacketType.MountMovement;
 
     public void Send(NetPeer netPeer, IPacket packet)
     {
-        byte[] data = serializer.Serialize(packet);
-        var method = packet.DeliveryMethod;
+        Send(netPeer, packet, movementPacketCompressor.Serialize(packet));
+    }
 
-        // Unreliable/Sequenced channels can't fragment: an oversized payload makes netPeer.Send throw
-        // TooBigPacketException, which the Poller swallows (e.g. movement then silently stops). When a
-        // packet exceeds the peer's single-packet limit, promote it to a fragmentable reliable channel so
-        // LiteNetLib splits it instead of throwing. Senders chunk to keep the common case unreliable; this is
-        // the backstop for whatever still overflows (small early MTU, fat all-cavalry batches, spawn bursts).
+    private void Send(NetPeer netPeer, IPacket packet, byte[] data)
+    {
+        DeliveryMethod? selectedMethod = SelectDeliveryMethod(
+            packet,
+            data.Length,
+            netPeer.GetMaxSinglePacketSize(packet.DeliveryMethod));
+        if (!selectedMethod.HasValue) return;
+
+        DeliveryMethod method = selectedMethod.Value;
         bool fragmentable = method == DeliveryMethod.ReliableOrdered || method == DeliveryMethod.ReliableUnordered;
-        if (!fragmentable && data.Length > Math.Min(netPeer.GetMaxSinglePacketSize(method), SafeSinglePacketBytes))
-        {
-            method = DeliveryMethod.ReliableUnordered;
-            fragmentable = true;
-        }
 
         try
         {
@@ -629,9 +651,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
         catch (TooBigPacketException) when (!fragmentable)
         {
-            // The size estimate still under-shot the peer's real cap — deliver via the fragmentable reliable
-            // channel rather than letting the Poller swallow the throw and drop the packet entirely.
-            netPeer.Send(data, DeliveryMethod.ReliableUnordered);
+            DeliveryMethod? retryMethod = SelectDeliveryMethod(packet, data.Length, 0);
+            if (retryMethod.HasValue)
+                netPeer.Send(data, retryMethod.Value);
         }
     }
 
@@ -643,7 +665,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
-
         packetManager.HandleReceive(peer, packet);
     }
 }

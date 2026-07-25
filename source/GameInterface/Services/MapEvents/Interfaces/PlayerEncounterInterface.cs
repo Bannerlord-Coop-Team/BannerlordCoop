@@ -62,6 +62,9 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
                         EndPlayerEncounter(playerEncounter);
                         break;
                     default:
+                        // Begin/Wait and any future states are not after-battle work. Yield until the
+                        // next campaign tick instead of spinning forever when no player map event exists.
+                        playerEncounter._stateHandled = true;
                         break;
                 }
             }

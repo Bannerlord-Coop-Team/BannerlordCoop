@@ -95,7 +95,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-051")]
-    public void NonHostDisconnect_OpposingSideTroops_AreDespawnedOnRemainingClients()
+    public void NonHostDisconnectDuringDeployment_OpposingSideTroops_AreAdoptedButRemainPaused()
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
@@ -122,14 +122,18 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 var origin = new CoopAgentOrigin(character, disconnectedParty.Party, -1, null, new UniqueTroopDescriptor(101));
                 var troop = mock.SpawnAgent(new AgentBuildData(character)
                     .Controller(AgentControllerType.None).Team(mock.AttackerTeam.Shell).TroopOrigin(origin));
+                troop.SetIsAIPaused(true);
                 Assert.True(registry.TryRegisterAgent("A", troopId, troop));
 
                 var broker = remaining.Resolve<IMessageBroker>();
                 broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
 
-                Assert.False(registry.TryGetAgentInfo(troopId, out _));
+                Assert.True(registry.TryGetAgentInfo(troopId, out var troopInfo));
+                Assert.Equal("B", troopInfo.CurrentAuthority);
                 Assert.True(AgentMirror.TryGet(troop, out var mirror));
-                Assert.False(mirror.IsActive, "a disconnected player's party must fade out like a retreat");
+                Assert.True(mirror.IsActive, "a disconnected player's fielded troop must remain in the battle");
+                Assert.Equal(AgentControllerType.AI, mirror.Controller);
+                Assert.True(mirror.IsAiPaused, "adoption must not bypass the deployment activation gate");
 
                 broker.Publish(this, new NetworkSpawnBattleAgents(new[]
                 {
@@ -491,7 +495,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-051")]
-    public void HostDisconnect_OwnPartyWithdraws_WhileNpcForcesAreAdopted()
+    public void HostDisconnect_OwnPartyAndNpcForcesAreAdopted()
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
@@ -527,9 +531,11 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
                 broker.Publish(this, new BattleHostMigrated(mapEventId, "A"));
 
-                Assert.False(registry.TryGetAgentInfo(ownPartyTroopId, out _));
+                Assert.True(registry.TryGetAgentInfo(ownPartyTroopId, out var ownPartyInfo));
+                Assert.Equal("B", ownPartyInfo.CurrentAuthority);
                 Assert.True(AgentMirror.TryGet(ownTroop, out var ownMirror));
-                Assert.False(ownMirror.IsActive);
+                Assert.True(ownMirror.IsActive);
+                Assert.Equal(AgentControllerType.AI, ownMirror.Controller);
 
                 Assert.True(registry.TryGetAgentInfo(npcTroopId, out var npcInfo));
                 Assert.Equal("B", npcInfo.CurrentAuthority);

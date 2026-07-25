@@ -341,13 +341,13 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), remoteRider));
             Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), localHorse));
 
-            component.AgentMovementHandler.PollMovement(0.02f);
+            component.AgentMovementHandler.PollMovement(0.05f);
             Assert.Equal(AgentControllerType.None, localHorseMirror.Controller);
             Assert.Equal(0f, localHorseMirror.MaximumSpeedLimit);
             Assert.Equal(0, localHorseMirror.SetMaximumSpeedLimitCalls);
 
             remoteRiderMirror.IsActive = false;
-            component.AgentMovementHandler.PollMovement(0.02f);
+            component.AgentMovementHandler.PollMovement(0.05f);
             Assert.Equal(AgentControllerType.AI, localHorseMirror.Controller);
             Assert.Equal(-1f, localHorseMirror.MaximumSpeedLimit);
             Assert.Equal(1, localHorseMirror.SetMaximumSpeedLimitCalls);
@@ -357,7 +357,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             localHorseMirror.MaximumSpeedLimit = 0f;
             localHorseMirror.SetMaximumSpeedLimitCalls = 0;
             remoteRider.MountAgent = null;
-            component.AgentMovementHandler.PollMovement(0.02f);
+            component.AgentMovementHandler.PollMovement(0.05f);
             Assert.Equal(AgentControllerType.AI, localHorseMirror.Controller);
             Assert.Equal(-1f, localHorseMirror.MaximumSpeedLimit);
             Assert.Equal(1, localHorseMirror.SetMaximumSpeedLimitCalls);
@@ -370,7 +370,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), localRider));
             Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), remoteHorse));
 
-            component.AgentMovementHandler.PollMovement(0.02f);
+            component.AgentMovementHandler.PollMovement(0.05f);
             Assert.Equal(AgentControllerType.AI, remoteHorseMirror.Controller);
             Assert.Equal(-1f, remoteHorseMirror.MaximumSpeedLimit);
             Assert.Equal(1, remoteHorseMirror.SetMaximumSpeedLimitCalls);
@@ -379,7 +379,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             remoteHorseMirror.MaximumSpeedLimit = 0f;
             remoteHorseMirror.SetMaximumSpeedLimitCalls = 0;
             remoteHorseMirror.IsActive = false;
-            component.AgentMovementHandler.PollMovement(0.02f);
+            component.AgentMovementHandler.PollMovement(0.05f);
             Assert.Equal(AgentControllerType.None, remoteHorseMirror.Controller);
             Assert.Equal(0f, remoteHorseMirror.MaximumSpeedLimit);
             Assert.Equal(0, remoteHorseMirror.SetMaximumSpeedLimitCalls);

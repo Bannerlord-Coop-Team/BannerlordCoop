@@ -201,15 +201,19 @@ public class CampaignState : ClientStateBase
             try
             {
                 if (ReferenceEquals(Logic.State, this) == false) return;
-                if (!mapTimeTrackerInterface.TryCompleteCampaignJoinCatchUp(
-                    out bool baselineRefreshRequired))
+                bool timeCaughtUp = mapTimeTrackerInterface.TryCompleteCampaignJoinCatchUp(
+                    out bool baselineRefreshRequired);
+                if (timeCaughtUp && baselineRefreshRequired)
                 {
+                    RequestBaseline(finalTimeCatchUp);
                     return;
                 }
 
-                if (baselineRefreshRequired)
+                bool packetBacklogAcceptable = finalTimeCatchUp &&
+                    obj.What.JoinPacketsRemaining >= 0 &&
+                    obj.What.JoinPacketsRemaining <= NetworkJoinSync.CompletionPacketThreshold;
+                if (!timeCaughtUp && !packetBacklogAcceptable)
                 {
-                    RequestBaseline(finalTimeCatchUp);
                     return;
                 }
 

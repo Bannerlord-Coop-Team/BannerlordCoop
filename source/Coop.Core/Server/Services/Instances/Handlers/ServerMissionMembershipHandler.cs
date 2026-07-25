@@ -129,11 +129,11 @@ public class ServerMissionMembershipHandler : IHandler
         }
 
         // Local signal for battle host migration / successor cleanup (no-op for non-battle instances). A drop
-        // withdraws the player's party like a retreat, so forget its reserve and re-spawn it fresh on rejoin.
+        // preserves the reserve so the battle host can field the disconnected player's remaining troops.
         messageBroker.Publish(this, new MissionMemberDeparted(
             controllerId,
             instanceId,
-            wasRetreat: true,
+            wasRetreat: false,
             isInstanceEmpty: remaining.Count == 0));
     }
 }

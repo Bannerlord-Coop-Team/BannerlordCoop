@@ -705,7 +705,8 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null) return;
-        if (!objectManager.TryGetIdWithLogging(partyVisual, out string visualId)) return;
+        if (!objectManager.TryGetIdWithLogging(partyVisual, out string partyVisualId)) return;
+        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return;
 
         objectManager.Remove(partyVisual);
 
@@ -714,7 +715,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(visualId));
+        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
     }
 
     private void RecreateVisual(MobileParty party)

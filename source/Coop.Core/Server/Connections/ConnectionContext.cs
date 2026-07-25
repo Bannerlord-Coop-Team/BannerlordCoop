@@ -3,6 +3,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -32,6 +33,7 @@ public class ConnectionContext
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
         IExistingPlayerSender existingPlayerSender,
+        IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender)
     {
         MessageBroker = messageBroker;
@@ -47,6 +49,7 @@ public class ConnectionContext
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
         ExistingPlayerSender = existingPlayerSender;
+        ServerOptionsProvider = serverOptionsProvider;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
     }
 
@@ -63,5 +66,6 @@ public class ConnectionContext
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
+    public IServerOptionsProvider ServerOptionsProvider { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
 }

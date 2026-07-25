@@ -1,7 +1,9 @@
 ﻿using System.Linq;
 using Common.Network;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using GameInterface.Services.Players;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -81,6 +83,40 @@ public class MissionReadyElectionTests : MissionTestEnvironment
             AssertHost(client, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
     }
 
+    [Fact]
+    [Trait("Requirement", "BR-010")]
+    public void EnteredButNotReadyPlayer_RetainsItsReserveWhileTheFirstHostIsElected()
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("host-ctrl", "loader-ctrl");
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var loader = clients[1];
+        string loaderMapEventPartyId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var loaderParty));
+            var mapEventParty = mapEvent.PartiesOnSide(loaderParty.Party.Side)
+                .Single(party => party.Party == loaderParty.Party);
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out loaderMapEventPartyId));
+        });
+
+        EnterBattle(loader, mapEventId, missionReady: false);
+        EnterBattle(host, mapEventId, missionReady: false);
+        int baseline = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+            .Count(message => message.MapEventId == mapEventId);
+
+        MakeMissionReady(host, mapEventId);
+
+        var hostElectionFeeds = host.InternalMessages.GetMessages<NetworkBattleTroopReserve>()
+            .Where(message => message.MapEventId == mapEventId)
+            .Skip(baseline)
+            .ToArray();
+        Assert.DoesNotContain(hostElectionFeeds.SelectMany(feed => feed.Parties),
+            party => party.PartyId == loaderMapEventPartyId);
+    }
+
     /// <summary>
     /// BR-013/BR-014: host migration promotes down the MISSION-READY order, not the entry order. Entry order
     /// is A,B,C but ready order is C,B,A, so the connection order is C,B,A and successive host departures
@@ -156,12 +192,20 @@ public class MissionReadyElectionTests : MissionTestEnvironment
         }, MapEventDisabledMethods);
 
         // ---- Phase 1: the future host enters, then becomes ready (elected). ----
-        var hostAttacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, null);
-        var hostDefender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+        var hostAttacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        var hostDefender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
         CoopTroopSupplierRegistry.Register(hostAttacker);
         CoopTroopSupplierRegistry.Register(hostDefender);
         try
         {
+            Server.Call(() =>
+            {
+                var playerManager = Server.Resolve<IPlayerManager>();
+                playerManager.SetPeer("other-ctrl", clients[1].NetPeer);
+                Assert.True(playerManager.TryGetPlayer("other-ctrl", out var otherPlayer));
+                Assert.True(playerManager.IsConnected(otherPlayer));
+            });
+
             EnterBattle(clients[0], mapEventId, missionReady: false);
 
             // Entry: only the owned side arrives. The unowned (defender/NPC) side must NOT arrive — not even
@@ -187,8 +231,8 @@ public class MissionReadyElectionTests : MissionTestEnvironment
         }
 
         // ---- Phase 2: the non-host enters, then becomes ready. Fresh suppliers observe only its feeds. ----
-        var otherAttacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, null);
-        var otherDefender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null);
+        var otherAttacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        var otherDefender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
         CoopTroopSupplierRegistry.Register(otherAttacker);
         CoopTroopSupplierRegistry.Register(otherDefender);
         try

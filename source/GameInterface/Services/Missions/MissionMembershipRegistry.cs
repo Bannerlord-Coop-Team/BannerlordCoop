@@ -6,4 +6,6 @@
 public interface IMissionMembershipRegistry
 {
     bool IsControllerInMission(string controllerId);
+
+    bool IsInstanceOccupied(string instanceId);
 }

@@ -19,6 +19,9 @@ concurrency:
   group: nightly-release
   cancel-in-progress: false
 
+env:
+  R2_PRIVATE_BUCKET: bannerlordcoop-build-inputs
+
 jobs:
   build:
     if: github.ref == 'refs/heads/development'
@@ -186,8 +189,40 @@ jobs:
           else
             base_json=null
           fi
-          printf '{"releaseDate":"%s","fileName":"%s","branch":"development","headSha":"%s","baseSha":%s}\n' \
-            "$RELEASE_DATE" "$FILE_NAME" "$HEAD_SHA" "$base_json" > artifact/manifest.json
+          archive_bytes=$(stat -c %s "artifact/$FILE_NAME")
+          archive_sha256=$(sha256sum "artifact/$FILE_NAME" | cut -d' ' -f1)
+          r2_key="nightly-client/Coop.7z"
+          printf '{"releaseDate":"%s","fileName":"%s","branch":"development","headSha":"%s","baseSha":%s,"serverInput":{"bucket":"%s","key":"%s","bytes":%s,"sha256":"%s"}}\n' \
+            "$RELEASE_DATE" "$FILE_NAME" "$HEAD_SHA" "$base_json" \
+            "$R2_PRIVATE_BUCKET" "$r2_key" "$archive_bytes" "$archive_sha256" \
+            > artifact/manifest.json
+
+      - name: Publish dedicated-server client input
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          FILE_NAME: ${{ steps.release.outputs.file_name }}
+          HEAD_SHA: ${{ steps.release.outputs.head_sha }}
+        run: |
+          set -eu
+          apk add --no-cache rclone >/dev/null
+          test -n "$R2_ACCOUNT_ID"
+          test -n "$R2_PRIVATE_BUCKET"
+          export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          prefix=nightly-client
+          archive="artifact/$FILE_NAME"
+          archive_bytes=$(stat -c %s "$archive")
+
+          # The manifest is uploaded last and acts as the completed handoff marker.
+          rclone copyto "$archive" "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          remote_bytes=$(rclone lsl "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | awk '{print $1}')
+          test "$remote_bytes" = "$archive_bytes"
+          rclone copyto artifact/manifest.json "r2:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
       - name: Upload nightly artifact
         uses: actions/upload-artifact@v7

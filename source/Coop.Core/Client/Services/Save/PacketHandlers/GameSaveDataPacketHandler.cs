@@ -4,6 +4,7 @@ using Common.PacketHandlers;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
@@ -108,7 +109,8 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.AlleyPlayerData,
             completedTransfer.InteractionsPlayerData,
             completedTransfer.TradePlayerData,
-            completedTransfer.AttachmentIdMap));
+            completedTransfer.AttachmentIdMap,
+            completedTransfer.ServerOptions));
     }
 
     private sealed class PendingTransfer
@@ -129,6 +131,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             InteractionsPlayerData = firstChunk.InteractionsPlayerData;
             TradePlayerData = firstChunk.TradePlayerData;
             AttachmentIdMap = firstChunk.AttachmentIdMap;
+            ServerOptions = firstChunk.ServerOptions;
         }
 
         public int TransferId { get; }
@@ -142,6 +145,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public InteractionsPlayerData InteractionsPlayerData { get; }
         public TradePlayerData TradePlayerData { get; }
         public AttachmentIdMap AttachmentIdMap { get; }
+        public ServerOptions ServerOptions { get; }
 
         public bool TryAdd(GameSaveDataChunkPacket chunk)
         {

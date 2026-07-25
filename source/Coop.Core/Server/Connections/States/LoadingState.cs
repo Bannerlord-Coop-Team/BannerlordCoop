@@ -54,6 +54,12 @@ public class LoadingState : ConnectionStateBase
 
     public override bool IsLoading => true;
 
+    internal bool IsFinalCatchUpPending =>
+        phase == JoinPhase.FinalBaselineQueued ||
+        phase == JoinPhase.WaitingForFinalBaseline ||
+        phase == JoinPhase.WorldReadyQueued ||
+        phase == JoinPhase.WaitingForCatchUpApplied;
+
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
