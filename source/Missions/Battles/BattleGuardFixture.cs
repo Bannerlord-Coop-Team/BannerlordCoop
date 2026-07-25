@@ -1103,6 +1103,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         restore.Mount.LookDirection = restore.MountLookDirection;
         agent.TeleportToPosition(restore.AgentPosition);
         agent.LookDirection = restore.AgentLookDirection;
+        agent.EventControlFlags &= ~Agent.EventControlFlag.Dismount;
         agent.Mount(restore.Mount);
     }
 
