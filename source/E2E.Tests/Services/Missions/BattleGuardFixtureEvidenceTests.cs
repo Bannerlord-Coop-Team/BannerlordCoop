@@ -1,5 +1,9 @@
 ﻿#if DEBUG
+using GameInterface.Services.Battles.Messages;
 using Missions.Battles;
+using ProtoBuf;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -294,6 +298,220 @@ public class BattleGuardFixtureEvidenceTests
 
         Assert.False(evidence.PlateauReady);
         Assert.True(evidence.RecentSlope < -0.35f);
+    }
+
+    [Fact]
+    public void MountedRoute_StraightSegment_IsStrikeReady()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        BattleGuardMountedRouteInput input = route.Update(
+            new Vec3(0f, 10f, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.Equal("Forward", route.State);
+        Assert.True(route.CanStageStrike);
+        Assert.Equal(30f, route.RemainingDistance);
+        Assert.Equal(Agent.MovementControlFlag.None, input.TurnFlag);
+        Assert.Equal(0f, input.Movement.x);
+        Assert.Equal(1f, input.Movement.y);
+    }
+
+    [Fact]
+    public void MountedRoute_Endpoint_UsesNativeTurnThenReturns()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        BattleGuardMountedRouteInput turning = route.Update(
+            new Vec3(0f, 35f, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.Equal("TurningToStart", route.State);
+        Assert.False(route.CanStageStrike);
+        Assert.Equal(
+            Agent.MovementControlFlag.TurnRight,
+            turning.TurnFlag);
+        Assert.Equal(0.45f, turning.Movement.y);
+
+        BattleGuardMountedRouteInput returning = route.Update(
+            new Vec3(0f, 35f, 0f),
+            new Vec3(0f, -1f, 0f));
+
+        Assert.Equal("Return", route.State);
+        Assert.True(route.CanStageStrike);
+        Assert.Equal(1, route.CompletedTurns);
+        Assert.Equal(
+            Agent.MovementControlFlag.None,
+            returning.TurnFlag);
+    }
+
+    [Fact]
+    public void MountedRoute_ReturnEndpoint_ReentersForwardLane()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        route.Update(
+            new Vec3(0f, 35f, 0f),
+            new Vec3(0f, 1f, 0f));
+        route.Update(
+            new Vec3(0f, 35f, 0f),
+            new Vec3(0f, -1f, 0f));
+        BattleGuardMountedRouteInput turning = route.Update(
+            new Vec3(0f, 5f, 0f),
+            new Vec3(0f, -1f, 0f));
+
+        Assert.Equal("TurningToEnd", route.State);
+        Assert.Equal(
+            Agent.MovementControlFlag.TurnRight,
+            turning.TurnFlag);
+
+        route.Update(
+            new Vec3(0f, 5f, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.Equal("Forward", route.State);
+        Assert.Equal(2, route.CompletedTurns);
+    }
+
+    [Fact]
+    public void MountedRoute_LateralDrift_SteersBackToTarget()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        BattleGuardMountedRouteInput input = route.Update(
+            new Vec3(2f, 10f, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.Equal(
+            Agent.MovementControlFlag.TurnLeft,
+            input.TurnFlag);
+        Assert.True(input.Movement.x < 0f);
+    }
+
+    [Fact]
+    public void MountedRoute_OutsideClearedLane_IsNotStrikeReady()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        route.Update(
+            new Vec3(4f, 10f, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.False(route.CanStageStrike);
+    }
+
+    [Fact]
+    public void MountedRoute_FirstRemoteSample_InfersReturnDirection()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        route.Update(
+            new Vec3(0f, 30f, 0f),
+            new Vec3(0f, -1f, 0f));
+
+        Assert.Equal("Return", route.State);
+        Assert.True(route.CanStageStrike);
+        Assert.Equal(30f, route.RemainingDistance);
+    }
+
+    [Fact]
+    public void MountedRoute_PrePositionSample_DoesNotCompleteTurn()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 25f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        BattleGuardMountedRouteInput pending = route.Update(
+            Vec3.Zero,
+            new Vec3(0f, -1f, 0f));
+
+        Assert.Equal("Pending", route.State);
+        Assert.Equal(0, route.CompletedTurns);
+        Assert.Equal(Vec2.Zero, pending.Movement);
+        Assert.Equal(
+            Agent.MovementControlFlag.None,
+            pending.TurnFlag);
+
+        route.Update(
+            new Vec3(0f, 25f, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.Equal("Forward", route.State);
+        Assert.Equal(0, route.CompletedTurns);
+    }
+
+    [Fact]
+    public void MountedRoute_AuthoritativeDefinition_RoundTrips()
+    {
+        Guid commandId = Guid.NewGuid();
+        var original = new NetworkBattleGuardFixtureRoute(
+            "battle",
+            commandId,
+            Guid.NewGuid(),
+            "guard-owner",
+            12f,
+            34f,
+            2f,
+            0.6f,
+            0.8f,
+            40f,
+            BattleGuardFixturePhase.Attack);
+        using var stream = new MemoryStream();
+
+        Serializer.Serialize(stream, original);
+        stream.Position = 0;
+        NetworkBattleGuardFixtureRoute received =
+            Serializer.Deserialize<NetworkBattleGuardFixtureRoute>(stream);
+        var route = new BattleGuardMountedRoute(
+            new Vec3(received.StartX, received.StartY, received.StartZ),
+            new Vec3(received.DirectionX, received.DirectionY, 0f),
+            received.Length);
+
+        Assert.Equal(original.BattleInstanceId, received.BattleInstanceId);
+        Assert.Equal(commandId, received.CommandId);
+        Assert.Equal(original.GuardAgentId, received.GuardAgentId);
+        Assert.Equal(original.GuardAuthority, received.GuardAuthority);
+        Assert.Equal(BattleGuardFixturePhase.Attack, received.Phase);
+        Assert.Equal(new Vec3(12f, 34f, 2f), route.Start);
+        Assert.Equal(new Vec3(0.6f, 0.8f, 0f), route.Direction);
+        Assert.Equal(40f, route.Length);
+    }
+
+    [Fact]
+    public void MountedRouteArrival_ClearsRouteWaitError()
+    {
+        Assert.Null(
+            BattleGuardFixture.ClearMountedRouteWaitError(
+                "waiting for mounted guard route"));
+    }
+
+    [Fact]
+    public void MountedRouteArrival_PreservesSetupError()
+    {
+        const string Error = "fixture weapon is unavailable";
+
+        Assert.Equal(
+            Error,
+            BattleGuardFixture.ClearMountedRouteWaitError(Error));
     }
 
     private static BattleGuardAnimationFrame Frame(

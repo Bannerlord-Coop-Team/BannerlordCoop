@@ -45,8 +45,12 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
     [ProtoMember(7)]
     public bool Reset { get; }
 
+    [ProtoMember(9)]
+    public Guid CommandId { get; }
+
     public NetworkBattleGuardFixtureCommand(
         string battleInstanceId,
+        Guid commandId,
         Guid guardAgentId,
         string guardAuthority,
         Guid strikerAgentId,
@@ -56,6 +60,7 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
         bool reset = false)
     {
         BattleInstanceId = battleInstanceId;
+        CommandId = commandId;
         GuardAgentId = guardAgentId;
         GuardAuthority = guardAuthority;
         StrikerAgentId = strikerAgentId;

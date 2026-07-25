@@ -135,6 +135,8 @@ public class CoopBattleController : CoopMissionController
         this.guardFixture = guardFixture;
         messageBroker.Subscribe<NetworkBattleGuardFixtureCommand>(
             Handle_BattleGuardFixtureCommand);
+        messageBroker.Subscribe<NetworkBattleGuardFixtureRoute>(
+            Handle_BattleGuardFixtureRoute);
 #endif
 
         // Decode order clips during battle setup so the first issued order does not hitch.
@@ -160,6 +162,8 @@ public class CoopBattleController : CoopMissionController
 #if DEBUG
         messageBroker.Unsubscribe<NetworkBattleGuardFixtureCommand>(
             Handle_BattleGuardFixtureCommand);
+        messageBroker.Unsubscribe<NetworkBattleGuardFixtureRoute>(
+            Handle_BattleGuardFixtureRoute);
         guardFixture.Reset(coopMissionComponent.AgentRegistry);
 #endif
 
@@ -291,6 +295,21 @@ public class CoopBattleController : CoopMissionController
                 guardFixture.Apply(command, coopMissionComponent.AgentRegistry);
             },
             context: nameof(Handle_BattleGuardFixtureCommand));
+    }
+
+    private void Handle_BattleGuardFixtureRoute(
+        MessagePayload<NetworkBattleGuardFixtureRoute> payload)
+    {
+        NetworkBattleGuardFixtureRoute route = payload.What;
+        GameThread.RunSafe(
+            () =>
+            {
+                if (route.BattleInstanceId != Session.InstanceId)
+                    return;
+
+                guardFixture.ApplyMountedRoute(route);
+            },
+            context: nameof(Handle_BattleGuardFixtureRoute));
     }
 #endif
 

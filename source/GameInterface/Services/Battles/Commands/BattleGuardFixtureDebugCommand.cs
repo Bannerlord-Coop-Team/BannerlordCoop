@@ -35,6 +35,7 @@ public static class BattleGuardFixtureDebugCommand
         }
         var command = new NetworkBattleGuardFixtureCommand(
             args[0],
+            Guid.NewGuid(),
             guardAgentId,
             args[2],
             strikerAgentId,
@@ -57,6 +58,7 @@ public static class BattleGuardFixtureDebugCommand
             return "Usage: coop.debug.battle.guard_fixture_reset battle-instance-id";
         var command = new NetworkBattleGuardFixtureCommand(
             args[0],
+            Guid.NewGuid(),
             Guid.Empty,
             null,
             Guid.Empty,
