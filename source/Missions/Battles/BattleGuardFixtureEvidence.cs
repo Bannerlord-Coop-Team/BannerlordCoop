@@ -451,7 +451,7 @@ internal sealed class BattleGuardContinuityEvidence
 internal sealed class BattleGuardReactionEvidence
 {
     private const float MissingVisualGraceSeconds = 0.05f;
-    private const float TerminalProgress = 0.95f;
+    private const float TerminalProgress = 0.70f;
 
     public bool HasStarted { get; private set; }
     public bool Active { get; private set; }
@@ -494,8 +494,7 @@ internal sealed class BattleGuardReactionEvidence
         else if (HasStarted &&
                  receivedReactionActive &&
                  (channel != Channel ||
-                  actionIndex != ActionIndex ||
-                  animationIndex != AnimationIndex))
+                  actionIndex != ActionIndex))
         {
             Interrupted = true;
             Active = false;
@@ -507,6 +506,8 @@ internal sealed class BattleGuardReactionEvidence
         if (exactVisual)
         {
             Active = true;
+            if (!hasExactVisual)
+                AnimationIndex = animationIndex;
             hasExactVisual = true;
             missingVisualSeconds = 0f;
             VisualDurationSeconds += Math.Max(0f, dt);

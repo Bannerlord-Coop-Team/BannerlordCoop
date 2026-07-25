@@ -44,6 +44,8 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float SampleIntervalSeconds = 0.05f;
     private const float ProgressEpsilon = 0.001f;
     private const float FixtureLaneOffset = 25f;
+    private const float MountedRunwayLength = 100f;
+    private const float MountedRunwayRadius = 1.5f;
     private const Agent.MovementControlFlag AttackFlags =
         Agent.MovementControlFlag.AttackDown |
         Agent.MovementControlFlag.AttackUp |
@@ -722,7 +724,12 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
         if (!guardDriver.Positioned)
         {
-            PositionGuard(agent, guardDriver);
+            if (!TryPositionGuard(agent, guardDriver))
+            {
+                lastError =
+                    "no clear mounted guard fixture lane was found";
+                return;
+            }
             guardDriver.Positioned = true;
         }
     }
@@ -785,21 +792,39 @@ public class BattleGuardFixture : IBattleGuardFixture
             agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
     }
 
-    private static void PositionGuard(Agent agent, GuardDriver driver)
+    private static bool TryPositionGuard(Agent agent, GuardDriver driver)
     {
         Vec3 forward = driver.OriginalLookDirection;
         forward.z = 0f;
         if (forward.LengthSquared < 0.0001f)
             forward = new Vec3(0f, 1f, 0f);
         forward.Normalize();
-        var lane = new Vec3(forward.y, -forward.x, 0f);
         Vec3 origin = driver.OriginalMount != null
             ? driver.OriginalMountPosition
             : driver.OriginalPosition;
-        Vec3 position = origin + (lane * FixtureLaneOffset);
         Scene scene = Mission.Current?.Scene;
-        if (scene != null)
-            position.z = scene.GetGroundHeightAtPosition(position);
+        Vec3 lane;
+        Vec3 position;
+        if (driver.Mode == BattleGuardFixtureMode.Mounted)
+        {
+            if (!TryGetMountedFixtureLane(
+                    scene,
+                    origin,
+                    forward,
+                    driver,
+                    out lane,
+                    out position))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            lane = new Vec3(forward.y, -forward.x, 0f);
+            position = origin + (lane * FixtureLaneOffset);
+            if (scene != null)
+                position.z = scene.GetGroundHeightAtPosition(position);
+        }
 
         if (agent.MountAgent != null)
         {
@@ -812,6 +837,77 @@ public class BattleGuardFixture : IBattleGuardFixture
             agent.TeleportToPosition(position);
             agent.LookDirection = lane;
         }
+        return true;
+    }
+
+    private static bool TryGetMountedFixtureLane(
+        Scene scene,
+        Vec3 origin,
+        Vec3 forward,
+        GuardDriver driver,
+        out Vec3 lane,
+        out Vec3 position)
+    {
+        if (driver.HasFixtureLane)
+        {
+            lane = driver.FixtureLane;
+            position = origin + (lane * FixtureLaneOffset);
+            position.z = scene?.GetGroundHeightAtPosition(position)
+                ?? position.z;
+            return true;
+        }
+
+        Vec3 perpendicular =
+            new Vec3(forward.y, -forward.x, 0f);
+        var candidates = new[]
+        {
+            perpendicular,
+            -perpendicular,
+            forward,
+            -forward
+        };
+        foreach (Vec3 candidate in candidates)
+        {
+            Vec3 candidatePosition =
+                origin + (candidate * FixtureLaneOffset);
+            if (scene != null)
+            {
+                candidatePosition.z =
+                    scene.GetGroundHeightAtPosition(candidatePosition);
+                Vec3 destination =
+                    candidatePosition +
+                    (candidate * MountedRunwayLength);
+                destination.z =
+                    scene.GetGroundHeightAtPosition(destination);
+                var start = new WorldPosition(
+                    scene,
+                    UIntPtr.Zero,
+                    candidatePosition,
+                    hasValidZ: false);
+                var end = new WorldPosition(
+                    scene,
+                    UIntPtr.Zero,
+                    destination,
+                    hasValidZ: false);
+                if (!scene.IsLineToPointClear(
+                        ref start,
+                        ref end,
+                        MountedRunwayRadius))
+                {
+                    continue;
+                }
+            }
+
+            driver.FixtureLane = candidate;
+            driver.HasFixtureLane = true;
+            lane = candidate;
+            position = candidatePosition;
+            return true;
+        }
+
+        lane = Vec3.Zero;
+        position = Vec3.Zero;
+        return false;
     }
 
     private static void ClearDefendFlags(
@@ -1520,6 +1616,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         Skeleton skeleton = null;
         bool exactReactionVisual = false;
         bool returnedToExactGuard = false;
+        int reactionVisualAnimationIndex = -1;
         float reactionVisualProgress = -1f;
         bool guardContinuityObserved = false;
         try
@@ -1554,15 +1651,23 @@ public class BattleGuardFixture : IBattleGuardFixture
 
                     if (sample.ExpectedReactionChannel >= 0)
                     {
-                        exactReactionVisual =
+                        int reactionChannel =
+                            sample.ExpectedReactionChannel;
+                        reactionVisualAnimationIndex =
                             skeleton.GetAnimationIndexAtChannel(
-                                sample.ExpectedReactionChannel) ==
-                            sample.ExpectedReactionAnimationIndex;
+                                reactionChannel);
+                        exactReactionVisual =
+                            skeleton.GetActionAtChannel(
+                                reactionChannel).Index ==
+                            sample.ExpectedReactionActionIndex &&
+                            reactionVisualAnimationIndex >= 0;
                         if (exactReactionVisual)
                         {
+                            sample.ObserveReactionVisual(
+                                reactionVisualAnimationIndex);
                             reactionVisualProgress =
                                 skeleton.GetAnimationParameterAtChannel(
-                                    sample.ExpectedReactionChannel);
+                                    reactionChannel);
                         }
                         returnedToExactGuard =
                             sample.LatchedChannel >= 0 &&
@@ -1590,7 +1695,9 @@ public class BattleGuardFixture : IBattleGuardFixture
             returnedToExactGuard,
             sample.CurrentReactionChannel,
             sample.CurrentReactionActionIndex,
-            sample.CurrentReactionAnimationIndex,
+            exactReactionVisual
+                ? reactionVisualAnimationIndex
+                : sample.CurrentReactionAnimationIndex,
             reactionVisualProgress,
             sample.VisualRootEvidence.CurrentPositionSpeed,
             dt);
@@ -1645,7 +1752,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             (agent.GetCurrentAnimationFlag(channel) &
              AnimFlags.anf_cyclic) != 0;
         if (channel == sample.ExpectedReactionChannel &&
-            animationIndex == sample.ExpectedReactionAnimationIndex)
+            skeleton.GetActionAtChannel(channel).Index ==
+                sample.ExpectedReactionActionIndex)
         {
             isCyclic = sample.ExpectedReactionCyclic;
         }
@@ -1981,6 +2089,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         public bool EquipmentReplaced { get; set; }
         public bool GuardArmed { get; set; }
         public bool Positioned { get; set; }
+        public bool HasFixtureLane { get; set; }
+        public Vec3 FixtureLane { get; set; }
         public float GuardBaselineHealth { get; set; }
         public bool HasGuardBaselineHealth { get; set; }
         public float CurrentHorizontalSpeed { get; set; }
@@ -2468,14 +2578,24 @@ public class BattleGuardFixture : IBattleGuardFixture
             CurrentReactionAnimationIndex = active ? animationIndex : -1;
             ReceivedReactionProgress = active ? progress : -1f;
             ReceivedReactionCyclic = active && isCyclic;
-            if (!active || ExpectedReactionAnimationIndex >= 0)
+            if (!active || ExpectedReactionActionIndex >= 0)
                 return;
 
             ExpectedReactionChannel = channel;
             ExpectedReactionActionIndex = actionIndex;
-            ExpectedReactionAnimationIndex = animationIndex;
             ExpectedReactionCyclic = isCyclic;
             ReactionActionIndex = actionIndex;
+        }
+
+        public void ObserveReactionVisual(int animationIndex)
+        {
+            if (animationIndex < 0 ||
+                ExpectedReactionAnimationIndex >= 0)
+            {
+                return;
+            }
+
+            ExpectedReactionAnimationIndex = animationIndex;
             ReactionAnimationIndex = animationIndex;
         }
 

@@ -41,7 +41,7 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void Reaction_DisappearingAfterTerminalExactClip_Completes()
+    public void Reaction_ReturningToGuardAfterVisibleReaction_Completes()
     {
         var evidence = new BattleGuardReactionEvidence();
 
@@ -62,7 +62,7 @@ public class BattleGuardFixtureEvidenceTests
             channel: -1,
             actionIndex: -1,
             animationIndex: -1,
-            visualProgress: 0.95f,
+            visualProgress: 0.70f,
             speed: 6f,
             dt: 0.02f);
         evidence.Observe(
@@ -79,8 +79,40 @@ public class BattleGuardFixtureEvidenceTests
         Assert.True(evidence.Completed);
         Assert.False(evidence.Interrupted);
         Assert.False(evidence.Active);
-        Assert.Equal(0.95f, evidence.MaxVisualProgress);
+        Assert.Equal(0.70f, evidence.MaxVisualProgress);
         Assert.Equal(0.04f, evidence.VisualDurationSeconds, 3);
+    }
+
+    [Fact]
+    public void Reaction_SameSemanticActionWithVisualVariant_IsNotInterrupted()
+    {
+        var evidence = new BattleGuardReactionEvidence();
+
+        evidence.Observe(
+            receivedReactionActive: true,
+            exactVisual: false,
+            returnedToExactGuard: false,
+            channel: 1,
+            actionIndex: 101,
+            animationIndex: 201,
+            visualProgress: -1f,
+            speed: 0f,
+            dt: 0.02f);
+        evidence.Observe(
+            receivedReactionActive: true,
+            exactVisual: true,
+            returnedToExactGuard: false,
+            channel: 1,
+            actionIndex: 101,
+            animationIndex: 202,
+            visualProgress: 0.75f,
+            speed: 0f,
+            dt: 0.02f);
+
+        Assert.True(evidence.Active);
+        Assert.False(evidence.Interrupted);
+        Assert.Equal(202, evidence.AnimationIndex);
+        Assert.Equal(0.75f, evidence.MaxVisualProgress);
     }
 
     [Fact]
