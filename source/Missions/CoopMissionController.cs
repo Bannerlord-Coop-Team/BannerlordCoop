@@ -43,6 +43,15 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
     }
 
+    public override void OnPreMissionTick(float dt)
+    {
+        base.OnPreMissionTick(dt);
+
+        // Native collision runs after this hook and before OnMissionTick. Restore remote guard state here so
+        // combat reads the received defend input and Agent state instead of the later display-only skeleton pose.
+        coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
+    }
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
@@ -63,7 +72,6 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
 
-        coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
         coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
     }

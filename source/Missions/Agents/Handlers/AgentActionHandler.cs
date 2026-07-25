@@ -26,10 +26,10 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
     void CatchUpJoiner(string controllerId);
 
-    /// <summary>[Game thread] Reassert received puppet defend state immediately before the display snapshot.</summary>
+    /// <summary>[Game thread] Replay received puppet guard visuals immediately before the display snapshot.</summary>
     void ReassertRemoteDefendStates(float dt = 0f);
 
-    /// <summary>[Game thread] Apply queued remote actions and refresh their retained defend state.</summary>
+    /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
 }
 
@@ -74,6 +74,7 @@ public class AgentActionHandler : IAgentActionHandler
         public bool Action1WasDiscrete;
         public bool Action0WasDefending;
         public bool Action1WasDefending;
+        public bool IsMounted;
         public bool HasAction0DefendingAction;
         public bool HasAction1DefendingAction;
         public int Action0DefendingAction;
@@ -129,17 +130,10 @@ public class AgentActionHandler : IAgentActionHandler
 
             _localAgentStates.TryGetValue(info.AgentId, out var state);
             bool hadState = state.HasObservation;
-            Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
+            Agent.GuardMode guardMode = GetEffectiveGuardMode(
+                info.AgentId,
                 agent,
                 defendFlags);
-            if (agent.HasMount
-                && defendFlags != Agent.MovementControlFlag.None
-                && !AgentActionData.IsGuardMode(guardMode)
-                && hadState
-                && AgentActionData.IsGuardMode(state.GuardMode))
-            {
-                guardMode = state.GuardMode;
-            }
             bool defendChanged;
             if (hadState)
             {
@@ -166,10 +160,18 @@ public class AgentActionHandler : IAgentActionHandler
                 guardChanged = AgentActionData.IsGuardMode(guardMode);
             }
 
+            bool guardedMountStateChanged =
+                hadState
+                && state.IsMounted != agent.HasMount
+                && (defendFlags != Agent.MovementControlFlag.None
+                    || AgentActionData.IsGuardMode(guardMode)
+                    || state.DefendFlags != Agent.MovementControlFlag.None
+                    || AgentActionData.IsGuardMode(state.GuardMode));
             bool action0Changed = !hadState || state.Action0 != action0;
             bool action1Changed = !hadState || state.Action1 != action1;
             if (!action0Changed && !action1Changed
-                && !defendChanged && !guardChanged)
+                && !defendChanged && !guardChanged
+                && !guardedMountStateChanged)
                 continue;
 
             bool action0Discrete =
@@ -229,7 +231,10 @@ public class AgentActionHandler : IAgentActionHandler
                     && (action1Discrete
                         || (hadState && state.Action1WasDiscrete)));
             bool broadcast =
-                defendChanged || guardChanged || discreteActionChanged;
+                defendChanged
+                || guardChanged
+                || guardedMountStateChanged
+                || discreteActionChanged;
             if (agent.HasMount
                 && (defendChanged
                     || guardChanged
@@ -261,6 +266,7 @@ public class AgentActionHandler : IAgentActionHandler
             state.Action1WasDiscrete = action1Discrete;
             state.Action0WasDefending = action0Defending;
             state.Action1WasDefending = action1Defending;
+            state.IsMounted = agent.HasMount;
             UpdateDefendingAction(
                 action0,
                 agent.GetCurrentActionType(0),
@@ -315,7 +321,8 @@ public class AgentActionHandler : IAgentActionHandler
                     continue;
 
                 var defendFlags = AgentActionData.GetEffectiveDefendMovementFlags(agent);
-                Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
+                Agent.GuardMode guardMode = GetEffectiveGuardMode(
+                    info.AgentId,
                     agent,
                     defendFlags);
                 if (defendFlags == Agent.MovementControlFlag.None
@@ -447,6 +454,28 @@ public class AgentActionHandler : IAgentActionHandler
         }
 
         return previousFlags != currentFlags;
+    }
+
+    private Agent.GuardMode GetEffectiveGuardMode(
+        Guid agentId,
+        Agent agent,
+        Agent.MovementControlFlag defendFlags)
+    {
+        Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
+            agent,
+            defendFlags);
+        if (agent.HasMount
+            && defendFlags != Agent.MovementControlFlag.None
+            && !AgentActionData.IsGuardMode(guardMode)
+            && _localAgentStates.TryGetValue(
+                agentId,
+                out LocalAgentActionState state)
+            && AgentActionData.IsGuardMode(state.GuardMode))
+        {
+            return state.GuardMode;
+        }
+
+        return guardMode;
     }
 
     private static void UpdateDefendingAction(

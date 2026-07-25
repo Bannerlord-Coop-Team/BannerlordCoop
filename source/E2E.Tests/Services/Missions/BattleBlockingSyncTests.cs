@@ -54,6 +54,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(action0, data.Action0Index);
             Assert.Equal(action1, data.Action1Index);
             Assert.Equal(Agent.GuardMode.Left, data.GuardMode);
+            Assert.False(data.IsMounted);
             Assert.Equal(1L, Assert.Single(packet.Sequences));
             Assert.Equal(0, packet.BattleHostEpoch);
         });
@@ -226,6 +227,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             AgentActionData heldAction = Assert.Single(heldPacket.Actions);
             Assert.Equal(expectedDefendFlag, heldAction.DefendFlags);
             Assert.Equal(expectedGuardMode, heldAction.GuardMode);
+            Assert.True(heldAction.IsMounted);
 
             mirror.MovementFlags = Agent.MovementControlFlag.None;
             mirror.Action1CodeType = Agent.ActionCodeType.Idle;
@@ -291,6 +293,52 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             AgentActionPacket attackPacket = Assert.Single(
                 context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
             Assert.Equal(2L, Assert.Single(attackPacket.Sequences));
+        });
+    }
+
+    [Fact]
+    public void PollActions_DismountWhileHoldingSameGuard_SendsPostureTransition()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+
+            context.Component.AgentActionHandler.PollActions();
+
+            mirror.GuardMode = Agent.GuardMode.Right;
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            mirror.Action1Index = 202;
+            mirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            context.Component.AgentActionHandler.PollActions();
+
+            Assert.True(
+                Assert.Single(
+                    Assert.Single(
+                        context.Network.NetworkSentPackets
+                            .GetPackets<AgentActionPacket>())
+                        .Actions)
+                    .IsMounted);
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.MountAgent = null;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            AgentActionData action = Assert.Single(packet.Actions);
+            Assert.False(action.IsMounted);
+            Assert.Equal(Agent.GuardMode.Right, action.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                action.DefendFlags);
         });
     }
 
@@ -407,6 +455,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(Agent.MovementControlFlag.DefendBlock, action.DefendFlags);
             Assert.Equal(Agent.GuardMode.Left, action.GuardMode);
             Assert.Equal(1, action.GuardPresentationChannel);
+            Assert.Equal(1, action.GuardActionChannel);
+            Assert.True(action.GuardActionIsDefending);
+            Assert.True(action.IsMounted);
         });
     }
 
@@ -448,6 +499,12 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 expectedChannel,
                 Assert.Single(result.Actions).GuardPresentationChannel);
+            Assert.Equal(
+                expectedChannel,
+                Assert.Single(result.Actions).GuardActionChannel);
+            Assert.False(
+                Assert.Single(result.Actions).GuardActionIsDefending);
+            Assert.True(Assert.Single(result.Actions).IsMounted);
         });
     }
 
@@ -464,7 +521,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.Action1Index = 202;
             ownerMirror.Action1CodeType = actionType;
 
-            Assert.Equal(-1, new AgentActionData(owner).GuardPresentationChannel);
+            var data = new AgentActionData(owner);
+            Assert.Equal(-1, data.GuardPresentationChannel);
+            Assert.Equal(-1, data.GuardActionChannel);
+            Assert.False(data.GuardActionIsDefending);
         });
     }
 
@@ -511,6 +571,59 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
             Assert.Equal(-1, puppetMirror.RawVisualAction1Index);
             Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
+        });
+    }
+
+    [Fact]
+    public void DismountSnapshot_DoesNotRetainMountedGuardPresentation()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            puppetMirror.HasVisualSkeleton = true;
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+
+            ownerMirror.MountAgent = null;
+            puppetMirror.MountAgent = null;
+            ownerMirror.Action1Index = 303;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Other;
+            puppetMirror.Action1Index = 303;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Other;
+
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            puppetMirror.SkeletonAction1Index = 303;
+            puppetMirror.RawVisualAction1Index = 303;
+            puppetMirror.InstallRawVisualActionCalls = 0;
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(303, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
         });
     }
 
@@ -571,6 +684,16 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
                 puppetMirror.SkeletonAction1Index = -1;
             }
+            puppetMirror.SetActionChannelCalls = 0;
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(
+                -1,
+                actionChannel == 0
+                    ? puppetMirror.Action0Index
+                    : puppetMirror.Action1Index);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
 
             controller.OnPreDisplayMissionTick(0.1f);
 
@@ -586,6 +709,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                     : puppetMirror.RawVisualAction1Progress,
                 precision: 3);
             Assert.Equal(1, puppetMirror.AdvanceRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
 
             ownerMirror.Action0Index = -1;
             ownerMirror.Action0Progress = 0f;
@@ -646,7 +770,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MissionPreDisplayTick_ReassertsMountedHeldDefendFlags_ThenClears()
+    public void MissionPreMissionTick_RestoresMountedHeldDefendFlags_ThenClears()
     {
         RunScenario("peer", context =>
         {
@@ -669,14 +793,28 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
             puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
+            int guardCommandCount = puppetMirror.SetWeaponGuardCalls;
+
+            controller.OnMissionTick(0f);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward,
+                puppetMirror.MovementFlags);
+            Assert.Equal(guardCommandCount, puppetMirror.SetWeaponGuardCalls);
+
             controller.OnPreDisplayMissionTick(0f);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward,
+                puppetMirror.MovementFlags);
+            Assert.Equal(guardCommandCount, puppetMirror.SetWeaponGuardCalls);
+
+            controller.OnPreMissionTick(0f);
 
             Assert.Equal(
                 Agent.MovementControlFlag.Forward | defendFlags,
                 puppetMirror.MovementFlags);
 
             puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
-            controller.OnPreDisplayMissionTick(0f);
+            controller.OnPreMissionTick(0f);
             Assert.Equal(
                 Agent.MovementControlFlag.Forward | defendFlags,
                 puppetMirror.MovementFlags);
@@ -686,7 +824,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
             puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
-            controller.OnPreDisplayMissionTick(0f);
+            controller.OnPreMissionTick(0f);
 
             Assert.Equal(
                 Agent.MovementControlFlag.Forward,
@@ -695,10 +833,12 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void RetainedOnFootGuard_DoesNotPulseConsumedDefendInput()
+    public void RetainedOnFootGuard_RestoresNativeActionWithoutPulsingPreDisplay()
     {
         RunScenario("peer", context =>
         {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
             var agentId = Guid.NewGuid();
 
             Agent puppet = SpawnRegisteredAgent(
@@ -709,6 +849,15 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendRight;
             ownerMirror.MovementFlags = defendFlags;
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1Progress = 0.2f;
+            ownerMirror.Action1Flags =
+                AnimFlags.amf_priority_defend
+                | AnimFlags.anf_cyclic
+                | AnimFlags.anf_restart;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Index = ownerMirror.Action1Index;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
 
             ApplyOwnerAction(context.Component, 1L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
@@ -717,19 +866,220 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
 
             puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
-            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
-            context.Component.AgentActionHandler.ReassertRemoteDefendStates();
+            puppetMirror.GuardMode = Agent.GuardMode.None;
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1Progress = 0f;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            puppetMirror.SetActionChannelCalls = 0;
+
+            controller.OnMissionTick(0.1f);
 
             Assert.Equal(
                 Agent.MovementControlFlag.Forward,
                 puppetMirror.MovementFlags);
-            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
             Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0f, puppetMirror.Action1Progress);
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward,
+                puppetMirror.MovementFlags);
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0f, puppetMirror.Action1Progress);
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward | defendFlags,
+                puppetMirror.MovementFlags);
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(0.3f, puppetMirror.Action1Progress);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
+            Assert.False(puppetMirror.LastSetActionIgnorePriority);
+            Assert.Equal(
+                AnimFlags.amf_priority_defend | AnimFlags.anf_cyclic,
+                puppetMirror.LastSetActionFlags);
+            Assert.Equal(0.3f, puppetMirror.LastSetActionStartProgress);
+            Assert.False(puppetMirror.LastSetActionForceFaceMorphRestart);
         });
     }
 
     [Fact]
-    public void MissionPreDisplayTick_OnFootGuardDecay_AdvancesRawVisualActionWithoutRestartingAgentAction()
+    public void PreMissionTick_RejectedNativeGuardRestore_RetriesNextTick()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1Progress = 0.2f;
+            ownerMirror.Action1Flags =
+                AnimFlags.amf_priority_defend | AnimFlags.anf_cyclic;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.SetActionChannelResult = false;
+
+            var guardAction = new AgentActionData(owner);
+            Assert.Equal(1, guardAction.GuardActionChannel);
+            Assert.True(guardAction.GuardActionIsDefending);
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0f, puppetMirror.Action1Progress);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
+
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0f, puppetMirror.Action1Progress);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.SetActionChannelResult = true;
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(0.3f, puppetMirror.Action1Progress);
+            Assert.Equal(2, puppetMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void PreMissionTick_DifferentNativeDefendingAction_IsPreserved()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1Progress = 0.2f;
+            ownerMirror.Action1Flags =
+                AnimFlags.amf_priority_defend | AnimFlags.anf_cyclic;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Index = ownerMirror.Action1Index;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
+            puppetMirror.Action1Index = 303;
+            puppetMirror.Action1Progress = 0.6f;
+            puppetMirror.Action1Flags = AnimFlags.amf_priority_defend;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.DefendShield;
+            puppetMirror.SetActionChannelCalls = 0;
+
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(303, puppetMirror.Action1Index);
+            Assert.Equal(0.6f, puppetMirror.Action1Progress);
+            Assert.Equal(AnimFlags.amf_priority_defend, puppetMirror.Action1Flags);
+            Assert.Equal(Agent.MovementControlFlag.Forward, puppetMirror.MovementFlags);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(303, puppetMirror.Action1Index);
+            Assert.Equal(0.6f, puppetMirror.Action1Progress);
+            Assert.Equal(AnimFlags.amf_priority_defend, puppetMirror.Action1Flags);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward
+                    | Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                puppetMirror.MovementFlags);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void PreMissionTick_PostureMismatch_DoesNotRestoreNativeGuardAction()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1Progress = 0.2f;
+            ownerMirror.Action1Flags =
+                AnimFlags.amf_priority_defend | AnimFlags.anf_cyclic;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Index = ownerMirror.Action1Index;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            puppetMirror.MountAgent = null;
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1Progress = 0f;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            puppetMirror.SetActionChannelCalls = 0;
+
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0f, puppetMirror.Action1Progress);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+
+            context.Mock.SpawnMount(puppet);
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(0.2f, puppetMirror.Action1Progress);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void MissionTicks_OnFootGuardDecay_RestoresNativeActionThenReplaysVisualFallback()
     {
         RunScenario("peer", context =>
         {
@@ -764,20 +1114,36 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.Action1Index = -1;
             puppetMirror.Action1Progress = 0f;
             puppetMirror.Action1Flags = 0;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
             puppetMirror.SkeletonAction1Index = -1;
             puppetMirror.SetActionChannelCalls = 0;
 
-            controller.OnMissionTick(0.1f);
+            controller.OnPreMissionTick(0.1f);
 
-            Assert.Equal(-1, puppetMirror.SkeletonAction1Index);
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(0.2f, puppetMirror.Action1Progress);
+            Assert.Equal(202, puppetMirror.SkeletonAction1Index);
             Assert.Equal(-1, puppetMirror.RawVisualAction1Index);
             Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward
+                    | Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                puppetMirror.MovementFlags);
 
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1Progress = 0f;
+            puppetMirror.Action1Flags = 0;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            puppetMirror.SkeletonAction1Index = -1;
+            puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(-1, puppetMirror.Action1Index);
             Assert.Equal(0f, puppetMirror.Action1Progress);
-            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
             Assert.Equal(-1, puppetMirror.SkeletonAction1Index);
             Assert.Equal(202, puppetMirror.RawVisualAction1Index);
             Assert.Equal(0.3f, puppetMirror.RawVisualAction1Progress, precision: 3);
@@ -811,7 +1177,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(202, puppetMirror.RawVisualAction1Index);
             Assert.Equal(2, puppetMirror.AdvanceRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallAgentVisualActionCalls);
-            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
 
             puppetMirror.SetActionChannelCalls = 0;
             puppetMirror.LastSetActionChannel = -1;
@@ -850,6 +1216,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     {
         RunScenario("peer", context =>
         {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
             var agentId = Guid.NewGuid();
 
             Agent puppet = SpawnRegisteredAgent(
@@ -871,7 +1239,17 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.GuardMode = Agent.GuardMode.None;
             puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
             context.Mock.SpawnMount(puppet);
-            context.Component.AgentActionHandler.ReassertRemoteDefendStates();
+
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward,
+                puppetMirror.MovementFlags);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+
+            controller.OnPreMissionTick(0.1f);
 
             Assert.Equal(expectedGuardMode, puppetMirror.GuardMode);
             Assert.Equal(
@@ -881,7 +1259,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 puppetMirror.MovementFlags);
             Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
 
-            context.Component.AgentActionHandler.ReassertRemoteDefendStates();
+            controller.OnPreMissionTick(0.1f);
 
             Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
 
@@ -902,6 +1280,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     {
         RunScenario("peer", context =>
         {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
             var agentId = Guid.NewGuid();
 
             Agent puppet = SpawnRegisteredAgent(
@@ -912,6 +1292,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.GuardMode = Agent.GuardMode.Right;
             ownerMirror.Action1Index = 202;
             ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Index = ownerMirror.Action1Index;
             puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
 
             ApplyOwnerAction(context.Component, 1L, agentId, owner);
@@ -928,17 +1309,32 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             ApplyOwnerAction(context.Component, 2L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
-            context.Component.AgentActionHandler.ReassertRemoteDefendStates();
+            int actionCommandCount = puppetMirror.SetActionChannelCalls;
+
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
             Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(actionCommandCount, puppetMirror.SetActionChannelCalls);
 
             puppetMirror.Action1Index = -1;
             puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
-            context.Component.AgentActionHandler.ReassertRemoteDefendStates();
+
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(actionCommandCount, puppetMirror.SetActionChannelCalls);
+
+            controller.OnPreMissionTick(0.1f);
 
             Assert.Equal(Agent.GuardMode.Up, puppetMirror.GuardMode);
             Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(actionCommandCount, puppetMirror.SetActionChannelCalls);
         });
     }
 
@@ -947,6 +1343,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     {
         RunScenario("peer", context =>
         {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
             var agentId = Guid.NewGuid();
 
             Agent puppet = SpawnRegisteredAgent(
@@ -983,12 +1381,82 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.Action1Index = -1;
             puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
             puppetMirror.SetActionChannelCalls = 0;
-            context.Component.AgentActionHandler.ReassertRemoteDefendStates();
+
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+
+            controller.OnPreMissionTick(0.1f);
 
             Assert.Equal(Agent.GuardMode.Up, puppetMirror.GuardMode);
             Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(-1, puppetMirror.Action1Index);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void MissionPreMissionTick_MountedSameDirectionGuard_RecommandsAfterReactionEnds()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Index = ownerMirror.Action1Index;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+
+            puppetMirror.Action1Index = 303;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.BlockedMelee;
+            puppetMirror.GuardMode = Agent.GuardMode.None;
+            puppetMirror.SetActionChannelCalls = 0;
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            controller.OnMissionTick(0.1f);
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
         });
     }
 
@@ -1119,6 +1587,53 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(agentId, Assert.Single(packet.AgentIds));
             Assert.Equal(Agent.GuardMode.Right, Assert.Single(packet.Actions).GuardMode);
             Assert.Equal(2L, Assert.Single(packet.Sequences));
+        });
+    }
+
+    [Fact]
+    public void CatchUpJoiner_MountedGaitSnapshot_PreservesHeldGuardDirection()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+            context.Component.AgentActionHandler.PollActions();
+
+            mirror.GuardMode = Agent.GuardMode.Right;
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            mirror.Action1Index = 202;
+            mirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.GuardMode = Agent.GuardMode.None;
+            mirror.MovementFlags = Agent.MovementControlFlag.None;
+            mirror.DefendMovementFlag = Agent.MovementControlFlag.DefendBlock;
+            mirror.Action1Index = 303;
+            mirror.Action1CodeType = Agent.ActionCodeType.Other;
+            mirror.Action1Direction = Agent.UsageDirection.None;
+            context.Component.AgentActionHandler.PollActions();
+
+            Assert.Empty(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+
+            context.Component.AgentActionHandler.CatchUpJoiner("joiner");
+
+            var directSend = Assert.Single(context.Network.DirectPacketSends);
+            var packet = Assert.IsType<AgentActionPacket>(directSend.Packet);
+            AgentActionData action = Assert.Single(packet.Actions);
+            Assert.True(action.IsMounted);
+            Assert.Equal(Agent.GuardMode.Right, action.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock,
+                action.DefendFlags);
         });
     }
 
@@ -1311,6 +1826,18 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ApplyOwnerAction(context.Component, 2L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
+            Assert.Equal(202, puppetMirror.Action1Index);
+
+            // Native rider ticking can still replace the restored guard after the pre-mission boundary.
+            puppetMirror.Action1Index = 303;
+            puppetMirror.Action1Progress = ownerMirror.Action1Progress;
+            puppetMirror.Action1Flags = ownerMirror.Action1Flags;
+            puppetMirror.Action1CodeType = ownerMirror.Action1CodeType;
+            puppetMirror.SkeletonAction1Index = 303;
+            puppetMirror.RawVisualAction1Index = 303;
+            puppetMirror.RawVisualAction1Progress = 0.4f;
+            puppetMirror.SetActionChannelCalls = 0;
+
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(303, puppetMirror.Action1Index);
@@ -1366,7 +1893,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MissionPreDisplayTick_MountedGuardModeDrift_DoesNotRecommandOrResetVisualProgress()
+    public void MissionPhases_MountedGuardModeDrift_RestoresBeforeNativeWithoutResettingVisualProgress()
     {
         RunScenario("peer", context =>
         {
@@ -1405,19 +1932,51 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             // Native rider ticking can clear its guard metadata without ending the received guard.
             puppetMirror.GuardMode = Agent.GuardMode.None;
+            puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
             puppetMirror.Action1Progress = 0f;
             puppetMirror.RawVisualAction1Progress = 0f;
             puppetMirror.AdvanceExistingRawVisualActionCalls = 0;
             puppetMirror.InstallAgentVisualActionCalls = 0;
+            puppetMirror.SetActionChannelCalls = 0;
+
+            controller.OnMissionTick(0.1f);
+
+            Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward,
+                puppetMirror.MovementFlags);
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(0f, puppetMirror.Action1Progress, precision: 3);
+            Assert.Equal(0f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
 
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(0f, puppetMirror.Action1Progress, precision: 3);
             Assert.Equal(0.3f, puppetMirror.RawVisualAction1Progress, precision: 3);
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward,
+                puppetMirror.MovementFlags);
+            Assert.Equal(202, puppetMirror.Action1Index);
             Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
             Assert.Equal(1, puppetMirror.AdvanceExistingRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallAgentVisualActionCalls);
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(0.3f, puppetMirror.Action1Progress, precision: 3);
+            Assert.Equal(0.3f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward
+                    | Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                puppetMirror.MovementFlags);
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
         });
     }
 
@@ -1537,7 +2096,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MissionTick_MountedGuardMetadataWithOverwrittenSkeleton_WaitsForPreDisplayReplay()
+    public void MissionPhases_MountedGuardMetadataWithOverwrittenSkeleton_WaitsForPreDisplayReplay()
     {
         RunScenario("peer", context =>
         {
@@ -1578,6 +2137,15 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.SetActionChannelCalls = 0;
 
             controller.OnMissionTick(0.1f);
+
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(303, puppetMirror.SkeletonAction1Index);
+            Assert.Equal(303, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.InstallAgentVisualActionCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+
+            controller.OnPreMissionTick(0.1f);
 
             Assert.Equal(202, puppetMirror.Action1Index);
             Assert.Equal(303, puppetMirror.SkeletonAction1Index);

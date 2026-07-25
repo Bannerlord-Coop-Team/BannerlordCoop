@@ -65,8 +65,13 @@ public sealed class MirrorAgent
     public AnimFlags Action0Flags { get; set; }
     public AnimFlags Action1Flags { get; set; }
     public int SetActionChannelCalls { get; set; }
+    public bool SetActionChannelResult { get; set; } = true;
     public int LastSetActionChannel { get; set; } = -1;
+    public bool LastSetActionIgnorePriority { get; set; }
+    public AnimFlags LastSetActionFlags { get; set; }
     public float LastSetActionBlendInPeriod { get; set; }
+    public float LastSetActionStartProgress { get; set; }
+    public bool LastSetActionForceFaceMorphRestart { get; set; }
     public bool HasVisualSkeleton { get; set; }
     public int SkeletonAction0Index { get; set; } = -1;
     public int SkeletonAction1Index { get; set; } = -1;

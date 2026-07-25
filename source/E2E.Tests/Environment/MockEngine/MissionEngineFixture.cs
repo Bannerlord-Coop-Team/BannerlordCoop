@@ -783,12 +783,28 @@ public sealed class MissionEngineFixture : IDisposable
         Agent __instance,
         int channelNo,
         ref ActionIndexCache actionIndexCache,
+        bool ignorePriority,
         AnimFlags additionalFlags,
         float blendInPeriod,
         float startProgress,
+        bool forceFaceMorphRestart,
         ref bool __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetActionChannelCalls++;
+        m.LastSetActionChannel = channelNo;
+        m.LastSetActionIgnorePriority = ignorePriority;
+        m.LastSetActionFlags = additionalFlags;
+        m.LastSetActionBlendInPeriod = blendInPeriod;
+        m.LastSetActionStartProgress = startProgress;
+        m.LastSetActionForceFaceMorphRestart =
+            forceFaceMorphRestart;
+        __result = m.SetActionChannelResult;
+        if (!__result)
+        {
+            return false;
+        }
+
         if (channelNo == 0)
         {
             m.Action0Index = actionIndexCache.Index;
@@ -814,10 +830,6 @@ public sealed class MissionEngineFixture : IDisposable
             }
         }
 
-        m.SetActionChannelCalls++;
-        m.LastSetActionChannel = channelNo;
-        m.LastSetActionBlendInPeriod = blendInPeriod;
-        __result = true;
         return false;
     }
 

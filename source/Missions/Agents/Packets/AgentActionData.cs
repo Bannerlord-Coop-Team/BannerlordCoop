@@ -184,6 +184,21 @@ namespace Missions.Agents.Packets
             return -1;
         }
 
+        private static int GetGuardActionChannel(
+            Agent agent,
+            int guardPresentationChannel)
+        {
+            if (guardPresentationChannel >= 0)
+                return guardPresentationChannel;
+
+            if (IsDefendingAction(agent.GetCurrentActionType(1)))
+                return 1;
+            if (IsDefendingAction(agent.GetCurrentActionType(0)))
+                return 0;
+
+            return -1;
+        }
+
         private static Agent.GuardMode GetGuardModeFromDefendDirection(
             Agent.UsageDirection direction) =>
             direction switch
@@ -251,6 +266,15 @@ namespace Missions.Agents.Packets
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
             GuardPresentationChannel = GetGuardPresentationChannel(agent);
+            GuardActionChannel = GetGuardActionChannel(
+                agent,
+                GuardPresentationChannel);
+            GuardActionIsDefending =
+                GuardActionChannel >= 0
+                && IsDefendingAction(
+                    agent.GetCurrentActionType(
+                        GuardActionChannel));
+            IsMounted = agent.HasMount;
         }
 
         public void Apply(Agent agent)
@@ -318,6 +342,12 @@ namespace Missions.Agents.Packets
         public int GuardState { get; }
         [ProtoMember(11)]
         public int GuardPresentationChannel { get; }
+        [ProtoMember(12)]
+        public bool IsMounted { get; }
+        [ProtoMember(13)]
+        public int GuardActionChannel { get; }
+        [ProtoMember(14)]
+        public bool GuardActionIsDefending { get; }
         internal Agent.MovementControlFlag DefendFlags =>
             GetDefendMovementFlags((Agent.MovementControlFlag)MovementFlag);
         internal Agent.GuardMode GuardMode => FromWireGuardState(GuardState);
