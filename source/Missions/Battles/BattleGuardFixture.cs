@@ -25,7 +25,9 @@ public interface IBattleGuardFixture
         float dt,
         INetworkAgentRegistry agentRegistry,
         IAgentActionHandler actionHandler);
-    void SamplePostReplayDisplayedState(INetworkAgentRegistry agentRegistry);
+    void SamplePostReplayDisplayedState(
+        INetworkAgentRegistry agentRegistry,
+        IAgentActionHandler actionHandler);
     void SampleFinalDisplayedState(float dt, INetworkAgentRegistry agentRegistry);
     void ObserveScoreHit(
         Agent affectedAgent,
@@ -239,7 +241,9 @@ public class BattleGuardFixture : IBattleGuardFixture
             actionHandler);
     }
 
-    public void SamplePostReplayDisplayedState(INetworkAgentRegistry agentRegistry)
+    public void SamplePostReplayDisplayedState(
+        INetworkAgentRegistry agentRegistry,
+        IAgentActionHandler actionHandler)
     {
         if (roles == null ||
             !TryGetExactAgent(
@@ -252,7 +256,10 @@ public class BattleGuardFixture : IBattleGuardFixture
             return;
         }
 
-        ObservePostReplayDisplayedState(info.Agent);
+        ObservePostReplayDisplayedState(
+            info.Agent,
+            info.AgentId,
+            actionHandler);
     }
 
     public void SampleFinalDisplayedState(float dt, INetworkAgentRegistry agentRegistry)
@@ -648,6 +655,9 @@ public class BattleGuardFixture : IBattleGuardFixture
         Agent agent,
         bool drivesGuard)
     {
+        bool phaseChanged =
+            guardDriver != null
+            && guardDriver.Phase != command.Phase;
         if (guardDriver == null)
             guardDriver = new GuardDriver(command.GuardAgentId, command.Mode, command.Phase, agent);
         else
@@ -655,6 +665,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             guardDriver.Mode = command.Mode;
             guardDriver.Phase = command.Phase;
         }
+        if (phaseChanged)
+            guardDriver.Positioned = false;
 
         if (!guardDriver.EquipmentReplaced &&
             !EquipFixtureWeapon(agent, GuardWeaponId, out string error))
@@ -800,10 +812,17 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (scene != null)
             position.z = scene.GetGroundHeightAtPosition(position);
 
-        agent.TeleportToPosition(position);
-        agent.LookDirection = lane;
         if (agent.MountAgent != null)
+        {
+            agent.MountAgent.TeleportToPosition(position);
             agent.MountAgent.LookDirection = lane;
+            agent.LookDirection = lane;
+        }
+        else
+        {
+            agent.TeleportToPosition(position);
+            agent.LookDirection = lane;
+        }
     }
 
     private static void ClearDefendFlags(
@@ -1608,8 +1627,28 @@ public class BattleGuardFixture : IBattleGuardFixture
             dt);
     }
 
-    private void ObservePostReplayDisplayedState(Agent agent)
+    private void ObservePostReplayDisplayedState(
+        Agent agent,
+        Guid agentId,
+        IAgentActionHandler actionHandler)
     {
+        if (actionHandler != null
+            && actionHandler.TryGetGuardImpact(
+                agentId,
+                out int reactionChannel,
+                out int guardActionIndex,
+                out int reactionAnimationIndex,
+                out float reactionProgress))
+        {
+            sample.ObserveReceivedReaction(
+                active: true,
+                reactionChannel,
+                guardActionIndex,
+                reactionAnimationIndex,
+                reactionProgress,
+                isCyclic: false);
+        }
+
         Skeleton skeleton = null;
         try
         {

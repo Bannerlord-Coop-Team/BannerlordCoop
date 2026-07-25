@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -75,6 +76,7 @@ public sealed class MirrorAgent
     public bool HasVisualSkeleton { get; set; }
     public int SkeletonAction0Index { get; set; } = -1;
     public int SkeletonAction1Index { get; set; } = -1;
+    public Dictionary<int, int> ActionAnimationIndices { get; } = new();
     public int RawVisualAction0Index { get; set; } = -1;
     public int RawVisualAction1Index { get; set; } = -1;
     public float RawVisualAction0Progress { get; set; }

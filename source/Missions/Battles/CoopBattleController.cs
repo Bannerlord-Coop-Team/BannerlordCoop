@@ -261,7 +261,8 @@ public class CoopBattleController : CoopMissionController
         base.OnPreDisplayMissionTick(dt);
 #if DEBUG
         guardFixture.SamplePostReplayDisplayedState(
-            coopMissionComponent.AgentRegistry);
+            coopMissionComponent.AgentRegistry,
+            coopMissionComponent.AgentActionHandler);
 #endif
         damageRouter.Tick(dt);
 #if DEBUG
@@ -373,6 +374,12 @@ public class CoopBattleController : CoopMissionController
             damagedHp,
             hitDistance,
             shotDifficulty);
+        coopMissionComponent.AgentActionHandler.ObserveBlockedHit(
+            affectedAgent,
+            affectorAgent,
+            isBlocked,
+            blow.IsMissile,
+            collisionData.CollisionResult);
 #if DEBUG
         guardFixture.ObserveScoreHit(
             affectedAgent,
