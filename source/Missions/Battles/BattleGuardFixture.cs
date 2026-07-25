@@ -2246,14 +2246,14 @@ public class BattleGuardFixture : IBattleGuardFixture
     private sealed class GuardInterceptionStrikeComponent : AgentComponent
     {
         private const float AttackPressSeconds = 0.35f;
-        private const float ReleaseLeadSeconds = 0.5f;
+        private const float ReleaseLeadSeconds = 0.25f;
         private const float MaximumChargeSeconds = 2.5f;
         private const float OutcomeWaitSeconds = 1.25f;
         private const float MaximumOutcomeWaitSeconds = 2.5f;
         private const float RetryRecoverySeconds = 0.5f;
         private const float MountedSpeedReadySeconds = 0.5f;
         private const float MinimumMountedStrikeSpeed = 5f;
-        private const float LateralOffset = 1.15f;
+        private const float LateralOffset = 0.9f;
         private const float MinimumLeadDistance = 6f;
         private const float MaximumLeadDistance = 10f;
         private const int MaximumAttempts = 5;
