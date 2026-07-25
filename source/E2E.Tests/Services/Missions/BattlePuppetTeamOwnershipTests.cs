@@ -124,7 +124,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-023")]
-    public void Deployment_RemoteNpcDrainsWhileOwnTroopRemainsBufferedUntilCommit()
+    public void Deployment_RemoteNpcWaitsForTeamSetup_OwnTroopWaitsForCommit()
     {
         using var fixture = new MissionEngineFixture();
         var (_, partyIds) = SetupCoopBattle("local", "enemy", "remote");
@@ -184,6 +184,13 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
 
             mission.AddTeam(BattleSideEnum.Attacker);
             mission.AddTeam(BattleSideEnum.Attacker);
+            spawner.DrainPendingPuppets();
+
+            Assert.False(registry.TryGetAgentInfo(ownAgentId, out _));
+            Assert.False(registry.TryGetAgentInfo(remoteAgentId, out _));
+
+            AccessTools.Field(typeof(DeploymentMissionController), "<TeamSetupOver>k__BackingField")
+                .SetValue(mission.DeploymentController, true);
             spawner.DrainPendingPuppets();
 
             Assert.False(registry.TryGetAgentInfo(ownAgentId, out _));
