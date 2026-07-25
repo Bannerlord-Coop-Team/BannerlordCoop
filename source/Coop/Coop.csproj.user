@@ -20,6 +20,7 @@
     <StartAction>Program</StartAction>
     <StartProgram>..\tools\DebugServerLauncher\bin\Release\net472\DebugServerLauncher.exe</StartProgram>
     <StartArguments>--no-attach</StartArguments>
-    <StartWorkingDirectory>E:\Mod Development\BannerlordCoop\</StartWorkingDirectory>
+    <StartWorkingDirectory>
+    </StartWorkingDirectory>
   </PropertyGroup>
 </Project>
