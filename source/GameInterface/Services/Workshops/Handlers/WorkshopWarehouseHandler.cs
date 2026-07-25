@@ -86,7 +86,10 @@ internal class WorkshopWarehouseHandler : IHandler
             if (owner.IsPlayerHero())
             {
                 sessionWorkshopPlayerDataInterface.AddNewWarehouseDataIfNeeded(ownerId, settlementId);
-                workshopsBehavior.AddNewWorkshopData(workshop);
+                WorkshopsCampaignBehaviorInitializationHandler.EnsurePlayerWorkshopData(
+                    workshopsBehavior,
+                    owner,
+                    new[] { workshop });
             }
             else if (oldOwner.IsPlayerHero())
             {

@@ -12,6 +12,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Workshops.Commands;
 using GameInterface.Services.Workshops.Interfaces;
 using HarmonyLib;
+using AddWorkshopData = GameInterface.Services.Workshops.Messages.AddNewWorkshopData;
 using WarehouseOwnerChanged = GameInterface.Services.Workshops.Messages.ChangeWorkshopOwner;
 using WarehouseOwnerChangedEvent = GameInterface.Services.Workshops.Messages.WorkshopOwnerChanged;
 using System.Collections.Generic;
@@ -260,6 +261,32 @@ public class WorkshopPurchaseConversationTests : IDisposable
 
         AssertWorkshopOwnedByBuyer(client, state, expectedBuyerGold: 1000, expectedSellerGold: 0);
         AssertClanWorkshopDataReadyForClanMenu(client, state);
+    }
+
+    [Fact]
+    public void AddNewWorkshopData_WhenBehaviorStorageHasNoFreeSlots_ExpandsAndAddsWorkshop()
+    {
+        var client = Clients.First();
+        var state = CreatePurchaseState(workshopOwnedByBuyer: false, buyerGold: 1000, sellerGold: 0);
+
+        client.Call(() =>
+        {
+            var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
+            Workshop occupiedWorkshop = ObjectHelper.SkipConstructor<Workshop>();
+            workshopsBehavior._workshopData =
+                new[] { new WorkshopsCampaignBehavior.WorkshopData(occupiedWorkshop) };
+        });
+
+        client.SimulateMessage(this, new AddWorkshopData(state.WorkshopId));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
+            var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
+
+            Assert.Equal(2, workshopsBehavior._workshopData.Length);
+            Assert.Same(workshop, workshopsBehavior.GetDataOfWorkshop(workshop)?.Workshop);
+        });
     }
 
     [Fact]

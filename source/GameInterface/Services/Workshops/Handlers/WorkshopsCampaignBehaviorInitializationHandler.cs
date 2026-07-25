@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -71,7 +72,16 @@ namespace GameInterface.Services.Workshops.Handlers
 
         private void Handle(MessagePayload<NetworkInitializeServerWorkshopDataKeys> obj)
         {
-            sessionWorkshopPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            GameThread.RunSafe(() =>
+            {
+                if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.PlayerHeroId, out var playerHero)) return;
+
+                sessionWorkshopPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+
+                WorkshopsCampaignBehavior workshopsCampaignBehavior =
+                    Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
+                EnsurePlayerWorkshopData(workshopsCampaignBehavior, playerHero, GetTownWorkshops());
+            }, context: nameof(WorkshopsCampaignBehaviorInitializationHandler));
         }
 
         private KeyValuePair<Settlement, ItemRoster>[] GetWarehouseRosterPerSettlement(string playerHeroId, Hero playerHero)
@@ -108,10 +118,7 @@ namespace GameInterface.Services.Workshops.Handlers
                     }
                 }
 
-                IEnumerable<Workshop> townWorkshops = Settlement.All
-                    .Where(settlement => settlement.IsTown)
-                    .SelectMany(settlement => settlement.Town.Workshops);
-                AddMissingPlayerWorkshopRosters(warehouseRosterPerSettlement, playerHero, townWorkshops);
+                AddMissingPlayerWorkshopRosters(warehouseRosterPerSettlement, playerHero, GetTownWorkshops());
             }, blocking: true);
 
             return CreateWarehouseRosterSlots(warehouseRosterPerSettlement, maxWorkshopCount);
@@ -134,6 +141,38 @@ namespace GameInterface.Services.Workshops.Handlers
             }
         }
 
+        internal static void EnsurePlayerWorkshopData(
+            WorkshopsCampaignBehavior workshopsCampaignBehavior,
+            Hero playerHero,
+            IEnumerable<Workshop> workshops)
+        {
+            foreach (Workshop workshop in workshops)
+            {
+                if (workshop?.Owner != playerHero) continue;
+
+                EnsureWorkshopData(workshopsCampaignBehavior, workshop);
+            }
+        }
+
+        internal static void EnsureWorkshopData(
+            WorkshopsCampaignBehavior workshopsCampaignBehavior,
+            Workshop workshop)
+        {
+            WorkshopsCampaignBehavior.WorkshopData[] workshopData =
+                workshopsCampaignBehavior._workshopData ?? Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
+            workshopsCampaignBehavior._workshopData = workshopData;
+
+            if (workshopsCampaignBehavior.GetDataOfWorkshop(workshop) != null) return;
+
+            if (!workshopData.Any(data => data == null))
+            {
+                Array.Resize(ref workshopData, workshopData.Length + 1);
+                workshopsCampaignBehavior._workshopData = workshopData;
+            }
+
+            workshopsCampaignBehavior.AddNewWorkshopData(workshop);
+        }
+
         internal static KeyValuePair<Settlement, ItemRoster>[] CreateWarehouseRosterSlots(
             IReadOnlyCollection<KeyValuePair<Settlement, ItemRoster>> warehouseRosters,
             int minimumCapacity)
@@ -150,6 +189,13 @@ namespace GameInterface.Services.Workshops.Handlers
             }
 
             return rosterSlots;
+        }
+
+        private static IEnumerable<Workshop> GetTownWorkshops()
+        {
+            return Settlement.All
+                .Where(settlement => settlement.IsTown)
+                .SelectMany(settlement => settlement.Town.Workshops);
         }
     }
 }

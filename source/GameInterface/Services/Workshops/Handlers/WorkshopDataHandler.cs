@@ -87,10 +87,9 @@ internal class WorkshopDataHandler : IHandler
             {
                 var workshopsBehavior = GetWorkshopsBehavior();
                 workshopsBehavior.EnsureBehaviorDataSize();
-                if (workshopsBehavior.GetDataOfWorkshop(workshop) == null)
-                {
-                    workshopsBehavior.AddNewWorkshopData(workshop);
-                }
+                WorkshopsCampaignBehaviorInitializationHandler.EnsureWorkshopData(
+                    workshopsBehavior,
+                    workshop);
             }
         }, context: nameof(WorkshopDataHandler));
     }
