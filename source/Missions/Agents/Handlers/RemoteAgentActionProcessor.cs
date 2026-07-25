@@ -959,8 +959,27 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         bool hasRetainedAgentAction =
             currentAction == guardState.GuardAction;
 
-        if (HasGuardReactionAction(agent)
-            && !hasRetainedAgentAction)
+        if (hasRetainedAgentAction)
+        {
+            guardState.GuardActionProgress =
+                agent.GetCurrentActionProgress(channel);
+            if (agentVisualActionAccessor.IsActionVisible(
+                    agent,
+                    channel,
+                    guardState.GuardAction))
+            {
+                return;
+            }
+
+            agentVisualActionAccessor.AdvanceActionIfAvailable(
+                agent,
+                channel,
+                guardState.GuardAction,
+                guardState.GuardActionProgress);
+            return;
+        }
+
+        if (HasGuardReactionAction(agent))
         {
             return;
         }

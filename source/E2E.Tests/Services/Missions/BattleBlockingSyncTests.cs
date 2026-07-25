@@ -2622,6 +2622,93 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PlayerMountedReaction_VisibleNativeTimeline_DoesNotWriteSkeleton()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            puppetMirror.HasVisualSkeleton = true;
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1Progress = 0.2f;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.BlockedMelee;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            puppetMirror.Action1Index = 202;
+            puppetMirror.Action1Progress = 0.35f;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.BlockedMelee;
+            puppetMirror.SkeletonAction1Index = 202;
+            puppetMirror.RawVisualAction1Index = 202;
+            puppetMirror.RawVisualAction1Progress = 0.2f;
+            puppetMirror.InstallRawVisualActionCalls = 0;
+            puppetMirror.AdvanceExistingRawVisualActionCalls = 0;
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(0.35f, puppetMirror.Action1Progress, precision: 3);
+            Assert.Equal(0.2f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.AdvanceExistingRawVisualActionCalls);
+        });
+    }
+
+    [Fact]
+    public void PlayerMountedReaction_OverwrittenVisualWithNativeMetadata_UsesNativeProgress()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            puppetMirror.HasVisualSkeleton = true;
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1Progress = 0.2f;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.BlockedMelee;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            puppetMirror.Action1Index = 202;
+            puppetMirror.Action1Progress = 0.35f;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.BlockedMelee;
+            puppetMirror.SkeletonAction1Index = -1;
+            puppetMirror.RawVisualAction1Index = 303;
+            puppetMirror.RawVisualAction1Progress = 0.6f;
+            puppetMirror.InstallRawVisualActionCalls = 0;
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(202, puppetMirror.Action1Index);
+            Assert.Equal(0.35f, puppetMirror.Action1Progress, precision: 3);
+            Assert.Equal(202, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0.35f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(1, puppetMirror.InstallRawVisualActionCalls);
+        });
+    }
+
+    [Fact]
     public void PlayerMountedReaction_ReplacesExistingLocomotionVisual()
     {
         RunScenario("peer", context =>
