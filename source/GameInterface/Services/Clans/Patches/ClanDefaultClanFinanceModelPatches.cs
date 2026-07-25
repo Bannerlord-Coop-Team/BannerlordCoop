@@ -65,7 +65,7 @@ internal class DefaultClanFinanceModelPatches
         // Calculate gold change for AI led clans normally
         if (clan.Leader == null || !clan.Leader.IsPlayerHero()) return true;
 
-        var clanLeaderMapEvent = clan.Leader.PartyBelongedTo.MapEvent;
+        var clanLeaderMapEvent = clan.Leader.PartyBelongedTo?.MapEvent;
 
         // Clan leader not in a map event, calculate gold change normally
         if (clanLeaderMapEvent == null) return true;
