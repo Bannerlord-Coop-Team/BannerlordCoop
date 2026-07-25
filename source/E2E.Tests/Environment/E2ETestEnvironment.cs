@@ -9,6 +9,7 @@ using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Services.Players;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -70,6 +71,28 @@ public class E2ETestEnvironment : IDisposable
         {
             Server.ObjectManager.AddExisting(settlement.StringId, settlement);
         }
+    }
+
+    /// <summary>
+    /// Associates an already registered player with a connected E2E client peer.
+    /// Use this when a test needs server behavior that depends on a live player,
+    /// such as time-control unpause policies.
+    /// </summary>
+    public void ConnectRegisteredPlayer(EnvironmentInstance client, string controllerId)
+    {
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(
+                playerManager.TryGetPlayer(controllerId, out var player),
+                $"Player '{controllerId}' must be registered before connecting its peer.");
+
+            playerManager.SetPeer(controllerId, client.NetPeer);
+
+            Assert.True(
+                playerManager.IsConnected(player),
+                $"Player '{controllerId}' was not connected to the supplied client peer.");
+        });
     }
 
     public void Dispose()
