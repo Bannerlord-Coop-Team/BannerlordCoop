@@ -165,7 +165,6 @@ internal class CampaignOptionsCommands
         // Player received damage is not a campaign option. Need to update for clients separately
         if (oldValue != (Difficulty)PlayerReceivedDamageDifficulty)
         {
-            // Player received damage is not a campaign option. Need to update for clients separately
             UpdateOtherOptions();
         }
 
