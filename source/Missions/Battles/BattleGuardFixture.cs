@@ -15,6 +15,7 @@ namespace Missions.Battles;
 public interface IBattleGuardFixture
 {
     void Apply(NetworkBattleGuardFixtureCommand command, INetworkAgentRegistry agentRegistry);
+    void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
     void SampleFinalDisplayedState(float dt, INetworkAgentRegistry agentRegistry);
     string GetState(INetworkAgentRegistry agentRegistry);
@@ -162,6 +163,12 @@ public class BattleGuardFixture : IBattleGuardFixture
                 agentRegistry.IsLocallyControlled(roles.StrikerAgentId);
             ApplyStriker(strikerInfo.Agent, drivesStriker);
         }
+    }
+
+    public void ApplyPlayerInput(INetworkAgentRegistry agentRegistry)
+    {
+        if (TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
+            DriveGuardInput(agent, guardDriver);
     }
 
     public void Tick(float dt, INetworkAgentRegistry agentRegistry)
@@ -381,26 +388,9 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     private void TickGuard(INetworkAgentRegistry agentRegistry)
     {
-        if (guardDriver == null)
+        if (!TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
             return;
 
-        if (controllerIdProvider.ControllerId != roles?.GuardAuthority ||
-            !TryGetExactAgent(
-                agentRegistry,
-                guardDriver.AgentId,
-                roles.GuardAuthority,
-                out CoopAgentInfo info) ||
-            !agentRegistry.IsLocallyControlled(guardDriver.AgentId))
-        {
-            DetachMigratedGuardDriver(agentRegistry);
-            return;
-        }
-
-        Agent agent = info.Agent;
-        if (!guardDriver.DrivesAgent)
-            return;
-
-        DriveGuardInput(agent, guardDriver);
         if (guardDriver.Mode == BattleGuardFixtureMode.Foot && agent.HasMount)
             return;
         if (guardDriver.Mode == BattleGuardFixtureMode.Mounted && !agent.HasMount)
@@ -418,6 +408,30 @@ public class BattleGuardFixture : IBattleGuardFixture
             PositionGuard(agent, guardDriver);
             guardDriver.Positioned = true;
         }
+    }
+
+    private bool TryGetDrivenGuardAgent(
+        INetworkAgentRegistry agentRegistry,
+        out Agent agent)
+    {
+        agent = null;
+        if (guardDriver?.DrivesAgent != true)
+            return false;
+
+        if (controllerIdProvider.ControllerId != roles?.GuardAuthority ||
+            !TryGetExactAgent(
+                agentRegistry,
+                guardDriver.AgentId,
+                roles.GuardAuthority,
+                out CoopAgentInfo info) ||
+            !agentRegistry.IsLocallyControlled(guardDriver.AgentId))
+        {
+            DetachMigratedGuardDriver(agentRegistry);
+            return false;
+        }
+
+        agent = info.Agent;
+        return true;
     }
 
     private static void DriveGuardInput(
