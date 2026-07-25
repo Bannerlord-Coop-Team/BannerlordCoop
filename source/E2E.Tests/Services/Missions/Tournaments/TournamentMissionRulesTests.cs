@@ -391,5 +391,4 @@ public class TournamentMissionRulesTests
             collisionData.CollisionResult,
             recordedCollision);
     }
-
 }
