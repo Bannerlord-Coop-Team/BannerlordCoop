@@ -230,23 +230,32 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void FinalCatchUpPending_StartsWithFinalBaselineAndEndsWithCampaignEntry()
+        public void JoinCatchUpPending_StartsAfterReplayAndEndsWithCampaignEntry()
         {
             var state = connectionLogic.SetState<LoadingState>();
-            Assert.False(state.IsFinalCatchUpPending);
+            Assert.False(state.IsJoinCatchUpPending);
 
-            StartBaseline(state);
-            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
-            Assert.False(state.IsFinalCatchUpPending);
+            CampaignEntered(state);
+            Assert.False(state.IsJoinCatchUpPending);
+            DrainGameThread();
+            Assert.True(state.IsJoinCatchUpPending);
+
+            Signal(state, JoinSyncSignal.ReplayApplied);
+            Assert.True(state.IsJoinCatchUpPending);
+            DrainGameThread();
+
+            Signal(state, JoinSyncSignal.BaselineRequested);
+            Assert.True(state.IsJoinCatchUpPending);
+            DrainGameThread();
 
             SendAndDrain(state, JoinSyncSignal.BaselineApplied);
-            Assert.True(state.IsFinalCatchUpPending);
+            Assert.True(state.IsJoinCatchUpPending);
 
             SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
-            Assert.True(state.IsFinalCatchUpPending);
+            Assert.True(state.IsJoinCatchUpPending);
 
             SendAndDrain(state, JoinSyncSignal.CatchUpApplied);
-            Assert.False(state.IsFinalCatchUpPending);
+            Assert.False(state.IsJoinCatchUpPending);
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
 

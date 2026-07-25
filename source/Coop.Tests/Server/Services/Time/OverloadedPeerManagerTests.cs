@@ -104,14 +104,14 @@ public class OverloadedPeerManagerTests
     }
 
     [Fact]
-    public void FinalJoinCatchUp_PausesAfterTwentySecondsRegardlessOfPacketCount()
+    public void InitialJoinCatchUp_PausesAfterTwentySecondsRegardlessOfPacketCount()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
         timeControlMock.Setup(t => t.GetTimeControl()).Returns(TimeControlEnum.Play_1x);
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
         var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
         var peer = AddConnectedPeer(connections);
-        StartFinalCatchUp(connections, peer);
+        StartInitialCatchUp(connections, peer);
         peer.SetQueueLength(100);
         DateTime startedUtc = DateTime.UtcNow;
 
@@ -183,7 +183,7 @@ public class OverloadedPeerManagerTests
     }
 
     [Fact]
-    public void LoadingPeerBeforeFinalCatchUp_DoesNotPauseAfterGracePeriod()
+    public void LoadingPeerBeforeJoinCatchUp_DoesNotPauseAfterGracePeriod()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();
@@ -210,6 +210,15 @@ public class OverloadedPeerManagerTests
 
     private void StartFinalCatchUp(ConnectionCollection connections, LiteNetLib.NetPeer peer)
     {
+        var state = StartInitialCatchUp(connections, peer);
+        SendAndDrain(state, peer, JoinSyncSignal.BaselineRequested);
+        SendAndDrain(state, peer, JoinSyncSignal.BaselineApplied);
+
+        Assert.True(state.IsJoinCatchUpPending);
+    }
+
+    private LoadingState StartInitialCatchUp(ConnectionCollection connections, LiteNetLib.NetPeer peer)
+    {
         serverComponent.Container.Resolve<IConnectionMessageQueue>().BeginQueueing(peer);
         var state = connections.ConnectionStates[peer].SetState<LoadingState>();
 
@@ -217,10 +226,9 @@ public class OverloadedPeerManagerTests
             new MessagePayload<NetworkPlayerCampaignEntered>(peer, new NetworkPlayerCampaignEntered()));
         DrainGameThread();
         SendAndDrain(state, peer, JoinSyncSignal.ReplayApplied);
-        SendAndDrain(state, peer, JoinSyncSignal.BaselineRequested);
-        SendAndDrain(state, peer, JoinSyncSignal.BaselineApplied);
 
-        Assert.True(state.IsFinalCatchUpPending);
+        Assert.True(state.IsJoinCatchUpPending);
+        return state;
     }
 
     private static void SendAndDrain(LoadingState state, LiteNetLib.NetPeer peer, JoinSyncSignal signal)
