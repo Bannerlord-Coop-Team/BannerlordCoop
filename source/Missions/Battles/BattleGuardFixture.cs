@@ -347,8 +347,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (!drivesGuard)
             return;
 
-        guardDriver.AttachInputDriver(agent);
-        guardDriver.UpdateInputDriver(command.Mode, command.Phase);
+        guardDriver.BeginDriving();
         if (command.Phase == BattleGuardFixturePhase.Calibration)
         {
             guardDriver.GuardArmed = false;
@@ -398,6 +397,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
 
         Agent agent = info.Agent;
+        if (!guardDriver.DrivesAgent)
+            return;
+
+        DriveGuardInput(agent, guardDriver);
         if (guardDriver.Mode == BattleGuardFixtureMode.Foot && agent.HasMount)
             return;
         if (guardDriver.Mode == BattleGuardFixtureMode.Mounted && !agent.HasMount)
@@ -415,6 +418,41 @@ public class BattleGuardFixture : IBattleGuardFixture
             PositionGuard(agent, guardDriver);
             guardDriver.Positioned = true;
         }
+    }
+
+    private static void DriveGuardInput(
+        Agent agent,
+        GuardDriver driver)
+    {
+        bool dismounting =
+            driver.Mode == BattleGuardFixtureMode.Foot &&
+            agent.HasMount;
+        bool moving =
+            !dismounting &&
+            driver.Mode == BattleGuardFixtureMode.Mounted &&
+            driver.Phase != BattleGuardFixturePhase.Attack;
+        bool guarding =
+            !dismounting &&
+            driver.Phase != BattleGuardFixturePhase.Calibration;
+
+        agent.EventControlFlags &= ~Agent.EventControlFlag.Dismount;
+        Agent.MovementControlFlag flags =
+            agent.MovementFlags & ~DriveFlags;
+        if (moving)
+            flags |= Agent.MovementControlFlag.Forward;
+        if (guarding)
+            flags |= DefendFlags;
+        agent.MovementFlags = flags;
+        agent.MovementInputVector = moving
+            ? new Vec2(0f, 1f)
+            : Vec2.Zero;
+        AgentActionData.ApplyDefendMovementFlags(
+            agent,
+            guarding
+                ? DefendFlags
+                : Agent.MovementControlFlag.None);
+        if (dismounting)
+            agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
     }
 
     private static void PositionGuard(Agent agent, GuardDriver driver)
@@ -577,11 +615,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (agent == null)
             return;
 
-        bool drivesGuard = driver.HasInputDriver;
+        bool drivesGuard = driver.DrivesAgent;
         if (drivesGuard &&
             HasMigratedAway(agentRegistry, agent, roles?.GuardAuthority))
         {
-            driver.DetachInputDriver(agent);
+            StopDrivingGuard(agent, driver);
             drivesGuard = false;
         }
 
@@ -593,15 +631,26 @@ public class BattleGuardFixture : IBattleGuardFixture
     {
         GuardDriver driver = guardDriver;
         Agent agent = driver?.Agent;
-        if (driver?.HasInputDriver != true ||
+        if (driver?.DrivesAgent != true ||
             !IsActiveMissionAgent(agent) ||
             !HasMigratedAway(agentRegistry, agent, roles?.GuardAuthority))
         {
             return;
         }
 
-        driver.DetachInputDriver(agent);
+        StopDrivingGuard(agent, driver);
         lastError = "guard authority changed during fixture";
+    }
+
+    private static void StopDrivingGuard(Agent agent, GuardDriver driver)
+    {
+        agent.EventControlFlags &= ~Agent.EventControlFlag.Dismount;
+        agent.MovementFlags &= ~DriveFlags;
+        agent.MovementInputVector = Vec2.Zero;
+        AgentActionData.ApplyDefendMovementFlags(
+            agent,
+            Agent.MovementControlFlag.None);
+        driver.StopDriving();
     }
 
     private static bool HasMigratedAway(
@@ -692,7 +741,7 @@ public class BattleGuardFixture : IBattleGuardFixture
                         originalAgent,
                         restore.Authority))
                 {
-                    restore.Driver.DetachInputDriver(originalAgent);
+                    StopDrivingGuard(originalAgent, restore.Driver);
                 }
                 else
                 {
@@ -729,7 +778,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             return;
         if (!agentRegistry.IsLocallyControlled(restore.AgentId))
         {
-            restore.Driver.DetachInputDriver(agent);
+            StopDrivingGuard(agent, restore.Driver);
             pendingGuardRestore = null;
             lastError = "guard remount authority is unavailable";
             return;
@@ -742,7 +791,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         Agent agent,
         PendingGuardRestore restore)
     {
-        restore.Driver.BeginMountRestore();
         restore.Mount.TeleportToPosition(restore.MountPosition);
         restore.Mount.LookDirection = restore.MountLookDirection;
         agent.TeleportToPosition(restore.AgentPosition);
@@ -754,7 +802,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         Agent agent,
         GuardDriver driver)
     {
-        driver.RestoreInputState(agent);
+        driver.StopDriving();
+        agent.EventControlFlags &= ~Agent.EventControlFlag.Dismount;
         agent.MovementFlags = driver.OriginalMovementFlags;
         agent.MovementInputVector = driver.OriginalMovementInputVector;
         AgentActionData.ApplyDefendMovementFlags(
@@ -1343,10 +1392,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Vec2 OriginalMovementInputVector { get; }
         public Agent.MovementControlFlag OriginalDefendFlags { get; }
         public Agent.GuardMode OriginalGuardMode { get; }
-        public AgentControllerType OriginalController { get; }
-        public Agent OriginalTarget { get; }
-        public Agent.WatchState OriginalWatchState { get; }
-        public bool WasPaused { get; }
         public Agent OriginalMount { get; }
         public Vec3 OriginalPosition { get; }
         public Vec3 OriginalLookDirection { get; }
@@ -1360,9 +1405,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         public bool Positioned { get; set; }
         public float GuardBaselineHealth { get; set; }
         public bool HasGuardBaselineHealth { get; set; }
-        public bool HasInputDriver => inputDriver != null;
-        private readonly bool originalHasOnAiInputSetCallback;
-        private ForcedGuardInputComponent inputDriver;
+        public bool DrivesAgent { get; private set; }
         private int guardChannel = -1;
         private int guardActionIndex = -1;
         private int guardAnimationIndex = -1;
@@ -1383,10 +1426,6 @@ public class BattleGuardFixture : IBattleGuardFixture
             OriginalDefendFlags =
                 AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
             OriginalGuardMode = agent.CurrentGuardMode;
-            OriginalController = agent.Controller;
-            OriginalTarget = agent.GetTargetAgent();
-            OriginalWatchState = agent.CurrentWatchState;
-            WasPaused = agent.IsPaused;
             OriginalMount = agent.MountAgent;
             OriginalPosition = agent.Position;
             OriginalLookDirection = agent.LookDirection;
@@ -1396,55 +1435,16 @@ public class BattleGuardFixture : IBattleGuardFixture
             OriginalWeapon0 = agent.Equipment[EquipmentIndex.Weapon0];
             OriginalWeapon1 = agent.Equipment[EquipmentIndex.Weapon1];
             OriginalWieldedEquipment = new AgentEquipmentData(agent);
-            originalHasOnAiInputSetCallback =
-                agent.GetHasOnAiInputSetCallback();
         }
 
-        public void AttachInputDriver(Agent agent)
+        public void BeginDriving()
         {
-            if (inputDriver != null)
-                return;
-
-            inputDriver = new ForcedGuardInputComponent(agent, Mode, Phase);
-            agent.AddComponent(inputDriver);
-            agent.SetHasOnAiInputSetCallback(true);
-            SetControllerDirect(agent, AgentControllerType.AI);
-            agent.SetIsAIPaused(false);
-            agent.SetTargetAgent(null);
-            agent.SetWatchState(Agent.WatchState.Alarmed);
+            DrivesAgent = true;
         }
 
-        public void UpdateInputDriver(
-            BattleGuardFixtureMode mode,
-            BattleGuardFixturePhase phase)
+        public void StopDriving()
         {
-            inputDriver?.Update(mode, phase);
-        }
-
-        public void RestoreInputState(Agent agent)
-        {
-            DetachInputDriver(agent);
-
-            SetControllerDirect(agent, OriginalController);
-            agent.SetTargetAgent(OriginalTarget);
-            agent.SetWatchState(OriginalWatchState);
-            agent.SetIsAIPaused(WasPaused);
-        }
-
-        public void DetachInputDriver(Agent agent)
-        {
-            if (inputDriver == null)
-                return;
-
-            agent.RemoveComponent(inputDriver);
-            agent.SetHasOnAiInputSetCallback(
-                originalHasOnAiInputSetCallback);
-            inputDriver = null;
-        }
-
-        public void BeginMountRestore()
-        {
-            inputDriver?.BeginMountRestore();
+            DrivesAgent = false;
         }
 
         public void CaptureGuardPresentation(SampleState sample)
@@ -1471,74 +1471,6 @@ public class BattleGuardFixture : IBattleGuardFixture
             guardActionIndex = -1;
             guardAnimationIndex = -1;
             guardActionCyclic = false;
-        }
-    }
-
-    private sealed class ForcedGuardInputComponent : AgentComponent
-    {
-        private BattleGuardFixtureMode mode;
-        private BattleGuardFixturePhase phase;
-        private bool restoringMount;
-
-        public ForcedGuardInputComponent(
-            Agent agent,
-            BattleGuardFixtureMode mode,
-            BattleGuardFixturePhase phase)
-            : base(agent)
-        {
-            this.mode = mode;
-            this.phase = phase;
-        }
-
-        public void Update(
-            BattleGuardFixtureMode nextMode,
-            BattleGuardFixturePhase nextPhase)
-        {
-            mode = nextMode;
-            phase = nextPhase;
-            restoringMount = false;
-        }
-
-        public void BeginMountRestore()
-        {
-            restoringMount = true;
-        }
-
-        public override void OnAIInputSet(
-            ref Agent.EventControlFlag eventFlag,
-            ref Agent.MovementControlFlag movementFlag,
-            ref Vec2 inputVector)
-        {
-            if (restoringMount)
-            {
-                eventFlag = Agent.EventControlFlag.Mount;
-                movementFlag = Agent.MovementControlFlag.None;
-                inputVector = Vec2.Zero;
-                return;
-            }
-
-            bool dismounting =
-                mode == BattleGuardFixtureMode.Foot &&
-                Agent.HasMount;
-            bool moving =
-                !dismounting &&
-                mode == BattleGuardFixtureMode.Mounted &&
-                phase != BattleGuardFixturePhase.Attack;
-            bool guarding =
-                !dismounting &&
-                phase != BattleGuardFixturePhase.Calibration;
-
-            eventFlag = dismounting
-                ? Agent.EventControlFlag.Dismount
-                : Agent.EventControlFlag.None;
-            movementFlag = moving
-                ? Agent.MovementControlFlag.Forward
-                : Agent.MovementControlFlag.None;
-            if (guarding)
-                movementFlag |= DefendFlags;
-            inputVector = moving
-                ? new Vec2(0f, 1f)
-                : Vec2.Zero;
         }
     }
 
