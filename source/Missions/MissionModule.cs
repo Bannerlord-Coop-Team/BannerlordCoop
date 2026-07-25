@@ -165,8 +165,8 @@ public class MissionModule : Module
         builder.RegisterType<RemoteAgentActionProcessor>()
             .As<IRemoteAgentActionProcessor>()
             .InstancePerDependency();
-        builder.RegisterType<GuardImpactHandler>()
-            .As<IGuardImpactHandler>()
+        builder.RegisterType<GuardReactionHandler>()
+            .As<IGuardReactionHandler>()
             .InstancePerDependency();
         builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
         builder.RegisterType<VanillaOrderVoiceService>()

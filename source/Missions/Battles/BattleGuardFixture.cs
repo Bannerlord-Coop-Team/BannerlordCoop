@@ -23,11 +23,8 @@ public interface IBattleGuardFixture
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
     void SamplePreReplayDisplayedState(
         float dt,
-        INetworkAgentRegistry agentRegistry,
-        IAgentActionHandler actionHandler);
-    void SamplePostReplayDisplayedState(
-        INetworkAgentRegistry agentRegistry,
-        IAgentActionHandler actionHandler);
+        INetworkAgentRegistry agentRegistry);
+    void SamplePostReplayDisplayedState(INetworkAgentRegistry agentRegistry);
     void SampleFinalDisplayedState(float dt, INetworkAgentRegistry agentRegistry);
     void ObserveScoreHit(
         Agent affectedAgent,
@@ -220,8 +217,7 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     public void SamplePreReplayDisplayedState(
         float dt,
-        INetworkAgentRegistry agentRegistry,
-        IAgentActionHandler actionHandler)
+        INetworkAgentRegistry agentRegistry)
     {
         if (roles == null ||
             !TryGetExactAgent(
@@ -236,14 +232,10 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         ObservePreReplayDisplayedState(
             info.Agent,
-            info.AgentId,
-            dt,
-            actionHandler);
+            dt);
     }
 
-    public void SamplePostReplayDisplayedState(
-        INetworkAgentRegistry agentRegistry,
-        IAgentActionHandler actionHandler)
+    public void SamplePostReplayDisplayedState(INetworkAgentRegistry agentRegistry)
     {
         if (roles == null ||
             !TryGetExactAgent(
@@ -256,10 +248,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             return;
         }
 
-        ObservePostReplayDisplayedState(
-            info.Agent,
-            info.AgentId,
-            actionHandler);
+        ObservePostReplayDisplayedState(info.Agent);
     }
 
     public void SampleFinalDisplayedState(float dt, INetworkAgentRegistry agentRegistry)
@@ -857,7 +846,7 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         Agent striker = strikerInfo.Agent;
         Agent guard = guardInfo.Agent;
-        if (IsReaction(guard))
+        if (IsReaction(guard, guardDriver.GuardActionIndex))
             strikerDriver.StopAfterReaction();
 
         if (striker.Controller != AgentControllerType.AI)
@@ -1441,38 +1430,18 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     private void ObservePreReplayDisplayedState(
         Agent agent,
-        Guid agentId,
-        float dt,
-        IAgentActionHandler actionHandler)
+        float dt)
     {
-        int reactionChannel = -1;
-        int reactionActionIndex = -1;
+        bool receivedReaction = TryGetReaction(
+            agent,
+            sample.LatchedActionIndex,
+            out int reactionChannel,
+            out int reactionActionIndex,
+            out int reactionAnimationIndex);
         float reactionProgress = -1f;
         bool reactionCyclic = false;
-        bool receivedReaction = actionHandler != null &&
-            actionHandler.TryGetRetainedGuardReaction(
-                agentId,
-                out reactionChannel,
-                out reactionActionIndex,
-                out reactionProgress,
-                out reactionCyclic);
-        int reactionAnimationIndex = -1;
         if (receivedReaction)
         {
-            var reactionAction =
-                new ActionIndexCache(reactionActionIndex);
-            reactionAnimationIndex =
-                MBActionSet.GetAnimationIndexOfAction(
-                    agent.ActionSet,
-                    in reactionAction);
-        }
-        else if (TryGetReaction(
-                     agent,
-                     out reactionChannel,
-                     out reactionActionIndex,
-                     out reactionAnimationIndex))
-        {
-            receivedReaction = true;
             reactionProgress =
                 agent.GetCurrentActionProgress(reactionChannel);
             reactionCyclic =
@@ -1627,28 +1596,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             dt);
     }
 
-    private void ObservePostReplayDisplayedState(
-        Agent agent,
-        Guid agentId,
-        IAgentActionHandler actionHandler)
+    private void ObservePostReplayDisplayedState(Agent agent)
     {
-        if (actionHandler != null
-            && actionHandler.TryGetGuardImpact(
-                agentId,
-                out int reactionChannel,
-                out int guardActionIndex,
-                out int reactionAnimationIndex,
-                out float reactionProgress))
-        {
-            sample.ObserveReceivedReaction(
-                active: true,
-                reactionChannel,
-                guardActionIndex,
-                reactionAnimationIndex,
-                reactionProgress,
-                isCyclic: false);
-        }
-
         Skeleton skeleton = null;
         try
         {
@@ -1700,6 +1649,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         {
             isCyclic = sample.ExpectedReactionCyclic;
         }
+        else if (channel == sample.LatchedChannel &&
+            animationIndex == sample.LatchedAnimationIndex)
+        {
+            isCyclic = sample.LatchedActionCyclic;
+        }
 
         return new BattleGuardAnimationFrame(
             channel,
@@ -1711,13 +1665,14 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     private static bool TryGetReaction(
         Agent agent,
+        int guardActionIndex,
         out int channel,
         out int actionIndex,
         out int animationIndex)
     {
         for (channel = 0; channel <= 1; channel++)
         {
-            if (!IsReaction(agent.GetCurrentActionType(channel)))
+            if (!IsReaction(agent, channel, guardActionIndex))
                 continue;
 
             ActionIndexCache action = agent.GetCurrentAction(channel);
@@ -1850,10 +1805,31 @@ public class BattleGuardFixture : IBattleGuardFixture
         sample.HasPreviousPosition = true;
     }
 
-    private static bool IsReaction(Agent agent)
+    private static bool IsReaction(
+        Agent agent,
+        int guardActionIndex)
     {
-        return IsReaction(agent.GetCurrentActionType(0)) ||
-            IsReaction(agent.GetCurrentActionType(1));
+        return IsReaction(agent, 0, guardActionIndex) ||
+            IsReaction(agent, 1, guardActionIndex);
+    }
+
+    private static bool IsReaction(
+        Agent agent,
+        int channel,
+        int guardActionIndex)
+    {
+        Agent.ActionCodeType actionType =
+            agent.GetCurrentActionType(channel);
+        if (IsReaction(actionType))
+            return true;
+
+        ActionIndexCache action = agent.GetCurrentAction(channel);
+        return guardActionIndex >= 0
+            && action.Index >= 0
+            && action.Index != guardActionIndex
+            && AgentActionData.IsDefendingAction(actionType)
+            && agent.GetCurrentActionStage(channel)
+                == Agent.ActionStage.DefendParry;
     }
 
     private static bool IsReaction(Agent.ActionCodeType actionType)
@@ -2011,6 +1987,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Vec3 CurrentHorizontalDirection { get; set; }
         public float CalibratedPlateauSpeed { get; set; } = -1f;
         public bool DrivesAgent { get; private set; }
+        public int GuardActionIndex => guardActionIndex;
         private int guardChannel = -1;
         private int guardActionIndex = -1;
         private int guardAnimationIndex = -1;
@@ -2204,7 +2181,7 @@ public class BattleGuardFixture : IBattleGuardFixture
                 state = InterceptionState.Exhausted;
                 return;
             }
-            if (IsReaction(guard))
+            if (IsReaction(guard, guardDriver.GuardActionIndex))
             {
                 StopAfterReaction();
                 return;

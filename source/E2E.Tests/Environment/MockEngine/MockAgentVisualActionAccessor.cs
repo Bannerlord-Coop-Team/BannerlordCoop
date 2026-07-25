@@ -55,8 +55,18 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         return animationIndex >= 0;
     }
 
-    public float GetAnimationDuration(int animationIndex) =>
-        animationIndex >= 0 ? 1f : 0f;
+    public float GetAnimationDuration(Agent agent, int animationIndex)
+    {
+        if (animationIndex < 0
+            || !AgentMirror.TryGet(agent, out MirrorAgent mirror))
+            return 0f;
+
+        return mirror.AnimationDurations.TryGetValue(
+            animationIndex,
+            out float duration)
+            ? duration
+            : 1f;
+    }
 
     public int GetAnimationIndex(
         Agent agent,
@@ -68,29 +78,7 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         return GetAnimationIndex(mirror, action.Index);
     }
 
-    public void AdvanceActionIfAvailable(
-        Agent agent,
-        int channel,
-        in ActionIndexCache action,
-        float progress,
-        bool installIfMissing = true)
-    {
-        if (!AgentMirror.TryGet(agent, out MirrorAgent mirror)
-            || !mirror.HasVisualSkeleton)
-        {
-            return;
-        }
-
-        int animationIndex = GetAnimationIndex(mirror, action.Index);
-        AdvanceAnimation(
-            mirror,
-            channel,
-            animationIndex,
-            progress,
-            installIfMissing);
-    }
-
-    public void AdvanceAnimationIfAvailable(
+    public void AdvanceExistingAnimationIfAvailable(
         Agent agent,
         int channel,
         int animationIndex,
@@ -107,16 +95,14 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
             mirror,
             channel,
             animationIndex,
-            progress,
-            installIfMissing: true);
+            progress);
     }
 
     private static void AdvanceAnimation(
         MirrorAgent mirror,
         int channel,
         int animationIndex,
-        float progress,
-        bool installIfMissing)
+        float progress)
     {
         int rawVisualAction = channel == 0
             ? mirror.RawVisualAction0Index
@@ -136,22 +122,6 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
             mirror.AdvanceExistingRawVisualActionCalls++;
             return;
         }
-
-        if (!installIfMissing) return;
-
-        if (channel == 0)
-        {
-            mirror.RawVisualAction0Index = animationIndex;
-            mirror.RawVisualAction0Progress = progress;
-        }
-        else
-        {
-            mirror.RawVisualAction1Index = animationIndex;
-            mirror.RawVisualAction1Progress = progress;
-        }
-
-        mirror.AdvanceRawVisualActionCalls++;
-        mirror.InstallRawVisualActionCalls++;
     }
 
     private static int GetAnimationIndex(

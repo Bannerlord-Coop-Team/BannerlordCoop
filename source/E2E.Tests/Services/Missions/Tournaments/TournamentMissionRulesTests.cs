@@ -7,7 +7,6 @@ using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
 using Moq;
 using System.Reflection;
-using System.Runtime.Serialization;
 using SandBox.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics.Arena;
 using TaleWorlds.Core;
@@ -348,42 +347,49 @@ public class TournamentMissionRulesTests
     }
 
     [Fact]
-    public void TournamentScoreHit_ForwardsGuardImpactToSharedActionHandler()
+    public void TournamentFightController_ForwardsBlockedHitToSharedGuardReactionRecorder()
     {
         var controller =
-            (CoopTournamentFightMissionController)
-            FormatterServices.GetUninitializedObject(
-                typeof(CoopTournamentFightMissionController));
-        bool called = false;
+            ObjectHelper.SkipConstructor<
+                CoopTournamentFightMissionController>();
+        bool recorded = false;
         bool recordedBlocked = false;
         bool recordedMissile = true;
         CombatCollisionResult recordedCollision = default;
-        controller.SetGuardImpactRecorder(
-            (_, _, isBlocked, isMissile, collisionResult) =>
+        controller.SetGuardReactionRecorder(
+            (
+                affectedAgent,
+                affectorAgent,
+                isBlocked,
+                isMissile,
+                collisionResult) =>
             {
-                called = true;
+                recorded = true;
                 recordedBlocked = isBlocked;
                 recordedMissile = isMissile;
                 recordedCollision = collisionResult;
             });
-        var blow = new Blow(0);
-        var collision = new AttackCollisionData();
+        var blow = new Blow();
+        var collisionData = new AttackCollisionData();
 
         controller.OnScoreHit(
             null,
             null,
             null,
-            isBlocked: true,
-            isSiegeEngineHit: false,
+            true,
+            false,
             in blow,
-            in collision,
-            damagedHp: 0f,
-            hitDistance: 0f,
-            shotDifficulty: 0f);
+            in collisionData,
+            0f,
+            0f,
+            0f);
 
-        Assert.True(called);
+        Assert.True(recorded);
         Assert.True(recordedBlocked);
         Assert.False(recordedMissile);
-        Assert.Equal(collision.CollisionResult, recordedCollision);
+        Assert.Equal(
+            collisionData.CollisionResult,
+            recordedCollision);
     }
+
 }

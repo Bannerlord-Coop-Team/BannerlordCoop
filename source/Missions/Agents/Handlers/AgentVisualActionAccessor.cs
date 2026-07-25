@@ -20,14 +20,8 @@ public interface IAgentVisualActionAccessor
     int GetAnimationIndex(
         Agent agent,
         in ActionIndexCache action);
-    float GetAnimationDuration(int animationIndex);
-    void AdvanceActionIfAvailable(
-        Agent agent,
-        int channel,
-        in ActionIndexCache action,
-        float progress,
-        bool installIfMissing = true);
-    void AdvanceAnimationIfAvailable(
+    float GetAnimationDuration(Agent agent, int animationIndex);
+    void AdvanceExistingAnimationIfAvailable(
         Agent agent,
         int channel,
         int animationIndex,
@@ -37,7 +31,6 @@ public interface IAgentVisualActionAccessor
 
 public class AgentVisualActionAccessor : IAgentVisualActionAccessor
 {
-    private const float RetainedReactionAnimationBlendPeriod = -1f;
     // The publicized MBAPI field throws in some live runtime load contexts.
     private static readonly FieldInfo AnimationField =
         typeof(MBAPI).GetField(
@@ -113,7 +106,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
         }
     }
 
-    public float GetAnimationDuration(int animationIndex)
+    public float GetAnimationDuration(Agent agent, int animationIndex)
     {
         try
         {
@@ -147,42 +140,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             in action);
     }
 
-    public void AdvanceActionIfAvailable(
-        Agent agent,
-        int channel,
-        in ActionIndexCache action,
-        float progress,
-        bool installIfMissing = true)
-    {
-        Skeleton skeleton = null;
-        try
-        {
-            skeleton = GetSkeleton(agent);
-            if (ReferenceEquals(skeleton, null)) return;
-
-            int animationIndex = GetAnimationIndex(agent, in action);
-            if (animationIndex < 0) return;
-
-            AdvanceAnimation(
-                skeleton,
-                channel,
-                animationIndex,
-                progress,
-                speed: 1f,
-                installIfMissing);
-        }
-        catch
-        {
-            // Visuals can become invalid between the validity check and skeleton access.
-        }
-        finally
-        {
-            if (!ReferenceEquals(skeleton, null))
-                skeleton.ManualInvalidate();
-        }
-    }
-
-    public void AdvanceAnimationIfAvailable(
+    public void AdvanceExistingAnimationIfAvailable(
         Agent agent,
         int channel,
         int animationIndex,
@@ -200,8 +158,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
                 channel,
                 animationIndex,
                 progress,
-                speed,
-                installIfMissing: true);
+                speed);
         }
         catch
         {
@@ -219,27 +176,13 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
         int channel,
         int animationIndex,
         float progress,
-        float speed,
-        bool installIfMissing)
+        float speed)
     {
         int visualAnimation = skeleton.GetAnimationIndexAtChannel(channel);
-        if (visualAnimation == animationIndex)
-        {
-            skeleton.SetAnimationParameterAtChannel(channel, progress);
-            skeleton.SetAnimationSpeedAtChannel(channel, speed);
-            return;
-        }
+        if (visualAnimation != animationIndex) return;
 
-        if (!installIfMissing) return;
-
-        // Native can replace the puppet reaction before display. Present the retained clip at its
-        // existing timeline without restarting another authored blend.
-        skeleton.SetAnimationAtChannel(
-            animationIndex,
-            channel,
-            animationSpeedMultiplier: speed,
-            blendInPeriod: RetainedReactionAnimationBlendPeriod,
-            startProgress: progress);
+        skeleton.SetAnimationParameterAtChannel(channel, progress);
+        skeleton.SetAnimationSpeedAtChannel(channel, speed);
     }
 
     private static Skeleton GetSkeleton(Agent agent)

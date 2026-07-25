@@ -255,14 +255,12 @@ public class CoopBattleController : CoopMissionController
 #if DEBUG
         guardFixture.SamplePreReplayDisplayedState(
             dt,
-            coopMissionComponent.AgentRegistry,
-            coopMissionComponent.AgentActionHandler);
+            coopMissionComponent.AgentRegistry);
 #endif
         base.OnPreDisplayMissionTick(dt);
 #if DEBUG
         guardFixture.SamplePostReplayDisplayedState(
-            coopMissionComponent.AgentRegistry,
-            coopMissionComponent.AgentActionHandler);
+            coopMissionComponent.AgentRegistry);
 #endif
         damageRouter.Tick(dt);
 #if DEBUG

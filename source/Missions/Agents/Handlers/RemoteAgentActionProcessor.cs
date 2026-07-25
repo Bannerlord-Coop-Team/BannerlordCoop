@@ -21,23 +21,12 @@ public interface IRemoteAgentActionProcessor : IDisposable
     void ReplayRemoteGuardReactions(float dt);
     void Receive(AgentActionPacket packet);
     void HandleBattleHostAssigned(NetworkBattleHostAssigned message);
-    bool TryGetRetainedGuardPresentation(
-        Guid agentId,
-        out int channel,
-        out ActionIndexCache action);
-#if DEBUG
-    bool TryGetRetainedGuardReaction(
-        Guid agentId,
-        out int channel,
-        out int actionIndex,
-        out float progress,
-        out bool isCyclic);
-#endif
 }
 
 public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 {
     private const float RetainedGuardReleaseBlendPeriod = 0.4f;
+    private const float GuardProgressRestartTolerance = 0.01f;
 
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
@@ -116,14 +105,23 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             DrivesMountedGuardPresentation =
                 action.Data.IsPlayerControlled
                 && guardActionIsDefending
+                && !action.Data.GuardActionIsReaction
                 && GetMountedGuardPresentationChannel(action.Data) >= 0;
             DrivesMountedReactionPresentation =
                 action.Data.IsPlayerControlled
-                && !guardActionIsDefending
+                && action.Data.GuardActionIsReaction
                 && GetMountedGuardPresentationChannel(action.Data) >= 0;
-            GuardActionProgress = guardActionChannel == 0
-                ? action.Data.Action0Progress
-                : action.Data.Action1Progress;
+            bool continuesPreviousGuard =
+                previousGuard.HasValue
+                && previousGuard.Value.GuardActionChannel
+                    == guardActionChannel
+                && previousGuard.Value.GuardAction
+                    == guardAction;
+            GuardActionProgress = continuesPreviousGuard
+                ? previousGuard.Value.GuardActionProgress
+                : guardActionChannel == 0
+                    ? action.Data.Action0Progress
+                    : action.Data.Action1Progress;
             HasGuardCommand = DrivesMountedReactionPresentation
                 ? false
                 : previousGuard?.HasGuardCommand ?? false;
@@ -285,69 +283,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             dt: dt);
     }
 
-    public bool TryGetRetainedGuardPresentation(
-        Guid agentId,
-        out int channel,
-        out ActionIndexCache action)
-    {
-        channel = -1;
-        action = ActionIndexCache.act_none;
-        if (!_agentStates.TryGetValue(
-                agentId,
-                out RemoteAgentActionState state)
-            || !state.RetainedGuard.HasValue)
-        {
-            return false;
-        }
-
-        RemoteGuardState guard = state.RetainedGuard.Value;
-        if (guard.GuardActionChannel < 0
-            || guard.GuardAction == ActionIndexCache.act_none)
-        {
-            return false;
-        }
-
-        channel = guard.GuardActionChannel;
-        action = guard.GuardAction;
-        return true;
-    }
-
-#if DEBUG
-    public bool TryGetRetainedGuardReaction(
-        Guid agentId,
-        out int channel,
-        out int actionIndex,
-        out float progress,
-        out bool isCyclic)
-    {
-        channel = -1;
-        actionIndex = -1;
-        progress = -1f;
-        isCyclic = false;
-        if (!_agentStates.TryGetValue(
-                agentId,
-                out RemoteAgentActionState state) ||
-            !state.RetainedGuard.HasValue)
-        {
-            return false;
-        }
-
-        RemoteGuardState guard = state.RetainedGuard.Value;
-        if (!guard.DrivesMountedReactionPresentation ||
-            guard.GuardActionChannel < 0 ||
-            guard.GuardAction == ActionIndexCache.act_none)
-        {
-            return false;
-        }
-
-        channel = guard.GuardActionChannel;
-        actionIndex = guard.GuardAction.Index;
-        progress = guard.GuardActionProgress;
-        isCyclic = guard.IsGuardActionCyclic;
-        return true;
-    }
-#endif
-
     private void ApplyRetainedRemoteGuardStates(
         bool replayGuardAction,
         float dt)
@@ -408,17 +343,19 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                             data.IsPlayerControlled || !agent.HasMount);
                 }
 
-                if (replayGuardAction
-                    && HasGuardReactionAction(agent))
+                bool hasGuardReaction =
+                    replayGuardAction
+                    && HasGuardReactionAction(agent, guardState);
+                if (hasGuardReaction)
                 {
                     guardState.HasGuardCommand = false;
                 }
 
                 if (replayGuardAction
-                    && (guardState.DrivesMountedGuardPresentation
-                        || guardState.DrivesMountedReactionPresentation))
+                    && !hasGuardReaction
+                    && guardState.DrivesMountedGuardPresentation)
                 {
-                    ReplayRetainedGuardAction(
+                    ReplayRetainedMountedGuard(
                         agent,
                         dt,
                         ref guardState);
@@ -899,7 +836,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
-        if (HasGuardReactionAction(agent)
+        if (HasGuardReactionAction(agent, guardState)
             || guardState.DrivesMountedReactionPresentation)
         {
             return;
@@ -943,132 +880,50 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         Agent agent,
         in RemoteGuardState guardState)
     {
-        bool retainGuardReactions =
-            guardState.DrivesMountedReactionPresentation;
+        if (HasGuardReactionAction(agent, guardState))
+            return false;
+
         return IsInterruptingGuardAction(
-                agent.GetCurrentActionType(0),
-                retainGuardReactions)
+                agent.GetCurrentActionType(0))
             || IsInterruptingGuardAction(
-                agent.GetCurrentActionType(1),
-                retainGuardReactions);
+                agent.GetCurrentActionType(1));
     }
 
-    private static bool HasGuardReactionAction(Agent agent) =>
-        AgentActionData.IsGuardReactionAction(agent.GetCurrentActionType(0))
-        || AgentActionData.IsGuardReactionAction(agent.GetCurrentActionType(1));
+    private static bool HasGuardReactionAction(
+        Agent agent,
+        in RemoteGuardState guardState) =>
+        IsGuardReactionAction(agent, 0, guardState)
+        || IsGuardReactionAction(agent, 1, guardState);
+
+    private static bool IsGuardReactionAction(
+        Agent agent,
+        int channel,
+        in RemoteGuardState guardState)
+    {
+        Agent.ActionCodeType actionType =
+            agent.GetCurrentActionType(channel);
+        if (AgentActionData.IsGuardReactionAction(actionType))
+            return true;
+
+        ActionIndexCache action = agent.GetCurrentAction(channel);
+        return action != ActionIndexCache.act_none
+            && (channel != guardState.GuardActionChannel
+                || action != guardState.GuardAction)
+            && AgentActionData.IsDefendingAction(actionType)
+            && agent.GetCurrentActionStage(channel)
+                == Agent.ActionStage.DefendParry;
+    }
 
     private static bool HasDefendingAction(Agent agent) =>
         AgentActionData.IsDefendingAction(agent.GetCurrentActionType(0))
         || AgentActionData.IsDefendingAction(agent.GetCurrentActionType(1));
 
     private static bool IsInterruptingGuardAction(
-        Agent.ActionCodeType actionType,
-        bool retainGuardReactions) =>
+        Agent.ActionCodeType actionType) =>
         actionType != Agent.ActionCodeType.Other
         && actionType != Agent.ActionCodeType.Idle
         && !AgentActionData.IsDefendingAction(actionType)
-        && (!retainGuardReactions
-            || !AgentActionData.IsGuardReactionAction(actionType));
-
-    private void ReplayRetainedGuardAction(
-        Agent agent,
-        float dt,
-        ref RemoteGuardState guardState)
-    {
-        if (!guardState.DrivesMountedReactionPresentation)
-        {
-            ReplayRetainedMountedGuard(
-                agent,
-                dt,
-                ref guardState);
-            return;
-        }
-
-        int channel = guardState.GuardActionChannel;
-        if (agent.Controller != AgentControllerType.None
-            || channel < 0
-            || channel > 1
-            || guardState.GuardAction == ActionIndexCache.act_none
-            || guardState.Action.Data.IsMounted != agent.HasMount)
-        {
-            return;
-        }
-
-        if (HasInterruptingGuardAction(agent, guardState))
-        {
-            // An interrupt on the other channel must not leave our presentation-only guard layered over it.
-            ClearRetainedGuardAction(agent, guardState);
-            return;
-        }
-
-        ActionIndexCache currentAction = agent.GetCurrentAction(channel);
-        bool hasRetainedAgentAction =
-            currentAction == guardState.GuardAction;
-
-        if (hasRetainedAgentAction)
-        {
-            guardState.GuardActionProgress =
-                agent.GetCurrentActionProgress(channel);
-            if (agentVisualActionAccessor.IsActionVisible(
-                    agent,
-                    channel,
-                    guardState.GuardAction))
-            {
-                return;
-            }
-
-            agentVisualActionAccessor.AdvanceActionIfAvailable(
-                agent,
-                channel,
-                guardState.GuardAction,
-                guardState.GuardActionProgress);
-            return;
-        }
-
-        if (HasGuardReactionAction(agent))
-        {
-            return;
-        }
-
-        if (!hasRetainedAgentAction
-            && currentAction != ActionIndexCache.act_none)
-        {
-            Agent.ActionCodeType currentActionType =
-                agent.GetCurrentActionType(channel);
-            if (currentActionType != Agent.ActionCodeType.Other
-                && currentActionType != Agent.ActionCodeType.Idle)
-            {
-                return;
-            }
-        }
-
-        float duration = MBActionSet.GetActionAnimationDuration(
-            agent.ActionSet,
-            in guardState.GuardAction);
-        if (dt > 0f && duration > 0f)
-        {
-            guardState.GuardActionProgress += dt / duration;
-            if (guardState.IsGuardActionCyclic)
-            {
-                guardState.GuardActionProgress -=
-                    (float)Math.Floor(guardState.GuardActionProgress);
-            }
-            else
-            {
-                guardState.GuardActionProgress = Math.Min(
-                    guardState.GuardActionProgress,
-                    0.999f);
-            }
-        }
-
-        // Native can clear a puppet guard before display. Advance its visual clip and blend
-        // immediately before the display snapshot; the next native Agent tick can clear it again.
-        agentVisualActionAccessor.AdvanceActionIfAvailable(
-            agent,
-            channel,
-            guardState.GuardAction,
-            guardState.GuardActionProgress);
-    }
+        && !AgentActionData.IsGuardReactionAction(actionType);
 
     private void ReplayRetainedMountedGuard(
         Agent agent,
@@ -1090,33 +945,94 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
-        float duration = MBActionSet.GetActionAnimationDuration(
-            agent.ActionSet,
+        int animationIndex = agentVisualActionAccessor.GetAnimationIndex(
+            agent,
             in guardState.GuardAction);
-        if (dt > 0f && duration > 0f)
+        if (animationIndex < 0
+            || !agentVisualActionAccessor.TryGetAnimationState(
+                agent,
+                channel,
+                out int visibleAnimationIndex,
+                out float visibleProgress,
+                out float visibleSpeed)
+            || visibleAnimationIndex != animationIndex
+            || float.IsNaN(visibleProgress)
+            || float.IsInfinity(visibleProgress))
         {
-            guardState.GuardActionProgress += dt / duration;
-            if (guardState.IsGuardActionCyclic)
-            {
-                guardState.GuardActionProgress -=
-                    (float)Math.Floor(guardState.GuardActionProgress);
-            }
-            else
-            {
-                guardState.GuardActionProgress = Math.Min(
-                    guardState.GuardActionProgress,
-                    0.999f);
-            }
+            return;
         }
 
-        // Native can restart a mounted puppet's guard while its held input is unchanged.
-        // Advance only the already-visible guard clip so reactions and locomotion keep priority.
-        agentVisualActionAccessor.AdvanceActionIfAvailable(
+        float duration =
+            agentVisualActionAccessor.GetAnimationDuration(
+                agent,
+                animationIndex);
+        float expectedProgress = AdvanceGuardProgress(
+            guardState.GuardActionProgress,
+            dt,
+            duration,
+            visibleSpeed,
+            guardState.IsGuardActionCyclic);
+        bool expectedWrapped =
+            guardState.IsGuardActionCyclic
+            && expectedProgress + GuardProgressRestartTolerance
+                < guardState.GuardActionProgress;
+        bool nativeRestarted =
+            visibleProgress + GuardProgressRestartTolerance
+                < guardState.GuardActionProgress
+            && !expectedWrapped;
+        if (!nativeRestarted)
+        {
+            guardState.GuardActionProgress =
+                ClampAnimationProgress(visibleProgress);
+            return;
+        }
+
+        guardState.GuardActionProgress = expectedProgress;
+        if (visibleSpeed <= 0f
+            || float.IsNaN(visibleSpeed)
+            || float.IsInfinity(visibleSpeed))
+        {
+            visibleSpeed = 1f;
+        }
+
+        // Correct only a native restart of the exact mounted guard clip.
+        agentVisualActionAccessor.AdvanceExistingAnimationIfAvailable(
             agent,
             channel,
-            guardState.GuardAction,
-            guardState.GuardActionProgress,
-            installIfMissing: false);
+            animationIndex,
+            expectedProgress,
+            visibleSpeed);
+    }
+
+    private static float AdvanceGuardProgress(
+        float progress,
+        float dt,
+        float duration,
+        float speed,
+        bool isCyclic)
+    {
+        progress = ClampAnimationProgress(progress);
+        if (dt <= 0f
+            || duration <= 0f
+            || float.IsNaN(duration)
+            || float.IsInfinity(duration))
+        {
+            return progress;
+        }
+
+        if (speed <= 0f || float.IsNaN(speed) || float.IsInfinity(speed))
+            speed = 1f;
+        progress += (dt * speed) / duration;
+        if (isCyclic)
+            return progress - (float)Math.Floor(progress);
+        return Math.Min(progress, 0.999f);
+    }
+
+    private static float ClampAnimationProgress(float progress)
+    {
+        if (float.IsNaN(progress) || float.IsInfinity(progress))
+            return 0f;
+        return Math.Max(0f, Math.Min(progress, 0.999f));
     }
 
     private void ClearRetainedGuardAction(

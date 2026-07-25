@@ -367,6 +367,513 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollActions_MountedDefendParryOnOtherChannel_MarksReactionChannel()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+            mirror.GuardMode = Agent.GuardMode.Right;
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            mirror.Action0Index = 3102;
+            mirror.Action0CodeType = Agent.ActionCodeType.Guard;
+            mirror.Action1Index = 3062;
+            mirror.Action1CodeType = Agent.ActionCodeType.Guard;
+
+            context.Component.AgentActionHandler.PollActions();
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.Action0Index = 3104;
+            mirror.Action0Progress = 0.2f;
+            mirror.Action0Flags = AnimFlags.amf_priority_defend;
+            mirror.Action0Stage = Agent.ActionStage.DefendParry;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionData data = Assert.Single(
+                Assert.Single(
+                    context.Network.NetworkSentPackets
+                        .GetPackets<AgentActionPacket>())
+                    .Actions);
+            Assert.Equal(0, data.GuardPresentationChannel);
+            Assert.Equal(0, data.GuardActionChannel);
+            Assert.True(data.GuardActionIsDefending);
+            Assert.True(data.GuardActionIsReaction);
+        });
+    }
+
+    [Fact]
+    public void CollisionAuthority_CapturesNonOwnedDefenderReactionOnce()
+    {
+        RunScenario("attacker", context =>
+        {
+            var attackerId = Guid.NewGuid();
+            var defenderId = Guid.NewGuid();
+
+            Agent attacker = SpawnRegisteredAgent(
+                context,
+                "attacker",
+                attackerId,
+                AgentControllerType.Player,
+                out _);
+            Agent defender = SpawnRegisteredAgent(
+                context,
+                "defender",
+                defenderId,
+                AgentControllerType.None,
+                out MirrorAgent defenderMirror);
+            defenderMirror.GuardMode = Agent.GuardMode.Right;
+            defenderMirror.Action1Index = 3102;
+            defenderMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+
+            context.Component.AgentActionHandler.ObserveBlockedHit(
+                defender,
+                attacker,
+                isBlocked: true,
+                isMissile: false,
+                collisionResult: CombatCollisionResult.Blocked);
+
+            defenderMirror.Action0Index = 3104;
+            defenderMirror.Action0Progress = 0.2f;
+            defenderMirror.Action0Flags =
+                AnimFlags.amf_priority_defend;
+            defenderMirror.Action0CodeType =
+                Agent.ActionCodeType.Guard;
+            defenderMirror.Action0Stage =
+                Agent.ActionStage.DefendParry;
+
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+
+            NetworkAgentGuardReaction message = Assert.Single(
+                context.Network.NetworkSentMessages
+                    .GetMessages<NetworkAgentGuardReaction>());
+            Assert.Equal("attacker", message.SourceControllerId);
+            Assert.Equal(attackerId, message.AttackerAgentId);
+            Assert.Equal(defenderId, message.AgentId);
+            Assert.Equal(0, message.ReactionChannel);
+            Assert.Equal(3104, message.ReactionActionIndex);
+            Assert.Equal(0.2f, message.Progress, precision: 3);
+            Assert.Equal(
+                (ulong)AnimFlags.amf_priority_defend,
+                message.AnimationFlags);
+            Assert.Equal(0, defenderMirror.AdvanceRawVisualActionCalls);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false, CombatCollisionResult.Blocked)]
+    [InlineData(true, true, CombatCollisionResult.Blocked)]
+    [InlineData(true, false, CombatCollisionResult.StrikeAgent)]
+    public void CollisionAuthority_NonMeleeBlock_DoesNotSendGuardReaction(
+        bool isBlocked,
+        bool isMissile,
+        CombatCollisionResult collisionResult)
+    {
+        RunScenario("attacker", context =>
+        {
+            Agent attacker = SpawnRegisteredAgent(
+                context,
+                "attacker",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            Agent defender = SpawnRegisteredAgent(
+                context,
+                "defender",
+                Guid.NewGuid(),
+                AgentControllerType.None,
+                out MirrorAgent defenderMirror);
+            defenderMirror.Action1Index = 3104;
+            defenderMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+            defenderMirror.Action1Stage =
+                Agent.ActionStage.DefendParry;
+
+            context.Component.AgentActionHandler.ObserveBlockedHit(
+                defender,
+                attacker,
+                isBlocked,
+                isMissile,
+                collisionResult);
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+
+            Assert.Empty(
+                context.Network.NetworkSentMessages
+                    .GetMessages<NetworkAgentGuardReaction>());
+        });
+    }
+
+    [Fact]
+    public void GuardReactionReceiver_AppliesOnceAndIgnoresStaleDuplicates()
+    {
+        RunScenario("defender", context =>
+        {
+            var attackerId = Guid.NewGuid();
+            var defenderId = Guid.NewGuid();
+
+            SpawnRegisteredAgent(
+                context,
+                "attacker",
+                attackerId,
+                AgentControllerType.None,
+                out _);
+            SpawnRegisteredAgent(
+                context,
+                "defender",
+                defenderId,
+                AgentControllerType.Player,
+                out MirrorAgent defenderMirror);
+            defenderMirror.GuardMode = Agent.GuardMode.Right;
+            defenderMirror.Action1Index = 3102;
+            defenderMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+
+            NetworkAgentGuardReaction message =
+                CreateGuardReactionMessage(
+                    attackerId,
+                    defenderId,
+                    sequence: 2);
+            context.Broker.Publish(this, message);
+            DrainGameThread();
+
+            Assert.Equal(1, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(1, defenderMirror.LastSetActionChannel);
+            Assert.Equal(3104, defenderMirror.Action1Index);
+            Assert.Equal(
+                AnimFlags.amf_priority_defend,
+                defenderMirror.LastSetActionFlags);
+            Assert.Equal(
+                0.2f,
+                defenderMirror.LastSetActionStartProgress,
+                precision: 3);
+
+            context.Broker.Publish(this, message);
+            context.Broker.Publish(
+                this,
+                CreateGuardReactionMessage(
+                    attackerId,
+                    defenderId,
+                    sequence: 1));
+            DrainGameThread();
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions(0.1f);
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions(0.1f);
+
+            Assert.Equal(1, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(0, defenderMirror.AdvanceRawVisualActionCalls);
+            Assert.Equal(0, defenderMirror.InstallRawVisualActionCalls);
+        });
+    }
+
+    [Fact]
+    public void GuardReactionReceiver_RetriesUntilAttackerRegistrationArrives()
+    {
+        RunScenario("defender", context =>
+        {
+            var attackerId = Guid.NewGuid();
+            var defenderId = Guid.NewGuid();
+
+            SpawnRegisteredAgent(
+                context,
+                "defender",
+                defenderId,
+                AgentControllerType.Player,
+                out MirrorAgent defenderMirror);
+
+            context.Broker.Publish(
+                this,
+                CreateGuardReactionMessage(
+                    attackerId,
+                    defenderId,
+                    sequence: 1));
+            DrainGameThread();
+            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
+
+            Agent attacker = SpawnAgent(
+                context,
+                AgentControllerType.None,
+                out _);
+            Assert.True(context.Registry.TryRegisterAgent(
+                "attacker",
+                attackerId,
+                attacker));
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+
+            Assert.Equal(1, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(3104, defenderMirror.Action1Index);
+        });
+    }
+
+    [Fact]
+    public void GuardReactionReceiver_RetriesFutureBattleHostAssignment()
+    {
+        const string MapEventId = "guard-reaction-battle";
+        RunBattleScenario("defender", MapEventId, context =>
+        {
+            var attackerId = Guid.NewGuid();
+            var defenderId = Guid.NewGuid();
+
+            SpawnRegisteredAgent(
+                context,
+                "defender",
+                defenderId,
+                AgentControllerType.Player,
+                out MirrorAgent defenderMirror);
+
+            context.Broker.Publish(
+                this,
+                CreateGuardReactionMessage(
+                    attackerId,
+                    defenderId,
+                    sequence: 1,
+                    sourceControllerId: "battle-host",
+                    battleHostEpoch: 2));
+            DrainGameThread();
+            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
+
+            AssignBattleHost(
+                context,
+                MapEventId,
+                "battle-host",
+                Array.Empty<string>(),
+                epoch: 2);
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+
+            Assert.Equal(1, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(3104, defenderMirror.Action1Index);
+        });
+    }
+
+    [Fact]
+    public void GuardReactionReceiver_RestartsNewCollisionUsingSameAction()
+    {
+        RunScenario("defender", context =>
+        {
+            var attackerId = Guid.NewGuid();
+            var defenderId = Guid.NewGuid();
+
+            SpawnRegisteredAgent(
+                context,
+                "attacker",
+                attackerId,
+                AgentControllerType.None,
+                out _);
+            SpawnRegisteredAgent(
+                context,
+                "defender",
+                defenderId,
+                AgentControllerType.Player,
+                out MirrorAgent defenderMirror);
+            defenderMirror.Action1Index = 3104;
+            defenderMirror.Action1Progress = 0.25f;
+            defenderMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+            defenderMirror.Action1Stage =
+                Agent.ActionStage.DefendParry;
+
+            context.Broker.Publish(
+                this,
+                CreateGuardReactionMessage(
+                    attackerId,
+                    defenderId,
+                    sequence: 1,
+                    progress: 0.2f));
+            DrainGameThread();
+            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
+
+            defenderMirror.Action1Progress = 0.8f;
+            NetworkAgentGuardReaction secondReaction =
+                CreateGuardReactionMessage(
+                    attackerId,
+                    defenderId,
+                    sequence: 2,
+                    progress: 0.05f);
+            context.Broker.Publish(this, secondReaction);
+            DrainGameThread();
+
+            Assert.Equal(1, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(3104, defenderMirror.Action1Index);
+            Assert.Equal(
+                0.05f,
+                defenderMirror.Action1Progress,
+                precision: 3);
+
+            context.Broker.Publish(this, secondReaction);
+            DrainGameThread();
+            Assert.Equal(1, defenderMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void GuardReactionReceiver_DoesNotOverwriteRealAttack()
+    {
+        RunScenario("defender", context =>
+        {
+            var attackerId = Guid.NewGuid();
+            var defenderId = Guid.NewGuid();
+
+            SpawnRegisteredAgent(
+                context,
+                "attacker",
+                attackerId,
+                AgentControllerType.None,
+                out _);
+            SpawnRegisteredAgent(
+                context,
+                "defender",
+                defenderId,
+                AgentControllerType.Player,
+                out MirrorAgent defenderMirror);
+            defenderMirror.Action0Index = 500;
+            defenderMirror.Action0CodeType =
+                Agent.ActionCodeType.StrikeMedium;
+
+            context.Broker.Publish(
+                this,
+                CreateGuardReactionMessage(
+                    attackerId,
+                    defenderId,
+                    sequence: 1));
+            DrainGameThread();
+
+            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(500, defenderMirror.Action0Index);
+            Assert.Equal(-1, defenderMirror.Action1Index);
+        });
+    }
+
+    [Fact]
+    public void GuardReactionReceiver_RetriesMountMismatchAndRejectedApplyWithoutGuardMetadata()
+    {
+        RunScenario("defender", context =>
+        {
+            var attackerId = Guid.NewGuid();
+            var defenderId = Guid.NewGuid();
+
+            SpawnRegisteredAgent(
+                context,
+                "attacker",
+                attackerId,
+                AgentControllerType.None,
+                out _);
+            Agent defender = SpawnRegisteredAgent(
+                context,
+                "defender",
+                defenderId,
+                AgentControllerType.Player,
+                out MirrorAgent defenderMirror);
+
+            context.Broker.Publish(
+                this,
+                CreateGuardReactionMessage(
+                    attackerId,
+                    defenderId,
+                    sequence: 1,
+                    isMounted: true));
+            DrainGameThread();
+            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
+
+            context.Mock.SpawnMount(defender);
+            defenderMirror.SetActionChannelResult = false;
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+            Assert.Equal(1, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(-1, defenderMirror.Action1Index);
+
+            defenderMirror.SetActionChannelResult = true;
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+
+            Assert.Equal(2, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(3104, defenderMirror.Action1Index);
+            Assert.Equal(0, defenderMirror.AdvanceRawVisualActionCalls);
+        });
+    }
+
+    [Fact]
+    public void MountedChannelZeroDefendParry_DoesNotReplayChannelOneGuardRaw()
+    {
+        RunScenario("peer", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context,
+                "owner",
+                agentId,
+                AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context,
+                AgentControllerType.Player,
+                out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+            puppetMirror.HasVisualSkeleton = true;
+
+            ownerMirror.GuardMode = Agent.GuardMode.Up;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendUp;
+            ownerMirror.Action1Index = 3062;
+            ownerMirror.Action1Progress = 0.6f;
+            ownerMirror.Action1Flags = AnimFlags.anf_cyclic;
+            ownerMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Index = 3062;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+
+            ApplyOwnerAction(
+                context.Component,
+                1L,
+                agentId,
+                owner);
+            context.Component.AgentActionHandler
+                .ApplyRemoteGuardStates();
+
+            puppetMirror.ActionAnimationIndices[3062] = 3220;
+            puppetMirror.AnimationDurations[3220] = 1f;
+            puppetMirror.RawVisualAction1Index = 3220;
+            puppetMirror.RawVisualAction1Progress = 0.1f;
+            puppetMirror.Action0Index = 3104;
+            puppetMirror.Action0CodeType =
+                Agent.ActionCodeType.Guard;
+            puppetMirror.Action0Stage =
+                Agent.ActionStage.DefendParry;
+            puppetMirror.AdvanceRawVisualActionCalls = 0;
+            puppetMirror.InstallRawVisualActionCalls = 0;
+
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions(0.1f);
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions(0.1f);
+
+            Assert.Equal(
+                0.1f,
+                puppetMirror.RawVisualAction1Progress,
+                precision: 3);
+            Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
+        });
+    }
+
+    [Fact]
     public void MarkerlessPlayerToAiTransition_DoesNotCarryPriorGuardAction()
     {
         RunScenario("peer", context =>
@@ -832,7 +1339,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [Theory]
     [InlineData(Agent.ActionCodeType.ParriedMelee, 0)]
     [InlineData(Agent.ActionCodeType.BlockedMelee, 1)]
-    public void TournamentPreDisplayTick_MountedPolearmReaction_ReplaysTransmittedFullAnimation(
+    public void TournamentPreDisplayTick_MountedPolearmReaction_DoesNotReplayRawAnimation(
         Agent.ActionCodeType reactionType,
         int actionChannel)
     {
@@ -900,17 +1407,17 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(
-                reactionAction,
+                -1,
                 actionChannel == 0
                     ? puppetMirror.RawVisualAction0Index
                     : puppetMirror.RawVisualAction1Index);
             Assert.Equal(
-                0.3f,
+                0f,
                 actionChannel == 0
                     ? puppetMirror.RawVisualAction0Progress
                     : puppetMirror.RawVisualAction1Progress,
                 precision: 3);
-            Assert.Equal(1, puppetMirror.AdvanceRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
 
             ownerMirror.Action0Index = -1;
@@ -926,12 +1433,12 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(-1, puppetMirror.RawVisualAction0Index);
             Assert.Equal(-1, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(1, puppetMirror.AdvanceRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
         });
     }
 
     [Fact]
-    public void MountedReactionPresentation_ArrivingBeforeMountState_RemainsRetained()
+    public void MountedReactionPresentation_ArrivingBeforeMountState_DoesNotInstallRawAnimation()
     {
         RunScenario("peer", context =>
         {
@@ -964,9 +1471,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             controller.OnPreDisplayMissionTick(0.1f);
 
-            Assert.Equal(reactionAction, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(0.3f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(1, puppetMirror.InstallRawVisualActionCalls);
+            Assert.Equal(-1, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallAgentVisualActionCalls);
         });
     }
@@ -2512,6 +3019,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 out MirrorAgent puppetMirror);
             puppetMirror.HasVisualSkeleton = true;
             puppetMirror.ActionAnimationIndices[202] = 3220;
+            puppetMirror.AnimationDurations[3220] = 4f;
             Agent owner = SpawnAgent(
                 context, AgentControllerType.Player, out MirrorAgent ownerMirror);
             context.Mock.SpawnMount(puppet);
@@ -2545,15 +3053,29 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(-1, puppetMirror.Action1Index);
             Assert.Equal(3220, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(0.3f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0.225f, puppetMirror.RawVisualAction1Progress, precision: 3);
             Assert.Equal(1, puppetMirror.AdvanceExistingRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
 
+            // Native forward progress owns the exact clip without a per-frame rewrite.
+            puppetMirror.RawVisualAction1Progress = 0.24f;
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(0.24f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(1, puppetMirror.AdvanceExistingRawVisualActionCalls);
+
+            // A same-guard snapshot must not rewind the retained raw-animation clock.
+            ownerMirror.Action1Progress = 0.05f;
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            puppetMirror.SkeletonAction1Index = -1;
             puppetMirror.RawVisualAction1Progress = 0.01f;
             controller.OnPreDisplayMissionTick(0.1f);
 
-            Assert.Equal(0.4f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0.265f, puppetMirror.RawVisualAction1Progress, precision: 3);
             Assert.Equal(2, puppetMirror.AdvanceExistingRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
 
@@ -2572,436 +3094,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(3220, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(0.6f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0.29f, puppetMirror.RawVisualAction1Progress, precision: 3);
             Assert.Equal(3, puppetMirror.AdvanceExistingRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
-        });
-    }
-
-    [Fact]
-    public void BlockedHit_RawGuardImpact_BroadcastsExactVisualClip()
-    {
-        const string mapEventId = "guard-impact-source";
-        RunBattleScenario("source", mapEventId, context =>
-        {
-            AssignBattleHost(
-                context,
-                mapEventId,
-                "source",
-                Array.Empty<string>(),
-                epoch: 2);
-            DrainGameThread();
-            var controller = context.Instance.Container.Resolve<CoopBattleController>(
-                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
-            var attackerId = Guid.NewGuid();
-            var defenderId = Guid.NewGuid();
-
-            Agent attacker = SpawnRegisteredAgent(
-                context, "source", attackerId, AgentControllerType.Player,
-                out _);
-            Agent defender = SpawnRegisteredAgent(
-                context, "source", defenderId, AgentControllerType.Player,
-                out MirrorAgent defenderMirror);
-            defenderMirror.HasVisualSkeleton = true;
-            defenderMirror.ActionAnimationIndices[202] = 3253;
-            defenderMirror.GuardMode = Agent.GuardMode.Right;
-            defenderMirror.MovementFlags =
-                Agent.MovementControlFlag.DefendBlock
-                | Agent.MovementControlFlag.DefendRight;
-            defenderMirror.Action1Index = 202;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Guard;
-            defenderMirror.SkeletonAction1Index = 202;
-            defenderMirror.RawVisualAction1Index = 3253;
-            defenderMirror.RawVisualAction1Progress = 0.1f;
-            context.Component.AgentActionHandler.PollActions();
-
-            defenderMirror.Action1Index = 204;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Other;
-            defenderMirror.SkeletonAction1Index = 204;
-            defenderMirror.RawVisualAction1Index = 3247;
-            defenderMirror.RawVisualAction1Progress = 0.2f;
-            context.Component.AgentActionHandler.ObserveBlockedHit(
-                defender,
-                attacker,
-                isBlocked: true,
-                isMissile: false,
-                CombatCollisionResult.Blocked);
-            controller.OnPreDisplayMissionTick(0f);
-
-            NetworkAgentGuardImpact impact = Assert.Single(
-                context.Network.NetworkSentMessages
-                    .GetMessages<NetworkAgentGuardImpact>());
-            Assert.Equal("source", impact.SourceControllerId);
-            Assert.Equal(1L, impact.Sequence);
-            Assert.Equal(2, impact.BattleHostEpoch);
-            Assert.Equal(attackerId, impact.AttackerAgentId);
-            Assert.Equal(defenderId, impact.AgentId);
-            Assert.Equal(1, impact.Channel);
-            Assert.Equal(202, impact.GuardActionIndex);
-            Assert.Equal(3247, impact.AnimationIndex);
-            Assert.Equal(0.2f, impact.Progress);
-            Assert.Equal(1f, impact.Speed);
-            Assert.Equal(1f, impact.Duration);
-
-            context.Network.NetworkSentMessages.Clear();
-            defenderMirror.RawVisualAction1Index = 3248;
-            context.Component.AgentActionHandler.ObserveBlockedHit(
-                defender,
-                attacker,
-                isBlocked: false,
-                isMissile: false,
-                CombatCollisionResult.Blocked);
-            controller.OnPreDisplayMissionTick(0f);
-
-            Assert.Empty(
-                context.Network.NetworkSentMessages
-                    .GetMessages<NetworkAgentGuardImpact>());
-
-            defenderMirror.Action1Index = 202;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Guard;
-            defenderMirror.SkeletonAction1Index = 202;
-            defenderMirror.RawVisualAction1Index = 3253;
-            defenderMirror.RawVisualAction1Progress = 0.1f;
-            context.Component.AgentActionHandler.ObserveBlockedHit(
-                defender,
-                attacker,
-                isBlocked: true,
-                isMissile: false,
-                CombatCollisionResult.Blocked);
-            controller.OnPreDisplayMissionTick(0f);
-            controller.OnPreDisplayMissionTick(0f);
-
-            Assert.Empty(
-                context.Network.NetworkSentMessages
-                    .GetMessages<NetworkAgentGuardImpact>());
-        });
-    }
-
-    [Fact]
-    public void BlockedHit_RemoteDefenderAlreadyInNativeImpact_UsesRetainedGuardBaseline()
-    {
-        RunScenario("source", context =>
-        {
-            var controller = context.Instance.Container.Resolve<CoopBattleController>(
-                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
-            var attackerId = Guid.NewGuid();
-            var defenderId = Guid.NewGuid();
-
-            Agent attacker = SpawnRegisteredAgent(
-                context, "source", attackerId, AgentControllerType.Player,
-                out _);
-            Agent defender = SpawnRegisteredAgent(
-                context, "peer", defenderId, AgentControllerType.None,
-                out MirrorAgent defenderMirror);
-            Agent defenderOwner = SpawnAgent(
-                context,
-                AgentControllerType.Player,
-                out MirrorAgent defenderOwnerMirror);
-            defenderMirror.HasVisualSkeleton = true;
-            defenderMirror.ActionAnimationIndices[202] = 3253;
-            defenderOwnerMirror.GuardMode = Agent.GuardMode.Right;
-            defenderOwnerMirror.MovementFlags =
-                Agent.MovementControlFlag.DefendBlock
-                | Agent.MovementControlFlag.DefendRight;
-            defenderOwnerMirror.Action1Index = 202;
-            defenderOwnerMirror.Action1CodeType =
-                Agent.ActionCodeType.Guard;
-            ApplyOwnerAction(
-                context.Component,
-                "peer",
-                sequence: 1L,
-                defenderId,
-                defenderOwner);
-            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
-
-            defenderMirror.Action1Index = 204;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Other;
-            defenderMirror.SkeletonAction1Index = 204;
-            defenderMirror.RawVisualAction1Index = 3247;
-            defenderMirror.RawVisualAction1Progress = 0.2f;
-            context.Component.AgentActionHandler.ObserveBlockedHit(
-                defender,
-                attacker,
-                isBlocked: true,
-                isMissile: false,
-                CombatCollisionResult.Blocked);
-            controller.OnPreDisplayMissionTick(0f);
-
-            NetworkAgentGuardImpact impact = Assert.Single(
-                context.Network.NetworkSentMessages
-                    .GetMessages<NetworkAgentGuardImpact>());
-            Assert.Equal(202, impact.GuardActionIndex);
-            Assert.Equal(3247, impact.AnimationIndex);
-            Assert.Equal(0.2f, impact.Progress);
-        });
-    }
-
-    [Fact]
-    public void GuardImpactReceive_LocalDefender_ReplaysVisualOnlyAndDropsStaleSequence()
-    {
-        RunScenario("peer", context =>
-        {
-            var controller = context.Instance.Container.Resolve<CoopBattleController>(
-                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
-            var attackerId = Guid.NewGuid();
-            var defenderId = Guid.NewGuid();
-
-            SpawnRegisteredAgent(
-                context, "source", attackerId, AgentControllerType.None,
-                out _);
-            Agent defender = SpawnRegisteredAgent(
-                context, "peer", defenderId, AgentControllerType.Player,
-                out MirrorAgent defenderMirror);
-            defenderMirror.HasVisualSkeleton = true;
-            defenderMirror.ActionAnimationIndices[202] = 3253;
-            defenderMirror.GuardMode = Agent.GuardMode.Right;
-            defenderMirror.MovementFlags =
-                Agent.MovementControlFlag.DefendBlock
-                | Agent.MovementControlFlag.DefendRight;
-            defenderMirror.Action1Index = 202;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Guard;
-            defenderMirror.SkeletonAction1Index = 202;
-            defenderMirror.RawVisualAction1Index = 3253;
-            defenderMirror.RawVisualAction1Progress = 0.5f;
-
-            context.Broker.Publish(
-                this,
-                new NetworkAgentGuardImpact(
-                    "source",
-                    sequence: 2L,
-                    battleHostEpoch: 0,
-                    attackerId,
-                    defenderId,
-                    channel: 1,
-                    guardActionIndex: 202,
-                    animationIndex: 3247,
-                    progress: 0.2f,
-                    speed: 1f,
-                    duration: 1f));
-            DrainGameThread();
-            controller.OnPreDisplayMissionTick(0.1f);
-
-            Assert.Equal(202, defenderMirror.Action1Index);
-            Assert.Equal(3247, defenderMirror.RawVisualAction1Index);
-            Assert.Equal(0.3f, defenderMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(1, defenderMirror.InstallRawVisualActionCalls);
-            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
-
-            defenderMirror.RawVisualAction1Index = 3253;
-            defenderMirror.RawVisualAction1Progress = 0.01f;
-            context.Broker.Publish(
-                this,
-                new NetworkAgentGuardImpact(
-                    "source",
-                    sequence: 1L,
-                    battleHostEpoch: 0,
-                    attackerId,
-                    defenderId,
-                    channel: 1,
-                    guardActionIndex: 202,
-                    animationIndex: 3248,
-                    progress: 0.8f,
-                    speed: 1f,
-                    duration: 1f));
-            DrainGameThread();
-            controller.OnPreDisplayMissionTick(0.1f);
-
-            Assert.Equal(3247, defenderMirror.RawVisualAction1Index);
-            Assert.Equal(0.4f, defenderMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(2, defenderMirror.InstallRawVisualActionCalls);
-            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
-
-            defenderMirror.GuardMode = Agent.GuardMode.None;
-            defenderMirror.MovementFlags = Agent.MovementControlFlag.None;
-            defenderMirror.Action1Index = -1;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Idle;
-            defenderMirror.SkeletonAction1Index = -1;
-            defenderMirror.RawVisualAction1Index = 3253;
-            controller.OnPreDisplayMissionTick(0.1f);
-
-            Assert.Equal(3253, defenderMirror.RawVisualAction1Index);
-            Assert.Equal(2, defenderMirror.InstallRawVisualActionCalls);
-            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
-        });
-    }
-
-    [Fact]
-    public void GuardImpactReceive_UnrelatedVisualClip_DoesNotOverwriteIt()
-    {
-        RunScenario("peer", context =>
-        {
-            var controller = context.Instance.Container.Resolve<CoopBattleController>(
-                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
-            var attackerId = Guid.NewGuid();
-            var defenderId = Guid.NewGuid();
-
-            SpawnRegisteredAgent(
-                context, "source", attackerId, AgentControllerType.None,
-                out _);
-            SpawnRegisteredAgent(
-                context, "peer", defenderId, AgentControllerType.Player,
-                out MirrorAgent defenderMirror);
-            defenderMirror.HasVisualSkeleton = true;
-            defenderMirror.ActionAnimationIndices[202] = 3253;
-            defenderMirror.GuardMode = Agent.GuardMode.Right;
-            defenderMirror.MovementFlags =
-                Agent.MovementControlFlag.DefendBlock
-                | Agent.MovementControlFlag.DefendRight;
-            defenderMirror.Action1Index = 202;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Guard;
-            defenderMirror.SkeletonAction1Index = 202;
-            defenderMirror.RawVisualAction1Index = 303;
-            defenderMirror.RawVisualAction1Progress = 0.4f;
-
-            context.Broker.Publish(
-                this,
-                new NetworkAgentGuardImpact(
-                    "source",
-                    sequence: 1L,
-                    battleHostEpoch: 0,
-                    attackerId,
-                    defenderId,
-                    channel: 1,
-                    guardActionIndex: 202,
-                    animationIndex: 3247,
-                    progress: 0.2f,
-                    speed: 1f,
-                    duration: 1f));
-            DrainGameThread();
-            controller.OnPreDisplayMissionTick(0.1f);
-
-            Assert.Equal(303, defenderMirror.RawVisualAction1Index);
-            Assert.Equal(0.4f, defenderMirror.RawVisualAction1Progress);
-            Assert.Equal(0, defenderMirror.InstallRawVisualActionCalls);
-            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
-        });
-    }
-
-    [Fact]
-    public void GuardImpactReceive_MigratedHostInheritedAttacker_ReplaysVisual()
-    {
-        const string mapEventId = "guard-impact-migration";
-        RunBattleScenario("observer", mapEventId, context =>
-        {
-            var controller = context.Instance.Container.Resolve<CoopBattleController>(
-                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
-            var attackerId = Guid.NewGuid();
-            var defenderId = Guid.NewGuid();
-
-            SpawnRegisteredAgent(
-                context, "departed-host", attackerId, AgentControllerType.None,
-                out _);
-            SpawnRegisteredAgent(
-                context, "observer", defenderId, AgentControllerType.Player,
-                out MirrorAgent defenderMirror);
-            defenderMirror.HasVisualSkeleton = true;
-            defenderMirror.ActionAnimationIndices[202] = 3253;
-            defenderMirror.GuardMode = Agent.GuardMode.Right;
-            defenderMirror.MovementFlags =
-                Agent.MovementControlFlag.DefendBlock
-                | Agent.MovementControlFlag.DefendRight;
-            defenderMirror.Action1Index = 202;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Guard;
-            defenderMirror.SkeletonAction1Index = 202;
-            defenderMirror.RawVisualAction1Index = 3253;
-            defenderMirror.RawVisualAction1Progress = 0.5f;
-
-            AssignBattleHost(
-                context,
-                mapEventId,
-                "successor",
-                Array.Empty<string>(),
-                epoch: 3);
-            DrainGameThread();
-            Assert.True(context.Registry.TryGetAgentInfo(
-                attackerId,
-                out CoopAgentInfo attackerInfo));
-            Assert.Equal("departed-host", attackerInfo.CurrentAuthority);
-
-            context.Broker.Publish(
-                this,
-                new NetworkAgentGuardImpact(
-                    "successor",
-                    sequence: 1L,
-                    battleHostEpoch: 3,
-                    attackerId,
-                    defenderId,
-                    channel: 1,
-                    guardActionIndex: 202,
-                    animationIndex: 3247,
-                    progress: 0.2f,
-                    speed: 1f,
-                    duration: 1f));
-            DrainGameThread();
-            controller.OnPreDisplayMissionTick(0.1f);
-
-            Assert.Equal(202, defenderMirror.Action1Index);
-            Assert.Equal(3247, defenderMirror.RawVisualAction1Index);
-            Assert.Equal(
-                0.3f,
-                defenderMirror.RawVisualAction1Progress,
-                precision: 3);
-            Assert.Equal(1, defenderMirror.InstallRawVisualActionCalls);
-            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
-        });
-    }
-
-    [Fact]
-    public void GuardImpactReceive_RawGuardWithoutAgentAction_ReplaysPastFirstFrame()
-    {
-        RunScenario("peer", context =>
-        {
-            var controller = context.Instance.Container.Resolve<CoopBattleController>(
-                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
-            var attackerId = Guid.NewGuid();
-            var defenderId = Guid.NewGuid();
-
-            SpawnRegisteredAgent(
-                context, "source", attackerId, AgentControllerType.None,
-                out _);
-            SpawnRegisteredAgent(
-                context, "peer", defenderId, AgentControllerType.Player,
-                out MirrorAgent defenderMirror);
-            defenderMirror.HasVisualSkeleton = true;
-            defenderMirror.ActionAnimationIndices[202] = 3253;
-            defenderMirror.GuardMode = Agent.GuardMode.Right;
-            defenderMirror.MovementFlags =
-                Agent.MovementControlFlag.DefendBlock
-                | Agent.MovementControlFlag.DefendRight;
-            defenderMirror.Action1Index = -1;
-            defenderMirror.Action1CodeType = Agent.ActionCodeType.Other;
-            defenderMirror.SkeletonAction1Index = -1;
-            defenderMirror.RawVisualAction1Index = 3253;
-            defenderMirror.RawVisualAction1Progress = 0.5f;
-
-            context.Broker.Publish(
-                this,
-                new NetworkAgentGuardImpact(
-                    "source",
-                    sequence: 1L,
-                    battleHostEpoch: 0,
-                    attackerId,
-                    defenderId,
-                    channel: 1,
-                    guardActionIndex: 202,
-                    animationIndex: 3247,
-                    progress: 0.2f,
-                    speed: 1f,
-                    duration: 1f));
-            DrainGameThread();
-            controller.OnPreDisplayMissionTick(0.1f);
-            controller.OnPreDisplayMissionTick(0.1f);
-
-            Assert.Equal(-1, defenderMirror.Action1Index);
-            Assert.Equal(3247, defenderMirror.RawVisualAction1Index);
-            Assert.Equal(
-                0.4f,
-                defenderMirror.RawVisualAction1Progress,
-                precision: 3);
-            Assert.Equal(1, defenderMirror.InstallRawVisualActionCalls);
-            Assert.Equal(1, defenderMirror.AdvanceExistingRawVisualActionCalls);
-            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
         });
     }
 
@@ -3186,7 +3282,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PlayerMountedReaction_OverwrittenVisualWithNativeMetadata_UsesNativeProgress()
+    public void PlayerMountedReaction_OverwrittenVisual_DoesNotWriteSkeleton()
     {
         RunScenario("peer", context =>
         {
@@ -3222,14 +3318,14 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(202, puppetMirror.Action1Index);
             Assert.Equal(0.35f, puppetMirror.Action1Progress, precision: 3);
-            Assert.Equal(202, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(0.35f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(1, puppetMirror.InstallRawVisualActionCalls);
+            Assert.Equal(303, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0.6f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
         });
     }
 
     [Fact]
-    public void PlayerMountedReaction_ReplacesExistingLocomotionVisual()
+    public void PlayerMountedReaction_DoesNotReplaceExistingLocomotionVisual()
     {
         RunScenario("peer", context =>
         {
@@ -3266,18 +3362,18 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(303, puppetMirror.Action1Index);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
-            Assert.Equal(202, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(0.3f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(1, puppetMirror.InstallRawVisualActionCalls);
+            Assert.Equal(303, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0.6f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
 
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(303, puppetMirror.Action1Index);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
-            Assert.Equal(202, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(0.4f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(1, puppetMirror.InstallRawVisualActionCalls);
-            Assert.Equal(1, puppetMirror.AdvanceExistingRawVisualActionCalls);
+            Assert.Equal(303, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0.6f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.AdvanceExistingRawVisualActionCalls);
         });
     }
 
@@ -3855,6 +3951,30 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(Agent.GuardMode.None, mirror.GuardMode);
             Assert.Equal(1, mirror.ResetGuardCalls);
         });
+    }
+
+    private static NetworkAgentGuardReaction
+        CreateGuardReactionMessage(
+            Guid attackerId,
+            Guid defenderId,
+            long sequence,
+            bool isMounted = false,
+            string sourceControllerId = "attacker",
+            int battleHostEpoch = 0,
+            float progress = 0.2f)
+    {
+        return new NetworkAgentGuardReaction(
+            sourceControllerId,
+            sequence: sequence,
+            battleHostEpoch,
+            attackerAgentId: attackerId,
+            agentId: defenderId,
+            reactionChannel: 1,
+            reactionActionIndex: 3104,
+            progress,
+            animationFlags:
+                (ulong)AnimFlags.amf_priority_defend,
+            isMounted);
     }
 
     private static void ApplyOwnerAction(

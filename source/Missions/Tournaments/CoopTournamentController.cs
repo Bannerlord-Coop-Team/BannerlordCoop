@@ -130,7 +130,7 @@ public class CoopTournamentController : CoopMissionController
         fightController = nativeFightController ?? throw new ArgumentNullException(nameof(nativeFightController));
         fightController.SetAgentRemovalProvider(() => !matchLifecycle.IsClearing);
         fightController.SetHitProgressionRecorder(CaptureHitProgression);
-        fightController.SetGuardImpactRecorder(
+        fightController.SetGuardReactionRecorder(
             coopMissionComponent.AgentActionHandler.ObserveBlockedHit);
         tournamentBehavior.SetLeaveRequest(RequestAuthoritativeLeave);
 

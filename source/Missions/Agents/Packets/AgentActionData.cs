@@ -246,7 +246,8 @@ namespace Missions.Agents.Packets
         internal AgentActionData(
             Agent agent,
             Agent.MovementControlFlag defendFlags,
-            Agent.GuardMode guardMode)
+            Agent.GuardMode guardMode,
+            int guardReactionChannel = -1)
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
@@ -266,15 +267,32 @@ namespace Missions.Agents.Packets
             Action1Index = cache1.Index;
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
-            GuardPresentationChannel = GetGuardPresentationChannel(agent);
-            GuardActionChannel = GetGuardActionChannel(
-                agent,
-                GuardPresentationChannel);
+            int validGuardReactionChannel =
+                guardReactionChannel >= 0
+                && guardReactionChannel <= 1
+                    ? guardReactionChannel
+                    : -1;
+            GuardPresentationChannel =
+                agent.HasMount && validGuardReactionChannel >= 0
+                    ? validGuardReactionChannel
+                    : GetGuardPresentationChannel(agent);
+            GuardActionChannel =
+                validGuardReactionChannel >= 0
+                    ? validGuardReactionChannel
+                    : GetGuardActionChannel(
+                        agent,
+                        GuardPresentationChannel);
             GuardActionIsDefending =
                 GuardActionChannel >= 0
                 && IsDefendingAction(
                     agent.GetCurrentActionType(
                         GuardActionChannel));
+            GuardActionIsReaction =
+                GuardActionChannel >= 0
+                && (guardReactionChannel == GuardActionChannel
+                    || IsGuardReactionAction(
+                        agent.GetCurrentActionType(
+                            GuardActionChannel)));
             IsMounted = agent.HasMount;
             IsPlayerControlled =
                 agent.Controller == AgentControllerType.Player;
@@ -353,6 +371,8 @@ namespace Missions.Agents.Packets
         public bool GuardActionIsDefending { get; }
         [ProtoMember(15)]
         public bool IsPlayerControlled { get; }
+        [ProtoMember(16)]
+        public bool GuardActionIsReaction { get; }
         internal Agent.MovementControlFlag DefendFlags =>
             GetDefendMovementFlags((Agent.MovementControlFlag)MovementFlag);
         internal Agent.GuardMode GuardMode => FromWireGuardState(GuardState);

@@ -25,7 +25,7 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
     void CatchUpJoiner(string controllerId);
 
-    /// <summary>[Game thread] Replay received guard presentation for the display snapshot.</summary>
+    /// <summary>[Game thread] Capture and apply one-shot guard reactions before the display snapshot.</summary>
     void ReplayRemoteGuardReactions(float dt = 0f);
 
     /// <summary>[Game thread] Record a locally authoritative blocked melee collision.</summary>
@@ -38,20 +38,6 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 
     /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
-#if DEBUG
-    bool TryGetRetainedGuardReaction(
-        Guid agentId,
-        out int channel,
-        out int actionIndex,
-        out float progress,
-        out bool isCyclic);
-    bool TryGetGuardImpact(
-        Guid agentId,
-        out int channel,
-        out int guardActionIndex,
-        out int animationIndex,
-        out float progress);
-#endif
 }
 
 /// <summary>
@@ -74,7 +60,7 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
-    private readonly IGuardImpactHandler guardImpactHandler;
+    private readonly IGuardReactionHandler guardReactionHandler;
 
     // Outbound observation and sequence share one record because both belong to the local agent's action stream.
     private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
@@ -109,7 +95,7 @@ public class AgentActionHandler : IAgentActionHandler
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IRemoteAgentActionProcessor remoteActionProcessor,
-        IGuardImpactHandler guardImpactHandler)
+        IGuardReactionHandler guardReactionHandler)
     {
         this.client = client;
         this.packetManager = packetManager;
@@ -117,7 +103,7 @@ public class AgentActionHandler : IAgentActionHandler
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.remoteActionProcessor = remoteActionProcessor;
-        this.guardImpactHandler = guardImpactHandler;
+        this.guardReactionHandler = guardReactionHandler;
 
         this.packetManager.RegisterPacketHandler(this);
         this.messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
@@ -213,6 +199,10 @@ public class AgentActionHandler : IAgentActionHandler
                 agent.GetCurrentActionType(0));
             bool action1Defending = AgentActionData.IsDefendingAction(
                 agent.GetCurrentActionType(1));
+            int guardReactionChannel = GetGuardReactionChannel(
+                agent,
+                hadState,
+                state);
 
             // Native command actions are untyped, so recognize the main agent's order gesture by action name.
             if (agent == Mission.Current.MainAgent)
@@ -302,7 +292,11 @@ public class AgentActionHandler : IAgentActionHandler
             long sequence = NextActionSequence(info.AgentId);
             (ids ??= new List<Guid>()).Add(info.AgentId);
             (actions ??= new List<AgentActionData>()).Add(
-                new AgentActionData(agent, defendFlags, guardMode));
+                new AgentActionData(
+                    agent,
+                    defendFlags,
+                    guardMode,
+                    guardReactionChannel));
             (sequences ??= new List<long>()).Add(sequence);
         }
 
@@ -398,9 +392,8 @@ public class AgentActionHandler : IAgentActionHandler
 
     public void ReplayRemoteGuardReactions(float dt = 0f)
     {
-        guardImpactHandler.CapturePendingLocalImpacts();
+        guardReactionHandler.ProcessPendingReactions();
         remoteActionProcessor.ReplayRemoteGuardReactions(dt);
-        guardImpactHandler.ReplayRemoteImpacts(dt);
     }
 
     public void ObserveBlockedHit(
@@ -410,96 +403,14 @@ public class AgentActionHandler : IAgentActionHandler
         bool isMissile,
         CombatCollisionResult collisionResult)
     {
-        int priorGuardChannel = -1;
-        ActionIndexCache priorGuardAction =
-            ActionIndexCache.act_none;
-        if (affectedAgent != null
-            && agentRegistry.TryGetAgentInfo(
-                affectedAgent,
-                out CoopAgentInfo affectedInfo))
-        {
-            if (!remoteActionProcessor.TryGetRetainedGuardPresentation(
-                    affectedInfo.AgentId,
-                    out priorGuardChannel,
-                    out priorGuardAction))
-            {
-                TryGetObservedLocalGuardPresentation(
-                    affectedInfo.AgentId,
-                    out priorGuardChannel,
-                    out priorGuardAction);
-            }
-        }
-
-        guardImpactHandler.ObserveBlockedHit(
+        guardReactionHandler.ObserveBlockedHit(
             affectedAgent,
             affectorAgent,
             isBlocked,
             isMissile,
             collisionResult,
-            priorGuardChannel,
-            priorGuardAction,
             remoteActionProcessor.GetOutgoingBattleHostEpoch());
     }
-
-    private bool TryGetObservedLocalGuardPresentation(
-        Guid agentId,
-        out int channel,
-        out ActionIndexCache action)
-    {
-        channel = -1;
-        action = ActionIndexCache.act_none;
-        if (!_localAgentStates.TryGetValue(
-                agentId,
-                out LocalAgentActionState state))
-        {
-            return false;
-        }
-
-        if (state.Action1WasDefending)
-        {
-            channel = 1;
-            action = new ActionIndexCache(state.Action1);
-            return action != ActionIndexCache.act_none;
-        }
-        if (!state.Action0WasDefending)
-            return false;
-
-        channel = 0;
-        action = new ActionIndexCache(state.Action0);
-        return action != ActionIndexCache.act_none;
-    }
-
-#if DEBUG
-    public bool TryGetRetainedGuardReaction(
-        Guid agentId,
-        out int channel,
-        out int actionIndex,
-        out float progress,
-        out bool isCyclic)
-    {
-        return remoteActionProcessor.TryGetRetainedGuardReaction(
-            agentId,
-            out channel,
-            out actionIndex,
-            out progress,
-            out isCyclic);
-    }
-
-    public bool TryGetGuardImpact(
-        Guid agentId,
-        out int channel,
-        out int guardActionIndex,
-        out int animationIndex,
-        out float progress)
-    {
-        return guardImpactHandler.TryGetGuardImpact(
-            agentId,
-            out channel,
-            out guardActionIndex,
-            out animationIndex,
-            out progress);
-    }
-#endif
 
     private void Handle_BattleHostAssigned(
         MessagePayload<NetworkBattleHostAssigned> payload)
@@ -543,6 +454,53 @@ public class AgentActionHandler : IAgentActionHandler
             && !previousActionDefending
             && hasDefendingAction
             && action == defendingAction;
+    }
+
+    private static int GetGuardReactionChannel(
+        Agent agent,
+        bool hadState,
+        LocalAgentActionState state)
+    {
+        if (IsGuardReactionTransition(
+                agent,
+                channel: 1,
+                hadState,
+                state.Action1,
+                state.Action1WasDefending))
+        {
+            return 1;
+        }
+
+        return IsGuardReactionTransition(
+            agent,
+            channel: 0,
+            hadState,
+            state.Action0,
+            state.Action0WasDefending)
+            ? 0
+            : -1;
+    }
+
+    private static bool IsGuardReactionTransition(
+        Agent agent,
+        int channel,
+        bool hadState,
+        int previousAction,
+        bool previousActionWasDefending)
+    {
+        Agent.ActionCodeType actionType =
+            agent.GetCurrentActionType(channel);
+        if (AgentActionData.IsGuardReactionAction(actionType))
+            return true;
+
+        int action = agent.GetCurrentAction(channel).Index;
+        return hadState
+            && previousActionWasDefending
+            && action >= 0
+            && action != previousAction
+            && AgentActionData.IsDefendingAction(actionType)
+            && agent.GetCurrentActionStage(channel)
+                == Agent.ActionStage.DefendParry;
     }
 
     private static bool HasDefendStateChanged(
@@ -626,7 +584,7 @@ public class AgentActionHandler : IAgentActionHandler
         messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
         packetManager.RemovePacketHandler(this);
         remoteActionProcessor.Dispose();
-        guardImpactHandler.Dispose();
+        guardReactionHandler.Dispose();
         _localAgentStates.Clear();
     }
 }

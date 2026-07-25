@@ -133,6 +133,7 @@ public sealed class MissionEngineFixture : IDisposable
         // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionStage), nameof(Agent_GetCurrentActionStage));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionDirection), nameof(Agent_GetCurrentActionDirection));
         Prefix(typeof(Agent), nameof(Agent.GetDefendMovementFlag), nameof(Agent_GetDefendMovementFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
@@ -734,6 +735,18 @@ public sealed class MissionEngineFixture : IDisposable
         {
             __result = m.Action1Direction;
         }
+        return false;
+    }
+
+    private static bool Agent_GetCurrentActionStage(
+        Agent __instance,
+        int channelNo,
+        ref Agent.ActionStage __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0
+            ? m.Action0Stage
+            : m.Action1Stage;
         return false;
     }
 

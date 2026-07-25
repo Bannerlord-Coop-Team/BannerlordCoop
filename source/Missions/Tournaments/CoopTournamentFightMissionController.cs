@@ -14,7 +14,7 @@ public delegate void TournamentHitProgressionRecorder(
     in AttackCollisionData collisionData,
     float shotDifficulty);
 
-public delegate void TournamentGuardImpactRecorder(
+public delegate void TournamentGuardReactionRecorder(
     Agent affectedAgent,
     Agent affectorAgent,
     bool isBlocked,
@@ -26,7 +26,7 @@ public class CoopTournamentFightMissionController : TournamentFightMissionContro
 {
     private Func<bool> shouldProcessAgentRemoval = () => true;
     private TournamentHitProgressionRecorder hitProgressionRecorder;
-    private TournamentGuardImpactRecorder guardImpactRecorder;
+    private TournamentGuardReactionRecorder guardReactionRecorder;
 
     public CoopTournamentFightMissionController(CultureObject culture)
         : base(culture)
@@ -43,9 +43,10 @@ public class CoopTournamentFightMissionController : TournamentFightMissionContro
         hitProgressionRecorder = recorder;
     }
 
-    public void SetGuardImpactRecorder(TournamentGuardImpactRecorder recorder)
+    public void SetGuardReactionRecorder(
+        TournamentGuardReactionRecorder recorder)
     {
-        guardImpactRecorder = recorder;
+        guardReactionRecorder = recorder;
     }
 
     public override void OnAgentRemoved(
@@ -72,7 +73,7 @@ public class CoopTournamentFightMissionController : TournamentFightMissionContro
     {
         if (affectorAgent?.IsMount == true && affectorAgent.RiderAgent != null)
             affectorAgent = affectorAgent.RiderAgent;
-        guardImpactRecorder?.Invoke(
+        guardReactionRecorder?.Invoke(
             affectedAgent,
             affectorAgent,
             isBlocked,
