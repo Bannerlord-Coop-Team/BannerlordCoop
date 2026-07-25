@@ -656,7 +656,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         bool hasMountedGuardPresentation =
             action.Data.IsPlayerControlled
             && GetMountedGuardPresentationChannel(action.Data) >= 0;
-        action.Data.Apply(agent);
+        action.Data.Apply(
+            agent,
+            agentVisualActionAccessor);
 
         ActionIndexCache guardAction = guardActionChannel == 0
             ? new ActionIndexCache(action.Data.Action0Index)

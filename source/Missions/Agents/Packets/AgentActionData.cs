@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using Missions.Agents.Handlers;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -298,14 +299,22 @@ namespace Missions.Agents.Packets
                 agent.Controller == AgentControllerType.Player;
         }
 
-        public void Apply(Agent agent)
+        public void Apply(
+            Agent agent,
+            IAgentVisualActionAccessor visualActionAccessor)
         {
             Agent.MovementControlFlag movementFlags = (Agent.MovementControlFlag)MovementFlag;
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
             agent.MovementFlags = movementFlags;
 
             // Install action transitions, but let an unchanged native action advance on its local timeline.
-            if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != Action0Index)
+            if (NeedsActionTransition(
+                agent,
+                0,
+                Action0Index,
+                visualActionAccessor,
+                preserveVisibleAction:
+                    IsMounted && GuardActionChannel == 0))
             {
                 // Use the reflection helper, NOT MBAPI.IMBAnimation directly: the publicized static field
                 // throws FieldAccessException in live play (see GetActionNameWithCode above), which kills
@@ -317,7 +326,13 @@ namespace Missions.Agents.Packets
                 }
             }
 
-            if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
+            if (NeedsActionTransition(
+                agent,
+                1,
+                Action1Index,
+                visualActionAccessor,
+                preserveVisibleAction:
+                    IsMounted && GuardActionChannel == 1))
             {
                 string actionName2 = GetActionNameWithCode(Action1Index);
                 if (actionName2 != null)
@@ -328,6 +343,30 @@ namespace Missions.Agents.Packets
 
             // Keep held defend input on the puppet; later reliable transitions replace or clear these bits.
             agent.MovementFlags = GetDefendMovementFlags(movementFlags);
+        }
+
+        private static bool NeedsActionTransition(
+            Agent agent,
+            int channel,
+            int expectedActionIndex,
+            IAgentVisualActionAccessor visualActionAccessor,
+            bool preserveVisibleAction)
+        {
+            ActionIndexCache currentAction =
+                agent.GetCurrentAction(channel);
+            if (currentAction != ActionIndexCache.act_none)
+                return currentAction.Index != expectedActionIndex;
+            if (expectedActionIndex == ActionIndexCache.act_none.Index)
+                return false;
+            if (!preserveVisibleAction)
+                return true;
+
+            ActionIndexCache expectedAction =
+                new ActionIndexCache(expectedActionIndex);
+            return !visualActionAccessor.IsActionVisible(
+                agent,
+                channel,
+                in expectedAction);
         }
 
         [ProtoMember(1)]

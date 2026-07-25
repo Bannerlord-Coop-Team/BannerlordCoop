@@ -10,6 +10,7 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using Missions;
+using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Battles;
@@ -3043,11 +3044,58 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.Action1Flags = ownerMirror.Action1Flags;
             puppetMirror.Action1CodeType = ownerMirror.Action1CodeType;
 
-            new AgentActionData(owner).Apply(puppet);
+            new AgentActionData(owner).Apply(
+                puppet,
+                context.Instance.Container
+                    .Resolve<IAgentVisualActionAccessor>());
 
             Assert.Equal(0.7f, puppetMirror.Action0Progress, precision: 3);
             Assert.Equal(0.8f, puppetMirror.Action1Progress, precision: 3);
             Assert.Equal(0, puppetMirror.SetCurrentActionProgressCalls);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void AgentActionData_VisibleMountedAction_DoesNotReplayWhenEngineReportsNone()
+    {
+        RunScenario("peer", context =>
+        {
+            Agent owner = SpawnAgent(
+                context,
+                AgentControllerType.Player,
+                out MirrorAgent ownerMirror);
+            Agent puppet = SpawnAgent(
+                context,
+                AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            context.Mock.SpawnMount(owner);
+            context.Mock.SpawnMount(puppet);
+
+            ownerMirror.Action1Index = 3062;
+            ownerMirror.Action1Progress = 0.05f;
+            ownerMirror.Action1Flags =
+                AnimFlags.amf_priority_defend | AnimFlags.anf_cyclic;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+
+            puppetMirror.HasVisualSkeleton = true;
+            puppetMirror.Action1Index = -1;
+            puppetMirror.SkeletonAction1Index = -1;
+            puppetMirror.ActionAnimationIndices[3062] = 3220;
+            puppetMirror.RawVisualAction1Index = 3220;
+            puppetMirror.RawVisualAction1Progress = 0.8f;
+
+            new AgentActionData(owner).Apply(
+                puppet,
+                context.Instance.Container
+                    .Resolve<IAgentVisualActionAccessor>());
+
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(3220, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(
+                0.8f,
+                puppetMirror.RawVisualAction1Progress,
+                precision: 3);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
         });
     }
