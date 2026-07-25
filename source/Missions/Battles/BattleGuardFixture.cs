@@ -1,4 +1,5 @@
 ﻿#if DEBUG
+using Common;
 using GameInterface.Services.Battles.Messages;
 using GameInterface.Services.Entity;
 using Missions.Agents.Handlers;
@@ -9,7 +10,9 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.ScreenSystem;
 
 namespace Missions.Battles;
 
@@ -69,6 +72,12 @@ public class BattleGuardFixture : IBattleGuardFixture
     private float sampleElapsed;
     private SampleState sample = new();
     private string lastError;
+    private MissionScreen evidenceCameraScreen;
+    private Camera evidenceCamera;
+    private Camera previousCustomCamera;
+    private MatrixFrame previousCombatCameraFrame;
+    private bool previousAllowInputWithCustomCamera;
+    private Guid evidenceCameraTargetId;
 
     public BattleGuardFixture(IControllerIdProvider controllerIdProvider)
     {
@@ -204,6 +213,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
         TickGuard(agentRegistry);
         TickStriker(agentRegistry);
+        TickEvidenceCamera(agentRegistry);
     }
 
     public void SamplePreReplayDisplayedState(
@@ -366,6 +376,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"replayMaxProgressDelta={sample.ReplayEvidence.MaxProgressDelta:0.###} " +
             $"replayMaxSpeedDelta={sample.ReplayEvidence.MaxSpeedDelta:0.###} " +
             $"strikeState={strikeState} strikeAttempts={strikeAttempts} " +
+            $"evidenceCamera={GetEvidenceCameraToken()} " +
             "visualTraceSchema=c:a:n:r:mr:d:md:pmin:pmax:span:adv:stall:reset:maxStep:sCur:sMin:sMax:sMean " +
             $"preVisualTraces={sample.PreReplayAnimationEvidence.GetToken()} " +
             $"visualTraces={sample.AnimationEvidence.GetToken()} " +
@@ -450,6 +461,7 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     public void Reset(INetworkAgentRegistry agentRegistry)
     {
+        ReleaseEvidenceCamera();
         RestoreGuard(agentRegistry);
         RestoreStriker(agentRegistry);
         if (pendingGuardRestore == null)
@@ -465,6 +477,170 @@ public class BattleGuardFixture : IBattleGuardFixture
         lastError = pendingGuardRestore == null
             ? null
             : "guard remount is still pending";
+    }
+
+    private string GetEvidenceCameraToken()
+    {
+        if (roles == null)
+            return "none";
+        if (controllerIdProvider.ControllerId == roles.GuardAuthority)
+            return "owner";
+        if (evidenceCamera != null &&
+            ReferenceEquals(evidenceCameraScreen?.CustomCamera, evidenceCamera) &&
+            evidenceCameraTargetId == roles.GuardAgentId)
+        {
+            return evidenceCameraTargetId.ToString();
+        }
+        return "pending";
+    }
+
+    private void TickEvidenceCamera(INetworkAgentRegistry agentRegistry)
+    {
+        if (!ModInformation.IsClient ||
+            roles == null ||
+            controllerIdProvider.ControllerId == roles.GuardAuthority)
+        {
+            ReleaseEvidenceCamera();
+            return;
+        }
+        if (!TryGetExactAgent(
+                agentRegistry,
+                roles.GuardAgentId,
+            roles.GuardAuthority,
+            out CoopAgentInfo guardInfo) ||
+            !IsActiveMissionAgent(guardInfo.Agent) ||
+            guardInfo.Agent.AgentVisuals == null ||
+            !guardInfo.Agent.AgentVisuals.IsValid())
+        {
+            ReleaseEvidenceCamera();
+            return;
+        }
+        if (!(ScreenManager.TopScreen is MissionScreen screen) ||
+            screen.Mission != Mission.Current ||
+            screen.CombatCamera == null)
+        {
+            ReleaseEvidenceCamera();
+            return;
+        }
+        if (evidenceCamera != null &&
+            (!ReferenceEquals(evidenceCameraScreen, screen) ||
+             !ReferenceEquals(screen.CustomCamera, evidenceCamera)))
+        {
+            ReleaseEvidenceCamera();
+            lastError = "observer evidence camera was replaced";
+            return;
+        }
+
+        try
+        {
+            if (evidenceCamera == null)
+                CreateEvidenceCamera(screen);
+
+            MatrixFrame frame =
+                CreateEvidenceCameraFrame(guardInfo.Agent);
+            evidenceCamera.Entity.SetGlobalFrame(in frame, true);
+            evidenceCameraTargetId = roles.GuardAgentId;
+        }
+        catch (Exception exception)
+        {
+            ReleaseEvidenceCamera();
+            lastError =
+                $"observer evidence camera failed: {exception.GetType().Name}";
+        }
+    }
+
+    private void CreateEvidenceCamera(MissionScreen screen)
+    {
+        evidenceCameraScreen = screen;
+        previousCustomCamera = screen.CustomCamera;
+        previousCombatCameraFrame = screen.CombatCamera.Frame;
+        previousAllowInputWithCustomCamera =
+            screen.AllowInputWithCustomCamera;
+
+        Camera camera = Camera.CreateCamera();
+        evidenceCamera = camera;
+        camera.SetFovVertical(
+            MathF.PI / 3f,
+            TaleWorlds.Engine.Screen.AspectRatio,
+            0.1f,
+            12500f);
+        camera.Entity = GameEntity.CreateEmpty(
+            Mission.Current.Scene,
+            false,
+            false,
+            false);
+        screen.CustomCamera = camera;
+        screen.AllowInputWithCustomCamera = false;
+    }
+
+    private static MatrixFrame CreateEvidenceCameraFrame(Agent guard)
+    {
+        MatrixFrame guardFrame =
+            guard.AgentVisuals.GetGlobalFrame();
+        Vec3 lower = guard.HasMount &&
+                     guard.MountAgent?.AgentVisuals != null &&
+                     guard.MountAgent.AgentVisuals.IsValid()
+            ? guard.MountAgent.AgentVisuals.GetGlobalFrame().origin
+            : guardFrame.origin;
+        Vec3 upper =
+            guard.AgentVisuals.GetGlobalStableEyePoint(true);
+        Vec3 target = (lower + upper) * 0.5f;
+
+        Vec3 forward = guard.LookDirection;
+        forward.z = 0f;
+        if (forward.LengthSquared < ProgressEpsilon)
+            forward = new Vec3(1f, 0f, 0f);
+        else
+            forward.Normalize();
+        Vec3 side = Vec3.CrossProduct(forward, Vec3.Up);
+        side.Normalize();
+
+        float distance = guard.HasMount ? 9f : 5.5f;
+        float height = guard.HasMount ? 1.5f : 0.7f;
+        Vec3 origin = target +
+            (side * distance) -
+            (forward * (distance * 0.25f)) +
+            (Vec3.Up * height);
+        Vec3 direction = target - origin;
+        direction.Normalize();
+
+        MatrixFrame frame = MatrixFrame.Identity;
+        frame.rotation.s =
+            Vec3.CrossProduct(direction, Vec3.Up);
+        frame.rotation.s.Normalize();
+        frame.rotation.f =
+            Vec3.CrossProduct(frame.rotation.s, direction);
+        frame.rotation.f.Normalize();
+        frame.rotation.u = -direction;
+        frame.origin = origin;
+        return frame;
+    }
+
+    private void ReleaseEvidenceCamera()
+    {
+        Camera camera = evidenceCamera;
+        MissionScreen screen = evidenceCameraScreen;
+        if (screen != null &&
+            ReferenceEquals(screen.CustomCamera, camera))
+        {
+            if (previousCustomCamera == null &&
+                screen.CombatCamera != null)
+            {
+                screen.UpdateFreeCamera(
+                    previousCombatCameraFrame);
+            }
+            screen.CustomCamera = previousCustomCamera;
+            screen.AllowInputWithCustomCamera =
+                previousAllowInputWithCustomCamera;
+        }
+
+        camera?.ReleaseCameraEntity();
+        evidenceCameraScreen = null;
+        evidenceCamera = null;
+        previousCustomCamera = null;
+        previousCombatCameraFrame = MatrixFrame.Identity;
+        previousAllowInputWithCustomCamera = false;
+        evidenceCameraTargetId = Guid.Empty;
     }
 
     private void ApplyGuard(
