@@ -785,6 +785,7 @@ public sealed class MissionEngineFixture : IDisposable
         float progress)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetCurrentActionProgressCalls++;
         if (channelNo == 0)
             m.Action0Progress = progress;
         else

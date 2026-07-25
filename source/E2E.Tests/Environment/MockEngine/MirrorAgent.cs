@@ -67,6 +67,7 @@ public sealed class MirrorAgent
     public float Action1Progress { get; set; }
     public AnimFlags Action0Flags { get; set; }
     public AnimFlags Action1Flags { get; set; }
+    public int SetCurrentActionProgressCalls { get; set; }
     public int SetActionChannelCalls { get; set; }
     public bool SetActionChannelResult { get; set; } = true;
     public int LastSetActionChannel { get; set; } = -1;

@@ -304,7 +304,7 @@ namespace Missions.Agents.Packets
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
             agent.MovementFlags = movementFlags;
 
-            // apply the animation on channel 0 if none exists
+            // Install action transitions, but let an unchanged native action advance on its local timeline.
             if (agent.GetCurrentAction(0) == ActionIndexCache.act_none || agent.GetCurrentAction(0).Index != Action0Index)
             {
                 // Use the reflection helper, NOT MBAPI.IMBAnimation directly: the publicized static field
@@ -316,13 +316,7 @@ namespace Missions.Agents.Packets
                     agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (AnimFlags)Action0Flag, startProgress: Action0Progress);
                 }
             }
-            // otherwise continue the existing animation
-            else
-            {
-                agent.SetCurrentActionProgress(0, Action0Progress);
-            }
 
-            // apply the animation on channel 1 if none exists
             if (agent.GetCurrentAction(1) == ActionIndexCache.act_none || agent.GetCurrentAction(1).Index != Action1Index)
             {
                 string actionName2 = GetActionNameWithCode(Action1Index);
@@ -330,11 +324,6 @@ namespace Missions.Agents.Packets
                 {
                     agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
                 }
-            }
-            // otherwise continue the existing animation
-            else
-            {
-                agent.SetCurrentActionProgress(1, Action1Progress);
             }
 
             // Keep held defend input on the puppet; later reliable transitions replace or clear these bits.
