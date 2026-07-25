@@ -20,6 +20,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
@@ -305,9 +306,27 @@ internal class BattleMissionStartHandler : IHandler
         // layer lists and crashes the game.
         var message = payload.What;
         GameThread.RunSafe(
-            () => OpenAttackMission(message.MapEventId, message.RandomTerrainSeed, message.AtmosphereOnCampaign,
-                message.InitiatingPartyId),
+            () => ShowLoadingScreenAndQueueAttackMission(message),
             context: nameof(Handle_NetworkStartAttackMission));
+    }
+
+    private void ShowLoadingScreenAndQueueAttackMission(NetworkStartAttackMission message)
+    {
+        if (!TryGetValidBattle(nameof(NetworkStartAttackMission), message.MapEventId, out _))
+            return;
+
+        LoadingWindow.EnableGlobalLoadingWindow();
+
+        // MissionState enables the loading window only after building every mission behavior.
+        // Defer that work one frame so the window is rendered before setup can stall the map.
+        GameThread.EnqueueSafe(() =>
+        {
+            OpenAttackMission(message.MapEventId, message.RandomTerrainSeed, message.AtmosphereOnCampaign,
+                message.InitiatingPartyId);
+
+            if (MissionState.Current == null)
+                LoadingWindow.DisableGlobalLoadingWindow();
+        }, context: nameof(Handle_NetworkStartAttackMission));
     }
 
     /// <summary>[Server] Snapshot the mission-defining siege inputs for one map event.</summary>
