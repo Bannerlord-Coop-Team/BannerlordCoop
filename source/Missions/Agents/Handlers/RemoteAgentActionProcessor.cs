@@ -18,7 +18,7 @@ public interface IRemoteAgentActionProcessor : IDisposable
     int GetOutgoingBattleHostEpoch();
     void ClearForLocalAgent(Guid agentId, Agent agent);
     void ApplyRemoteGuardStates();
-    void ReplayRemoteGuardReactions(float dt);
+    void ReplayRemoteGuardReactions();
     void Receive(AgentActionPacket packet);
     void HandleBattleHostAssigned(NetworkBattleHostAssigned message);
 }
@@ -26,7 +26,6 @@ public interface IRemoteAgentActionProcessor : IDisposable
 public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 {
     private const float RetainedGuardReleaseBlendPeriod = 0.4f;
-    private const float GuardProgressRestartTolerance = 0.01f;
 
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
@@ -77,10 +76,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public readonly RemoteAction Action;
         public readonly int GuardActionChannel;
         public readonly ActionIndexCache GuardAction;
-        public readonly bool IsGuardActionCyclic;
-        public readonly bool DrivesMountedGuardPresentation;
         public readonly bool DrivesMountedReactionPresentation;
-        public float GuardActionProgress;
         public bool HasGuardCommand;
         public Agent.GuardMode LastCommandedGuardMode;
         public int LastCommandedMountIndex;
@@ -89,39 +85,15 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             RemoteAction action,
             int guardActionChannel,
             ActionIndexCache guardAction,
-            bool guardActionIsDefending,
             RemoteGuardState? previousGuard)
         {
             Action = action;
             GuardActionChannel = guardActionChannel;
             GuardAction = guardAction;
-            AnimFlags guardActionFlags = (AnimFlags)(guardActionChannel == 0
-                ? action.Data.Action0Flag
-                : guardActionChannel == 1
-                    ? action.Data.Action1Flag
-                    : 0UL);
-            IsGuardActionCyclic =
-                (guardActionFlags & AnimFlags.anf_cyclic) != 0;
-            DrivesMountedGuardPresentation =
-                action.Data.IsPlayerControlled
-                && guardActionIsDefending
-                && !action.Data.GuardActionIsReaction
-                && GetMountedGuardPresentationChannel(action.Data) >= 0;
             DrivesMountedReactionPresentation =
                 action.Data.IsPlayerControlled
                 && action.Data.GuardActionIsReaction
                 && GetMountedGuardPresentationChannel(action.Data) >= 0;
-            bool continuesPreviousGuard =
-                previousGuard.HasValue
-                && previousGuard.Value.GuardActionChannel
-                    == guardActionChannel
-                && previousGuard.Value.GuardAction
-                    == guardAction;
-            GuardActionProgress = continuesPreviousGuard
-                ? previousGuard.Value.GuardActionProgress
-                : guardActionChannel == 0
-                    ? action.Data.Action0Progress
-                    : action.Data.Action1Progress;
             HasGuardCommand = DrivesMountedReactionPresentation
                 ? false
                 : previousGuard?.HasGuardCommand ?? false;
@@ -138,14 +110,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             Action = action;
             GuardActionChannel = retainedGuard.GuardActionChannel;
             GuardAction = retainedGuard.GuardAction;
-            IsGuardActionCyclic = retainedGuard.IsGuardActionCyclic;
-            DrivesMountedGuardPresentation =
-                action.Data.IsPlayerControlled
-                && retainedGuard.DrivesMountedGuardPresentation;
             DrivesMountedReactionPresentation =
                 action.Data.IsPlayerControlled
                 && retainedGuard.DrivesMountedReactionPresentation;
-            GuardActionProgress = retainedGuard.GuardActionProgress;
             HasGuardCommand = retainedGuard.HasGuardCommand;
             LastCommandedGuardMode = retainedGuard.LastCommandedGuardMode;
             LastCommandedMountIndex = retainedGuard.LastCommandedMountIndex;
@@ -270,22 +237,19 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
         ApplyPendingRemoteActions();
         ApplyRetainedRemoteGuardStates(
-            replayGuardAction: false,
-            dt: 0f);
+            replayGuardAction: false);
     }
 
-    public void ReplayRemoteGuardReactions(float dt)
+    public void ReplayRemoteGuardReactions()
     {
         if (_disposed || Mission.Current == null) return;
 
         ApplyRetainedRemoteGuardStates(
-            replayGuardAction: true,
-            dt: dt);
+            replayGuardAction: true);
     }
 
     private void ApplyRetainedRemoteGuardStates(
-        bool replayGuardAction,
-        float dt)
+        bool replayGuardAction)
     {
         if (_disposed || Mission.Current == null) return;
         if (_retainedGuardAgentIds.Count == 0) return;
@@ -349,16 +313,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 if (hasGuardReaction)
                 {
                     guardState.HasGuardCommand = false;
-                }
-
-                if (replayGuardAction
-                    && !hasGuardReaction
-                    && guardState.DrivesMountedGuardPresentation)
-                {
-                    ReplayRetainedMountedGuard(
-                        agent,
-                        dt,
-                        ref guardState);
                 }
                 state.RetainedGuard = guardState;
             }
@@ -709,9 +663,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             : guardActionChannel == 1
                 ? new ActionIndexCache(action.Data.Action1Index)
                 : ActionIndexCache.act_none;
-        bool guardActionIsDefending =
-            guardActionChannel >= 0
-            && action.Data.GuardActionIsDefending;
         bool retainsGuard = action.Data.DefendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(action.Data.GuardMode)
             || (hasMountedGuardPresentation
@@ -739,7 +690,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 action,
                 guardActionChannel,
                 guardAction,
-                guardActionIsDefending,
                 previousGuard);
         }
         RecordRemoteActionSequence(agentId, action);
@@ -924,116 +874,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         && actionType != Agent.ActionCodeType.Idle
         && !AgentActionData.IsDefendingAction(actionType)
         && !AgentActionData.IsGuardReactionAction(actionType);
-
-    private void ReplayRetainedMountedGuard(
-        Agent agent,
-        float dt,
-        ref RemoteGuardState guardState)
-    {
-        if (!guardState.DrivesMountedGuardPresentation)
-            return;
-
-        int channel = guardState.GuardActionChannel;
-        if (agent.Controller != AgentControllerType.None
-            || channel < 0
-            || channel > 1
-            || guardState.GuardAction == ActionIndexCache.act_none
-            || !agent.HasMount
-            || guardState.Action.Data.IsMounted != agent.HasMount
-            || HasInterruptingGuardAction(agent, guardState))
-        {
-            return;
-        }
-
-        int animationIndex = agentVisualActionAccessor.GetAnimationIndex(
-            agent,
-            in guardState.GuardAction);
-        if (animationIndex < 0
-            || !agentVisualActionAccessor.TryGetAnimationState(
-                agent,
-                channel,
-                out int visibleAnimationIndex,
-                out float visibleProgress,
-                out float visibleSpeed)
-            || visibleAnimationIndex != animationIndex
-            || float.IsNaN(visibleProgress)
-            || float.IsInfinity(visibleProgress))
-        {
-            return;
-        }
-
-        float duration =
-            agentVisualActionAccessor.GetAnimationDuration(
-                agent,
-                animationIndex);
-        float expectedProgress = AdvanceGuardProgress(
-            guardState.GuardActionProgress,
-            dt,
-            duration,
-            visibleSpeed,
-            guardState.IsGuardActionCyclic);
-        bool expectedWrapped =
-            guardState.IsGuardActionCyclic
-            && expectedProgress + GuardProgressRestartTolerance
-                < guardState.GuardActionProgress;
-        bool nativeRestarted =
-            visibleProgress + GuardProgressRestartTolerance
-                < guardState.GuardActionProgress
-            && !expectedWrapped;
-        if (!nativeRestarted)
-        {
-            guardState.GuardActionProgress =
-                ClampAnimationProgress(visibleProgress);
-            return;
-        }
-
-        guardState.GuardActionProgress = expectedProgress;
-        if (visibleSpeed <= 0f
-            || float.IsNaN(visibleSpeed)
-            || float.IsInfinity(visibleSpeed))
-        {
-            visibleSpeed = 1f;
-        }
-
-        // Correct only a native restart of the exact mounted guard clip.
-        agentVisualActionAccessor.AdvanceExistingAnimationIfAvailable(
-            agent,
-            channel,
-            animationIndex,
-            expectedProgress,
-            visibleSpeed);
-    }
-
-    private static float AdvanceGuardProgress(
-        float progress,
-        float dt,
-        float duration,
-        float speed,
-        bool isCyclic)
-    {
-        progress = ClampAnimationProgress(progress);
-        if (dt <= 0f
-            || duration <= 0f
-            || float.IsNaN(duration)
-            || float.IsInfinity(duration))
-        {
-            return progress;
-        }
-
-        if (speed <= 0f || float.IsNaN(speed) || float.IsInfinity(speed))
-            speed = 1f;
-        progress += (dt * speed) / duration;
-        if (isCyclic)
-            return progress - (float)Math.Floor(progress);
-        return Math.Min(progress, 0.999f);
-    }
-
-    private static float ClampAnimationProgress(float progress)
-    {
-        if (float.IsNaN(progress) || float.IsInfinity(progress))
-            return 0f;
-        return Math.Max(0f, Math.Min(progress, 0.999f));
-    }
 
     private void ClearRetainedGuardAction(
         Agent agent,

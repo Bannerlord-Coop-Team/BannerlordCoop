@@ -26,7 +26,7 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     void CatchUpJoiner(string controllerId);
 
     /// <summary>[Game thread] Capture and apply one-shot guard reactions before the display snapshot.</summary>
-    void ReplayRemoteGuardReactions(float dt = 0f);
+    void ReplayRemoteGuardReactions();
 
     /// <summary>[Game thread] Record a locally authoritative blocked melee collision.</summary>
     void ObserveBlockedHit(
@@ -390,10 +390,10 @@ public class AgentActionHandler : IAgentActionHandler
         remoteActionProcessor.ApplyRemoteGuardStates();
     }
 
-    public void ReplayRemoteGuardReactions(float dt = 0f)
+    public void ReplayRemoteGuardReactions()
     {
         guardReactionHandler.ProcessPendingReactions();
-        remoteActionProcessor.ReplayRemoteGuardReactions(dt);
+        remoteActionProcessor.ReplayRemoteGuardReactions();
     }
 
     public void ObserveBlockedHit(

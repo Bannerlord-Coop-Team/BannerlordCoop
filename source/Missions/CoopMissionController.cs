@@ -81,7 +81,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         base.OnPreDisplayMissionTick(dt);
 
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
-        coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions(dt);
+        coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
     }
 
     public virtual void Dispose()

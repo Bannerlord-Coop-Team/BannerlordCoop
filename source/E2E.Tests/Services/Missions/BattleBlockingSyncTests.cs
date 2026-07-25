@@ -566,9 +566,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                     sequence: 1));
             DrainGameThread();
             context.Component.AgentActionHandler
-                .ReplayRemoteGuardReactions(0.1f);
+                .ReplayRemoteGuardReactions();
             context.Component.AgentActionHandler
-                .ReplayRemoteGuardReactions(0.1f);
+                .ReplayRemoteGuardReactions();
 
             Assert.Equal(1, defenderMirror.SetActionChannelCalls);
             Assert.Equal(0, defenderMirror.AdvanceRawVisualActionCalls);
@@ -860,9 +860,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.InstallRawVisualActionCalls = 0;
 
             context.Component.AgentActionHandler
-                .ReplayRemoteGuardReactions(0.1f);
+                .ReplayRemoteGuardReactions();
             context.Component.AgentActionHandler
-                .ReplayRemoteGuardReactions(0.1f);
+                .ReplayRemoteGuardReactions();
 
             Assert.Equal(
                 0.1f,
@@ -1275,7 +1275,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
             puppetMirror.SkeletonAction1Index = -1;
             puppetMirror.RawVisualAction1Index = -1;
-            context.Component.AgentActionHandler.ReplayRemoteGuardReactions(0.1f);
+            context.Component.AgentActionHandler.ReplayRemoteGuardReactions();
 
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
             Assert.Equal(-1, puppetMirror.RawVisualAction1Index);
@@ -3006,7 +3006,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MissionPreDisplayTick_MountedGuardNativeProgressRestarts_AdvancesRetainedVisualTimeline()
+    public void MissionPreDisplayTick_MountedGuardVisualTimeline_RemainsNative()
     {
         RunScenario("peer", context =>
         {
@@ -3018,8 +3018,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 context, "owner", agentId, AgentControllerType.None,
                 out MirrorAgent puppetMirror);
             puppetMirror.HasVisualSkeleton = true;
-            puppetMirror.ActionAnimationIndices[202] = 3220;
-            puppetMirror.AnimationDurations[3220] = 4f;
             Agent owner = SpawnAgent(
                 context, AgentControllerType.Player, out MirrorAgent ownerMirror);
             context.Mock.SpawnMount(puppet);
@@ -3040,8 +3038,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ApplyOwnerAction(context.Component, 1L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
-            // Mounted native ticking clears the Agent action but leaves the correct raw clip
-            // visible at a restarted progress immediately before display.
+            // Native can wrap the exact raw guard clip while the held guard remains active.
             puppetMirror.Action1Index = -1;
             puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
             puppetMirror.SkeletonAction1Index = -1;
@@ -3053,17 +3050,17 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(-1, puppetMirror.Action1Index);
             Assert.Equal(3220, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(0.225f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(1, puppetMirror.AdvanceExistingRawVisualActionCalls);
+            Assert.Equal(0.01f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
 
-            // Native forward progress owns the exact clip without a per-frame rewrite.
+            // Native forward progress remains untouched.
             puppetMirror.RawVisualAction1Progress = 0.24f;
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(0.24f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(1, puppetMirror.AdvanceExistingRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
 
             // A same-guard snapshot must not rewind the retained raw-animation clock.
             ownerMirror.Action1Progress = 0.05f;
@@ -3075,27 +3072,28 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.RawVisualAction1Progress = 0.01f;
             controller.OnPreDisplayMissionTick(0.1f);
 
-            Assert.Equal(0.265f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(2, puppetMirror.AdvanceExistingRawVisualActionCalls);
+            Assert.Equal(0.01f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
 
-            // A different raw clip owns presentation until native makes the guard visible again.
+            // A different raw clip owns presentation.
             puppetMirror.RawVisualAction1Index = 303;
             puppetMirror.RawVisualAction1Progress = 0.7f;
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(303, puppetMirror.RawVisualAction1Index);
             Assert.Equal(0.7f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(2, puppetMirror.AdvanceExistingRawVisualActionCalls);
+            Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
 
-            puppetMirror.RawVisualAction1Index = 3220;
-            puppetMirror.RawVisualAction1Progress = 0.01f;
+            // A missing raw clip is not synthesized over native presentation.
+            puppetMirror.RawVisualAction1Index = -1;
+            puppetMirror.RawVisualAction1Progress = 0f;
             controller.OnPreDisplayMissionTick(0.1f);
 
-            Assert.Equal(3220, puppetMirror.RawVisualAction1Index);
-            Assert.Equal(0.29f, puppetMirror.RawVisualAction1Progress, precision: 3);
-            Assert.Equal(3, puppetMirror.AdvanceExistingRawVisualActionCalls);
+            Assert.Equal(-1, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0f, puppetMirror.RawVisualAction1Progress);
+            Assert.Equal(0, puppetMirror.AdvanceRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.InstallRawVisualActionCalls);
             Assert.Equal(0, puppetMirror.SetActionChannelCalls);
         });
