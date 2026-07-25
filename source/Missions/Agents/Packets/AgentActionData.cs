@@ -1,5 +1,6 @@
 ﻿using ProtoBuf;
 using System.Reflection;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Packets
@@ -275,6 +276,8 @@ namespace Missions.Agents.Packets
                     agent.GetCurrentActionType(
                         GuardActionChannel));
             IsMounted = agent.HasMount;
+            IsPlayerControlled =
+                agent.Controller == AgentControllerType.Player;
         }
 
         public void Apply(Agent agent)
@@ -348,6 +351,8 @@ namespace Missions.Agents.Packets
         public int GuardActionChannel { get; }
         [ProtoMember(14)]
         public bool GuardActionIsDefending { get; }
+        [ProtoMember(15)]
+        public bool IsPlayerControlled { get; }
         internal Agent.MovementControlFlag DefendFlags =>
             GetDefendMovementFlags((Agent.MovementControlFlag)MovementFlag);
         internal Agent.GuardMode GuardMode => FromWireGuardState(GuardState);

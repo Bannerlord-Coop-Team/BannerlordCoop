@@ -47,8 +47,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         base.OnPreMissionTick(dt);
 
-        // Native collision runs after this hook and before OnMissionTick. Restore remote guard state here so
-        // combat reads the received defend input and Agent state instead of the later display-only skeleton pose.
+        // Bannerlord calls this before the display, mission-behavior, and native Agent ticks. Restore remote
+        // defend input here so the Agent tick resolves guard collision through the same path as local input.
         coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
     }
 
@@ -80,8 +80,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         base.OnPreDisplayMissionTick(dt);
 
-        // This runs after the previous native agent tick and immediately before the display snapshot.
-        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates(dt);
+        // Keep short remote guard reactions visible for this frame without driving held guard actions.
+        coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions(dt);
     }
 
     public virtual void Dispose()

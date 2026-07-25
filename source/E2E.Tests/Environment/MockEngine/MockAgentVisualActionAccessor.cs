@@ -33,8 +33,7 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress,
-        bool replaceCurrentVisual)
+        float progress)
     {
         if (!AgentMirror.TryGet(agent, out MirrorAgent mirror)
             || !mirror.HasVisualSkeleton)
@@ -42,9 +41,6 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
             return;
         }
 
-        int visualAction = channel == 0
-            ? mirror.SkeletonAction0Index
-            : mirror.SkeletonAction1Index;
         int rawVisualAction = channel == 0
             ? mirror.RawVisualAction0Index
             : mirror.RawVisualAction1Index;
@@ -61,20 +57,6 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
 
             mirror.AdvanceRawVisualActionCalls++;
             mirror.AdvanceExistingRawVisualActionCalls++;
-            return;
-        }
-
-        if (visualAction == ActionIndexCache.act_none.Index
-            && rawVisualAction >= 0
-            && !replaceCurrentVisual)
-        {
-            return;
-        }
-
-        if (visualAction != ActionIndexCache.act_none.Index
-            && visualAction != action.Index
-            && !replaceCurrentVisual)
-        {
             return;
         }
 

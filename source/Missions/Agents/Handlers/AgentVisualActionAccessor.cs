@@ -1,7 +1,4 @@
-﻿using Common.Logging;
-using Serilog;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
@@ -17,19 +14,12 @@ public interface IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress,
-        bool replaceCurrentVisual);
+        float progress);
 }
 
 public class AgentVisualActionAccessor : IAgentVisualActionAccessor
 {
-    private static readonly ILogger Logger =
-        LogManager.GetLogger<AgentVisualActionAccessor>();
-    private const float RetainedGuardAnimationBlendPeriod = -1f;
-    private const float ReplayLogIntervalSeconds = 1f;
-
-    private readonly Dictionary<long, float> _lastReplayLogTimes =
-        new Dictionary<long, float>();
+    private const float RetainedReactionAnimationBlendPeriod = -1f;
 
     public bool IsActionVisible(
         Agent agent,
@@ -69,8 +59,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress,
-        bool replaceCurrentVisual)
+        float progress)
     {
         Skeleton skeleton = null;
         try
@@ -78,7 +67,6 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             skeleton = GetSkeleton(agent);
             if (ReferenceEquals(skeleton, null)) return;
 
-            ActionIndexCache visualAction = skeleton.GetActionAtChannel(channel);
             int animationIndex = MBActionSet.GetAnimationIndexOfAction(
                 agent.ActionSet,
                 in action);
@@ -91,35 +79,13 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
                 return;
             }
 
-            if (visualAction == ActionIndexCache.act_none
-                && visualAnimation >= 0
-                && !replaceCurrentVisual)
-            {
-                return;
-            }
-
-            if (visualAction != ActionIndexCache.act_none
-                && visualAction != action
-                && !replaceCurrentVisual)
-            {
-                return;
-            }
-
-            LogVisualReplay(
-                agent,
-                channel,
-                action,
-                visualAction,
-                animationIndex,
-                visualAnimation);
-
-            // Native can replace the puppet action before display. Present the retained clip at its
+            // Native can replace the puppet reaction before display. Present the retained clip at its
             // existing timeline without restarting another authored blend.
             skeleton.SetAnimationAtChannel(
                 animationIndex,
                 channel,
                 animationSpeedMultiplier: 1f,
-                blendInPeriod: RetainedGuardAnimationBlendPeriod,
+                blendInPeriod: RetainedReactionAnimationBlendPeriod,
                 startProgress: progress);
         }
         catch
@@ -131,36 +97,6 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             if (!ReferenceEquals(skeleton, null))
                 skeleton.ManualInvalidate();
         }
-    }
-
-    private void LogVisualReplay(
-        Agent agent,
-        int channel,
-        in ActionIndexCache action,
-        in ActionIndexCache visualAction,
-        int animationIndex,
-        int visualAnimation)
-    {
-        float now = Mission.Current?.CurrentTime ?? 0f;
-        long key = ((long)agent.Index << 2) | (uint)channel;
-        if (_lastReplayLogTimes.TryGetValue(key, out float last)
-            && now - last < ReplayLogIntervalSeconds)
-        {
-            return;
-        }
-
-        _lastReplayLogTimes[key] = now;
-        Logger.Debug(
-            "[GuardSync] Reinstall visual agent={Agent} mounted={Mounted} " +
-            "channel={Channel} action={Action} visualAction={VisualAction} " +
-            "animation={Animation} visualAnimation={VisualAnimation}",
-            agent.Index,
-            agent.HasMount,
-            channel,
-            action.Index,
-            visualAction.Index,
-            animationIndex,
-            visualAnimation);
     }
 
     private static Skeleton GetSkeleton(Agent agent)

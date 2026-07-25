@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
@@ -7,9 +6,9 @@ using GameInterface.Services.Entity;
 using LiteNetLib;
 using Missions.Agents.Packets;
 using Missions.Messages;
-using Serilog;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
@@ -26,8 +25,8 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
     void CatchUpJoiner(string controllerId);
 
-    /// <summary>[Game thread] Replay received puppet guard visuals immediately before the display snapshot.</summary>
-    void ReassertRemoteDefendStates(float dt = 0f);
+    /// <summary>[Game thread] Replay short received puppet guard reactions for the display snapshot.</summary>
+    void ReplayRemoteGuardReactions(float dt = 0f);
 
     /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
@@ -44,9 +43,6 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
-    private static readonly ILogger Logger =
-        LogManager.GetLogger<AgentActionHandler>();
-
     // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
     private const int MaxAgentsPerActionPacket = 8;
 
@@ -75,6 +71,7 @@ public class AgentActionHandler : IAgentActionHandler
         public bool Action0WasDefending;
         public bool Action1WasDefending;
         public bool IsMounted;
+        public bool IsPlayerControlled;
         public bool HasAction0DefendingAction;
         public bool HasAction1DefendingAction;
         public int Action0DefendingAction;
@@ -167,11 +164,20 @@ public class AgentActionHandler : IAgentActionHandler
                     || AgentActionData.IsGuardMode(guardMode)
                     || state.DefendFlags != Agent.MovementControlFlag.None
                     || AgentActionData.IsGuardMode(state.GuardMode));
+            bool guardedControllerRoleChanged =
+                hadState
+                && state.IsPlayerControlled
+                    != (agent.Controller == AgentControllerType.Player)
+                && (defendFlags != Agent.MovementControlFlag.None
+                    || AgentActionData.IsGuardMode(guardMode)
+                    || state.DefendFlags != Agent.MovementControlFlag.None
+                    || AgentActionData.IsGuardMode(state.GuardMode));
             bool action0Changed = !hadState || state.Action0 != action0;
             bool action1Changed = !hadState || state.Action1 != action1;
             if (!action0Changed && !action1Changed
                 && !defendChanged && !guardChanged
-                && !guardedMountStateChanged)
+                && !guardedMountStateChanged
+                && !guardedControllerRoleChanged)
                 continue;
 
             bool action0Discrete =
@@ -234,29 +240,8 @@ public class AgentActionHandler : IAgentActionHandler
                 defendChanged
                 || guardChanged
                 || guardedMountStateChanged
+                || guardedControllerRoleChanged
                 || discreteActionChanged;
-            if (agent.HasMount
-                && (defendChanged
-                    || guardChanged
-                    || action0GuardLocomotionChurn
-                    || action1GuardLocomotionChurn))
-            {
-                Logger.Debug(
-                    "[GuardSync] Mounted owner agent={Agent} broadcast={Broadcast} " +
-                    "defend={Defend} guard={Guard} action0={Action0}/{Type0} " +
-                    "action1={Action1}/{Type1} gaitChurn={Churn0}/{Churn1}",
-                    agent.Index,
-                    broadcast,
-                    defendFlags,
-                    guardMode,
-                    action0,
-                    agent.GetCurrentActionType(0),
-                    action1,
-                    agent.GetCurrentActionType(1),
-                    action0GuardLocomotionChurn,
-                    action1GuardLocomotionChurn);
-            }
-
             state.HasObservation = true;
             state.Action0 = action0;
             state.Action1 = action1;
@@ -267,6 +252,8 @@ public class AgentActionHandler : IAgentActionHandler
             state.Action0WasDefending = action0Defending;
             state.Action1WasDefending = action1Defending;
             state.IsMounted = agent.HasMount;
+            state.IsPlayerControlled =
+                agent.Controller == AgentControllerType.Player;
             UpdateDefendingAction(
                 action0,
                 agent.GetCurrentActionType(0),
@@ -384,9 +371,9 @@ public class AgentActionHandler : IAgentActionHandler
         remoteActionProcessor.ApplyRemoteGuardStates();
     }
 
-    public void ReassertRemoteDefendStates(float dt = 0f)
+    public void ReplayRemoteGuardReactions(float dt = 0f)
     {
-        remoteActionProcessor.ReassertRemoteDefendStates(dt);
+        remoteActionProcessor.ReplayRemoteGuardReactions(dt);
     }
 
     private void Handle_BattleHostAssigned(
