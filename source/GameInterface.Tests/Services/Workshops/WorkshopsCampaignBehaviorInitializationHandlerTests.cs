@@ -2,6 +2,7 @@
 using GameInterface.Services.Workshops.Handlers;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -12,20 +13,57 @@ namespace GameInterface.Tests.Services.Workshops;
 public class WorkshopsCampaignBehaviorInitializationHandlerTests
 {
     [Fact]
-    public void AddMissingOwnedWorkshopRosters_NoSavedRoster_AddsEmptyRosterForWorkshopSettlement()
+    public void AddMissingPlayerWorkshopRosters_OwnerMatchesPlayer_AddsEmptyRosterForWorkshopSettlement()
     {
+        Hero playerHero = ObjectHelper.SkipConstructor<Hero>();
         Settlement settlement = ObjectHelper.SkipConstructor<Settlement>();
-        Workshop workshop = ObjectHelper.SkipConstructor<Workshop>();
-        typeof(Workshop).GetField("_settlement", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .SetValue(workshop, settlement);
+        Workshop workshop = CreateWorkshop(playerHero, settlement);
         var warehouseRosters = new Dictionary<Settlement, ItemRoster>();
 
-        WorkshopsCampaignBehaviorInitializationHandler.AddMissingOwnedWorkshopRosters(
+        WorkshopsCampaignBehaviorInitializationHandler.AddMissingPlayerWorkshopRosters(
             warehouseRosters,
+            playerHero,
             new[] { workshop });
 
         ItemRoster roster = Assert.Contains(settlement, warehouseRosters);
         Assert.Empty(roster);
+    }
+
+    [Fact]
+    public void AddMissingPlayerWorkshopRosters_OwnerDoesNotMatchPlayer_DoesNotAddRoster()
+    {
+        Hero playerHero = ObjectHelper.SkipConstructor<Hero>();
+        Hero otherHero = ObjectHelper.SkipConstructor<Hero>();
+        Settlement settlement = ObjectHelper.SkipConstructor<Settlement>();
+        Workshop workshop = CreateWorkshop(otherHero, settlement);
+        var warehouseRosters = new Dictionary<Settlement, ItemRoster>();
+
+        WorkshopsCampaignBehaviorInitializationHandler.AddMissingPlayerWorkshopRosters(
+            warehouseRosters,
+            playerHero,
+            new[] { workshop });
+
+        Assert.Empty(warehouseRosters);
+    }
+
+    [Fact]
+    public void AddMissingPlayerWorkshopRosters_SavedRoster_PreservesRoster()
+    {
+        Hero playerHero = ObjectHelper.SkipConstructor<Hero>();
+        Settlement settlement = ObjectHelper.SkipConstructor<Settlement>();
+        Workshop workshop = CreateWorkshop(playerHero, settlement);
+        var savedRoster = new ItemRoster();
+        var warehouseRosters = new Dictionary<Settlement, ItemRoster>
+        {
+            [settlement] = savedRoster,
+        };
+
+        WorkshopsCampaignBehaviorInitializationHandler.AddMissingPlayerWorkshopRosters(
+            warehouseRosters,
+            playerHero,
+            new[] { workshop });
+
+        Assert.Same(savedRoster, Assert.Contains(settlement, warehouseRosters));
     }
 
     [Fact]
@@ -83,5 +121,15 @@ public class WorkshopsCampaignBehaviorInitializationHandlerTests
         Assert.Equal(2, result.Length);
         Assert.Contains(result, slot => slot.Key == firstSettlement && slot.Value == firstRoster);
         Assert.Contains(result, slot => slot.Key == secondSettlement && slot.Value == secondRoster);
+    }
+
+    private static Workshop CreateWorkshop(Hero owner, Settlement settlement)
+    {
+        Workshop workshop = ObjectHelper.SkipConstructor<Workshop>();
+        typeof(Workshop).GetField("_owner", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(workshop, owner);
+        typeof(Workshop).GetField("_settlement", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(workshop, settlement);
+        return workshop;
     }
 }

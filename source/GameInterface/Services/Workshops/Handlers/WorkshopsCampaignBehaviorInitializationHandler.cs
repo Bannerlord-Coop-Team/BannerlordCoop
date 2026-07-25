@@ -9,6 +9,7 @@ using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Roster;
@@ -107,19 +108,25 @@ namespace GameInterface.Services.Workshops.Handlers
                     }
                 }
 
-                AddMissingOwnedWorkshopRosters(warehouseRosterPerSettlement, playerHero.OwnedWorkshops);
+                IEnumerable<Workshop> townWorkshops = Settlement.All
+                    .Where(settlement => settlement.IsTown)
+                    .SelectMany(settlement => settlement.Town.Workshops);
+                AddMissingPlayerWorkshopRosters(warehouseRosterPerSettlement, playerHero, townWorkshops);
             }, blocking: true);
 
             return CreateWarehouseRosterSlots(warehouseRosterPerSettlement, maxWorkshopCount);
         }
 
-        internal static void AddMissingOwnedWorkshopRosters(
+        internal static void AddMissingPlayerWorkshopRosters(
             IDictionary<Settlement, ItemRoster> warehouseRosters,
-            IEnumerable<Workshop> ownedWorkshops)
+            Hero playerHero,
+            IEnumerable<Workshop> workshops)
         {
-            foreach (var workshop in ownedWorkshops)
+            foreach (var workshop in workshops)
             {
-                Settlement settlement = workshop?.Settlement;
+                if (workshop?.Owner != playerHero) continue;
+
+                Settlement settlement = workshop.Settlement;
                 if (settlement != null && !warehouseRosters.ContainsKey(settlement))
                 {
                     warehouseRosters[settlement] = new ItemRoster();
