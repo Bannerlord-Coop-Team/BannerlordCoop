@@ -47,7 +47,7 @@ public class ConnectionMessageQueueTests
         return peer;
     }
 
-    private bool NothingSentTo(NetPeer peer) => network.SentPackets.ContainsKey(peer.Id) == false;
+    private bool NothingSentTo(NetPeer peer) => network.SentPayloads.ContainsKey(peer.Id) == false;
 
     // NetPeer equality is endpoint-based and TestNetwork.CreatePeer reuses one endpoint, so a second
     // distinct peer must be given its own endpoint to be a distinct dictionary key.
@@ -76,14 +76,14 @@ public class ConnectionMessageQueueTests
         // Dropping phase: the queue takes the packet (true) but discards it — it is already in the save.
         Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
 
-        messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+        queue.Flush(peer);
 
         // The dropped packet is never replayed.
         Assert.True(NothingSentTo(peer));
     }
 
     [Fact]
-    public void Queueing_HoldsBroadcasts_ThenFlushesFifoOnCampaignEntered()
+    public void Queueing_HoldsBroadcasts_ThenFlushesFifoWhileRemainingQueued()
     {
         var peer = Connect();
         queue.BeginQueueing(peer);
@@ -98,9 +98,13 @@ public class ConnectionMessageQueueTests
         // Held, not sent, while the peer loads.
         Assert.True(NothingSentTo(peer));
 
-        messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+        queue.Flush(peer);
 
         Assert.Equal(new IPacket[] { first, second, third }, network.GetPeerPackets(peer));
+
+        var afterFlush = new FakePacket();
+        Assert.True(queue.TryHandleBroadcast(peer, afterFlush));
+        Assert.DoesNotContain(afterFlush, network.GetPeerPackets(peer));
     }
 
     [Fact]
@@ -111,8 +115,35 @@ public class ConnectionMessageQueueTests
 
         Assert.False(queue.TryHandleBroadcast(peer, new FakeCampaignTimePacket()));
 
-        messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+        queue.Flush(peer);
         Assert.True(NothingSentTo(peer));
+    }
+
+    [Fact]
+    public void CatchUpProgress_CombinesHeldAndReliablePacketsUntilClientAcknowledges()
+    {
+        var peer = Connect();
+        peer.SetQueueLength(5);
+
+        Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
+
+        queue.BeginQueueing(peer);
+        queue.TryHandleBroadcast(peer, new FakePacket());
+        queue.TryHandleBroadcast(peer, new FakePacket());
+
+        Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int queued));
+        Assert.Equal(7, queued);
+
+        queue.Flush(peer);
+        Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int draining));
+        Assert.Equal(5, draining);
+
+        queue.OpenWithTail(peer, new NetworkJoinSync(JoinSyncSignal.WorldReady));
+        Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int opened));
+        Assert.Equal(5, opened);
+
+        queue.CompleteCatchUp(peer);
+        Assert.False(queue.TryGetCatchUpPacketsRemaining(peer, out _));
     }
 
     [Fact]
@@ -138,37 +169,51 @@ public class ConnectionMessageQueueTests
         Assert.True(queue.TryHandleBroadcast(peer, held));
         Assert.True(NothingSentTo(peer));
 
-        messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+        queue.Flush(peer);
         Assert.Equal(new IPacket[] { held }, network.GetPeerPackets(peer));
     }
 
     [Fact]
-    public void AfterCampaignEntered_PeerReceivesLive()
+    public void Flush_KeepsPeerQueuedUntilOpenWithTail()
     {
         var peer = Connect();
         queue.BeginQueueing(peer);
-        messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+        queue.Flush(peer);
 
+        var held = new FakePacket();
+        Assert.True(queue.TryHandleBroadcast(peer, held));
+        Assert.True(NothingSentTo(peer));
+
+        var marker = new NetworkJoinSync(JoinSyncSignal.WorldReady);
+        queue.OpenWithTail(peer, marker);
+
+        Assert.Equal(new object[] { held, marker }, network.GetPeerPayloads(peer));
         Assert.False(queue.TryHandleBroadcast(peer, new FakePacket()));
     }
 
     [Fact]
-    public void ReplayedPacketsPrecedeLivePackets()
+    public void OpenWithTail_SendsHeldPacketsThenMarkerThenLivePackets()
     {
         var peer = Connect();
         queue.BeginQueueing(peer);
 
-        var held = new FakePacket();
-        queue.TryHandleBroadcast(peer, held);
+        var beforeFlush = new FakePacket();
+        queue.TryHandleBroadcast(peer, beforeFlush);
+        queue.Flush(peer);
 
-        messageBroker.Publish(this, new PlayerCampaignEntered(peer)); // flush replays held
+        var afterFlush = new FakePacket();
+        queue.TryHandleBroadcast(peer, afterFlush);
 
-        // A broadcast after the flush is live; the caller sends it, landing strictly after the replay.
+        var marker = new NetworkJoinSync(JoinSyncSignal.WorldReady);
+        queue.OpenWithTail(peer, marker);
+
         var live = new FakePacket();
         Assert.False(queue.TryHandleBroadcast(peer, live));
         network.Send(peer, live);
 
-        Assert.Equal(new IPacket[] { held, live }, network.GetPeerPackets(peer));
+        Assert.Equal(
+            new object[] { beforeFlush, afterFlush, marker, live },
+            network.GetPeerPayloads(peer));
     }
 
     [Fact]
@@ -180,9 +225,9 @@ public class ConnectionMessageQueueTests
 
         messageBroker.Publish(this, new PlayerDisconnected(peer, default));
 
-        // Untracked again -> live; a late campaign-entered finds no channel and replays nothing.
+        // Untracked again -> live; a late flush finds no channel and replays nothing.
         Assert.False(queue.TryHandleBroadcast(peer, new FakePacket()));
-        messageBroker.Publish(this, new PlayerCampaignEntered(peer));
+        queue.Flush(peer);
         Assert.True(NothingSentTo(peer));
     }
 
@@ -199,7 +244,7 @@ public class ConnectionMessageQueueTests
     }
 
     [Fact]
-    public void NetworkCampaignEntered_DoesNotFlush_OnlyLocalDoes()
+    public void NetworkCampaignEntered_DoesNotFlush()
     {
         var peer = Connect();
         queue.BeginQueueing(peer);

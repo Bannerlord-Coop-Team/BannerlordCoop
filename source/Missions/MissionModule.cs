@@ -44,6 +44,10 @@ public class MissionModule : Module
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
             .InstancePerDependency();
+        builder.RegisterType<CompressedMovementPacketHandler>()
+            .AsSelf()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
         builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
 
         // MissionContext mirrors the server's instance membership and must live for the whole client
