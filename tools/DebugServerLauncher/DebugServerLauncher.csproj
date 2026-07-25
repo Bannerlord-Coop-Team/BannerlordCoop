@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Debug launcher for the .stage-win coop dedicated server (see Program.cs for
+    the full story). net472 on purpose: the Coop projects are net472, so VS's F5
+    picks the Desktop CLR debug engine - pointing DebugAutoConnect's StartProgram
+    at this exe attaches cleanly, and the exe then DTE-attaches VS's CoreCLR
+    engine to the actual game engine process.
+
+    Not part of Coop.sln; built on demand by tools\debug-server.ps1 (or
+    `dotnet build tools\DebugServerLauncher -c Release`).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>DebugServerLauncher</RootNamespace>
+    <AssemblyName>DebugServerLauncher</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <!-- EnvDTE COM interop, embedded (NoPIA): the COM interface types compile into
+       this exe, so no EnvDTE assemblies need to exist or resolve at runtime and
+       any Visual Studio version with the same COM GUIDs (all of them) works. -->
+  <ItemGroup>
+    <PackageReference Include="envdte" Version="17.0.32112.339" EmbedInteropTypes="true" />
+    <PackageReference Include="envdte80" Version="17.0.32112.339" EmbedInteropTypes="true" />
+  </ItemGroup>
+
+</Project>

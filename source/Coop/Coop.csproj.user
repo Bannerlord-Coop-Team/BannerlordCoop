@@ -13,9 +13,13 @@
     <StartArguments>/singleplayer /server _MODULES_%2aNative%2aSandBoxCore%2aCustomBattle%2aSandBox%2aStoryMode%2aCoop%2a_MODULES_</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'DebugAutoConnect|AnyCPU'">
+    <!-- DebugServerLauncher (net472, so F5's Desktop CLR engine attaches to it
+         cleanly) starts the .stage-win server and DTE-attaches this VS's CoreCLR
+         debugger to the engine child process (where all Coop code runs).
+         If the exe is missing, run tools\debug-server.ps1 once to build it. -->
     <StartAction>Program</StartAction>
-    <StartProgram>..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
-    <StartArguments>/singleplayer /server /autoconnect _MODULES_%2aNative%2aSandBoxCore%2aSandBox%2aStoryMode%2aCoop%2a_MODULES_</StartArguments>
-    <StartWorkingDirectory>..\..\..\..\mb2\bin\Win64_Shipping_Client\</StartWorkingDirectory>
+    <StartProgram>E:\Mod Development\BannerlordCoop\tools\DebugServerLauncher\bin\Release\net472\DebugServerLauncher.exe</StartProgram>
+    <StartArguments>--no-attach</StartArguments>
+    <StartWorkingDirectory>E:\Mod Development\BannerlordCoop\</StartWorkingDirectory>
   </PropertyGroup>
 </Project>
