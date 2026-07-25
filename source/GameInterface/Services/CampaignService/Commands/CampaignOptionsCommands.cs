@@ -1,12 +1,13 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.CampaignService.Messages;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using static TaleWorlds.CampaignSystem.CampaignOptions;
-using static TaleWorlds.MountAndBlade.BannerlordConfig;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using System.Text;
+using static TaleWorlds.CampaignSystem.CampaignOptions;
+using static TaleWorlds.Library.CommandLineFunctionality;
+using static TaleWorlds.MountAndBlade.BannerlordConfig;
 
 namespace GameInterface.Services.CampaignService.Commands;
 
@@ -153,6 +154,8 @@ internal class CampaignOptionsCommands
     [CommandLineArgumentFunction("PlayerReceivedDamageDifficulty", "coop.debug.campaignoptions")]
     public static string SetPlayerReceivedDamageDifficulty(List<string> strings)
     {
+        Difficulty oldValue = (Difficulty)PlayerReceivedDamageDifficulty;
+
         var result = HandleDifficultyOptionCommand(
             strings,
             nameof(PlayerReceivedDamageDifficulty),
@@ -160,7 +163,11 @@ internal class CampaignOptionsCommands
             value => PlayerReceivedDamageDifficulty = (int)value);
 
         // Player received damage is not a campaign option. Need to update for clients separately
-        UpdateOtherOptions();
+        if (oldValue != (Difficulty)PlayerReceivedDamageDifficulty)
+        {
+            // Player received damage is not a campaign option. Need to update for clients separately
+            UpdateOtherOptions();
+        }
 
         return result;
     }
