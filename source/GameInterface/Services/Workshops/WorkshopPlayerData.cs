@@ -17,46 +17,8 @@ public class WorkshopPlayerData
     [ProtoMember(1)]
     public Dictionary<string, KeyValuePair<string, List<ItemRosterElementData>>[]> PlayerWarehouseRosterPerSettlement { get; }
 
-    // Dictionary<WorkshopId, WorkshopDataSnapshot>
-    [ProtoMember(2)]
-    public Dictionary<string, WorkshopDataSnapshot> WorkshopDataByWorkshopId { get; }
-
-    public WorkshopPlayerData(
-        Dictionary<string, KeyValuePair<string, List<ItemRosterElementData>>[]> playerWarehouseRosterPerSettlement,
-        Dictionary<string, WorkshopDataSnapshot> workshopDataByWorkshopId)
+    public WorkshopPlayerData(Dictionary<string, KeyValuePair<string, List<ItemRosterElementData>>[]> playerWarehouseRosterPerSettlement)
     {
-        PlayerWarehouseRosterPerSettlement = playerWarehouseRosterPerSettlement ?? new();
-        WorkshopDataByWorkshopId = workshopDataByWorkshopId ?? new();
-    }
-}
-
-/// <summary>
-/// Saved player-workshop production state that vanilla stores in its single-player behavior array.
-/// </summary>
-[ProtoContract(SkipConstructor = true)]
-public class WorkshopDataSnapshot
-{
-    [ProtoMember(1)]
-    public bool IsGettingInputsFromWarehouse { get; }
-
-    [ProtoMember(2)]
-    public float ProductionProgressForWarehouse { get; }
-
-    [ProtoMember(3)]
-    public float ProductionProgressForTown { get; }
-
-    [ProtoMember(4)]
-    public float StockProductionInWarehouseRatio { get; }
-
-    public WorkshopDataSnapshot(
-        bool isGettingInputsFromWarehouse,
-        float productionProgressForWarehouse,
-        float productionProgressForTown,
-        float stockProductionInWarehouseRatio)
-    {
-        IsGettingInputsFromWarehouse = isGettingInputsFromWarehouse;
-        ProductionProgressForWarehouse = productionProgressForWarehouse;
-        ProductionProgressForTown = productionProgressForTown;
-        StockProductionInWarehouseRatio = stockProductionInWarehouseRatio;
+        PlayerWarehouseRosterPerSettlement = playerWarehouseRosterPerSettlement;
     }
 }

@@ -6,7 +6,6 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Workshops.Interfaces;
@@ -21,9 +20,6 @@ public interface ISessionWorkshopPlayerDataInterface : IGameAbstraction
     void UpdateWarehouseRoster(string ownerId, string settlementId, ItemRosterElement[] newWarehouseData);
     ItemRosterElement GetItemRosterElementFromData(ItemRosterElementData itemRosterElementData);
     void AddPlayerKeys(string playerHeroId);
-    bool TryGetWorkshopData(string workshopId, out WorkshopDataSnapshot workshopData);
-    void UpdateWorkshopData(string workshopId, WorkshopsCampaignBehavior.WorkshopData workshopData);
-    void RemoveWorkshopData(string workshopId);
 }
 
 public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInterface
@@ -196,33 +192,6 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
         {
             WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[playerHeroId] = new KeyValuePair<string, List<ItemRosterElementData>>[Campaign.Current.Models.ClanTierModel.MaxClanTier + 1];
         }
-    }
-
-    public bool TryGetWorkshopData(string workshopId, out WorkshopDataSnapshot workshopData)
-    {
-        workshopData = null;
-        return WorkshopPlayerData?.WorkshopDataByWorkshopId?.TryGetValue(workshopId, out workshopData) == true;
-    }
-
-    public void UpdateWorkshopData(string workshopId, WorkshopsCampaignBehavior.WorkshopData workshopData)
-    {
-        if (workshopData == null) return;
-        if (WorkshopPlayerData?.WorkshopDataByWorkshopId == null)
-        {
-            Logger.Error("WorkshopDataByWorkshopId was null");
-            return;
-        }
-
-        WorkshopPlayerData.WorkshopDataByWorkshopId[workshopId] = new WorkshopDataSnapshot(
-            workshopData.IsGettingInputsFromWarehouse,
-            workshopData.ProductionProgressForWarehouse,
-            workshopData.ProductionProgressForTown,
-            workshopData.StockProductionInWarehouseRatio);
-    }
-
-    public void RemoveWorkshopData(string workshopId)
-    {
-        WorkshopPlayerData?.WorkshopDataByWorkshopId?.Remove(workshopId);
     }
 
     public ItemRosterElement GetItemRosterElementFromData(ItemRosterElementData itemRosterElementData)

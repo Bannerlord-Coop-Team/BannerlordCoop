@@ -1,8 +1,4 @@
-﻿using Common.Logging;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
-using GameInterface.Services.Workshops.Interfaces;
-using Serilog;
+﻿using GameInterface.Services.Players;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,8 +13,7 @@ public interface IWorkshopDataRestorer
     void RestoreClientWorkshopData(
         WorkshopsCampaignBehavior workshopsCampaignBehavior,
         Hero playerHero,
-        IEnumerable<Workshop> workshops,
-        WorkshopPlayerData workshopPlayerData);
+        IEnumerable<Workshop> workshops);
 
     void RestoreServerWorkshopData(
         WorkshopsCampaignBehavior workshopsCampaignBehavior,
@@ -26,40 +21,27 @@ public interface IWorkshopDataRestorer
 
     WorkshopsCampaignBehavior.WorkshopData EnsureWorkshopData(
         WorkshopsCampaignBehavior workshopsCampaignBehavior,
-        Workshop workshop,
-        WorkshopDataSnapshot savedData = null);
+        Workshop workshop);
 }
 
 public class WorkshopDataRestorer : IWorkshopDataRestorer
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<WorkshopDataRestorer>();
-
-    private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
-    private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
 
-    public WorkshopDataRestorer(
-        IObjectManager objectManager,
-        IPlayerManager playerManager,
-        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+    public WorkshopDataRestorer(IPlayerManager playerManager)
     {
-        this.objectManager = objectManager;
         this.playerManager = playerManager;
-        this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
     }
 
     public void RestoreClientWorkshopData(
         WorkshopsCampaignBehavior workshopsCampaignBehavior,
         Hero playerHero,
-        IEnumerable<Workshop> workshops,
-        WorkshopPlayerData workshopPlayerData)
+        IEnumerable<Workshop> workshops)
     {
         RestoreWorkshopData(
             workshopsCampaignBehavior,
             workshops,
-            workshop => workshop.Owner == playerHero,
-            workshopPlayerData,
-            updateSession: false);
+            workshop => workshop.Owner == playerHero);
     }
 
     public void RestoreServerWorkshopData(
@@ -69,15 +51,12 @@ public class WorkshopDataRestorer : IWorkshopDataRestorer
         RestoreWorkshopData(
             workshopsCampaignBehavior,
             workshops,
-            workshop => playerManager.Contains(workshop.Owner),
-            workshopPlayerData: null,
-            updateSession: true);
+            workshop => playerManager.Contains(workshop.Owner));
     }
 
     public WorkshopsCampaignBehavior.WorkshopData EnsureWorkshopData(
         WorkshopsCampaignBehavior workshopsCampaignBehavior,
-        Workshop workshop,
-        WorkshopDataSnapshot savedData = null)
+        Workshop workshop)
     {
         WorkshopsCampaignBehavior.WorkshopData[] workshopData =
             workshopsCampaignBehavior._workshopData ?? Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
@@ -97,52 +76,18 @@ public class WorkshopDataRestorer : IWorkshopDataRestorer
             dataOfWorkshop = workshopsCampaignBehavior.GetDataOfWorkshop(workshop);
         }
 
-        if (savedData != null)
-        {
-            dataOfWorkshop.IsGettingInputsFromWarehouse = savedData.IsGettingInputsFromWarehouse;
-            dataOfWorkshop.ProductionProgressForWarehouse = savedData.ProductionProgressForWarehouse;
-            dataOfWorkshop.ProductionProgressForTown = savedData.ProductionProgressForTown;
-            dataOfWorkshop.StockProductionInWarehouseRatio = savedData.StockProductionInWarehouseRatio;
-        }
-
         return dataOfWorkshop;
     }
 
     private void RestoreWorkshopData(
         WorkshopsCampaignBehavior workshopsCampaignBehavior,
         IEnumerable<Workshop> workshops,
-        Func<Workshop, bool> shouldRestore,
-        WorkshopPlayerData workshopPlayerData,
-        bool updateSession)
+        Func<Workshop, bool> shouldRestore)
     {
         foreach (Workshop workshop in workshops)
         {
             if (workshop == null || !shouldRestore(workshop)) continue;
-            if (!objectManager.TryGetIdWithLogging(workshop, out var workshopId)) continue;
-
-            WorkshopDataSnapshot savedData = null;
-            if (updateSession)
-            {
-                sessionWorkshopPlayerDataInterface.TryGetWorkshopData(workshopId, out savedData);
-            }
-            else
-            {
-                workshopPlayerData?.WorkshopDataByWorkshopId?.TryGetValue(workshopId, out savedData);
-            }
-
-            if (savedData == null && workshopsCampaignBehavior.GetDataOfWorkshop(workshop) == null)
-            {
-                Logger.Warning(
-                    "Missing saved workshop data for {WorkshopId}; restoring production defaults",
-                    workshopId);
-            }
-
-            WorkshopsCampaignBehavior.WorkshopData restoredData =
-                EnsureWorkshopData(workshopsCampaignBehavior, workshop, savedData);
-            if (updateSession)
-            {
-                sessionWorkshopPlayerDataInterface.UpdateWorkshopData(workshopId, restoredData);
-            }
+            EnsureWorkshopData(workshopsCampaignBehavior, workshop);
         }
     }
 }

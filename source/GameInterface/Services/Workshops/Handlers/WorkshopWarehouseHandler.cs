@@ -89,11 +89,9 @@ internal class WorkshopWarehouseHandler : IHandler
             if (owner.IsPlayerHero())
             {
                 sessionWorkshopPlayerDataInterface.AddNewWarehouseDataIfNeeded(ownerId, settlementId);
-                WorkshopsCampaignBehavior.WorkshopData workshopData =
-                    workshopDataRestorer.EnsureWorkshopData(
+                workshopDataRestorer.EnsureWorkshopData(
                     workshopsBehavior,
                     workshop);
-                sessionWorkshopPlayerDataInterface.UpdateWorkshopData(workshopId, workshopData);
             }
             else if (oldOwner.IsPlayerHero())
             {
@@ -110,7 +108,6 @@ internal class WorkshopWarehouseHandler : IHandler
                     sessionWorkshopPlayerDataInterface.RemoveWarehouseData(oldOwnerId, settlementId);
                 }
                 workshopsBehavior.RemoveWorkshopData(workshop);
-                sessionWorkshopPlayerDataInterface.RemoveWorkshopData(workshopId);
             }
 
             network.SendAll(new ChangeWorkshopOwner(workshopId, oldOwnerId));

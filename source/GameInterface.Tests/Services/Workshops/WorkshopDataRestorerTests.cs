@@ -1,8 +1,6 @@
 ﻿using Common.Util;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Workshops;
-using GameInterface.Services.Workshops.Interfaces;
 using Moq;
 using System;
 using System.Linq;
@@ -17,31 +15,7 @@ namespace GameInterface.Tests.Services.Workshops;
 public class WorkshopDataRestorerTests
 {
     [Fact]
-    public void EnsureWorkshopData_SavedSnapshot_RestoresEveryField()
-    {
-        Workshop workshop = CreateWorkshop(ObjectHelper.SkipConstructor<Hero>());
-        WorkshopsCampaignBehavior workshopsBehavior = CreateWorkshopsBehavior();
-        var savedData = new WorkshopDataSnapshot(
-            isGettingInputsFromWarehouse: true,
-            productionProgressForWarehouse: 0.25f,
-            productionProgressForTown: 0.5f,
-            stockProductionInWarehouseRatio: 0.75f);
-
-        WorkshopsCampaignBehavior.WorkshopData workshopData =
-            CreateRestorer().EnsureWorkshopData(
-                workshopsBehavior,
-                workshop,
-                savedData);
-
-        Assert.Same(workshop, workshopData.Workshop);
-        Assert.True(workshopData.IsGettingInputsFromWarehouse);
-        Assert.Equal(0.25f, workshopData.ProductionProgressForWarehouse);
-        Assert.Equal(0.5f, workshopData.ProductionProgressForTown);
-        Assert.Equal(0.75f, workshopData.StockProductionInWarehouseRatio);
-    }
-
-    [Fact]
-    public void EnsureWorkshopData_ExistingWorkshopDataWithoutSnapshot_PreservesEntry()
+    public void EnsureWorkshopData_ExistingVanillaData_PreservesEntryAndFields()
     {
         Workshop workshop = CreateWorkshop(ObjectHelper.SkipConstructor<Hero>());
         WorkshopsCampaignBehavior workshopsBehavior = CreateWorkshopsBehavior();
@@ -82,7 +56,7 @@ public class WorkshopDataRestorerTests
     }
 
     [Fact]
-    public void EnsureWorkshopData_NoSnapshot_CreatesDefaultEntry()
+    public void EnsureWorkshopData_MissingEntry_CreatesDefaultEntry()
     {
         Workshop workshop = CreateWorkshop(ObjectHelper.SkipConstructor<Hero>());
         WorkshopsCampaignBehavior workshopsBehavior = CreateWorkshopsBehavior();
@@ -106,61 +80,43 @@ public class WorkshopDataRestorerTests
         Workshop disconnectedWorkshop = CreateWorkshop(disconnectedHero);
         Workshop nonPlayerWorkshop = CreateWorkshop(nonPlayerHero);
         WorkshopsCampaignBehavior workshopsBehavior = CreateWorkshopsBehavior();
-        var joiningSnapshot = new WorkshopDataSnapshot(true, 0.1f, 0.2f, 0.3f);
-        var disconnectedSnapshot = new WorkshopDataSnapshot(false, 0.4f, 0.5f, 0.6f);
-        var objectManager = new Mock<IObjectManager>();
+        var joiningData = new WorkshopsCampaignBehavior.WorkshopData(joiningWorkshop)
+        {
+            IsGettingInputsFromWarehouse = true,
+            ProductionProgressForWarehouse = 0.1f,
+            ProductionProgressForTown = 0.2f,
+            StockProductionInWarehouseRatio = 0.3f,
+        };
+        workshopsBehavior._workshopData = new[] { joiningData };
         var playerManager = new Mock<IPlayerManager>();
-        var sessionWorkshopPlayerData = new Mock<ISessionWorkshopPlayerDataInterface>();
-        string joiningWorkshopId = "Workshop_Joining";
-        string disconnectedWorkshopId = "Workshop_Disconnected";
 
-        objectManager
-            .Setup(manager => manager.TryGetIdWithLogging(joiningWorkshop, out joiningWorkshopId))
-            .Returns(true);
-        objectManager
-            .Setup(manager => manager.TryGetIdWithLogging(disconnectedWorkshop, out disconnectedWorkshopId))
-            .Returns(true);
         playerManager.Setup(manager => manager.Contains(joiningHero)).Returns(true);
         playerManager.Setup(manager => manager.Contains(disconnectedHero)).Returns(true);
-        sessionWorkshopPlayerData
-            .Setup(data => data.TryGetWorkshopData(joiningWorkshopId, out joiningSnapshot))
-            .Returns(true);
-        sessionWorkshopPlayerData
-            .Setup(data => data.TryGetWorkshopData(disconnectedWorkshopId, out disconnectedSnapshot))
-            .Returns(true);
-        var restorer = new WorkshopDataRestorer(
-            objectManager.Object,
-            playerManager.Object,
-            sessionWorkshopPlayerData.Object);
+        var restorer = new WorkshopDataRestorer(playerManager.Object);
 
         restorer.RestoreServerWorkshopData(
             workshopsBehavior,
             new[] { joiningWorkshop, disconnectedWorkshop, nonPlayerWorkshop });
 
-        WorkshopsCampaignBehavior.WorkshopData joiningData =
-            workshopsBehavior.GetDataOfWorkshop(joiningWorkshop);
         WorkshopsCampaignBehavior.WorkshopData disconnectedData =
             workshopsBehavior.GetDataOfWorkshop(disconnectedWorkshop);
-        Assert.NotNull(joiningData);
+        Assert.Same(joiningData, workshopsBehavior.GetDataOfWorkshop(joiningWorkshop));
         Assert.NotNull(disconnectedData);
         Assert.Null(workshopsBehavior.GetDataOfWorkshop(nonPlayerWorkshop));
         Assert.Equal(2, workshopsBehavior._workshopData.Count(data => data != null));
+        Assert.True(joiningData.IsGettingInputsFromWarehouse);
         Assert.Equal(0.1f, joiningData.ProductionProgressForWarehouse);
-        Assert.Equal(0.4f, disconnectedData.ProductionProgressForWarehouse);
-        sessionWorkshopPlayerData.Verify(
-            data => data.UpdateWorkshopData(joiningWorkshopId, joiningData),
-            Times.Once);
-        sessionWorkshopPlayerData.Verify(
-            data => data.UpdateWorkshopData(disconnectedWorkshopId, disconnectedData),
-            Times.Once);
+        Assert.Equal(0.2f, joiningData.ProductionProgressForTown);
+        Assert.Equal(0.3f, joiningData.StockProductionInWarehouseRatio);
+        Assert.False(disconnectedData.IsGettingInputsFromWarehouse);
+        Assert.Equal(0f, disconnectedData.ProductionProgressForWarehouse);
+        Assert.Equal(0f, disconnectedData.ProductionProgressForTown);
+        Assert.Equal(0f, disconnectedData.StockProductionInWarehouseRatio);
     }
 
     private static WorkshopDataRestorer CreateRestorer()
     {
-        return new WorkshopDataRestorer(
-            Mock.Of<IObjectManager>(),
-            Mock.Of<IPlayerManager>(),
-            Mock.Of<ISessionWorkshopPlayerDataInterface>());
+        return new WorkshopDataRestorer(Mock.Of<IPlayerManager>());
     }
 
     private static Workshop CreateWorkshop(Hero owner)

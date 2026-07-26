@@ -73,8 +73,7 @@ namespace GameInterface.Services.Workshops.Handlers
                         workshopDataRestorer.RestoreClientWorkshopData(
                             workshopsCampaignBehavior,
                             playerHero,
-                            GetTownWorkshops(),
-                            workshopPlayerData);
+                            GetTownWorkshops());
                     }
                 },
                 blocking: true,

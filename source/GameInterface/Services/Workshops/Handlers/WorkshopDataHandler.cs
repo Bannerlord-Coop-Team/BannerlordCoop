@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -20,20 +19,17 @@ internal class WorkshopDataHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
     private readonly IWorkshopDataRestorer workshopDataRestorer;
 
     public WorkshopDataHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
         IWorkshopDataRestorer workshopDataRestorer)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
         this.workshopDataRestorer = workshopDataRestorer;
 
         // Server => Clients
@@ -80,7 +76,6 @@ internal class WorkshopDataHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-            SaveWorkshopData(workshopId, obj.What.Workshop);
             network.SendAll(new AddNewWorkshopData(workshopId));
         }, context: nameof(WorkshopDataHandler));
     }
@@ -108,7 +103,6 @@ internal class WorkshopDataHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-            sessionWorkshopPlayerDataInterface.RemoveWorkshopData(workshopId);
             network.SendAll(new RemoveWorkshopData(workshopId));
         }, context: nameof(WorkshopDataHandler));
     }
@@ -132,7 +126,6 @@ internal class WorkshopDataHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-            SaveWorkshopData(workshopId, obj.What.Workshop);
             network.SendAll(new AddOutputProgressForWarehouse(workshopId, obj.What.ProgressToAdd));
         }, context: nameof(WorkshopDataHandler));
     }
@@ -156,7 +149,6 @@ internal class WorkshopDataHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
 
-            SaveWorkshopData(workshopId, obj.What.Workshop);
             network.SendAll(new AddOutputProgressForTown(workshopId, obj.What.ProgressToAdd));
         }, context: nameof(WorkshopDataHandler));
     }
@@ -193,7 +185,6 @@ internal class WorkshopDataHandler : IHandler
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
 
-            SaveWorkshopData(obj.What.WorkshopId, workshop);
             network.SendAll(new SetIsGettingInputsFromWarehouseClients(obj.What.WorkshopId, obj.What.IsActive));
         }, context: nameof(WorkshopDataHandler));
     }
@@ -230,7 +221,6 @@ internal class WorkshopDataHandler : IHandler
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
 
-            SaveWorkshopData(obj.What.WorkshopId, workshop);
             network.SendAll(new SetStockProductionInWarehouseRatioClients(obj.What.WorkshopId, obj.What.ProgressToAdd));
         }, context: nameof(WorkshopDataHandler));
     }
@@ -251,12 +241,5 @@ internal class WorkshopDataHandler : IHandler
     private WorkshopsCampaignBehavior GetWorkshopsBehavior()
     {
         return Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
-    }
-
-    private void SaveWorkshopData(string workshopId, Workshop workshop)
-    {
-        WorkshopsCampaignBehavior.WorkshopData workshopData =
-            GetWorkshopsBehavior().GetDataOfWorkshop(workshop);
-        sessionWorkshopPlayerDataInterface.UpdateWorkshopData(workshopId, workshopData);
     }
 }

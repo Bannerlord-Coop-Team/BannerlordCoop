@@ -2,7 +2,6 @@
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using GameInterface.CoopSessionData;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Clans.Messages;
@@ -10,7 +9,6 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.Workshops;
 using GameInterface.Services.Workshops.Commands;
 using GameInterface.Services.Workshops.Interfaces;
 using HarmonyLib;
@@ -142,7 +140,6 @@ public class WorkshopPurchaseConversationTests : IDisposable
         }
 
         AssertClanWorkshopDataReadyForClanMenu(client, state);
-        AssertServerWorkshopSnapshot(Server, state);
     }
 
     private static void ObserveOwnerChangeDispatch(Workshop workshop, Hero oldOwner)
@@ -290,101 +287,6 @@ public class WorkshopPurchaseConversationTests : IDisposable
             Assert.True(workshopsBehavior._workshopData.Length > 1);
             Assert.Same(workshop, workshopsBehavior.GetDataOfWorkshop(workshop)?.Workshop);
         });
-    }
-
-    [Fact]
-    public void RestoreClientWorkshopData_TransferredSnapshotRestoresEveryField()
-    {
-        var client = Clients.First();
-        var state = CreatePurchaseState(workshopOwnedByBuyer: true, buyerGold: 600, sellerGold: 400);
-        var workshopPlayerData = new WorkshopPlayerData(
-            new(),
-            new()
-            {
-                [state.WorkshopId] = new WorkshopDataSnapshot(
-                    isGettingInputsFromWarehouse: true,
-                    productionProgressForWarehouse: 0.25f,
-                    productionProgressForTown: 0.5f,
-                    stockProductionInWarehouseRatio: 0.75f),
-            });
-
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<Hero>(state.BuyerId, out var buyer));
-            Assert.True(client.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
-
-            var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
-            workshopsBehavior._workshopData = Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
-
-            using (new AllowedThread())
-            {
-                client.Resolve<IWorkshopDataRestorer>().RestoreClientWorkshopData(
-                    workshopsBehavior,
-                    buyer,
-                    new[] { workshop },
-                    workshopPlayerData);
-            }
-        });
-
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
-
-            WorkshopsCampaignBehavior.WorkshopData workshopData =
-                Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>().GetDataOfWorkshop(workshop);
-            Assert.NotNull(workshopData);
-            Assert.True(workshopData.IsGettingInputsFromWarehouse);
-            Assert.Equal(0.25f, workshopData.ProductionProgressForWarehouse);
-            Assert.Equal(0.5f, workshopData.ProductionProgressForTown);
-            Assert.Equal(0.75f, workshopData.StockProductionInWarehouseRatio);
-        });
-    }
-
-    [Fact]
-    public void WorkshopProductionChanges_ServerPersistsCompleteSnapshot()
-    {
-        var client = Clients.First();
-        var state = CreatePurchaseState(workshopOwnedByBuyer: true, buyerGold: 600, sellerGold: 400);
-
-        foreach (var environmentClient in Clients)
-        {
-            environmentClient.SimulateMessage(this, new AddWorkshopData(state.WorkshopId));
-        }
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
-
-            var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
-            var workshopData = Server.Resolve<IWorkshopDataRestorer>().EnsureWorkshopData(
-                workshopsBehavior,
-                workshop);
-            Server.Resolve<ISessionWorkshopPlayerDataInterface>().UpdateWorkshopData(
-                state.WorkshopId,
-                workshopData);
-
-            workshopsBehavior.AddOutputProgressForWarehouse(workshop, 1.25f);
-            workshopsBehavior.AddOutputProgressForTown(workshop, 2.5f);
-        });
-
-        client.Call(() =>
-        {
-            var network = client.Resolve<Common.Network.INetwork>();
-            network.SendAll(new GameInterface.Services.Workshops.Messages.SetIsGettingInputsFromWarehouse(
-                state.WorkshopId,
-                true));
-            network.SendAll(new GameInterface.Services.Workshops.Messages.SetStockProductionInWarehouseRatio(
-                state.WorkshopId,
-                0.75f));
-        });
-
-        AssertServerWorkshopSnapshot(
-            Server,
-            state,
-            isGettingInputsFromWarehouse: true,
-            productionProgressForWarehouse: 1.25f,
-            productionProgressForTown: 2.5f,
-            stockProductionInWarehouseRatio: 0.75f);
     }
 
     [Fact]
@@ -563,28 +465,6 @@ public class WorkshopPurchaseConversationTests : IDisposable
             Assert.NotNull(workshopsBehavior.GetWarehouseRoster(workshop.Settlement));
             workshopsBehavior.GetWarehouseItemRosterWeight(workshop.Settlement);
             Assert.Single(workshopsBehavior._workshopData, data => data?.Workshop == workshop);
-        });
-    }
-
-    private static void AssertServerWorkshopSnapshot(
-        EnvironmentInstance server,
-        PurchaseState state,
-        bool isGettingInputsFromWarehouse = false,
-        float productionProgressForWarehouse = 0f,
-        float productionProgressForTown = 0f,
-        float stockProductionInWarehouseRatio = 0f)
-    {
-        server.Call(() =>
-        {
-            var workshopPlayerData = server.Resolve<ICoopSessionProvider>().CoopSession.WorkshopPlayerData;
-
-            Assert.True(workshopPlayerData.WorkshopDataByWorkshopId.TryGetValue(
-                state.WorkshopId,
-                out var savedWorkshopData));
-            Assert.Equal(isGettingInputsFromWarehouse, savedWorkshopData.IsGettingInputsFromWarehouse);
-            Assert.Equal(productionProgressForWarehouse, savedWorkshopData.ProductionProgressForWarehouse);
-            Assert.Equal(productionProgressForTown, savedWorkshopData.ProductionProgressForTown);
-            Assert.Equal(stockProductionInWarehouseRatio, savedWorkshopData.StockProductionInWarehouseRatio);
         });
     }
 
