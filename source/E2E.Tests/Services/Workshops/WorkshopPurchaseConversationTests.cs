@@ -76,6 +76,17 @@ public class WorkshopPurchaseConversationTests : IDisposable
         Assert.Equal(WorkshopCapital, request.Capital);
         Assert.Equal(WorkshopCost, request.Cost);
 
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(state.SellerId, out var seller));
+
+            // The E2E harness does not register campaign behavior events.
+            MessageBroker.Instance.Publish(
+                Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>(),
+                new WarehouseOwnerChangedEvent(workshop, seller));
+        });
+
         AssertWorkshopOwnedByBuyer(Server, state, expectedBuyerGold: 600, expectedSellerGold: 400);
         foreach (var environmentClient in Clients)
         {
