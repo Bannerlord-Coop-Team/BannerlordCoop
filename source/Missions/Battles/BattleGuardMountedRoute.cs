@@ -15,6 +15,7 @@ internal sealed class BattleGuardMountedRoute
     private const float StrikeAlignmentDot = 0.9f;
     private const float TurnCompletionDot = 0.9f;
     private const float TurnStartMaximumSpeed = 1f;
+    private const float TurnForwardInput = 0.2f;
     private const float SteeringGain = 2f;
     private const float SteeringDeadZone = 0.05f;
     private const float MovementHeadingMinimumSpeed = 0.1f;
@@ -168,9 +169,9 @@ internal sealed class BattleGuardMountedRoute
         else if (turning)
         {
             turnInput = 1f;
-            forwardInput = 0f;
+            forwardInput = TurnForwardInput;
             translationFlag =
-                Agent.MovementControlFlag.None;
+                Agent.MovementControlFlag.Forward;
         }
         else
         {
