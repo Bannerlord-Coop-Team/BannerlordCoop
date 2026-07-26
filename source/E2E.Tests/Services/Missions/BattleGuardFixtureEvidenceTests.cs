@@ -416,6 +416,38 @@ public class BattleGuardFixtureEvidenceTests
             turning.TurnFlag);
         Assert.Equal(0.2f, turning.Movement.y);
 
+        BattleGuardMountedRouteInput rebraking = route.Update(
+            new Vec3(0f, 35f, 0f),
+            new Vec2(0.1f, -0.99f),
+            new Vec3(0.1f, 0.99f, 0f),
+            1.5f);
+
+        Assert.Equal("BrakingToStart", route.State);
+        Assert.False(route.CanStageStrike);
+        Assert.Equal(
+            Agent.MovementControlFlag.Backward,
+            rebraking.TranslationFlag);
+        Assert.Equal(
+            Agent.MovementControlFlag.None,
+            rebraking.TurnFlag);
+        Assert.Equal(-1f, rebraking.Movement.y);
+
+        BattleGuardMountedRouteInput resumedTurn = route.Update(
+            new Vec3(0f, 35f, 0f),
+            Vec2.Zero,
+            new Vec3(0f, 1f, 0f),
+            1f);
+
+        Assert.Equal("TurningToStart", route.State);
+        Assert.False(route.CanStageStrike);
+        Assert.Equal(
+            Agent.MovementControlFlag.Forward,
+            resumedTurn.TranslationFlag);
+        Assert.Equal(
+            Agent.MovementControlFlag.TurnRight,
+            resumedTurn.TurnFlag);
+        Assert.Equal(0.2f, resumedTurn.Movement.y);
+
         BattleGuardMountedRouteInput returning = route.Update(
             new Vec3(0f, 35f, 0f),
             Vec2.Zero,

@@ -14,7 +14,8 @@ internal sealed class BattleGuardMountedRoute
     private const float StrikeMaximumLateralOffset = 3f;
     private const float StrikeAlignmentDot = 0.9f;
     private const float TurnCompletionDot = 0.9f;
-    private const float TurnStartMaximumSpeed = 1f;
+    private const float TurnResumeMaximumSpeed = 1f;
+    private const float TurnBrakeMinimumSpeed = 1.5f;
     private const float TurnForwardInput = 0.2f;
     private const float SteeringGain = 2f;
     private const float SteeringDeadZone = 0.05f;
@@ -125,8 +126,8 @@ internal sealed class BattleGuardMountedRoute
               Progress <= StrikeClearanceDistance)))
         {
             headingToEnd = !headingToEnd;
-            braking = horizontalSpeed > TurnStartMaximumSpeed;
-            turning = !braking;
+            braking = horizontalSpeed > TurnResumeMaximumSpeed;
+            turning = true;
         }
 
         Vec3 target = headingToEnd ? end : start;
@@ -144,14 +145,20 @@ internal sealed class BattleGuardMountedRoute
         float signedError =
             (steeringHeading.x * desired.y) -
             (steeringHeading.y * desired.x);
+        if (turning &&
+            !braking &&
+            horizontalSpeed >= TurnBrakeMinimumSpeed)
+        {
+            braking = true;
+        }
         if (braking &&
-            horizontalSpeed <= TurnStartMaximumSpeed)
+            horizontalSpeed <= TurnResumeMaximumSpeed)
         {
             braking = false;
-            turning = true;
         }
         if (turning && alignment >= TurnCompletionDot)
         {
+            braking = false;
             turning = false;
             CompletedTurns++;
         }
