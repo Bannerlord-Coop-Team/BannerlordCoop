@@ -19,18 +19,6 @@ public sealed class DirectPacketSend
     }
 }
 
-public sealed class SerializedPacketSend
-{
-    public IPacket Packet { get; }
-    public byte[] Payload { get; }
-
-    public SerializedPacketSend(IPacket packet, byte[] payload)
-    {
-        Packet = packet;
-        Payload = payload;
-    }
-}
-
 /// <summary>
 /// Mock of the mission P2P mesh (<see cref="IBattleNetwork"/>) for E2E tests. The real mesh is a direct
 /// client-to-client LiteNetLib link; this routes <see cref="IMessage"/> traffic between client instances
@@ -44,8 +32,6 @@ public class MockBattleNetwork : IBattleNetwork
     public NetPeer NetPeer { get; } = NetPeerExtensions.CreatePeer();
     public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
     public List<DirectPacketSend> DirectPacketSends { get; } = new();
-    public List<SerializedPacketSend> SerializedPacketSends { get; } = new();
-    public int MaxUnreliablePayloadBytes { get; set; } = 1000;
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
@@ -62,16 +48,10 @@ public class MockBattleNetwork : IBattleNetwork
 
     // Packet broadcasts are captured for sender-path assertions; packet-level mesh routing isn't exercised.
     public void SendAll(IPacket packet) => NetworkSentPackets.Add(packet);
-    public void SendAll(IPacket packet, byte[] serializedPacket)
-    {
-        NetworkSentPackets.Add(packet);
-        SerializedPacketSends.Add(new SerializedPacketSend(packet, serializedPacket));
-    }
     public void Send(string controllerId, IPacket packet)
     {
         NetworkSentPackets.Add(packet);
         DirectPacketSends.Add(new DirectPacketSend(controllerId, packet));
     }
     public void SendAllBut(string controllerId, IPacket packet) => throw new NotImplementedException();
-    public int GetMaxUnreliablePayloadBytes() => MaxUnreliablePayloadBytes;
 }

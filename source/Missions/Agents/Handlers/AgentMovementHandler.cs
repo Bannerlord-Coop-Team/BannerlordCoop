@@ -9,7 +9,6 @@ using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Packets;
 using Missions.Messages;
-using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -38,9 +37,11 @@ public class AgentMovementHandler : IAgentMovementHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
+    // Movement is strictly droppable, so keep even mounted snapshots below the 1 KB unreliable ceiling.
+    private const int MaxAgentsPerMovementPacket = 3;
+
     // Forty updates per second keeps locally authoritative agents responsive.
     private const float MovementPollingIntervalSeconds = 0.025f;
-    private const int InitialMovementBatchProbeCount = 3;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -48,13 +49,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IAgentEquipmentApplier equipmentApplier;
-    private readonly IMovementPacketCompressor movementPacketCompressor;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
-    private readonly Dictionary<(Type SnapshotType, string IdentityScopeId, bool UseCanonicalIds), int>
-        preferredMovementBatchCounts =
-            new Dictionary<(Type SnapshotType, string IdentityScopeId, bool UseCanonicalIds), int>();
-    private readonly HashSet<(Type SnapshotType, string IdentityScopeId)> canonicalMovementFallbacks =
-        new HashSet<(Type SnapshotType, string IdentityScopeId)>();
 
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
@@ -82,8 +77,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
-        IAgentEquipmentApplier equipmentApplier,
-        IMovementPacketCompressor movementPacketCompressor)
+        IAgentEquipmentApplier equipmentApplier)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
 
@@ -93,7 +87,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.equipmentApplier = equipmentApplier;
-        this.movementPacketCompressor = movementPacketCompressor;
 
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
@@ -127,8 +120,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         _interpolator.Clear();
-        preferredMovementBatchCounts.Clear();
-        canonicalMovementFallbacks.Clear();
 
         packetManager.RemovePacketHandler(this);
         packetManager.RemovePacketHandler(_mountMovementApplier);
@@ -157,22 +148,11 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         public void Add(CoopAgentInfo info, T data)
         {
-            CanonicalIds.Add(info.AgentId);
-            if (IdentityScopeId != null)
+            if (IdentityScopeId == null)
+                CanonicalIds.Add(info.AgentId);
+            else
                 CompactIds.Add(info.MovementId);
             Data.Add(data);
-        }
-    }
-
-    private sealed class SerializedMovementCandidate
-    {
-        public IPacket Packet { get; }
-        public byte[] Payload { get; }
-
-        public SerializedMovementCandidate(IPacket packet, byte[] payload)
-        {
-            Packet = packet;
-            Payload = payload;
         }
     }
 
@@ -255,11 +235,10 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         SendEquipment(equipmentGroups.Values);
         SendEquipment(legacyEquipment);
-        int maxPayloadBytes = client.GetMaxUnreliablePayloadBytes();
-        SendMovement(movementGroups.Values, maxPayloadBytes);
-        SendMovement(legacyMovement, maxPayloadBytes);
-        SendMountMovement(mountGroups.Values, maxPayloadBytes);
-        SendMountMovement(legacyMountMovement, maxPayloadBytes);
+        SendMovement(movementGroups.Values);
+        SendMovement(legacyMovement);
+        SendMountMovement(mountGroups.Values);
+        SendMountMovement(legacyMountMovement);
     }
 
     private static void AddToBatch<T>(
@@ -315,307 +294,67 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
-    private void SendMovement(
-        IEnumerable<MovementBatch<AgentData>> batches,
-        int maxPayloadBytes)
+    private void SendMovement(IEnumerable<MovementBatch<AgentData>> batches)
     {
         foreach (var batch in batches)
-            SendMovement(batch, maxPayloadBytes);
+            SendMovement(batch);
     }
 
-    private void SendMovement(
-        MovementBatch<AgentData> batch,
-        int maxPayloadBytes)
-    {
-        SendMovementBatch(
-            batch,
-            maxPayloadBytes,
-            (identityScopeId, compactIds, canonicalIds, data) =>
-                identityScopeId == null
-                    ? new MovementPacket(canonicalIds, data)
-                    : new MovementPacket(identityScopeId, compactIds, data));
-    }
-
-    private void SendMountMovement(
-        IEnumerable<MovementBatch<AgentMountData>> batches,
-        int maxPayloadBytes)
-    {
-        foreach (var batch in batches)
-            SendMountMovement(batch, maxPayloadBytes);
-    }
-
-    private void SendMountMovement(
-        MovementBatch<AgentMountData> batch,
-        int maxPayloadBytes)
-    {
-        SendMovementBatch(
-            batch,
-            maxPayloadBytes,
-            (identityScopeId, compactIds, canonicalIds, data) =>
-                identityScopeId == null
-                    ? new MountMovementPacket(canonicalIds, data)
-                    : new MountMovementPacket(identityScopeId, compactIds, data));
-    }
-
-    private void SendMovementBatch<T>(
-        MovementBatch<T> batch,
-        int maxPayloadBytes,
-        Func<string, ushort[], Guid[], T[], IPacket> createPacket)
+    private void SendMovement(MovementBatch<AgentData> batch)
     {
         if (batch == null) return;
-        if (maxPayloadBytes <= 0)
-        {
-            Logger.Warning(
-                "[BattleTraffic] Skipping {SnapshotCount} {SnapshotType} snapshots for scope {IdentityScopeId}: " +
-                "route framing leaves no unreliable payload budget",
-                batch.Data.Count,
-                typeof(T).Name,
-                batch.IdentityScopeId ?? "legacy-guid");
-            return;
-        }
 
-        int start = 0;
-        var fallbackKey = (typeof(T), batch.IdentityScopeId);
-        bool useCanonicalIds = batch.IdentityScopeId == null ||
-            canonicalMovementFallbacks.Contains(fallbackKey);
-        bool allowGrowth = true;
-        while (start < batch.Data.Count)
+        for (int start = 0; start < batch.Data.Count; start += MaxAgentsPerMovementPacket)
         {
-            int remaining = batch.Data.Count - start;
-            var preferenceKey = (typeof(T), batch.IdentityScopeId, useCanonicalIds);
-            int preferredCount = preferredMovementBatchCounts.TryGetValue(
-                preferenceKey, out int previousSafeCount)
-                ? previousSafeCount
-                : InitialMovementBatchProbeCount;
-            if (!TryFindLargestFittingCandidate(
-                    batch,
-                    start,
-                    preferredCount,
-                    allowGrowth,
-                    maxPayloadBytes,
-                    useCanonicalIds,
-                    createPacket,
-                    out int safeCount,
-                    out SerializedMovementCandidate safeCandidate,
-                    out SerializedMovementCandidate singleCandidate))
+            int count = Math.Min(MaxAgentsPerMovementPacket, batch.Data.Count - start);
+            var data = new AgentData[count];
+            batch.Data.CopyTo(start, data, 0, count);
+
+            if (batch.IdentityScopeId == null)
             {
-                SerializedMovementCandidate guidSingleCandidate = null;
-                if (!useCanonicalIds &&
-                    TryFindLargestFittingCandidate(
-                        batch,
-                        start,
-                        preferredCount,
-                        allowGrowth,
-                        maxPayloadBytes,
-                        useCanonicalIds: true,
-                        createPacket,
-                        out safeCount,
-                        out safeCandidate,
-                        out guidSingleCandidate))
-                {
-                    useCanonicalIds = true;
-                    canonicalMovementFallbacks.Add(fallbackKey);
-                    preferenceKey = (typeof(T), batch.IdentityScopeId, useCanonicalIds);
-                    client.SendAll(safeCandidate.Packet, safeCandidate.Payload);
-                    RememberPreferredBatchCount(preferenceKey, safeCount, remaining);
-                    start += safeCount;
-                    allowGrowth = false;
-                    continue;
-                }
-
-                if (!useCanonicalIds)
-                {
-                    Logger.Warning(
-                        "[BattleTraffic] Skipping oversized {PacketType} snapshot {AgentId}: compact={CompactBytes}, " +
-                        "guid={GuidBytes}, budget={BudgetBytes}",
-                        singleCandidate.Packet.PacketType,
-                        batch.CanonicalIds[start],
-                        singleCandidate.Payload.Length,
-                        guidSingleCandidate.Payload.Length,
-                        maxPayloadBytes);
-                }
-                else
-                {
-                    Logger.Warning(
-                        "[BattleTraffic] Skipping oversized {PacketType} snapshot {AgentId}: payload={PayloadBytes}, " +
-                        "budget={BudgetBytes}",
-                        singleCandidate.Packet.PacketType,
-                        batch.CanonicalIds[start],
-                        singleCandidate.Payload.Length,
-                        maxPayloadBytes);
-                }
-
-                start++;
-                continue;
+                var ids = new Guid[count];
+                batch.CanonicalIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new MovementPacket(ids, data));
             }
-
-            client.SendAll(safeCandidate.Packet, safeCandidate.Payload);
-            RememberPreferredBatchCount(preferenceKey, safeCount, remaining);
-            start += safeCount;
-            allowGrowth = false;
+            else
+            {
+                var ids = new ushort[count];
+                batch.CompactIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new MovementPacket(batch.IdentityScopeId, ids, data));
+            }
         }
     }
 
-    private void RememberPreferredBatchCount(
-        (Type SnapshotType, string IdentityScopeId, bool UseCanonicalIds) preferenceKey,
-        int safeCount,
-        int remaining)
+    private void SendMountMovement(IEnumerable<MovementBatch<AgentMountData>> batches)
     {
-        if (safeCount < remaining ||
-            !preferredMovementBatchCounts.TryGetValue(preferenceKey, out int previousSafeCount) ||
-            safeCount > previousSafeCount)
-        {
-            preferredMovementBatchCounts[preferenceKey] = safeCount;
-        }
+        foreach (var batch in batches)
+            SendMountMovement(batch);
     }
 
-    private bool TryFindLargestFittingCandidate<T>(
-        MovementBatch<T> batch,
-        int start,
-        int preferredCount,
-        bool allowGrowth,
-        int maxPayloadBytes,
-        bool useCanonicalIds,
-        Func<string, ushort[], Guid[], T[], IPacket> createPacket,
-        out int safeCount,
-        out SerializedMovementCandidate safeCandidate,
-        out SerializedMovementCandidate singleCandidate)
+    private void SendMountMovement(MovementBatch<AgentMountData> batch)
     {
-        int remaining = batch.Data.Count - start;
+        if (batch == null) return;
 
-        SerializedMovementCandidate GetCandidate(int count)
+        for (int start = 0; start < batch.Data.Count; start += MaxAgentsPerMovementPacket)
         {
-            CreateSerializedCandidate(
-                batch,
-                start,
-                count,
-                useCanonicalIds,
-                createPacket,
-                out IPacket packet,
-                out byte[] payload);
-            return new SerializedMovementCandidate(packet, payload);
-        }
+            int count = Math.Min(MaxAgentsPerMovementPacket, batch.Data.Count - start);
+            var data = new AgentMountData[count];
+            batch.Data.CopyTo(start, data, 0, count);
 
-        (int Count, SerializedMovementCandidate Candidate) Refine(
-            int knownSafeCount,
-            SerializedMovementCandidate knownSafeCandidate,
-            int knownOversizedCount)
-        {
-            int low = knownSafeCount;
-            int high = knownOversizedCount;
-            var largestSafeCandidate = knownSafeCandidate;
-            while (low + 1 < high)
+            if (batch.IdentityScopeId == null)
             {
-                int probeCount = low + ((high - low) / 2);
-                SerializedMovementCandidate probe = GetCandidate(probeCount);
-                if (probe.Payload.Length <= maxPayloadBytes)
-                {
-                    low = probeCount;
-                    largestSafeCandidate = probe;
-                }
-                else
-                {
-                    high = probeCount;
-                }
+                var ids = new Guid[count];
+                batch.CanonicalIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new MountMovementPacket(ids, data));
             }
-
-            return (low, largestSafeCandidate);
-        }
-
-        safeCount = 0;
-        safeCandidate = null;
-        singleCandidate = null;
-
-        int initialCount = Math.Min(Math.Max(1, preferredCount), remaining);
-        SerializedMovementCandidate initialCandidate = GetCandidate(initialCount);
-        if (initialCandidate.Payload.Length <= maxPayloadBytes)
-        {
-            safeCount = initialCount;
-            safeCandidate = initialCandidate;
-            if (initialCount == remaining || !allowGrowth) return true;
-
-            for (long offset = 1; ;)
+            else
             {
-                int probeCount = (int)Math.Min(
-                    remaining,
-                    (long)initialCount + offset);
-                SerializedMovementCandidate probe = GetCandidate(probeCount);
-                if (probe.Payload.Length > maxPayloadBytes)
-                {
-                    (safeCount, safeCandidate) = Refine(
-                        safeCount,
-                        safeCandidate,
-                        probeCount);
-                    return true;
-                }
-
-                safeCount = probeCount;
-                safeCandidate = probe;
-                if (probeCount == remaining) return true;
-
-                offset *= 2;
+                var ids = new ushort[count];
+                batch.CompactIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new MountMovementPacket(
+                    batch.IdentityScopeId, ids, data));
             }
         }
-
-        int smallestOversizedCount = initialCount;
-        if (initialCount == 1)
-        {
-            singleCandidate = initialCandidate;
-            return false;
-        }
-
-        for (long offset = 1; ;)
-        {
-            int probeCount = (int)Math.Max(
-                1,
-                (long)initialCount - offset);
-            SerializedMovementCandidate probe = GetCandidate(probeCount);
-            if (probe.Payload.Length <= maxPayloadBytes)
-            {
-                (safeCount, safeCandidate) = Refine(
-                    probeCount,
-                    probe,
-                    smallestOversizedCount);
-                return true;
-            }
-
-            smallestOversizedCount = probeCount;
-            if (probeCount == 1)
-            {
-                singleCandidate = probe;
-                return false;
-            }
-
-            offset *= 2;
-        }
-    }
-
-    private void CreateSerializedCandidate<T>(
-        MovementBatch<T> batch,
-        int start,
-        int count,
-        bool useCanonicalIds,
-        Func<string, ushort[], Guid[], T[], IPacket> createPacket,
-        out IPacket packet,
-        out byte[] payload)
-    {
-        var data = new T[count];
-        batch.Data.CopyTo(start, data, 0, count);
-
-        if (useCanonicalIds || batch.IdentityScopeId == null)
-        {
-            var ids = new Guid[count];
-            batch.CanonicalIds.CopyTo(start, ids, 0, count);
-            packet = createPacket(null, null, ids, data);
-        }
-        else
-        {
-            var ids = new ushort[count];
-            batch.CompactIds.CopyTo(start, ids, 0, count);
-            packet = createPacket(batch.IdentityScopeId, ids, null, data);
-        }
-
-        payload = movementPacketCompressor.Serialize(packet);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -661,10 +400,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                     if (agentRegistry.IsLocallyControlled(agent))
                         continue;
 
-                    SyncMountState(
-                        agent,
-                        movement.IdentityScopeId ?? agentInfo.MovementScopeId,
-                        data);
+                    SyncMountState(agent, movement.IdentityScopeId, data);
 
                     // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
                     if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
