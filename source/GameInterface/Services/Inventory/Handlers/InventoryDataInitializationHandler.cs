@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Messages;
@@ -67,7 +68,10 @@ internal class InventoryDataInitializationHandler : IHandler
 
     private void Handle(MessagePayload<NetworkInitializeServerInventoryDataKeys> obj)
     {
-        sessionInventoryPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        GameThread.RunSafe(() =>
+        {
+            sessionInventoryPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        });
     }
 
     private List<string> GetInventoryItemLocks(string playerHeroId)

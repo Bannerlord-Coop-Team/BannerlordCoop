@@ -18,14 +18,12 @@ public class SessionInventoryPlayerDataInterface : ISessionInventoryPlayerDataIn
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SessionInventoryPlayerDataInterface>();
     private readonly ICoopSessionProvider coopSessionProvider;
-    private readonly IObjectManager objectManager;
 
     private InventoryPlayerData InventoryPlayerData => coopSessionProvider.CoopSession.InventoryPlayerData;
 
-    public SessionInventoryPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager)
+    public SessionInventoryPlayerDataInterface(ICoopSessionProvider coopSessionProvider)
     {
         this.coopSessionProvider = coopSessionProvider;
-        this.objectManager = objectManager;
     }
 
     public void SetInventoryLocks(string playerHeroId, IEnumerable<string> lockedItemIds)
