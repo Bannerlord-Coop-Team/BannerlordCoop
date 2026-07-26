@@ -43,6 +43,8 @@ internal class VassalServiceHandler : IHandler
         messageBroker.Subscribe<VassalServiceAccepted>(HandleVassalServiceAccepted);
         messageBroker.Subscribe<RequestVassalService>(HandleRequestVassalService);
         messageBroker.Subscribe<VassalServiceResult>(HandleVassalServiceResult);
+        messageBroker.Subscribe<VassalServiceLeft>(HandleVassalServiceLeft);
+        messageBroker.Subscribe<RequestLeaveVassalService>(HandleRequestLeaveVassalService);
     }
 
     public void Dispose()
@@ -50,6 +52,8 @@ internal class VassalServiceHandler : IHandler
         messageBroker.Unsubscribe<VassalServiceAccepted>(HandleVassalServiceAccepted);
         messageBroker.Unsubscribe<RequestVassalService>(HandleRequestVassalService);
         messageBroker.Unsubscribe<VassalServiceResult>(HandleVassalServiceResult);
+        messageBroker.Unsubscribe<VassalServiceLeft>(HandleVassalServiceLeft);
+        messageBroker.Unsubscribe<RequestLeaveVassalService>(HandleRequestLeaveVassalService);
     }
 
     private void HandleVassalServiceAccepted(MessagePayload<VassalServiceAccepted> payload)
@@ -183,5 +187,26 @@ internal class VassalServiceHandler : IHandler
                 new TextObject("{=tKW8m6bZ}Reward Troops"));
             behavior._receivedVassalRewards = true;
         }, context: nameof(VassalServiceHandler));
+    }
+    private void HandleVassalServiceLeft(MessagePayload<VassalServiceLeft> payload )
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
+
+        network.SendAll(new RequestLeaveVassalService(clanId));
+    }
+    private void HandleRequestLeaveVassalService(MessagePayload<RequestLeaveVassalService> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
+        {
+            Logger.Error("Received {Message} without a registered player peer", nameof(RequestLeaveVassalService));
+            return;
+        }
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+            ChangeKingdomAction.ApplyByLeaveKingdom(clan, true);
+        });
     }
 }

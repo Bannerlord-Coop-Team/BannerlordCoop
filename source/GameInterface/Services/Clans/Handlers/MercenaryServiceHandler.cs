@@ -37,12 +37,20 @@ internal class MercenaryServiceHandler : IHandler
 
         messageBroker.Subscribe<MercenaryServiceAccepted>(HandleMercenaryServiceAccepted);
         messageBroker.Subscribe<RequestMercenaryService>(HandleRequestMercenaryService);
+        messageBroker.Subscribe<MercenaryServiceDismissalAccepted>(HandleMercenaryServiceDismissalAccepted);
+        messageBroker.Subscribe<RequestMercenaryDismissalService>(HandleRequestMercenaryDismissalService);
+        messageBroker.Subscribe<PlayerRelationChange>(HandlePlayerRelationChange);
+        messageBroker.Subscribe<NetworkPlayerRelationChange>(HandleNetworkPlayerRelationChange);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<MercenaryServiceAccepted>(HandleMercenaryServiceAccepted);
         messageBroker.Unsubscribe<RequestMercenaryService>(HandleRequestMercenaryService);
+        messageBroker.Unsubscribe<MercenaryServiceDismissalAccepted>(HandleMercenaryServiceDismissalAccepted);
+        messageBroker.Unsubscribe<RequestMercenaryDismissalService>(HandleRequestMercenaryDismissalService);
+        messageBroker.Unsubscribe<PlayerRelationChange>(HandlePlayerRelationChange);
+        messageBroker.Unsubscribe<NetworkPlayerRelationChange>(HandleNetworkPlayerRelationChange);
     }
 
     private void HandleMercenaryServiceAccepted(MessagePayload<MercenaryServiceAccepted> payload)
@@ -50,7 +58,7 @@ internal class MercenaryServiceHandler : IHandler
         // Conversation consequences publish synchronously on the game thread.
         if (!objectManager.TryGetIdWithLogging(payload.What.Kingdom, out var kingdomId)) return;
 
-        network.SendAll(new RequestMercenaryService(kingdomId));
+        network.SendAll(new RequestMercenaryService(kingdomId, payload.What.AwardMultiplier));
     }
 
     private void HandleRequestMercenaryService(MessagePayload<RequestMercenaryService> payload)
@@ -65,11 +73,11 @@ internal class MercenaryServiceHandler : IHandler
         }
 
         GameThread.RunSafe(
-            () => ApplyMercenaryService(player.ClanId, player.HeroId, payload.What.KingdomId),
+            () => ApplyMercenaryService(player.ClanId, player.HeroId, payload.What.KingdomId, payload.What.AwardMultiplier),
             context: nameof(MercenaryServiceHandler));
     }
 
-    private void ApplyMercenaryService(string clanId, string heroId, string kingdomId)
+    private void ApplyMercenaryService(string clanId, string heroId, string kingdomId, int awardMultiplier)
     {
         // Only called from the GameThread.RunSafe action above.
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
@@ -88,9 +96,66 @@ internal class MercenaryServiceHandler : IHandler
             return;
         }
 
-        int awardMultiplier = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(clan, kingdom);
-
         ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, kingdom, default, awardMultiplier);
         GainKingdomInfluenceAction.ApplyForJoiningFaction(hero, 5f);
+    }
+
+    private void HandleMercenaryServiceDismissalAccepted(MessagePayload<MercenaryServiceDismissalAccepted> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Kingdom, out var kingdomId)) return;
+
+        network.SendAll(new RequestMercenaryDismissalService(kingdomId));
+    }
+
+    private void HandleRequestMercenaryDismissalService(MessagePayload<RequestMercenaryDismissalService> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        // Peer associations use a ConcurrentDictionary and are safe to resolve on the poll thread.
+        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
+        {
+            Logger.Error("Received {Message} without a registered player peer", nameof(RequestMercenaryDismissalService));
+            return;
+        }
+
+        GameThread.RunSafe(
+            () => ApplyMercenaryDismissalService(player.ClanId, player.HeroId),
+            context: nameof(MercenaryServiceHandler));
+    }
+
+    private void ApplyMercenaryDismissalService(string clanId, string heroId)
+    {
+        if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
+
+        if (hero.Clan != clan)
+        {
+            Logger.Warning("Rejected mercenary service request because hero {HeroId} does not belong to clan {ClanId}", heroId, clanId);
+            return;
+        }
+
+        if (clan.Kingdom == null || !clan.IsUnderMercenaryService)
+        {
+            Logger.Warning("Rejected mercenary service removal request because clan {ClanId} does not belong to a kingdom", clanId);
+            return;
+        }
+
+        ChangeClanInfluenceAction.Apply(clan, -hero.Clan.Influence);
+        ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan, true);
+    }
+    private void HandlePlayerRelationChange(MessagePayload<PlayerRelationChange> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Hero, out var heroId)) return;
+
+        network.SendAll(new NetworkPlayerRelationChange(heroId, payload.What.Relation));
+    }
+    private void HandleNetworkPlayerRelationChange(MessagePayload<NetworkPlayerRelationChange> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.HeroId, out var hero)) return;
+
+            ChangeRelationAction.ApplyPlayerRelation(Hero.OneToOneConversationHero.Clan.Leader, payload.What.Relation, true, true);
+        }); 
     }
 }

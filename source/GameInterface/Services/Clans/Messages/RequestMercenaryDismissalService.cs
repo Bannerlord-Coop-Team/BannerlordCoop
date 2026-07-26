@@ -4,15 +4,13 @@ using ProtoBuf;
 namespace GameInterface.Services.Clans.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RequestMercenaryService : ICommand
+internal readonly struct RequestMercenaryDismissalService : ICommand
 {
     [ProtoMember(1)]
     public readonly string KingdomId;
-    [ProtoMember(2)]
-    public readonly int AwardMultiplier;
-    public RequestMercenaryService(string kingdomId, int awardMultiplier)
+
+    public RequestMercenaryDismissalService(string kingdomId)
     {
         KingdomId = kingdomId;
-        AwardMultiplier = awardMultiplier;
     }
 }
