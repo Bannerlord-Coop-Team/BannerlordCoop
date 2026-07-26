@@ -4,6 +4,7 @@ using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
 using LiteNetLib;
+using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Messages;
 using System;
@@ -403,6 +404,18 @@ public class AgentActionHandler : IAgentActionHandler
         bool isMissile,
         CombatCollisionResult collisionResult)
     {
+        if (isBlocked
+            && affectedAgent != null
+            && affectorAgent != null
+            && agentRegistry.IsLocallyControlled(affectorAgent))
+        {
+            messageBroker.Publish(
+                this,
+                new LocalAgentGuardedHit(
+                    affectedAgent,
+                    affectorAgent));
+        }
+
         guardReactionHandler.ObserveBlockedHit(
             affectedAgent,
             affectorAgent,

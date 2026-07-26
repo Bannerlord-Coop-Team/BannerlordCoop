@@ -408,8 +408,11 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void CollisionAuthority_CapturesNonOwnedDefenderReactionOnce()
+    [Theory]
+    [InlineData(CombatCollisionResult.Blocked)]
+    [InlineData(CombatCollisionResult.StrikeAgent)]
+    public void CollisionAuthority_CapturesNonOwnedDefenderReactionOnce(
+        CombatCollisionResult collisionResult)
     {
         RunScenario("attacker", context =>
         {
@@ -438,7 +441,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 attacker,
                 isBlocked: true,
                 isMissile: false,
-                collisionResult: CombatCollisionResult.Blocked);
+                collisionResult: collisionResult);
 
             defenderMirror.Action0Index = 3104;
             defenderMirror.Action0Progress = 0.2f;
@@ -473,8 +476,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [Theory]
     [InlineData(false, false, CombatCollisionResult.Blocked)]
     [InlineData(true, true, CombatCollisionResult.Blocked)]
-    [InlineData(true, false, CombatCollisionResult.StrikeAgent)]
-    public void CollisionAuthority_NonMeleeBlock_DoesNotSendGuardReaction(
+    public void CollisionAuthority_UnblockedOrMissile_DoesNotSendGuardReaction(
         bool isBlocked,
         bool isMissile,
         CombatCollisionResult collisionResult)

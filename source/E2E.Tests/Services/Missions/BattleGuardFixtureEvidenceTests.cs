@@ -365,25 +365,40 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void MountedStrikerPosition_ApproachesFromFrontAndSide()
+    public void MountedStrikerPosition_ApproachesParallelPolearmLane()
     {
-        var contactPoint = new Vec3(2f, 3f, 4f);
+        var guardPosition = new Vec3(2f, 3f, 4f);
         var forward = new Vec3(0f, 1f, 0f);
         var lateral = new Vec3(1f, 0f, 0f);
 
+        Vec3 contactPoint =
+            BattleGuardFixture.GetMountedStrikeContactPoint(
+                guardPosition,
+                new Vec3(0f, 2f, 1f),
+                8f);
         Vec3 position = BattleGuardFixture.GetMountedStrikerPosition(
             contactPoint,
             new Vec3(0f, 2f, 1f));
-        Vec3 offset = position - contactPoint;
+        Vec3 contactOffset = contactPoint - guardPosition;
+        Vec3 strikerOffset = position - contactPoint;
 
         Assert.Equal(
-            1.5f,
-            Vec3.DotProduct(offset, forward),
+            8f,
+            Vec3.DotProduct(contactOffset, forward),
             precision: 3);
         Assert.Equal(
-            1.15f,
-            Vec3.DotProduct(offset, lateral),
+            1.5f,
+            Vec3.DotProduct(contactOffset, lateral),
             precision: 3);
+        Assert.Equal(
+            1.5f,
+            Vec3.DotProduct(strikerOffset, forward),
+            precision: 3);
+        Assert.Equal(
+            0f,
+            Vec3.DotProduct(strikerOffset, lateral),
+            precision: 3);
+        Assert.Equal(guardPosition.z, contactPoint.z, precision: 3);
         Assert.Equal(contactPoint.z, position.z, precision: 3);
     }
 
@@ -418,6 +433,27 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(
             expected,
             BattleGuardFixture.IsRemountStateReconciled(
+                riderReferencesMount,
+                mountReferencesRider));
+    }
+
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, false, false, true)]
+    public void MountRestore_RequiresReciprocalLinksForActiveMount(
+        bool originalMountActive,
+        bool riderReferencesMount,
+        bool mountReferencesRider,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.NeedsMountRestore(
+                originalMountActive,
                 riderReferencesMount,
                 mountReferencesRider));
     }

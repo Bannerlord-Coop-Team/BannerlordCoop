@@ -11,6 +11,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
+using Missions.Agents;
 using Missions.Data;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -95,7 +96,8 @@ public class CoopBattleController : CoopMissionController
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
         IHostEpochPolicy hostEpochPolicy,
-        IBattleAgentBudget agentBudget
+        IBattleAgentBudget agentBudget,
+        IGuardedHitWindow guardedHitWindow
 #if DEBUG
         , IBattleGuardFixture guardFixture
 #endif
@@ -114,7 +116,12 @@ public class CoopBattleController : CoopMissionController
         puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget);
         puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
-        damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
+        damageRouter = new BattleDamageRouter(
+            network,
+            messageBroker,
+            coopMissionComponent,
+            session,
+            guardedHitWindow);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch

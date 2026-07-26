@@ -36,6 +36,7 @@ public class CoopTournamentController : CoopMissionController
     private static readonly ILogger Logger = LogManager.GetLogger<CoopTournamentController>();
     private readonly INetwork relayNetwork;
     private readonly INetworkWorldItemRegistry worldItemRegistry;
+    private readonly IGuardedHitWindow guardedHitWindow;
     private readonly TournamentMissionSession session;
     private readonly TournamentMatchLifecycle matchLifecycle;
     private readonly TournamentAgentSpawner agentSpawner;
@@ -69,6 +70,8 @@ public class CoopTournamentController : CoopMissionController
     private readonly System.Collections.Generic.HashSet<Guid> applyingDamage = new();
     private readonly List<NetworkTournamentAgentKnockedOut> pendingKnockouts = new();
     private readonly List<IEvent> pendingTournamentPackets = new();
+    private readonly Queue<PendingLocalTournamentDamage>
+        pendingLocalDamage = new();
     private long damageSequence;
     private long knockoutSequence;
     private long runtimeSequence;
@@ -79,6 +82,38 @@ public class CoopTournamentController : CoopMissionController
     private readonly Dictionary<Agent, TournamentAgentSpawnData> manifestAgentData = new();
     private readonly Dictionary<Guid, Agent> manifestAgentInstances = new();
 
+    private sealed class PendingLocalTournamentDamage
+    {
+        public string MatchId { get; }
+        public Agent Victim { get; }
+        public Agent Attacker { get; }
+        public Guid VictimId { get; }
+        public Guid AttackerId { get; }
+        public Blow Blow { get; }
+        public AttackCollisionData CollisionData { get; }
+        public long ReadyEpoch { get; }
+
+        public PendingLocalTournamentDamage(
+            string matchId,
+            Agent victim,
+            Agent attacker,
+            Guid victimId,
+            Guid attackerId,
+            Blow blow,
+            AttackCollisionData collisionData,
+            long readyEpoch)
+        {
+            MatchId = matchId;
+            Victim = victim;
+            Attacker = attacker;
+            VictimId = victimId;
+            AttackerId = attackerId;
+            Blow = blow;
+            CollisionData = collisionData;
+            ReadyEpoch = readyEpoch;
+        }
+    }
+
     public CoopTournamentController(
         IBattleNetwork network,
         INetwork relayNetwork,
@@ -87,7 +122,8 @@ public class CoopTournamentController : CoopMissionController
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent,
         INetworkWorldItemRegistry worldItemRegistry,
-        ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory
+        ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory,
+        IGuardedHitWindow guardedHitWindow
 #if DEBUG
         , ITournamentCombatFixture combatFixture
 #endif
@@ -96,6 +132,7 @@ public class CoopTournamentController : CoopMissionController
     {
         this.relayNetwork = relayNetwork;
         this.worldItemRegistry = worldItemRegistry;
+        this.guardedHitWindow = guardedHitWindow;
         spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
         session = new TournamentMissionSession(controllerIdProvider);
         matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
@@ -228,6 +265,8 @@ public class CoopTournamentController : CoopMissionController
         receivedKnockoutSequences.Clear();
         receivedRuntimeSequences.Clear();
         pendingKnockouts.Clear();
+        pendingLocalDamage.Clear();
+        guardedHitWindow.Reset();
         RemovePendingTournamentPacketsForOtherMatches();
         damageSequence = 0;
         knockoutSequence = 0;
@@ -411,20 +450,16 @@ public class CoopTournamentController : CoopMissionController
 
         if (blow.InflictedDamage > 0)
         {
-            long sequence = ++damageSequence;
-            var message = new NetworkApplyTournamentDamage(
-                snapshot.SessionId,
+            pendingLocalDamage.Enqueue(
+                new PendingLocalTournamentDamage(
                 snapshot.CurrentMatchId,
-                snapshot.Revision,
-                session.OwnControllerId,
-                sequence,
+                victim,
+                attacker,
                 victimInfo.AgentId,
                 attackerId,
                 blow,
-                collisionData);
-            receivedDamageSequences.TryAccept(session.OwnControllerId, sequence);
-            network.SendAll(message);
-            ApplyTournamentDamage(message);
+                collisionData,
+                guardedHitWindow.Epoch + 1));
         }
         return false;
     }
@@ -962,6 +997,7 @@ public class CoopTournamentController : CoopMissionController
 
     public override void OnMissionTick(float dt)
     {
+        ProcessPendingLocalDamage();
         if (!missionReadyForManifest)
         {
             missionReadyForManifest = true;
@@ -977,6 +1013,84 @@ public class CoopTournamentController : CoopMissionController
         TryStartHostMatch();
         TrySubmitSpawnManifest();
         TrySubmitMatchResult(dt);
+    }
+
+    private void ProcessPendingLocalDamage(bool force = false)
+    {
+        guardedHitWindow.Advance();
+        int count = pendingLocalDamage.Count;
+        for (int i = 0; i < count; i++)
+        {
+            PendingLocalTournamentDamage pending =
+                pendingLocalDamage.Dequeue();
+            if (!force &&
+                pending.ReadyEpoch > guardedHitWindow.Epoch)
+            {
+                pendingLocalDamage.Enqueue(pending);
+                continue;
+            }
+
+            if (guardedHitWindow.TryConsumeGuarded(
+                    pending.Victim,
+                    pending.Attacker))
+            {
+                continue;
+            }
+
+            if (snapshot == null ||
+                snapshot.Phase != TournamentSessionPhase.LiveMatch ||
+                snapshot.CurrentMatchId != pending.MatchId)
+            {
+                continue;
+            }
+
+            var registry = coopMissionComponent.AgentRegistry;
+            if (!registry.TryGetAgentInfo(
+                    pending.VictimId,
+                    out CoopAgentInfo victimInfo) ||
+                !ReferenceEquals(victimInfo.Agent, pending.Victim))
+            {
+                continue;
+            }
+
+            CoopAgentInfo attackerInfo = null;
+            if (pending.AttackerId != Guid.Empty &&
+                (!registry.TryGetAgentInfo(
+                    pending.AttackerId,
+                    out attackerInfo) ||
+                 !ReferenceEquals(
+                     attackerInfo.Agent,
+                     pending.Attacker)))
+            {
+                continue;
+            }
+
+            if (!TournamentDamageAuthority.IsValidOrigin(
+                    session.OwnControllerId,
+                    victimInfo.CurrentAuthority,
+                    pending.AttackerId,
+                    attackerInfo?.CurrentAuthority))
+            {
+                continue;
+            }
+
+            long sequence = ++damageSequence;
+            var message = new NetworkApplyTournamentDamage(
+                snapshot.SessionId,
+                snapshot.CurrentMatchId,
+                snapshot.Revision,
+                session.OwnControllerId,
+                sequence,
+                pending.VictimId,
+                pending.AttackerId,
+                pending.Blow,
+                pending.CollisionData);
+            receivedDamageSequences.TryAccept(
+                session.OwnControllerId,
+                sequence);
+            network.SendAll(message);
+            ApplyTournamentDamage(message);
+        }
     }
 
     private void TryStartHostMatch()
@@ -1855,6 +1969,8 @@ public class CoopTournamentController : CoopMissionController
 
     protected override void OnLeaving()
     {
+        ProcessPendingLocalDamage(force: true);
+
         if (snapshot != null && !snapshot.IsCompleted && HasLocalMissionMember(snapshot) && !leaveRequested)
             relayNetwork.SendAll(new NetworkRequestLeaveActiveTournament(snapshot.SessionId, snapshot.Revision));
 
@@ -1866,6 +1982,8 @@ public class CoopTournamentController : CoopMissionController
         manifestAgentData.Clear();
         manifestAgentInstances.Clear();
         pendingKnockouts.Clear();
+        pendingLocalDamage.Clear();
+        guardedHitWindow.Reset();
         pendingTournamentPackets.Clear();
         receivedDamageSequences.Clear();
         appliedDamageSequences.Clear();
@@ -1888,6 +2006,8 @@ public class CoopTournamentController : CoopMissionController
         messageBroker.Unsubscribe<NetworkTournamentCombatFixtureCommand>(Handle_CombatFixtureCommand);
         combatFixture.Dispose();
 #endif
+        pendingLocalDamage.Clear();
+        guardedHitWindow.Dispose();
         base.Dispose();
     }
 

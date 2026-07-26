@@ -135,7 +135,6 @@ public class GuardReactionHandler : IGuardReactionHandler
             || Mission.Current == null
             || !isBlocked
             || isMissile
-            || !IsBlockedCollision(collisionResult)
             || affectedAgent == null
             || affectorAgent == null
             || !agentRegistry.IsLocallyControlled(affectorAgent)
@@ -475,15 +474,6 @@ public class GuardReactionHandler : IGuardReactionHandler
         return AgentActionData.IsDefendingAction(actionType)
             && agent.GetCurrentActionStage(channel)
                 == Agent.ActionStage.DefendParry;
-    }
-
-    private static bool IsBlockedCollision(
-        CombatCollisionResult collisionResult)
-    {
-        return collisionResult == CombatCollisionResult.Blocked
-            || collisionResult == CombatCollisionResult.Parried
-            || collisionResult
-                == CombatCollisionResult.ChamberBlocked;
     }
 
     private static bool HasInterruptingAction(Agent agent)

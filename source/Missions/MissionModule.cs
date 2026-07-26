@@ -64,6 +64,9 @@ public class MissionModule : Module
         // fresh CoopMissionController, which pulls a fresh ICoopMissionComponent and a fresh set of sync
         // handlers — so no agent/registry state from a previous mission leaks into the next.
         builder.RegisterType<CoopMissionComponent>().As<ICoopMissionComponent>().InstancePerDependency();
+        builder.RegisterType<GuardedHitWindow>()
+            .As<IGuardedHitWindow>()
+            .InstancePerDependency();
 
         // The location P2P controller. Resolved as ILocationMissionBehavior by PlayerLocationEntryPatches
         // and attached to every opened location mission (tavern/indoor, town centre, castle courtyard,

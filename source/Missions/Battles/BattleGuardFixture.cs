@@ -53,7 +53,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float MountedRouteSampleLength = 5f;
     private const float MountedRouteMaximumRise = 1.5f;
     private const float MountedStrikeForwardOffset = 1.5f;
-    private const float MountedStrikeLateralOffset = 1.15f;
+    private const float MountedStrikeLateralOffset = 1.5f;
     private const float MountedStrikeMinimumLeadDistance = 6f;
     private const float MountedStrikeMaximumLeadDistance = 10f;
     private const float MountedStrikeReleaseLeadSeconds = 0.25f;
@@ -363,8 +363,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             damagedHp);
         if (!isBlocked ||
             guardDriver == null ||
-            !ReferenceEquals(affectedAgent, guardDriver.Agent) ||
-            !IsBlockedCollision(collisionData.CollisionResult))
+            !ReferenceEquals(affectedAgent, guardDriver.Agent))
         {
             return;
         }
@@ -1322,18 +1321,39 @@ public class BattleGuardFixture : IBattleGuardFixture
         return riderReferencesMount && mountReferencesRider;
     }
 
-    internal static Vec3 GetMountedStrikerPosition(
-        Vec3 contactPoint,
-        Vec3 laneDirection)
+    internal static bool NeedsMountRestore(
+        bool originalMountActive,
+        bool riderReferencesMount,
+        bool mountReferencesRider)
+    {
+        return originalMountActive &&
+            !IsRemountStateReconciled(
+                riderReferencesMount,
+                mountReferencesRider);
+    }
+
+    internal static Vec3 GetMountedStrikeContactPoint(
+        Vec3 guardPosition,
+        Vec3 laneDirection,
+        float leadDistance)
     {
         laneDirection = GetHorizontalDirection(laneDirection);
         var lateral = new Vec3(
             laneDirection.y,
             -laneDirection.x,
             0f);
-        return contactPoint +
-            (laneDirection * MountedStrikeForwardOffset) +
+        return guardPosition +
+            (laneDirection * leadDistance) +
             (lateral * MountedStrikeLateralOffset);
+    }
+
+    internal static Vec3 GetMountedStrikerPosition(
+        Vec3 contactPoint,
+        Vec3 laneDirection)
+    {
+        laneDirection = GetHorizontalDirection(laneDirection);
+        return contactPoint +
+            (laneDirection * MountedStrikeForwardOffset);
     }
 
     internal static bool ShouldReleaseMountedStrike(
@@ -1563,9 +1583,12 @@ public class BattleGuardFixture : IBattleGuardFixture
             ReplaceWeapon(agent, EquipmentIndex.Weapon1, driver.OriginalWeapon1);
             driver.OriginalWieldedEquipment.Apply(agent);
         }
-        bool needsRemount =
-            driver.OriginalMount?.IsActive() == true &&
-            !ReferenceEquals(agent.MountAgent, driver.OriginalMount);
+        bool originalMountActive =
+            driver.OriginalMount?.IsActive() == true;
+        bool needsRemount = NeedsMountRestore(
+            originalMountActive,
+            ReferenceEquals(agent.MountAgent, driver.OriginalMount),
+            ReferenceEquals(driver.OriginalMount?.RiderAgent, agent));
         if (needsRemount)
         {
             pendingGuardRestore = new PendingGuardRestore(
@@ -1591,8 +1614,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
 
         CompleteGuardRestore(agent, driver);
-        if (driver.OriginalMount?.IsActive() == true)
+        if (originalMountActive)
         {
+            Mission.Current?.RemoveMountWithoutRider(
+                driver.OriginalMount);
             driver.OriginalMount.TeleportToPosition(
                 driver.OriginalMountPosition);
             driver.OriginalMount.LookDirection =
@@ -2479,14 +2504,6 @@ public class BattleGuardFixture : IBattleGuardFixture
             actionType == Agent.ActionCodeType.ParriedMelee;
     }
 
-    private static bool IsBlockedCollision(
-        CombatCollisionResult collisionResult)
-    {
-        return collisionResult == CombatCollisionResult.Blocked ||
-            collisionResult == CombatCollisionResult.Parried ||
-            collisionResult == CombatCollisionResult.ChamberBlocked;
-    }
-
     private sealed class AiPauseState
     {
         public Agent Agent { get; }
@@ -2846,8 +2863,13 @@ public class BattleGuardFixture : IBattleGuardFixture
             float damagedHp)
         {
             HitCount++;
-            LastHitTarget =
-                affectedAgent?.Character?.StringId ?? "unknown";
+            string targetId =
+                affectedAgent?.Character?.StringId ??
+                affectedAgent?.Name?.ToString() ??
+                "unknown";
+            LastHitTarget = affectedAgent?.IsMount == true
+                ? $"mount:{targetId}"
+                : targetId;
             LastHitCollision = collisionResult.ToString();
             LastHitBlocked = isBlocked;
             LastHitDamagedHp = damagedHp;
@@ -3010,7 +3032,10 @@ public class BattleGuardFixture : IBattleGuardFixture
                 Math.Min(
                     MountedStrikeMaximumLeadDistance,
                     speed * 0.85f));
-            contactPoint = guard.Position + (laneDirection * leadDistance);
+            contactPoint = GetMountedStrikeContactPoint(
+                guard.Position,
+                laneDirection,
+                leadDistance);
 
             Vec3 strikerPosition =
                 GetMountedStrikerPosition(contactPoint, laneDirection);
