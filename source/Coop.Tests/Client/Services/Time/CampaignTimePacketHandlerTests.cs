@@ -1,5 +1,6 @@
 ﻿using Common.PacketHandlers;
 using Common.Tests.Utils;
+using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Time.Handlers;
 using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Time.Interfaces;
@@ -30,11 +31,27 @@ public class CampaignTimePacketHandlerTests
         var packetManager = new Mock<IPacketManager>();
         var mapTimeTracker = new Mock<IMapTimeTrackerInterface>();
         var handler = new CampaignTimePacketHandler(broker, packetManager.Object, mapTimeTracker.Object);
-        var packet = new CampaignTimePacket(123456L);
+        var packet = new CampaignTimePacket(123456L, -1);
 
         handler.HandlePacket(null, packet);
 
         mapTimeTracker.Verify(m => m.SyncCampaignTime(packet.ServerTicks, 0f), Times.Once);
+        var sample = Assert.Single(broker.GetMessagesFromType<CampaignTimeSampleReceived>());
+        Assert.Equal(-1, sample.JoinPacketsRemaining);
+    }
+
+    [Fact]
+    public void CampaignTimePacket_WithJoinProgress_PublishesRemainingPackets()
+    {
+        var broker = new TestMessageBroker();
+        var packetManager = new Mock<IPacketManager>();
+        var mapTimeTracker = new Mock<IMapTimeTrackerInterface>();
+        var handler = new CampaignTimePacketHandler(broker, packetManager.Object, mapTimeTracker.Object);
+
+        handler.HandlePacket(null, new CampaignTimePacket(123456L, 4321));
+
+        var sample = Assert.Single(broker.GetMessagesFromType<CampaignTimeSampleReceived>());
+        Assert.Equal(4321, sample.JoinPacketsRemaining);
     }
 
     [Theory]

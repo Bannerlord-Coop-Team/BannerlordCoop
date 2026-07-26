@@ -254,6 +254,11 @@ public class WorkshopPurchaseConversationTests : IDisposable
             workshopsBehavior._workshopData = Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
             workshopsBehavior._warehouseRosterPerSettlement = Array.Empty<KeyValuePair<Settlement, ItemRoster>>();
 
+            // The capacity patch counts workshops attached to towns.
+            var town = ObjectHelper.SkipConstructor<Town>();
+            town.Workshops = new[] { workshop };
+            Campaign.Current._towns.Add(town);
+
             ChangeOwnerOfWorkshopActionPatches.ApplyPredictedWorkshopOwnership(workshop, buyer);
             ChangeOwnerOfWorkshopActionPatches.ApplyPredictedWorkshopData(workshop, buyer);
         });
