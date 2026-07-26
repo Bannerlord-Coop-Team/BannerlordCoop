@@ -347,7 +347,7 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void MountedStrikerPosition_ApproachesFromFrontAndSide()
+    public void MountedStrikerPosition_ApproachesHeadOnAlongRoute()
     {
         var contactPoint = new Vec3(2f, 3f, 4f);
         var forward = new Vec3(0f, 1f, 0f);
@@ -363,7 +363,7 @@ public class BattleGuardFixtureEvidenceTests
             Vec3.DotProduct(offset, forward),
             precision: 3);
         Assert.Equal(
-            1.15f,
+            0f,
             Vec3.DotProduct(offset, lateral),
             precision: 3);
         Assert.Equal(contactPoint.z, position.z, precision: 3);

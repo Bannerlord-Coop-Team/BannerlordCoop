@@ -53,7 +53,6 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float MountedRouteSampleLength = 5f;
     private const float MountedRouteMaximumRise = 1.5f;
     private const float MountedStrikeForwardOffset = 1.5f;
-    private const float MountedStrikeLateralOffset = 1.15f;
     private const float MountedStrikeMinimumLeadDistance = 6f;
     private const float MountedStrikeMaximumLeadDistance = 10f;
     private const float MountedStrikeMinimumRunway =
@@ -1273,13 +1272,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         Vec3 laneDirection)
     {
         laneDirection = GetHorizontalDirection(laneDirection);
-        var lateral = new Vec3(
-            laneDirection.y,
-            -laneDirection.x,
-            0f);
         return contactPoint +
-            (laneDirection * MountedStrikeForwardOffset) +
-            (lateral * MountedStrikeLateralOffset);
+            (laneDirection * MountedStrikeForwardOffset);
     }
 
     private static Vec3 GetHorizontalDirection(Vec3 direction)
