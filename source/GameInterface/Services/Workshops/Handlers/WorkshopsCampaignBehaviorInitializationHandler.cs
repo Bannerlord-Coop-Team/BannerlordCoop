@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -7,8 +6,6 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
-using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -22,11 +19,11 @@ namespace GameInterface.Services.Workshops.Handlers
 {
     internal class WorkshopsCampaignBehaviorInitializationHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<WorkshopsCampaignBehaviorInitializationHandler>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
         private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
+        private readonly IWorkshopDataRestorer workshopDataRestorer;
 
         private WorkshopPlayerData workshopPlayerData;
 
@@ -34,12 +31,14 @@ namespace GameInterface.Services.Workshops.Handlers
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
-            ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+            ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
+            IWorkshopDataRestorer workshopDataRestorer)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
             this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
+            this.workshopDataRestorer = workshopDataRestorer;
             messageBroker.Subscribe<InitializeClientWorkshopData>(Handle);
             messageBroker.Subscribe<PlayerHeroChanged>(Handle);
             messageBroker.Subscribe<NetworkInitializeServerWorkshopDataKeys>(Handle);
@@ -66,6 +65,20 @@ namespace GameInterface.Services.Workshops.Handlers
             WorkshopsCampaignBehavior workshopsCampaignBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
 
             workshopsCampaignBehavior._warehouseRosterPerSettlement = GetWarehouseRosterPerSettlement(playerHeroId, playerHero);
+            GameThread.RunSafe(
+                () =>
+                {
+                    using (new AllowedThread())
+                    {
+                        workshopDataRestorer.RestoreClientWorkshopData(
+                            workshopsCampaignBehavior,
+                            playerHero,
+                            GetTownWorkshops(),
+                            workshopPlayerData);
+                    }
+                },
+                blocking: true,
+                context: nameof(WorkshopsCampaignBehaviorInitializationHandler));
 
             network.SendAll(new NetworkInitializeServerWorkshopDataKeys(playerHeroId));
         }
@@ -80,7 +93,9 @@ namespace GameInterface.Services.Workshops.Handlers
 
                 WorkshopsCampaignBehavior workshopsCampaignBehavior =
                     Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
-                EnsurePlayerWorkshopData(workshopsCampaignBehavior, playerHero, GetTownWorkshops());
+                workshopDataRestorer.RestoreServerWorkshopData(
+                    workshopsCampaignBehavior,
+                    GetTownWorkshops());
             }, context: nameof(WorkshopsCampaignBehaviorInitializationHandler));
         }
 
@@ -139,38 +154,6 @@ namespace GameInterface.Services.Workshops.Handlers
                     warehouseRosters[settlement] = new ItemRoster();
                 }
             }
-        }
-
-        internal static void EnsurePlayerWorkshopData(
-            WorkshopsCampaignBehavior workshopsCampaignBehavior,
-            Hero playerHero,
-            IEnumerable<Workshop> workshops)
-        {
-            foreach (Workshop workshop in workshops)
-            {
-                if (workshop?.Owner != playerHero) continue;
-
-                EnsureWorkshopData(workshopsCampaignBehavior, workshop);
-            }
-        }
-
-        internal static void EnsureWorkshopData(
-            WorkshopsCampaignBehavior workshopsCampaignBehavior,
-            Workshop workshop)
-        {
-            WorkshopsCampaignBehavior.WorkshopData[] workshopData =
-                workshopsCampaignBehavior._workshopData ?? Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
-            workshopsCampaignBehavior._workshopData = workshopData;
-
-            if (workshopsCampaignBehavior.GetDataOfWorkshop(workshop) != null) return;
-
-            if (!workshopData.Any(data => data == null))
-            {
-                Array.Resize(ref workshopData, workshopData.Length + 1);
-                workshopsCampaignBehavior._workshopData = workshopData;
-            }
-
-            workshopsCampaignBehavior.AddNewWorkshopData(workshop);
         }
 
         internal static KeyValuePair<Settlement, ItemRoster>[] CreateWarehouseRosterSlots(

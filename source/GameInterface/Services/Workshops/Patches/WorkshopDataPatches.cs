@@ -17,60 +17,64 @@ internal class WorkshopDataPatches
     [HarmonyPrefix]
     public static bool AddNewWorkshopDataPrefix(ref WorkshopsCampaignBehavior __instance, Workshop workshop)
     {
-        // Don't run on clients unless in an allowed thread
-        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
+        return ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();
+    }
 
-        // Update clients
-        var message = new NewWorkshopDataAdded(workshop);
-        MessageBroker.Instance.Publish(__instance, message);
+    [HarmonyPatch(nameof(WorkshopsCampaignBehavior.AddNewWorkshopData))]
+    [HarmonyPostfix]
+    public static void AddNewWorkshopDataPostfix(ref WorkshopsCampaignBehavior __instance, Workshop workshop)
+    {
+        if (ModInformation.IsClient) return;
 
-        // Run on the server
-        return true;
+        MessageBroker.Instance.Publish(__instance, new NewWorkshopDataAdded(workshop));
     }
 
     [HarmonyPatch(nameof(WorkshopsCampaignBehavior.RemoveWorkshopData))]
     [HarmonyPrefix]
     public static bool RemoveWorkshopDataPrefix(ref WorkshopsCampaignBehavior __instance, Workshop workshop)
     {
-        // Don't run on clients unless in an allowed thread
-        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
+        return ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();
+    }
 
-        // Update clients
-        var message = new WorkshopDataRemoved(workshop);
-        MessageBroker.Instance.Publish(__instance, message);
+    [HarmonyPatch(nameof(WorkshopsCampaignBehavior.RemoveWorkshopData))]
+    [HarmonyPostfix]
+    public static void RemoveWorkshopDataPostfix(ref WorkshopsCampaignBehavior __instance, Workshop workshop)
+    {
+        if (ModInformation.IsClient) return;
 
-        // Run on the server
-        return true;
+        MessageBroker.Instance.Publish(__instance, new WorkshopDataRemoved(workshop));
     }
 
     [HarmonyPatch(nameof(WorkshopsCampaignBehavior.AddOutputProgressForWarehouse))]
     [HarmonyPrefix]
     public static bool AddOutputProgressForWarehousePrefix(ref WorkshopsCampaignBehavior __instance, Workshop workshop, float progressToAdd)
     {
-        // Don't run on clients unless in an allowed thread
-        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
+        return ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();
+    }
 
-        // Update clients
-        var message = new OutputProgressAddedForWarehouse(workshop, progressToAdd);
-        MessageBroker.Instance.Publish(__instance, message);
+    [HarmonyPatch(nameof(WorkshopsCampaignBehavior.AddOutputProgressForWarehouse))]
+    [HarmonyPostfix]
+    public static void AddOutputProgressForWarehousePostfix(ref WorkshopsCampaignBehavior __instance, Workshop workshop, float progressToAdd)
+    {
+        if (ModInformation.IsClient) return;
 
-        // Run on the server
-        return true;
+        MessageBroker.Instance.Publish(__instance, new OutputProgressAddedForWarehouse(workshop, progressToAdd));
     }
 
     [HarmonyPatch(nameof(WorkshopsCampaignBehavior.AddOutputProgressForTown))]
     [HarmonyPrefix]
     public static bool AddOutputProgressForTownPrefix(ref WorkshopsCampaignBehavior __instance, Workshop workshop, float progressToAdd)
     {
-        // Don't run on clients unless in an allowed thread
-        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
+        return ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();
+    }
 
-        // Update clients
-        var message = new OutputProgressForTownAdded(workshop, progressToAdd);
-        MessageBroker.Instance.Publish(__instance, message);
+    [HarmonyPatch(nameof(WorkshopsCampaignBehavior.AddOutputProgressForTown))]
+    [HarmonyPostfix]
+    public static void AddOutputProgressForTownPostfix(ref WorkshopsCampaignBehavior __instance, Workshop workshop, float progressToAdd)
+    {
+        if (ModInformation.IsClient) return;
 
-        // Run on the server
-        return true;
+        MessageBroker.Instance.Publish(__instance, new OutputProgressForTownAdded(workshop, progressToAdd));
     }
 }
 

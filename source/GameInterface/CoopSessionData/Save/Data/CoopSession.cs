@@ -37,7 +37,7 @@ public class CoopSession : ICoopSession
         string.Empty,
         Array.Empty<Player>(),
         new CraftingPlayerData(new(), new(), new()),
-        new WorkshopPlayerData(new()),
+        new WorkshopPlayerData(new(), new()),
         new CaravansPlayerData(new(), new()),
         new AlleyPlayerData(new()),
         new InteractionsPlayerData(new(), new(), new(), new()),

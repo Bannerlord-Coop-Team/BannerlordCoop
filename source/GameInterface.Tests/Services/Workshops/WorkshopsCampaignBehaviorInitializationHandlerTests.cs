@@ -1,11 +1,8 @@
 ﻿using Common.Util;
 using GameInterface.Services.Workshops.Handlers;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -67,81 +64,6 @@ public class WorkshopsCampaignBehaviorInitializationHandlerTests
             new[] { workshop });
 
         Assert.Same(savedRoster, Assert.Contains(settlement, warehouseRosters));
-    }
-
-    [Fact]
-    public void EnsurePlayerWorkshopData_OwnerMatchesPlayer_AddsWorkshopData()
-    {
-        Hero playerHero = ObjectHelper.SkipConstructor<Hero>();
-        Settlement settlement = ObjectHelper.SkipConstructor<Settlement>();
-        Workshop workshop = CreateWorkshop(playerHero, settlement);
-        WorkshopsCampaignBehavior workshopsBehavior = CreateWorkshopsBehavior();
-
-        WorkshopsCampaignBehaviorInitializationHandler.EnsurePlayerWorkshopData(
-            workshopsBehavior,
-            playerHero,
-            new[] { workshop });
-
-        WorkshopsCampaignBehavior.WorkshopData workshopData =
-            Assert.Single(workshopsBehavior._workshopData.Where(data => data != null))!;
-        Assert.Same(workshop, workshopData.Workshop);
-    }
-
-    [Fact]
-    public void EnsurePlayerWorkshopData_ExistingWorkshopData_DoesNotDuplicateEntry()
-    {
-        Hero playerHero = ObjectHelper.SkipConstructor<Hero>();
-        Settlement settlement = ObjectHelper.SkipConstructor<Settlement>();
-        Workshop workshop = CreateWorkshop(playerHero, settlement);
-        WorkshopsCampaignBehavior workshopsBehavior = CreateWorkshopsBehavior();
-        workshopsBehavior._workshopData =
-            new[] { new WorkshopsCampaignBehavior.WorkshopData(workshop) };
-
-        WorkshopsCampaignBehaviorInitializationHandler.EnsurePlayerWorkshopData(
-            workshopsBehavior,
-            playerHero,
-            new[] { workshop });
-
-        WorkshopsCampaignBehavior.WorkshopData workshopData =
-            Assert.Single(workshopsBehavior._workshopData)!;
-        Assert.Same(workshop, workshopData.Workshop);
-    }
-
-    [Fact]
-    public void EnsurePlayerWorkshopData_FullStorage_ExpandsForPlayerWorkshop()
-    {
-        Hero playerHero = ObjectHelper.SkipConstructor<Hero>();
-        Hero otherHero = ObjectHelper.SkipConstructor<Hero>();
-        Workshop existingWorkshop = CreateWorkshop(otherHero, ObjectHelper.SkipConstructor<Settlement>());
-        Workshop playerWorkshop = CreateWorkshop(playerHero, ObjectHelper.SkipConstructor<Settlement>());
-        WorkshopsCampaignBehavior workshopsBehavior = CreateWorkshopsBehavior();
-        workshopsBehavior._workshopData =
-            new[] { new WorkshopsCampaignBehavior.WorkshopData(existingWorkshop) };
-
-        WorkshopsCampaignBehaviorInitializationHandler.EnsurePlayerWorkshopData(
-            workshopsBehavior,
-            playerHero,
-            new[] { existingWorkshop, playerWorkshop });
-
-        Assert.Equal(2, workshopsBehavior._workshopData.Length);
-        Assert.Contains(workshopsBehavior._workshopData, data => data?.Workshop == existingWorkshop);
-        Assert.Contains(workshopsBehavior._workshopData, data => data?.Workshop == playerWorkshop);
-    }
-
-    [Fact]
-    public void EnsurePlayerWorkshopData_OwnerDoesNotMatchPlayer_DoesNotAddEntry()
-    {
-        Hero playerHero = ObjectHelper.SkipConstructor<Hero>();
-        Hero otherHero = ObjectHelper.SkipConstructor<Hero>();
-        Workshop workshop = CreateWorkshop(otherHero, ObjectHelper.SkipConstructor<Settlement>());
-        WorkshopsCampaignBehavior workshopsBehavior = CreateWorkshopsBehavior();
-
-        WorkshopsCampaignBehaviorInitializationHandler.EnsurePlayerWorkshopData(
-            workshopsBehavior,
-            playerHero,
-            new[] { workshop });
-
-        Assert.Empty(workshopsBehavior._workshopData);
     }
 
     [Fact]
@@ -209,13 +131,5 @@ public class WorkshopsCampaignBehaviorInitializationHandlerTests
         typeof(Workshop).GetField("_settlement", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(workshop, settlement);
         return workshop;
-    }
-
-    private static WorkshopsCampaignBehavior CreateWorkshopsBehavior()
-    {
-        WorkshopsCampaignBehavior workshopsBehavior =
-            ObjectHelper.SkipConstructor<WorkshopsCampaignBehavior>();
-        workshopsBehavior._workshopData = Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
-        return workshopsBehavior;
     }
 }

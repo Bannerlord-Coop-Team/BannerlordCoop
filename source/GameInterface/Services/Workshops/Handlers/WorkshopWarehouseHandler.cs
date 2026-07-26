@@ -28,19 +28,22 @@ internal class WorkshopWarehouseHandler : IHandler
     private readonly INetwork network;
     private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
     private readonly IWorkshopsCampaignBehaviorInterface workshopsCampaignBehaviorInterface;
+    private readonly IWorkshopDataRestorer workshopDataRestorer;
 
     public WorkshopWarehouseHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
-        IWorkshopsCampaignBehaviorInterface workshopsCampaignBehaviorInterface)
+        IWorkshopsCampaignBehaviorInterface workshopsCampaignBehaviorInterface,
+        IWorkshopDataRestorer workshopDataRestorer)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
         this.workshopsCampaignBehaviorInterface = workshopsCampaignBehaviorInterface;
+        this.workshopDataRestorer = workshopDataRestorer;
         messageBroker.Subscribe<WorkshopOwnerChanged>(Handle_WorkshopOwnerChanged);
         messageBroker.Subscribe<ChangeWorkshopOwner>(Handle_ChangeWorkshopOwner);
         messageBroker.Subscribe<OutputProducedToWarehouse>(Handle_OutputProducedToWarehouse);
@@ -86,10 +89,11 @@ internal class WorkshopWarehouseHandler : IHandler
             if (owner.IsPlayerHero())
             {
                 sessionWorkshopPlayerDataInterface.AddNewWarehouseDataIfNeeded(ownerId, settlementId);
-                WorkshopsCampaignBehaviorInitializationHandler.EnsurePlayerWorkshopData(
+                WorkshopsCampaignBehavior.WorkshopData workshopData =
+                    workshopDataRestorer.EnsureWorkshopData(
                     workshopsBehavior,
-                    owner,
-                    new[] { workshop });
+                    workshop);
+                sessionWorkshopPlayerDataInterface.UpdateWorkshopData(workshopId, workshopData);
             }
             else if (oldOwner.IsPlayerHero())
             {
@@ -106,6 +110,7 @@ internal class WorkshopWarehouseHandler : IHandler
                     sessionWorkshopPlayerDataInterface.RemoveWarehouseData(oldOwnerId, settlementId);
                 }
                 workshopsBehavior.RemoveWorkshopData(workshop);
+                sessionWorkshopPlayerDataInterface.RemoveWorkshopData(workshopId);
             }
 
             network.SendAll(new ChangeWorkshopOwner(workshopId, oldOwnerId));
