@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Common.Messaging;
 using Common.Network;
@@ -245,9 +245,9 @@ public class MovementTrafficTests : MissionTestEnvironment
                 PopulateIncompressibleMovementState(riderMirror, i + 1);
                 PopulateIncompressibleMovementState(mountMirror, i + 101);
                 Assert.True(registry.TryRegisterAgent(
-                    "peer", Guid.NewGuid(), (ushort)(i * 2 + 1), rider));
+                    "peer", Guid.NewGuid(), (ushort)((i * 2) + 1), rider));
                 Assert.True(registry.TryRegisterAgent(
-                    "peer", Guid.NewGuid(), (ushort)(i * 2 + 2), mount));
+                    "peer", Guid.NewGuid(), (ushort)((i * 2) + 2), mount));
             }
 
             handler.PollMovement(0f);
@@ -802,12 +802,12 @@ public class MovementTrafficTests : MissionTestEnvironment
 
     private static float NextFloat(ref uint state, float magnitude)
     {
-        return ((Next(ref state) / (float)uint.MaxValue) * 2f - 1f) * magnitude;
+        return (((Next(ref state) / (float)uint.MaxValue) * 2f) - 1f) * magnitude;
     }
 
     private static uint Next(ref uint state)
     {
-        state = unchecked(state * 1664525u + 1013904223u);
+        state = unchecked((state * 1664525u) + 1013904223u);
         return state;
     }
 
