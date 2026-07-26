@@ -23,21 +23,8 @@ internal class FindClosestMountAvailablePatch
             return false;
         }
 
-        foreach (KeyValuePair<Agent, MissionTime> entry in mission.MountsWithoutRiders)
-        {
-            Agent candidate = entry.Key;
-            if (candidate != null &&
-                candidate.IsActive() &&
-                candidate.RiderAgent == null &&
-                !candidate.IsRunningAway &&
-                candidate.CommonAIComponent == null)
-            {
-                __result = FindClosestMountAvailableSafe(__instance, mission);
-                return false;
-            }
-        }
-
-        return true;
+        __result = FindClosestMountAvailableSafe(__instance, mission);
+        return false;
     }
 
     private static Agent FindClosestMountAvailableSafe(
