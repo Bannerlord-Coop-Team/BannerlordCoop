@@ -16,12 +16,8 @@ public interface IBattleNetwork
     void Stop();
     void Send(string controllerId, IPacket packet);
     void SendAll(IPacket packet);
-    /// <summary>Broadcast an already serialized packet without repeating size-test serialization.</summary>
-    void SendAll(IPacket packet, byte[] serializedPacket);
     void SendAllBut(string controllerId, IPacket packet);
     void Send(string controllerId, IMessage message);
     void SendAll(IMessage message);
     void SendAllBut(string controllerId, IMessage message);
-    /// <summary>Largest inner unreliable payload safe for every current viable direct or relay route.</summary>
-    int GetMaxUnreliablePayloadBytes();
 }
