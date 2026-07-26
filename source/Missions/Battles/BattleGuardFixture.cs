@@ -765,6 +765,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             return;
 
         guardDriver.BeginDriving();
+        if (command.Mode == BattleGuardFixtureMode.Mounted)
+            guardDriver.MountedSpeedLimiter.Apply(agent.MountAgent);
         if (command.Phase == BattleGuardFixturePhase.Calibration)
         {
             guardDriver.GuardArmed = false;
@@ -820,6 +822,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             }
             return;
         }
+        if (guardDriver.Mode == BattleGuardFixtureMode.Mounted)
+            guardDriver.MountedSpeedLimiter.Apply(agent.MountAgent);
         if (!guardDriver.Positioned)
         {
             if (!TryPositionGuard(agent, guardDriver))
@@ -1424,7 +1428,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
 
         if (agent == null)
+        {
+            driver.StopDriving();
             return;
+        }
 
         bool drivesGuard = driver.DrivesAgent;
         if (drivesGuard &&
@@ -2563,6 +2570,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         public float CurrentHorizontalSpeed { get; set; }
         public Vec3 CurrentHorizontalDirection { get; set; }
         public float CalibratedPlateauSpeed { get; set; } = -1f;
+        public BattleGuardMountedSpeedLimiter MountedSpeedLimiter { get; } =
+            new();
         public bool DrivesAgent { get; private set; }
         public int GuardActionIndex => guardActionIndex;
         private int guardChannel = -1;
@@ -2606,6 +2615,7 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         public void StopDriving()
         {
+            MountedSpeedLimiter.Restore();
             DrivesAgent = false;
         }
 
@@ -2633,6 +2643,49 @@ public class BattleGuardFixture : IBattleGuardFixture
             guardActionIndex = -1;
             guardAnimationIndex = -1;
             guardActionCyclic = false;
+        }
+    }
+
+    internal sealed class BattleGuardMountedSpeedLimiter
+    {
+        internal const float MaximumSpeed = 7.5f;
+        private const float SpeedLimitEpsilon = 0.001f;
+        private Agent mount;
+        private float originalMaximumSpeed;
+
+        public void Apply(Agent nextMount)
+        {
+            if (nextMount?.IsActive() != true)
+                return;
+            if (!ReferenceEquals(mount, nextMount))
+            {
+                Restore();
+                mount = nextMount;
+                originalMaximumSpeed = nextMount.GetMaximumSpeedLimit();
+            }
+            if (Math.Abs(
+                    nextMount.GetMaximumSpeedLimit() -
+                    MaximumSpeed) <= SpeedLimitEpsilon)
+            {
+                return;
+            }
+
+            nextMount.SetMaximumSpeedLimit(
+                MaximumSpeed,
+                isMultiplier: false);
+        }
+
+        public void Restore()
+        {
+            Agent limitedMount = mount;
+            mount = null;
+            if (limitedMount?.IsActive() == true)
+            {
+                limitedMount.SetMaximumSpeedLimit(
+                    originalMaximumSpeed,
+                    isMultiplier: false);
+            }
+            originalMaximumSpeed = 0f;
         }
     }
 
