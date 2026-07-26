@@ -189,8 +189,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Assert.False(registry.TryGetAgentInfo(ownAgentId, out _));
             Assert.False(registry.TryGetAgentInfo(remoteAgentId, out _));
 
-            AccessTools.Field(typeof(DeploymentMissionController), "<TeamSetupOver>k__BackingField")
-                .SetValue(mission.DeploymentController, true);
+            mission.DeploymentController.TeamSetupOver = true;
             spawner.DrainPendingPuppets();
 
             Assert.False(registry.TryGetAgentInfo(ownAgentId, out _));
