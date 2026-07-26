@@ -539,6 +539,26 @@ public class BattleGuardFixtureEvidenceTests
         Assert.False(route.CanStageStrike);
     }
 
+    [Theory]
+    [InlineData(4.9f, 40f, true)]
+    [InlineData(5.1f, 40f, false)]
+    [InlineData(0f, 84f, true)]
+    [InlineData(0f, 86f, false)]
+    public void MountedRouteClearance_IncludesLaneAndEndpointRadius(
+        float x,
+        float y,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.IsInsideMountedRouteClearance(
+                new Vec3(x, y, 0f),
+                Vec3.Zero,
+                new Vec3(0f, 1f, 0f),
+                80f,
+                5f));
+    }
+
     [Fact]
     public void MountedRoute_FirstRemoteSample_InfersReturnDirection()
     {

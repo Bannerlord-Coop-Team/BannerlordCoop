@@ -48,7 +48,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float SampleIntervalSeconds = 0.05f;
     private const float ProgressEpsilon = 0.001f;
     private const float FixtureLaneOffset = 25f;
-    private const float MountedRouteLength = 40f;
+    private const float MountedRouteLength = 80f;
     private const float MountedRouteRadius = 5f;
     private const float MountedRouteSampleLength = 5f;
     private const float MountedRouteMaximumRise = 1.5f;
@@ -1130,7 +1130,8 @@ public class BattleGuardFixture : IBattleGuardFixture
                 if (!IsMountedRouteClear(
                         scene,
                         candidatePosition,
-                        candidate))
+                        candidate,
+                        driver))
                     continue;
             }
 
@@ -1153,7 +1154,8 @@ public class BattleGuardFixture : IBattleGuardFixture
     private static bool IsMountedRouteClear(
         Scene scene,
         Vec3 start,
-        Vec3 direction)
+        Vec3 direction,
+        GuardDriver driver)
     {
         Vec3 previous = start;
         for (float distance = MountedRouteSampleLength;
@@ -1189,7 +1191,62 @@ public class BattleGuardFixture : IBattleGuardFixture
             previous = current;
         }
 
+        Mission mission = Mission.Current;
+        if (mission == null)
+            return true;
+
+        foreach (Agent agent in mission.Agents)
+        {
+            if (agent == null ||
+                !agent.IsActive() ||
+                agent.Mission != mission ||
+                ReferenceEquals(agent, driver.Agent) ||
+                ReferenceEquals(agent, driver.OriginalMount))
+            {
+                continue;
+            }
+
+            if (IsInsideMountedRouteClearance(
+                    agent.Position,
+                    start,
+                    direction,
+                    MountedRouteLength,
+                    MountedRouteRadius))
+            {
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    internal static bool IsInsideMountedRouteClearance(
+        Vec3 position,
+        Vec3 start,
+        Vec3 direction,
+        float length,
+        float radius)
+    {
+        direction.z = 0f;
+        if (direction.LengthSquared < 0.0001f ||
+            length <= 0f ||
+            radius < 0f)
+        {
+            return false;
+        }
+
+        direction.Normalize();
+        Vec3 offset = position - start;
+        offset.z = 0f;
+        float progress = Math.Max(
+            0f,
+            Math.Min(
+                length,
+                Vec3.DotProduct(offset, direction)));
+        Vec3 separation =
+            position - (start + (direction * progress));
+        separation.z = 0f;
+        return separation.LengthSquared <= radius * radius;
     }
 
     private static Vec3 GetHorizontalDirection(Vec3 direction)
