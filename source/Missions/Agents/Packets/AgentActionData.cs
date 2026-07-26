@@ -314,7 +314,11 @@ namespace Missions.Agents.Packets
                 Action0Index,
                 visualActionAccessor,
                 preserveVisibleAction:
-                    IsMounted && GuardActionChannel == 0))
+                    IsMounted && GuardActionChannel == 0,
+                preserveCurrentGuardReaction:
+                    ShouldPreserveCurrentGuardReaction(
+                        agent,
+                        0)))
             {
                 // Use the reflection helper, NOT MBAPI.IMBAnimation directly: the publicized static field
                 // throws FieldAccessException in live play (see GetActionNameWithCode above), which kills
@@ -332,7 +336,11 @@ namespace Missions.Agents.Packets
                 Action1Index,
                 visualActionAccessor,
                 preserveVisibleAction:
-                    IsMounted && GuardActionChannel == 1))
+                    IsMounted && GuardActionChannel == 1,
+                preserveCurrentGuardReaction:
+                    ShouldPreserveCurrentGuardReaction(
+                        agent,
+                        1)))
             {
                 string actionName2 = GetActionNameWithCode(Action1Index);
                 if (actionName2 != null)
@@ -350,8 +358,12 @@ namespace Missions.Agents.Packets
             int channel,
             int expectedActionIndex,
             IAgentVisualActionAccessor visualActionAccessor,
-            bool preserveVisibleAction)
+            bool preserveVisibleAction,
+            bool preserveCurrentGuardReaction)
         {
+            if (preserveCurrentGuardReaction)
+                return false;
+
             ActionIndexCache currentAction =
                 agent.GetCurrentAction(channel);
             if (currentAction != ActionIndexCache.act_none)
@@ -367,6 +379,29 @@ namespace Missions.Agents.Packets
                 agent,
                 channel,
                 in expectedAction);
+        }
+
+        internal bool ShouldPreserveCurrentGuardReaction(
+            Agent agent,
+            int channel)
+        {
+            if (GuardActionIsReaction
+                || GuardActionChannel != channel
+                || !GuardActionIsDefending
+                || (DefendFlags == Agent.MovementControlFlag.None
+                    && !IsGuardMode(GuardMode)))
+            {
+                return false;
+            }
+
+            Agent.ActionCodeType actionType =
+                agent.GetCurrentActionType(channel);
+            if (IsGuardReactionAction(actionType))
+                return true;
+
+            return IsDefendingAction(actionType)
+                && agent.GetCurrentActionStage(channel)
+                    == Agent.ActionStage.DefendParry;
         }
 
         [ProtoMember(1)]

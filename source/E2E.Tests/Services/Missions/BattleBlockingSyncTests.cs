@@ -718,6 +718,112 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HeldGuardSnapshot_DoesNotInterruptCurrentRemoteReaction(
+        bool defendParry)
+    {
+        RunScenario("peer", context =>
+        {
+            var agentId = Guid.NewGuid();
+            Agent puppet = SpawnRegisteredAgent(
+                context,
+                "owner",
+                agentId,
+                AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context,
+                AgentControllerType.Player,
+                out MirrorAgent ownerMirror);
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 3102;
+            ownerMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+
+            ApplyOwnerAction(
+                context.Component,
+                1L,
+                agentId,
+                owner);
+            context.Component.AgentActionHandler
+                .ApplyRemoteGuardStates();
+
+            puppetMirror.Action1Index = 3104;
+            puppetMirror.Action1CodeType = defendParry
+                ? Agent.ActionCodeType.Guard
+                : Agent.ActionCodeType.BlockedMelee;
+            if (defendParry)
+            {
+                puppetMirror.Action1Stage =
+                    Agent.ActionStage.DefendParry;
+            }
+            puppetMirror.SetActionChannelCalls = 0;
+
+            var heldGuard = new AgentActionData(owner);
+            Assert.True(
+                heldGuard.ShouldPreserveCurrentGuardReaction(
+                    puppet,
+                    1));
+
+            ApplyOwnerAction(
+                context.Component,
+                2L,
+                agentId,
+                owner);
+            context.Component.AgentActionHandler
+                .ApplyRemoteGuardStates();
+
+            Assert.Equal(3104, puppetMirror.Action1Index);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
+    public void HeldGuardSnapshot_DoesNotPreserveReactionOnOtherChannel()
+    {
+        RunScenario("peer", context =>
+        {
+            var agentId = Guid.NewGuid();
+            Agent puppet = SpawnRegisteredAgent(
+                context,
+                "owner",
+                agentId,
+                AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context,
+                AgentControllerType.Player,
+                out MirrorAgent ownerMirror);
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 3102;
+            ownerMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+            ownerMirror.Action0Index = 500;
+            ownerMirror.Action0CodeType =
+                Agent.ActionCodeType.StrikeMedium;
+
+            puppetMirror.Action0Index = 3104;
+            puppetMirror.Action0CodeType =
+                Agent.ActionCodeType.BlockedMelee;
+
+            var heldGuardWithAttack = new AgentActionData(owner);
+            Assert.Equal(1, heldGuardWithAttack.GuardActionChannel);
+            Assert.True(heldGuardWithAttack.GuardActionIsDefending);
+            Assert.False(
+                heldGuardWithAttack.ShouldPreserveCurrentGuardReaction(
+                    puppet,
+                    0));
+        });
+    }
+
     [Fact]
     public void GuardReactionReceiver_DoesNotOverwriteRealAttack()
     {
