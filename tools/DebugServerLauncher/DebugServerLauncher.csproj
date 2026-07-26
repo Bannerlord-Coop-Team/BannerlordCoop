@@ -7,8 +7,9 @@
     at this exe attaches cleanly, and the exe then DTE-attaches VS's CoreCLR
     engine to the actual game engine process.
 
-    Not part of Coop.sln; built on demand by tools\debug-server.ps1 (or
-    `dotnet build tools\DebugServerLauncher -c Release`).
+    Part of Coop.sln: every solution configuration maps this project to
+    Release|Any CPU, so the exe the DebugAutoConnect profile launches is always
+    built fresh by F5's pre-launch solution build (no bootstrap script needed).
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

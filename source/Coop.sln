@@ -40,6 +40,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientDebug3", "ClientDebug
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coop.Steam", "Coop.Steam\Coop.Steam.csproj", "{5ECA7AE6-C1B4-4C14-9BF4-6545D12B7ACE}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DebugServerLauncher", "..\tools\DebugServerLauncher\DebugServerLauncher.csproj", "{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,6 +52,18 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.Debug|Any CPU.Build.0 = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.Debug|x64.ActiveCfg = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.Debug|x64.Build.0 = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.DebugAutoConnect|Any CPU.ActiveCfg = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.DebugAutoConnect|Any CPU.Build.0 = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.DebugAutoConnect|x64.ActiveCfg = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.DebugAutoConnect|x64.Build.0 = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.Release|x64.ActiveCfg = Release|Any CPU
+		{8F4E7C21-6B9D-4A35-B2E8-1D5C3A9F70E4}.Release|x64.Build.0 = Release|Any CPU
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|Any CPU.Build.0 = Debug|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|x64.ActiveCfg = Debug|x64

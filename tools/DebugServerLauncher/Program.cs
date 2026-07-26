@@ -21,8 +21,10 @@ namespace DebugServerLauncher
     /// cleanly) starts the server, waits for the engine child, and attaches the
     /// "Managed (.NET Core, .NET 5+)" engine to it via DTE automation.
     ///
-    /// Wired as source\Coop's DebugAutoConnect StartProgram. From a terminal,
-    /// run tools\debug-server.ps1 (builds this project when stale, then runs it).
+    /// Wired as source\Coop's DebugAutoConnect StartProgram; the project is part
+    /// of Coop.sln (every solution configuration builds it as Release), so the
+    /// F5 pre-launch build always produces a fresh exe. From a terminal, run
+    /// tools\DebugServerLauncher\bin\Release\net472\DebugServerLauncher.exe.
     ///
     /// With --no-attach the debug concessions are dropped and the server runs
     /// stock — TUI and Watchdog crash dumps — with this process staying silent;
