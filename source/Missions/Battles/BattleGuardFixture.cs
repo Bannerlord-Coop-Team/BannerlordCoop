@@ -53,8 +53,11 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float MountedRouteSampleLength = 5f;
     private const float MountedRouteMaximumRise = 1.5f;
     private const float MountedStrikeForwardOffset = 1.5f;
+    private const float MountedStrikeLateralOffset = 1.15f;
     private const float MountedStrikeMinimumLeadDistance = 6f;
     private const float MountedStrikeMaximumLeadDistance = 10f;
+    private const float MountedStrikeReleaseLeadSeconds = 0.45f;
+    private const float MountedStrikeMaximumChargeSeconds = 2.5f;
     private const float MountedStrikeMinimumRunway =
         BattleGuardMountedRoute.StrikeClearanceDistance +
         MountedStrikeMaximumLeadDistance +
@@ -1272,8 +1275,24 @@ public class BattleGuardFixture : IBattleGuardFixture
         Vec3 laneDirection)
     {
         laneDirection = GetHorizontalDirection(laneDirection);
+        var lateral = new Vec3(
+            laneDirection.y,
+            -laneDirection.x,
+            0f);
         return contactPoint +
-            (laneDirection * MountedStrikeForwardOffset);
+            (laneDirection * MountedStrikeForwardOffset) +
+            (lateral * MountedStrikeLateralOffset);
+    }
+
+    internal static bool ShouldReleaseMountedStrike(
+        float longitudinalDistance,
+        float speed,
+        float chargeSeconds)
+    {
+        float timeToContact =
+            longitudinalDistance / Math.Max(0.1f, speed);
+        return timeToContact <= MountedStrikeReleaseLeadSeconds ||
+            chargeSeconds >= MountedStrikeMaximumChargeSeconds;
     }
 
     private static Vec3 GetHorizontalDirection(Vec3 direction)
@@ -2763,8 +2782,6 @@ public class BattleGuardFixture : IBattleGuardFixture
     private sealed class GuardInterceptionStrikeComponent : AgentComponent
     {
         private const float AttackPressSeconds = 0.35f;
-        private const float ReleaseLeadSeconds = 0.25f;
-        private const float MaximumChargeSeconds = 2.5f;
         private const float OutcomeWaitSeconds = 1.25f;
         private const float MaximumOutcomeWaitSeconds = 2.5f;
         private const float RetryRecoverySeconds = 0.5f;
@@ -2926,15 +2943,11 @@ public class BattleGuardFixture : IBattleGuardFixture
             }
 
             float longitudinalDistance = GetLongitudinalDistance();
-            float speed = Math.Max(
-                0.1f,
-                guardDriver.CurrentHorizontalSpeed);
-            float timeToContact = longitudinalDistance / speed;
-            if (timeToContact <= ReleaseLeadSeconds ||
-                stateElapsed >= MaximumChargeSeconds)
-            {
+            if (ShouldReleaseMountedStrike(
+                    longitudinalDistance,
+                    guardDriver.CurrentHorizontalSpeed,
+                    stateElapsed))
                 ReleaseAttack();
-            }
         }
 
         private void TickReleased()
