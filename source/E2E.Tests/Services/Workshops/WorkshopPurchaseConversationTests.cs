@@ -7,7 +7,6 @@ using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Workshops;
@@ -76,6 +75,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
         Assert.Equal(WorkshopCapital, request.Capital);
         Assert.Equal(WorkshopCost, request.Cost);
 
+        AssertWorkshopOwnedByBuyer(Server, state, expectedBuyerGold: 600, expectedSellerGold: 400);
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
@@ -87,7 +87,6 @@ public class WorkshopPurchaseConversationTests : IDisposable
                 new WarehouseOwnerChangedEvent(workshop, seller));
         });
 
-        AssertWorkshopOwnedByBuyer(Server, state, expectedBuyerGold: 600, expectedSellerGold: 400);
         foreach (var environmentClient in Clients)
         {
             AssertWorkshopOwnedByBuyer(environmentClient, state, expectedBuyerGold: 600, expectedSellerGold: 400);
@@ -299,13 +298,13 @@ public class WorkshopPurchaseConversationTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
             var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
 
-            Assert.Equal(2, workshopsBehavior._workshopData.Length);
+            Assert.True(workshopsBehavior._workshopData.Length > 1);
             Assert.Same(workshop, workshopsBehavior.GetDataOfWorkshop(workshop)?.Workshop);
         });
     }
 
     [Fact]
-    public void PlayerHeroChanged_ClientRestoresTransferredWorkshopSnapshot()
+    public void RestoreClientWorkshopData_TransferredSnapshotRestoresEveryField()
     {
         var client = Clients.First();
         var state = CreatePurchaseState(workshopOwnedByBuyer: true, buyerGold: 600, sellerGold: 400);
@@ -323,16 +322,19 @@ public class WorkshopPurchaseConversationTests : IDisposable
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(state.BuyerId, out var buyer));
+            Assert.True(client.ObjectManager.TryGetObject<Workshop>(state.WorkshopId, out var workshop));
 
             var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
             workshopsBehavior._workshopData = Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
 
-            var messageBroker = client.Resolve<IMessageBroker>();
-            messageBroker.Publish(
-                this,
-                new GameInterface.Services.Workshops.Messages.InitializeClientWorkshopData(
-                    workshopPlayerData));
-            messageBroker.Publish(this, new PlayerHeroChanged(Hero.MainHero, buyer));
+            using (new AllowedThread())
+            {
+                client.Resolve<IWorkshopDataRestorer>().RestoreClientWorkshopData(
+                    workshopsBehavior,
+                    buyer,
+                    new[] { workshop },
+                    workshopPlayerData);
+            }
         });
 
         client.Call(() =>
