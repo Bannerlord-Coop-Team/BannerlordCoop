@@ -4,7 +4,7 @@ using TaleWorlds.Library;
 namespace GameInterface.Surrogates;
 
 [ProtoContract]
-internal struct Vec3Surrogate
+internal struct ColorSurrogate
 {
     [ProtoMember(1)]
     public float X { get; set; }
@@ -15,14 +15,18 @@ internal struct Vec3Surrogate
     [ProtoMember(3)]
     public float Z { get; set; }
 
-    public Vec3Surrogate(Vec3 v)
+    [ProtoMember(4)]
+    public float W { get; set; }
+
+    public ColorSurrogate(Vec3 v)
     {
         X = v.x;
         Y = v.y;
         Z = v.z;
+        W = v.w;
     }
 
-    public static implicit operator Vec3Surrogate(Vec3 v) => new Vec3Surrogate(v);
+    public static implicit operator ColorSurrogate(Vec3 v) => new ColorSurrogate(v);
 
-    public static implicit operator Vec3(Vec3Surrogate s) => new Vec3(s.X, s.Y, s.Z);
+    public static implicit operator Vec3(ColorSurrogate s) => new Vec3(s.X, s.Y, s.Z, s.W);
 }
