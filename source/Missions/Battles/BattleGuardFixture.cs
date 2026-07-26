@@ -56,7 +56,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float MountedStrikeLateralOffset = 1.15f;
     private const float MountedStrikeMinimumLeadDistance = 6f;
     private const float MountedStrikeMaximumLeadDistance = 10f;
-    private const float MountedStrikeReleaseLeadSeconds = 0.45f;
+    private const float MountedStrikeReleaseLeadSeconds = 0.25f;
     private const float MountedStrikeMaximumChargeSeconds = 2.5f;
     private const float MountedStrikeMinimumRunway =
         BattleGuardMountedRoute.StrikeClearanceDistance +
@@ -265,8 +265,10 @@ public class BattleGuardFixture : IBattleGuardFixture
     public void Tick(float dt, INetworkAgentRegistry agentRegistry)
     {
         PauseOtherAi(agentRegistry);
+        bool remountWasPending = pendingGuardRestore != null;
         TickPendingGuardRestore(agentRegistry);
-        if (pendingGuardRestore == null &&
+        if (!remountWasPending &&
+            pendingGuardRestore == null &&
             roles == null &&
             aiPauseStates.Count > 0)
         {
@@ -348,11 +350,20 @@ public class BattleGuardFixture : IBattleGuardFixture
         in AttackCollisionData collisionData,
         float damagedHp)
     {
+        if (strikerDriver == null ||
+            !ReferenceEquals(affectorAgent, strikerDriver.Agent))
+        {
+            return;
+        }
+
+        strikerDriver.ObserveHit(
+            affectedAgent,
+            isBlocked,
+            collisionData.CollisionResult,
+            damagedHp);
         if (!isBlocked ||
             guardDriver == null ||
-            strikerDriver == null ||
             !ReferenceEquals(affectedAgent, guardDriver.Agent) ||
-            !ReferenceEquals(affectorAgent, strikerDriver.Agent) ||
             !IsBlockedCollision(collisionData.CollisionResult))
         {
             return;
@@ -387,6 +398,28 @@ public class BattleGuardFixture : IBattleGuardFixture
             strikerDriver?.AttackState ?? "none";
         int strikeAttempts =
             strikerDriver?.AttackAttempts ?? 0;
+        string strikeStageRoute =
+            strikerDriver?.StrikeStageRoute ?? "none";
+        float strikeStageProgress =
+            strikerDriver?.StrikeStageProgress ?? 0f;
+        float strikeStageLateral =
+            strikerDriver?.StrikeStageLateral ?? 0f;
+        float strikeReleaseDistance =
+            strikerDriver?.StrikeReleaseDistance ?? -1f;
+        float strikeReleaseSpeed =
+            strikerDriver?.StrikeReleaseSpeed ?? -1f;
+        float strikeReleaseLead =
+            strikerDriver?.StrikeReleaseLead ?? -1f;
+        int strikeHitCount =
+            strikerDriver?.HitCount ?? 0;
+        string strikeLastTarget =
+            strikerDriver?.LastHitTarget ?? "none";
+        string strikeLastCollision =
+            strikerDriver?.LastHitCollision ?? "none";
+        bool strikeLastBlocked =
+            strikerDriver?.LastHitBlocked ?? false;
+        float strikeLastDamagedHp =
+            strikerDriver?.LastHitDamagedHp ?? 0f;
         return $"fixtureGuard={guard} fixtureStriker={striker} fixtureRestore={restore} " +
             $"trackedAgent={sample.AgentId} " +
             $"samples={sample.Samples} missing={sample.MissingSamples} visiblePct={visiblePercent:0.#} " +
@@ -448,6 +481,17 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"replayMaxProgressDelta={sample.ReplayEvidence.MaxProgressDelta:0.###} " +
             $"replayMaxSpeedDelta={sample.ReplayEvidence.MaxSpeedDelta:0.###} " +
             $"strikeState={strikeState} strikeAttempts={strikeAttempts} " +
+            $"strikeStageRoute={strikeStageRoute} " +
+            $"strikeStageProgress={strikeStageProgress:0.###} " +
+            $"strikeStageLateral={strikeStageLateral:0.###} " +
+            $"strikeReleaseDistance={strikeReleaseDistance:0.###} " +
+            $"strikeReleaseSpeed={strikeReleaseSpeed:0.###} " +
+            $"strikeReleaseLead={strikeReleaseLead:0.###} " +
+            $"strikeHitCount={strikeHitCount} " +
+            $"strikeLastTarget={GetTokenValue(strikeLastTarget)} " +
+            $"strikeLastCollision={strikeLastCollision} " +
+            $"strikeLastBlocked={strikeLastBlocked} " +
+            $"strikeLastDamagedHp={strikeLastDamagedHp:0.###} " +
             $"evidenceCamera={GetEvidenceCameraToken()} " +
             "visualTraceSchema=c:a:n:r:mr:d:md:pmin:pmax:span:adv:stall:reset:maxStep:sCur:sMin:sMax:sMean " +
             $"preVisualTraces={sample.PreReplayAnimationEvidence.GetToken()} " +
@@ -1267,7 +1311,15 @@ public class BattleGuardFixture : IBattleGuardFixture
         BattleGuardMountedRoute route)
     {
         return route?.CanStageStrike == true &&
+            route.IsHeadingToEnd &&
             route.RemainingDistance >= MountedStrikeMinimumRunway;
+    }
+
+    internal static bool IsRemountStateReconciled(
+        bool riderReferencesMount,
+        bool mountReferencesRider)
+    {
+        return riderReferencesMount && mountReferencesRider;
     }
 
     internal static Vec3 GetMountedStrikerPosition(
@@ -1590,8 +1642,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
 
         Agent agent = info.Agent;
-        if (ReferenceEquals(agent.MountAgent, restore.Mount))
+        if (IsRemountStateReconciled(
+                ReferenceEquals(agent.MountAgent, restore.Mount),
+                ReferenceEquals(restore.Mount.RiderAgent, agent)))
         {
+            Mission.Current?.RemoveMountWithoutRider(restore.Mount);
             if (restore.DrivesRestore)
                 CompleteGuardRestore(agent, restore.Driver);
             pendingGuardRestore = null;
@@ -2723,6 +2778,23 @@ public class BattleGuardFixture : IBattleGuardFixture
             attackDriver?.State ?? "none";
         public int AttackAttempts =>
             attackDriver?.Attempts ?? 0;
+        public string StrikeStageRoute =>
+            attackDriver?.StageRoute ?? "none";
+        public float StrikeStageProgress =>
+            attackDriver?.StageProgress ?? 0f;
+        public float StrikeStageLateral =>
+            attackDriver?.StageLateral ?? 0f;
+        public float StrikeReleaseDistance =>
+            attackDriver?.ReleaseDistance ?? -1f;
+        public float StrikeReleaseSpeed =>
+            attackDriver?.ReleaseSpeed ?? -1f;
+        public float StrikeReleaseLead =>
+            attackDriver?.ReleaseLead ?? -1f;
+        public int HitCount { get; private set; }
+        public string LastHitTarget { get; private set; } = "none";
+        public string LastHitCollision { get; private set; } = "none";
+        public bool LastHitBlocked { get; private set; }
+        public float LastHitDamagedHp { get; private set; }
         private readonly bool originalHasOnAiInputSetCallback;
         private GuardInterceptionStrikeComponent attackDriver;
 
@@ -2767,6 +2839,20 @@ public class BattleGuardFixture : IBattleGuardFixture
             attackDriver?.StopAfterReaction();
         }
 
+        public void ObserveHit(
+            Agent affectedAgent,
+            bool isBlocked,
+            CombatCollisionResult collisionResult,
+            float damagedHp)
+        {
+            HitCount++;
+            LastHitTarget =
+                affectedAgent?.Character?.StringId ?? "unknown";
+            LastHitCollision = collisionResult.ToString();
+            LastHitBlocked = isBlocked;
+            LastHitDamagedHp = damagedHp;
+        }
+
         public void DetachAttackDriver(Agent agent)
         {
             if (attackDriver == null)
@@ -2791,6 +2877,12 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         public string State => state.ToString();
         public int Attempts { get; private set; }
+        public string StageRoute { get; private set; } = "none";
+        public float StageProgress { get; private set; }
+        public float StageLateral { get; private set; }
+        public float ReleaseDistance { get; private set; } = -1f;
+        public float ReleaseSpeed { get; private set; } = -1f;
+        public float ReleaseLead { get; private set; } = -1f;
 
         private readonly Agent striker;
         private readonly Agent guard;
@@ -2904,6 +2996,12 @@ public class BattleGuardFixture : IBattleGuardFixture
         {
             laneDirection = GetHorizontalDirection(
                 guardDriver.CurrentHorizontalDirection);
+            StageRoute =
+                guardDriver.MountedRoute?.State ?? "none";
+            StageProgress =
+                guardDriver.MountedRoute?.Progress ?? 0f;
+            StageLateral =
+                guardDriver.MountedRoute?.LateralOffset ?? 0f;
             float speed = Math.Max(
                 1f,
                 guardDriver.CurrentHorizontalSpeed);
@@ -2964,6 +3062,15 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         private void ReleaseAttack()
         {
+            if (guardDriver.Mode == BattleGuardFixtureMode.Mounted)
+            {
+                ReleaseDistance = GetLongitudinalDistance();
+                ReleaseSpeed =
+                    guardDriver.CurrentHorizontalSpeed;
+                ReleaseLead =
+                    ReleaseDistance /
+                    Math.Max(0.1f, ReleaseSpeed);
+            }
             state = InterceptionState.Released;
             stateElapsed = 0f;
         }

@@ -35,6 +35,7 @@ internal sealed class BattleGuardMountedRoute
     public float RemainingDistance { get; private set; }
     public int CompletedTurns { get; private set; }
     public bool CanStageStrike { get; private set; }
+    public bool IsHeadingToEnd => headingToEnd;
     public Vec3 Start => start;
     public Vec3 Direction => axis;
     public float Length => length;

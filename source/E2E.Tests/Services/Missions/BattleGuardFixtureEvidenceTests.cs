@@ -347,6 +347,24 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
+    public void MountedStrikeRunway_ReturnLegWaitsForForwardStraight()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            120f);
+
+        route.Update(
+            new Vec3(0f, 60f, 0f),
+            new Vec3(0f, -1f, 0f));
+
+        Assert.Equal("Return", route.State);
+        Assert.True(route.CanStageStrike);
+        Assert.False(
+            BattleGuardFixture.HasMountedStrikeRunway(route));
+    }
+
+    [Fact]
     public void MountedStrikerPosition_ApproachesFromFrontAndSide()
     {
         var contactPoint = new Vec3(2f, 3f, 4f);
@@ -370,8 +388,8 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(3.6f, 8f, 0.5f, true)]
-    [InlineData(3.7f, 8f, 0.5f, false)]
+    [InlineData(2f, 8f, 0.5f, true)]
+    [InlineData(2.1f, 8f, 0.5f, false)]
     [InlineData(100f, 8f, 2.5f, true)]
     public void MountedStrikeRelease_LeadsContactOrEndsCharge(
         float longitudinalDistance,
@@ -385,6 +403,23 @@ public class BattleGuardFixtureEvidenceTests
                 longitudinalDistance,
                 speed,
                 chargeSeconds));
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void RemountState_RequiresBothAgentLinks(
+        bool riderReferencesMount,
+        bool mountReferencesRider,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.IsRemountStateReconciled(
+                riderReferencesMount,
+                mountReferencesRider));
     }
 
     [Fact]
