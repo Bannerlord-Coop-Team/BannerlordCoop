@@ -324,6 +324,51 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(1f, input.Movement.y);
     }
 
+    [Theory]
+    [InlineData(92.5f, true)]
+    [InlineData(93f, false)]
+    public void MountedStrikeRunway_AccountsForLeadBeforeRouteTurn(
+        float routeProgress,
+        bool expected)
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            120f);
+
+        route.Update(
+            new Vec3(0f, routeProgress, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.True(route.CanStageStrike);
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.HasMountedStrikeRunway(route));
+    }
+
+    [Fact]
+    public void MountedStrikerPosition_ApproachesFromFrontAndSide()
+    {
+        var contactPoint = new Vec3(2f, 3f, 4f);
+        var forward = new Vec3(0f, 1f, 0f);
+        var lateral = new Vec3(1f, 0f, 0f);
+
+        Vec3 position = BattleGuardFixture.GetMountedStrikerPosition(
+            contactPoint,
+            new Vec3(0f, 2f, 1f));
+        Vec3 offset = position - contactPoint;
+
+        Assert.Equal(
+            1.5f,
+            Vec3.DotProduct(offset, forward),
+            precision: 3);
+        Assert.Equal(
+            1.15f,
+            Vec3.DotProduct(offset, lateral),
+            precision: 3);
+        Assert.Equal(contactPoint.z, position.z, precision: 3);
+    }
+
     [Fact]
     public void MountedRoute_MovementDirection_WinsOverStaleLookDirection()
     {

@@ -52,6 +52,14 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float MountedRouteRadius = 5f;
     private const float MountedRouteSampleLength = 5f;
     private const float MountedRouteMaximumRise = 1.5f;
+    private const float MountedStrikeForwardOffset = 1.5f;
+    private const float MountedStrikeLateralOffset = 1.15f;
+    private const float MountedStrikeMinimumLeadDistance = 6f;
+    private const float MountedStrikeMaximumLeadDistance = 10f;
+    private const float MountedStrikeMinimumRunway =
+        BattleGuardMountedRoute.StrikeClearanceDistance +
+        MountedStrikeMaximumLeadDistance +
+        MountedStrikeForwardOffset;
     private const Agent.MovementControlFlag AttackFlags =
         Agent.MovementControlFlag.AttackDown |
         Agent.MovementControlFlag.AttackUp |
@@ -1247,6 +1255,27 @@ public class BattleGuardFixture : IBattleGuardFixture
             position - (start + (direction * progress));
         separation.z = 0f;
         return separation.LengthSquared <= radius * radius;
+    }
+
+    internal static bool HasMountedStrikeRunway(
+        BattleGuardMountedRoute route)
+    {
+        return route?.CanStageStrike == true &&
+            route.RemainingDistance >= MountedStrikeMinimumRunway;
+    }
+
+    internal static Vec3 GetMountedStrikerPosition(
+        Vec3 contactPoint,
+        Vec3 laneDirection)
+    {
+        laneDirection = GetHorizontalDirection(laneDirection);
+        var lateral = new Vec3(
+            laneDirection.y,
+            -laneDirection.x,
+            0f);
+        return contactPoint +
+            (laneDirection * MountedStrikeForwardOffset) +
+            (lateral * MountedStrikeLateralOffset);
     }
 
     private static Vec3 GetHorizontalDirection(Vec3 direction)
@@ -2694,9 +2723,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         private const float RetryRecoverySeconds = 0.5f;
         private const float MountedSpeedReadySeconds = 0.5f;
         private const float MinimumMountedStrikeSpeed = 5f;
-        private const float LateralOffset = 1.15f;
-        private const float MinimumLeadDistance = 6f;
-        private const float MaximumLeadDistance = 10f;
         private const int MaximumAttempts = 5;
 
         public string State => state.ToString();
@@ -2789,7 +2815,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             if (!guard.HasMount ||
                 guardDriver.CurrentHorizontalSpeed <
                     MinimumMountedStrikeSpeed ||
-                guardDriver.MountedRoute?.CanStageStrike != true)
+                !HasMountedStrikeRunway(guardDriver.MountedRoute))
             {
                 stateElapsed = 0f;
                 return;
@@ -2818,16 +2844,14 @@ public class BattleGuardFixture : IBattleGuardFixture
                 1f,
                 guardDriver.CurrentHorizontalSpeed);
             float leadDistance = Math.Max(
-                MinimumLeadDistance,
-                Math.Min(MaximumLeadDistance, speed * 0.85f));
+                MountedStrikeMinimumLeadDistance,
+                Math.Min(
+                    MountedStrikeMaximumLeadDistance,
+                    speed * 0.85f));
             contactPoint = guard.Position + (laneDirection * leadDistance);
 
-            var lateral = new Vec3(
-                laneDirection.y,
-                -laneDirection.x,
-                0f);
             Vec3 strikerPosition =
-                contactPoint + (lateral * LateralOffset);
+                GetMountedStrikerPosition(contactPoint, laneDirection);
             SetGroundHeight(ref strikerPosition);
             striker.TeleportToPosition(strikerPosition);
             FacePoint(striker, contactPoint);

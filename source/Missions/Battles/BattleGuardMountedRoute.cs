@@ -9,7 +9,7 @@ namespace Missions.Battles;
 internal sealed class BattleGuardMountedRoute
 {
     private const float PositionToleranceDistance = 6f;
-    private const float StrikeClearanceDistance = 16f;
+    internal const float StrikeClearanceDistance = 16f;
     internal const float MinimumLength = StrikeClearanceDistance * 2f;
     private const float StrikeMaximumLateralOffset = 3f;
     private const float StrikeAlignmentDot = 0.9f;
