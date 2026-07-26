@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Workshops;
 using GameInterface.Services.Workshops.Interfaces;
 using Moq;
 using System;
