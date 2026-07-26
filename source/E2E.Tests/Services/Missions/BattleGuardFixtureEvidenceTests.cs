@@ -540,10 +540,10 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(4.9f, 40f, true)]
-    [InlineData(5.1f, 40f, false)]
-    [InlineData(0f, 84f, true)]
-    [InlineData(0f, 86f, false)]
+    [InlineData(4.9f, 60f, true)]
+    [InlineData(5.1f, 60f, false)]
+    [InlineData(0f, 124f, true)]
+    [InlineData(0f, 126f, false)]
     public void MountedRouteClearance_IncludesLaneAndEndpointRadius(
         float x,
         float y,
@@ -555,7 +555,7 @@ public class BattleGuardFixtureEvidenceTests
                 new Vec3(x, y, 0f),
                 Vec3.Zero,
                 new Vec3(0f, 1f, 0f),
-                80f,
+                120f,
                 5f));
     }
 

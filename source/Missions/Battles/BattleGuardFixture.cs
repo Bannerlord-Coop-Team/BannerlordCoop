@@ -48,7 +48,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float SampleIntervalSeconds = 0.05f;
     private const float ProgressEpsilon = 0.001f;
     private const float FixtureLaneOffset = 25f;
-    private const float MountedRouteLength = 80f;
+    private const float MountedRouteLength = 120f;
     private const float MountedRouteRadius = 5f;
     private const float MountedRouteSampleLength = 5f;
     private const float MountedRouteMaximumRise = 1.5f;
