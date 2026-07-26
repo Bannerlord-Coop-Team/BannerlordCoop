@@ -336,6 +336,7 @@ public class BattleGuardFixtureEvidenceTests
             new Vec3(0f, 30f, 0f),
             new Vec2(0f, -1f),
             new Vec3(0f, 1f, 0f),
+            new Vec3(0f, 1f, 0f),
             8f);
 
         Assert.Equal("Return", route.State);
@@ -354,6 +355,7 @@ public class BattleGuardFixtureEvidenceTests
             new Vec3(0f, 30f, 0f),
             new Vec2(0f, 1f),
             new Vec3(0f, -1f, 0f),
+            new Vec3(0f, 1f, 0f),
             0f);
 
         Assert.Equal("Return", route.State);
@@ -361,7 +363,7 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void MountedRoute_Endpoint_BrakesDuringNativeTurnThenReturns()
+    public void MountedRoute_Endpoint_UsesPhysicalFacingToCompleteTurn()
     {
         var route = new BattleGuardMountedRoute(
             new Vec3(0f, 0f, 0f),
@@ -371,6 +373,7 @@ public class BattleGuardFixtureEvidenceTests
         BattleGuardMountedRouteInput braking = route.Update(
             new Vec3(0f, 35f, 0f),
             new Vec2(0f, 1f),
+            new Vec3(0f, 1f, 0f),
             new Vec3(0f, 1f, 0f),
             8f);
 
@@ -389,6 +392,7 @@ public class BattleGuardFixtureEvidenceTests
             new Vec3(0f, 35f, 0f),
             new Vec2(0f, -1f),
             new Vec3(0f, 1f, 0f),
+            new Vec3(0f, 1f, 0f),
             0.5f);
 
         Assert.Equal("TurningToStart", route.State);
@@ -404,6 +408,7 @@ public class BattleGuardFixtureEvidenceTests
         BattleGuardMountedRouteInput turning = route.Update(
             new Vec3(0f, 35f, 0f),
             Vec2.Zero,
+            new Vec3(0f, 1f, 0f),
             new Vec3(0f, 1f, 0f),
             0f);
 
@@ -421,6 +426,7 @@ public class BattleGuardFixtureEvidenceTests
             new Vec3(0f, 35f, 0f),
             new Vec2(0.1f, -0.99f),
             new Vec3(0.1f, 0.99f, 0f),
+            new Vec3(0f, 1f, 0f),
             1.5f);
 
         Assert.Equal("BrakingToStart", route.State);
@@ -438,6 +444,7 @@ public class BattleGuardFixtureEvidenceTests
             new Vec3(0f, 35f, 0f),
             Vec2.Zero,
             new Vec3(0f, 1f, 0f),
+            new Vec3(0f, 1f, 0f),
             1f);
 
         Assert.Equal("TurningToStart", route.State);
@@ -453,6 +460,7 @@ public class BattleGuardFixtureEvidenceTests
         BattleGuardMountedRouteInput returning = route.Update(
             new Vec3(0f, 35f, 0f),
             Vec2.Zero,
+            new Vec3(0f, 1f, 0f),
             new Vec3(0f, -1f, 0f),
             0f);
 

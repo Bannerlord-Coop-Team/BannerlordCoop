@@ -877,6 +877,7 @@ public class BattleGuardFixture : IBattleGuardFixture
                         movementSource.Position,
                         movementSource.GetMovementDirection(),
                         movementSource.LookDirection,
+                        movementSource.Frame.rotation.f,
                         movementSource.GetRealGlobalVelocity().AsVec2.Length);
                 flags |=
                     routeInput.TranslationFlag |

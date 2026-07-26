@@ -217,6 +217,7 @@ internal sealed class BattleGuardMountedRoute
         Vec3 position,
         Vec2 movementDirection,
         Vec3 lookDirection,
+        Vec3 physicalFacing,
         float horizontalSpeed)
     {
         return Update(
@@ -225,7 +226,7 @@ internal sealed class BattleGuardMountedRoute
                 movementDirection,
                 lookDirection,
                 horizontalSpeed),
-            lookDirection,
+            physicalFacing,
             horizontalSpeed);
     }
 
