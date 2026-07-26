@@ -252,7 +252,11 @@ public class WorkshopPurchaseConversationTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Hero>(state.BuyerId, out var buyer));
 
             var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
-            workshopsBehavior._workshopData = Array.Empty<WorkshopsCampaignBehavior.WorkshopData>();
+            int capacity = Campaign.Current.Models.WorkshopModel.MaximumWorkshopsPlayerCanHave;
+            workshopsBehavior._workshopData = Enumerable.Range(0, capacity)
+                .Select(_ => new WorkshopsCampaignBehavior.WorkshopData(
+                    ObjectHelper.SkipConstructor<Workshop>()))
+                .ToArray();
             workshopsBehavior._warehouseRosterPerSettlement = Array.Empty<KeyValuePair<Settlement, ItemRoster>>();
 
             ChangeOwnerOfWorkshopActionPatches.ApplyPredictedWorkshopOwnership(workshop, buyer);

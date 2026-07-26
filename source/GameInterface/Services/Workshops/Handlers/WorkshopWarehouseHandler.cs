@@ -130,10 +130,9 @@ internal class WorkshopWarehouseHandler : IHandler
                 using (new AllowedThread())
                 {
                     workshopsBehavior.EnsureBehaviorDataSize();
-                    if (workshopsBehavior.GetDataOfWorkshop(workshop) == null)
-                    {
-                        workshopsBehavior.AddNewWorkshopData(workshop);
-                    }
+                    workshopDataRestorer.EnsureWorkshopData(
+                        workshopsBehavior,
+                        workshop);
                     workshopsBehavior.AddNewWarehouseDataIfNeeded(workshop.Settlement);
                 }
                 return;

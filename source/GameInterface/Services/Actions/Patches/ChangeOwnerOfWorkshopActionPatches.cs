@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Workshops;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -77,14 +78,12 @@ internal class ChangeOwnerOfWorkshopActionPatches
 
         var workshopsBehavior = Campaign.Current?.GetCampaignBehavior<WorkshopsCampaignBehavior>();
         if (workshopsBehavior == null) return;
+        if (!ContainerProvider.TryResolve<IWorkshopDataRestorer>(out var workshopDataRestorer)) return;
 
         using (new AllowedThread())
         {
             workshopsBehavior.EnsureBehaviorDataSize();
-            if (workshopsBehavior.GetDataOfWorkshop(workshop) == null)
-            {
-                workshopsBehavior.AddNewWorkshopData(workshop);
-            }
+            workshopDataRestorer.EnsureWorkshopData(workshopsBehavior, workshop);
             workshopsBehavior.AddNewWarehouseDataIfNeeded(workshop.Settlement);
         }
     }
