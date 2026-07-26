@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,8 +23,7 @@ internal class KingdomManagementVMPatches
             string a = inquiryElement.Identifier as string;
             if (a == "keep")
             {
-                //TODO
-                //ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(Clan.PlayerClan, true);
+                MessageBroker.Instance.Publish(__instance, new StartRebellion(Clan.PlayerClan));
             }
             else if (a == "dontkeep")
             {
@@ -39,7 +39,7 @@ internal class KingdomManagementVMPatches
     {
         if (Clan.PlayerClan.IsUnderMercenaryService)
         {
-            MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(Clan.PlayerClan.Kingdom));
+            MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(Clan.PlayerClan.Kingdom, Clan.PlayerClan));
         }
         else
         {

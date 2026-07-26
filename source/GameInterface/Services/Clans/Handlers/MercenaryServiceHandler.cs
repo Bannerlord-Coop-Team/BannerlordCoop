@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -41,6 +42,8 @@ internal class MercenaryServiceHandler : IHandler
         messageBroker.Subscribe<RequestMercenaryDismissalService>(HandleRequestMercenaryDismissalService);
         messageBroker.Subscribe<PlayerRelationChange>(HandlePlayerRelationChange);
         messageBroker.Subscribe<NetworkPlayerRelationChange>(HandleNetworkPlayerRelationChange);
+        messageBroker.Subscribe<GiveGold>(HandleGiveGold);
+        messageBroker.Subscribe<NetworkGiveGold>(HandleNetworkGiveGold);
     }
 
     public void Dispose()
@@ -51,6 +54,8 @@ internal class MercenaryServiceHandler : IHandler
         messageBroker.Unsubscribe<RequestMercenaryDismissalService>(HandleRequestMercenaryDismissalService);
         messageBroker.Unsubscribe<PlayerRelationChange>(HandlePlayerRelationChange);
         messageBroker.Unsubscribe<NetworkPlayerRelationChange>(HandleNetworkPlayerRelationChange);
+        messageBroker.Unsubscribe<GiveGold>(HandleGiveGold);
+        messageBroker.Unsubscribe<NetworkGiveGold>(HandleNetworkGiveGold);
     }
 
     private void HandleMercenaryServiceAccepted(MessagePayload<MercenaryServiceAccepted> payload)
@@ -103,8 +108,9 @@ internal class MercenaryServiceHandler : IHandler
     private void HandleMercenaryServiceDismissalAccepted(MessagePayload<MercenaryServiceDismissalAccepted> payload)
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.Kingdom, out var kingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
 
-        network.SendAll(new RequestMercenaryDismissalService(kingdomId));
+        network.SendAll(new RequestMercenaryDismissalService(kingdomId, clanId));
     }
 
     private void HandleRequestMercenaryDismissalService(MessagePayload<RequestMercenaryDismissalService> payload)
@@ -119,7 +125,7 @@ internal class MercenaryServiceHandler : IHandler
         }
 
         GameThread.RunSafe(
-            () => ApplyMercenaryDismissalService(player.ClanId, player.HeroId),
+            () => ApplyMercenaryDismissalService(payload.What.ClanId, player.HeroId),
             context: nameof(MercenaryServiceHandler));
     }
 
@@ -127,12 +133,6 @@ internal class MercenaryServiceHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
-
-        if (hero.Clan != clan)
-        {
-            Logger.Warning("Rejected mercenary service request because hero {HeroId} does not belong to clan {ClanId}", heroId, clanId);
-            return;
-        }
 
         if (clan.Kingdom == null || !clan.IsUnderMercenaryService)
         {
@@ -151,11 +151,46 @@ internal class MercenaryServiceHandler : IHandler
     }
     private void HandleNetworkPlayerRelationChange(MessagePayload<NetworkPlayerRelationChange> payload)
     {
+        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
+        {
+            Logger.Error("Received {Message} without a registered player peer", nameof(RequestMercenaryDismissalService));
+            return;
+        }
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var clientHero)) return;
 
-            ChangeRelationAction.ApplyPlayerRelation(Hero.OneToOneConversationHero.Clan.Leader, payload.What.Relation, true, true);
+            ResolvedMainHeroContext.ResolvedMainHero = clientHero;
+            try
+            {
+                ChangeRelationAction.ApplyPlayerRelation(hero, payload.What.Relation, true, true);
+            }
+            finally
+            {
+                ResolvedMainHeroContext.ResolvedMainHero = null;
+            }
         }); 
+    }
+    private void HandleGiveGold(MessagePayload<GiveGold> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Hero, out var heroId)) return;
+
+        network.SendAll(new NetworkPlayerRelationChange(heroId, payload.What.Gold));
+    }
+    private void HandleNetworkGiveGold(MessagePayload<NetworkGiveGold> payload)
+    {
+        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
+        {
+            Logger.Error("Received {Message} without a registered player peer", nameof(NetworkGiveGold));
+            return;
+        }
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var clientHero)) return;
+
+            GiveGoldAction.ApplyBetweenCharacters(clientHero, hero, payload.What.Gold, false);
+        });
     }
 }

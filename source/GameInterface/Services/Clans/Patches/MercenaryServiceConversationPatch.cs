@@ -4,6 +4,7 @@ using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Clans.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Library;
 
@@ -39,7 +40,7 @@ internal class MercenaryServiceConversationPatch
         if (ModInformation.IsClient)
         {
             var kingdom = Hero.OneToOneConversationHero.Clan.Kingdom;
-            MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom));
+            MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, Clan.PlayerClan));
             return false;
         }
 
@@ -51,14 +52,14 @@ internal class MercenaryServiceConversationPatch
     private static bool ConversationMercenaryResponseAcceptOnConsequencePrefix(LordConversationsCampaignBehavior __instance)
     {
         int num = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(Hero.OneToOneConversationHero.Clan, (Kingdom)Hero.MainHero.MapFaction, true);
-        var kingdom = Hero.OneToOneConversationHero.Clan.Kingdom;
+        var kingdom = (Kingdom)Hero.MainHero.MapFaction;
         if (Hero.OneToOneConversationHero.Clan.IsUnderMercenaryService)
         {
             num *= 3;
             num /= 2;
             if (Hero.OneToOneConversationHero.Clan.MapFaction.IsKingdomFaction)
             {
-                MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom));
+                MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, Hero.OneToOneConversationHero.Clan));
             }
         }
         MessageBroker.Instance.Publish(__instance, new MercenaryServiceAccepted(kingdom, num));
@@ -72,7 +73,7 @@ internal class MercenaryServiceConversationPatch
         var kingdom = Hero.OneToOneConversationHero.Clan.Kingdom;
         if (Clan.PlayerClan.IsUnderMercenaryService)
         {
-            MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom));
+            MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, Clan.PlayerClan));
             return false;
         }
         MessageBroker.Instance.Publish(__instance, new VassalServiceLeft(Clan.PlayerClan));
@@ -84,9 +85,10 @@ internal class MercenaryServiceConversationPatch
     private static bool ConversationPlayerWantToFireMercenaryOnConsequencePrefix(LordConversationsCampaignBehavior __instance)
     {
         var kingdom = Hero.OneToOneConversationHero.Clan.Kingdom;
+        var clan = Hero.OneToOneConversationHero.Clan;
 
         MessageBroker.Instance.Publish(__instance, new PlayerRelationChange(Hero.OneToOneConversationHero.Clan.Leader, -2));
-        MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom));
+        MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, clan));
         return false;
     }
 
@@ -96,10 +98,19 @@ internal class MercenaryServiceConversationPatch
     {
         int num = MathF.Max(0, (int)Hero.OneToOneConversationHero.Clan.Influence) * Hero.OneToOneConversationHero.Clan.MercenaryAwardMultiplier;
         var kingdom = Hero.OneToOneConversationHero.Clan.Kingdom;
-
+        var clan = Hero.OneToOneConversationHero.Clan;
         MessageBroker.Instance.Publish(__instance, new PlayerRelationChange(Hero.OneToOneConversationHero.Clan.Leader, -(int)(3f + MathF.Sqrt((float)((int)((float)num / 100f))))));
-        MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom));
-        MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Hero.OneToOneConversationHero.Clan, (int)(-Hero.OneToOneConversationHero.Clan.Influence)));
+        MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, clan));
+        MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Hero.OneToOneConversationHero.Clan, (int)(Hero.OneToOneConversationHero.Clan.Influence)));
+        return false;
+    }
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_player_want_to_fire_mercenary_with_paying_debt_on_consequence))]
+    [HarmonyPrefix]
+    private static bool ConversationPlayerWantToFireMercenaryWithPayingDebtOnConsequence(LordConversationsCampaignBehavior __instance)
+    {
+        int amount = MathF.Max(0, (int)Hero.OneToOneConversationHero.Clan.Influence) * Hero.OneToOneConversationHero.Clan.MercenaryAwardMultiplier;
+        MessageBroker.Instance.Publish(__instance, new GiveGold(amount, Hero.OneToOneConversationHero.Clan.Leader));
+        MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Hero.OneToOneConversationHero.Clan, (int)(Hero.OneToOneConversationHero.Clan.Influence)));
         return false;
     }
 }

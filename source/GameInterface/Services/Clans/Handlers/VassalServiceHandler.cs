@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
@@ -45,6 +46,8 @@ internal class VassalServiceHandler : IHandler
         messageBroker.Subscribe<VassalServiceResult>(HandleVassalServiceResult);
         messageBroker.Subscribe<VassalServiceLeft>(HandleVassalServiceLeft);
         messageBroker.Subscribe<RequestLeaveVassalService>(HandleRequestLeaveVassalService);
+        messageBroker.Subscribe<StartRebellion>(HandleStartRebellion);
+        messageBroker.Subscribe<NetworkStartRebellion>(HandleNetworkStartRebellion);
     }
 
     public void Dispose()
@@ -54,6 +57,8 @@ internal class VassalServiceHandler : IHandler
         messageBroker.Unsubscribe<VassalServiceResult>(HandleVassalServiceResult);
         messageBroker.Unsubscribe<VassalServiceLeft>(HandleVassalServiceLeft);
         messageBroker.Unsubscribe<RequestLeaveVassalService>(HandleRequestLeaveVassalService);
+        messageBroker.Unsubscribe<StartRebellion>(HandleStartRebellion);
+        messageBroker.Unsubscribe<NetworkStartRebellion>(HandleNetworkStartRebellion);
     }
 
     private void HandleVassalServiceAccepted(MessagePayload<VassalServiceAccepted> payload)
@@ -196,17 +201,24 @@ internal class VassalServiceHandler : IHandler
     }
     private void HandleRequestLeaveVassalService(MessagePayload<RequestLeaveVassalService> payload)
     {
-        if (ModInformation.IsClient) return;
-
-        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
-        {
-            Logger.Error("Received {Message} without a registered player peer", nameof(RequestLeaveVassalService));
-            return;
-        }
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
             ChangeKingdomAction.ApplyByLeaveKingdom(clan, true);
+        });
+    }
+    private void HandleStartRebellion(MessagePayload<StartRebellion> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
+
+        network.SendAll(new NetworkStartRebellion(clanId));
+    }
+    private void HandleNetworkStartRebellion(MessagePayload<NetworkStartRebellion> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+            ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(clan, true);
         });
     }
 }

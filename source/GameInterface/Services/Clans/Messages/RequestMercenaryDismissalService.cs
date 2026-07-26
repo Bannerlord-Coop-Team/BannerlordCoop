@@ -8,9 +8,12 @@ internal readonly struct RequestMercenaryDismissalService : ICommand
 {
     [ProtoMember(1)]
     public readonly string KingdomId;
+    [ProtoMember(2)]
+    public readonly string ClanId;
 
-    public RequestMercenaryDismissalService(string kingdomId)
+    public RequestMercenaryDismissalService(string kingdomId, string clanId)
     {
         KingdomId = kingdomId;
+        ClanId = clanId;
     }
 }
