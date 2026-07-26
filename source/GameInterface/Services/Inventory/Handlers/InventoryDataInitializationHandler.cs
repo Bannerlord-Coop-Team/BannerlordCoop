@@ -52,7 +52,7 @@ internal class InventoryDataInitializationHandler : IHandler
         inventoryPlayerData = obj.What.InventoryPlayerData;
     }
 
-    // Need to load interactions data when the hero changes for the player
+    // Need to load inventory data when the hero changes for the player
     private void Handle(MessagePayload<PlayerHeroChanged> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.NewHero, out string playerHeroId)) return;
