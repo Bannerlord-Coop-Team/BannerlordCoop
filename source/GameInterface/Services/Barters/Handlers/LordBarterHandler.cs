@@ -22,11 +22,9 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Barters.Handlers;
 
@@ -145,20 +143,36 @@ internal sealed class LordBarterHandler : IHandler
                 return;
             }
 
-            if (!TryGetAuthorization(peer, request, out reason))
+            if (!TryGetAuthorization(peer, request, out var authorization, out reason))
             {
                 Reject(peer, request, playerHero.Gold, reason);
                 return;
             }
 
-            if (!CanAuthorizeKind(peer, playerHero, targetHero, request, out reason))
+            Kingdom targetKingdom = null;
+            if ((LordBarterKind)request.Kind == LordBarterKind.JoinKingdomAsClan &&
+                !objectManager.TryGetObject(authorization.TargetKingdomId, out targetKingdom))
+            {
+                Reject(peer, request, playerHero.Gold, "The destination kingdom is no longer available.");
+                return;
+            }
+
+            if (!CanAuthorizeKind(peer, playerHero, targetHero, request, targetKingdom, out reason))
             {
                 Reject(peer, request, playerHero.Gold, reason);
                 return;
             }
 
             using var playerContext = new BarterPlayerContext(playerHero, playerParty.MobileParty);
-            if (!TryBuildBarter(playerHero, playerParty, targetHero, targetParty, request, out var barter, out reason))
+            if (!TryBuildBarter(
+                    playerHero,
+                    playerParty,
+                    targetHero,
+                    targetParty,
+                    request,
+                    targetKingdom,
+                    out var barter,
+                    out reason))
             {
                 Reject(peer, request, playerHero.Gold, reason);
                 return;
@@ -179,25 +193,19 @@ internal sealed class LordBarterHandler : IHandler
                 if (!(barterable is SafePassageBarterable) &&
                     !(barterable is NoAttackBarterable))
                 {
-                    try
-                    {
-                        barterable.Apply();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error(ex, "Failed to apply barterable {BarterableType}", barterable.GetType().Name);
-                    }
+                    barterable.Apply();
                 }
             }
 
-            CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offered);
-            ApplyOverpayRelationBonus(playerHero, targetHero, MathF.Max(0f, offerValue));
-
-            if ((LordBarterKind)request.Kind == LordBarterKind.SafePassage)
-            {
+            var isSafePassage = (LordBarterKind)request.Kind == LordBarterKind.SafePassage;
+            if (isSafePassage)
                 ApplySafePassage(targetParty?.MobileParty, playerParty?.MobileParty);
+
+            CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offered);
+            ApplyOverpayRelationBonus(playerHero, targetHero, offerValue);
+
+            if (isSafePassage)
                 ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
-            }
 
             FlushGold(playerHero);
             FlushGold(targetHero);
@@ -225,11 +233,26 @@ internal sealed class LordBarterHandler : IHandler
             return;
         }
 
+        var kind = (LordBarterKind)authorization.Kind;
+        Kingdom targetKingdom = null;
+        if (kind == LordBarterKind.JoinKingdomAsClan)
+        {
+            if (string.IsNullOrEmpty(authorization.TargetKingdomId) ||
+                !objectManager.TryGetObject(authorization.TargetKingdomId, out targetKingdom))
+            {
+                return;
+            }
+        }
+        else if (!string.IsNullOrEmpty(authorization.TargetKingdomId))
+        {
+            return;
+        }
+
         var request = new NetworkRequestLordBarter(
             authorization.TargetHeroId,
             (PeaceConversationContext)authorization.Context,
             authorization.ContextId,
-            (LordBarterKind)authorization.Kind,
+            kind,
             Array.Empty<PeaceBarterTerm>(),
             authorization.RequestId);
         if (!TryResolveContext(
@@ -245,6 +268,7 @@ internal sealed class LordBarterHandler : IHandler
                 playerHero,
                 targetHero,
                 request,
+                targetKingdom,
                 out _))
         {
             return;
@@ -256,14 +280,19 @@ internal sealed class LordBarterHandler : IHandler
             authorization.Context,
             authorization.ContextId,
             authorization.Kind,
+            authorization.TargetKingdomId,
             DateTime.UtcNow.Add(AuthorizationLifetime));
         completedResults.Remove(peer);
     }
 
-    private bool TryGetAuthorization(NetPeer peer, NetworkRequestLordBarter request, out string reason)
+    private bool TryGetAuthorization(
+        NetPeer peer,
+        NetworkRequestLordBarter request,
+        out LordBarterAuthorization authorization,
+        out string reason)
     {
         reason = null;
-        if (!authorizations.TryGetValue(peer, out var authorization))
+        if (!authorizations.TryGetValue(peer, out authorization))
         {
             reason = "The lord barter is no longer authorized.";
             return false;
@@ -272,6 +301,7 @@ internal sealed class LordBarterHandler : IHandler
         if (authorization.ExpiresAtUtc <= DateTime.UtcNow)
         {
             authorizations.Remove(peer);
+            authorization = null;
             reason = "The lord barter authorization expired.";
             return false;
         }
@@ -361,6 +391,7 @@ internal sealed class LordBarterHandler : IHandler
         Hero playerHero,
         Hero targetHero,
         NetworkRequestLordBarter request,
+        Kingdom targetKingdom,
         out string reason)
     {
         reason = null;
@@ -387,6 +418,8 @@ internal sealed class LordBarterHandler : IHandler
         var playerClan = playerHero.Clan;
         var targetClan = targetHero.Clan;
         if (playerClan?.Kingdom == null ||
+            targetKingdom == null ||
+            playerClan.Kingdom != targetKingdom ||
             playerClan.Leader != playerHero ||
             targetClan?.Leader != targetHero ||
             targetClan.Kingdom == null ||
@@ -402,7 +435,15 @@ internal sealed class LordBarterHandler : IHandler
         return true;
     }
 
-    private bool TryBuildBarter(Hero playerHero, PartyBase playerParty, Hero targetHero, PartyBase targetParty, NetworkRequestLordBarter request, out BarterData barter, out string reason)
+    private bool TryBuildBarter(
+        Hero playerHero,
+        PartyBase playerParty,
+        Hero targetHero,
+        PartyBase targetParty,
+        NetworkRequestLordBarter request,
+        Kingdom targetKingdom,
+        out BarterData barter,
+        out string reason)
     {
         barter = null; reason = null;
         if (BarterManager.Instance == null)
@@ -412,7 +453,7 @@ internal sealed class LordBarterHandler : IHandler
         }
         var kind = (LordBarterKind)request.Kind;
         if (kind == LordBarterKind.JoinKingdomAsClan &&
-            !CanAuthorizeKind(null, playerHero, targetHero, request, out reason))
+            !CanAuthorizeKind(null, playerHero, targetHero, request, targetKingdom, out reason))
             return false;
         if (kind == LordBarterKind.SafePassage && targetParty?.MobileParty == null)
         {
@@ -433,7 +474,7 @@ internal sealed class LordBarterHandler : IHandler
             initializer = BarterManager.Instance.InitializeJoinFactionBarterContext;
             baseBarterables.Add(new JoinKingdomAsClanBarterable(
                 targetHero,
-                playerHero.Clan.Kingdom,
+                targetKingdom,
                 isDefecting: true));
         }
 
@@ -496,19 +537,26 @@ internal sealed class LordBarterHandler : IHandler
 
     private bool MatchesPrisoner(Hero prisoner, PeaceBarterTerm term) => prisoner?.CharacterObject != null && objectManager.TryGetId(prisoner.CharacterObject, out var id) && id == term.ObjectId;
 
-    private static void ApplySafePassage(MobileParty targetParty, MobileParty playerParty)
+    internal static void ApplySafePassage(MobileParty targetParty, MobileParty playerParty)
     {
         if (targetParty == null || playerParty == null) return;
         var attackProtectionEnds = CampaignTime.HoursFromNow(32f);
         var factionProtectionEnds = CampaignTime.DaysFromNow(5f);
-        var protectedParties = new HashSet<MobileParty> { targetParty };
-        if (targetParty.Army?.LeaderParty != null) protectedParties.Add(targetParty.Army.LeaderParty);
-        foreach (var party in protectedParties.ToArray())
+        var protectedParties = new HashSet<MobileParty>();
+        if (PlayerEncounter.Current != null)
         {
-            if (party.AttachedParties == null) continue;
-            foreach (var attachedParty in party.AttachedParties)
-                if (attachedParty?.IsActive == true) protectedParties.Add(attachedParty);
+            var playerSideParties = new List<MobileParty>();
+            var opponentSideParties = new List<MobileParty>();
+            PlayerEncounter.Current.FindAllNpcPartiesWhoWillJoinEvent(
+                playerSideParties,
+                opponentSideParties);
+            foreach (var party in opponentSideParties)
+            {
+                if (party != null)
+                    protectedParties.Add(party);
+            }
         }
+        protectedParties.Add(targetParty);
         foreach (var party in protectedParties)
         {
             DefaultMobilePartyAIModelPatches.PreventAttacksUntil(
@@ -525,7 +573,7 @@ internal sealed class LordBarterHandler : IHandler
             factionProtectionEnds);
     }
 
-    private static void ApplyOverpayRelationBonus(Hero playerHero, Hero otherHero, float overpayAmount)
+    internal static void ApplyOverpayRelationBonus(Hero playerHero, Hero otherHero, float overpayAmount)
     {
         var campaign = Campaign.Current;
         if (otherHero == null ||
@@ -533,35 +581,15 @@ internal sealed class LordBarterHandler : IHandler
             playerHero?.MapFaction == null ||
             otherHero.MapFaction == null ||
             otherHero.MapFaction.IsAtWarWith(playerHero.MapFaction) ||
-            campaign == null)
+            campaign?.Models?.BarterModel == null)
         {
             return;
         }
 
-        var relation = otherHero.GetRelation(playerHero);
-        var maximumRelation = MathF.Clamp(relation + 3, -100f, 100f);
-        var relationBonus = 0f;
-        for (var currentRelation = relation; currentRelation < maximumRelation; currentRelation++)
-        {
-            var cost = 1000 + ((100 * currentRelation) * currentRelation);
-            if (overpayAmount >= cost)
-            {
-                overpayAmount -= cost;
-                relationBonus += 1f;
-                continue;
-            }
-
-            if (MBRandom.RandomFloat <= overpayAmount / cost)
-                relationBonus += 1f;
-            break;
-        }
-
-        if (playerHero.GetPerkValue(DefaultPerks.Charm.Tribute))
-            relationBonus *= 1f + DefaultPerks.Charm.Tribute.PrimaryBonus;
-
-        var roundedBonus = (int)MathF.Ceiling(relationBonus);
-        if (roundedBonus > 0)
-            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, otherHero, roundedBonus);
+        var relationBonus = campaign.Models.BarterModel
+            .CalculateOverpayRelationIncreaseCosts(otherHero, overpayAmount);
+        if (relationBonus > 0)
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, otherHero, relationBonus);
     }
 
     private void FlushGold(Hero hero)
@@ -608,6 +636,7 @@ internal sealed class LordBarterHandler : IHandler
         private int Context { get; }
         private string ContextId { get; }
         private int Kind { get; }
+        public string TargetKingdomId { get; }
         public DateTime ExpiresAtUtc { get; }
 
         public LordBarterAuthorization(
@@ -616,6 +645,7 @@ internal sealed class LordBarterHandler : IHandler
             int context,
             string contextId,
             int kind,
+            string targetKingdomId,
             DateTime expiresAtUtc)
         {
             RequestId = requestId;
@@ -623,6 +653,7 @@ internal sealed class LordBarterHandler : IHandler
             Context = context;
             ContextId = contextId;
             Kind = kind;
+            TargetKingdomId = targetKingdomId;
             ExpiresAtUtc = expiresAtUtc;
         }
 

@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -136,13 +137,27 @@ internal static class LordBarterPatch
                 PlayerEncounter.Current != null &&
                 barter.OtherParty == MobileParty.ConversationParty?.Party)
             {
+                var siegeEvent = barter.OtherParty?.SiegeEvent;
                 using (new AllowedThread())
                 {
                     var faction = barter.OtherParty.MapFaction;
                     if (faction != null)
                         faction.NotAttackableByPlayerUntilTime = CampaignTime.DaysFromNow(5f);
                 }
-                PlayerEncounter.LeaveEncounter = true;
+                if (siegeEvent != null &&
+                    siegeEvent.BesiegerCamp.HasInvolvedPartyForEventType(barter.OtherParty) &&
+                    siegeEvent.BesiegedSettlement.HasInvolvedPartyForEventType(PartyBase.MainParty))
+                {
+                    using (new AllowedThread())
+                    {
+                        Campaign.Current.GameMenuManager.SetNextMenu("menu_siege_safe_passage_accepted");
+                        PlayerSiege.FinalizePlayerSiege();
+                    }
+                }
+                else
+                {
+                    PlayerEncounter.LeaveEncounter = true;
+                }
             }
         }
         catch
@@ -229,12 +244,26 @@ internal static class LordBarterPatch
         pendingContext = context;
         pendingContextId = contextId;
         pendingKind = kind;
+        string targetKingdomId = null;
+        if (kind == LordBarterKind.JoinKingdomAsClan)
+        {
+            var joinKingdom = barterData.GetOfferedBarterables()
+                .OfType<JoinKingdomAsClanBarterable>()
+                .FirstOrDefault();
+            if (joinKingdom?.TargetKingdom == null ||
+                !objectManager.TryGetId(joinKingdom.TargetKingdom, out targetKingdomId))
+            {
+                ClearPendingRequest();
+                return false;
+            }
+        }
         network.SendAll(new NetworkAuthorizeLordBarter(
             pendingRequestId,
             targetHeroId,
             context,
             contextId,
-            kind));
+            kind,
+            targetKingdomId));
         return true;
     }
 

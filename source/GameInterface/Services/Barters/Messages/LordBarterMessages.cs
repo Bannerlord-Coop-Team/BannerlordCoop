@@ -19,19 +19,22 @@ internal readonly struct NetworkAuthorizeLordBarter : ICommand
     [ProtoMember(3)] public readonly string ContextId;
     [ProtoMember(4)] public readonly int Context;
     [ProtoMember(5)] public readonly int Kind;
+    [ProtoMember(6)] public readonly string TargetKingdomId;
 
     public NetworkAuthorizeLordBarter(
         string requestId,
         string targetHeroId,
         PeaceConversationContext context,
         string contextId,
-        LordBarterKind kind)
+        LordBarterKind kind,
+        string targetKingdomId = null)
     {
         RequestId = requestId;
         TargetHeroId = targetHeroId;
         ContextId = contextId;
         Context = (int)context;
         Kind = (int)kind;
+        TargetKingdomId = targetKingdomId;
     }
 }
 

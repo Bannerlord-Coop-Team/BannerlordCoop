@@ -117,14 +117,15 @@ public class NetworkBarterSerializationTest
     }
 
     [Fact]
-    public void LordBarterAuthorization_RoundTrip_PreservesExactContextAndKind()
+    public void LordBarterAuthorization_RoundTrip_PreservesExactContextKindAndKingdom()
     {
         var original = new NetworkAuthorizeLordBarter(
             "lord-request",
             "target-lord",
             PeaceConversationContext.MapParty,
             "target-party",
-            LordBarterKind.JoinKingdomAsClan);
+            LordBarterKind.JoinKingdomAsClan,
+            "target-kingdom");
 
         var result = RoundTrip(original);
 
@@ -133,6 +134,7 @@ public class NetworkBarterSerializationTest
         Assert.Equal((int)PeaceConversationContext.MapParty, result.Context);
         Assert.Equal("target-party", result.ContextId);
         Assert.Equal((int)LordBarterKind.JoinKingdomAsClan, result.Kind);
+        Assert.Equal("target-kingdom", result.TargetKingdomId);
     }
 
     [Fact]
