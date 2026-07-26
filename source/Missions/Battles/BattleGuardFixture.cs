@@ -868,7 +868,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         Vec2 movementInput = Vec2.Zero;
         if (moving)
         {
-            flags |= Agent.MovementControlFlag.Forward;
             if (driver.MountedRoute != null)
             {
                 Agent mount = agent.MountAgent;
@@ -879,11 +878,14 @@ public class BattleGuardFixture : IBattleGuardFixture
                         movementSource.GetMovementDirection(),
                         movementSource.LookDirection,
                         movementSource.GetRealGlobalVelocity().AsVec2.Length);
-                flags |= routeInput.TurnFlag;
+                flags |=
+                    routeInput.TranslationFlag |
+                    routeInput.TurnFlag;
                 movementInput = routeInput.Movement;
             }
             else
             {
+                flags |= Agent.MovementControlFlag.Forward;
                 movementInput = new Vec2(0f, 1f);
             }
         }
@@ -1289,14 +1291,17 @@ public class BattleGuardFixture : IBattleGuardFixture
     }
 
     internal static bool IsFixtureWieldState(
+        BattleGuardFixtureMode mode,
         EquipmentIndex mainHandIndex,
         EquipmentIndex offHandIndex,
         int mainHandUsageIndex,
         string mainHandItemId)
     {
+        int expectedUsageIndex =
+            mode == BattleGuardFixtureMode.Foot ? 1 : 0;
         return mainHandIndex == EquipmentIndex.Weapon0 &&
             offHandIndex == EquipmentIndex.None &&
-            mainHandUsageIndex == 0 &&
+            mainHandUsageIndex == expectedUsageIndex &&
             mainHandItemId == GuardWeaponId;
     }
 
@@ -1872,11 +1877,14 @@ public class BattleGuardFixture : IBattleGuardFixture
         sample.OffHandIndex = (int)offHandIndex;
         sample.MainHandUsageIndex = mainHandUsageIndex;
         sample.MainHandItemId = mainHandItemId;
-        sample.GuardEquipmentReady = IsFixtureWieldState(
-            mainHandIndex,
-            offHandIndex,
-            mainHandUsageIndex,
-            mainHandItemId);
+        sample.GuardEquipmentReady =
+            guardDriver != null &&
+            IsFixtureWieldState(
+                guardDriver.Mode,
+                mainHandIndex,
+                offHandIndex,
+                mainHandUsageIndex,
+                mainHandItemId);
     }
 
     private void ObservePreReplayDisplayedState(

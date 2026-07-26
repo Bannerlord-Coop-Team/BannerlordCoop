@@ -316,6 +316,9 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal("Forward", route.State);
         Assert.True(route.CanStageStrike);
         Assert.Equal(30f, route.RemainingDistance);
+        Assert.Equal(
+            Agent.MovementControlFlag.Forward,
+            input.TranslationFlag);
         Assert.Equal(Agent.MovementControlFlag.None, input.TurnFlag);
         Assert.Equal(0f, input.Movement.x);
         Assert.Equal(1f, input.Movement.y);
@@ -358,31 +361,72 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void MountedRoute_Endpoint_UsesNativeTurnThenReturns()
+    public void MountedRoute_Endpoint_BrakesBeforeNativeTurnThenReturns()
     {
         var route = new BattleGuardMountedRoute(
             new Vec3(0f, 0f, 0f),
             new Vec3(0f, 1f, 0f),
             40f);
 
-        BattleGuardMountedRouteInput turning = route.Update(
+        BattleGuardMountedRouteInput braking = route.Update(
             new Vec3(0f, 35f, 0f),
-            new Vec3(0f, 1f, 0f));
+            new Vec2(0f, 1f),
+            new Vec3(0f, 1f, 0f),
+            8f);
+
+        Assert.Equal("BrakingToStart", route.State);
+        Assert.False(route.CanStageStrike);
+        Assert.Equal(
+            Agent.MovementControlFlag.Backward,
+            braking.TranslationFlag);
+        Assert.Equal(
+            Agent.MovementControlFlag.None,
+            braking.TurnFlag);
+        Assert.Equal(-1f, braking.Movement.y);
+
+        BattleGuardMountedRouteInput reverseVelocity = route.Update(
+            new Vec3(0f, 35f, 0f),
+            new Vec2(0f, -1f),
+            new Vec3(0f, 1f, 0f),
+            0.5f);
 
         Assert.Equal("TurningToStart", route.State);
         Assert.False(route.CanStageStrike);
         Assert.Equal(
+            Agent.MovementControlFlag.None,
+            reverseVelocity.TranslationFlag);
+        Assert.Equal(
+            Agent.MovementControlFlag.TurnRight,
+            reverseVelocity.TurnFlag);
+
+        BattleGuardMountedRouteInput turning = route.Update(
+            new Vec3(0f, 35f, 0f),
+            Vec2.Zero,
+            new Vec3(0f, 1f, 0f),
+            0f);
+
+        Assert.Equal("TurningToStart", route.State);
+        Assert.False(route.CanStageStrike);
+        Assert.Equal(
+            Agent.MovementControlFlag.None,
+            turning.TranslationFlag);
+        Assert.Equal(
             Agent.MovementControlFlag.TurnRight,
             turning.TurnFlag);
-        Assert.Equal(0.45f, turning.Movement.y);
+        Assert.Equal(0f, turning.Movement.y);
 
         BattleGuardMountedRouteInput returning = route.Update(
             new Vec3(0f, 35f, 0f),
-            new Vec3(0f, -1f, 0f));
+            Vec2.Zero,
+            new Vec3(0f, -1f, 0f),
+            0f);
 
         Assert.Equal("Return", route.State);
         Assert.True(route.CanStageStrike);
         Assert.Equal(1, route.CompletedTurns);
+        Assert.Equal(
+            Agent.MovementControlFlag.Forward,
+            returning.TranslationFlag);
         Assert.Equal(
             Agent.MovementControlFlag.None,
             returning.TurnFlag);
@@ -486,6 +530,9 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(Vec2.Zero, pending.Movement);
         Assert.Equal(
             Agent.MovementControlFlag.None,
+            pending.TranslationFlag);
+        Assert.Equal(
+            Agent.MovementControlFlag.None,
             pending.TurnFlag);
 
         route.Update(
@@ -552,16 +599,39 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void FixtureWieldState_RequiresTwoHandedGuardWeaponWithoutOffhand()
+    public void FixtureWieldState_RequiresModeUsageAndNoOffhand()
     {
         Assert.True(
             BattleGuardFixture.IsFixtureWieldState(
+                BattleGuardFixtureMode.Foot,
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.None,
+                1,
+                "empire_lance_1_t3_blunt"));
+        Assert.False(
+            BattleGuardFixture.IsFixtureWieldState(
+                BattleGuardFixtureMode.Foot,
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.None,
+                0,
+                "empire_lance_1_t3_blunt"));
+        Assert.True(
+            BattleGuardFixture.IsFixtureWieldState(
+                BattleGuardFixtureMode.Mounted,
                 EquipmentIndex.Weapon0,
                 EquipmentIndex.None,
                 0,
                 "empire_lance_1_t3_blunt"));
         Assert.False(
             BattleGuardFixture.IsFixtureWieldState(
+                BattleGuardFixtureMode.Mounted,
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.None,
+                1,
+                "empire_lance_1_t3_blunt"));
+        Assert.False(
+            BattleGuardFixture.IsFixtureWieldState(
+                BattleGuardFixtureMode.Mounted,
                 EquipmentIndex.Weapon0,
                 EquipmentIndex.Weapon1,
                 0,

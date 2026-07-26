@@ -8,13 +8,13 @@ namespace Missions.Battles;
 /// <summary>Drives the mounted guard around a bounded lane with native player input.</summary>
 internal sealed class BattleGuardMountedRoute
 {
-    private const float EndpointTurnDistance = 6f;
-    internal const float MinimumLength = EndpointTurnDistance * 2f;
+    private const float PositionToleranceDistance = 6f;
     private const float StrikeClearanceDistance = 16f;
+    internal const float MinimumLength = StrikeClearanceDistance * 2f;
     private const float StrikeMaximumLateralOffset = 3f;
     private const float StrikeAlignmentDot = 0.9f;
-    private const float TurnCompletionDot = 0.65f;
-    private const float TurnForwardInput = 0.45f;
+    private const float TurnCompletionDot = 0.9f;
+    private const float TurnStartMaximumSpeed = 1f;
     private const float SteeringGain = 2f;
     private const float SteeringDeadZone = 0.05f;
     private const float MovementHeadingMinimumSpeed = 0.1f;
@@ -24,6 +24,7 @@ internal sealed class BattleGuardMountedRoute
     private readonly Vec3 axis;
     private readonly float length;
     private bool headingToEnd = true;
+    private bool braking;
     private bool turning;
     private bool initialized;
 
@@ -38,6 +39,8 @@ internal sealed class BattleGuardMountedRoute
     public string State =>
         !initialized
             ? "Pending"
+            : braking
+            ? headingToEnd ? "BrakingToEnd" : "BrakingToStart"
             : turning
             ? headingToEnd ? "TurningToEnd" : "TurningToStart"
             : headingToEnd ? "Forward" : "Return";
@@ -64,6 +67,19 @@ internal sealed class BattleGuardMountedRoute
         Vec3 position,
         Vec3 heading)
     {
+        return Update(
+            position,
+            heading,
+            heading,
+            0f);
+    }
+
+    private BattleGuardMountedRouteInput Update(
+        Vec3 position,
+        Vec3 heading,
+        Vec3 facing,
+        float horizontalSpeed)
+    {
         Vec3 offset = position - start;
         offset.z = 0f;
         Progress = Vec3.DotProduct(offset, axis);
@@ -76,16 +92,22 @@ internal sealed class BattleGuardMountedRoute
             heading = headingToEnd ? axis : -axis;
         else
             heading.Normalize();
+        facing.z = 0f;
+        if (facing.LengthSquared < 0.0001f)
+            facing = heading;
+        else
+            facing.Normalize();
         if (!initialized)
         {
-            if (Progress < -EndpointTurnDistance ||
-                Progress > length + EndpointTurnDistance ||
-                Math.Abs(LateralOffset) > EndpointTurnDistance)
+            if (Progress < -PositionToleranceDistance ||
+                Progress > length + PositionToleranceDistance ||
+                Math.Abs(LateralOffset) > PositionToleranceDistance)
             {
                 RemainingDistance = 0f;
                 CanStageStrike = false;
                 return new BattleGuardMountedRouteInput(
                     Vec2.Zero,
+                    Agent.MovementControlFlag.None,
                     Agent.MovementControlFlag.None);
             }
 
@@ -94,14 +116,16 @@ internal sealed class BattleGuardMountedRoute
             initialized = true;
         }
 
-        if (!turning &&
+        if (!braking &&
+            !turning &&
             ((headingToEnd &&
-              Progress >= length - EndpointTurnDistance) ||
+              Progress >= length - StrikeClearanceDistance) ||
              (!headingToEnd &&
-              Progress <= EndpointTurnDistance)))
+              Progress <= StrikeClearanceDistance)))
         {
             headingToEnd = !headingToEnd;
-            turning = true;
+            braking = horizontalSpeed > TurnStartMaximumSpeed;
+            turning = !braking;
         }
 
         Vec3 target = headingToEnd ? end : start;
@@ -112,10 +136,19 @@ internal sealed class BattleGuardMountedRoute
         else
             desired.Normalize();
 
-        float alignment = Vec3.DotProduct(heading, desired);
+        Vec3 steeringHeading =
+            braking || turning ? facing : heading;
+        float alignment =
+            Vec3.DotProduct(steeringHeading, desired);
         float signedError =
-            (heading.x * desired.y) -
-            (heading.y * desired.x);
+            (steeringHeading.x * desired.y) -
+            (steeringHeading.y * desired.x);
+        if (braking &&
+            horizontalSpeed <= TurnStartMaximumSpeed)
+        {
+            braking = false;
+            turning = true;
+        }
         if (turning && alignment >= TurnCompletionDot)
         {
             turning = false;
@@ -124,21 +157,34 @@ internal sealed class BattleGuardMountedRoute
 
         float turnInput;
         float forwardInput;
-        if (turning)
+        Agent.MovementControlFlag translationFlag;
+        if (braking)
+        {
+            turnInput = 0f;
+            forwardInput = -1f;
+            translationFlag =
+                Agent.MovementControlFlag.Backward;
+        }
+        else if (turning)
         {
             turnInput = 1f;
-            forwardInput = TurnForwardInput;
+            forwardInput = 0f;
+            translationFlag =
+                Agent.MovementControlFlag.None;
         }
         else
         {
             turnInput = Clamp(-signedError * SteeringGain);
             forwardInput = 1f;
+            translationFlag =
+                Agent.MovementControlFlag.Forward;
         }
 
         RemainingDistance = headingToEnd
             ? length - Progress
             : Progress;
         CanStageStrike =
+            !braking &&
             !turning &&
             Progress >= 0f &&
             Progress <= length &&
@@ -155,6 +201,7 @@ internal sealed class BattleGuardMountedRoute
 
         return new BattleGuardMountedRouteInput(
             new Vec2(turnInput, forwardInput),
+            translationFlag,
             turnFlag);
     }
 
@@ -169,7 +216,9 @@ internal sealed class BattleGuardMountedRoute
             ResolveHeading(
                 movementDirection,
                 lookDirection,
-                horizontalSpeed));
+                horizontalSpeed),
+            lookDirection,
+            horizontalSpeed);
     }
 
     internal static Vec3 ResolveHeading(
@@ -202,13 +251,16 @@ internal sealed class BattleGuardMountedRoute
 internal readonly struct BattleGuardMountedRouteInput
 {
     public Vec2 Movement { get; }
+    public Agent.MovementControlFlag TranslationFlag { get; }
     public Agent.MovementControlFlag TurnFlag { get; }
 
     public BattleGuardMountedRouteInput(
         Vec2 movement,
+        Agent.MovementControlFlag translationFlag,
         Agent.MovementControlFlag turnFlag)
     {
         Movement = movement;
+        TranslationFlag = translationFlag;
         TurnFlag = turnFlag;
     }
 }
