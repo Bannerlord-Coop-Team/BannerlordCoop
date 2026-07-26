@@ -51,6 +51,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly Dictionary<NetPeer, string> mappedPeerControllers = new();
     private readonly Dictionary<NetPeer, ulong> peerSteamIds = new();
     private readonly HashSet<NetPeer> connectedPendingPeers = new();
+    private readonly object relayPayloadBudgetGate = new();
+    private readonly Dictionary<(string InstanceId, string ControllerId), int> relayPayloadBudgets = new();
     private bool disposed;
 
     private string instanceId = null;
@@ -171,6 +173,11 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             mappedPeerControllers.Clear();
             peerSteamIds.Clear();
             connectedPendingPeers.Clear();
+        }
+
+        lock (relayPayloadBudgetGate)
+        {
+            relayPayloadBudgets.Clear();
         }
     }
 
@@ -564,10 +571,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void SendAll(IPacket packet)
     {
-        byte[] data = movementPacketCompressor.Serialize(packet);
+        SendAll(packet, movementPacketCompressor.Serialize(packet));
+    }
+
+    public void SendAll(IPacket packet, byte[] serializedPacket)
+    {
         foreach (var controllerId in missionContext.ControllersInMission)
         {
-            Send(controllerId, packet, data);
+            Send(controllerId, packet, serializedPacket);
         }
     }
 
@@ -605,11 +616,134 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         // Otherwise send relay packet to the server
-        relayNetwork.SendAll(new RelayPacket(packet.DeliveryMethod, instanceId, controllerId, data));
+        string relayInstanceId;
+        lock (peerGate)
+        {
+            relayInstanceId = instanceId;
+        }
+
+        if (IsMovementPacket(packet))
+        {
+            int maxRelayPayloadBytes =
+                GetMaxRelayPayloadBytes(relayInstanceId, controllerId);
+            if (data.Length > maxRelayPayloadBytes)
+            {
+                if (maxRelayPayloadBytes > 0)
+                {
+                    Logger.Warning(
+                        "[BattleTraffic] Discarding oversized {PacketType} relay payload for {ControllerId}: " +
+                        "{PayloadBytes} bytes, budget={BudgetBytes}",
+                        packet.PacketType,
+                        controllerId,
+                        data.Length,
+                        maxRelayPayloadBytes);
+                }
+                return;
+            }
+        }
+
+        relayNetwork.SendAll(new RelayPacket(
+            packet.DeliveryMethod,
+            relayInstanceId,
+            controllerId,
+            data));
     }
 
     // Peer-reported MTUs can be optimistic, so cap nonfragmentable sends at a conservative ceiling.
     internal const int SafeSinglePacketBytes = 1000;
+
+    public int GetMaxUnreliablePayloadBytes()
+    {
+        int maxPayloadBytes = SafeSinglePacketBytes;
+        bool hasRoute = false;
+        bool hasViableRoute = false;
+        string currentInstanceId;
+        lock (peerGate)
+        {
+            currentInstanceId = instanceId;
+        }
+
+        foreach (string controllerId in missionContext.ControllersInMission)
+        {
+            hasRoute = true;
+            int routePayloadBytes;
+            if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
+            {
+                routePayloadBytes =
+                    Math.Max(0, peer.GetMaxSinglePacketSize(DeliveryMethod.Unreliable));
+            }
+            else
+            {
+                routePayloadBytes =
+                    GetMaxRelayPayloadBytes(currentInstanceId, controllerId);
+            }
+
+            if (routePayloadBytes <= 0) continue;
+
+            hasViableRoute = true;
+            maxPayloadBytes = Math.Min(maxPayloadBytes, routePayloadBytes);
+        }
+
+        return hasRoute && !hasViableRoute ? 0 : maxPayloadBytes;
+    }
+
+    private int GetMaxRelayPayloadBytes(string currentInstanceId, string controllerId)
+    {
+        var key = (currentInstanceId, controllerId);
+        lock (relayPayloadBudgetGate)
+        {
+            if (!relayPayloadBudgets.TryGetValue(key, out int payloadBytes))
+            {
+                payloadBytes = CalculateMaxRelayPayloadBytes(
+                    serializer,
+                    currentInstanceId,
+                    controllerId,
+                    SafeSinglePacketBytes);
+                relayPayloadBudgets[key] = payloadBytes;
+                if (payloadBytes <= 0)
+                {
+                    Logger.Warning(
+                        "[BattleTraffic] Relay framing leaves no unreliable payload capacity for " +
+                        "{ControllerId} in {InstanceId}",
+                        controllerId,
+                        currentInstanceId);
+                }
+            }
+
+            return payloadBytes;
+        }
+    }
+
+    internal static int CalculateMaxRelayPayloadBytes(
+        ICommonSerializer serializer,
+        string instanceId,
+        string controllerId,
+        int maxDatagramBytes)
+    {
+        if (maxDatagramBytes <= 0) return 0;
+
+        bool Fits(int payloadBytes) =>
+            serializer.Serialize(new RelayPacket(
+                DeliveryMethod.Unreliable,
+                instanceId,
+                controllerId,
+                new byte[payloadBytes])).Length <= maxDatagramBytes;
+
+        if (!Fits(0)) return 0;
+
+        int low = 0;
+        int high = maxDatagramBytes;
+        while (low < high)
+        {
+            int candidate = low + ((high - low + 1) / 2);
+            if (Fits(candidate))
+                low = candidate;
+            else
+                high = candidate - 1;
+        }
+
+        return low;
+    }
 
     internal static DeliveryMethod? SelectDeliveryMethod(
         IPacket packet,
