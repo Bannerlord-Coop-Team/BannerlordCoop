@@ -19,7 +19,10 @@ internal class AddHeroToPartyActionPatches
         if (ModInformation.IsClient) return;
 
         // Don't notify players of hero joining non player parties
-        if ((newParty == null || !newParty.IsPlayerParty())) return;
+        if (!showNotification 
+            || !hero.IsPlayerCompanion 
+            || newParty == null 
+            || !newParty.IsPlayerParty()) return;
 
         var message = new NotifyHeroJoinedParty(newParty, hero);
         MessageBroker.Instance.Publish(null, message);
