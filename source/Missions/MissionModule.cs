@@ -28,7 +28,6 @@ public class MissionModule : Module
 {
     internal const string MissilePatchCategory = "CoopMissilePatches";
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
-    internal const string MountPatchCategory = "CoopMountPatches";
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -40,9 +39,6 @@ public class MissionModule : Module
         builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
             typeof(AgentVoicePatch).Assembly,
             AgentVoicePatchCategory));
-        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
-            typeof(FindClosestMountAvailablePatch).Assembly,
-            MountPatchCategory));
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
         builder.RegisterType<MovementPacketCompressor>()
