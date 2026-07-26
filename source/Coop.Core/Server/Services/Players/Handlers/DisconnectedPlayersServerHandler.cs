@@ -4,7 +4,6 @@ using Common.Network.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Players;
-using LiteNetLib.Utils;
 using System.Linq;
 
 namespace Coop.Core.Server.Services.Players.Handlers;
