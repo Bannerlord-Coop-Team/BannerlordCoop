@@ -46,7 +46,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private const float PositionDeltaThresholdSq = 0.0001f;
     private const float DirectionDeltaThresholdSq = 0.0001f;
     private const float SpeedDeltaThreshold = 0.01f;
-    private const float ForcedSyncIntervalSeconds = 1.0f;
+    private const float ForcedSyncIntervalSeconds = 0.25f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
