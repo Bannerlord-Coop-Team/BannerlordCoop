@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections;
-using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
@@ -34,7 +33,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
     private TimeControlEnum? originalSpeed;
     private volatile NetPeer[] cachedOverloadedPeers = Array.Empty<NetPeer>();
-    private readonly Dictionary<NetPeer, DateTime> finalCatchUpStartedUtc = new Dictionary<NetPeer, DateTime>();
+    private readonly Dictionary<NetPeer, DateTime> joinCatchUpStartedUtc = new Dictionary<NetPeer, DateTime>();
 
     // Diagnostics for the catch-up pause: when it started and when depths were last logged, so a
     // long pause leaves periodic evidence in the log instead of only an in-game message.
@@ -67,7 +66,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     {
         // Removes pause policy from time handler
         timeControlInterface.RemoveUnpausePolicy(PlayersOverloadedPolicy);
-        finalCatchUpStartedUtc.Clear();
+        joinCatchUpStartedUtc.Clear();
     }
 
     private static int GetQueueDepth(NetPeer peer)
@@ -88,35 +87,33 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             .ToList();
     }
 
-    private List<NetPeer> UpdateFinalCatchUpPeers(DateTime utcNow)
+    private List<NetPeer> UpdateJoinCatchUpPeers(DateTime utcNow)
     {
         var peers = connectionCollection
-            .Where(logic => logic.State is LoadingState { IsFinalCatchUpPending: true })
+            .Where(logic => logic.State is LoadingState { IsJoinCatchUpPending: true })
             .Select(logic => logic.Peer)
             .ToList();
         var activePeers = new HashSet<NetPeer>(peers);
 
-        foreach (var peer in finalCatchUpStartedUtc.Keys.Where(peer => !activePeers.Contains(peer)).ToArray())
+        foreach (var peer in joinCatchUpStartedUtc.Keys.Where(peer => !activePeers.Contains(peer)).ToArray())
         {
-            finalCatchUpStartedUtc.Remove(peer);
+            joinCatchUpStartedUtc.Remove(peer);
         }
 
         foreach (var peer in peers)
         {
-            if (!finalCatchUpStartedUtc.ContainsKey(peer))
+            if (!joinCatchUpStartedUtc.ContainsKey(peer))
             {
-                finalCatchUpStartedUtc.Add(peer, utcNow);
+                joinCatchUpStartedUtc.Add(peer, utcNow);
             }
         }
 
         return peers;
     }
 
-    private List<NetPeer> GetStalledJoiningPeers(IEnumerable<NetPeer> finalCatchUpPeers, DateTime utcNow) =>
-        finalCatchUpPeers
-            .Where(peer => utcNow - finalCatchUpStartedUtc[peer] > JoinCatchUpPauseDelay)
-            .Where(peer => connectionMessageQueue.TryGetCatchUpPacketsRemaining(peer, out int packetsRemaining) &&
-                           packetsRemaining > NetworkJoinSync.CompletionPacketThreshold)
+    private List<NetPeer> GetStalledJoiningPeers(IEnumerable<NetPeer> joinCatchUpPeers, DateTime utcNow) =>
+        joinCatchUpPeers
+            .Where(peer => utcNow - joinCatchUpStartedUtc[peer] >= JoinCatchUpPauseDelay)
             .ToList();
 
     private int GetReportedQueueDepth(NetPeer peer) =>
@@ -136,8 +133,8 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
     internal void CheckForOverloadedPeers(DateTime utcNow)
     {
-        var finalCatchUpPeers = UpdateFinalCatchUpPeers(utcNow);
-        var stalledJoiningPeers = GetStalledJoiningPeers(finalCatchUpPeers, utcNow);
+        var joinCatchUpPeers = UpdateJoinCatchUpPeers(utcNow);
+        var stalledJoiningPeers = GetStalledJoiningPeers(joinCatchUpPeers, utcNow);
 
         // While paused for overload, hold until every peer has drained below the (lower) resume
         // threshold, not just back under the pause threshold. The gap between the two thresholds is

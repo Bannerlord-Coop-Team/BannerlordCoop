@@ -97,7 +97,8 @@ public class CoopBattleController : CoopMissionController
         IMissionContext missionContext,
         IHostEpochPolicy hostEpochPolicy,
         IBattleAgentBudget agentBudget,
-        IGuardedHitWindow guardedHitWindow
+        IGuardedHitWindow guardedHitWindow,
+        IPuppetMountStateRepairer puppetMountStateRepairer
 #if DEBUG
         , IBattleGuardFixture guardFixture
 #endif
@@ -114,7 +115,11 @@ public class CoopBattleController : CoopMissionController
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
         puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget);
-        puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
+        puppetDeathApplier = new PuppetDeathApplier(
+            messageBroker,
+            coopMissionComponent,
+            casualties,
+            puppetMountStateRepairer);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(
             network,

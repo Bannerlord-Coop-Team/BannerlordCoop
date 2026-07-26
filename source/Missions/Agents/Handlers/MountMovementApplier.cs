@@ -21,11 +21,16 @@ public class MountMovementApplier : IPacketHandler
 {
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IAgentPositionInterpolator interpolator;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
 
-    public MountMovementApplier(INetworkAgentRegistry agentRegistry, IAgentPositionInterpolator interpolator)
+    public MountMovementApplier(
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator interpolator,
+        IPuppetMountStateRepairer puppetMountStateRepairer)
     {
         this.agentRegistry = agentRegistry;
         this.interpolator = interpolator;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
     }
 
     public PacketType PacketType => PacketType.MountMovement;
@@ -91,6 +96,7 @@ public class MountMovementApplier : IPacketHandler
 
                     if (horse.Controller != AgentControllerType.None)
                         horse.Controller = AgentControllerType.None;
+                    puppetMountStateRepairer.PreserveRiderlessPuppet(horse);
 
                     data.ApplyMount(horse);
                     interpolator.SetMountTarget(horse, data.MountPosition, data.MountMovementDirection);

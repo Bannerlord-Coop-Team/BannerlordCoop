@@ -564,9 +564,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                         {
                             MapEventParty captorParty = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(captureChances);
 
-                            if (playerLootPrisonerRosters.ContainsKey(captorParty))
+                            if (captorParty != null &&
+                                playerLootPrisonerRosters.TryGetValue(captorParty, out TroopRoster playerLootPrisonerRoster))
                             {
-                                playerLootPrisonerRosters[captorParty].AddToCounts(character, 1, false, 0, 0, true, -1);
+                                playerLootPrisonerRoster.AddToCounts(character, 1, false, 0, 0, true, -1);
                             }
                             else
                             {
@@ -611,9 +612,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                             {
                                 MapEventParty captorParty = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(woundedCaptureChances);
 
-                                if (playerLootPrisonerRosters.ContainsKey(captorParty))
+                                if (captorParty != null &&
+                                    playerLootPrisonerRosters.TryGetValue(captorParty, out TroopRoster playerLootPrisonerRoster))
                                 {
-                                    playerLootPrisonerRosters[captorParty].AddToCounts(character, 1, false, 0, 0, true, -1);
+                                    playerLootPrisonerRoster.AddToCounts(character, 1, false, 0, 0, true, -1);
                                 }
                                 else
                                 {
@@ -635,9 +637,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                             {
                                 MapEventParty captorParty = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(healthyCaptureChances);
 
-                                if (playerLootPrisonerRosters.ContainsKey(captorParty))
+                                if (captorParty != null &&
+                                    playerLootPrisonerRosters.TryGetValue(captorParty, out TroopRoster playerLootPrisonerRoster))
                                 {
-                                    playerLootPrisonerRosters[captorParty].AddToCounts(character, 1, false, 0, 0, true, -1);
+                                    playerLootPrisonerRoster.AddToCounts(character, 1, false, 0, 0, true, -1);
                                 }
                                 else
                                 {

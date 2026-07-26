@@ -48,9 +48,9 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
 
-    // Server-side: terrain seed chosen once per map event and reused for every client that opens the same battle,
-    // so they all use the same terrain seed. Keyed by map event id.
+    // Server-side: scene inputs chosen once per map event and reused for late entrants.
     private readonly ConcurrentDictionary<string, int> mapEventTerrainSeeds = new ConcurrentDictionary<string, int>();
+    private readonly ConcurrentDictionary<string, AtmosphereInfo> mapEventAtmospheres = new ConcurrentDictionary<string, AtmosphereInfo>();
     private readonly Random terrainSeedRandom = new Random();
 
     // Server-side: the siege mission inputs (wall level, wall HPs, engine lists) snapshotted once per map event,
@@ -93,6 +93,7 @@ internal class BattleMissionStartHandler : IHandler
         if (objectManager.TryGetId(payload.What.MapEvent, out var mapEventId))
         {
             mapEventTerrainSeeds.TryRemove(mapEventId, out _);
+            mapEventAtmospheres.TryRemove(mapEventId, out _);
             siegeMissionSnapshots.TryRemove(mapEventId, out _);
         }
     }
@@ -207,7 +208,9 @@ internal class BattleMissionStartHandler : IHandler
                 else
                 {
                     operation = "read campaign atmosphere";
-                    AtmosphereInfo atmosphereOnCampaign = GetAtmosphereOnCampaign(mapEvent);
+                    AtmosphereInfo atmosphereOnCampaign = GetOrCreateAtmosphereSnapshot(
+                        payload.What.MapEventId,
+                        () => GetAtmosphereOnCampaign(mapEvent));
 
                     operation = "send attack mission start";
                     network.SendAll(new NetworkStartAttackMission(
@@ -227,6 +230,11 @@ internal class BattleMissionStartHandler : IHandler
                 network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
             }
         }, context: nameof(Handle_NetworkBattleStartRequest));
+    }
+
+    internal AtmosphereInfo GetOrCreateAtmosphereSnapshot(string mapEventId, Func<AtmosphereInfo> create)
+    {
+        return mapEventAtmospheres.GetOrAdd(mapEventId, _ => create());
     }
 
     private static AtmosphereInfo GetAtmosphereOnCampaign(MapEvent mapEvent)

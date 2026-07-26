@@ -6,6 +6,7 @@ using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.TroopRosters.Coalescing;
 using GameInterface.Services.TroopRosters.Messages;
@@ -39,15 +40,19 @@ internal class TroopRosterDeltaHandler : IHandler
     private readonly INetwork network;
     private readonly ISendCoalescer coalescer;
     private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
+    private readonly IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider;
 
     public TroopRosterDeltaHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network,
-        IEncounterMenuConditionRefresher encounterMenuConditionRefresher, ISendCoalescer coalescer = null)
+        IEncounterMenuConditionRefresher encounterMenuConditionRefresher,
+        IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider,
+        ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
         this.coalescer = coalescer;
+        this.partyScreenRosterBaselineProvider = partyScreenRosterBaselineProvider;
 
         // Authority send path: the roster patches publish these local events (server-only) with the server index.
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
@@ -262,6 +267,12 @@ internal class TroopRosterDeltaHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging(rosterId, out roster)) return;
                 roster.RemoveZeroCounts();
+                var baselineRoster = partyScreenRosterBaselineProvider.GetBaselineRoster(roster);
+                if (baselineRoster != null)
+                {
+                    baselineRoster.RemoveZeroCounts();
+                    baselineRoster.InitializeCachedData();
+                }
                 roster.InitializeCachedData();
             }
 
@@ -286,6 +297,13 @@ internal class TroopRosterDeltaHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character)) return;
 
                 apply(roster, character);
+                // Done resets live rosters from this snapshot, so authority changes must update both copies.
+                var baselineRoster = partyScreenRosterBaselineProvider.GetBaselineRoster(roster);
+                if (baselineRoster != null)
+                {
+                    apply(baselineRoster, character);
+                    baselineRoster.InitializeCachedData();
+                }
             }
 
             // Coalesced roster changes can land after the map event opens its encounter menu.

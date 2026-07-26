@@ -559,16 +559,20 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Agent sourceHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
             sourceHorseMirror.RealGlobalVelocity = new Vec3(0.6f, 0.8f, 5f);
-            component.AgentMovementHandler.MountMovementApplier.HandlePacket(
-                null,
-                new MountMovementPacket(
-                    new[] { horseId },
-                    new[] { new AgentMountData(sourceHorse, horseId) }));
+            var packet = new MountMovementPacket(
+                new[] { horseId },
+                new[] { new AgentMountData(sourceHorse, horseId) });
+            component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);
 
             Assert.Equal(AgentControllerType.None, puppetHorseMirror.Controller);
             Assert.Equal(1f, puppetHorseMirror.MaximumSpeedLimit);
             Assert.False(puppetHorseMirror.LastMaximumSpeedLimitIsMultiplier);
             Assert.Equal(1, puppetHorseMirror.SetMaximumSpeedLimitCalls);
+            Assert.NotNull(puppetHorse.CommonAIComponent);
+
+            puppetHorse.CommonAIComponent.OnMountReserved(47);
+            component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);
+            Assert.Equal(47, puppetHorse.CommonAIComponent.ReservedRiderAgentIndex);
         });
     }
 
