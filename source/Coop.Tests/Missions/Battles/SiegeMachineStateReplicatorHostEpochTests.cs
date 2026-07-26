@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
 using GameInterface.Services.MapEvents;
@@ -9,6 +9,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -231,10 +232,13 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
             "Stamp", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
 
+        var ladderFrame = new MatrixFrame(Mat3.Identity, new Vec3(1f, 2f, 3f));
         var captured = new NetworkSiegeMachineState(
             machineId: 30, hitPoints: 42.5f, destructionState: 2, gateState: 1, ladderState: 3,
             moveDistance: 18f, hasArrived: true, weaponState: 4, aimDirection: 0.75f,
-            aimReleaseAngle: 0.25f);
+            aimReleaseAngle: 0.25f, ladderAnimationSpeed: 1.73f, ladderAnimationProgress: 0.42f,
+            ladderAnimationState: 2, ladderFallAngularSpeed: -0.5f, ladderFrame: ladderFrame,
+            ladderAnimationIndex: 17);
 
         var stamped = Assert.IsType<NetworkSiegeMachineState>(
             method!.Invoke(sut, new object[] { captured }));
@@ -250,6 +254,12 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(4, stamped.WeaponState);
         Assert.Equal(0.75f, stamped.AimDirection);
         Assert.Equal(0.25f, stamped.AimReleaseAngle);
+        Assert.Equal(1.73f, stamped.LadderAnimationSpeed);
+        Assert.Equal(0.42f, stamped.LadderAnimationProgress);
+        Assert.Equal(2, stamped.LadderAnimationState);
+        Assert.Equal(-0.5f, stamped.LadderFallAngularSpeed);
+        Assert.Equal(ladderFrame.origin, stamped.LadderFrame.origin);
+        Assert.Equal(17, stamped.LadderAnimationIndex);
     }
 
     // ------------------------------------------------------------------

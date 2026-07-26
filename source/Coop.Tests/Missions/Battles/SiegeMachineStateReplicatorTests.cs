@@ -1,9 +1,13 @@
+﻿using GameInterface.Surrogates;
 using Missions.Battles;
 using Missions.Messages;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -11,6 +15,50 @@ namespace Coop.Tests.Missions.Battles;
 
 public class SiegeMachineStateReplicatorTests
 {
+    [Fact]
+    public void NetworkSiegeMachineState_RoundTripsLadderAnimationSnapshot()
+    {
+        _ = new SurrogateCollection();
+        var ladderFrame = new MatrixFrame(Mat3.Identity, new Vec3(1f, 2f, 3f));
+        var original = new NetworkSiegeMachineState(
+            machineId: 12,
+            hitPoints: -1f,
+            destructionState: -1,
+            gateState: -1,
+            ladderState: (int)SiegeLadder.LadderState.BeingRaised,
+            moveDistance: -1f,
+            hasArrived: false,
+            weaponState: -1,
+            aimDirection: -1000f,
+            aimReleaseAngle: -1000f,
+            hostEpoch: 4,
+            ladderAnimationSpeed: 1.73f,
+            ladderAnimationProgress: 0.42f,
+            ladderAnimationState: (int)SiegeLadder.LadderAnimationState.PhysicallyDynamic,
+            ladderFallAngularSpeed: -0.5f,
+            ladderFrame: ladderFrame,
+            ladderAnimationIndex: 17);
+
+        NetworkSiegeMachineState result;
+        using (var stream = new MemoryStream())
+        {
+            RuntimeTypeModel.Default.Serialize(stream, original);
+            stream.Position = 0;
+            result = (NetworkSiegeMachineState)RuntimeTypeModel.Default.Deserialize(
+                stream,
+                null,
+                typeof(NetworkSiegeMachineState));
+        }
+
+        Assert.Equal(original.LadderState, result.LadderState);
+        Assert.Equal(original.LadderAnimationSpeed, result.LadderAnimationSpeed);
+        Assert.Equal(original.LadderAnimationProgress, result.LadderAnimationProgress);
+        Assert.Equal(original.LadderAnimationState, result.LadderAnimationState);
+        Assert.Equal(original.LadderFallAngularSpeed, result.LadderFallAngularSpeed);
+        Assert.Equal(original.LadderFrame.origin, result.LadderFrame.origin);
+        Assert.Equal(original.LadderAnimationIndex, result.LadderAnimationIndex);
+    }
+
     [Fact]
     public void AuthoritativeHitPoints_UpdateTheMappedMissionSiegeWeapon()
     {

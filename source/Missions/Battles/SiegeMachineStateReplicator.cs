@@ -7,6 +7,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Missions;
 
@@ -47,6 +48,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // Aim replication: -1000 sentinel (a valid angle can be -1) and vanilla's own re-send threshold.
     private const float AimSentinel = -1000f;
     private const float AimEpsilon = 0.02f;
+    private const float LadderAnimationSentinel = -1f;
+    private const float LadderAnimationEpsilon = 0.01f;
+    private const float LadderFrameEpsilon = 0.001f;
 
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeMachineStateReplicator>();
 
@@ -224,7 +228,13 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 && previous.WeaponState == state.WeaponState
                 && Math.Abs(previous.MoveDistance - state.MoveDistance) < MoveDistanceThreshold
                 && Math.Abs(previous.AimDirection - state.AimDirection) < AimEpsilon
-                && Math.Abs(previous.AimReleaseAngle - state.AimReleaseAngle) < AimEpsilon)
+                && Math.Abs(previous.AimReleaseAngle - state.AimReleaseAngle) < AimEpsilon
+                && Math.Abs(previous.LadderAnimationSpeed - state.LadderAnimationSpeed) < LadderAnimationEpsilon
+                && Math.Abs(previous.LadderAnimationProgress - state.LadderAnimationProgress) < LadderAnimationEpsilon
+                && previous.LadderAnimationState == state.LadderAnimationState
+                && Math.Abs(previous.LadderFallAngularSpeed - state.LadderFallAngularSpeed) < LadderAnimationEpsilon
+                && previous.LadderAnimationIndex == state.LadderAnimationIndex
+                && LadderFramesEqual(previous.LadderFrame, state.LadderFrame))
             {
                 continue;
             }
@@ -234,6 +244,15 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
     }
 
+    private static bool LadderFramesEqual(MatrixFrame left, MatrixFrame right)
+    {
+        float thresholdSquared = LadderFrameEpsilon * LadderFrameEpsilon;
+        return (left.origin - right.origin).LengthSquared < thresholdSquared
+            && (left.rotation.s - right.rotation.s).LengthSquared < thresholdSquared
+            && (left.rotation.f - right.rotation.f).LengthSquared < thresholdSquared
+            && (left.rotation.u - right.rotation.u).LengthSquared < thresholdSquared;
+    }
+
     // BR-102: an outgoing state asserts this sender's simulation authority NOW, so stamp the current
     // host epoch at the send boundary (CaptureState stays a pure machine read; lastSent keeps the
     // unstamped capture, whose delta comparison never looks at the epoch).
@@ -241,7 +260,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     {
         return new NetworkSiegeMachineState(state.MachineId, state.HitPoints, state.DestructionState,
             state.GateState, state.LadderState, state.MoveDistance, state.HasArrived, state.WeaponState,
-            state.AimDirection, state.AimReleaseAngle, session.HostEpoch);
+            state.AimDirection, state.AimReleaseAngle, session.HostEpoch,
+            state.LadderAnimationSpeed, state.LadderAnimationProgress, state.LadderAnimationState,
+            state.LadderFallAngularSpeed, state.LadderFrame, state.LadderAnimationIndex);
     }
 
     // BR-102: drop a host-authority message stamped by an earlier hosting generation (a deposed host
@@ -262,7 +283,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private static NetworkSiegeMachineState CaptureState(UsableMachine machine, bool isHost, bool simulatedLocally)
     {
         ReadState(machine, out var hitPoints, out var destructionState, out var gateState, out var ladderState,
-            out var moveDistance, out var hasArrived, out var weaponState, out var aimDirection, out var aimReleaseAngle);
+            out var moveDistance, out var hasArrived, out var weaponState, out var aimDirection, out var aimReleaseAngle,
+            out var ladderAnimationSpeed, out var ladderAnimationProgress, out var ladderAnimationState,
+            out var ladderFallAngularSpeed, out var ladderFrame, out var ladderAnimationIndex);
 
         if (isHost && !simulatedLocally)
         {
@@ -280,6 +303,12 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             hitPoints = -1f;
             destructionState = -1;
             ladderState = -1;
+            ladderAnimationSpeed = LadderAnimationSentinel;
+            ladderAnimationProgress = LadderAnimationSentinel;
+            ladderAnimationState = -1;
+            ladderFallAngularSpeed = 0f;
+            ladderFrame = MatrixFrame.Zero;
+            ladderAnimationIndex = -1;
             if (!IsMovementMachine(machine))
             {
                 gateState = -1;
@@ -289,7 +318,10 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
 
         return new NetworkSiegeMachineState(machine.Id.Id, hitPoints, destructionState, gateState, ladderState,
-            moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle);
+            moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle,
+            ladderAnimationSpeed: ladderAnimationSpeed, ladderAnimationProgress: ladderAnimationProgress,
+            ladderAnimationState: ladderAnimationState, ladderFallAngularSpeed: ladderFallAngularSpeed,
+            ladderFrame: ladderFrame, ladderAnimationIndex: ladderAnimationIndex);
     }
 
     private void DeactivateNewMachines()
@@ -944,7 +976,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private static void ReadState(UsableMachine machine, out float hitPoints, out int destructionState,
         out int gateState, out int ladderState, out float moveDistance, out bool hasArrived, out int weaponState,
-        out float aimDirection, out float aimReleaseAngle)
+        out float aimDirection, out float aimReleaseAngle, out float ladderAnimationSpeed,
+        out float ladderAnimationProgress, out int ladderAnimationState, out float ladderFallAngularSpeed,
+        out MatrixFrame ladderFrame, out int ladderAnimationIndex)
     {
         hitPoints = -1f;
         destructionState = -1;
@@ -958,7 +992,26 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         // network message); it rides the same field as the castle gate's.
         gateState = machine is CastleGate gate ? (int)gate.State
             : machine is SiegeTower gateTower ? (int)gateTower.State : -1;
-        ladderState = machine is SiegeLadder ladder ? (int)ladder.State : -1;
+        ladderState = -1;
+        ladderAnimationSpeed = LadderAnimationSentinel;
+        ladderAnimationProgress = LadderAnimationSentinel;
+        ladderAnimationState = -1;
+        ladderFallAngularSpeed = 0f;
+        ladderFrame = MatrixFrame.Zero;
+        ladderAnimationIndex = -1;
+        if (machine is SiegeLadder ladder)
+        {
+            ladderState = (int)ladder.State;
+            ladderAnimationState = (int)ladder._animationState;
+            ladderFallAngularSpeed = ladder._fallAngularSpeed;
+            ladderFrame = ladder._ladderObject.GameEntity.GetGlobalFrame();
+            ladderAnimationIndex = ladder._ladderSkeleton.GetAnimationIndexAtChannel(0);
+            if (ladderAnimationIndex >= 0)
+            {
+                ladderAnimationSpeed = ladder._ladderSkeleton.GetAnimationSpeedAtChannel(0);
+                ladderAnimationProgress = ladder._ladderSkeleton.GetAnimationParameterAtChannel(0);
+            }
+        }
         weaponState = -1;
         aimDirection = AimSentinel;
         aimReleaseAngle = AimSentinel;
@@ -1096,9 +1149,39 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             gateTower.State = (SiegeTower.GateState)state.GateState;
         }
 
-        if (state.LadderState >= 0 && machine is SiegeLadder ladder && (int)ladder.State != state.LadderState)
+        if (state.LadderState >= 0 && machine is SiegeLadder ladder)
         {
-            ladder.State = (SiegeLadder.LadderState)state.LadderState;
+            var targetState = (SiegeLadder.LadderState)state.LadderState;
+            if (ladder.State != targetState)
+            {
+                // Poll snapshots can skip vanilla's synchronous transition states that start or finish animations.
+                foreach (var transitionState in GetLadderTransitionStates(ladder.State, targetState))
+                {
+                    ladder.State = transitionState;
+                }
+                ladder.State = targetState;
+            }
+
+            if (state.LadderAnimationState >= 0)
+            {
+                ladder._animationState = (SiegeLadder.LadderAnimationState)state.LadderAnimationState;
+                ladder._fallAngularSpeed = state.LadderFallAngularSpeed;
+                ladder._lastDotProductOfAnimationAndTargetRotation = -1000f;
+
+                var ladderFrame = state.LadderFrame;
+                ladderFrame.rotation.Orthonormalize();
+                ladder._ladderObject.GameEntity.SetGlobalFrame(ladderFrame);
+
+                if (state.LadderAnimationIndex >= 0)
+                {
+                    ladder._ladderSkeleton.SetAnimationAtChannel(state.LadderAnimationIndex, 0);
+                    ladder._ladderSkeleton.SetAnimationSpeedAtChannel(0, state.LadderAnimationSpeed);
+                    ladder._ladderSkeleton.SetAnimationParameterAtChannel(
+                        0,
+                        MBMath.ClampFloat(state.LadderAnimationProgress, 0f, 1f));
+                    ladder._ladderSkeleton.ForceUpdateBoneFrames();
+                }
+            }
         }
 
         if (state.HitPoints >= 0f && machine.DestructionComponent != null)
@@ -1114,6 +1197,62 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             {
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
+        }
+    }
+
+    internal static IEnumerable<SiegeLadder.LadderState> GetLadderTransitionStates(
+        SiegeLadder.LadderState currentState,
+        SiegeLadder.LadderState targetState)
+    {
+        if (targetState == SiegeLadder.LadderState.BeingRaised)
+        {
+            if (currentState == SiegeLadder.LadderState.OnLand
+                || currentState == SiegeLadder.LadderState.FallToLand)
+            {
+                yield return SiegeLadder.LadderState.BeingRaisedStartFromGround;
+            }
+            else if (currentState == SiegeLadder.LadderState.OnWall
+                || currentState == SiegeLadder.LadderState.FallToWall)
+            {
+                yield return SiegeLadder.LadderState.BeingPushedBackStartFromWall;
+                yield return SiegeLadder.LadderState.BeingPushedBack;
+                yield return SiegeLadder.LadderState.BeingPushedBackStopped;
+            }
+            else if (currentState == SiegeLadder.LadderState.BeingPushedBack
+                || currentState == SiegeLadder.LadderState.BeingPushedBackStartFromWall)
+            {
+                yield return SiegeLadder.LadderState.BeingPushedBackStopped;
+            }
+        }
+        else if (targetState == SiegeLadder.LadderState.BeingPushedBack)
+        {
+            if (currentState == SiegeLadder.LadderState.OnWall
+                || currentState == SiegeLadder.LadderState.FallToWall)
+            {
+                yield return SiegeLadder.LadderState.BeingPushedBackStartFromWall;
+            }
+            else if (currentState == SiegeLadder.LadderState.OnLand
+                || currentState == SiegeLadder.LadderState.FallToLand)
+            {
+                yield return SiegeLadder.LadderState.BeingRaisedStartFromGround;
+                yield return SiegeLadder.LadderState.BeingRaised;
+                yield return SiegeLadder.LadderState.BeingRaisedStopped;
+            }
+            else if (currentState == SiegeLadder.LadderState.BeingRaised
+                || currentState == SiegeLadder.LadderState.BeingRaisedStartFromGround)
+            {
+                yield return SiegeLadder.LadderState.BeingRaisedStopped;
+            }
+        }
+        else if (targetState == SiegeLadder.LadderState.OnWall
+            && currentState != SiegeLadder.LadderState.FallToWall)
+        {
+            yield return SiegeLadder.LadderState.FallToWall;
+        }
+        else if (targetState == SiegeLadder.LadderState.OnLand
+            && currentState != SiegeLadder.LadderState.FallToLand)
+        {
+            yield return SiegeLadder.LadderState.FallToLand;
         }
     }
 

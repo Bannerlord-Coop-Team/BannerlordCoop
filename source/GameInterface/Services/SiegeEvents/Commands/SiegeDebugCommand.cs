@@ -467,6 +467,56 @@ public class SiegeDebugCommand
             string.Join(Environment.NewLine, joined);
     }
 
+    [CommandLineArgumentFunction("prepare_ladders_only", "coop.debug.siege")]
+    public static string PrepareLaddersOnly(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.prepare_ladders_only <settlementId>";
+        }
+
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be used by the server";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var siegeEvent = settlement.SiegeEvent;
+        var attackerEngines = siegeEvent?.BesiegerCamp?.SiegeEngines;
+        var defenderEngines = settlement.SiegeEngines;
+        if (siegeEvent == null || attackerEngines == null || defenderEngines == null)
+        {
+            return $"{settlement.Name} is not under siege";
+        }
+
+        if (attackerEngines.DeployedSiegeEngines.Count > 0
+            || attackerEngines.ReservedSiegeEngines.Count > 0
+            || defenderEngines.DeployedSiegeEngines.Count > 0
+            || defenderEngines.ReservedSiegeEngines.Count > 0)
+        {
+            return $"{settlement.Name} already has campaign siege engines; stop and recreate the fixture";
+        }
+
+        var preparations = attackerEngines.SiegePreparations;
+        if (!preparations.IsConstructed)
+        {
+            preparations.SetProgress(1f);
+            siegeEvent.CreateSiegeObject(preparations, siegeEvent.GetSiegeEventSide(BattleSideEnum.Attacker));
+        }
+
+        return $"Prepared a ladder-only assault at {settlement.Name} ({settlement.StringId}): " +
+            $"preparation={preparations.Progress:0.00} attackerEngines=0 defenderEngines=0";
+    }
+
     [CommandLineArgumentFunction("stage_machines", "coop.debug.siege")]
     public static string StageMachines(List<string> args)
     {
@@ -878,7 +928,8 @@ public class SiegeDebugCommand
                     $" disabled={(machine.IsDisabled ? 1 : 0)} visible={(machine.GameEntity.IsVisibleIncludeParents() ? 1 : 0)}" +
                     $" deactivated={(machine.IsDeactivated ? 1 : 0)} aiOff={(machine.IsDisabledForAI ? 1 : 0)}" +
                     $" simLocal={(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id) ? 1 : 0)}" +
-                    $" pts={machine.StandingPoints.Count} ptsOff={deactivatedPoints} ptsUsed={usedPoints}");
+                    $" pts={machine.StandingPoints.Count} ptsOff={deactivatedPoints} ptsUsed={usedPoints}" +
+                    DescribeMissionMachineState(machine));
             }
             else if (missionObject is TaleWorlds.MountAndBlade.DeploymentPoint deploymentPoint)
             {
@@ -905,5 +956,21 @@ public class SiegeDebugCommand
         var dump = string.Join(Environment.NewLine, lines);
         Logger.Information("[MachineDump]\n{Dump}", dump);
         return dump;
+    }
+
+    private static string DescribeMissionMachineState(TaleWorlds.MountAndBlade.UsableMachine machine)
+    {
+        if (!(machine is TaleWorlds.MountAndBlade.SiegeLadder ladder))
+        {
+            return string.Empty;
+        }
+
+        int animationIndex = ladder._ladderSkeleton.GetAnimationIndexAtChannel(0);
+        float animationProgress = animationIndex >= 0
+            ? ladder._ladderSkeleton.GetAnimationParameterAtChannel(0)
+            : 0f;
+
+        return $" ladderState={ladder.State} ladderAnimation={ladder._animationState}" +
+            $" ladderAnimationIndex={animationIndex} ladderProgress={animationProgress:0.000}";
     }
 }

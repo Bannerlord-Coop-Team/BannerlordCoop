@@ -1,4 +1,4 @@
-using GameInterface.Services.SiegeEvents.Patches;
+﻿using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,7 @@ using FormatterServices = System.Runtime.Serialization.FormatterServices;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
+[Collection(nameof(SiegeAftermathCampaignCollection))]
 public sealed class SiegeAftermathPendingTests : IDisposable
 {
     public SiegeAftermathPendingTests()
@@ -145,18 +146,27 @@ public sealed class SiegeAftermathPendingTests : IDisposable
     [Fact]
     public void NarrationContext_IsParticipantScopedAndIndependentOfChoicePrompt()
     {
-        var participantSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
-        var unrelatedSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
-        var siegeEventInterface = new SiegeEventInterface();
+        var originalCampaign = Campaign.Current;
+        try
+        {
+            Campaign.Current = null;
+            var participantSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
+            var unrelatedSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
+            var siegeEventInterface = new SiegeEventInterface();
 
-        siegeEventInterface.SetLocalAftermathNarrationContext(participantSettlement);
-        siegeEventInterface.SetLocalAftermathNarration(unrelatedSettlement,
-            (int)SiegeAftermathAction.SiegeAftermath.Devastate);
-        Assert.True(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
+            siegeEventInterface.SetLocalAftermathNarrationContext(participantSettlement);
+            siegeEventInterface.SetLocalAftermathNarration(unrelatedSettlement,
+                (int)SiegeAftermathAction.SiegeAftermath.Devastate);
+            Assert.True(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
 
-        siegeEventInterface.SetLocalAftermathNarration(participantSettlement,
-            (int)SiegeAftermathAction.SiegeAftermath.Pillage);
-        Assert.False(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
+            siegeEventInterface.SetLocalAftermathNarration(participantSettlement,
+                (int)SiegeAftermathAction.SiegeAftermath.Pillage);
+            Assert.False(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
+        }
+        finally
+        {
+            Campaign.Current = originalCampaign;
+        }
     }
 
     private static (Settlement Settlement, SiegeAftermathPatches.PendingAftermath Pending) AddBoundPending()
@@ -230,3 +240,6 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         }
     }
 }
+
+[CollectionDefinition(nameof(SiegeAftermathCampaignCollection), DisableParallelization = true)]
+public sealed class SiegeAftermathCampaignCollection { }
