@@ -168,7 +168,7 @@ internal sealed class BattleGuardMountedRoute
         Agent.MovementControlFlag translationFlag;
         if (braking)
         {
-            turnInput = 0f;
+            turnInput = 1f;
             forwardInput = -1f;
             translationFlag =
                 Agent.MovementControlFlag.Backward;

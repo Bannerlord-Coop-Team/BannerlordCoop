@@ -361,7 +361,7 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void MountedRoute_Endpoint_BrakesBeforeNativeTurnThenReturns()
+    public void MountedRoute_Endpoint_BrakesDuringNativeTurnThenReturns()
     {
         var route = new BattleGuardMountedRoute(
             new Vec3(0f, 0f, 0f),
@@ -380,8 +380,9 @@ public class BattleGuardFixtureEvidenceTests
             Agent.MovementControlFlag.Backward,
             braking.TranslationFlag);
         Assert.Equal(
-            Agent.MovementControlFlag.None,
+            Agent.MovementControlFlag.TurnRight,
             braking.TurnFlag);
+        Assert.Equal(1f, braking.Movement.x);
         Assert.Equal(-1f, braking.Movement.y);
 
         BattleGuardMountedRouteInput reverseVelocity = route.Update(
@@ -428,8 +429,9 @@ public class BattleGuardFixtureEvidenceTests
             Agent.MovementControlFlag.Backward,
             rebraking.TranslationFlag);
         Assert.Equal(
-            Agent.MovementControlFlag.None,
+            Agent.MovementControlFlag.TurnRight,
             rebraking.TurnFlag);
+        Assert.Equal(1f, rebraking.Movement.x);
         Assert.Equal(-1f, rebraking.Movement.y);
 
         BattleGuardMountedRouteInput resumedTurn = route.Update(
