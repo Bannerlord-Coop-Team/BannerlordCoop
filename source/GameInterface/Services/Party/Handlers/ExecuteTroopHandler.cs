@@ -10,6 +10,13 @@ using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Party.Handlers;
 
+/// <summary>
+/// Relay for prisoner execution. Currently dormant: execution is disabled in coop
+/// (<see href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/2310">issue #2310</see>) —
+/// <see cref="Patches.PartyScreenLogicPatches"/> skips the native execute flow, so nothing publishes
+/// <see cref="HeroExecuted"/>. Kept for a future server-validated execution sync; the death cascade
+/// (clan/ruler succession, kingdom destruction) must be synced before rewiring this.
+/// </summary>
 internal class ExecuteTroopHandler : IHandler
 {
     private static readonly ILogger logger = LogManager.GetLogger<ExecuteTroopHandler>();
