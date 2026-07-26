@@ -19,11 +19,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Barters.Handlers;
 
@@ -176,12 +179,23 @@ internal sealed class LordBarterHandler : IHandler
                 if (!(barterable is SafePassageBarterable) &&
                     !(barterable is NoAttackBarterable))
                 {
-                    barterable.Apply();
+                    try
+                    {
+                        barterable.Apply();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex, "Failed to apply barterable {BarterableType}", barterable.GetType().Name);
+                    }
                 }
             }
+
+            CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offered);
+            ApplyOverpayRelationBonus(playerHero, targetHero, MathF.Max(0f, offerValue));
+
             if ((LordBarterKind)request.Kind == LordBarterKind.SafePassage)
             {
-                ApplySafePassage(targetParty.MobileParty, playerParty.MobileParty);
+                ApplySafePassage(targetParty?.MobileParty, playerParty?.MobileParty);
                 ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
             }
 
@@ -273,38 +287,64 @@ internal sealed class LordBarterHandler : IHandler
 
     private bool TryResolveContext(NetPeer peer, NetworkRequestLordBarter request, out Hero playerHero, out PartyBase playerParty, out Hero targetHero, out PartyBase targetParty, out string reason)
     {
-        playerHero = null; playerParty = null; targetHero = null; targetParty = null; reason = null;
-        if (string.IsNullOrEmpty(request.RequestId) || !Enum.IsDefined(typeof(PeaceConversationContext), request.Context) ||
-            !Enum.IsDefined(typeof(LordBarterKind), request.Kind) || !playerManager.TryGetPlayer(peer, out Player player) ||
-            !objectManager.TryGetObject(player.HeroId, out playerHero) || !objectManager.TryGetObject(player.MobilePartyId, out MobileParty mobileParty) ||
+        playerHero = null;
+        playerParty = null;
+        targetHero = null;
+        targetParty = null;
+        reason = null;
+
+        if (string.IsNullOrEmpty(request.RequestId) ||
+            !Enum.IsDefined(typeof(PeaceConversationContext), request.Context) ||
+            !Enum.IsDefined(typeof(LordBarterKind), request.Kind))
+        {
+            reason = "The server received an invalid lord barter request format.";
+            return false;
+        }
+
+        if (!playerManager.TryGetPlayer(peer, out Player player) ||
+            !objectManager.TryGetObject(player.HeroId, out playerHero) ||
+            !objectManager.TryGetObject(player.MobilePartyId, out MobileParty mobileParty) ||
             !objectManager.TryGetObject(request.TargetHeroId, out targetHero))
         {
             reason = "The server could not identify the lord barter participants.";
             return false;
         }
+
         if (targetHero.IsPlayerHero() || mobileParty.LeaderHero != playerHero || !mobileParty.IsActive)
         {
             reason = "The lord barter participants are no longer available.";
             return false;
         }
+
         playerParty = mobileParty.Party;
         targetParty = targetHero.PartyBelongedTo?.Party;
+
         if ((PeaceConversationContext)request.Context == PeaceConversationContext.MapParty)
         {
-            if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty) || requestedParty != targetParty ||
-                requestedParty.MobileParty?.IsActive != true || requestedParty.MobileParty.MapEvent != null || mobileParty.MapEvent != null ||
-                !objectManager.TryGetId(playerParty, out var playerPartyId) || !conversationPartyTracker.TryGetEngagement(peer, out var engagement) ||
-                engagement.PartyId != request.ContextId || engagement.EngagerPartyId != playerPartyId)
+            if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty) ||
+                requestedParty != targetParty ||
+                requestedParty.MobileParty?.IsActive != true ||
+                requestedParty.MobileParty.MapEvent != null ||
+                mobileParty.MapEvent != null ||
+                !objectManager.TryGetId(playerParty, out var playerPartyId) ||
+                !conversationPartyTracker.TryGetEngagement(peer, out var engagement) ||
+                engagement.PartyId != request.ContextId ||
+                engagement.EngagerPartyId != playerPartyId)
             {
                 reason = "The lord conversation is no longer active.";
                 return false;
             }
         }
-        else if (targetHero.CharacterObject == null || !objectManager.TryGetId(targetHero.CharacterObject, out var characterId) ||
-                 !locationConversationTracker.TryGetEngagement(peer, out var npcKey) || npcKey != LocationConversationTracker.ComposeKey(request.ContextId, characterId))
+        else
         {
-            reason = "The lord conversation is no longer active.";
-            return false;
+            if (targetHero.CharacterObject == null ||
+                !objectManager.TryGetId(targetHero.CharacterObject, out var characterId) ||
+                !locationConversationTracker.TryGetEngagement(peer, out var npcKey) ||
+                npcKey != LocationConversationTracker.ComposeKey(request.ContextId, characterId))
+            {
+                reason = "The lord conversation is no longer active.";
+                return false;
+            }
         }
 
         if (targetHero.IsPrisoner || targetHero.Clan == null)
@@ -312,6 +352,7 @@ internal sealed class LordBarterHandler : IHandler
             reason = "That lord is no longer available for barter.";
             return false;
         }
+
         return true;
     }
 
@@ -484,6 +525,45 @@ internal sealed class LordBarterHandler : IHandler
             factionProtectionEnds);
     }
 
+    private static void ApplyOverpayRelationBonus(Hero playerHero, Hero otherHero, float overpayAmount)
+    {
+        var campaign = Campaign.Current;
+        if (otherHero == null ||
+            overpayAmount <= 0f ||
+            playerHero?.MapFaction == null ||
+            otherHero.MapFaction == null ||
+            otherHero.MapFaction.IsAtWarWith(playerHero.MapFaction) ||
+            campaign == null)
+        {
+            return;
+        }
+
+        var relation = otherHero.GetRelation(playerHero);
+        var maximumRelation = MathF.Clamp(relation + 3, -100f, 100f);
+        var relationBonus = 0f;
+        for (var currentRelation = relation; currentRelation < maximumRelation; currentRelation++)
+        {
+            var cost = 1000 + ((100 * currentRelation) * currentRelation);
+            if (overpayAmount >= cost)
+            {
+                overpayAmount -= cost;
+                relationBonus += 1f;
+                continue;
+            }
+
+            if (MBRandom.RandomFloat <= overpayAmount / cost)
+                relationBonus += 1f;
+            break;
+        }
+
+        if (playerHero.GetPerkValue(DefaultPerks.Charm.Tribute))
+            relationBonus *= 1f + DefaultPerks.Charm.Tribute.PrimaryBonus;
+
+        var roundedBonus = (int)MathF.Ceiling(relationBonus);
+        if (roundedBonus > 0)
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, otherHero, roundedBonus);
+    }
+
     private void FlushGold(Hero hero)
     {
         if (sendCoalescer != null && hero != null && objectManager.TryGetId(hero, out var id)) sendCoalescer.FlushInstance(id, network);
@@ -492,7 +572,9 @@ internal sealed class LordBarterHandler : IHandler
     private void Reject(NetPeer peer, NetworkRequestLordBarter request, int gold, string reason)
     {
         Logger.Warning("Rejected lord barter with {TargetHeroId}: {Reason}", request.TargetHeroId, reason);
-        SendResult(peer, new NetworkLordBarterResult(request.ContextId, false, gold, reason, request.RequestId));
+        var result = new NetworkLordBarterResult(request.ContextId, false, gold, reason, request.RequestId);
+        completedResults[peer] = result;
+        SendResult(peer, result);
     }
 
     private void SendAccepted(NetPeer peer, NetworkRequestLordBarter request, int gold)
