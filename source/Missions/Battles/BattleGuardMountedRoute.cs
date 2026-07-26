@@ -17,6 +17,7 @@ internal sealed class BattleGuardMountedRoute
     private const float TurnForwardInput = 0.45f;
     private const float SteeringGain = 2f;
     private const float SteeringDeadZone = 0.05f;
+    private const float MovementHeadingMinimumSpeed = 0.1f;
 
     private readonly Vec3 start;
     private readonly Vec3 end;
@@ -155,6 +156,41 @@ internal sealed class BattleGuardMountedRoute
         return new BattleGuardMountedRouteInput(
             new Vec2(turnInput, forwardInput),
             turnFlag);
+    }
+
+    public BattleGuardMountedRouteInput Update(
+        Vec3 position,
+        Vec2 movementDirection,
+        Vec3 lookDirection,
+        float horizontalSpeed)
+    {
+        return Update(
+            position,
+            ResolveHeading(
+                movementDirection,
+                lookDirection,
+                horizontalSpeed));
+    }
+
+    internal static Vec3 ResolveHeading(
+        Vec2 movementDirection,
+        Vec3 lookDirection,
+        float horizontalSpeed)
+    {
+        Vec3 heading = horizontalSpeed >= MovementHeadingMinimumSpeed
+            ? new Vec3(
+                movementDirection.x,
+                movementDirection.y,
+                0f)
+            : Vec3.Zero;
+        if (heading.LengthSquared < 0.0001f)
+        {
+            heading = lookDirection;
+            heading.z = 0f;
+        }
+        if (heading.LengthSquared >= 0.0001f)
+            heading.Normalize();
+        return heading;
     }
 
     private static float Clamp(float value)

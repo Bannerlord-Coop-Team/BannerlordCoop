@@ -2,6 +2,7 @@
 using GameInterface.Services.Battles.Messages;
 using Missions.Battles;
 using ProtoBuf;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -321,6 +322,42 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
+    public void MountedRoute_MovementDirection_WinsOverStaleLookDirection()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        route.Update(
+            new Vec3(0f, 30f, 0f),
+            new Vec2(0f, -1f),
+            new Vec3(0f, 1f, 0f),
+            8f);
+
+        Assert.Equal("Return", route.State);
+        Assert.True(route.CanStageStrike);
+    }
+
+    [Fact]
+    public void MountedRoute_StoppedMount_UsesLookDespiteStaleMovementDirection()
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            40f);
+
+        route.Update(
+            new Vec3(0f, 30f, 0f),
+            new Vec2(0f, 1f),
+            new Vec3(0f, -1f, 0f),
+            0f);
+
+        Assert.Equal("Return", route.State);
+        Assert.True(route.CanStageStrike);
+    }
+
+    [Fact]
     public void MountedRoute_Endpoint_UsesNativeTurnThenReturns()
     {
         var route = new BattleGuardMountedRoute(
@@ -512,6 +549,23 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(
             Error,
             BattleGuardFixture.ClearMountedRouteWaitError(Error));
+    }
+
+    [Fact]
+    public void FixtureWieldState_RequiresTwoHandedGuardWeaponWithoutOffhand()
+    {
+        Assert.True(
+            BattleGuardFixture.IsFixtureWieldState(
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.None,
+                0,
+                "empire_lance_1_t3_blunt"));
+        Assert.False(
+            BattleGuardFixture.IsFixtureWieldState(
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.Weapon1,
+                0,
+                "empire_lance_1_t3_blunt"));
     }
 
     private static BattleGuardAnimationFrame Frame(

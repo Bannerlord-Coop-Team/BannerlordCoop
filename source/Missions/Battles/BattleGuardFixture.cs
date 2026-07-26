@@ -388,6 +388,11 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"recentSpeedSamples={sample.SpeedEvidence.RecentSamples} " +
             $"recentSpeedSpread={sample.SpeedEvidence.RecentSpread:0.###} " +
             $"recentSpeedSlope={sample.SpeedEvidence.RecentSlope:0.###} " +
+            $"guardMainHand={sample.MainHandIndex} " +
+            $"guardOffHand={sample.OffHandIndex} " +
+            $"guardMainUsage={sample.MainHandUsageIndex} " +
+            $"guardMainItem={GetTokenValue(sample.MainHandItemId)} " +
+            $"guardEquipmentReady={sample.GuardEquipmentReady} " +
             $"routeState={route?.State ?? "none"} " +
             $"routeProgress={route?.Progress ?? 0f:0.###} " +
             $"routeLateral={route?.LateralOffset ?? 0f:0.###} " +
@@ -867,10 +872,13 @@ public class BattleGuardFixture : IBattleGuardFixture
             if (driver.MountedRoute != null)
             {
                 Agent mount = agent.MountAgent;
+                Agent movementSource = mount ?? agent;
                 BattleGuardMountedRouteInput routeInput =
                     driver.MountedRoute.Update(
-                        mount?.Position ?? agent.Position,
-                        mount?.LookDirection ?? agent.LookDirection);
+                        movementSource.Position,
+                        movementSource.GetMovementDirection(),
+                        movementSource.LookDirection,
+                        movementSource.GetRealGlobalVelocity().AsVec2.Length);
                 flags |= routeInput.TurnFlag;
                 movementInput = routeInput.Movement;
             }
@@ -928,14 +936,18 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         if (agent.MountAgent != null)
         {
+            Vec2 movementDirection = lane.AsVec2;
             agent.MountAgent.TeleportToPosition(position);
             agent.MountAgent.LookDirection = lane;
+            agent.MountAgent.SetMovementDirection(movementDirection);
             agent.LookDirection = lane;
+            agent.SetMovementDirection(movementDirection);
         }
         else
         {
             agent.TeleportToPosition(position);
             agent.LookDirection = lane;
+            agent.SetMovementDirection(lane.AsVec2);
         }
         return true;
     }
@@ -1261,6 +1273,12 @@ public class BattleGuardFixture : IBattleGuardFixture
         ReplaceWeapon(agent, EquipmentIndex.Weapon0, weapon);
         ReplaceWeapon(agent, EquipmentIndex.Weapon1, MissionWeapon.Invalid);
         agent.SetWieldedItemIndexAsClient(
+            Agent.HandIndex.OffHand,
+            EquipmentIndex.None,
+            false,
+            false,
+            0);
+        agent.SetWieldedItemIndexAsClient(
             Agent.HandIndex.MainHand,
             EquipmentIndex.Weapon0,
             false,
@@ -1268,6 +1286,18 @@ public class BattleGuardFixture : IBattleGuardFixture
             0);
         error = null;
         return true;
+    }
+
+    internal static bool IsFixtureWieldState(
+        EquipmentIndex mainHandIndex,
+        EquipmentIndex offHandIndex,
+        int mainHandUsageIndex,
+        string mainHandItemId)
+    {
+        return mainHandIndex == EquipmentIndex.Weapon0 &&
+            offHandIndex == EquipmentIndex.None &&
+            mainHandUsageIndex == 0 &&
+            mainHandItemId == GuardWeaponId;
     }
 
     private static void ReplaceWeapon(
@@ -1381,8 +1411,10 @@ public class BattleGuardFixture : IBattleGuardFixture
                 driver.OriginalMount,
                 driver.OriginalPosition,
                 driver.OriginalLookDirection,
+                driver.OriginalMovementDirection,
                 driver.OriginalMountPosition,
                 driver.OriginalMountLookDirection,
+                driver.OriginalMountMovementDirection,
                 drivesGuard);
         }
         if (!drivesGuard)
@@ -1401,12 +1433,15 @@ public class BattleGuardFixture : IBattleGuardFixture
                 driver.OriginalMountPosition);
             driver.OriginalMount.LookDirection =
                 driver.OriginalMountLookDirection;
+            driver.OriginalMount.SetMovementDirection(
+                driver.OriginalMountMovementDirection);
         }
         else
         {
             agent.TeleportToPosition(driver.OriginalPosition);
         }
         agent.LookDirection = driver.OriginalLookDirection;
+        agent.SetMovementDirection(driver.OriginalMovementDirection);
     }
 
     private void TickPendingGuardRestore(
@@ -1482,8 +1517,11 @@ public class BattleGuardFixture : IBattleGuardFixture
     {
         restore.Mount.TeleportToPosition(restore.MountPosition);
         restore.Mount.LookDirection = restore.MountLookDirection;
+        restore.Mount.SetMovementDirection(
+            restore.MountMovementDirection);
         agent.TeleportToPosition(restore.AgentPosition);
         agent.LookDirection = restore.AgentLookDirection;
+        agent.SetMovementDirection(restore.AgentMovementDirection);
         agent.EventControlFlags &=
             ~(Agent.EventControlFlag.Dismount |
               Agent.EventControlFlag.Mount);
@@ -1744,6 +1782,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             sample.HasBaselineHealth = true;
         }
         sample.HealthDelta = agent.Health - sample.BaselineHealth;
+        SampleEquipment(agent);
         SampleSpeed(agent, elapsed);
 
         Skeleton skeleton = null;
@@ -1800,6 +1839,44 @@ public class BattleGuardFixture : IBattleGuardFixture
             if (!ReferenceEquals(skeleton, null))
                 skeleton.ManualInvalidate();
         }
+    }
+
+    private void SampleEquipment(Agent agent)
+    {
+        if (!AgentEquipmentData.HasSafeWeaponSlots(agent?.Equipment))
+        {
+            sample.MainHandIndex = (int)EquipmentIndex.None;
+            sample.OffHandIndex = (int)EquipmentIndex.None;
+            sample.MainHandUsageIndex = -1;
+            sample.MainHandItemId = null;
+            sample.GuardEquipmentReady = false;
+            return;
+        }
+
+        EquipmentIndex mainHandIndex =
+            agent.GetPrimaryWieldedItemIndex();
+        EquipmentIndex offHandIndex =
+            agent.GetOffhandWieldedItemIndex();
+        int mainHandUsageIndex = -1;
+        string mainHandItemId = null;
+        if (mainHandIndex >= EquipmentIndex.WeaponItemBeginSlot &&
+            mainHandIndex < EquipmentIndex.NumAllWeaponSlots)
+        {
+            MissionWeapon mainHandWeapon =
+                agent.Equipment[mainHandIndex];
+            mainHandUsageIndex = mainHandWeapon.CurrentUsageIndex;
+            mainHandItemId = mainHandWeapon.Item?.StringId;
+        }
+
+        sample.MainHandIndex = (int)mainHandIndex;
+        sample.OffHandIndex = (int)offHandIndex;
+        sample.MainHandUsageIndex = mainHandUsageIndex;
+        sample.MainHandItemId = mainHandItemId;
+        sample.GuardEquipmentReady = IsFixtureWieldState(
+            mainHandIndex,
+            offHandIndex,
+            mainHandUsageIndex,
+            mainHandItemId);
     }
 
     private void ObservePreReplayDisplayedState(
@@ -2307,8 +2384,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Agent Mount { get; }
         public Vec3 AgentPosition { get; }
         public Vec3 AgentLookDirection { get; }
+        public Vec2 AgentMovementDirection { get; }
         public Vec3 MountPosition { get; }
         public Vec3 MountLookDirection { get; }
+        public Vec2 MountMovementDirection { get; }
         public bool DrivesRestore { get; }
 
         public PendingGuardRestore(
@@ -2318,8 +2397,10 @@ public class BattleGuardFixture : IBattleGuardFixture
             Agent mount,
             Vec3 agentPosition,
             Vec3 agentLookDirection,
+            Vec2 agentMovementDirection,
             Vec3 mountPosition,
             Vec3 mountLookDirection,
+            Vec2 mountMovementDirection,
             bool drivesRestore)
         {
             Driver = driver;
@@ -2328,8 +2409,10 @@ public class BattleGuardFixture : IBattleGuardFixture
             Mount = mount;
             AgentPosition = agentPosition;
             AgentLookDirection = agentLookDirection;
+            AgentMovementDirection = agentMovementDirection;
             MountPosition = mountPosition;
             MountLookDirection = mountLookDirection;
+            MountMovementDirection = mountMovementDirection;
             DrivesRestore = drivesRestore;
         }
     }
@@ -2367,8 +2450,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Agent OriginalMount { get; }
         public Vec3 OriginalPosition { get; }
         public Vec3 OriginalLookDirection { get; }
+        public Vec2 OriginalMovementDirection { get; }
         public Vec3 OriginalMountPosition { get; }
         public Vec3 OriginalMountLookDirection { get; }
+        public Vec2 OriginalMountMovementDirection { get; }
         public MissionWeapon OriginalWeapon0 { get; }
         public MissionWeapon OriginalWeapon1 { get; }
         public AgentEquipmentData OriginalWieldedEquipment { get; }
@@ -2408,9 +2493,12 @@ public class BattleGuardFixture : IBattleGuardFixture
             OriginalMount = agent.MountAgent;
             OriginalPosition = agent.Position;
             OriginalLookDirection = agent.LookDirection;
+            OriginalMovementDirection = agent.GetMovementDirection();
             OriginalMountPosition = OriginalMount?.Position ?? Vec3.Zero;
             OriginalMountLookDirection =
                 OriginalMount?.LookDirection ?? Vec3.Zero;
+            OriginalMountMovementDirection =
+                OriginalMount?.GetMovementDirection() ?? Vec2.Zero;
             OriginalWeapon0 = agent.Equipment[EquipmentIndex.Weapon0];
             OriginalWeapon1 = agent.Equipment[EquipmentIndex.Weapon1];
             OriginalWieldedEquipment = new AgentEquipmentData(agent);
@@ -2808,6 +2896,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         public float BaselineHealth;
         public bool HasBaselineHealth;
         public float HealthDelta;
+        public int MainHandIndex = -2;
+        public int OffHandIndex = -2;
+        public int MainHandUsageIndex = -1;
+        public string MainHandItemId;
+        public bool GuardEquipmentReady;
         public int RawActionIndex = -1;
         public float RawProgress = -1f;
         public int LatchedChannel = -1;
