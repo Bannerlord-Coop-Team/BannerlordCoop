@@ -53,7 +53,8 @@ public class KingdomHandlerTests
             new Mock<IPlayerManager>().Object,
             new Mock<IKingdomDecisionVoteManager>().Object,
             new Mock<IKingdomMembershipState>().Object,
-            new Mock<IKingdomInterface>().Object);
+            new Mock<IKingdomInterface>().Object,
+            new Mock<IKingdomCreator>().Object);
     }
 
     private static bool TryGetCulture(KingdomHandler handler, string cultureId, out CultureObject culture)

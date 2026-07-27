@@ -309,7 +309,7 @@ internal class InteractionPatches
     /// <summary>True while a player's battle is still within its post-start window for AI parties to join as
     /// reinforcements (<see cref="MapEventConfig.PlayerBattleAiJoinWindowHours"/>). The window is opened in
     /// <see cref="Postfix_Initialize"/>; only the server ever populates it, so this is a server-side query.</summary>
-    internal static bool IsWithinAiJoinWindow(MapEvent mapEvent)
+    public static bool IsWithinAiJoinWindow(MapEvent mapEvent)
         => playerBattleAiJoinWindows.TryGetValue(mapEvent, out var window) && !window.Expired;
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
