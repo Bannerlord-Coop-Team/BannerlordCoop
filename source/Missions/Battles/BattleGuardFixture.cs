@@ -313,9 +313,9 @@ public class BattleGuardFixture : IBattleGuardFixture
                     guardMode,
                     force: guarding);
             }
-            if (guarding)
-                ApplyMountedGuardPresentationAction(
-                    agent,
+            guardDriver.MountedPresentationActionPending =
+                ShouldQueueMountedGuardPresentation(
+                    guarding,
                     guardDriver.Direction);
             guardDriver.MountedPostNativeGuardCommandPending = false;
             guardDriver.MountedPostNativeDirectionChanged = false;
@@ -341,6 +341,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         TickGuard(agentRegistry);
         TickStriker(agentRegistry);
         TickEvidenceCamera(agentRegistry);
+        ApplyPendingMountedGuardPresentationAction(agentRegistry);
     }
 
     public void SamplePreReplayDisplayedState(
@@ -600,6 +601,11 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"guardDirection={guardDriver?.Direction.ToString() ?? "none"} " +
             $"guardMode={sample.GuardMode} " +
             $"guardStateChanges={guardDriver?.MountedGuardStateChanges ?? 0} " +
+            $"guardPresentationPending={guardDriver?.MountedPresentationActionPending == true} " +
+            $"guardPresentationAttempts={guardDriver?.MountedPresentationAttempts ?? 0} " +
+            $"guardPresentationApplied={guardDriver?.MountedPresentationApplied == true} " +
+            $"guardPresentationRequestedAction={guardDriver?.MountedPresentationRequestedActionIndex ?? -1} " +
+            $"guardPresentationImmediateAction={guardDriver?.MountedPresentationImmediateActionIndex ?? -1} " +
             $"guardAction={sample.LatchedActionIndex} " +
             $"guardAnimation={sample.LatchedAnimationIndex} " +
             $"visualAction={sample.VisualActionIndex} visualAnimation={sample.VisualAnimationIndex} " +
@@ -1253,21 +1259,40 @@ public class BattleGuardFixture : IBattleGuardFixture
             _ => null
         };
 
-    private static void ApplyMountedGuardPresentationAction(
-        Agent agent,
+    internal static bool ShouldQueueMountedGuardPresentation(
+        bool guarding,
         BattleGuardFixtureDirection direction)
     {
+        return guarding &&
+            GetMountedGuardPresentationActionName(direction) != null;
+    }
+
+    private void ApplyPendingMountedGuardPresentationAction(
+        INetworkAgentRegistry agentRegistry)
+    {
+        GuardDriver driver = guardDriver;
+        if (driver?.MountedPresentationActionPending != true ||
+            !TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
+        {
+            return;
+        }
+
         string actionName =
-            GetMountedGuardPresentationActionName(direction);
+            GetMountedGuardPresentationActionName(driver.Direction);
+        driver.MountedPresentationActionPending = false;
         if (actionName == null)
             return;
 
         ActionIndexCache action = ActionIndexCache.Create(actionName);
-        agent.SetActionChannel(
+        driver.MountedPresentationAttempts++;
+        driver.MountedPresentationRequestedActionIndex = action.Index;
+        driver.MountedPresentationApplied = agent.SetActionChannel(
             1,
             in action,
             ignorePriority: true,
             additionalFlags: AnimFlags.anf_restart);
+        driver.MountedPresentationImmediateActionIndex =
+            agent.GetCurrentAction(1).Index;
     }
 
     private static bool TryPositionGuard(Agent agent, GuardDriver driver)
@@ -3159,6 +3184,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
         public bool MountedPostNativeGuardCommandPending { get; set; }
         public bool MountedPostNativeDirectionChanged { get; set; }
+        public bool MountedPresentationActionPending { get; set; }
+        public int MountedPresentationAttempts { get; set; }
+        public bool MountedPresentationApplied { get; set; }
+        public int MountedPresentationRequestedActionIndex { get; set; } = -1;
+        public int MountedPresentationImmediateActionIndex { get; set; } = -1;
         public uint AppliedRiderMovementFlags { get; private set; }
         public uint AppliedNativeDefendMovementFlags { get; private set; }
         public string AppliedAction0Direction { get; private set; } = "None";
