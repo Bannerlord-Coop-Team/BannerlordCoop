@@ -1,9 +1,16 @@
 ﻿using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.ObjectManager;
 using Missions.Battles;
+using Moq;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -109,6 +116,35 @@ public class CoopBattleMissionSpawnHandlerSizingTests
 
         Assert.True(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
             BattleSideEnum.Attacker, "player-party", defender, attacker));
+    }
+
+    [Fact]
+    public void LocalPartyId_SkipsUnregisteredMatchingMapEventParty()
+    {
+#pragma warning disable SYSLIB0050
+        var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
+        var localParty = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
+        var side = (MapEventSide)FormatterServices.GetUninitializedObject(typeof(MapEventSide));
+        var unregistered = (MapEventParty)FormatterServices.GetUninitializedObject(typeof(MapEventParty));
+        var registered = (MapEventParty)FormatterServices.GetUninitializedObject(typeof(MapEventParty));
+#pragma warning restore SYSLIB0050
+        unregistered.Party = localParty;
+        registered.Party = localParty;
+        typeof(MapEventSide).GetField("_battleParties", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(side, new MBList<MapEventParty>());
+        side._battleParties.Add(unregistered);
+        side._battleParties.Add(registered);
+        mapEvent._sides = new MapEventSide[2];
+        mapEvent._sides[(int)BattleSideEnum.Defender] = side;
+
+        var objectManager = new Mock<IObjectManager>();
+        string unregisteredId = null;
+        objectManager.Setup(x => x.TryGetId(unregistered, out unregisteredId)).Returns(false);
+        string registeredId = "MapEventParty_Created_34";
+        objectManager.Setup(x => x.TryGetId(registered, out registeredId)).Returns(true);
+
+        Assert.Equal(registeredId,
+            CoopFieldBattleLauncher.GetLocalPlayerPartyId(mapEvent, localParty, objectManager.Object));
     }
 
     [Fact]

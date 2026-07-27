@@ -178,10 +178,25 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
 
     internal static string GetLocalPlayerPartyId(MapEvent mapEvent, IObjectManager objectManager)
     {
-        var mapEventParty = mapEvent?.FindMapEventParty(PartyBase.MainParty);
-        return mapEventParty != null && objectManager.TryGetId(mapEventParty, out var playerPartyId)
-            ? playerPartyId
-            : null;
+        return GetLocalPlayerPartyId(mapEvent, PartyBase.MainParty, objectManager);
+    }
+
+    internal static string GetLocalPlayerPartyId(MapEvent mapEvent, PartyBase localParty, IObjectManager objectManager)
+    {
+        if (mapEvent?._sides == null || localParty == null || objectManager == null)
+            return null;
+
+        foreach (var side in mapEvent._sides)
+        {
+            if (side == null) continue;
+
+            foreach (var mapEventParty in side.Parties)
+                if (mapEventParty?.Party == localParty &&
+                    objectManager.TryGetId(mapEventParty, out var playerPartyId))
+                    return playerPartyId;
+        }
+
+        return null;
     }
 
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest
