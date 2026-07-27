@@ -665,12 +665,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
-        if (!movementPacketCompressor.TryRestore(packet, out packet))
-        {
-            Logger.Warning("Discarding an invalid compressed movement packet");
-            return;
-        }
-
         packetManager.HandleReceive(peer, packet);
     }
 }

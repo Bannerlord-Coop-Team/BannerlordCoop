@@ -42,6 +42,9 @@ internal class TroopRosterPatches
     internal static bool IsRegistered(TroopRoster roster)
         => ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(roster, out _);
 
+    internal static bool ShouldReportClientMutation(bool isClient, bool isRegistered)
+        => isClient && isRegistered;
+
     [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
     [HarmonyPrefix]
     private static void PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange,
@@ -50,7 +53,8 @@ internal class TroopRosterPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddToCountsAtIndex), typeof(TroopRoster));
+            if (ShouldReportClientMutation(ModInformation.IsClient, IsRegistered(__instance)))
+                Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.AddToCountsAtIndex), typeof(TroopRoster));
             return;
         }
 
@@ -86,7 +90,8 @@ internal class TroopRosterPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.RemoveZeroCounts), typeof(TroopRoster));
+            if (ShouldReportClientMutation(ModInformation.IsClient, IsRegistered(__instance)))
+                Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.RemoveZeroCounts), typeof(TroopRoster));
             return;
         }
 
@@ -113,7 +118,8 @@ internal class TroopRosterPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementNumber), typeof(TroopRoster));
+            if (ShouldReportClientMutation(ModInformation.IsClient, IsRegistered(__instance)))
+                Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementNumber), typeof(TroopRoster));
             return;
         }
 
@@ -146,7 +152,8 @@ internal class TroopRosterPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementWoundedNumber), typeof(TroopRoster));
+            if (ShouldReportClientMutation(ModInformation.IsClient, IsRegistered(__instance)))
+                Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementWoundedNumber), typeof(TroopRoster));
             return;
         }
 
@@ -177,7 +184,8 @@ internal class TroopRosterPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementXp), typeof(TroopRoster));
+            if (ShouldReportClientMutation(ModInformation.IsClient, IsRegistered(__instance)))
+                Logger.Error("Client attempted to {methodName} on a managed {type}", nameof(TroopRoster.SetElementXp), typeof(TroopRoster));
             return;
         }
 
