@@ -458,20 +458,25 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, false)]
-    [InlineData(false, true, true)]
-    [InlineData(false, false, false)]
+    [InlineData(true, false, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]
+    [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
     public void MountedGuardState_CommandsNativeStateOnlyOnTransition(
         bool guarding,
         bool guardCommandActive,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection guardCommandDirection,
         bool expected)
     {
         Assert.Equal(
             expected,
             BattleGuardFixture.ShouldCommandMountedGuardState(
                 guarding,
-                guardCommandActive));
+                guardCommandActive,
+                direction,
+                guardCommandDirection));
     }
 
     [Fact]

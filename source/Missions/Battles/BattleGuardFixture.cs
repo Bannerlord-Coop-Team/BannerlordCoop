@@ -1112,7 +1112,9 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (driver.Mode == BattleGuardFixtureMode.Mounted &&
             ShouldCommandMountedGuardState(
                 guarding,
-                driver.MountedGuardCommandActive))
+                driver.MountedGuardCommandActive,
+                driver.Direction,
+                driver.MountedGuardCommandDirection))
         {
             AgentActionData.ApplyGuardState(
                 agent,
@@ -1121,6 +1123,7 @@ public class BattleGuardFixture : IBattleGuardFixture
                     : Agent.GuardMode.None,
                 force: guarding);
             driver.MountedGuardCommandActive = guarding;
+            driver.MountedGuardCommandDirection = driver.Direction;
             driver.MountedGuardStateChanges++;
         }
         if (targetLookDirection.LengthSquared >= 0.0001f)
@@ -1533,9 +1536,12 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     internal static bool ShouldCommandMountedGuardState(
         bool guarding,
-        bool guardCommandActive)
+        bool guardCommandActive,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection guardCommandDirection)
     {
-        return guarding != guardCommandActive;
+        return guarding != guardCommandActive ||
+            (guarding && direction != guardCommandDirection);
     }
 
     internal static bool IsRemountStateReconciled(
@@ -3007,6 +3013,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Vec3 CurrentHorizontalDirection { get; set; }
         public float CalibratedPlateauSpeed { get; set; } = -1f;
         public bool MountedGuardCommandActive { get; set; }
+        public BattleGuardFixtureDirection MountedGuardCommandDirection
+        {
+            get;
+            set;
+        }
         public int MountedGuardStateChanges { get; set; }
         public BattleGuardMountedSpeedLimiter MountedSpeedLimiter { get; } =
             new();
@@ -3033,6 +3044,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             Mode = mode;
             Phase = phase;
             Direction = direction;
+            MountedGuardCommandDirection = direction;
             OriginalMovementFlags = agent.MovementFlags;
             OriginalMovementInputVector = agent.MovementInputVector;
             OriginalDefendFlags =
