@@ -630,8 +630,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
-            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
-            Assert.Equal(1, puppetMirror.ResetGuardCalls);
+            Assert.Equal(3, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(2, puppetMirror.ResetGuardCalls);
             Assert.Equal(
                 actionCommandCount + 1,
                 puppetMirror.SetActionChannelCalls);
@@ -639,7 +639,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MissionPreDisplayTick_MountedOppositeGuardAction_RetriesRealizedDirection()
+    public void PreMissionTick_MountedRealizedDirection_RecommandsBeforeDisplay()
     {
         RunScenario("peer", context =>
         {
@@ -678,11 +678,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendRight;
-            ownerMirror.Action1Index = 3070;
-            ownerMirror.Action1Progress = 0.05f;
             ownerMirror.Action1Direction = Agent.UsageDirection.DefendRight;
-            puppetMirror.SetActionChannelResult = false;
-
             ApplyOwnerAction(context.Component, 2L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
@@ -693,36 +689,49 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                     | Agent.MovementControlFlag.DefendRight,
                 AgentActionData.GetDefendMovementFlags(
                     puppetMirror.MovementFlags));
+
+            ownerMirror.Action1Index = 3070;
+            ownerMirror.Action1Progress = 0.05f;
+            ownerMirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            puppetMirror.SetActionChannelResult = false;
+            ApplyOwnerAction(context.Component, 3L, agentId, owner);
+
             int rejectedActionCommands = puppetMirror.SetActionChannelCalls;
             Assert.True(rejectedActionCommands > 0);
 
             puppetMirror.SetActionChannelResult = true;
             puppetMirror.Action0Index = 404;
             puppetMirror.Action0CodeType = Agent.ActionCodeType.StrikeMedium;
-            controller.OnPreDisplayMissionTick(0.1f);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
             Assert.Equal(3078, puppetMirror.Action1Index);
             Assert.Equal(
                 rejectedActionCommands,
                 puppetMirror.SetActionChannelCalls);
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(1, puppetMirror.ResetGuardCalls);
 
             puppetMirror.Action0Index = -1;
             puppetMirror.Action0CodeType = Agent.ActionCodeType.Idle;
-            controller.OnPreDisplayMissionTick(0.1f);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
-            Assert.Equal(3070, puppetMirror.Action1Index);
+            Assert.Equal(3078, puppetMirror.Action1Index);
             Assert.Equal(
-                rejectedActionCommands + 1,
+                rejectedActionCommands,
                 puppetMirror.SetActionChannelCalls);
-            Assert.Equal(1, puppetMirror.LastSetActionChannel);
-            Assert.True(puppetMirror.LastSetActionIgnorePriority);
-            Assert.Equal(0.05f, puppetMirror.LastSetActionStartProgress);
+            Assert.Equal(3, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(2, puppetMirror.ResetGuardCalls);
 
+            puppetMirror.Action1Index = 3070;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendRight;
+            int actionCommandsBeforeDisplay =
+                puppetMirror.SetActionChannelCalls;
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(3070, puppetMirror.Action1Index);
             Assert.Equal(
-                rejectedActionCommands + 1,
+                actionCommandsBeforeDisplay,
                 puppetMirror.SetActionChannelCalls);
         });
     }
