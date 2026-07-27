@@ -966,16 +966,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
-        bool currentGuardActionHasDisplacedVisual =
-            agent.HasMount
-            && agent.GetCurrentAction(channel) == guardState.GuardAction
-            && guardState.DisplacedGuardAction != ActionIndexCache.act_none
-            && agentVisualActionAccessor.IsActionVisible(
-                agent,
-                channel,
-                in guardState.DisplacedGuardAction);
-        if (!currentGuardActionHasDisplacedVisual
-            && !IsMountedGuardDirectionMissing(
+        if (agent.GetCurrentAction(channel) == guardState.GuardAction)
+            return;
+
+        if (!IsMountedGuardDirectionMissing(
                 agent,
                 guardState.Action.Data,
                 channel,
@@ -992,12 +986,16 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         float actionProgress = channel == 0
             ? data.Action0Progress
             : data.Action1Progress;
-        if (agent.SetActionChannel(
+        agent.SetActionChannel(
             channel,
             guardState.GuardAction,
             ignorePriority: true,
-            additionalFlags: actionFlags,
-            startProgress: actionProgress))
+            additionalFlags: actionFlags | AnimFlags.anf_restart,
+            startProgress: actionProgress);
+        if (agentVisualActionAccessor.IsActionVisible(
+            agent,
+            channel,
+            in guardState.GuardAction))
         {
             guardState.NeedsGuardPresentationTransition = false;
         }

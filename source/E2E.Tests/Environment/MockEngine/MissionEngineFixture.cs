@@ -876,6 +876,12 @@ public sealed class MissionEngineFixture : IDisposable
             return false;
         }
 
+        if (m.AcceptedSetActionChannelDeferralsRemaining > 0)
+        {
+            m.AcceptedSetActionChannelDeferralsRemaining--;
+            return false;
+        }
+
         if (channelNo == 0)
         {
             m.Action0Index = actionIndexCache.Index;

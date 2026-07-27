@@ -409,14 +409,18 @@ namespace Missions.Agents.Packets
                     Action0Index,
                     out ActionIndexCache action0))
                 {
+                    bool forceGuardDirectionTransition =
+                        ShouldForceMountedGuardDirectionTransition(
+                            agent,
+                            0);
+                    AnimFlags actionFlags = (AnimFlags)Action0Flag;
+                    if (forceGuardDirectionTransition)
+                        actionFlags |= AnimFlags.anf_restart;
                     agent.SetActionChannel(
                         0,
                         action0,
-                        ignorePriority:
-                            ShouldForceMountedGuardDirectionTransition(
-                                agent,
-                                0),
-                        additionalFlags: (AnimFlags)Action0Flag,
+                        ignorePriority: forceGuardDirectionTransition,
+                        additionalFlags: actionFlags,
                         startProgress: Action0Progress);
                 }
             }
@@ -439,14 +443,18 @@ namespace Missions.Agents.Packets
                     Action1Index,
                     out ActionIndexCache action1))
                 {
+                    bool forceGuardDirectionTransition =
+                        ShouldForceMountedGuardDirectionTransition(
+                            agent,
+                            1);
+                    AnimFlags actionFlags = (AnimFlags)Action1Flag;
+                    if (forceGuardDirectionTransition)
+                        actionFlags |= AnimFlags.anf_restart;
                     agent.SetActionChannel(
                         1,
                         action1,
-                        ignorePriority:
-                            ShouldForceMountedGuardDirectionTransition(
-                                agent,
-                                1),
-                        additionalFlags: (AnimFlags)Action1Flag,
+                        ignorePriority: forceGuardDirectionTransition,
+                        additionalFlags: actionFlags,
                         startProgress: Action1Progress);
                 }
             }
