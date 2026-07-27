@@ -33,9 +33,9 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     public TroopScoreHitVerticalTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void ReportedTroopScoreHit_UpdatesContributionEverywhere()
+    public void ReportedTroopScoreHit_AfterAttackerKilled_UpdatesContributionEverywhere()
     {
-        var (partyId, _, victimId) = SetupScoredBattleOnServer();
+        var (partyId, troopSeed, victimId) = SetupScoredBattleOnServer();
 
         int serverContribution = 0;
 
@@ -44,6 +44,11 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
             Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
             var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
             Assert.True(Server.ObjectManager.TryGetId(attacker, out string attackerId));
+
+            // A casualty report from another client can arrive before this projectile's delayed hit.
+            party.Troops.OnTroopKilled(new UniqueTroopDescriptor(troopSeed));
+            Assert.Contains(party.Troops, element =>
+                element.Descriptor.UniqueSeed == troopSeed && element.IsKilled);
 
             int before = party.ContributionToBattle;
 
@@ -72,7 +77,6 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
         int contributionBefore = 0;
         int xpBefore = 0;
-        int expectedXp = 0;
 
         Server.Call(() =>
         {
@@ -104,15 +108,6 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
             xpBefore = party.Troops
                 .Where(element => element.Troop == attacker)
                 .Sum(element => element.XpGained);
-            expectedXp = Campaign.Current.Models.CombatXpModel.GetXpFromHit(
-                attacker,
-                null,
-                victim,
-                party.Party,
-                30,
-                true,
-                CombatXpModel.MissionTypeEnum.Battle).RoundedResultNumber;
-            Assert.True(expectedXp > 0, "The fixture hit must produce XP");
         });
 
         reporter.Call(() =>
@@ -146,12 +141,22 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
             var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
-            Assert.Equal(contributionBefore + expectedXp, party.ContributionToBattle);
-            Assert.Equal(
-                xpBefore + expectedXp,
-                party.Troops
-                    .Where(element => element.Troop == attacker)
-                    .Sum(element => element.XpGained));
+            int contributionDelta = party.ContributionToBattle - contributionBefore;
+            int xpDelta = party.Troops
+                .Where(element => element.Troop == attacker)
+                .Sum(element => element.XpGained) - xpBefore;
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+            int expectedXp = Campaign.Current.Models.CombatXpModel.GetXpFromHit(
+                attacker,
+                null,
+                victim,
+                party.Party,
+                30,
+                true,
+                CombatXpModel.MissionTypeEnum.Battle).RoundedResultNumber;
+            Assert.True(expectedXp > 0, "The fixture hit must produce XP");
+            Assert.Equal(expectedXp, contributionDelta);
+            Assert.Equal(expectedXp, xpDelta);
             serverContribution = party.ContributionToBattle;
         });
 

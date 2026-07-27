@@ -285,12 +285,14 @@ internal class MapEventPartyHandler : IHandler
         bool isSimulatedHit)
     {
         var roster = mapEventParty.Troops;
+        UniqueTroopDescriptor? fallbackDescriptor = null;
         if (roster != null)
         {
             foreach (var element in roster)
             {
-                if (element.IsKilled || element.IsWounded || element.IsRouted) continue;
                 if (element.Troop != attackingTroop) continue;
+                fallbackDescriptor ??= element.Descriptor;
+                if (element.IsKilled || element.IsWounded || element.IsRouted) continue;
 
                 // The attacker's weapon is not carried over the wire; native simulation also passes null.
                 mapEventParty.OnTroopScoreHit(
@@ -305,8 +307,21 @@ internal class MapEventPartyHandler : IHandler
             }
         }
 
+        if (fallbackDescriptor.HasValue)
+        {
+            mapEventParty.OnTroopScoreHit(
+                fallbackDescriptor.Value,
+                attackedTroop,
+                damage,
+                isFatal,
+                isTeamKill: false,
+                null,
+                isSimulatedHit);
+            return;
+        }
+
         Logger.Warning(
-            "Score hit for {AttackingTroop} dropped: no live matching troop in party {Party}'s current roster",
+            "Score hit for {AttackingTroop} dropped: no matching troop in party {Party}'s current roster",
             attackingTroop.StringId,
             mapEventParty.Party?.Id);
     }

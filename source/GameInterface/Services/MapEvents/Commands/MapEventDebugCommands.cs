@@ -845,12 +845,10 @@ public class MapEventDebugCommands
         BattleRewardPlayerSnapshot snapshot,
         MapEventParty mapEventParty)
     {
-        var initialItems = snapshot.ItemRoster.Sum(element => element.Amount);
-        var initialPrisoners = snapshot.PrisonRoster.Sum(element => element.Number);
         return $"{role}Controller={snapshot.ControllerId}, {role}Party={snapshot.Party.StringId}, " +
                $"{role}Contribution={mapEventParty?.ContributionToBattle ?? 0}, " +
-               $"{role}ItemsDelta={snapshot.Party.ItemRoster.Sum(element => element.Amount) - initialItems}, " +
-               $"{role}PrisonersDelta={snapshot.Party.PrisonRoster.TotalManCount - initialPrisoners}, " +
+               $"{role}ItemsDelta={snapshot.Party.ItemRoster.Sum(element => element.Amount)}, " +
+               $"{role}PrisonersDelta={snapshot.Party.PrisonRoster.TotalManCount}, " +
                $"{role}MapEvent={(snapshot.Party.MapEvent == null ? "none" : "attached")}";
     }
 
