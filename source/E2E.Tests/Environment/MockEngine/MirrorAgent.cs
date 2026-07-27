@@ -72,6 +72,9 @@ public sealed class MirrorAgent
     public int SetCurrentActionProgressCalls { get; set; }
     public int SetActionChannelCalls { get; set; }
     public List<int> SetActionChannelIndices { get; } = new();
+    public List<float> SetActionChannelBlendInPeriods { get; } = new();
+    public List<float> SetActionChannelBlendOutToNonePeriods { get; } = new();
+    public List<float> SetActionChannelBlendOutPeriods { get; } = new();
     public List<string> ActionAndGuardCallOrder { get; } = new();
     public bool SetActionChannelResult { get; set; } = true;
     public int AcceptedSetActionChannelDeferralsRemaining { get; set; }

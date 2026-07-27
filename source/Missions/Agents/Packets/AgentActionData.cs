@@ -121,6 +121,9 @@ namespace Missions.Agents.Packets
                 ActionIndexCache.act_none,
                 ignorePriority: true,
                 additionalFlags: AnimFlags.anf_restart,
+                blendInPeriod: 0f,
+                blendOutPeriodToNoAnim: 0f,
+                blendOutPeriod: 0f,
                 forceFaceMorphRestart: false);
         }
 

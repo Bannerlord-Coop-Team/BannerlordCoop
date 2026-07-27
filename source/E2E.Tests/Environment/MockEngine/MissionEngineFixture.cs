@@ -857,13 +857,19 @@ public sealed class MissionEngineFixture : IDisposable
         bool ignorePriority,
         AnimFlags additionalFlags,
         float blendInPeriod,
+        float blendOutPeriodToNoAnim,
         float startProgress,
+        float blendOutPeriod,
         bool forceFaceMorphRestart,
         ref bool __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetActionChannelCalls++;
         m.SetActionChannelIndices.Add(actionIndexCache.Index);
+        m.SetActionChannelBlendInPeriods.Add(blendInPeriod);
+        m.SetActionChannelBlendOutToNonePeriods.Add(
+            blendOutPeriodToNoAnim);
+        m.SetActionChannelBlendOutPeriods.Add(blendOutPeriod);
         m.ActionAndGuardCallOrder.Add("set-action");
         m.LastSetActionChannel = channelNo;
         m.LastSetActionIgnorePriority = ignorePriority;
@@ -881,7 +887,10 @@ public sealed class MissionEngineFixture : IDisposable
             return false;
         }
 
-        if (actionIndexCache == ActionIndexCache.act_none)
+        if (actionIndexCache == ActionIndexCache.act_none
+            && blendInPeriod == 0f
+            && blendOutPeriodToNoAnim == 0f
+            && blendOutPeriod == 0f)
         {
             m.ClearRetainedNativeAction(channelNo);
         }

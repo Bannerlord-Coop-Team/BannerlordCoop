@@ -740,6 +740,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.RetainedNativeActionDirection =
                 Agent.UsageDirection.DefendLeft;
             puppetMirror.SetActionChannelIndices.Clear();
+            puppetMirror.SetActionChannelBlendInPeriods.Clear();
+            puppetMirror.SetActionChannelBlendOutToNonePeriods.Clear();
+            puppetMirror.SetActionChannelBlendOutPeriods.Clear();
             puppetMirror.ActionAndGuardCallOrder.Clear();
 
             ownerMirror.GuardMode = Agent.GuardMode.Right;
@@ -762,6 +765,15 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 new[] { ActionIndexCache.act_none.Index, 3070 },
                 puppetMirror.SetActionChannelIndices);
+            Assert.Equal(
+                new[] { 0f, -0.2f },
+                puppetMirror.SetActionChannelBlendInPeriods);
+            Assert.Equal(
+                new[] { 0f, 0.4f },
+                puppetMirror.SetActionChannelBlendOutToNonePeriods);
+            Assert.Equal(
+                new[] { 0f, -0.2f },
+                puppetMirror.SetActionChannelBlendOutPeriods);
             Assert.Equal(
                 new[]
                 {
