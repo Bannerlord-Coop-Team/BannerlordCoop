@@ -1102,13 +1102,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
         if (guarding)
             flags |= defendFlags;
-        agent.MovementFlags = flags;
-        agent.MovementInputVector = movementInput;
-        AgentActionData.ApplyDefendMovementFlags(
-            agent,
-            guarding
-                ? defendFlags
-                : Agent.MovementControlFlag.None);
         bool mountedGuardDirectionChanged =
             driver.Mode == BattleGuardFixtureMode.Mounted &&
             ShouldResetMountedGuardDirection(
@@ -1143,6 +1136,13 @@ public class BattleGuardFixture : IBattleGuardFixture
             driver.MountedGuardCommandDirection = driver.Direction;
             driver.MountedGuardStateChanges++;
         }
+        agent.MovementFlags = flags;
+        agent.MovementInputVector = movementInput;
+        AgentActionData.ApplyDefendMovementFlags(
+            agent,
+            guarding
+                ? defendFlags
+                : Agent.MovementControlFlag.None);
         if (targetLookDirection.LengthSquared >= 0.0001f)
             agent.LookDirection = targetLookDirection;
         if (dismounting)

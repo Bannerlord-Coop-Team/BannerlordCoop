@@ -402,6 +402,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 context, AgentControllerType.Player, out MirrorAgent ownerMirror);
             context.Mock.SpawnMount(puppet);
             context.Mock.SpawnMount(owner);
+            puppetMirror.SetWeaponGuardOverwritesDefendFlags = true;
 
             ownerMirror.GuardMode = Agent.GuardMode.Left;
             ownerMirror.MovementFlags =

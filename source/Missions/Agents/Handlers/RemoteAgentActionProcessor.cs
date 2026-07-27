@@ -297,14 +297,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 if (!replayGuardAction)
                 {
                     AgentActionData data = guardState.Action.Data;
-                    AgentActionData.ApplyDefendMovementFlags(
-                        agent,
-                        data.DefendFlags);
                     ApplyRetainedGuardCommand(
                         agent,
                         ref guardState,
                         restoreNativeGuardState:
                             data.IsPlayerControlled || !agent.HasMount);
+                    AgentActionData.ApplyDefendMovementFlags(
+                        agent,
+                        data.DefendFlags);
                 }
 
                 bool hasGuardReaction =
