@@ -1,4 +1,4 @@
-using Common.PacketHandlers;
+﻿using Common.PacketHandlers;
 using LiteNetLib;
 using ProtoBuf;
 using System;
@@ -20,13 +20,27 @@ namespace Missions.Agents.Packets
         public PacketType PacketType => PacketType.MountMovement;
 
         [ProtoMember(1)]
-        public Guid[] MountIds { get; }
+        public string IdentityScopeId { get; }
         [ProtoMember(2)]
+        public ushort[] MountIds { get; }
+        [ProtoMember(3)]
         public AgentMountData[] Mounts { get; }
+        [ProtoMember(4)]
+        public Guid[] MountGuids { get; }
 
-        public MountMovementPacket(Guid[] mountIds, AgentMountData[] mounts)
+        public MountMovementPacket(string identityScopeId, ushort[] mountIds, AgentMountData[] mounts)
         {
+            IdentityScopeId = identityScopeId;
             MountIds = mountIds;
+            Mounts = mounts;
+            MountGuids = null;
+        }
+
+        public MountMovementPacket(Guid[] mountGuids, AgentMountData[] mounts)
+        {
+            IdentityScopeId = null;
+            MountIds = null;
+            MountGuids = mountGuids;
             Mounts = mounts;
         }
     }

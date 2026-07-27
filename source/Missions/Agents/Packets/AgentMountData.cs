@@ -10,7 +10,11 @@ namespace Missions.Agents.Packets
     {
         // The parameter is the MOUNT agent itself (callers pass rider.MountAgent), so read it directly —
         // mirroring ApplyMount. Dereferencing .MountAgent here was reading the mount's own (null) mount → NRE.
-        public AgentMountData(Agent mountAgent, Guid mountId = default)
+        public AgentMountData(
+            Agent mountAgent,
+            ushort mountMovementId = 0,
+            string mountIdentityScopeId = null,
+            Guid mountAgentId = default)
         {
             MountInputVector = mountAgent.MovementInputVector;
             MountAction0Flag = (ulong)mountAgent.GetCurrentAnimationFlag(0);
@@ -23,7 +27,14 @@ namespace Missions.Agents.Packets
             MountMovementDirection = mountAgent.GetMovementDirection();
             MountPosition = mountAgent.Position;
             MountSpeed = mountAgent.GetRealGlobalVelocity().AsVec2.Length;
-            MountId = mountId;
+            MountMovementId = mountMovementId;
+            MountIdentityScopeId = mountIdentityScopeId;
+            MountAgentId = mountAgentId;
+        }
+
+        public AgentMountData(Agent mountAgent, Guid mountAgentId)
+            : this(mountAgent, 0, null, mountAgentId)
+        {
         }
 
         public void ApplyMount(Agent mountAgent)
@@ -78,11 +89,9 @@ namespace Missions.Agents.Packets
         public Vec2 MountMovementDirection { get; }
         [ProtoMember(7)]
         public Vec3 MountPosition { get; }
-        /// <summary>The mount's own network id (registry id), or <see cref="Guid.Empty"/> when the horse isn't
-        /// registered. Lets the receiver put the puppet on the EXACT horse the owner rides — including a
-        /// mid-battle switch to a different horse — instead of guessing from the last one it dismounted.</summary>
+        /// <summary>The mount's owner-scoped movement id, or zero when the horse is unregistered.</summary>
         [ProtoMember(8)]
-        public Guid MountId { get; }
+        public ushort MountMovementId { get; }
         [ProtoMember(9)]
         public ulong MountAction0Flag { get; }
         [ProtoMember(10)]
@@ -92,5 +101,10 @@ namespace Missions.Agents.Packets
         /// <summary>The owner's horizontal mount speed, used as the puppet's absolute native speed limit.</summary>
         [ProtoMember(12)]
         public float MountSpeed { get; }
+        /// <summary>Only populated when the mount's original owner differs from the rider's identity scope.</summary>
+        [ProtoMember(13)]
+        public string MountIdentityScopeId { get; }
+        [ProtoMember(14)]
+        public Guid MountAgentId { get; }
     }
 }

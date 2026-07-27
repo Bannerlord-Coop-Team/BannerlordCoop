@@ -33,6 +33,7 @@ public interface IMapEventInitializationBarrier : IGameAbstraction
     void CommitServer(MapEvent mapEvent);
     void AbortServer(MapEvent mapEvent);
     void AttachClient(MapEventSide side, MapEventParty party, Action afterCommit = null);
+    void RunAfterCommit(MapEvent mapEvent, Action action);
     void TrackParty(MapEvent mapEvent, MapEventParty party);
     void DeferVisual(GauntletMapEventVisual visual, CampaignVec2 position);
     void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null);
@@ -247,6 +248,20 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
         state.Parties.Add(party.Party);
         state.Callback += afterCommit;
+    }
+
+    public void RunAfterCommit(MapEvent mapEvent, Action action)
+    {
+        if (mapEvent == null) throw new ArgumentNullException(nameof(mapEvent));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+
+        if (!states.TryGetValue(mapEvent, out var state) || state.Committed)
+        {
+            action();
+            return;
+        }
+
+        state.Callback += action;
     }
 
     public void TrackParty(MapEvent mapEvent, MapEventParty party)

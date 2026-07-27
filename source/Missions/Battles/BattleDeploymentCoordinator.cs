@@ -5,7 +5,6 @@ using GameInterface.Services.MapEvents;
 using Missions.Messages;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -343,8 +342,14 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
             var mission = Mission.Current;
             if (mission == null) return;
 
-            var hostSide = PartyBase.MainParty?.Side ?? BattleSideEnum.None;
-            var enemySide = hostSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+            var playerSide = mission.PlayerTeam?.Side ?? BattleSideEnum.None;
+            if (playerSide != BattleSideEnum.Attacker && playerSide != BattleSideEnum.Defender)
+            {
+                Logger.Warning("[BattleSync] Cannot release enemy NPCs without a valid mission player side");
+                return;
+            }
+
+            var enemySide = playerSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
 
             // Global AI gate back on so the enemy formations tick; our own side stays put because it is AI-paused.
             mission.AllowAiTicking = true;
