@@ -71,9 +71,8 @@ internal class TrackPoolPatches
     [HarmonyPostfix]
     public static void RequestTrackPostfix(Track __result)
     {
-        // Overriden by client when received
-        __result.IsEnemy = false;
-        __result.IsPointer = false;
-        __result.IsDetected = false;
+        __result.IsEnemy = false; // Server doesn't have enemies
+        __result.IsPointer = false; // Doesn't seem to be used in vanilla
+        __result.IsDetected = false; // Not used as more than player can detect a track
     }
 }
