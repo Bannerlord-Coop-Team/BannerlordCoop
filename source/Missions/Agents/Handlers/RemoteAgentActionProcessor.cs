@@ -82,6 +82,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public bool NeedsGuardDirectionTransition;
         public bool NeedsGuardPresentationTransition;
         public bool CanRecoverMissingGuardDirection;
+        public bool GuardCommandAppliedWithAction;
         public Agent.GuardMode LastCommandedGuardMode;
         public int LastCommandedMountIndex;
 
@@ -130,6 +131,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     == guardActionChannel
                 && previousGuard.Value.GuardAction == guardAction
                 && previousGuard.Value.CanRecoverMissingGuardDirection;
+            GuardCommandAppliedWithAction = false;
             LastCommandedGuardMode = previousGuard?.LastCommandedGuardMode
                 ?? Agent.GuardMode.None;
             LastCommandedMountIndex = previousGuard?.LastCommandedMountIndex
@@ -154,6 +156,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 retainedGuard.NeedsGuardPresentationTransition;
             CanRecoverMissingGuardDirection =
                 retainedGuard.CanRecoverMissingGuardDirection;
+            GuardCommandAppliedWithAction = false;
             LastCommandedGuardMode = retainedGuard.LastCommandedGuardMode;
             LastCommandedMountIndex = retainedGuard.LastCommandedMountIndex;
         }
@@ -778,6 +781,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             appliedGuardState.HasGuardCommand = true;
             appliedGuardState.NeedsGuardDirectionTransition = false;
             appliedGuardState.CanRecoverMissingGuardDirection = false;
+            appliedGuardState.GuardCommandAppliedWithAction = true;
             appliedGuardState.LastCommandedGuardMode =
                 action.Data.GuardMode;
             appliedGuardState.LastCommandedMountIndex =
@@ -959,6 +963,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         bool directionTransitionPending =
             guardState.NeedsGuardDirectionTransition
             || missingGuardDirectionRecovery;
+        bool refreshMountedGuardCommand =
+            tracksMountedGuardDirection
+            && guardState.HasGuardCommand
+            && !guardState.GuardCommandAppliedWithAction
+            && !directionTransitionPending
+            && !mountChanged
+            && !guardModeChanged;
+        guardState.GuardCommandAppliedWithAction = false;
         bool nativeGuardStateMissing =
             restoreNativeGuardState
             && !agent.HasMount
@@ -969,6 +981,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             || mountChanged
             || guardModeChanged
             || directionTransitionPending
+            || refreshMountedGuardCommand
             || nativeGuardStateMissing)
         {
             if (agent.HasMount
@@ -999,6 +1012,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 bool forceGuardCommand =
                     mountChanged
                     || reacquiringGuard
+                    || refreshMountedGuardCommand
                     || nativeGuardStateMissing;
                 AgentActionData.ApplyGuardState(
                     agent,
