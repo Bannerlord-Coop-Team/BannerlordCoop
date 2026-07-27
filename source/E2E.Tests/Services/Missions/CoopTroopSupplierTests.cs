@@ -91,6 +91,23 @@ public class CoopTroopSupplierTests
     }
 
     [Fact]
+    public void Supply_PrioritizesLocalPartyBeforeOtherOwnedParties()
+    {
+        var supplier = new CoopTroopSupplier(
+            "M1", BattleSideEnum.Attacker, null, new BattleAgentBudget(), preferredPartyId: "player");
+        supplier.SetReserve(new[]
+        {
+            Party("army-member", 3, seedBase: 100),
+            Party("player", 2, seedBase: 200),
+        });
+
+        supplier.SupplyTroops(1);
+
+        Assert.Equal(0, SuppliedFor(supplier, "army-member"));
+        Assert.Equal(1, SuppliedFor(supplier, "player"));
+    }
+
+    [Fact]
     public void StaleResend_DoesNotRewind_FurtherAlongPointer()
     {
         // Migration/race: we've already supplied 5, but a resend carries a STALE pointer (3) because our last

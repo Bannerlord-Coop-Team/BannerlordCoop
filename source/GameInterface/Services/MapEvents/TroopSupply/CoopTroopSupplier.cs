@@ -49,16 +49,22 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private readonly IObjectManager objectManager;
     // BR-110: the engine agent budget clamps wave/initial allocation to the mission's render capacity.
     private readonly IBattleAgentBudget agentBudget;
+    // The local party must be allocated before other parties this controller owns. Otherwise an army's AI
+    // parties can fill the render cap before the local hero is reserved, leaving native deployment without
+    // an InitialPlayerAgent.
+    private readonly string preferredPartyId;
 
     public string MapEventId { get; }
     public BattleSideEnum Side { get; }
 
-    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager, IBattleAgentBudget agentBudget)
+    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager,
+        IBattleAgentBudget agentBudget, string preferredPartyId = null)
     {
         MapEventId = mapEventId;
         Side = side;
         this.objectManager = objectManager;
         this.agentBudget = agentBudget;
+        this.preferredPartyId = preferredPartyId;
     }
 
     /// <summary>
@@ -99,12 +105,16 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                     if (priorSupplied.TryGetValue(party.PartyId, out var local) && local > supplied)
                         supplied = Math.Min(local, entries.Length);
                     priorSupplied.Remove(party.PartyId); // kept — not part of the dropped set
-                    parties.Add(new PartyState
+                    var state = new PartyState
                     {
                         PartyId = party.PartyId,
                         Entries = entries,
                         Supplied = supplied,
-                    });
+                    };
+                    if (preferredPartyId != null && party.PartyId == preferredPartyId)
+                        parties.Insert(0, state);
+                    else
+                        parties.Add(state);
                     foreach (var entry in entries)
                         seedToPartyId[entry.Seed] = party.PartyId;
                 }

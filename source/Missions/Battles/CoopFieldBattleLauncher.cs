@@ -105,8 +105,10 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         {
             // Each client fields only what it OWNS. Registered so the server reserve (requested below via
             // PlayerEnteredBattle) feeds these during scene load; the spawn handler then sizes each side.
-            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager, agentBudget);
-            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager, agentBudget);
+            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager,
+                agentBudget, playerPartyId);
+            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager,
+                agentBudget, playerPartyId);
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 

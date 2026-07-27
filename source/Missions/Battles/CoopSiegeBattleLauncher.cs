@@ -94,8 +94,10 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
 
         var mission = MissionState.OpenNew("SiegeMissionWithDeployment", rec, (InitializeMissionBehaviorsDelegate)delegate
         {
-            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager, agentBudget);
-            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager, agentBudget);
+            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager,
+                agentBudget, playerPartyId);
+            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager,
+                agentBudget, playerPartyId);
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 
