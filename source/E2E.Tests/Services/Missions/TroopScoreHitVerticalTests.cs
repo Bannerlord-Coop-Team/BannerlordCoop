@@ -30,6 +30,8 @@ namespace E2E.Tests.Services.Missions;
 /// </summary>
 public class TroopScoreHitVerticalTests : MissionTestEnvironment
 {
+    private const int ScoreHitXp = 40;
+
     public TroopScoreHitVerticalTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
@@ -337,17 +339,35 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     {
         Server.Call(() =>
         {
-            if (Campaign.Current.Models != null) return;
-
             var models = new List<GameModel>
             {
-                new DefaultCombatXpModel(),
+                new FixedCombatXpModel(),
                 new DefaultMilitaryPowerModel(),
                 new DefaultCharacterStatsModel(),
             };
 
-            var gameModels = Server.GameInstance.Game.AddGameModelsManager<GameModels>(models);
-            AccessTools.Field(typeof(Campaign), "_gameModels").SetValue(Campaign.Current, gameModels);
+            var gameModels = new GameModels(models);
+            Server.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
+            Campaign.Current._gameModels = gameModels;
         });
+    }
+
+    private sealed class FixedCombatXpModel : CombatXpModel
+    {
+        public override float CaptainRadius => 0f;
+
+        public override SkillObject GetSkillForWeapon(WeaponComponentData weapon, bool isSiegeEngineHit) => null;
+
+        public override ExplainedNumber GetXpFromHit(
+            CharacterObject attackerTroop,
+            CharacterObject captain,
+            CharacterObject attackedTroop,
+            PartyBase attackerParty,
+            int damage,
+            bool isFatal,
+            MissionTypeEnum missionType) =>
+            new ExplainedNumber(ScoreHitXp);
+
+        public override float GetXpMultiplierFromShotDifficulty(float shotDifficulty) => 1f;
     }
 }
