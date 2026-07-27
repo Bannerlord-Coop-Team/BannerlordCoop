@@ -39,17 +39,20 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly ILocalBattlePartyResolver localBattlePartyResolver;
 
     public CoopSiegeBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        ILocalBattlePartyResolver localBattlePartyResolver)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
+        this.localBattlePartyResolver = localBattlePartyResolver;
     }
 
     public Mission OpenCoopSiegeBattle(MissionInitializerRecord rec, float[] wallHitPointRatios,
@@ -62,7 +65,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             return null;
         }
 
-        var playerPartyId = CoopFieldBattleLauncher.GetLocalPlayerPartyId(mapEvent, objectManager);
+        var playerPartyId = localBattlePartyResolver.Resolve(mapEvent);
         if (playerPartyId == null)
             Logger.Error("[BattleSync] Local player party is not resolvable; opening the siege battle so its mission lifecycle can reject it safely");
 

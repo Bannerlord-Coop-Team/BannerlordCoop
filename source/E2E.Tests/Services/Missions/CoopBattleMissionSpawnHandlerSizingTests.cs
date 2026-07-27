@@ -151,7 +151,7 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         objectManager.Setup(x => x.TryGetId(registered, out registeredId)).Returns(true);
 
         Assert.Equal(registeredId,
-            CoopFieldBattleLauncher.GetLocalPlayerPartyId(mapEvent, localParty, objectManager.Object));
+            LocalBattlePartyResolver.Resolve(mapEvent, localParty, null, objectManager.Object));
     }
 
     [Fact]
@@ -160,34 +160,45 @@ public class CoopBattleMissionSpawnHandlerSizingTests
 #pragma warning disable SYSLIB0050
         var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
         var localMobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+        var logicalMobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
         var controlledMobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
         var localParty = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
+        var logicalParty = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
         var controlledParty = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
         var side = (MapEventSide)FormatterServices.GetUninitializedObject(typeof(MapEventSide));
+        var logicalMapEventParty = (MapEventParty)FormatterServices.GetUninitializedObject(typeof(MapEventParty));
         var controlledMapEventParty = (MapEventParty)FormatterServices.GetUninitializedObject(typeof(MapEventParty));
 #pragma warning restore SYSLIB0050
         localMobileParty.StringId = "Player";
+        logicalMobileParty.StringId = "Player";
         controlledMobileParty.StringId = "PlayerReplica";
         localParty.MobileParty = localMobileParty;
+        logicalParty.MobileParty = logicalMobileParty;
         controlledParty.MobileParty = controlledMobileParty;
+        logicalMapEventParty.Party = logicalParty;
         controlledMapEventParty.Party = controlledParty;
         typeof(MapEventSide).GetField("_battleParties", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(side, new MBList<MapEventParty>());
+        side._battleParties.Add(logicalMapEventParty);
         side._battleParties.Add(controlledMapEventParty);
         mapEvent._sides = new MapEventSide[2];
         mapEvent._sides[(int)BattleSideEnum.Defender] = side;
 
         var objectManager = new Mock<IObjectManager>();
+        string logicalMapEventPartyId = "MapEventParty_Created_12";
+        objectManager.Setup(x => x.TryGetId(logicalMapEventParty, out logicalMapEventPartyId)).Returns(true);
         string controlledMapEventPartyId = "MapEventParty_Created_34";
         objectManager.Setup(x => x.TryGetId(controlledMapEventParty, out controlledMapEventPartyId)).Returns(true);
+        string controlledMobilePartyId = "MobileParty_Player";
+        objectManager.Setup(x => x.TryGetId(controlledMobileParty, out controlledMobilePartyId)).Returns(true);
 
         Assert.Equal(
             controlledMapEventPartyId,
-            CoopFieldBattleLauncher.GetLocalPlayerPartyId(
+            LocalBattlePartyResolver.Resolve(
                 mapEvent,
                 localParty,
-                objectManager.Object,
-                party => ReferenceEquals(party, controlledParty)));
+                controlledMobilePartyId,
+                objectManager.Object));
     }
 
     [Fact]

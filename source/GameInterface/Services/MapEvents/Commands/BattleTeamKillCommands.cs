@@ -202,6 +202,8 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
         var dataSource = scoreboard?.DataSource;
         if (dataSource == null)
             return "Failed: no battle scoreboard UI.";
+        if (dataSource.Attackers?.Parties == null || dataSource.Defenders?.Parties == null)
+            return "Failed: battle scoreboard parties are not loaded.";
 
         var mapEvent = MobileParty.MainParty?.MapEvent;
         if (mapEvent == null)
