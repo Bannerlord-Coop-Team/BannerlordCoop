@@ -109,8 +109,19 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 !DrivesMountedReactionPresentation
                 && needsGuardDirectionTransition;
             NeedsGuardPresentationTransition =
-                NeedsGuardDirectionTransition
-                && DisplacedGuardAction != ActionIndexCache.act_none;
+                !DrivesMountedReactionPresentation
+                && action.Data.IsMounted
+                && action.Data.IsPlayerControlled
+                && action.Data.GuardActionIsDefending
+                && !action.Data.GuardActionIsReaction
+                && AgentActionData.IsGuardMode(action.Data.GuardMode)
+                && guardAction != ActionIndexCache.act_none
+                && previousGuard.HasValue
+                && previousGuard.Value.GuardActionChannel
+                    == guardActionChannel
+                && previousGuard.Value.GuardAction
+                    != ActionIndexCache.act_none
+                && previousGuard.Value.GuardAction != guardAction;
             LastCommandedGuardMode = previousGuard?.LastCommandedGuardMode
                 ?? Agent.GuardMode.None;
             LastCommandedMountIndex = previousGuard?.LastCommandedMountIndex
