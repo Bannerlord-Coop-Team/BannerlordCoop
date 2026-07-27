@@ -53,6 +53,7 @@ public sealed class MirrorAgent
     public Vec2 MovementDirection { get; set; }
     public Vec2 InputVector { get; set; }
     public Agent.MovementControlFlag MovementFlags { get; set; }
+    public bool ClearLocomotionFlagsOnContinuousStateWrite { get; set; }
     public Agent.EventControlFlag EventControlFlags { get; set; }
     public bool CrouchMode { get; set; }
     public Agent.GuardMode GuardMode { get; set; } = Agent.GuardMode.None;

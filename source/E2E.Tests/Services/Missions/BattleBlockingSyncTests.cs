@@ -90,6 +90,49 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void RemoteGuardAction_DoesNotReplaceContinuousLocomotionFlags()
+    {
+        RunScenario("peer", context =>
+        {
+            var agentId = Guid.NewGuid();
+            Agent puppet = SpawnRegisteredAgent(
+                context,
+                "owner",
+                agentId,
+                AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context,
+                AgentControllerType.Player,
+                out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+
+            puppetMirror.MovementFlags =
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.Backward |
+                Agent.MovementControlFlag.TurnRight |
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendUp;
+            ownerMirror.GuardMode = Agent.GuardMode.Up;
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft |
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendUp,
+                puppetMirror.MovementFlags);
+        });
+    }
+
     [Theory]
     [InlineData(
         Agent.MovementControlFlag.DefendRight,

@@ -305,7 +305,7 @@ namespace Missions.Agents.Packets
         {
             Agent.MovementControlFlag movementFlags = (Agent.MovementControlFlag)MovementFlag;
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
-            agent.MovementFlags = movementFlags;
+            ApplyDefendMovementFlags(agent, movementFlags);
 
             // Install action transitions, but let an unchanged native action advance on its local timeline.
             if (NeedsActionTransition(
@@ -350,7 +350,7 @@ namespace Missions.Agents.Packets
             }
 
             // Keep held defend input on the puppet; later reliable transitions replace or clear these bits.
-            agent.MovementFlags = GetDefendMovementFlags(movementFlags);
+            ApplyDefendMovementFlags(agent, movementFlags);
         }
 
         private static bool NeedsActionTransition(

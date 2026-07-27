@@ -111,7 +111,8 @@ internal sealed class BattleGuardMountedRoute
                 return new BattleGuardMountedRouteInput(
                     Vec2.Zero,
                     Agent.MovementControlFlag.None,
-                    Agent.MovementControlFlag.None);
+                    Agent.MovementControlFlag.None,
+                    Vec3.Zero);
             }
 
             headingToEnd =
@@ -211,7 +212,8 @@ internal sealed class BattleGuardMountedRoute
         return new BattleGuardMountedRouteInput(
             new Vec2(turnInput, forwardInput),
             translationFlag,
-            turnFlag);
+            turnFlag,
+            desired);
     }
 
     public BattleGuardMountedRouteInput Update(
@@ -229,6 +231,52 @@ internal sealed class BattleGuardMountedRoute
                 horizontalSpeed),
             physicalFacing,
             horizontalSpeed);
+    }
+
+    internal static BattleGuardMountedRouteInput CreateStraightInput(
+        Vec2 movementDirection,
+        Vec3 currentLookDirection,
+        float horizontalSpeed,
+        Vec3 desiredTravelDirection,
+        Vec3 desiredLookDirection)
+    {
+        desiredTravelDirection.z = 0f;
+        if (desiredTravelDirection.LengthSquared < 0.0001f)
+            throw new ArgumentException(
+                "straight travel direction is required",
+                nameof(desiredTravelDirection));
+        desiredTravelDirection.Normalize();
+        desiredLookDirection.z = 0f;
+        if (desiredLookDirection.LengthSquared < 0.0001f)
+            throw new ArgumentException(
+                "straight look direction is required",
+                nameof(desiredLookDirection));
+        desiredLookDirection.Normalize();
+
+        Vec3 heading = ResolveHeading(
+            movementDirection,
+            currentLookDirection,
+            horizontalSpeed);
+        if (heading.LengthSquared < 0.0001f)
+            heading = desiredTravelDirection;
+
+        float signedError =
+            (heading.x * desiredTravelDirection.y) -
+            (heading.y * desiredTravelDirection.x);
+        float turnInput = Clamp(
+            -signedError * SteeringGain);
+        Agent.MovementControlFlag turnFlag =
+            Agent.MovementControlFlag.None;
+        if (turnInput > SteeringDeadZone)
+            turnFlag = Agent.MovementControlFlag.TurnRight;
+        else if (turnInput < -SteeringDeadZone)
+            turnFlag = Agent.MovementControlFlag.TurnLeft;
+
+        return new BattleGuardMountedRouteInput(
+            new Vec2(turnInput, 1f),
+            Agent.MovementControlFlag.Forward,
+            turnFlag,
+            desiredLookDirection);
     }
 
     internal static Vec3 ResolveHeading(
@@ -263,15 +311,18 @@ internal readonly struct BattleGuardMountedRouteInput
     public Vec2 Movement { get; }
     public Agent.MovementControlFlag TranslationFlag { get; }
     public Agent.MovementControlFlag TurnFlag { get; }
+    public Vec3 LookDirection { get; }
 
     public BattleGuardMountedRouteInput(
         Vec2 movement,
         Agent.MovementControlFlag translationFlag,
-        Agent.MovementControlFlag turnFlag)
+        Agent.MovementControlFlag turnFlag,
+        Vec3 lookDirection)
     {
         Movement = movement;
         TranslationFlag = translationFlag;
         TurnFlag = turnFlag;
+        LookDirection = lookDirection;
     }
 }
 #endif

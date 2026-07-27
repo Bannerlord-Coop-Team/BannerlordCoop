@@ -322,11 +322,62 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(Agent.MovementControlFlag.None, input.TurnFlag);
         Assert.Equal(0f, input.Movement.x);
         Assert.Equal(1f, input.Movement.y);
+        Assert.Equal(new Vec3(0f, 1f, 0f), input.LookDirection);
+    }
+
+    [Fact]
+    public void MountedStrikeStraightInput_HoldsTravelAndGuardDirections()
+    {
+        BattleGuardMountedRouteInput input =
+            BattleGuardMountedRoute.CreateStraightInput(
+                new Vec2(0f, 1f),
+                new Vec3(-1f, 0f, 0f),
+                7.5f,
+                new Vec3(0f, 2f, 1f),
+                new Vec3(2f, 0f, 1f));
+
+        Assert.Equal(
+            Agent.MovementControlFlag.Forward,
+            input.TranslationFlag);
+        Assert.Equal(
+            Agent.MovementControlFlag.None,
+            input.TurnFlag);
+        Assert.Equal(0f, input.Movement.x);
+        Assert.Equal(1f, input.Movement.y);
+        Assert.Equal(
+            new Vec3(1f, 0f, 0f),
+            input.LookDirection);
+    }
+
+    [Theory]
+    [InlineData(0.2f, 0.98f, Agent.MovementControlFlag.TurnLeft)]
+    [InlineData(-0.2f, 0.98f, Agent.MovementControlFlag.TurnRight)]
+    public void MountedStrikeStraightInput_CorrectsTravelHeading(
+        float movementX,
+        float movementY,
+        Agent.MovementControlFlag expectedTurn)
+    {
+        BattleGuardMountedRouteInput input =
+            BattleGuardMountedRoute.CreateStraightInput(
+                new Vec2(movementX, movementY),
+                new Vec3(0f, 1f, 0f),
+                7.5f,
+                new Vec3(0f, 1f, 0f),
+                new Vec3(1f, 0f, 0f));
+
+        Assert.Equal(expectedTurn, input.TurnFlag);
+        Assert.Equal(
+            Math.Sign(movementX) * -1,
+            Math.Sign(input.Movement.x));
+        Assert.Equal(1f, input.Movement.y);
+        Assert.Equal(
+            new Vec3(1f, 0f, 0f),
+            input.LookDirection);
     }
 
     [Theory]
     [InlineData(92.5f, true)]
-    [InlineData(93f, false)]
+    [InlineData(92.51f, false)]
     public void MountedStrikeRunway_AccountsForLeadBeforeRouteTurn(
         float routeProgress,
         bool expected)
@@ -364,42 +415,174 @@ public class BattleGuardFixtureEvidenceTests
             BattleGuardFixture.HasMountedStrikeRunway(route));
     }
 
+    [Theory]
+    [InlineData(3f, true)]
+    [InlineData(3.01f, false)]
+    [InlineData(-3.01f, false)]
+    public void MountedStrikeRunway_UsesRouteStraightLaneBound(
+        float lateralOffset,
+        bool expected)
+    {
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            120f);
+
+        route.Update(
+            new Vec3(lateralOffset, 60f, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.Equal(expected, route.CanStageStrike);
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.HasMountedStrikeRunway(route));
+    }
+
+    [Theory]
+    [InlineData(0f, 1f, 0f, 2f, true)]
+    [InlineData(0.1f, 0.995f, 0f, 1f, true)]
+    [InlineData(0.2f, 0.98f, 0f, 1f, false)]
+    [InlineData(0f, 0f, 0f, 1f, false)]
+    public void MountedStrikeTravelAlignment_WaitsForSettledGuardFacing(
+        float travelX,
+        float travelY,
+        float lookX,
+        float lookY,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.HasMountedStrikeTravelAlignment(
+                new Vec3(travelX, travelY, 0f),
+                new Vec3(lookX, lookY, 0f)));
+    }
+
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(false, false, false)]
+    public void MountedGuardState_CommandsNativeStateOnlyOnTransition(
+        bool guarding,
+        bool guardCommandActive,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldCommandMountedGuardState(
+                guarding,
+                guardCommandActive));
+    }
+
     [Fact]
-    public void MountedStrikerPosition_ApproachesParallelPolearmLane()
+    public void MountedStrikerPosition_RecreatesSideInterceptionGeometry()
     {
         var guardPosition = new Vec3(2f, 3f, 4f);
-        var forward = new Vec3(0f, 1f, 0f);
+        var route = new Vec3(0f, 1f, 0f);
         var lateral = new Vec3(1f, 0f, 0f);
+        Vec3 guardedLook =
+            BattleGuardFixture.GetMountedStrikeGuardedLookDirection(
+                route);
 
         Vec3 contactPoint =
             BattleGuardFixture.GetMountedStrikeContactPoint(
                 guardPosition,
                 new Vec3(0f, 2f, 1f),
                 8f);
+        Vec3 strikeTarget =
+            BattleGuardFixture.GetMountedStrikeTargetPoint(
+                contactPoint,
+                route);
         Vec3 position = BattleGuardFixture.GetMountedStrikerPosition(
-            contactPoint,
-            new Vec3(0f, 2f, 1f));
-        Vec3 contactOffset = contactPoint - guardPosition;
+            strikeTarget,
+            route);
+        Vec3 targetOffset = strikeTarget - contactPoint;
+        Vec3 forwardOffset = position - strikeTarget;
         Vec3 strikerOffset = position - contactPoint;
+        Vec3 strikerDirection = strikerOffset;
+        strikerDirection.Normalize();
+        Vec3 attackDirection = strikeTarget - position;
+        attackDirection.Normalize();
+        Vec3 contactOffset = contactPoint - guardPosition;
+        float forwardAlignment =
+            Vec3.DotProduct(strikerDirection, route);
+        float lateralAlignment =
+            Vec3.DotProduct(strikerDirection, lateral);
 
         Assert.Equal(
             8f,
-            Vec3.DotProduct(contactOffset, forward),
-            precision: 3);
-        Assert.Equal(
-            1.5f,
-            Vec3.DotProduct(contactOffset, lateral),
-            precision: 3);
-        Assert.Equal(
-            1.5f,
-            Vec3.DotProduct(strikerOffset, forward),
+            Vec3.DotProduct(contactOffset, route),
             precision: 3);
         Assert.Equal(
             0f,
-            Vec3.DotProduct(strikerOffset, lateral),
+            Vec3.DotProduct(contactOffset, lateral),
+            precision: 3);
+        Assert.Equal(1.5f, targetOffset.Length, precision: 3);
+        Assert.Equal(
+            0f,
+            Vec3.DotProduct(targetOffset, route),
+            precision: 3);
+        Assert.Equal(
+            1.5f,
+            Vec3.DotProduct(targetOffset, lateral),
+            precision: 3);
+        Assert.Equal(1.5f, forwardOffset.Length, precision: 3);
+        Assert.Equal(
+            1.5f,
+            Vec3.DotProduct(forwardOffset, route),
+            precision: 3);
+        Assert.Equal(
+            0f,
+            Vec3.DotProduct(forwardOffset, lateral),
+            precision: 3);
+        Assert.Equal(2.12132025f, strikerOffset.Length, precision: 3);
+        Assert.Equal(
+            1f,
+            Vec3.DotProduct(strikerDirection, guardedLook),
+            precision: 3);
+        Assert.Equal(0.70710677f, forwardAlignment, precision: 3);
+        Assert.Equal(0.70710677f, lateralAlignment, precision: 3);
+        Assert.Equal(
+            forwardAlignment,
+            lateralAlignment,
+            precision: 3);
+        Assert.Equal(
+            -1f,
+            Vec3.DotProduct(attackDirection, route),
+            precision: 3);
+        Assert.Equal(
+            0f,
+            Vec3.DotProduct(attackDirection, lateral),
             precision: 3);
         Assert.Equal(guardPosition.z, contactPoint.z, precision: 3);
+        Assert.Equal(contactPoint.z, strikeTarget.z, precision: 3);
         Assert.Equal(contactPoint.z, position.z, precision: 3);
+    }
+
+    [Fact]
+    public void MountedStrikeTrackedLook_FacesCurrentStrikerPosition()
+    {
+        Vec3 direction =
+            BattleGuardFixture.GetMountedStrikeTrackedLookDirection(
+                new Vec3(2f, 3f, 4f),
+                new Vec3(5f, 7f, 9f),
+                new Vec3(0f, 1f, 0f));
+
+        Assert.Equal(0.6f, direction.x, precision: 3);
+        Assert.Equal(0.8f, direction.y, precision: 3);
+        Assert.Equal(0f, direction.z);
+    }
+
+    [Fact]
+    public void MountedStrikeTrackedLook_UsesFallbackAtZeroStandoff()
+    {
+        Vec3 direction =
+            BattleGuardFixture.GetMountedStrikeTrackedLookDirection(
+                new Vec3(2f, 3f, 4f),
+                new Vec3(2f, 3f, 9f),
+                new Vec3(0f, 2f, 1f));
+
+        Assert.Equal(new Vec3(0f, 1f, 0f), direction);
     }
 
     [Theory]
@@ -417,7 +600,55 @@ public class BattleGuardFixtureEvidenceTests
             BattleGuardFixture.ShouldReleaseMountedStrike(
                 longitudinalDistance,
                 speed,
-                chargeSeconds));
+                chargeSeconds,
+                BattleGuardFixture.GetMountedStrikeReleaseLeadSeconds(1)));
+    }
+
+    [Theory]
+    [InlineData(0, 0.25f)]
+    [InlineData(1, 0.25f)]
+    [InlineData(3, 0.45f)]
+    [InlineData(5, 0.65f)]
+    [InlineData(6, 0.65f)]
+    public void MountedStrikeRelease_ProfilesBracketNativeImpactTiming(
+        int attempt,
+        float expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.GetMountedStrikeReleaseLeadSeconds(attempt),
+            precision: 3);
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void StrikeCompletion_RequiresExactBlockedPairEvidence(
+        bool isBlocked,
+        bool isExactGuard,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldCompleteStrikeFromScoreHit(
+                isBlocked,
+                isExactGuard));
+    }
+
+    [Theory]
+    [InlineData(Agent.ActionStage.AttackReady, true)]
+    [InlineData(Agent.ActionStage.AttackQuickReady, true)]
+    [InlineData(Agent.ActionStage.AttackRelease, false)]
+    [InlineData(Agent.ActionStage.None, false)]
+    public void MountedStrikeRelease_RequiresNativeReadyStage(
+        Agent.ActionStage actionStage,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.IsNativeAttackReady(actionStage));
     }
 
     [Theory]
@@ -466,7 +697,7 @@ public class BattleGuardFixtureEvidenceTests
             new Vec3(0f, 1f, 0f),
             40f);
 
-        route.Update(
+        BattleGuardMountedRouteInput input = route.Update(
             new Vec3(0f, 30f, 0f),
             new Vec2(0f, -1f),
             new Vec3(0f, 1f, 0f),
@@ -475,6 +706,7 @@ public class BattleGuardFixtureEvidenceTests
 
         Assert.Equal("Return", route.State);
         Assert.True(route.CanStageStrike);
+        Assert.Equal(new Vec3(0f, -1f, 0f), input.LookDirection);
     }
 
     [Fact]
@@ -607,6 +839,9 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(
             Agent.MovementControlFlag.None,
             returning.TurnFlag);
+        Assert.Equal(
+            new Vec3(0f, -1f, 0f),
+            returning.LookDirection);
     }
 
     [Fact]

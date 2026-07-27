@@ -100,6 +100,225 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void AgentData_AppliesRiderAndMountLocomotionFlagsWithoutClearingDefend()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceRider = SpawnRider(mock);
+            Agent sourceHorse = mock.SpawnMount(sourceRider);
+            Agent puppetRider = SpawnRider(mock);
+            Agent puppetHorse = mock.SpawnMount(puppetRider);
+            Assert.True(AgentMirror.TryGet(sourceRider, out var sourceRiderMirror));
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetRider, out var puppetRiderMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            puppetRiderMirror.ClearLocomotionFlagsOnContinuousStateWrite = true;
+            puppetHorseMirror.ClearLocomotionFlagsOnContinuousStateWrite = true;
+
+            sourceRiderMirror.MovementFlags =
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft |
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendUp;
+            sourceHorseMirror.MovementFlags =
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft;
+            puppetRiderMirror.MovementFlags =
+                Agent.MovementControlFlag.Backward |
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendRight;
+            puppetHorseMirror.MovementFlags =
+                Agent.MovementControlFlag.Backward |
+                Agent.MovementControlFlag.DefendDown;
+
+            new AgentData(sourceRider).Apply(puppetRider);
+
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft |
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendRight,
+                puppetRiderMirror.MovementFlags);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft |
+                Agent.MovementControlFlag.DefendDown,
+                puppetHorseMirror.MovementFlags);
+        });
+    }
+
+    [Fact]
+    public void MountedFollow_ReplaysTheLatestOwnerInputsAfterNativeClearsThePuppet()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceRider = SpawnRider(mock);
+            Agent sourceHorse = mock.SpawnMount(sourceRider);
+            Agent puppetRider = SpawnRider(mock);
+            Agent puppetHorse = mock.SpawnMount(puppetRider);
+            Assert.True(AgentMirror.TryGet(sourceRider, out var sourceRiderMirror));
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetRider, out var puppetRiderMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            puppetRiderMirror.ClearLocomotionFlagsOnContinuousStateWrite = true;
+            puppetHorseMirror.ClearLocomotionFlagsOnContinuousStateWrite = true;
+
+            sourceRiderMirror.Position = new Vec3(1f, 0f, 1f);
+            sourceRiderMirror.MovementDirection = new Vec2(1f, 0f);
+            sourceRiderMirror.LookDirection = new Vec3(-1f, 0f, 0f);
+            sourceRider.MovementInputVector = new Vec2(0f, 1f);
+            sourceRiderMirror.MovementFlags =
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft;
+            sourceHorseMirror.Position = new Vec3(1f, 0f, 0f);
+            sourceHorseMirror.MovementDirection = new Vec2(1f, 0f);
+            sourceHorseMirror.LookDirection = new Vec3(-1f, 0f, 0f);
+            sourceHorse.MovementInputVector = new Vec2(0f, 1f);
+            sourceHorseMirror.MovementFlags =
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft;
+
+            var data = new AgentData(sourceRider);
+            data.Apply(puppetRider);
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetMountedRiderTarget(puppetRider, data);
+
+            puppetRiderMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendUp;
+            puppetRiderMirror.LookDirection = new Vec3(1f, 0f, 0f);
+            puppetRider.MovementInputVector = Vec2.Zero;
+            puppetHorseMirror.MovementFlags = Agent.MovementControlFlag.None;
+            puppetHorseMirror.LookDirection = new Vec3(1f, 0f, 0f);
+            puppetHorse.MovementInputVector = Vec2.Zero;
+
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft |
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendUp,
+                puppetRiderMirror.MovementFlags);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnLeft,
+                puppetHorseMirror.MovementFlags);
+            Assert.Equal(sourceRiderMirror.LookDirection, puppetRiderMirror.LookDirection);
+            Assert.Equal(sourceHorseMirror.LookDirection, puppetHorseMirror.LookDirection);
+            Assert.Equal(sourceRider.MovementInputVector, puppetRider.MovementInputVector);
+            Assert.Equal(sourceHorse.MovementInputVector, puppetHorse.MovementInputVector);
+        });
+    }
+
+    [Fact]
+    public void OnFootFollow_ReplaysTheLatestOwnerInputsAfterNativeClearsThePuppet()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent source = SpawnRider(mock);
+            Agent puppet = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
+            Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+            puppetMirror.ClearLocomotionFlagsOnContinuousStateWrite = true;
+
+            sourceMirror.Position = new Vec3(1f, 0f, 0f);
+            sourceMirror.MovementDirection = new Vec2(1f, 0f);
+            sourceMirror.LookDirection = new Vec3(-1f, 0f, 0f);
+            sourceMirror.RealGlobalVelocity = new Vec3(1f, 0f, 0f);
+            source.MovementInputVector = new Vec2(0f, 1f);
+            sourceMirror.MovementFlags =
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnRight;
+
+            var data = new AgentData(source);
+            data.Apply(puppet);
+            Vec2 expectedInput = puppet.MovementInputVector;
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetRiderTarget(puppet, data);
+
+            puppetMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendRight;
+            puppetMirror.LookDirection = new Vec3(1f, 0f, 0f);
+            puppet.MovementInputVector = Vec2.Zero;
+
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnRight |
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendRight,
+                puppetMirror.MovementFlags);
+            Assert.Equal(sourceMirror.LookDirection, puppetMirror.LookDirection);
+            Assert.Equal(expectedInput, puppet.MovementInputVector);
+        });
+    }
+
+    [Fact]
+    public void OnFootFollow_DiscardsTheTargetWhenThePuppetReachesZeroHealth()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent source = SpawnRider(mock);
+            Agent puppet = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
+            Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
+
+            sourceMirror.Position = new Vec3(1f, 0f, 0f);
+            sourceMirror.MovementDirection = new Vec2(1f, 0f);
+            sourceMirror.LookDirection = new Vec3(-1f, 0f, 0f);
+            source.MovementInputVector = new Vec2(0f, 1f);
+            sourceMirror.MovementFlags =
+                Agent.MovementControlFlag.Forward |
+                Agent.MovementControlFlag.TurnRight;
+
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetRiderTarget(puppet, new AgentData(source));
+
+            puppetMirror.Health = 0f;
+            puppetMirror.MovementDirection = new Vec2(0f, -1f);
+            puppetMirror.LookDirection = new Vec3(1f, 0f, 0f);
+            puppet.MovementInputVector = Vec2.Zero;
+            puppetMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendLeft;
+
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(new Vec2(0f, -1f), puppetMirror.MovementDirection);
+            Assert.Equal(new Vec3(1f, 0f, 0f), puppetMirror.LookDirection);
+            Assert.Equal(Vec2.Zero, puppet.MovementInputVector);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendLeft,
+                puppetMirror.MovementFlags);
+            Assert.False(
+                interpolator.TryGetTargetMovementFlags(
+                    puppet,
+                    out _,
+                    out _));
+        });
+    }
+
+    [Fact]
     public void MountMovementPacket_RoundTripsHorizontalMountSpeed()
     {
         using var fixture = new MissionEngineFixture();

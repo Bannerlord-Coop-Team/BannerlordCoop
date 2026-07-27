@@ -48,7 +48,7 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// animation, and churned the skeleton), this diffs each owned agent's action channels ON THE GAME THREAD and,
 /// only when a DISCRETE action, held defend input, or realized guard state changes, broadcasts it
 /// <see cref="DeliveryMethod.ReliableOrdered"/>. The receiver applies the transition and lets the engine advance
-/// it. Locomotion (walk/run/idle) is skipped — it is reproduced from the synced <c>MovementInputVector</c>.
+/// it. Locomotion (walk/run/idle) is skipped — the movement packet continuously supplies its input and move flags.
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
@@ -441,7 +441,7 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     // Discrete actions worth replicating explicitly. Pure locomotion (Idle / the generic Other bucket that
-    // walk/run fall into) is reproduced on the puppet from the synced MovementInputVector, so it is NOT sent.
+    // walk/run fall into) is reproduced on the puppet from the continuous movement packet, so it is NOT sent.
     private static bool IsDiscreteAction(Agent.ActionCodeType type)
     {
         return type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle;

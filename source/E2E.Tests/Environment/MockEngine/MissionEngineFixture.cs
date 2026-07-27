@@ -638,6 +638,8 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.LookDirection = value;
+        if (m.ClearLocomotionFlagsOnContinuousStateWrite)
+            m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
         return false;
     }
 
@@ -652,6 +654,8 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.MovementDirection = __0;
+        if (m.ClearLocomotionFlagsOnContinuousStateWrite)
+            m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
         return false;
     }
 
@@ -738,6 +742,8 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.InputVector = value;
+        if (m.ClearLocomotionFlagsOnContinuousStateWrite)
+            m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
         return false;
     }
 
