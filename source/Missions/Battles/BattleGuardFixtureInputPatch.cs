@@ -12,9 +12,17 @@ namespace Missions.Battles;
     new[] { typeof(float) })]
 internal static class BattleGuardFixtureInputPatch
 {
+    private static bool Prefix()
+    {
+        // The fixture owns every control flag while driving the main agent.
+        return Mission.Current?
+            .GetMissionBehavior<CoopBattleController>()?
+            .IsGuardFixtureDrivingPlayerInput() != true;
+    }
+
     private static void Postfix()
     {
-        // Native consumes player controls before mission OnMissionTick.
+        // The fixture input must be installed before native consumes control flags.
         Mission.Current?
             .GetMissionBehavior<CoopBattleController>()?
             .ApplyGuardFixturePlayerInput();

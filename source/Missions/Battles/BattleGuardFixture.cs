@@ -21,6 +21,7 @@ public interface IBattleGuardFixture
 {
     void Apply(NetworkBattleGuardFixtureCommand command, INetworkAgentRegistry agentRegistry);
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
+    bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
@@ -269,6 +270,12 @@ public class BattleGuardFixture : IBattleGuardFixture
     {
         if (TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
             DriveGuardInput(agent, guardDriver);
+    }
+
+    public bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry)
+    {
+        return TryGetDrivenGuardAgent(agentRegistry, out Agent agent) &&
+            ReferenceEquals(agent, Mission.Current?.MainAgent);
     }
 
     public void ReapplyPlayerGuardInput(
