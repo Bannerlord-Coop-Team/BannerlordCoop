@@ -558,11 +558,12 @@ public class SiegeDebugCommand
         var mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out string id) ? id : "none";
         var camp = party.BesiegerCamp?.SiegeEvent?.BesiegedSettlement?.StringId ?? "none";
         var army = party.Army?.LeaderParty?.StringId ?? "none";
+        var settlement = party.CurrentSettlement?.StringId ?? "none";
         var heroHitPoints = party.LeaderHero?.HitPoints.ToString() ?? "none";
         bool isMainParty = party == MobileParty.MainParty;
 
         return $"party={party.StringId} mapEvent={mapEventId} siegeAssault={mapEvent?.IsSiegeAssault == true} " +
-            $"side={party.Party.Side} besiegerCamp={camp} army={army} heroHitPoints={heroHitPoints} " +
+            $"side={party.Party.Side} besiegerCamp={camp} army={army} settlement={settlement} heroHitPoints={heroHitPoints} " +
             $"playerSiege={isMainParty && PlayerSiege.PlayerSiegeEvent != null} encounter={isMainParty && PlayerEncounter.Current != null}";
     }
 
