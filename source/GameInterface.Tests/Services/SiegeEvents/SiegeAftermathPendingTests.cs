@@ -12,7 +12,7 @@ using FormatterServices = System.Runtime.Serialization.FormatterServices;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
-[Collection(nameof(SiegeAftermathCampaignCollection))]
+[Collection(nameof(CampaignCurrentCollection))]
 public sealed class SiegeAftermathPendingTests : IDisposable
 {
     public SiegeAftermathPendingTests()
@@ -146,10 +146,11 @@ public sealed class SiegeAftermathPendingTests : IDisposable
     [Fact]
     public void NarrationContext_IsParticipantScopedAndIndependentOfChoicePrompt()
     {
-        var originalCampaign = Campaign.Current;
+        // Bootstrap tests can leave an uninitialized Campaign.Current behind.
+        var previousCampaign = Campaign.Current;
+        Campaign.Current = null;
         try
         {
-            Campaign.Current = null;
             var participantSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
             var unrelatedSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
             var siegeEventInterface = new SiegeEventInterface();
@@ -165,7 +166,7 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         }
         finally
         {
-            Campaign.Current = originalCampaign;
+            Campaign.Current = previousCampaign;
         }
     }
 
@@ -241,5 +242,8 @@ public sealed class SiegeAftermathPendingTests : IDisposable
     }
 }
 
-[CollectionDefinition(nameof(SiegeAftermathCampaignCollection), DisableParallelization = true)]
-public sealed class SiegeAftermathCampaignCollection { }
+/// <summary>
+/// Serializes tests that temporarily replace the process-wide campaign.
+/// </summary>
+[CollectionDefinition(nameof(CampaignCurrentCollection), DisableParallelization = true)]
+public sealed class CampaignCurrentCollection { }
