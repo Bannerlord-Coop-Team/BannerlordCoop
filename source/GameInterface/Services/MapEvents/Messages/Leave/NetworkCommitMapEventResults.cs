@@ -21,10 +21,19 @@ internal readonly struct NetworkCommitMapEventResults : ICommand
     [ProtoMember(3)]
     public readonly NetworkPlayerLootData PlayerLootData;
 
-    public NetworkCommitMapEventResults(string mapEventId, BattleSideEnum winningSide, NetworkPlayerLootData playerLootData)
+    /// <summary>The server-authored map-event party whose rewards this receiver must stage.</summary>
+    [ProtoMember(4)]
+    public readonly string PlayerMapEventPartyId;
+
+    public NetworkCommitMapEventResults(
+        string mapEventId,
+        BattleSideEnum winningSide,
+        string playerMapEventPartyId,
+        NetworkPlayerLootData playerLootData)
     {
         MapEventId = mapEventId;
         WinningSide = winningSide;
+        PlayerMapEventPartyId = playerMapEventPartyId;
         PlayerLootData = playerLootData;
     }
 }

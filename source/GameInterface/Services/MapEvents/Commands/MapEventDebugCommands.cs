@@ -669,8 +669,8 @@ public class MapEventDebugCommands
                 pt: null,
                 new CampaignVec2(new Vec2(fixturePosition.X - 0.4f, fixturePosition.Y), isOnLand: true));
             fixture.BanditParty.MemberRoster.AddToCounts(banditTroop, 30);
-            fixture.BanditParty.PrisonRoster.AddToCounts(banditTroop, 12);
-            fixture.BanditParty.ItemRoster.AddToCounts(DefaultItems.Grain, 60);
+            fixture.BanditParty.PrisonRoster.AddToCounts(banditTroop, 120);
+            fixture.BanditParty.ItemRoster.AddToCounts(DefaultItems.Grain, 600);
             fixture.BanditParty.SetMoveModeHold();
 
             fixture.MapEvent = MapEventBattleFactory.CreateMapEvent(
@@ -795,6 +795,29 @@ public class MapEventDebugCommands
                $"finalized={fixture.MapEvent.IsFinalized}, lateJoinerAdded={fixture.LateJoinerAdded}, " +
                FormatBattleRewardPlayerState("initiator", fixture.Initiator, fixture.InitiatorMapEventParty) + ", " +
                FormatBattleRewardPlayerState("lateJoiner", fixture.LateJoiner, fixture.LateJoinerMapEventParty) + ".";
+    }
+
+    // coop.debug.mapevent.battle_reward_client_state
+    /// <summary>Reports the local player's staged or already-applied native battle rewards.</summary>
+    [CommandLineArgumentFunction("battle_reward_client_state", "coop.debug.mapevent")]
+    public static string GetBattleRewardClientState(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.battle_reward_client_state";
+
+        var encounter = PlayerEncounter.Current;
+        var mainParty = PartyBase.MainParty;
+        return $"Battle reward client state: encounter={encounter != null}, " +
+               $"encounterState={(encounter == null ? "none" : encounter.EncounterState.ToString())}, " +
+               $"activeState={GameStateManager.Current?.ActiveState?.GetType().Name ?? "none"}, " +
+               $"pendingItems={encounter?.RosterToReceiveLootItems.Sum(element => element.Amount) ?? 0}, " +
+               $"pendingMembers={encounter?.RosterToReceiveLootMembers.TotalManCount ?? 0}, " +
+               $"pendingPrisoners={encounter?.RosterToReceiveLootPrisoners.TotalManCount ?? 0}, " +
+               $"partyItems={mainParty?.ItemRoster.Sum(element => element.Amount) ?? 0}, " +
+               $"partyPrisoners={mainParty?.PrisonRoster.TotalManCount ?? 0}.";
     }
 
     // coop.debug.mapevent.battle_reward_fixture_restore
