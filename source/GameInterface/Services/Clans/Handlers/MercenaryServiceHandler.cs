@@ -97,7 +97,10 @@ internal class MercenaryServiceHandler : IHandler
         }
 
         ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, kingdom, default, awardMultiplier);
-        GainKingdomInfluenceAction.ApplyForJoiningFaction(hero, 5f);
+        if (clan == hero.Clan)
+        {
+            GainKingdomInfluenceAction.ApplyForJoiningFaction(hero, 5f);
+        }
     }
 
     private void HandleMercenaryServiceDismissalAccepted(MessagePayload<MercenaryServiceDismissalAccepted> payload)
