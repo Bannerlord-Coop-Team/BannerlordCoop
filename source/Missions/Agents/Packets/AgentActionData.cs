@@ -294,8 +294,8 @@ namespace Missions.Agents.Packets
             {
                 Agent.GuardMode.Up => Agent.UsageDirection.AttackUp,
                 Agent.GuardMode.Down => Agent.UsageDirection.AttackDown,
-                Agent.GuardMode.Left => Agent.UsageDirection.AttackLeft,
-                Agent.GuardMode.Right => Agent.UsageDirection.AttackRight,
+                Agent.GuardMode.Left => Agent.UsageDirection.AttackRight,
+                Agent.GuardMode.Right => Agent.UsageDirection.AttackLeft,
                 _ => Agent.UsageDirection.None
             };
 
