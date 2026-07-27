@@ -612,6 +612,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"guardPresentationApplied={guardDriver?.MountedPresentationApplied == true} " +
             $"guardPresentationRequestedAction={guardDriver?.MountedPresentationRequestedActionIndex ?? -1} " +
             $"guardPresentationImmediateAction={guardDriver?.MountedPresentationImmediateActionIndex ?? -1} " +
+            $"guardPresentationStartProgress={guardDriver?.MountedPresentationStartProgress ?? -1f:0.###} " +
             $"guardPresentationImmediateMode={guardDriver?.MountedPresentationImmediateGuardMode ?? "None"} " +
             $"guardAction={sample.LatchedActionIndex} " +
             $"guardAnimation={sample.LatchedAnimationIndex} " +
@@ -1284,6 +1285,19 @@ public class BattleGuardFixture : IBattleGuardFixture
             GetMountedGuardPresentationActionName(direction) != null;
     }
 
+    internal static float GetMountedGuardPresentationStartProgress(
+        bool transitionPending,
+        float currentProgress)
+    {
+        return transitionPending ||
+            float.IsNaN(currentProgress) ||
+            float.IsInfinity(currentProgress) ||
+            currentProgress < 0f ||
+            currentProgress > 1f
+                ? 0f
+                : currentProgress;
+    }
+
     private void ApplyMountedGuardPresentationAction(
         INetworkAgentRegistry agentRegistry)
     {
@@ -1318,9 +1332,9 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (!transitionPending && !actionChanged)
             return;
 
-        float startProgress = transitionPending
-            ? 0f
-            : agent.GetCurrentActionProgress(1);
+        float startProgress = GetMountedGuardPresentationStartProgress(
+            transitionPending,
+            agent.GetCurrentActionProgress(1));
         AnimFlags additionalFlags = transitionPending
             ? AnimFlags.anf_restart
             : (AnimFlags)0uL;
@@ -1330,6 +1344,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             GetGuardMode(driver.Direction));
         driver.MountedPresentationAttempts++;
         driver.MountedPresentationRequestedActionIndex = action.Index;
+        driver.MountedPresentationStartProgress = startProgress;
         driver.MountedPresentationApplied = agent.SetActionChannel(
             1,
             in action,
@@ -3236,6 +3251,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         public bool MountedPresentationApplied { get; set; }
         public int MountedPresentationRequestedActionIndex { get; set; } = -1;
         public int MountedPresentationImmediateActionIndex { get; set; } = -1;
+        public float MountedPresentationStartProgress { get; set; } = -1f;
         public string MountedPresentationImmediateGuardMode { get; set; } =
             "None";
         public uint AppliedRiderMovementFlags { get; private set; }

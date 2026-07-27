@@ -593,6 +593,39 @@ public class BattleGuardFixtureEvidenceTests
                 direction));
     }
 
+    [Theory]
+    [InlineData(true, 0.5f, 0f)]
+    [InlineData(false, -1f, 0f)]
+    [InlineData(false, 1.1f, 0f)]
+    [InlineData(false, 0f, 0f)]
+    [InlineData(false, 0.42f, 0.42f)]
+    public void MountedGuardPresentationAction_UsesValidStartProgress(
+        bool transitionPending,
+        float currentProgress,
+        float expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.GetMountedGuardPresentationStartProgress(
+                transitionPending,
+                currentProgress));
+    }
+
+    [Fact]
+    public void MountedGuardPresentationAction_ClampsNonFiniteStartProgress()
+    {
+        Assert.Equal(
+            0f,
+            BattleGuardFixture.GetMountedGuardPresentationStartProgress(
+                false,
+                float.NaN));
+        Assert.Equal(
+            0f,
+            BattleGuardFixture.GetMountedGuardPresentationStartProgress(
+                false,
+                float.PositiveInfinity));
+    }
+
     [Fact]
     public void MountedStrikerPosition_RecreatesSideInterceptionGeometry()
     {
