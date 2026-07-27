@@ -548,6 +548,51 @@ public class BattleGuardFixtureEvidenceTests
                 direction));
     }
 
+    [Theory]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Guard,
+        BattleGuardFixtureDirection.Left,
+        true)]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Guard,
+        BattleGuardFixtureDirection.Right,
+        true)]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Calibration,
+        BattleGuardFixtureDirection.Right,
+        false)]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Attack,
+        BattleGuardFixtureDirection.Right,
+        false)]
+    [InlineData(
+        BattleGuardFixtureMode.Foot,
+        BattleGuardFixturePhase.Guard,
+        BattleGuardFixtureDirection.Right,
+        false)]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Guard,
+        BattleGuardFixtureDirection.Up,
+        false)]
+    public void MountedGuardPresentationAction_MaintainsOnlyGuardPhase(
+        BattleGuardFixtureMode mode,
+        BattleGuardFixturePhase phase,
+        BattleGuardFixtureDirection direction,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldMaintainMountedGuardPresentation(
+                mode,
+                phase,
+                direction));
+    }
+
     [Fact]
     public void MountedStrikerPosition_RecreatesSideInterceptionGeometry()
     {

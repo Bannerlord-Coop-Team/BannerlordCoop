@@ -347,7 +347,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     public void ApplyPostAgentTickGuardInput(
         INetworkAgentRegistry agentRegistry)
     {
-        ApplyPendingMountedGuardPresentationAction(agentRegistry);
+        ApplyMountedGuardPresentationAction(agentRegistry);
     }
 
     public void SamplePreReplayDisplayedState(
@@ -1274,36 +1274,68 @@ public class BattleGuardFixture : IBattleGuardFixture
             GetMountedGuardPresentationActionName(direction) != null;
     }
 
-    private void ApplyPendingMountedGuardPresentationAction(
+    internal static bool ShouldMaintainMountedGuardPresentation(
+        BattleGuardFixtureMode mode,
+        BattleGuardFixturePhase phase,
+        BattleGuardFixtureDirection direction)
+    {
+        return mode == BattleGuardFixtureMode.Mounted &&
+            phase == BattleGuardFixturePhase.Guard &&
+            GetMountedGuardPresentationActionName(direction) != null;
+    }
+
+    private void ApplyMountedGuardPresentationAction(
         INetworkAgentRegistry agentRegistry)
     {
         GuardDriver driver = guardDriver;
-        if (driver?.MountedPresentationActionPending != true ||
+        if (driver == null ||
             !TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
         {
             return;
         }
 
+        if (!ShouldMaintainMountedGuardPresentation(
+                driver.Mode,
+                driver.Phase,
+                driver.Direction) ||
+            !agent.HasMount)
+        {
+            driver.MountedPresentationActionPending = false;
+            return;
+        }
+
         string actionName =
             GetMountedGuardPresentationActionName(driver.Direction);
-        driver.MountedPresentationActionPending = false;
-        if (actionName == null)
-            return;
+        ActionIndexCache action = ActionIndexCache.Create(actionName);
+        bool transitionPending =
+            driver.MountedPresentationActionPending;
+        bool actionChanged =
+            agent.GetCurrentAction(1).Index != action.Index;
 
-        AgentActionData.ApplyGuardDirectionTransition(
-            agent,
-            GetGuardMode(driver.Direction));
         AgentActionData.ApplyDefendMovementFlags(
             agent,
             GetDefendFlags(driver.Direction));
-        ActionIndexCache action = ActionIndexCache.Create(actionName);
+        if (!transitionPending && !actionChanged)
+            return;
+
+        float startProgress = transitionPending
+            ? 0f
+            : agent.GetCurrentActionProgress(1);
+        AnimFlags additionalFlags = transitionPending
+            ? AnimFlags.anf_restart
+            : (AnimFlags)0uL;
+        driver.MountedPresentationActionPending = false;
+        AgentActionData.ApplyGuardDirectionTransition(
+            agent,
+            GetGuardMode(driver.Direction));
         driver.MountedPresentationAttempts++;
         driver.MountedPresentationRequestedActionIndex = action.Index;
         driver.MountedPresentationApplied = agent.SetActionChannel(
             1,
             in action,
             ignorePriority: true,
-            additionalFlags: AnimFlags.anf_restart);
+            additionalFlags: additionalFlags,
+            startProgress: startProgress);
         driver.MountedPresentationImmediateActionIndex =
             agent.GetCurrentAction(1).Index;
         driver.MountedPresentationImmediateGuardMode =
