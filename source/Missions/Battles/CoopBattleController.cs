@@ -274,6 +274,7 @@ public class CoopBattleController : CoopMissionController
     public override void OnPreDisplayMissionTick(float dt)
     {
 #if DEBUG
+        ApplyGuardFixturePostAgentTickInput();
         guardFixture.SamplePreReplayDisplayedState(
             dt,
             coopMissionComponent.AgentRegistry);
