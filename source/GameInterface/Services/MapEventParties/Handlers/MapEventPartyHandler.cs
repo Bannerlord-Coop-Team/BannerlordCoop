@@ -309,6 +309,7 @@ internal class MapEventPartyHandler : IHandler
 
         if (fallbackDescriptor.HasValue)
         {
+            // The score message may arrive after the matching attacker became a casualty.
             mapEventParty.OnTroopScoreHit(
                 fallbackDescriptor.Value,
                 attackedTroop,
