@@ -18,16 +18,41 @@ namespace GameInterface.Services.Workshops;
 /// (GetOutputDailyChange dereferences the missing data) and faults the server's production tick.
 /// </summary>
 /// <remarks>
-/// Temporary; remove this class once poisoned saves are no longer in circulation. Its only call
-/// sites are the two hooks in <see cref="WorkshopsCampaignBehaviorInitializationHandler"/>.
+/// Temporary; remove this file once poisoned saves are no longer in circulation. Its only
+/// consumer is <see cref="WorkshopsCampaignBehaviorInitializationHandler"/> (constructor
+/// injection plus the two repair calls).
 /// </remarks>
-internal static class WorkshopRepairer
+internal interface IWorkshopRepairer : IGameAbstraction
 {
     /// <summary>
     /// Backfills the local behavior storage for every workshop the player hero owns. Runs blocking
     /// so the player cannot open the Clan screen before their own workshops have data again.
     /// </summary>
-    internal static void RepairClientWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, Hero playerHero)
+    void RepairClientWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, Hero playerHero);
+
+    /// <summary>
+    /// Backfills the server behavior storage and the session-store warehouse entries for every
+    /// workshop the player hero owns. The AddNewWorkshopData server prefix broadcasts each
+    /// restored entry to every client.
+    /// </summary>
+    void RepairServerWorkshopData(Hero playerHero, string playerHeroId);
+}
+
+/// <inheritdoc cref="IWorkshopRepairer"/>
+internal class WorkshopRepairer : IWorkshopRepairer
+{
+    private readonly IObjectManager objectManager;
+    private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
+
+    public WorkshopRepairer(
+        IObjectManager objectManager,
+        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+    {
+        this.objectManager = objectManager;
+        this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
+    }
+
+    public void RepairClientWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, Hero playerHero)
     {
         GameThread.RunSafe(() =>
         {
@@ -39,16 +64,7 @@ internal static class WorkshopRepairer
         }, blocking: true);
     }
 
-    /// <summary>
-    /// Backfills the server behavior storage and the session-store warehouse entries for every
-    /// workshop the player hero owns. The AddNewWorkshopData server prefix broadcasts each
-    /// restored entry to every client.
-    /// </summary>
-    internal static void RepairServerWorkshopData(
-        Hero playerHero,
-        string playerHeroId,
-        IObjectManager objectManager,
-        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+    public void RepairServerWorkshopData(Hero playerHero, string playerHeroId)
     {
         GameThread.RunSafe(() =>
         {
@@ -72,7 +88,7 @@ internal static class WorkshopRepairer
         }, context: nameof(WorkshopRepairer));
     }
 
-    internal static void AddMissingWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, IEnumerable<Workshop> ownedWorkshops)
+    private static void AddMissingWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, IEnumerable<Workshop> ownedWorkshops)
     {
         foreach (Workshop workshop in ownedWorkshops)
         {

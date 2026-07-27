@@ -86,7 +86,7 @@ public class WorkshopDataRepairTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
 
             var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
-            WorkshopRepairer.RepairClientWorkshopData(workshopsBehavior, hero);
+            client.Resolve<IWorkshopRepairer>().RepairClientWorkshopData(workshopsBehavior, hero);
         });
 
         AssertWorkshopDataRestored(client, workshopId);
@@ -113,7 +113,7 @@ public class WorkshopDataRepairTests : IDisposable
             Assert.Contains(workshop, ownedWorkshops);
 
             var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
-            WorkshopRepairer.RepairClientWorkshopData(workshopsBehavior, hero);
+            client.Resolve<IWorkshopRepairer>().RepairClientWorkshopData(workshopsBehavior, hero);
         });
 
         AssertWorkshopDataRestored(client, workshopId);

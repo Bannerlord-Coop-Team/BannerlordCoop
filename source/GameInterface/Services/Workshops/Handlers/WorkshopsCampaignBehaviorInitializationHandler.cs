@@ -25,6 +25,7 @@ namespace GameInterface.Services.Workshops.Handlers
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
         private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
+        private readonly IWorkshopRepairer workshopRepairer;
 
         private WorkshopPlayerData workshopPlayerData;
 
@@ -32,12 +33,14 @@ namespace GameInterface.Services.Workshops.Handlers
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
-            ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+            ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
+            IWorkshopRepairer workshopRepairer)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
             this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
+            this.workshopRepairer = workshopRepairer;
             messageBroker.Subscribe<InitializeClientWorkshopData>(Handle);
             messageBroker.Subscribe<PlayerHeroChanged>(Handle);
             messageBroker.Subscribe<NetworkInitializeServerWorkshopDataKeys>(Handle);
@@ -64,7 +67,7 @@ namespace GameInterface.Services.Workshops.Handlers
             WorkshopsCampaignBehavior workshopsCampaignBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
 
             workshopsCampaignBehavior._warehouseRosterPerSettlement = GetWarehouseRosterPerSettlement(playerHeroId, playerHero);
-            WorkshopRepairer.RepairClientWorkshopData(workshopsCampaignBehavior, playerHero);
+            workshopRepairer.RepairClientWorkshopData(workshopsCampaignBehavior, playerHero);
 
             network.SendAll(new NetworkInitializeServerWorkshopDataKeys(playerHeroId));
         }
@@ -76,7 +79,7 @@ namespace GameInterface.Services.Workshops.Handlers
 
             if (!objectManager.TryGetObjectWithLogging(playerHeroId, out Hero playerHero)) return;
 
-            WorkshopRepairer.RepairServerWorkshopData(playerHero, playerHeroId, objectManager, sessionWorkshopPlayerDataInterface);
+            workshopRepairer.RepairServerWorkshopData(playerHero, playerHeroId);
         }
 
         internal static IEnumerable<Workshop> GetWorkshopsOwnedBy(Hero playerHero)
