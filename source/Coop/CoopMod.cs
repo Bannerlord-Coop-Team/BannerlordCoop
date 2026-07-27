@@ -219,9 +219,10 @@ namespace Coop
                 ?.InformationalVersion ?? "unknown";
             Logger.Information("BannerlordCoop build {Build}", informationalVersion);
             Logger.Information(
-                "[Protobuf] MonoRuntime={MonoRuntime} AutoCompile={AutoCompile} CLRVersion={ClrVersion}",
+                "[Protobuf] MonoRuntime={MonoRuntime} AutoCompile={AutoCompile} StructFactoryWorkaround={StructFactoryWorkaround} CLRVersion={ClrVersion}",
                 ProtoBufSerializer.IsMonoRuntime,
                 ProtoBufSerializer.AutoCompileEnabled,
+                ProtoBufSerializer.StructFactoryWorkaroundEnabled,
                 Environment.Version);
 
             Logger.Verbose("Coop Mod Module Started");
