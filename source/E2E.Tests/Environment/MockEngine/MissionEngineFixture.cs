@@ -857,19 +857,13 @@ public sealed class MissionEngineFixture : IDisposable
         bool ignorePriority,
         AnimFlags additionalFlags,
         float blendInPeriod,
-        float blendOutPeriodToNoAnim,
         float startProgress,
-        float blendOutPeriod,
         bool forceFaceMorphRestart,
         ref bool __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetActionChannelCalls++;
         m.SetActionChannelIndices.Add(actionIndexCache.Index);
-        m.SetActionChannelBlendInPeriods.Add(blendInPeriod);
-        m.SetActionChannelBlendOutToNonePeriods.Add(
-            blendOutPeriodToNoAnim);
-        m.SetActionChannelBlendOutPeriods.Add(blendOutPeriod);
         m.ActionAndGuardCallOrder.Add("set-action");
         m.LastSetActionChannel = channelNo;
         m.LastSetActionIgnorePriority = ignorePriority;
@@ -887,10 +881,7 @@ public sealed class MissionEngineFixture : IDisposable
             return false;
         }
 
-        if (actionIndexCache == ActionIndexCache.act_none
-            && blendInPeriod == 0f
-            && blendOutPeriodToNoAnim == 0f
-            && blendOutPeriod == 0f)
+        if (actionIndexCache == ActionIndexCache.act_none)
         {
             m.ClearRetainedNativeAction(channelNo);
         }
@@ -986,9 +977,9 @@ public sealed class MissionEngineFixture : IDisposable
                 Agent.UsageDirection.AttackDown =>
                     Agent.MovementControlFlag.DefendDown,
                 Agent.UsageDirection.AttackLeft =>
-                    Agent.MovementControlFlag.DefendRight,
-                Agent.UsageDirection.AttackRight =>
                     Agent.MovementControlFlag.DefendLeft,
+                Agent.UsageDirection.AttackRight =>
+                    Agent.MovementControlFlag.DefendRight,
                 _ => Agent.MovementControlFlag.None
             };
             m.MovementFlags =
@@ -1002,8 +993,8 @@ public sealed class MissionEngineFixture : IDisposable
         {
             case Agent.UsageDirection.AttackUp: m.GuardMode = Agent.GuardMode.Up; break;
             case Agent.UsageDirection.AttackDown: m.GuardMode = Agent.GuardMode.Down; break;
-            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Right; break;
-            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Left; break;
+            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Left; break;
+            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Right; break;
         }
         return false;
     }

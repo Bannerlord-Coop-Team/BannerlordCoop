@@ -740,9 +740,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.RetainedNativeActionDirection =
                 Agent.UsageDirection.DefendLeft;
             puppetMirror.SetActionChannelIndices.Clear();
-            puppetMirror.SetActionChannelBlendInPeriods.Clear();
-            puppetMirror.SetActionChannelBlendOutToNonePeriods.Clear();
-            puppetMirror.SetActionChannelBlendOutPeriods.Clear();
             puppetMirror.ActionAndGuardCallOrder.Clear();
 
             ownerMirror.GuardMode = Agent.GuardMode.Right;
@@ -765,15 +762,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 new[] { ActionIndexCache.act_none.Index, 3070 },
                 puppetMirror.SetActionChannelIndices);
-            Assert.Equal(
-                new[] { 0f, -0.2f },
-                puppetMirror.SetActionChannelBlendInPeriods);
-            Assert.Equal(
-                new[] { 0f, 0.4f },
-                puppetMirror.SetActionChannelBlendOutToNonePeriods);
-            Assert.Equal(
-                new[] { 0f, -0.2f },
-                puppetMirror.SetActionChannelBlendOutPeriods);
             Assert.Equal(
                 new[]
                 {
@@ -892,7 +880,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(3070, puppetMirror.Action1Index);
             Assert.True(puppetMirror.LastSetActionIgnorePriority);
             Assert.Equal(
-                Agent.UsageDirection.AttackLeft,
+                Agent.UsageDirection.AttackRight,
                 puppetMirror.LastSetWeaponGuardDirection);
         });
     }
@@ -1115,7 +1103,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 guardResetsBeforePeriodicDisplacement,
                 puppetMirror.ResetGuardCalls);
             Assert.Equal(
-                Agent.UsageDirection.AttackLeft,
+                Agent.UsageDirection.AttackRight,
                 puppetMirror.LastSetWeaponGuardDirection);
             Assert.Equal(
                 Agent.GuardMode.Right,
@@ -4091,7 +4079,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 actionCommandsBeforeMovement,
                 puppetMirror.SetActionChannelCalls);
             Assert.Equal(
-                Agent.UsageDirection.AttackLeft,
+                Agent.UsageDirection.AttackRight,
                 puppetMirror.LastSetWeaponGuardDirection);
         });
     }
@@ -4275,7 +4263,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
                 bool nativeSelectsRight =
                     puppetMirror.LastSetWeaponGuardDirection
-                        == Agent.UsageDirection.AttackLeft;
+                        == Agent.UsageDirection.AttackRight;
                 puppetMirror.Action1Index =
                     nativeSelectsRight ? 3070 : 3078;
                 puppetMirror.Action1CodeType = nativeSelectsRight
@@ -5514,8 +5502,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [Theory]
     [InlineData(Agent.GuardMode.Up, Agent.UsageDirection.AttackUp)]
     [InlineData(Agent.GuardMode.Down, Agent.UsageDirection.AttackDown)]
-    [InlineData(Agent.GuardMode.Left, Agent.UsageDirection.AttackRight)]
-    [InlineData(Agent.GuardMode.Right, Agent.UsageDirection.AttackLeft)]
+    [InlineData(Agent.GuardMode.Left, Agent.UsageDirection.AttackLeft)]
+    [InlineData(Agent.GuardMode.Right, Agent.UsageDirection.AttackRight)]
     public void GuardApply_MapsEveryGuardDirection(
         Agent.GuardMode guardMode,
         Agent.UsageDirection usageDirection)

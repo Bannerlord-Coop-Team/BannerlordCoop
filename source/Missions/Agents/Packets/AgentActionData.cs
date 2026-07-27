@@ -121,9 +121,6 @@ namespace Missions.Agents.Packets
                 ActionIndexCache.act_none,
                 ignorePriority: true,
                 additionalFlags: AnimFlags.anf_restart,
-                blendInPeriod: 0f,
-                blendOutPeriodToNoAnim: 0f,
-                blendOutPeriod: 0f,
                 forceFaceMorphRestart: false);
         }
 
@@ -310,8 +307,8 @@ namespace Missions.Agents.Packets
             {
                 Agent.GuardMode.Up => Agent.UsageDirection.AttackUp,
                 Agent.GuardMode.Down => Agent.UsageDirection.AttackDown,
-                Agent.GuardMode.Left => Agent.UsageDirection.AttackRight,
-                Agent.GuardMode.Right => Agent.UsageDirection.AttackLeft,
+                Agent.GuardMode.Left => Agent.UsageDirection.AttackLeft,
+                Agent.GuardMode.Right => Agent.UsageDirection.AttackRight,
                 _ => Agent.UsageDirection.None
             };
 
