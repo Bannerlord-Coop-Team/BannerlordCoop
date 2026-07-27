@@ -37,12 +37,13 @@ internal static class BattleGuardFixtureInputPatch
 [HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
 [HarmonyPatch(
     typeof(Mission),
-    nameof(Mission.TickAgentsAndTeamsImp),
-    new[] { typeof(float), typeof(bool) })]
+    "OnPreTick",
+    new[] { typeof(float) })]
 internal static class BattleGuardFixturePostAgentTickPatch
 {
     private static void Postfix()
     {
+        // OnPreTick waits for the async agent tick and returns to the main thread.
         Mission.Current?
             .GetMissionBehavior<CoopBattleController>()?
             .ApplyGuardFixturePostAgentTickInput();
