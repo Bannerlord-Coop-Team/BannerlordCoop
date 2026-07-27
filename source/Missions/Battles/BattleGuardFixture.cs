@@ -22,6 +22,7 @@ public interface IBattleGuardFixture
     void Apply(NetworkBattleGuardFixtureCommand command, INetworkAgentRegistry agentRegistry);
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
+    void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
     void SamplePreReplayDisplayedState(
         float dt,
@@ -270,6 +271,45 @@ public class BattleGuardFixture : IBattleGuardFixture
             DriveGuardInput(agent, guardDriver);
     }
 
+    public void ReapplyPlayerGuardInput(
+        INetworkAgentRegistry agentRegistry)
+    {
+        if (!TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
+            return;
+
+        bool guarding =
+            guardDriver.Phase != BattleGuardFixturePhase.Calibration &&
+            (guardDriver.Mode != BattleGuardFixtureMode.Foot ||
+             !agent.HasMount);
+        Agent.MovementControlFlag defendFlags = guarding
+            ? GetDefendFlags(guardDriver.Direction)
+            : Agent.MovementControlFlag.None;
+        if (guardDriver.MountedPostNativeGuardCommandPending)
+        {
+            Agent.GuardMode guardMode = guarding
+                ? GetGuardMode(guardDriver.Direction)
+                : Agent.GuardMode.None;
+            if (guardDriver.MountedPostNativeDirectionChanged)
+            {
+                AgentActionData.ApplyGuardDirectionTransition(
+                    agent,
+                    guardMode);
+            }
+            else
+            {
+                AgentActionData.ApplyGuardState(
+                    agent,
+                    guardMode,
+                    force: guarding);
+            }
+            guardDriver.MountedPostNativeGuardCommandPending = false;
+            guardDriver.MountedPostNativeDirectionChanged = false;
+        }
+
+        AgentActionData.ApplyDefendMovementFlags(agent, defendFlags);
+        guardDriver.ObserveAppliedInput(agent);
+    }
+
     public void Tick(float dt, INetworkAgentRegistry agentRegistry)
     {
         PauseOtherAi(agentRegistry);
@@ -507,8 +547,11 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"medianSpeed={sample.GetMedianSpeed():0.###} health={sample.Health:0.###} " +
             $"riderMoveFlags={sample.RiderMovementFlags} " +
             $"mountMoveFlags={sample.MountMovementFlags} " +
+            $"nativeDefendFlags={sample.NativeDefendMovementFlags} " +
             $"targetRiderMoveFlags={targetRiderMovementFlags} " +
             $"targetMountMoveFlags={targetMountMovementFlags} " +
+            $"appliedRiderMoveFlags={guardDriver?.AppliedRiderMovementFlags ?? 0} " +
+            $"appliedNativeDefendFlags={guardDriver?.AppliedNativeDefendMovementFlags ?? 0} " +
             $"riderBodyYaw={sample.RiderBodyYaw:0.###} " +
             $"riderLookYaw={sample.RiderLookYaw:0.###} " +
             $"riderMoveYaw={sample.RiderMovementYaw:0.###} " +
@@ -531,6 +574,13 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"routeTurns={route?.CompletedTurns ?? 0} " +
             $"routeStrikeReady={route?.CanStageStrike == true} " +
             $"healthDelta={sample.HealthDelta:0.###} rawAction={sample.RawActionIndex} " +
+            $"rawActionName={GetTokenValue(sample.RawActionName)} " +
+            $"rawActionType={sample.RawActionType} " +
+            $"rawActionDirection={sample.RawActionDirection} " +
+            $"action0Direction={sample.Action0Direction} " +
+            $"action1Direction={sample.Action1Direction} " +
+            $"appliedAction0Direction={guardDriver?.AppliedAction0Direction ?? "None"} " +
+            $"appliedAction1Direction={guardDriver?.AppliedAction1Direction ?? "None"} " +
             $"rawProgress={sample.RawProgress:0.###} guardChannel={sample.LatchedChannel} " +
             $"guardDirection={guardDriver?.Direction.ToString() ?? "none"} " +
             $"guardMode={sample.GuardMode} " +
@@ -1134,6 +1184,9 @@ public class BattleGuardFixture : IBattleGuardFixture
             }
             driver.MountedGuardCommandActive = guarding;
             driver.MountedGuardCommandDirection = driver.Direction;
+            driver.MountedPostNativeGuardCommandPending = true;
+            driver.MountedPostNativeDirectionChanged =
+                mountedGuardDirectionChanged;
             driver.MountedGuardStateChanges++;
         }
         agent.MovementFlags = flags;
@@ -1147,6 +1200,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             agent.LookDirection = targetLookDirection;
         if (dismounting)
             agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
+        driver.ObserveAppliedInput(agent);
     }
 
     internal static Agent.MovementControlFlag GetDefendFlags(
@@ -2311,6 +2365,12 @@ public class BattleGuardFixture : IBattleGuardFixture
         sample.AgentId = agentId;
         sample.Mounted = agent.HasMount;
         sample.GuardMode = agent.CurrentGuardMode.ToString();
+        sample.NativeDefendMovementFlags =
+            (uint)agent.GetDefendMovementFlag();
+        sample.Action0Direction =
+            agent.GetCurrentActionDirection(0).ToString();
+        sample.Action1Direction =
+            agent.GetCurrentActionDirection(1).ToString();
         sample.Health = agent.Health;
         if (!sample.HasBaselineHealth)
         {
@@ -2350,6 +2410,12 @@ public class BattleGuardFixture : IBattleGuardFixture
             int channel = sample.LatchedChannel;
             ActionIndexCache rawAction = agent.GetCurrentAction(channel);
             sample.RawActionIndex = rawAction.Index;
+            sample.RawActionName =
+                AgentActionData.GetActionNameWithCode(rawAction.Index);
+            sample.RawActionType =
+                agent.GetCurrentActionType(channel).ToString();
+            sample.RawActionDirection =
+                agent.GetCurrentActionDirection(channel).ToString();
             sample.RawProgress = agent.GetCurrentActionProgress(channel);
             sample.VisualActionIndex = skeleton.GetActionAtChannel(channel).Index;
             sample.VisualAnimationIndex = skeleton.GetAnimationIndexAtChannel(channel);
@@ -3050,6 +3116,12 @@ public class BattleGuardFixture : IBattleGuardFixture
             get;
             set;
         }
+        public bool MountedPostNativeGuardCommandPending { get; set; }
+        public bool MountedPostNativeDirectionChanged { get; set; }
+        public uint AppliedRiderMovementFlags { get; private set; }
+        public uint AppliedNativeDefendMovementFlags { get; private set; }
+        public string AppliedAction0Direction { get; private set; } = "None";
+        public string AppliedAction1Direction { get; private set; } = "None";
         public int MountedGuardStateChanges { get; set; }
         public BattleGuardMountedSpeedLimiter MountedSpeedLimiter { get; } =
             new();
@@ -3106,6 +3178,17 @@ public class BattleGuardFixture : IBattleGuardFixture
             EndMountedStrike();
             MountedSpeedLimiter.Restore();
             DrivesAgent = false;
+        }
+
+        public void ObserveAppliedInput(Agent agent)
+        {
+            AppliedRiderMovementFlags = (uint)agent.MovementFlags;
+            AppliedNativeDefendMovementFlags =
+                (uint)agent.GetDefendMovementFlag();
+            AppliedAction0Direction =
+                agent.GetCurrentActionDirection(0).ToString();
+            AppliedAction1Direction =
+                agent.GetCurrentActionDirection(1).ToString();
         }
 
         public void BeginMountedStrike(
@@ -3949,6 +4032,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         public float PeakHorizontalSpeed;
         public uint RiderMovementFlags;
         public uint MountMovementFlags;
+        public uint NativeDefendMovementFlags;
         public float RiderBodyYaw;
         public float RiderLookYaw;
         public float RiderMovementYaw;
@@ -3966,6 +4050,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         public bool GuardEquipmentReady;
         public string GuardMode = "None";
         public int RawActionIndex = -1;
+        public string RawActionName;
+        public string RawActionType = "None";
+        public string RawActionDirection = "None";
+        public string Action0Direction = "None";
+        public string Action1Direction = "None";
         public float RawProgress = -1f;
         public int LatchedChannel = -1;
         public int LatchedActionIndex = -1;

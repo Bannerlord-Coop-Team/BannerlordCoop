@@ -137,17 +137,31 @@ namespace Missions.Agents.Packets
             Agent.MovementControlFlag defendFlags)
         {
             Agent.GuardMode guardMode = agent.CurrentGuardMode;
-            if (IsGuardMode(guardMode))
+            if (!agent.HasMount && IsGuardMode(guardMode))
                 return guardMode;
 
             if (defendFlags == Agent.MovementControlFlag.None)
-                return Agent.GuardMode.None;
+            {
+                return IsGuardMode(guardMode)
+                    ? guardMode
+                    : Agent.GuardMode.None;
+            }
+
+            if (agent.HasMount)
+            {
+                guardMode = GetGuardModeFromDefendingAction(agent);
+                if (IsGuardMode(guardMode))
+                    return guardMode;
+            }
+
+            guardMode = agent.CurrentGuardMode;
+            if (IsGuardMode(guardMode))
+                return guardMode;
 
             guardMode = GetGuardModeFromDefendFlags(defendFlags);
             if (IsGuardMode(guardMode))
                 return guardMode;
 
-            // Mounted shields keep their exact direction on the defend action even when CurrentGuardMode is unset.
             guardMode = GetGuardModeFromDefendDirection(
                 agent.GetCurrentActionDirection(1));
             if (IsGuardMode(guardMode))
@@ -155,6 +169,21 @@ namespace Missions.Agents.Packets
 
             return GetGuardModeFromDefendDirection(
                 agent.GetCurrentActionDirection(0));
+        }
+
+        internal static Agent.MovementControlFlag AlignDefendDirection(
+            Agent.MovementControlFlag defendFlags,
+            Agent.GuardMode guardMode)
+        {
+            if (defendFlags == Agent.MovementControlFlag.None ||
+                !IsGuardMode(guardMode))
+            {
+                return defendFlags;
+            }
+
+            return (defendFlags &
+                    ~Agent.MovementControlFlag.DefendDirMask) |
+                GuardModeToDefendFlag(guardMode);
         }
 
         internal static bool IsDefendingAction(Agent.ActionCodeType actionType)
@@ -223,14 +252,50 @@ namespace Missions.Agents.Packets
                 _ => Agent.GuardMode.None
             };
 
+        internal static Agent.GuardMode GetGuardModeFromDefendingAction(
+            Agent agent)
+        {
+            Agent.GuardMode guardMode =
+                GetGuardModeFromDefendingAction(agent, 1);
+            return IsGuardMode(guardMode)
+                ? guardMode
+                : GetGuardModeFromDefendingAction(agent, 0);
+        }
+
+        private static Agent.GuardMode GetGuardModeFromDefendingAction(
+            Agent agent,
+            int channel)
+        {
+            if (!IsDefendingAction(agent.GetCurrentActionType(channel)))
+                return Agent.GuardMode.None;
+
+            return GetGuardModeFromDefendDirection(
+                agent.GetCurrentActionDirection(channel));
+        }
+
+        private static Agent.MovementControlFlag GuardModeToDefendFlag(
+            Agent.GuardMode guardMode) =>
+            guardMode switch
+            {
+                Agent.GuardMode.Up =>
+                    Agent.MovementControlFlag.DefendUp,
+                Agent.GuardMode.Down =>
+                    Agent.MovementControlFlag.DefendDown,
+                Agent.GuardMode.Left =>
+                    Agent.MovementControlFlag.DefendLeft,
+                Agent.GuardMode.Right =>
+                    Agent.MovementControlFlag.DefendRight,
+                _ => Agent.MovementControlFlag.None
+            };
+
         private static Agent.UsageDirection GuardModeToUsageDirection(
             Agent.GuardMode guardMode) =>
             guardMode switch
             {
                 Agent.GuardMode.Up => Agent.UsageDirection.AttackUp,
                 Agent.GuardMode.Down => Agent.UsageDirection.AttackDown,
-                Agent.GuardMode.Left => Agent.UsageDirection.AttackRight,
-                Agent.GuardMode.Right => Agent.UsageDirection.AttackLeft,
+                Agent.GuardMode.Left => Agent.UsageDirection.AttackLeft,
+                Agent.GuardMode.Right => Agent.UsageDirection.AttackRight,
                 _ => Agent.UsageDirection.None
             };
 
@@ -263,6 +328,13 @@ namespace Missions.Agents.Packets
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
+
+            if (agent.HasMount)
+            {
+                defendFlags = AlignDefendDirection(
+                    defendFlags,
+                    guardMode);
+            }
 
             Agent.MovementControlFlag movementFlags = agent.MovementFlags;
             movementFlags &= ~DefendMovementFlagsMask;

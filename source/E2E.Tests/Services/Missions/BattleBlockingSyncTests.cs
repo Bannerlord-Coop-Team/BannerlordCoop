@@ -225,7 +225,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         Agent.ActionCodeType.DefendShield,
         Agent.UsageDirection.DefendRight,
         Agent.MovementControlFlag.None,
-        Agent.MovementControlFlag.DefendBlock,
+        Agent.MovementControlFlag.DefendBlock
+            | Agent.MovementControlFlag.DefendRight,
         Agent.GuardMode.Right)]
     [InlineData(
         Agent.MovementControlFlag.None,
@@ -373,7 +374,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             mirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendRight;
-            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
             context.Component.AgentActionHandler.PollActions();
 
             AgentActionPacket packet = Assert.Single(
@@ -385,6 +385,100 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 rightGuard.DefendFlags);
             Assert.Equal(Agent.GuardMode.Right, rightGuard.GuardMode);
             Assert.Equal(2L, Assert.Single(packet.Sequences));
+
+            context.Network.NetworkSentPackets.Packets.Clear();
+            context.Component.AgentActionHandler.PollActions();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionData backToLeft = Assert.Single(
+                Assert.Single(
+                    context.Network.NetworkSentPackets
+                        .GetPackets<AgentActionPacket>())
+                    .Actions);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendLeft,
+                backToLeft.DefendFlags);
+            Assert.Equal(Agent.GuardMode.Left, backToLeft.GuardMode);
+        });
+    }
+
+    [Fact]
+    public void PollActions_MountedGuardActionDirection_ReplacesStaleInputDirection()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            mirror.Action1Index = 202;
+            mirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            mirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+            context.Component.AgentActionHandler.PollActions();
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.Action1Index = 203;
+            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            AgentActionData action = Assert.Single(packet.Actions);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                action.DefendFlags);
+            Assert.Equal(Agent.GuardMode.Right, action.GuardMode);
+            Assert.Equal(2L, Assert.Single(packet.Sequences));
+
+            context.Network.NetworkSentPackets.Packets.Clear();
+            context.Component.AgentActionHandler.PollActions();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            mirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionData backToLeft = Assert.Single(
+                Assert.Single(
+                    context.Network.NetworkSentPackets
+                        .GetPackets<AgentActionPacket>())
+                    .Actions);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendLeft,
+                backToLeft.DefendFlags);
+            Assert.Equal(Agent.GuardMode.Left, backToLeft.GuardMode);
         });
     }
 
@@ -1391,7 +1485,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 serializer.Deserialize<IPacket>(wire));
 
             AgentActionData action = Assert.Single(result.Actions);
-            Assert.Equal(Agent.MovementControlFlag.DefendBlock, action.DefendFlags);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendLeft,
+                action.DefendFlags);
             Assert.Equal(Agent.GuardMode.Left, action.GuardMode);
             Assert.Equal(1, action.GuardPresentationChannel);
             Assert.Equal(1, action.GuardActionChannel);
@@ -2733,7 +2830,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.True(action.IsMounted);
             Assert.Equal(Agent.GuardMode.Right, action.GuardMode);
             Assert.Equal(
-                Agent.MovementControlFlag.DefendBlock,
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
                 action.DefendFlags);
         });
     }
@@ -4267,8 +4365,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [Theory]
     [InlineData(Agent.GuardMode.Up, Agent.UsageDirection.AttackUp)]
     [InlineData(Agent.GuardMode.Down, Agent.UsageDirection.AttackDown)]
-    [InlineData(Agent.GuardMode.Left, Agent.UsageDirection.AttackRight)]
-    [InlineData(Agent.GuardMode.Right, Agent.UsageDirection.AttackLeft)]
+    [InlineData(Agent.GuardMode.Left, Agent.UsageDirection.AttackLeft)]
+    [InlineData(Agent.GuardMode.Right, Agent.UsageDirection.AttackRight)]
     public void GuardApply_MapsEveryGuardDirection(
         Agent.GuardMode guardMode,
         Agent.UsageDirection usageDirection)

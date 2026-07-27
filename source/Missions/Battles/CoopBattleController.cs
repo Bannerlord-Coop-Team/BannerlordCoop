@@ -210,6 +210,11 @@ public class CoopBattleController : CoopMissionController
 
     public override void OnMissionTick(float dt)
     {
+#if DEBUG
+        // Native can replace fixture defend input after the main-controller postfix.
+        guardFixture.ReapplyPlayerGuardInput(
+            coopMissionComponent.AgentRegistry);
+#endif
         base.OnMissionTick(dt);
 
         // The mission host is the single siege authority (engine deployment and machine simulation);

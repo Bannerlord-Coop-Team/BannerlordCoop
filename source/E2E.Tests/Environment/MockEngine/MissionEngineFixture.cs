@@ -957,9 +957,9 @@ public sealed class MissionEngineFixture : IDisposable
                 Agent.UsageDirection.AttackDown =>
                     Agent.MovementControlFlag.DefendDown,
                 Agent.UsageDirection.AttackLeft =>
-                    Agent.MovementControlFlag.DefendRight,
-                Agent.UsageDirection.AttackRight =>
                     Agent.MovementControlFlag.DefendLeft,
+                Agent.UsageDirection.AttackRight =>
+                    Agent.MovementControlFlag.DefendRight,
                 _ => Agent.MovementControlFlag.None
             };
             m.MovementFlags =
@@ -973,8 +973,8 @@ public sealed class MissionEngineFixture : IDisposable
         {
             case Agent.UsageDirection.AttackUp: m.GuardMode = Agent.GuardMode.Up; break;
             case Agent.UsageDirection.AttackDown: m.GuardMode = Agent.GuardMode.Down; break;
-            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Right; break;
-            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Left; break;
+            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Left; break;
+            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Right; break;
         }
         return false;
     }
