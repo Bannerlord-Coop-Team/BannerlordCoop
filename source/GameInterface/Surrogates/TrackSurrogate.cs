@@ -15,7 +15,7 @@ internal class TrackSurrogate
     public float Direction { get; set; }
 
     [ProtoMember(3)]
-    public TextObject PartyName { get; set; }
+    public string PartyName { get; set; }
 
     [ProtoMember(4)]
     public string CultureId { get; set; }
@@ -56,7 +56,7 @@ internal class TrackSurrogate
         {
             Position = track.Position,
             Direction = track.Direction,
-            PartyName = track.PartyName,
+            PartyName = track.PartyName.ToString(),
             CultureId = track.Culture?.StringId,
             Speed = track.Speed,
             NumberOfAllMembers = track.NumberOfAllMembers,
@@ -80,7 +80,7 @@ internal class TrackSurrogate
         {
             Position = surrogate.Position,
             Direction = surrogate.Direction,
-            PartyName = surrogate.PartyName,
+            PartyName = new TextObject(surrogate.PartyName),
             Culture = culture,
             Speed = surrogate.Speed,
             NumberOfAllMembers = surrogate.NumberOfAllMembers,

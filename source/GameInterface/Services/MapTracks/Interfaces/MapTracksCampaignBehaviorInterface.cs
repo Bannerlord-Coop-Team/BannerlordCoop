@@ -197,8 +197,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
 
     public void AddPlayerPartyKeys(string playerPartyId)
     {
-        if (playerMapTracksData.PlayerDetectedTracks.ContainsKey(playerPartyId)) return;
-
+        // If a player rejoins, their visible tracks will be lost. Reset server side detected tracks
         playerMapTracksData.PlayerDetectedTracks[playerPartyId] = new MBList<Track>();
     }
 
@@ -218,6 +217,9 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
             {
                 changedTrack.IsDetected = true;
                 behavior._detectedTracksCache.Add(changedTrack);
+
+                // Party is lost in transfer so unable to determine map faction from the track
+                // IsEnemy only appears at a high scouting skill level and has very minimal effect on gameplay
                 //track.IsEnemy = FactionManager.IsAtWarAgainstFaction(Hero.MainHero.MapFaction, party.MapFaction);
                 CampaignEventDispatcher.Instance.TrackDetected(changedTrack);
             }
