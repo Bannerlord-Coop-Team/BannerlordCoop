@@ -389,7 +389,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MountedPuppet_GuardDirectionChange_RecommandsWithoutRestartingAction()
+    public void MountedPuppet_GuardDirectionChange_ResetsGuardWithoutRestartingAction()
     {
         RunScenario("peer", context =>
         {
@@ -418,6 +418,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
             Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(0, puppetMirror.ResetGuardCalls);
             int actionCommandCount = puppetMirror.SetActionChannelCalls;
 
             ownerMirror.GuardMode = Agent.GuardMode.Right;
@@ -435,6 +436,13 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 AgentActionData.GetDefendMovementFlags(
                     puppetMirror.MovementFlags));
             Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(1, puppetMirror.ResetGuardCalls);
+            Assert.Equal(actionCommandCount, puppetMirror.SetActionChannelCalls);
+
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(1, puppetMirror.ResetGuardCalls);
             Assert.Equal(actionCommandCount, puppetMirror.SetActionChannelCalls);
         });
     }

@@ -479,6 +479,28 @@ public class BattleGuardFixtureEvidenceTests
                 guardCommandDirection));
     }
 
+    [Theory]
+    [InlineData(true, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]
+    [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
+    public void MountedGuardDirection_ResetsOnlyWhileChangingHeldDirection(
+        bool guarding,
+        bool guardCommandActive,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection guardCommandDirection,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldResetMountedGuardDirection(
+                guarding,
+                guardCommandActive,
+                direction,
+                guardCommandDirection));
+    }
+
     [Fact]
     public void MountedStrikerPosition_RecreatesSideInterceptionGeometry()
     {

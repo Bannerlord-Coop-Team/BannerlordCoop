@@ -1109,6 +1109,13 @@ public class BattleGuardFixture : IBattleGuardFixture
             guarding
                 ? defendFlags
                 : Agent.MovementControlFlag.None);
+        bool mountedGuardDirectionChanged =
+            driver.Mode == BattleGuardFixtureMode.Mounted &&
+            ShouldResetMountedGuardDirection(
+                guarding,
+                driver.MountedGuardCommandActive,
+                driver.Direction,
+                driver.MountedGuardCommandDirection);
         if (driver.Mode == BattleGuardFixtureMode.Mounted &&
             ShouldCommandMountedGuardState(
                 guarding,
@@ -1116,12 +1123,22 @@ public class BattleGuardFixture : IBattleGuardFixture
                 driver.Direction,
                 driver.MountedGuardCommandDirection))
         {
-            AgentActionData.ApplyGuardState(
-                agent,
-                guarding
-                    ? GetGuardMode(driver.Direction)
-                    : Agent.GuardMode.None,
-                force: guarding);
+            Agent.GuardMode guardMode = guarding
+                ? GetGuardMode(driver.Direction)
+                : Agent.GuardMode.None;
+            if (mountedGuardDirectionChanged)
+            {
+                AgentActionData.ApplyGuardDirectionTransition(
+                    agent,
+                    guardMode);
+            }
+            else
+            {
+                AgentActionData.ApplyGuardState(
+                    agent,
+                    guardMode,
+                    force: guarding);
+            }
             driver.MountedGuardCommandActive = guarding;
             driver.MountedGuardCommandDirection = driver.Direction;
             driver.MountedGuardStateChanges++;
@@ -1541,7 +1558,22 @@ public class BattleGuardFixture : IBattleGuardFixture
         BattleGuardFixtureDirection guardCommandDirection)
     {
         return guarding != guardCommandActive ||
-            (guarding && direction != guardCommandDirection);
+            ShouldResetMountedGuardDirection(
+                guarding,
+                guardCommandActive,
+                direction,
+                guardCommandDirection);
+    }
+
+    internal static bool ShouldResetMountedGuardDirection(
+        bool guarding,
+        bool guardCommandActive,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection guardCommandDirection)
+    {
+        return guarding &&
+            guardCommandActive &&
+            direction != guardCommandDirection;
     }
 
     internal static bool IsRemountStateReconciled(

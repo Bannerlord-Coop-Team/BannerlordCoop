@@ -813,14 +813,23 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             || guardModeChanged
             || nativeGuardStateMissing)
         {
-            bool forceGuardCommand =
-                mountChanged
-                || reacquiringGuard
-                || nativeGuardStateMissing;
-            AgentActionData.ApplyGuardState(
-                agent,
-                guardMode,
-                force: forceGuardCommand);
+            if (agent.HasMount && guardModeChanged)
+            {
+                AgentActionData.ApplyGuardDirectionTransition(
+                    agent,
+                    guardMode);
+            }
+            else
+            {
+                bool forceGuardCommand =
+                    mountChanged
+                    || reacquiringGuard
+                    || nativeGuardStateMissing;
+                AgentActionData.ApplyGuardState(
+                    agent,
+                    guardMode,
+                    force: forceGuardCommand);
+            }
         }
 
         guardState.HasGuardCommand = true;

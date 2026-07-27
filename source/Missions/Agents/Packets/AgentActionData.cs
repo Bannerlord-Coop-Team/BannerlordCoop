@@ -100,6 +100,17 @@ namespace Missions.Agents.Packets
             }
         }
 
+        internal static void ApplyGuardDirectionTransition(
+            Agent agent,
+            Agent.GuardMode guardMode)
+        {
+            if (!IsGuardMode(guardMode))
+                return;
+
+            agent.ResetGuard();
+            ApplyGuardState(agent, guardMode, force: true);
+        }
+
         internal static bool IsGuardMode(Agent.GuardMode guardMode) =>
             guardMode == Agent.GuardMode.Up
             || guardMode == Agent.GuardMode.Down
