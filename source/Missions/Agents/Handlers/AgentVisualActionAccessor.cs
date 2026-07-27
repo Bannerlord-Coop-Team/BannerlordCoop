@@ -10,6 +10,10 @@ public interface IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action);
+
+    bool HasVisibleAction(
+        Agent agent,
+        int channel);
 }
 
 public class AgentVisualActionAccessor : IAgentVisualActionAccessor
@@ -36,6 +40,31 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             if (visualAction != ActionIndexCache.act_none) return false;
 
             return animationIndex >= 0 && visualAnimation == animationIndex;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            if (!ReferenceEquals(skeleton, null))
+                skeleton.ManualInvalidate();
+        }
+    }
+
+    public bool HasVisibleAction(
+        Agent agent,
+        int channel)
+    {
+        Skeleton skeleton = null;
+        try
+        {
+            skeleton = GetSkeleton(agent);
+            if (ReferenceEquals(skeleton, null)) return false;
+
+            return skeleton.GetActionAtChannel(channel)
+                    != ActionIndexCache.act_none
+                || skeleton.GetAnimationIndexAtChannel(channel) >= 0;
         }
         catch
         {

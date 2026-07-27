@@ -29,6 +29,26 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         return rawVisualAction == GetAnimationIndex(mirror, action.Index);
     }
 
+    public bool HasVisibleAction(
+        Agent agent,
+        int channel)
+    {
+        if (!AgentMirror.TryGet(agent, out MirrorAgent mirror)
+            || !mirror.HasVisualSkeleton)
+        {
+            return false;
+        }
+
+        int visualAction = channel == 0
+            ? mirror.SkeletonAction0Index
+            : mirror.SkeletonAction1Index;
+        int rawVisualAction = channel == 0
+            ? mirror.RawVisualAction0Index
+            : mirror.RawVisualAction1Index;
+        return visualAction != ActionIndexCache.act_none.Index
+            || rawVisualAction >= 0;
+    }
+
     private static int GetAnimationIndex(
         MirrorAgent mirror,
         int actionIndex)

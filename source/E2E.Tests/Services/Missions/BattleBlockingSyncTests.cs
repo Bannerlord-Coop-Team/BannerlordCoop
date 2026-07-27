@@ -765,6 +765,48 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 actionCommandsBeforeDisplay,
                 puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.HasVisualSkeleton = true;
+            puppetMirror.ActionAnimationIndices[3078] = 2991;
+            puppetMirror.ActionAnimationIndices[3070] = 3027;
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendLeft;
+            puppetMirror.SkeletonAction1Index = -1;
+            puppetMirror.RawVisualAction1Index = 2991;
+            int actionCommandsBeforePostNativeRecovery =
+                puppetMirror.SetActionChannelCalls;
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(3070, puppetMirror.Action1Index);
+            Assert.Equal(
+                actionCommandsBeforePostNativeRecovery + 1,
+                puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.LastSetActionChannel);
+            Assert.True(puppetMirror.LastSetActionIgnorePriority);
+
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            puppetMirror.Action1Direction = Agent.UsageDirection.None;
+            puppetMirror.SkeletonAction1Index = -1;
+            puppetMirror.RawVisualAction1Index = 3027;
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(
+                actionCommandsBeforePostNativeRecovery + 1,
+                puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.RawVisualAction1Index = -1;
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(
+                actionCommandsBeforePostNativeRecovery + 1,
+                puppetMirror.SetActionChannelCalls);
         });
     }
 
