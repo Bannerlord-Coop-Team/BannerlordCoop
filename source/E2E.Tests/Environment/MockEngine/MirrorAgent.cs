@@ -93,6 +93,8 @@ public sealed class MirrorAgent
     public int InstallAgentVisualActionCalls { get; set; }
     public Agent.MovementControlFlag DefendMovementFlag { get; set; }
     public int SetWeaponGuardCalls { get; set; }
+    public Agent.UsageDirection LastSetWeaponGuardDirection { get; set; } =
+        Agent.UsageDirection.None;
     public bool SetWeaponGuardOverwritesDefendFlags { get; set; }
     public int ResetGuardCalls { get; set; }
 }

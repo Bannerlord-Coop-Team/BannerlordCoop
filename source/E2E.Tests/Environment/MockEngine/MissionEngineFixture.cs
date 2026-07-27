@@ -947,6 +947,7 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetWeaponGuardCalls++;
+        m.LastSetWeaponGuardDirection = direction;
         if (m.SetWeaponGuardOverwritesDefendFlags)
         {
             Agent.MovementControlFlag defendFlags = direction switch
@@ -972,8 +973,8 @@ public sealed class MissionEngineFixture : IDisposable
         {
             case Agent.UsageDirection.AttackUp: m.GuardMode = Agent.GuardMode.Up; break;
             case Agent.UsageDirection.AttackDown: m.GuardMode = Agent.GuardMode.Down; break;
-            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Left; break;
-            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Right; break;
+            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Right; break;
+            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Left; break;
         }
         return false;
     }

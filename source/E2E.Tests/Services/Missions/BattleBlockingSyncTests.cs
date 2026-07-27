@@ -4265,11 +4265,13 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(Agent.GuardMode.Up)]
-    [InlineData(Agent.GuardMode.Down)]
-    [InlineData(Agent.GuardMode.Left)]
-    [InlineData(Agent.GuardMode.Right)]
-    public void GuardApply_MapsEveryGuardDirection(Agent.GuardMode guardMode)
+    [InlineData(Agent.GuardMode.Up, Agent.UsageDirection.AttackUp)]
+    [InlineData(Agent.GuardMode.Down, Agent.UsageDirection.AttackDown)]
+    [InlineData(Agent.GuardMode.Left, Agent.UsageDirection.AttackRight)]
+    [InlineData(Agent.GuardMode.Right, Agent.UsageDirection.AttackLeft)]
+    public void GuardApply_MapsEveryGuardDirection(
+        Agent.GuardMode guardMode,
+        Agent.UsageDirection usageDirection)
     {
         RunScenario(null, context =>
         {
@@ -4278,6 +4280,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             AgentActionData.ApplyGuardState(puppet, guardMode);
 
             Assert.Equal(guardMode, mirror.GuardMode);
+            Assert.Equal(usageDirection, mirror.LastSetWeaponGuardDirection);
             Assert.Equal(1, mirror.SetWeaponGuardCalls);
             Assert.Equal(0, mirror.ResetGuardCalls);
         });
