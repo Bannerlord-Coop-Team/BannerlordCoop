@@ -412,6 +412,10 @@ namespace Missions.Agents.Packets
                     agent.SetActionChannel(
                         0,
                         action0,
+                        ignorePriority:
+                            ShouldForceMountedGuardDirectionTransition(
+                                agent,
+                                0),
                         additionalFlags: (AnimFlags)Action0Flag,
                         startProgress: Action0Progress);
                 }
@@ -438,6 +442,10 @@ namespace Missions.Agents.Packets
                     agent.SetActionChannel(
                         1,
                         action1,
+                        ignorePriority:
+                            ShouldForceMountedGuardDirectionTransition(
+                                agent,
+                                1),
                         additionalFlags: (AnimFlags)Action1Flag,
                         startProgress: Action1Progress);
                 }
@@ -477,6 +485,25 @@ namespace Missions.Agents.Packets
 
             action = new ActionIndexCache(-1);
             return false;
+        }
+
+        private bool ShouldForceMountedGuardDirectionTransition(
+            Agent agent,
+            int channel)
+        {
+            if (!IsMounted
+                || GuardActionChannel != channel
+                || !IsGuardMode(GuardMode))
+            {
+                return false;
+            }
+
+            Agent.GuardMode currentActionGuardMode =
+                GetGuardModeFromDefendDirection(
+                    agent.GetCurrentActionDirection(channel));
+            // Equal-priority mounted guard siblings can reject this one-shot transition.
+            return IsGuardMode(currentActionGuardMode)
+                && currentActionGuardMode != GuardMode;
         }
 
         private static bool NeedsActionTransition(

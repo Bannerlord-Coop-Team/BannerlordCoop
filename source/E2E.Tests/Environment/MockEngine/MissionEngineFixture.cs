@@ -867,7 +867,10 @@ public sealed class MissionEngineFixture : IDisposable
         m.LastSetActionStartProgress = startProgress;
         m.LastSetActionForceFaceMorphRestart =
             forceFaceMorphRestart;
-        __result = m.SetActionChannelResult;
+        __result =
+            m.SetActionChannelResult
+            && (!m.RejectSetActionChannelWithoutIgnorePriority
+                || ignorePriority);
         if (!__result)
         {
             return false;

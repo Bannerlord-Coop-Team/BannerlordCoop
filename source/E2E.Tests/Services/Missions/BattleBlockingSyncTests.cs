@@ -577,6 +577,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Agent.UsageDirection.DefendLeft;
             puppetMirror.Action1Stage =
                 Agent.ActionStage.DefendParry;
+            puppetMirror.RejectSetActionChannelWithoutIgnorePriority = true;
 
             ApplyOwnerAction(context.Component, 1L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
@@ -625,6 +626,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 actionCommandCount + 1,
                 puppetMirror.SetActionChannelCalls);
+            Assert.True(puppetMirror.LastSetActionIgnorePriority);
 
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
