@@ -119,17 +119,24 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     }
 
     [Fact]
-    public void LocalPartyId_SkipsUnregisteredMatchingMapEventParty()
+    public void LocalPartyId_FindsRegisteredLogicalPartyAfterUnregisteredReference()
     {
 #pragma warning disable SYSLIB0050
         var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
+        var localMobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+        var registeredMobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
         var localParty = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
+        var registeredParty = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
         var side = (MapEventSide)FormatterServices.GetUninitializedObject(typeof(MapEventSide));
         var unregistered = (MapEventParty)FormatterServices.GetUninitializedObject(typeof(MapEventParty));
         var registered = (MapEventParty)FormatterServices.GetUninitializedObject(typeof(MapEventParty));
 #pragma warning restore SYSLIB0050
+        localMobileParty.StringId = "Player";
+        registeredMobileParty.StringId = "Player";
+        localParty.MobileParty = localMobileParty;
+        registeredParty.MobileParty = registeredMobileParty;
         unregistered.Party = localParty;
-        registered.Party = localParty;
+        registered.Party = registeredParty;
         typeof(MapEventSide).GetField("_battleParties", BindingFlags.NonPublic | BindingFlags.Instance)!
             .SetValue(side, new MBList<MapEventParty>());
         side._battleParties.Add(unregistered);

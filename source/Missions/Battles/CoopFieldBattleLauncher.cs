@@ -186,12 +186,13 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         if (mapEvent?._sides == null || localParty == null || objectManager == null)
             return null;
 
+        var localPartyId = localParty.Id;
         foreach (var side in mapEvent._sides)
         {
             if (side == null) continue;
 
             foreach (var mapEventParty in side.Parties)
-                if (mapEventParty?.Party == localParty &&
+                if (mapEventParty?.Party?.Id == localPartyId &&
                     objectManager.TryGetId(mapEventParty, out var playerPartyId))
                     return playerPartyId;
         }
