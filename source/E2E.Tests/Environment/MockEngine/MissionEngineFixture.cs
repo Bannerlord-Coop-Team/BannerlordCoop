@@ -860,6 +860,7 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetActionChannelCalls++;
+        m.ActionAndGuardCallOrder.Add("set-action");
         m.LastSetActionChannel = channelNo;
         m.LastSetActionIgnorePriority = ignorePriority;
         m.LastSetActionFlags = additionalFlags;
@@ -956,6 +957,7 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetWeaponGuardCalls++;
+        m.ActionAndGuardCallOrder.Add("set-guard");
         m.LastSetWeaponGuardDirection = direction;
         if (m.SetWeaponGuardOverwritesDefendFlags)
         {
@@ -992,6 +994,7 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.ResetGuardCalls++;
+        m.ActionAndGuardCallOrder.Add("reset-guard");
         m.GuardMode = Agent.GuardMode.None;
         return false;
     }

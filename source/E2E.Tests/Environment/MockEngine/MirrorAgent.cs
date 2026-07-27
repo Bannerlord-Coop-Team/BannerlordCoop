@@ -71,6 +71,7 @@ public sealed class MirrorAgent
     public AnimFlags Action1Flags { get; set; }
     public int SetCurrentActionProgressCalls { get; set; }
     public int SetActionChannelCalls { get; set; }
+    public List<string> ActionAndGuardCallOrder { get; } = new();
     public bool SetActionChannelResult { get; set; } = true;
     public int AcceptedSetActionChannelDeferralsRemaining { get; set; }
     public bool RejectSetActionChannelWithoutIgnorePriority { get; set; }

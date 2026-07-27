@@ -382,11 +382,12 @@ namespace Missions.Agents.Packets
                 agent.Controller == AgentControllerType.Player;
         }
 
-        public void Apply(
+        public bool Apply(
             Agent agent,
             IAgentVisualActionAccessor visualActionAccessor)
         {
             Agent.MovementControlFlag movementFlags = (Agent.MovementControlFlag)MovementFlag;
+            bool mountedGuardDirectionTransitionApplied = false;
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
             ApplyDefendMovementFlags(agent, movementFlags);
 
@@ -415,7 +416,13 @@ namespace Missions.Agents.Packets
                             0);
                     AnimFlags actionFlags = (AnimFlags)Action0Flag;
                     if (forceGuardDirectionTransition)
+                    {
+                        ApplyGuardDirectionTransition(
+                            agent,
+                            GuardMode);
+                        mountedGuardDirectionTransitionApplied = true;
                         actionFlags |= AnimFlags.anf_restart;
+                    }
                     agent.SetActionChannel(
                         0,
                         action0,
@@ -449,7 +456,13 @@ namespace Missions.Agents.Packets
                             1);
                     AnimFlags actionFlags = (AnimFlags)Action1Flag;
                     if (forceGuardDirectionTransition)
+                    {
+                        ApplyGuardDirectionTransition(
+                            agent,
+                            GuardMode);
+                        mountedGuardDirectionTransitionApplied = true;
                         actionFlags |= AnimFlags.anf_restart;
+                    }
                     agent.SetActionChannel(
                         1,
                         action1,
@@ -461,6 +474,7 @@ namespace Missions.Agents.Packets
 
             // Keep held defend input on the puppet; later reliable transitions replace or clear these bits.
             ApplyDefendMovementFlags(agent, movementFlags);
+            return mountedGuardDirectionTransitionApplied;
         }
 
         private bool TryResolveActionTransition(
