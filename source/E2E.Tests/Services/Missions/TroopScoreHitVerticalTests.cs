@@ -77,12 +77,28 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
-            var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
-            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
 
             // Battle setup can re-flatten after the reserve descriptor was handed to the spawning client.
             party.Update();
             Assert.DoesNotContain(party.Troops, element => element.Descriptor.UniqueSeed == troopSeed);
+        });
+
+        var reporter = Clients.First();
+
+        // The reporter is the client controlling the troop that was hit: it holds the attacker as a puppet
+        // whose CoopAgentOrigin carries the server-minted descriptor. Give it local identities to report with.
+        reporter.Call(() =>
+        {
+            var attacker = reporter.CreateRegisteredObject<CharacterObject>("e2e_attacker");
+            attacker.Culture = ObjectHelper.SkipConstructor<CultureObject>();
+            reporter.CreateRegisteredObject<CharacterObject>("e2e_victim");
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+            var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
 
             contributionBefore = party.ContributionToBattle;
             xpBefore = party.Troops
@@ -97,17 +113,6 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
                 true,
                 CombatXpModel.MissionTypeEnum.Battle).RoundedResultNumber;
             Assert.True(expectedXp > 0, "The fixture hit must produce XP");
-        });
-
-        var reporter = Clients.First();
-
-        // The reporter is the client controlling the troop that was hit: it holds the attacker as a puppet
-        // whose CoopAgentOrigin carries the server-minted descriptor. Give it local identities to report with.
-        reporter.Call(() =>
-        {
-            var attacker = reporter.CreateRegisteredObject<CharacterObject>("e2e_attacker");
-            attacker.Culture = ObjectHelper.SkipConstructor<CultureObject>();
-            reporter.CreateRegisteredObject<CharacterObject>("e2e_victim");
         });
 
         reporter.Call(() =>
