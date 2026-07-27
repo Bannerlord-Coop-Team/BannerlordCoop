@@ -735,6 +735,36 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 actionCommandsBeforeDisplay,
                 puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.GuardMode = Agent.GuardMode.None;
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
+            puppetMirror.Action1Direction = Agent.UsageDirection.None;
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(4, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(3, puppetMirror.ResetGuardCalls);
+            Assert.Equal(
+                actionCommandsBeforeDisplay,
+                puppetMirror.SetActionChannelCalls);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                AgentActionData.GetDefendMovementFlags(
+                    puppetMirror.MovementFlags));
+
+            puppetMirror.Action1Index = 3070;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendRight;
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(4, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(3, puppetMirror.ResetGuardCalls);
+            Assert.Equal(
+                actionCommandsBeforeDisplay,
+                puppetMirror.SetActionChannelCalls);
         });
     }
 
@@ -3681,9 +3711,14 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
             puppetMirror.Action1Index = ownerMirror.Action1Index;
             puppetMirror.Action1CodeType = ownerMirror.Action1CodeType;
+            puppetMirror.ActionAnimationIndices[202] = 3220;
 
             ApplyOwnerAction(context.Component, 1L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            int guardCommandsBeforeNativeTick =
+                puppetMirror.SetWeaponGuardCalls;
+            int guardResetsBeforeNativeTick =
+                puppetMirror.ResetGuardCalls;
 
             // Native can wrap the exact raw guard clip while the held guard remains active.
             puppetMirror.Action1Index = -1;
@@ -3692,6 +3727,19 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.RawVisualAction1Index = 3220;
             puppetMirror.RawVisualAction1Progress = 0.01f;
             puppetMirror.SetActionChannelCalls = 0;
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(
+                guardCommandsBeforeNativeTick,
+                puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(
+                guardResetsBeforeNativeTick,
+                puppetMirror.ResetGuardCalls);
+            Assert.Equal(-1, puppetMirror.Action1Index);
+            Assert.Equal(3220, puppetMirror.RawVisualAction1Index);
+            Assert.Equal(0.01f, puppetMirror.RawVisualAction1Progress, precision: 3);
+            Assert.Equal(0, puppetMirror.SetActionChannelCalls);
 
             controller.OnPreDisplayMissionTick(0.1f);
 
