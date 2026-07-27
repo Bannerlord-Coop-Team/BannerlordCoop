@@ -155,6 +155,42 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     }
 
     [Fact]
+    public void LocalPartyId_FindsRegisteredControlledPartyWhenLogicalIdDiffers()
+    {
+#pragma warning disable SYSLIB0050
+        var mapEvent = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
+        var localMobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+        var controlledMobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+        var localParty = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
+        var controlledParty = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
+        var side = (MapEventSide)FormatterServices.GetUninitializedObject(typeof(MapEventSide));
+        var controlledMapEventParty = (MapEventParty)FormatterServices.GetUninitializedObject(typeof(MapEventParty));
+#pragma warning restore SYSLIB0050
+        localMobileParty.StringId = "Player";
+        controlledMobileParty.StringId = "PlayerReplica";
+        localParty.MobileParty = localMobileParty;
+        controlledParty.MobileParty = controlledMobileParty;
+        controlledMapEventParty.Party = controlledParty;
+        typeof(MapEventSide).GetField("_battleParties", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(side, new MBList<MapEventParty>());
+        side._battleParties.Add(controlledMapEventParty);
+        mapEvent._sides = new MapEventSide[2];
+        mapEvent._sides[(int)BattleSideEnum.Defender] = side;
+
+        var objectManager = new Mock<IObjectManager>();
+        string controlledMapEventPartyId = "MapEventParty_Created_34";
+        objectManager.Setup(x => x.TryGetId(controlledMapEventParty, out controlledMapEventPartyId)).Returns(true);
+
+        Assert.Equal(
+            controlledMapEventPartyId,
+            CoopFieldBattleLauncher.GetLocalPlayerPartyId(
+                mapEvent,
+                localParty,
+                objectManager.Object,
+                party => ReferenceEquals(party, controlledParty)));
+    }
+
+    [Fact]
     public void ExhaustedLocalParty_DoesNotOpenDeployment()
     {
         var agentBudget = new BattleAgentBudget();

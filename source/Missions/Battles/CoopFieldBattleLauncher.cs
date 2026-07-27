@@ -4,10 +4,12 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using SandBox.Missions.MissionLogics;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -183,21 +185,46 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
 
     internal static string GetLocalPlayerPartyId(MapEvent mapEvent, PartyBase localParty, IObjectManager objectManager)
     {
-        if (mapEvent?._sides == null || localParty == null || objectManager == null)
+        return GetLocalPlayerPartyId(
+            mapEvent,
+            localParty,
+            objectManager,
+            party => party?.MobileParty?.IsControlledByThisInstance() == true);
+    }
+
+    internal static string GetLocalPlayerPartyId(
+        MapEvent mapEvent,
+        PartyBase localParty,
+        IObjectManager objectManager,
+        Func<PartyBase, bool> isControlledParty)
+    {
+        if (mapEvent?._sides == null ||
+            localParty == null ||
+            objectManager == null ||
+            isControlledParty == null)
             return null;
 
         var localPartyId = localParty.Id;
+        string logicalPartyId = null;
         foreach (var side in mapEvent._sides)
         {
             if (side == null) continue;
 
             foreach (var mapEventParty in side.Parties)
-                if (mapEventParty?.Party?.Id == localPartyId &&
-                    objectManager.TryGetId(mapEventParty, out var playerPartyId))
+            {
+                if (mapEventParty?.Party == null ||
+                    !objectManager.TryGetId(mapEventParty, out var playerPartyId))
+                    continue;
+
+                if (isControlledParty(mapEventParty.Party))
                     return playerPartyId;
+
+                if (logicalPartyId == null && mapEventParty.Party.Id == localPartyId)
+                    logicalPartyId = playerPartyId;
+            }
         }
 
-        return null;
+        return logicalPartyId;
     }
 
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest
