@@ -393,6 +393,12 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                             agent,
                             data.DefendFlags);
                     }
+                    if (refreshMountedGuardCommand && guardStateApplied)
+                    {
+                        ReplayMountedGuardTransitionAfterMovement(
+                            agent,
+                            guardState);
+                    }
                 }
 
                 bool hasGuardReaction =
@@ -1091,27 +1097,98 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
-        AgentActionData data = guardState.Action.Data;
-        AnimFlags actionFlags = (AnimFlags)(channel == 0
-            ? data.Action0Flag
-            : data.Action1Flag);
-        float actionProgress = channel == 0
-            ? data.Action0Progress
-            : data.Action1Progress;
+        if (!TryGetMountedGuardPresentationMetadata(
+                guardState,
+                out AnimFlags actionFlags,
+                out float actionProgress))
+        {
+            return;
+        }
+
+        SetMountedGuardPresentation(
+            agent,
+            guardState,
+            actionFlags,
+            actionProgress);
+    }
+
+    private void ReplayMountedGuardTransitionAfterMovement(
+        Agent agent,
+        in RemoteGuardState guardState)
+    {
+        if (!guardState.NeedsGuardPresentationTransition
+            || guardState.DrivesMountedReactionPresentation
+            || HasGuardReactionAction(agent, guardState)
+            || HasInterruptingGuardAction(agent, guardState))
+        {
+            return;
+        }
+
+        if (!TryGetMountedGuardPresentationMetadata(
+                guardState,
+                out AnimFlags actionFlags,
+                out float actionProgress))
+        {
+            return;
+        }
+
+        int channel = guardState.GuardActionChannel;
+        ActionIndexCache currentAction = agent.GetCurrentAction(channel);
+        if (currentAction != guardState.GuardAction
+            && currentAction != guardState.DisplacedGuardAction)
+        {
+            return;
+        }
+
+        SetMountedGuardPresentation(
+            agent,
+            guardState,
+            actionFlags,
+            actionProgress);
+    }
+
+    private static void SetMountedGuardPresentation(
+        Agent agent,
+        in RemoteGuardState guardState,
+        AnimFlags actionFlags,
+        float actionProgress)
+    {
         agent.SetActionChannel(
-            channel,
+            guardState.GuardActionChannel,
             guardState.GuardAction,
             ignorePriority: true,
             additionalFlags: actionFlags | AnimFlags.anf_restart,
             startProgress: actionProgress);
-        if (agentVisualActionAccessor.IsActionVisible(
-            agent,
-            channel,
-            in guardState.GuardAction)
-            && guardState.CanRecoverMissingGuardDirection)
+    }
+
+    private static bool TryGetMountedGuardPresentationMetadata(
+        in RemoteGuardState guardState,
+        out AnimFlags actionFlags,
+        out float actionProgress)
+    {
+        int channel = guardState.GuardActionChannel;
+        actionFlags = (AnimFlags)0uL;
+        actionProgress = 0f;
+        if (channel < 0 || channel > 1)
+            return false;
+
+        AgentActionData data = guardState.Action.Data;
+        int actionIndex = channel == 0
+            ? data.Action0Index
+            : data.Action1Index;
+        if (GetGuardActionChannel(data) != channel
+            || actionIndex != guardState.GuardAction.Index)
         {
-            guardState.NeedsGuardPresentationTransition = false;
+            return false;
         }
+
+        actionFlags = (AnimFlags)(channel == 0
+            ? data.Action0Flag
+            : data.Action1Flag);
+        actionProgress = channel == 0
+            ? data.Action0Progress
+            : data.Action1Progress;
+        return true;
     }
 
     private bool IsMountedGuardDirectionMissing(
