@@ -303,12 +303,13 @@ namespace Missions.Agents.Packets
 
         private static Agent.UsageDirection GuardModeToUsageDirection(
             Agent.GuardMode guardMode) =>
+            // SetWeaponGuard expects the incoming attack direction; horizontal defense faces its opposite.
             guardMode switch
             {
                 Agent.GuardMode.Up => Agent.UsageDirection.AttackUp,
                 Agent.GuardMode.Down => Agent.UsageDirection.AttackDown,
-                Agent.GuardMode.Left => Agent.UsageDirection.AttackLeft,
-                Agent.GuardMode.Right => Agent.UsageDirection.AttackRight,
+                Agent.GuardMode.Left => Agent.UsageDirection.AttackRight,
+                Agent.GuardMode.Right => Agent.UsageDirection.AttackLeft,
                 _ => Agent.UsageDirection.None
             };
 
