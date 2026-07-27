@@ -651,7 +651,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 (puppetMirror.LastSetActionFlags
                     & AnimFlags.anf_restart) != (AnimFlags)0uL);
             Assert.Equal(
-                guardCommandsBeforeTransition + 1,
+                guardCommandsBeforeTransition + 2,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
                 guardResetsBeforeTransition + 1,
@@ -665,7 +665,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 actionCommandsBeforeTransition + 3,
                 puppetMirror.SetActionChannelCalls);
             Assert.Equal(
-                guardCommandsBeforeTransition + 1,
+                guardCommandsBeforeTransition + 3,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
                 guardResetsBeforeTransition + 1,
@@ -677,7 +677,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 actionCommandsBeforeTransition + 3,
                 puppetMirror.SetActionChannelCalls);
             Assert.Equal(
-                guardCommandsBeforeTransition + 1,
+                guardCommandsBeforeTransition + 3,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
                 guardResetsBeforeTransition + 1,
@@ -1027,7 +1027,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 actionCommandsBeforePostNativeRecovery + 2,
                 puppetMirror.SetActionChannelCalls);
             Assert.Equal(
-                guardCommandsBeforePeriodicDisplacement + 1,
+                guardCommandsBeforePeriodicDisplacement + 2,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
                 guardResetsBeforePeriodicDisplacement,
@@ -1141,7 +1141,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MountedRealizedDirection_BeforeGuardTick_RetriesOnlyStaleRawAction()
+    public void MountedRealizedDirection_BeforeGuardTick_DoesNotRepeatAcceptedPresentation()
     {
         RunScenario("peer", context =>
         {
@@ -1257,7 +1257,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(
-                actionCommandsBeforeDisplay + 2,
+                actionCommandsBeforeDisplay + 1,
                 puppetMirror.SetActionChannelCalls);
 
             controller.OnPreMissionTick(0.1f);
@@ -4072,6 +4072,27 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 puppetMirror.SetActionChannelCalls;
             puppetMirror.ActionAndGuardCallOrder.Clear();
 
+            puppetMirror.Action1Index = 3078;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendLeft1h;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendLeft;
+            puppetMirror.SkeletonAction1Index = 3078;
+            puppetMirror.RawVisualAction1Index = 2991;
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(
+                new[] { "set-guard" },
+                puppetMirror.ActionAndGuardCallOrder);
+            Assert.Equal(
+                guardCommandsBeforeMovement + 1,
+                puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(
+                actionCommandsBeforeMovement,
+                puppetMirror.SetActionChannelCalls);
+            puppetMirror.ActionAndGuardCallOrder.Clear();
+
             controller.OnMissionTick(0.1f);
 
             int continuousStateIndex =
@@ -4087,7 +4108,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.True(guardIndex > continuousStateIndex);
             Assert.True(actionIndex > guardIndex);
             Assert.Equal(
-                guardCommandsBeforeMovement + 1,
+                guardCommandsBeforeMovement + 2,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
                 guardResetsBeforeMovement,
@@ -4109,14 +4130,21 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Agent.UsageDirection.DefendLeft;
             puppetMirror.SkeletonAction1Index = 3078;
             puppetMirror.RawVisualAction1Index = 2991;
+            puppetMirror.ActionAndGuardCallOrder.Clear();
 
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(3070, puppetMirror.Action1Index);
             Assert.Equal(3070, puppetMirror.SkeletonAction1Index);
             Assert.Equal(
+                new[] { "set-guard", "set-action" },
+                puppetMirror.ActionAndGuardCallOrder);
+            Assert.Equal(
                 actionCommandsBeforeMovement + 2,
                 puppetMirror.SetActionChannelCalls);
+            Assert.Equal(
+                guardCommandsBeforeMovement + 3,
+                puppetMirror.SetWeaponGuardCalls);
             int actionCommandsAfterNativeRecovery =
                 puppetMirror.SetActionChannelCalls;
             puppetMirror.Action1CodeType =
@@ -4131,7 +4159,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 actionCommandsAfterNativeRecovery,
                 puppetMirror.SetActionChannelCalls);
             Assert.Equal(
-                guardCommandsBeforeMovement + 2,
+                guardCommandsBeforeMovement + 4,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
                 guardResetsBeforeMovement,

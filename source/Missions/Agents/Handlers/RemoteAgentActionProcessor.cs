@@ -1105,6 +1105,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
+        Agent.GuardMode guardMode = guardState.Action.Data.GuardMode;
+        AgentActionData.ApplyGuardState(
+            agent,
+            guardMode,
+            force: true);
         SetMountedGuardPresentation(
             agent,
             guardState,
@@ -1113,10 +1118,15 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (agentVisualActionAccessor.IsActionVisible(
             agent,
             channel,
-            in guardState.GuardAction)
-            && guardState.CanRecoverMissingGuardDirection)
+            in guardState.GuardAction))
         {
+            guardState.HasGuardCommand = true;
             guardState.NeedsGuardPresentationTransition = false;
+            guardState.CanRecoverMissingGuardDirection = true;
+            guardState.GuardCommandAppliedWithAction = true;
+            guardState.LastCommandedGuardMode = guardMode;
+            guardState.LastCommandedMountIndex =
+                agent.MountAgent?.Index ?? -1;
         }
     }
 
