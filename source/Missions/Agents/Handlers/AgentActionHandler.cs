@@ -17,9 +17,9 @@ namespace Missions.Agents.Handlers;
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
     /// <summary>
-    /// [Game thread] Detect discrete action, defend-input, and realized guard changes on owned agents and broadcast them. Driven per-frame from
-    /// CoopMissionController.OnMissionTick: the game thread is the only place a
-    /// one-frame action transition can be observed without racing the engine, and event capture must be exact.
+    /// [Game thread] Detect discrete action, defend-input, and realized guard changes on owned agents and broadcast them. Driven from
+    /// CoopMissionController.OnPreDisplayMissionTick after the completed native Agent tick and again from OnMissionTick after behavior input:
+    /// these are the game-thread boundaries where a one-frame transition can be observed without racing the engine.
     /// </summary>
     void PollActions();
 

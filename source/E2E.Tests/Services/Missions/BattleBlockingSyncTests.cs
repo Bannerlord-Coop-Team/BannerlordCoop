@@ -417,6 +417,72 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PreDisplayPoll_MountedGuardActionCatchingUp_BroadcastsVisibleDirection()
+    {
+        RunScenario("owner", context =>
+        {
+            var controller =
+                context.Instance.Container.Resolve<CoopBattleController>(
+                    new TypedParameter(
+                        typeof(ICoopMissionComponent),
+                        context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context,
+                "owner",
+                agentId,
+                AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+
+            mirror.GuardMode = Agent.GuardMode.Left;
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            mirror.Action1Index = 202;
+            mirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            mirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+            context.Component.AgentActionHandler.PollActions();
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionData requestedRight = Assert.Single(
+                Assert.Single(
+                    context.Network.NetworkSentPackets
+                        .GetPackets<AgentActionPacket>())
+                    .Actions);
+            Assert.Equal(202, requestedRight.Action1Index);
+            Assert.Equal(Agent.GuardMode.Right, requestedRight.GuardMode);
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            controller.OnPreDisplayMissionTick(0.1f);
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            mirror.Action1Index = 203;
+            mirror.Action1Progress = 0.15f;
+            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            AgentActionData realizedRight = Assert.Single(packet.Actions);
+            Assert.Equal(203, realizedRight.Action1Index);
+            Assert.Equal(0.15f, realizedRight.Action1Progress);
+            Assert.Equal(Agent.GuardMode.Right, realizedRight.GuardMode);
+            Assert.Equal(3L, Assert.Single(packet.Sequences));
+        });
+    }
+
+    [Fact]
     public void PollActions_MountedGuardActionDirection_ReplacesStaleInputDirection()
     {
         RunScenario("owner", context =>
@@ -483,7 +549,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MountedPuppet_GuardDirectionChange_ResetsGuardWithoutRestartingAction()
+    public void MountedPuppet_GuardDirectionChange_AppliesRealizedActionOnce()
     {
         RunScenario("peer", context =>
         {
@@ -502,11 +568,15 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.MovementFlags =
                 Agent.MovementControlFlag.DefendBlock
                 | Agent.MovementControlFlag.DefendLeft;
-            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1Index = 3078;
             ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
             ownerMirror.Action1Direction = Agent.UsageDirection.DefendLeft;
-            puppetMirror.Action1Index = 202;
+            puppetMirror.Action1Index = 3078;
             puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendLeft;
+            puppetMirror.Action1Stage =
+                Agent.ActionStage.DefendParry;
 
             ApplyOwnerAction(context.Component, 1L, agentId, owner);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
@@ -534,11 +604,35 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(1, puppetMirror.ResetGuardCalls);
             Assert.Equal(actionCommandCount, puppetMirror.SetActionChannelCalls);
 
+            ownerMirror.Action1Index = 3070;
+            ownerMirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            var realizedRight = new AgentActionData(owner);
+            Assert.Equal(Agent.GuardMode.Right, realizedRight.GuardMode);
+            Assert.Equal(1, realizedRight.GuardActionChannel);
+            Assert.False(
+                realizedRight.ShouldPreserveCurrentGuardReaction(
+                    puppet,
+                    1));
+            ApplyOwnerAction(context.Component, 3L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(3070, puppetMirror.Action1Index);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                AgentActionData.GetDefendMovementFlags(
+                    puppetMirror.MovementFlags));
+            Assert.Equal(
+                actionCommandCount + 1,
+                puppetMirror.SetActionChannelCalls);
+
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
             Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(1, puppetMirror.ResetGuardCalls);
-            Assert.Equal(actionCommandCount, puppetMirror.SetActionChannelCalls);
+            Assert.Equal(
+                actionCommandCount + 1,
+                puppetMirror.SetActionChannelCalls);
         });
     }
 

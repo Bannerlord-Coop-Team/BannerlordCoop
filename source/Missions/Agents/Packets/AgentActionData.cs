@@ -403,13 +403,17 @@ namespace Missions.Agents.Packets
                         agent,
                         0)))
             {
-                // Use the reflection helper, NOT MBAPI.IMBAnimation directly: the publicized static field
-                // throws FieldAccessException in live play (see GetActionNameWithCode above), which kills
-                // every movement-packet apply and leaves remote agents frozen.
-                string actionName1 = GetActionNameWithCode(Action0Index);
-                if (actionName1 != null)
+                if (TryResolveActionTransition(
+                    agent,
+                    0,
+                    Action0Index,
+                    out ActionIndexCache action0))
                 {
-                    agent.SetActionChannel(0, ActionIndexCache.Create(actionName1), additionalFlags: (AnimFlags)Action0Flag, startProgress: Action0Progress);
+                    agent.SetActionChannel(
+                        0,
+                        action0,
+                        additionalFlags: (AnimFlags)Action0Flag,
+                        startProgress: Action0Progress);
                 }
             }
 
@@ -425,15 +429,54 @@ namespace Missions.Agents.Packets
                         agent,
                         1)))
             {
-                string actionName2 = GetActionNameWithCode(Action1Index);
-                if (actionName2 != null)
+                if (TryResolveActionTransition(
+                    agent,
+                    1,
+                    Action1Index,
+                    out ActionIndexCache action1))
                 {
-                    agent.SetActionChannel(1, ActionIndexCache.Create(actionName2), additionalFlags: (AnimFlags)Action1Flag, startProgress: Action1Progress);
+                    agent.SetActionChannel(
+                        1,
+                        action1,
+                        additionalFlags: (AnimFlags)Action1Flag,
+                        startProgress: Action1Progress);
                 }
             }
 
             // Keep held defend input on the puppet; later reliable transitions replace or clear these bits.
             ApplyDefendMovementFlags(agent, movementFlags);
+        }
+
+        private bool TryResolveActionTransition(
+            Agent agent,
+            int channel,
+            int actionIndex,
+            out ActionIndexCache action)
+        {
+            string actionName = GetActionNameWithCode(actionIndex);
+            if (actionName != null)
+            {
+                action = ActionIndexCache.Create(actionName);
+                return true;
+            }
+
+            Agent.GuardMode currentActionGuardMode =
+                GetGuardModeFromDefendDirection(
+                    agent.GetCurrentActionDirection(channel));
+            if (actionIndex >= 0
+                && IsMounted
+                && GuardActionChannel == channel
+                && IsGuardMode(GuardMode)
+                && IsGuardMode(currentActionGuardMode)
+                && currentActionGuardMode != GuardMode)
+            {
+                // The synchronized native index is sufficient when a stale sibling guard must transition.
+                action = new ActionIndexCache(actionIndex);
+                return true;
+            }
+
+            action = new ActionIndexCache(-1);
+            return false;
         }
 
         private static bool NeedsActionTransition(
@@ -481,6 +524,16 @@ namespace Missions.Agents.Packets
                 agent.GetCurrentActionType(channel);
             if (IsGuardReactionAction(actionType))
                 return true;
+
+            Agent.GuardMode currentActionGuardMode =
+                GetGuardModeFromDefendDirection(
+                    agent.GetCurrentActionDirection(channel));
+            if (IsGuardMode(GuardMode)
+                && IsGuardMode(currentActionGuardMode)
+                && currentActionGuardMode != GuardMode)
+            {
+                return false;
+            }
 
             return IsDefendingAction(actionType)
                 && agent.GetCurrentActionStage(channel)
