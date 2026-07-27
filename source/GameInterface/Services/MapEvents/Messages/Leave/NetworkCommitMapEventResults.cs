@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MapEvents.Data;
 using ProtoBuf;
 using TaleWorlds.Core;
@@ -25,14 +25,20 @@ internal readonly struct NetworkCommitMapEventResults : ICommand
     [ProtoMember(4)]
     public readonly string PlayerMapEventPartyId;
 
+    /// <summary>The receiver's server-authoritative side in this map event.</summary>
+    [ProtoMember(5)]
+    public readonly BattleSideEnum PlayerSide;
+
     public NetworkCommitMapEventResults(
         string mapEventId,
         BattleSideEnum winningSide,
+        BattleSideEnum playerSide,
         string playerMapEventPartyId,
         NetworkPlayerLootData playerLootData)
     {
         MapEventId = mapEventId;
         WinningSide = winningSide;
+        PlayerSide = playerSide;
         PlayerMapEventPartyId = playerMapEventPartyId;
         PlayerLootData = playerLootData;
     }

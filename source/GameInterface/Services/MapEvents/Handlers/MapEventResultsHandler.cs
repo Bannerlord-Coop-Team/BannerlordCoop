@@ -82,7 +82,7 @@ internal class MapEventResultsHandler : IHandler
             foreach (var player in playerManager.Players)
             {
                 if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
-                    !TryGetPlayerMapEventParty(mapEvent, player.MobilePartyId, out var playerMapEventParty, out _) ||
+                    !TryGetPlayerMapEventParty(mapEvent, player.MobilePartyId, out var playerMapEventParty, out var playerSide) ||
                     !objectManager.TryGetIdWithLogging(playerMapEventParty, out var playerMapEventPartyId))
                 {
                     continue;
@@ -91,6 +91,7 @@ internal class MapEventResultsHandler : IHandler
                 network.Send(peer, new NetworkCommitMapEventResults(
                     mapEventId,
                     mapEvent.WinningSide,
+                    playerSide,
                     playerMapEventPartyId,
                     networkPlayerLootData));
             }
@@ -111,19 +112,20 @@ internal class MapEventResultsHandler : IHandler
             var playerEncounter = PlayerEncounter.Current;
             if (playerEncounter == null || PlayerEncounter.Battle != mapEvent) return;
 
-            if (!objectManager.TryGetObjectWithLogging<MapEventParty>(
-                    data.PlayerMapEventPartyId,
-                    out var playerMapEventParty) ||
-                !TryGetMapEventPartySide(mapEvent, playerMapEventParty, out var playerSide))
-            {
+            if ((data.PlayerSide != BattleSideEnum.Attacker && data.PlayerSide != BattleSideEnum.Defender) ||
+                string.IsNullOrEmpty(data.PlayerMapEventPartyId))
                 return;
-            }
 
-            var playerLootData = mapEventResultsInterface.UnpackPlayerLootData(data.PlayerLootData);
+            mapEventResultsInterface.UnpackPlayerLootDataForParty(
+                data.PlayerLootData,
+                data.PlayerMapEventPartyId,
+                out var lootedItems,
+                out var lootedMembers,
+                out var lootedPrisoners);
 
             // Set the encounter state ahead to start at applying results when a winning player leaves the battle
             // CaptureHeroes is the first EncounterState that doesn't rely on the MapEvent, which is already destroyed when a player leaves a battle
-            if (data.WinningSide == playerSide)
+            if (data.WinningSide == data.PlayerSide)
             {
                 playerEncounter.EncounterState = PlayerEncounterState.CaptureHeroes;
             }
@@ -134,29 +136,9 @@ internal class MapEventResultsHandler : IHandler
 
             using (new AllowedThread())
             {
-                // Add looted items to player encounter
-                foreach (var playerLootedItems in playerLootData.LootedItems)
-                {
-                    if (playerLootedItems.Key != playerMapEventParty) continue;
-
-                    playerEncounter.RosterToReceiveLootItems.Add(playerLootedItems.Value);
-                }
-
-                // Add looted members to player encounter
-                foreach (var playerLootedMembers in playerLootData.LootedMembers)
-                {
-                    if (playerLootedMembers.Key != playerMapEventParty) continue;
-
-                    playerEncounter.RosterToReceiveLootMembers.Add(playerLootedMembers.Value);
-                }
-
-                // Add looted prisoners to player encounter
-                foreach (var playerLootedPrisoners in playerLootData.LootedPrisoners)
-                {
-                    if (playerLootedPrisoners.Key != playerMapEventParty) continue;
-
-                    playerEncounter.RosterToReceiveLootPrisoners.Add(playerLootedPrisoners.Value);
-                }
+                playerEncounter.RosterToReceiveLootItems.Add(lootedItems);
+                playerEncounter.RosterToReceiveLootMembers.Add(lootedMembers);
+                playerEncounter.RosterToReceiveLootPrisoners.Add(lootedPrisoners);
             }
         });
     }
@@ -182,27 +164,6 @@ internal class MapEventResultsHandler : IHandler
             return true;
         }
 
-        return false;
-    }
-
-    private static bool TryGetMapEventPartySide(
-        MapEvent mapEvent,
-        MapEventParty playerMapEventParty,
-        out BattleSideEnum playerSide)
-    {
-        if (mapEvent.AttackerSide.Parties.Contains(playerMapEventParty))
-        {
-            playerSide = BattleSideEnum.Attacker;
-            return true;
-        }
-
-        if (mapEvent.DefenderSide.Parties.Contains(playerMapEventParty))
-        {
-            playerSide = BattleSideEnum.Defender;
-            return true;
-        }
-
-        playerSide = BattleSideEnum.None;
         return false;
     }
 

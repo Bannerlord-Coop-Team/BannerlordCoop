@@ -26,6 +26,12 @@ public interface IMapEventResultsInterface : IGameAbstraction
 {
     public NetworkPlayerLootData PackPlayerLootData(PlayerLootData playerLootData);
     public PlayerLootData UnpackPlayerLootData(NetworkPlayerLootData playerLootData);
+    public void UnpackPlayerLootDataForParty(
+        NetworkPlayerLootData playerLootData,
+        string mapEventPartyId,
+        out ItemRoster lootedItems,
+        out TroopRoster lootedMembers,
+        out TroopRoster lootedPrisoners);
     public void CalculateAndCommitMapEventResults(MapEvent mapEvent, out NetworkPlayerLootData networkPlayerLootData);
 }
 
@@ -129,6 +135,47 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         });
 
         return new PlayerLootData(lootedItems, lootedMembers, lootedPrisoners);
+    }
+
+    public void UnpackPlayerLootDataForParty(
+        NetworkPlayerLootData networkPlayerLootData,
+        string mapEventPartyId,
+        out ItemRoster lootedItems,
+        out TroopRoster lootedMembers,
+        out TroopRoster lootedPrisoners)
+    {
+        ItemRoster items = null;
+        TroopRoster members = null;
+        TroopRoster prisoners = null;
+
+        GameThread.Run(() =>
+        {
+            using (new AllowedThread())
+            {
+                items = new ItemRoster();
+                members = new TroopRoster();
+                prisoners = new TroopRoster();
+
+                if (networkPlayerLootData.LootedItems?.TryGetValue(mapEventPartyId, out var itemElements) == true)
+                    items.Add(itemElements);
+
+                if (networkPlayerLootData.LootedMembers?.TryGetValue(mapEventPartyId, out var memberData) == true)
+                {
+                    foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(memberData))
+                        members.Add(troopRosterElement);
+                }
+
+                if (networkPlayerLootData.LootedPrisoners?.TryGetValue(mapEventPartyId, out var prisonerData) == true)
+                {
+                    foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(prisonerData))
+                        prisoners.Add(troopRosterElement);
+                }
+            }
+        }, blocking: true, label: nameof(UnpackPlayerLootDataForParty));
+
+        lootedItems = items;
+        lootedMembers = members;
+        lootedPrisoners = prisoners;
     }
 
     public void CalculateAndCommitMapEventResults(MapEvent mapEvent, out NetworkPlayerLootData networkPlayerLootData)
