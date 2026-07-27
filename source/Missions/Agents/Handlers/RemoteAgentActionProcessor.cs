@@ -1110,6 +1110,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             guardState,
             actionFlags,
             actionProgress);
+        if (agentVisualActionAccessor.IsActionVisible(
+            agent,
+            channel,
+            in guardState.GuardAction)
+            && guardState.CanRecoverMissingGuardDirection)
+        {
+            guardState.NeedsGuardPresentationTransition = false;
+        }
     }
 
     private void ReplayMountedGuardTransitionAfterMovement(

@@ -3996,7 +3996,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MissionTick_MountedGuardTransition_ReplaysActionAfterMovementGuardRefresh()
+    public void MissionTick_MountedGuardTransition_ReplaysActionOnceAfterMovementGuardRefresh()
     {
         RunScenario("peer", context =>
         {
@@ -4102,14 +4102,33 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 puppetMirror.LastSetActionFlags.HasFlag(
                     AnimFlags.anf_restart));
 
-            controller.OnPreDisplayMissionTick(0.1f);
-            int actionCommandsAfterConfirmation =
-                puppetMirror.SetActionChannelCalls;
+            puppetMirror.Action1Index = 3078;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendLeft1h;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendLeft;
+            puppetMirror.SkeletonAction1Index = 3078;
+            puppetMirror.RawVisualAction1Index = 2991;
 
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(3070, puppetMirror.Action1Index);
+            Assert.Equal(3070, puppetMirror.SkeletonAction1Index);
+            Assert.Equal(
+                actionCommandsBeforeMovement + 2,
+                puppetMirror.SetActionChannelCalls);
+            int actionCommandsAfterNativeRecovery =
+                puppetMirror.SetActionChannelCalls;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendRight1h;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendRight;
+
+            controller.OnPreMissionTick(0.1f);
             controller.OnMissionTick(0.1f);
 
             Assert.Equal(
-                actionCommandsAfterConfirmation,
+                actionCommandsAfterNativeRecovery,
                 puppetMirror.SetActionChannelCalls);
             Assert.Equal(
                 guardCommandsBeforeMovement + 2,
