@@ -90,5 +90,16 @@ internal static class BattleDebugCommands
             Mission.Current?.GetMissionBehavior<CoopBattleController>();
         return controller?.GetGuardFixtureCandidates(args) ?? "No active coop battle mission";
     }
+
+    [CommandLineArgumentFunction("guard_fixture_trace", "coop.debug.battle")]
+    public static string GuardFixtureTrace(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.guard_fixture_trace";
+
+        CoopBattleController controller =
+            Mission.Current?.GetMissionBehavior<CoopBattleController>();
+        return controller?.GetGuardFixtureTrace() ?? "No active coop battle mission";
+    }
 #endif
 }

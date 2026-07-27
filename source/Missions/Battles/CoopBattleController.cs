@@ -307,6 +307,9 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent.AgentRegistry,
             coopMissionComponent.AgentMovementHandler.Interpolator);
 
+    internal string GetGuardFixtureTrace() =>
+        BattleGuardNativeTrace.GetReport();
+
     internal string GetGuardFixtureCandidates(List<string> args) =>
         guardFixture.GetCandidates(coopMissionComponent.AgentRegistry, args);
 
