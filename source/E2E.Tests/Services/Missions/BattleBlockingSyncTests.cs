@@ -834,6 +834,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.Action1Index = 3070;
             ownerMirror.Action1Direction = Agent.UsageDirection.DefendRight;
             var realizedRight = new AgentActionData(owner);
+            puppetMirror.SetMovementFlagsCalls = 0;
             Assert.Equal(Agent.GuardMode.Right, realizedRight.GuardMode);
             Assert.Equal(1, realizedRight.GuardActionChannel);
             Assert.False(
@@ -855,10 +856,13 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.True(puppetMirror.LastSetActionIgnorePriority);
             Assert.Equal(3, puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(2, puppetMirror.ResetGuardCalls);
+            Assert.Equal(3, puppetMirror.SetMovementFlagsCalls);
 
             int stableGuardCommands = puppetMirror.SetWeaponGuardCalls;
             int stableGuardResets = puppetMirror.ResetGuardCalls;
             int stableActionCommands = puppetMirror.SetActionChannelCalls;
+            int stableMovementFlagWrites =
+                puppetMirror.SetMovementFlagsCalls;
 
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
@@ -872,6 +876,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 stableGuardCommands + 1,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
+                stableMovementFlagWrites + 2,
+                puppetMirror.SetMovementFlagsCalls);
+            Assert.Equal(
                 stableGuardResets,
                 puppetMirror.ResetGuardCalls);
             Assert.Equal(
@@ -882,6 +889,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 Agent.UsageDirection.AttackRight,
                 puppetMirror.LastSetWeaponGuardDirection);
+            Assert.True(
+                puppetMirror.LastMovementFlagsWriteSequence <
+                puppetMirror.LastWeaponGuardWriteSequence);
         });
     }
 

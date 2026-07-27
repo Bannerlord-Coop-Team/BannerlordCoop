@@ -380,20 +380,21 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 if (!replayGuardAction)
                 {
                     AgentActionData data = guardState.Action.Data;
-                    bool guardStateApplied = ApplyRetainedGuardCommand(
-                        agent,
-                        ref guardState,
-                        restoreNativeGuardState:
-                            data.IsPlayerControlled || !agent.HasMount,
-                        refreshMountedGuardCommand:
-                            refreshMountedGuardCommand);
-                    if (!refreshMountedGuardCommand || guardStateApplied)
+                    if (!refreshMountedGuardCommand)
                     {
                         AgentActionData.ApplyDefendMovementFlags(
                             agent,
                             data.DefendFlags);
                     }
-                    if (refreshMountedGuardCommand && guardStateApplied)
+                    bool guardCommandApplied = ApplyRetainedGuardCommand(
+                        agent,
+                        ref guardState,
+                        data.DefendFlags,
+                        restoreNativeGuardState:
+                            data.IsPlayerControlled || !agent.HasMount,
+                        refreshMountedGuardCommand:
+                            refreshMountedGuardCommand);
+                    if (refreshMountedGuardCommand && guardCommandApplied)
                     {
                         ReplayMountedGuardTransitionAfterMovement(
                             agent,
@@ -921,6 +922,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private bool ApplyRetainedGuardCommand(
         Agent agent,
         ref RemoteGuardState guardState,
+        Agent.MovementControlFlag defendFlags,
         bool restoreNativeGuardState,
         bool refreshMountedGuardCommand)
     {
@@ -1008,13 +1010,23 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && agent.CurrentGuardMode != guardMode
             && !HasDefendingAction(agent);
 
-        if (!guardState.HasGuardCommand
+        bool shouldApplyGuardCommand =
+            !guardState.HasGuardCommand
             || mountChanged
             || guardModeChanged
             || directionTransitionPending
             || shouldRefreshMountedGuardCommand
-            || nativeGuardStateMissing)
+            || nativeGuardStateMissing;
+        if (shouldApplyGuardCommand)
         {
+            if (refreshMountedGuardCommand)
+            {
+                // Movement replay writes after the pre-mission guard apply. Refresh its defend flags first so
+                // the explicit synchronized guard direction is the final native command for this frame.
+                AgentActionData.ApplyDefendMovementFlags(
+                    agent,
+                    defendFlags);
+            }
             if (agent.HasMount
                 && (guardModeChanged
                     || guardState.NeedsGuardDirectionTransition
@@ -1056,7 +1068,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         guardState.NeedsGuardDirectionTransition = false;
         guardState.LastCommandedGuardMode = guardMode;
         guardState.LastCommandedMountIndex = mountIndex;
-        return true;
+        return shouldApplyGuardCommand;
     }
 
     private void RestoreMountedGuardDirectionPresentation(

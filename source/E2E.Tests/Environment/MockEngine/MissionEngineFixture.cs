@@ -930,6 +930,8 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_set_MovementFlags(Agent __instance, Agent.MovementControlFlag value)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetMovementFlagsCalls++;
+        m.LastMovementFlagsWriteSequence = ++m.NativeStateWriteSequence;
         m.MovementFlags = value;
         return false;
     }
@@ -966,6 +968,7 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetWeaponGuardCalls++;
+        m.LastWeaponGuardWriteSequence = ++m.NativeStateWriteSequence;
         m.ActionAndGuardCallOrder.Add("set-guard");
         m.LastSetWeaponGuardDirection = direction;
         if (m.SetWeaponGuardOverwritesDefendFlags)
