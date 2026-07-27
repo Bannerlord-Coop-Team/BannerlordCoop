@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using ProtoBuf.Meta;
 using System;
 using System.IO;
 
@@ -14,6 +15,15 @@ public interface ICommonSerializer
 public class ProtoBufSerializer : ICommonSerializer
 {
     private readonly ISerializableTypeMapper typeMapper;
+
+    // Proton reports Windows, so its managed runtime is the reliable discriminator.
+    public static bool IsMonoRuntime { get; } = Type.GetType("Mono.Runtime") != null;
+    public static bool AutoCompileEnabled => RuntimeTypeModel.Default.AutoCompile;
+
+    public static void ConfigureRuntimeModel()
+    {
+        RuntimeTypeModel.Default.AutoCompile = !IsMonoRuntime;
+    }
 
     public ProtoBufSerializer(ISerializableTypeMapper typeMapper)
     {
