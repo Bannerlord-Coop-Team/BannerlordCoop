@@ -111,6 +111,19 @@ namespace Missions.Agents.Packets
             ApplyGuardState(agent, guardMode, force: true);
         }
 
+        private static void ClearMountedGuardDirectionAction(
+            Agent agent,
+            int channel)
+        {
+            // Retire the cyclic sibling before native guard input can select it again.
+            agent.SetActionChannel(
+                channel,
+                ActionIndexCache.act_none,
+                ignorePriority: true,
+                additionalFlags: AnimFlags.anf_restart,
+                forceFaceMorphRestart: false);
+        }
+
         internal static bool IsGuardMode(Agent.GuardMode guardMode) =>
             guardMode == Agent.GuardMode.Up
             || guardMode == Agent.GuardMode.Down
@@ -417,6 +430,7 @@ namespace Missions.Agents.Packets
                     AnimFlags actionFlags = (AnimFlags)Action0Flag;
                     if (forceGuardDirectionTransition)
                     {
+                        ClearMountedGuardDirectionAction(agent, 0);
                         ApplyGuardDirectionTransition(
                             agent,
                             GuardMode);
@@ -457,6 +471,7 @@ namespace Missions.Agents.Packets
                     AnimFlags actionFlags = (AnimFlags)Action1Flag;
                     if (forceGuardDirectionTransition)
                     {
+                        ClearMountedGuardDirectionAction(agent, 1);
                         ApplyGuardDirectionTransition(
                             agent,
                             GuardMode);

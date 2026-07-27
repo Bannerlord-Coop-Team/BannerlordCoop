@@ -71,6 +71,7 @@ public sealed class MirrorAgent
     public AnimFlags Action1Flags { get; set; }
     public int SetCurrentActionProgressCalls { get; set; }
     public int SetActionChannelCalls { get; set; }
+    public List<int> SetActionChannelIndices { get; } = new();
     public List<string> ActionAndGuardCallOrder { get; } = new();
     public bool SetActionChannelResult { get; set; } = true;
     public int AcceptedSetActionChannelDeferralsRemaining { get; set; }
@@ -100,6 +101,44 @@ public sealed class MirrorAgent
         Agent.UsageDirection.None;
     public bool SetWeaponGuardOverwritesDefendFlags { get; set; }
     public int ResetGuardCalls { get; set; }
+    public bool RetainedNativeActionArmed { get; set; }
+    public int RetainedNativeActionChannel { get; set; } = -1;
+    public int RetainedNativeActionIndex { get; set; } = -1;
+    public Agent.ActionCodeType RetainedNativeActionType { get; set; } =
+        Agent.ActionCodeType.Idle;
+    public Agent.UsageDirection RetainedNativeActionDirection { get; set; } =
+        Agent.UsageDirection.None;
+    public int RetainedNativeActionResumeCalls { get; set; }
+
+    public void ClearRetainedNativeAction(int channel)
+    {
+        if (RetainedNativeActionChannel != channel)
+            return;
+
+        RetainedNativeActionArmed = false;
+    }
+
+    public bool ResumeRetainedNativeAction()
+    {
+        if (!RetainedNativeActionArmed)
+            return false;
+
+        RetainedNativeActionResumeCalls++;
+        if (RetainedNativeActionChannel == 0)
+        {
+            Action0Index = RetainedNativeActionIndex;
+            Action0CodeType = RetainedNativeActionType;
+            Action0Direction = RetainedNativeActionDirection;
+        }
+        else
+        {
+            Action1Index = RetainedNativeActionIndex;
+            Action1CodeType = RetainedNativeActionType;
+            Action1Direction = RetainedNativeActionDirection;
+        }
+
+        return true;
+    }
 }
 
 /// <summary>

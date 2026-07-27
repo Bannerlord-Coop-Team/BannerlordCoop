@@ -863,6 +863,7 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.SetActionChannelCalls++;
+        m.SetActionChannelIndices.Add(actionIndexCache.Index);
         m.ActionAndGuardCallOrder.Add("set-action");
         m.LastSetActionChannel = channelNo;
         m.LastSetActionIgnorePriority = ignorePriority;
@@ -878,6 +879,11 @@ public sealed class MissionEngineFixture : IDisposable
         if (!__result)
         {
             return false;
+        }
+
+        if (actionIndexCache == ActionIndexCache.act_none)
+        {
+            m.ClearRetainedNativeAction(channelNo);
         }
 
         if (m.AcceptedSetActionChannelDeferralsRemaining > 0)
