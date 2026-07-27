@@ -1261,6 +1261,15 @@ public class BattleGuardFixture : IBattleGuardFixture
             _ => Agent.GuardMode.Up
         };
 
+    internal static bool ShouldLatchGuardPresentation(
+        BattleGuardFixturePhase phase,
+        BattleGuardFixtureDirection expectedDirection,
+        Agent.GuardMode observedGuardMode)
+    {
+        return phase != BattleGuardFixturePhase.Guard ||
+            observedGuardMode == GetGuardMode(expectedDirection);
+    }
+
     internal static string GetMountedGuardPresentationActionName(
         BattleGuardFixtureDirection direction) =>
         direction switch
@@ -2927,6 +2936,17 @@ public class BattleGuardFixture : IBattleGuardFixture
         {
             if (!AgentActionData.IsDefendingAction(agent.GetCurrentActionType(channel)))
                 continue;
+
+            if (guardDriver != null &&
+                !ShouldLatchGuardPresentation(
+                    guardDriver.Phase,
+                    guardDriver.Direction,
+                    AgentActionData.GetGuardModeFromDefendingAction(
+                        agent,
+                        channel)))
+            {
+                continue;
+            }
 
             ActionIndexCache action = agent.GetCurrentAction(channel);
             if (action.Index < 0)

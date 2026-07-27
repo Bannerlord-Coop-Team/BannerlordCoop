@@ -530,6 +530,41 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(
+        BattleGuardFixturePhase.Guard,
+        BattleGuardFixtureDirection.Left,
+        Agent.GuardMode.Left,
+        true)]
+    [InlineData(
+        BattleGuardFixturePhase.Guard,
+        BattleGuardFixtureDirection.Right,
+        Agent.GuardMode.Left,
+        false)]
+    [InlineData(
+        BattleGuardFixturePhase.Guard,
+        BattleGuardFixtureDirection.Right,
+        Agent.GuardMode.Right,
+        true)]
+    [InlineData(
+        BattleGuardFixturePhase.Attack,
+        BattleGuardFixtureDirection.Right,
+        Agent.GuardMode.Left,
+        true)]
+    public void GuardPresentation_DefersOnlyMismatchedGuardPhaseDirection(
+        BattleGuardFixturePhase phase,
+        BattleGuardFixtureDirection expectedDirection,
+        Agent.GuardMode observedGuardMode,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldLatchGuardPresentation(
+                phase,
+                expectedDirection,
+                observedGuardMode));
+    }
+
+    [Theory]
     [InlineData(true, BattleGuardFixtureDirection.Left, true)]
     [InlineData(true, BattleGuardFixtureDirection.Right, true)]
     [InlineData(true, BattleGuardFixtureDirection.Up, false)]
