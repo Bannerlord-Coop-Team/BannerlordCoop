@@ -47,8 +47,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         base.OnPreMissionTick(dt);
 
-        // Bannerlord calls this before the display, mission-behavior, and native Agent ticks. Restore remote
-        // defend input here so the Agent tick resolves guard collision through the same path as local input.
+        // Restore queued remote guard state at the mission input boundary so collision reads the same held
+        // defend state as the owning client.
         coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
     }
 
@@ -66,6 +66,10 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
         // override it, so this runs for both battle and location missions.
         coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
+
+        // Continuous movement setters run after the mission input boundary. Refresh the retained mounted
+        // direction here so the upcoming native Agent cycle cannot select the previous guard sibling.
+        coopMissionComponent.AgentActionHandler.RefreshRemoteGuardStatesAfterMovement();
 
         // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action
         // transition can't be observed reliably off-thread, so actions are event-synced from here instead of

@@ -637,6 +637,7 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_set_LookDirection(Agent __instance, Vec3 value)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ActionAndGuardCallOrder.Add("continuous-state");
         m.LookDirection = value;
         if (m.ClearLocomotionFlagsOnContinuousStateWrite)
             m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
@@ -653,6 +654,7 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_SetMovementDirection(Agent __instance, Vec2 __0)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ActionAndGuardCallOrder.Add("continuous-state");
         m.MovementDirection = __0;
         if (m.ClearLocomotionFlagsOnContinuousStateWrite)
             m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
@@ -741,6 +743,7 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_set_MovementInputVector(Agent __instance, Vec2 value)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ActionAndGuardCallOrder.Add("continuous-state");
         m.InputVector = value;
         if (m.ClearLocomotionFlagsOnContinuousStateWrite)
             m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;

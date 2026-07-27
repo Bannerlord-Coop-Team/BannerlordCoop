@@ -39,6 +39,9 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 
     /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
+
+    /// <summary>[Game thread] Refresh retained mounted guard direction after continuous movement replay.</summary>
+    void RefreshRemoteGuardStatesAfterMovement();
 }
 
 /// <summary>
@@ -405,6 +408,11 @@ public class AgentActionHandler : IAgentActionHandler
     public void ApplyRemoteGuardStates()
     {
         remoteActionProcessor.ApplyRemoteGuardStates();
+    }
+
+    public void RefreshRemoteGuardStatesAfterMovement()
+    {
+        remoteActionProcessor.RefreshRemoteGuardStatesAfterMovement();
     }
 
     public void ReplayRemoteGuardReactions()
