@@ -887,7 +887,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(3070, puppetMirror.Action1Index);
             Assert.True(puppetMirror.LastSetActionIgnorePriority);
             Assert.Equal(
-                Agent.UsageDirection.AttackLeft,
+                Agent.UsageDirection.AttackRight,
                 puppetMirror.LastSetWeaponGuardDirection);
             Assert.True(
                 puppetMirror.LastMovementFlagsWriteSequence <
@@ -1113,7 +1113,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 guardResetsBeforePeriodicDisplacement,
                 puppetMirror.ResetGuardCalls);
             Assert.Equal(
-                Agent.UsageDirection.AttackLeft,
+                Agent.UsageDirection.AttackRight,
                 puppetMirror.LastSetWeaponGuardDirection);
             Assert.Equal(
                 Agent.GuardMode.Right,
@@ -4089,7 +4089,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 actionCommandsBeforeMovement,
                 puppetMirror.SetActionChannelCalls);
             Assert.Equal(
-                Agent.UsageDirection.AttackLeft,
+                Agent.UsageDirection.AttackRight,
                 puppetMirror.LastSetWeaponGuardDirection);
         });
     }
@@ -4271,10 +4271,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 controller.OnPreMissionTick(0.1f);
                 controller.OnMissionTick(0.1f);
 
-                // The native input names the incoming attack side, so AttackLeft selects visual DefendRight.
                 bool nativeSelectsRight =
                     puppetMirror.LastSetWeaponGuardDirection
-                        == Agent.UsageDirection.AttackLeft;
+                        == Agent.UsageDirection.AttackRight;
                 puppetMirror.Action1Index =
                     nativeSelectsRight ? 3070 : 3078;
                 puppetMirror.Action1CodeType = nativeSelectsRight
@@ -5564,8 +5563,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     [Theory]
     [InlineData(Agent.GuardMode.Up, Agent.UsageDirection.AttackUp)]
     [InlineData(Agent.GuardMode.Down, Agent.UsageDirection.AttackDown)]
-    [InlineData(Agent.GuardMode.Left, Agent.UsageDirection.AttackRight)]
-    [InlineData(Agent.GuardMode.Right, Agent.UsageDirection.AttackLeft)]
+    [InlineData(Agent.GuardMode.Left, Agent.UsageDirection.AttackLeft)]
+    [InlineData(Agent.GuardMode.Right, Agent.UsageDirection.AttackRight)]
     public void GuardApply_MapsEveryGuardDirection(
         Agent.GuardMode guardMode,
         Agent.UsageDirection usageDirection)
