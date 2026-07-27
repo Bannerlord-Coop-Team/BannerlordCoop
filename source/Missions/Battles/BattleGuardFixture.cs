@@ -324,6 +324,9 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         AgentActionData.ApplyDefendMovementFlags(agent, defendFlags);
         guardDriver.ObserveAppliedInput(agent);
+
+        // Both production action polls must observe the same held fixture presentation.
+        ApplyMountedGuardPresentationAction(agentRegistry);
     }
 
     public void Tick(float dt, INetworkAgentRegistry agentRegistry)
