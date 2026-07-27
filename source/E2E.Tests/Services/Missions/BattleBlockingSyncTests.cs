@@ -824,7 +824,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 out MirrorAgent puppetMirror);
             Agent owner = SpawnAgent(
                 context, AgentControllerType.Player, out MirrorAgent ownerMirror);
-            context.Mock.SpawnMount(puppet);
+            Agent puppetMount = context.Mock.SpawnMount(puppet);
             context.Mock.SpawnMount(owner);
 
             ownerMirror.GuardMode = Agent.GuardMode.Left;
@@ -860,14 +860,34 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.HasVisualSkeleton = true;
             puppetMirror.ActionAnimationIndices[3078] = 2991;
             puppetMirror.ActionAnimationIndices[3070] = 3027;
-            puppetMirror.Action1Index = -1;
-            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
-            puppetMirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+            puppetMirror.Action1Index = 4000;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Other;
+            puppetMirror.Action1Direction = Agent.UsageDirection.None;
             puppetMirror.SkeletonAction1Index = -1;
             puppetMirror.RawVisualAction1Index = 2991;
             int actionCommandsBeforeDisplay =
                 puppetMirror.SetActionChannelCalls;
 
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(4000, puppetMirror.Action1Index);
+            Assert.Equal(
+                actionCommandsBeforeDisplay,
+                puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.Action1Index = 3070;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            puppetMirror.Action1Direction = Agent.UsageDirection.DefendRight;
+
+            puppetMirror.MountAgent = null;
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(3070, puppetMirror.Action1Index);
+            Assert.Equal(
+                actionCommandsBeforeDisplay,
+                puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.MountAgent = puppetMount;
             controller.OnPreDisplayMissionTick(0.1f);
 
             Assert.Equal(3070, puppetMirror.Action1Index);

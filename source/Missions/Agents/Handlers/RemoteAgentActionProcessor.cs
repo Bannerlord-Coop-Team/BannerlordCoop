@@ -966,7 +966,16 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
-        if (!IsMountedGuardDirectionMissing(
+        bool currentGuardActionHasDisplacedVisual =
+            agent.HasMount
+            && agent.GetCurrentAction(channel) == guardState.GuardAction
+            && guardState.DisplacedGuardAction != ActionIndexCache.act_none
+            && agentVisualActionAccessor.IsActionVisible(
+                agent,
+                channel,
+                in guardState.DisplacedGuardAction);
+        if (!currentGuardActionHasDisplacedVisual
+            && !IsMountedGuardDirectionMissing(
                 agent,
                 guardState.Action.Data,
                 channel,
