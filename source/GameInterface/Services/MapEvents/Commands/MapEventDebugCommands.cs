@@ -520,6 +520,60 @@ public class MapEventDebugCommands
                $"against player {args[0]}.";
     }
 
+    // coop.debug.mapevent.battle_reward_fixture_prepare testclient testclient2
+    /// <summary>Closes the unfinished idle player encounter loaded by the #2308 live-test save.</summary>
+    [CommandLineArgumentFunction("battle_reward_fixture_prepare", "coop.debug.mapevent")]
+    public static string PrepareBattleRewardFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.battle_reward_fixture_prepare <initiatorControllerId> <lateJoinerControllerId>";
+
+        if (args[0] == args[1])
+            return "The initiator and late joiner must be different players.";
+
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPlayer(args[0], out var initiatorPlayer) ||
+            !playerManager.TryGetPlayer(args[1], out var lateJoinerPlayer) ||
+            !playerManager.IsConnected(initiatorPlayer) ||
+            !playerManager.IsConnected(lateJoinerPlayer))
+            return "Both fixture players must be connected.";
+
+        if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var initiatorParty, out var error))
+            return error;
+
+        if (!TryGetPlayerParty(args[1], requireReady: false, out _, out var lateJoinerParty, out error))
+            return error;
+
+        var mapEvent = initiatorParty.MapEvent;
+        if (mapEvent == null && lateJoinerParty.MapEvent == null)
+            return "Battle reward fixture preflight is already clean.";
+
+        if (mapEvent == null || lateJoinerParty.MapEvent != mapEvent)
+            return "The fixture players must share the same saved map event.";
+
+        if (mapEvent.IsFinalized)
+            return "The saved map event is already finalized.";
+
+        if (mapEvent.BattleState != BattleState.None)
+            return $"Refusing to finalize saved map event with battle state {mapEvent.BattleState}.";
+
+        if (mapEvent.MapEventSettlement != null || mapEvent.BattleObserver != null)
+            return "Refusing to finalize a settlement or active simulation map event.";
+
+        var mapEventId = objectManager.TryGetId(mapEvent, out string resolvedMapEventId)
+            ? resolvedMapEventId
+            : "<unregistered>";
+        mapEvent.FinalizeEvent();
+
+        if (!mapEvent.IsFinalized || initiatorParty.MapEvent != null || lateJoinerParty.MapEvent != null)
+            return $"Saved map event {mapEventId} did not finalize cleanly.";
+
+        return $"Battle reward fixture preflight prepared: finalized={mapEventId}, battleState=None.";
+    }
+
     // coop.debug.mapevent.battle_reward_fixture_start testclient testclient2
     /// <summary>Creates the two-player late-join field battle from #2308.</summary>
     [CommandLineArgumentFunction("battle_reward_fixture_start", "coop.debug.mapevent")]
