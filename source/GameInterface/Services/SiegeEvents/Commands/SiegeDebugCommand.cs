@@ -353,7 +353,8 @@ public class SiegeDebugCommand
             return $"Settlement with id {args[0]} not found";
         }
 
-        var leader = settlement.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        var camp = settlement.SiegeEvent?.BesiegerCamp;
+        var leader = camp?.LeaderParty;
         if (leader == null)
         {
             return $"{settlement.Name} has no active siege leader";
@@ -364,7 +365,21 @@ public class SiegeDebugCommand
             return "Unable to resolve SiegeEventInterface";
         }
 
+        var siegeParties = camp._besiegerParties.ToArray();
+        foreach (var party in siegeParties)
+        {
+            if (party != leader)
+            {
+                siegeEventInterface.BreakSiege(party);
+            }
+        }
+
         siegeEventInterface.BreakSiege(leader);
+        if (settlement.SiegeEvent != null)
+        {
+            return $"Failed to stop the siege of {settlement.Name}; " +
+                $"{settlement.SiegeEvent.BesiegerCamp?._besiegerParties.Count ?? 0} parties remain";
+        }
 
         var restoreResult = PartyCommands.RestorePositionCommand(new List<string>
         {
@@ -498,12 +513,14 @@ public class SiegeDebugCommand
             return $"{settlement.Name} is not under siege";
         }
 
+        ClearSiegeEngines(attackerEngines);
+        ClearSiegeEngines(defenderEngines);
         if (attackerEngines.DeployedSiegeEngines.Count > 0
             || attackerEngines.ReservedSiegeEngines.Count > 0
             || defenderEngines.DeployedSiegeEngines.Count > 0
             || defenderEngines.ReservedSiegeEngines.Count > 0)
         {
-            return $"{settlement.Name} already has campaign siege engines; stop and recreate the fixture";
+            return $"Failed to remove the campaign siege engines from {settlement.Name}";
         }
 
         var preparations = attackerEngines.SiegePreparations;
@@ -515,6 +532,34 @@ public class SiegeDebugCommand
 
         return $"Prepared a ladder-only assault at {settlement.Name} ({settlement.StringId}): " +
             $"preparation={preparations.Progress:0.00} attackerEngines=0 defenderEngines=0";
+    }
+
+    private static void ClearSiegeEngines(SiegeEnginesContainer siegeEngines)
+    {
+        for (int i = siegeEngines.DeployedRangedSiegeEngines.Length - 1; i >= 0; i--)
+        {
+            if (siegeEngines.DeployedRangedSiegeEngines[i] != null)
+            {
+                siegeEngines.RemoveDeployedSiegeEngine(i, isRanged: true, moveToReserve: false);
+            }
+        }
+
+        for (int i = siegeEngines.DeployedMeleeSiegeEngines.Length - 1; i >= 0; i--)
+        {
+            if (siegeEngines.DeployedMeleeSiegeEngines[i] != null)
+            {
+                siegeEngines.RemoveDeployedSiegeEngine(i, isRanged: false, moveToReserve: false);
+            }
+        }
+
+        while (siegeEngines.ReservedSiegeEngines.Count > 0)
+        {
+            var siegeEngine = siegeEngines.ReservedSiegeEngines[0];
+            if (!siegeEngines.RemovedSiegeEngineFromReservedSiegeEngines(siegeEngine))
+            {
+                break;
+            }
+        }
     }
 
     [CommandLineArgumentFunction("stage_machines", "coop.debug.siege")]
