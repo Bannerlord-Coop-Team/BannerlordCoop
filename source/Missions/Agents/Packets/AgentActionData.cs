@@ -402,6 +402,7 @@ namespace Missions.Agents.Packets
             Agent.MovementControlFlag movementFlags = (Agent.MovementControlFlag)MovementFlag;
             bool mountedGuardDirectionTransitionApplied = false;
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
+            // Apply held input before action transitions so an explicit guard direction remains the final native command.
             ApplyDefendMovementFlags(agent, movementFlags);
 
             // Install action transitions, but let an unchanged native action advance on its local timeline.
@@ -487,8 +488,6 @@ namespace Missions.Agents.Packets
                 }
             }
 
-            // Keep held defend input on the puppet; later reliable transitions replace or clear these bits.
-            ApplyDefendMovementFlags(agent, movementFlags);
             return mountedGuardDirectionTransitionApplied;
         }
 
