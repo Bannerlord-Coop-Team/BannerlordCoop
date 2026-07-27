@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Extentions;
 using GameInterface.Services.MapTracks.Messages;
 using GameInterface.Services.ObjectManager;
@@ -303,7 +303,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         int size = track.Size;
         float elapsedHoursUntilNow = track.CreationTime.ElapsedHoursUntilNow;
         float num = (track.Position.ToVec2() - playerParty.Position.ToVec2()).Length / trackSpottingDistance;
-        float num2 = -75f + elapsedHoursUntilNow / Campaign.Current.Models.MapTrackModel.MaxTrackLife * 100f + num * 100f + MathF.Max(0f, 100f - (float)size) * (CampaignTime.Now.IsNightTime ? 10f : 1f);
+        float num2 = -75f + (elapsedHoursUntilNow / Campaign.Current.Models.MapTrackModel.MaxTrackLife * 100f) + (num * 100f) + (MathF.Max(0f, 100f - (float)size) * (CampaignTime.Now.IsNightTime ? 10f : 1f));
         if (playerParty.HasPerk(DefaultPerks.Scouting.Ranger, true) && !playerParty.IsCurrentlyAtSea)
         {
             num2 -= num2 * DefaultPerks.Scouting.Ranger.SecondaryBonus;
