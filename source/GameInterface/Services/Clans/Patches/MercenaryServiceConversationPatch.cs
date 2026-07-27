@@ -25,7 +25,8 @@ internal class MercenaryServiceConversationPatch
         if (ModInformation.IsClient)
         {
             var kingdom = Hero.OneToOneConversationHero.Clan.Kingdom;
-            MessageBroker.Instance.Publish(__instance, new MercenaryServiceAccepted(kingdom, mercenaryAwardFactor));
+            var clan = Hero.OneToOneConversationHero.Clan;
+            MessageBroker.Instance.Publish(__instance, new MercenaryServiceAccepted(kingdom, mercenaryAwardFactor, clan));
             return false;
         }
 
@@ -53,16 +54,17 @@ internal class MercenaryServiceConversationPatch
     {
         int num = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(Hero.OneToOneConversationHero.Clan, (Kingdom)Hero.MainHero.MapFaction, true);
         var kingdom = (Kingdom)Hero.MainHero.MapFaction;
+        var clan = Hero.OneToOneConversationHero.Clan;
         if (Hero.OneToOneConversationHero.Clan.IsUnderMercenaryService)
         {
             num *= 3;
             num /= 2;
             if (Hero.OneToOneConversationHero.Clan.MapFaction.IsKingdomFaction)
             {
-                MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, Hero.OneToOneConversationHero.Clan));
+                MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, clan));
             }
         }
-        MessageBroker.Instance.Publish(__instance, new MercenaryServiceAccepted(kingdom, num));
+        MessageBroker.Instance.Publish(__instance, new MercenaryServiceAccepted(kingdom, num, clan));
         return false;
     }
 

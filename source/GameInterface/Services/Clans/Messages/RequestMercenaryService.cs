@@ -10,9 +10,12 @@ internal readonly struct RequestMercenaryService : ICommand
     public readonly string KingdomId;
     [ProtoMember(2)]
     public readonly int AwardMultiplier;
-    public RequestMercenaryService(string kingdomId, int awardMultiplier)
+    [ProtoMember(3)]
+    public readonly string ClanId;
+    public RequestMercenaryService(string kingdomId, int awardMultiplier, string clanId)
     {
         KingdomId = kingdomId;
         AwardMultiplier = awardMultiplier;
+        ClanId = clanId;
     }
 }

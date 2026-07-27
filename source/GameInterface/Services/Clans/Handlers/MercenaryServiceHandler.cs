@@ -62,8 +62,9 @@ internal class MercenaryServiceHandler : IHandler
     {
         // Conversation consequences publish synchronously on the game thread.
         if (!objectManager.TryGetIdWithLogging(payload.What.Kingdom, out var kingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
 
-        network.SendAll(new RequestMercenaryService(kingdomId, payload.What.AwardMultiplier));
+        network.SendAll(new RequestMercenaryService(kingdomId, payload.What.AwardMultiplier, clanId));
     }
 
     private void HandleRequestMercenaryService(MessagePayload<RequestMercenaryService> payload)
@@ -78,7 +79,7 @@ internal class MercenaryServiceHandler : IHandler
         }
 
         GameThread.RunSafe(
-            () => ApplyMercenaryService(player.ClanId, player.HeroId, payload.What.KingdomId, payload.What.AwardMultiplier),
+            () => ApplyMercenaryService(payload.What.ClanId, player.HeroId, payload.What.KingdomId, payload.What.AwardMultiplier),
             context: nameof(MercenaryServiceHandler));
     }
 
@@ -88,12 +89,6 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
-
-        if (hero.Clan != clan)
-        {
-            Logger.Warning("Rejected mercenary service request because hero {HeroId} does not belong to clan {ClanId}", heroId, clanId);
-            return;
-        }
 
         if (clan.Kingdom != null || clan.IsUnderMercenaryService)
         {
@@ -176,7 +171,7 @@ internal class MercenaryServiceHandler : IHandler
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.Hero, out var heroId)) return;
 
-        network.SendAll(new NetworkPlayerRelationChange(heroId, payload.What.Gold));
+        network.SendAll(new NetworkGiveGold(payload.What.Gold, heroId));
     }
     private void HandleNetworkGiveGold(MessagePayload<NetworkGiveGold> payload)
     {
