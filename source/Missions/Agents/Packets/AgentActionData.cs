@@ -262,7 +262,7 @@ namespace Missions.Agents.Packets
                 : GetGuardModeFromDefendingAction(agent, 0);
         }
 
-        private static Agent.GuardMode GetGuardModeFromDefendingAction(
+        internal static Agent.GuardMode GetGuardModeFromDefendingAction(
             Agent agent,
             int channel)
         {

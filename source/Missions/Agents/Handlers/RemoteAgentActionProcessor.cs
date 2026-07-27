@@ -294,6 +294,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     continue;
                 }
 
+                if (replayGuardAction)
+                {
+                    // Native rider ticking can retain the previous equal-priority guard sibling.
+                    RetryMountedGuardDirectionPresentation(
+                        agent,
+                        guardState);
+                }
+
                 if (!replayGuardAction)
                 {
                     AgentActionData data = guardState.Action.Data;
@@ -929,6 +937,55 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             agent,
             Agent.MovementControlFlag.None);
         AgentActionData.ApplyGuardState(agent, Agent.GuardMode.None);
+    }
+
+    private static void RetryMountedGuardDirectionPresentation(
+        Agent agent,
+        in RemoteGuardState guardState)
+    {
+        AgentActionData data = guardState.Action.Data;
+        if (!agent.HasMount
+            || !data.IsMounted
+            || !data.IsPlayerControlled
+            || !data.GuardActionIsDefending
+            || data.GuardActionIsReaction
+            || !AgentActionData.IsGuardMode(data.GuardMode)
+            || HasInterruptingGuardAction(agent, guardState))
+        {
+            return;
+        }
+
+        int channel = guardState.GuardActionChannel;
+        if (channel < 0
+            || channel > 1
+            || guardState.GuardAction == ActionIndexCache.act_none
+            || agent.GetCurrentAction(channel) == guardState.GuardAction)
+        {
+            return;
+        }
+
+        Agent.GuardMode currentGuardMode =
+            AgentActionData.GetGuardModeFromDefendingAction(
+                agent,
+                channel);
+        if (!AgentActionData.IsGuardMode(currentGuardMode)
+            || currentGuardMode == data.GuardMode)
+        {
+            return;
+        }
+
+        AnimFlags actionFlags = (AnimFlags)(channel == 0
+            ? data.Action0Flag
+            : data.Action1Flag);
+        float actionProgress = channel == 0
+            ? data.Action0Progress
+            : data.Action1Progress;
+        agent.SetActionChannel(
+            channel,
+            guardState.GuardAction,
+            ignorePriority: true,
+            additionalFlags: actionFlags,
+            startProgress: actionProgress);
     }
 
     private static int GetMountedGuardPresentationChannel(

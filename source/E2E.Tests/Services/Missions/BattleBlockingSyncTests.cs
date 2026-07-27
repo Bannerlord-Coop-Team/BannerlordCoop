@@ -639,6 +639,95 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void MissionPreDisplayTick_MountedOppositeGuardAction_RetriesRealizedDirection()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+
+            ownerMirror.GuardMode = Agent.GuardMode.Left;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            ownerMirror.Action1Index = 3078;
+            ownerMirror.Action1Progress = 0.2f;
+            ownerMirror.Action1Flags =
+                AnimFlags.amf_priority_defend | AnimFlags.anf_cyclic;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            ownerMirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+            puppetMirror.Action1Index = ownerMirror.Action1Index;
+            puppetMirror.Action1Progress = ownerMirror.Action1Progress;
+            puppetMirror.Action1Flags = ownerMirror.Action1Flags;
+            puppetMirror.Action1CodeType = ownerMirror.Action1CodeType;
+            puppetMirror.Action1Direction = ownerMirror.Action1Direction;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 3070;
+            ownerMirror.Action1Progress = 0.05f;
+            ownerMirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            puppetMirror.SetActionChannelResult = false;
+
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(3078, puppetMirror.Action1Index);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                AgentActionData.GetDefendMovementFlags(
+                    puppetMirror.MovementFlags));
+            int rejectedActionCommands = puppetMirror.SetActionChannelCalls;
+            Assert.True(rejectedActionCommands > 0);
+
+            puppetMirror.SetActionChannelResult = true;
+            puppetMirror.Action0Index = 404;
+            puppetMirror.Action0CodeType = Agent.ActionCodeType.StrikeMedium;
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(3078, puppetMirror.Action1Index);
+            Assert.Equal(
+                rejectedActionCommands,
+                puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.Action0Index = -1;
+            puppetMirror.Action0CodeType = Agent.ActionCodeType.Idle;
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(3070, puppetMirror.Action1Index);
+            Assert.Equal(
+                rejectedActionCommands + 1,
+                puppetMirror.SetActionChannelCalls);
+            Assert.Equal(1, puppetMirror.LastSetActionChannel);
+            Assert.True(puppetMirror.LastSetActionIgnorePriority);
+            Assert.Equal(0.05f, puppetMirror.LastSetActionStartProgress);
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(3070, puppetMirror.Action1Index);
+            Assert.Equal(
+                rejectedActionCommands + 1,
+                puppetMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
     public void PollActions_MixedPlayerAndAiBatch_LabelsEachControllerRole()
     {
         RunScenario("owner", context =>
