@@ -1012,6 +1012,61 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(40f, route.Length);
     }
 
+    [Theory]
+    [InlineData(
+        BattleGuardFixtureDirection.Up,
+        Agent.MovementControlFlag.DefendUp,
+        Agent.GuardMode.Up)]
+    [InlineData(
+        BattleGuardFixtureDirection.Down,
+        Agent.MovementControlFlag.DefendDown,
+        Agent.GuardMode.Down)]
+    [InlineData(
+        BattleGuardFixtureDirection.Left,
+        Agent.MovementControlFlag.DefendLeft,
+        Agent.GuardMode.Left)]
+    [InlineData(
+        BattleGuardFixtureDirection.Right,
+        Agent.MovementControlFlag.DefendRight,
+        Agent.GuardMode.Right)]
+    public void GuardDirection_MapsToExactNativeInput(
+        BattleGuardFixtureDirection direction,
+        Agent.MovementControlFlag directionFlag,
+        Agent.GuardMode guardMode)
+    {
+        Assert.Equal(
+            Agent.MovementControlFlag.DefendBlock | directionFlag,
+            BattleGuardFixture.GetDefendFlags(direction));
+        Assert.Equal(
+            guardMode,
+            BattleGuardFixture.GetGuardMode(direction));
+    }
+
+    [Fact]
+    public void GuardCommand_DirectionRoundTrips()
+    {
+        var original = new NetworkBattleGuardFixtureCommand(
+            "battle",
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "guard-owner",
+            Guid.NewGuid(),
+            "striker-owner",
+            BattleGuardFixtureMode.Mounted,
+            BattleGuardFixturePhase.Guard,
+            BattleGuardFixtureDirection.Right);
+        using var stream = new MemoryStream();
+
+        Serializer.Serialize(stream, original);
+        stream.Position = 0;
+        NetworkBattleGuardFixtureCommand received =
+            Serializer.Deserialize<NetworkBattleGuardFixtureCommand>(stream);
+
+        Assert.Equal(
+            BattleGuardFixtureDirection.Right,
+            received.Direction);
+    }
+
     [Fact]
     public void MountedRouteArrival_ClearsRouteWaitError()
     {

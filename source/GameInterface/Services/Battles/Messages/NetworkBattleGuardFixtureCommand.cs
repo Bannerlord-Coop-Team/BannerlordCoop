@@ -18,6 +18,14 @@ public enum BattleGuardFixturePhase
     Attack
 }
 
+public enum BattleGuardFixtureDirection
+{
+    Up,
+    Down,
+    Left,
+    Right
+}
+
 [ProtoContract(SkipConstructor = true)]
 public sealed class NetworkBattleGuardFixtureCommand : IEvent
 {
@@ -48,6 +56,9 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
     [ProtoMember(9)]
     public Guid CommandId { get; }
 
+    [ProtoMember(10)]
+    public BattleGuardFixtureDirection Direction { get; }
+
     public NetworkBattleGuardFixtureCommand(
         string battleInstanceId,
         Guid commandId,
@@ -57,6 +68,8 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
         string strikerAuthority,
         BattleGuardFixtureMode mode,
         BattleGuardFixturePhase phase,
+        BattleGuardFixtureDirection direction =
+            BattleGuardFixtureDirection.Up,
         bool reset = false)
     {
         BattleInstanceId = battleInstanceId;
@@ -67,6 +80,7 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
         StrikerAuthority = strikerAuthority;
         Mode = mode;
         Phase = phase;
+        Direction = direction;
         Reset = reset;
     }
 }

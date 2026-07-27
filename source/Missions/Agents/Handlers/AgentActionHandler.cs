@@ -544,6 +544,15 @@ public class AgentActionHandler : IAgentActionHandler
         Agent agent,
         Agent.MovementControlFlag defendFlags)
     {
+        if (agent.HasMount
+            && (defendFlags & Agent.MovementControlFlag.DefendBlock) != 0)
+        {
+            Agent.GuardMode requestedGuardMode =
+                AgentActionData.GetGuardModeFromDefendFlags(defendFlags);
+            if (AgentActionData.IsGuardMode(requestedGuardMode))
+                return requestedGuardMode;
+        }
+
         Agent.GuardMode guardMode = AgentActionData.GetEffectiveGuardMode(
             agent,
             defendFlags);

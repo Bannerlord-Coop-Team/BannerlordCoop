@@ -83,14 +83,14 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const Agent.MovementControlFlag TurnFlags =
         Agent.MovementControlFlag.TurnLeft |
         Agent.MovementControlFlag.TurnRight;
-    private const Agent.MovementControlFlag DefendFlags =
-        Agent.MovementControlFlag.DefendBlock |
-        Agent.MovementControlFlag.DefendUp;
+    private const Agent.MovementControlFlag DefendStateFlags =
+        Agent.MovementControlFlag.DefendMask |
+        Agent.MovementControlFlag.DefendBlock;
     private const Agent.MovementControlFlag DriveFlags =
         TranslationFlags |
         TurnFlags |
         AttackFlags |
-        DefendFlags;
+        DefendStateFlags;
 
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleNetwork network;
@@ -532,6 +532,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"routeStrikeReady={route?.CanStageStrike == true} " +
             $"healthDelta={sample.HealthDelta:0.###} rawAction={sample.RawActionIndex} " +
             $"rawProgress={sample.RawProgress:0.###} guardChannel={sample.LatchedChannel} " +
+            $"guardDirection={guardDriver?.Direction.ToString() ?? "none"} " +
             $"guardMode={sample.GuardMode} " +
             $"guardStateChanges={guardDriver?.MountedGuardStateChanges ?? 0} " +
             $"guardAction={sample.LatchedActionIndex} " +
@@ -883,11 +884,17 @@ public class BattleGuardFixture : IBattleGuardFixture
         bool drivesGuard)
     {
         if (guardDriver == null)
-            guardDriver = new GuardDriver(command.GuardAgentId, command.Mode, command.Phase, agent);
+            guardDriver = new GuardDriver(
+                command.GuardAgentId,
+                command.Mode,
+                command.Phase,
+                command.Direction,
+                agent);
         else
         {
             guardDriver.Mode = command.Mode;
             guardDriver.Phase = command.Phase;
+            guardDriver.Direction = command.Direction;
         }
         if (command.Phase != BattleGuardFixturePhase.Attack)
             guardDriver.EndMountedStrike();
@@ -1040,6 +1047,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         bool guarding =
             !dismounting &&
             driver.Phase != BattleGuardFixturePhase.Calibration;
+        Agent.MovementControlFlag defendFlags =
+            GetDefendFlags(driver.Direction);
 
         agent.EventControlFlags &= ~Agent.EventControlFlag.Dismount;
         Agent.MovementControlFlag flags =
@@ -1092,13 +1101,13 @@ public class BattleGuardFixture : IBattleGuardFixture
             }
         }
         if (guarding)
-            flags |= DefendFlags;
+            flags |= defendFlags;
         agent.MovementFlags = flags;
         agent.MovementInputVector = movementInput;
         AgentActionData.ApplyDefendMovementFlags(
             agent,
             guarding
-                ? DefendFlags
+                ? defendFlags
                 : Agent.MovementControlFlag.None);
         if (driver.Mode == BattleGuardFixtureMode.Mounted &&
             ShouldCommandMountedGuardState(
@@ -1108,7 +1117,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             AgentActionData.ApplyGuardState(
                 agent,
                 guarding
-                    ? Agent.GuardMode.Up
+                    ? GetGuardMode(driver.Direction)
                     : Agent.GuardMode.None,
                 force: guarding);
             driver.MountedGuardCommandActive = guarding;
@@ -1119,6 +1128,32 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (dismounting)
             agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
     }
+
+    internal static Agent.MovementControlFlag GetDefendFlags(
+        BattleGuardFixtureDirection direction)
+    {
+        Agent.MovementControlFlag directionFlag = direction switch
+        {
+            BattleGuardFixtureDirection.Down =>
+                Agent.MovementControlFlag.DefendDown,
+            BattleGuardFixtureDirection.Left =>
+                Agent.MovementControlFlag.DefendLeft,
+            BattleGuardFixtureDirection.Right =>
+                Agent.MovementControlFlag.DefendRight,
+            _ => Agent.MovementControlFlag.DefendUp
+        };
+        return Agent.MovementControlFlag.DefendBlock | directionFlag;
+    }
+
+    internal static Agent.GuardMode GetGuardMode(
+        BattleGuardFixtureDirection direction) =>
+        direction switch
+        {
+            BattleGuardFixtureDirection.Down => Agent.GuardMode.Down,
+            BattleGuardFixtureDirection.Left => Agent.GuardMode.Left,
+            BattleGuardFixtureDirection.Right => Agent.GuardMode.Right,
+            _ => Agent.GuardMode.Up
+        };
 
     private static bool TryPositionGuard(Agent agent, GuardDriver driver)
     {
@@ -2945,6 +2980,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Guid AgentId { get; }
         public BattleGuardFixtureMode Mode { get; set; }
         public BattleGuardFixturePhase Phase { get; set; }
+        public BattleGuardFixtureDirection Direction { get; set; }
         public Agent.MovementControlFlag OriginalMovementFlags { get; }
         public Vec2 OriginalMovementInputVector { get; }
         public Agent.MovementControlFlag OriginalDefendFlags { get; }
@@ -2989,12 +3025,14 @@ public class BattleGuardFixture : IBattleGuardFixture
             Guid agentId,
             BattleGuardFixtureMode mode,
             BattleGuardFixturePhase phase,
+            BattleGuardFixtureDirection direction,
             Agent agent)
         {
             Agent = agent;
             AgentId = agentId;
             Mode = mode;
             Phase = phase;
+            Direction = direction;
             OriginalMovementFlags = agent.MovementFlags;
             OriginalMovementInputVector = agent.MovementInputVector;
             OriginalDefendFlags =

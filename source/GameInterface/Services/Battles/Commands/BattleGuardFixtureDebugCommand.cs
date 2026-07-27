@@ -15,10 +15,10 @@ public static class BattleGuardFixtureDebugCommand
     public static string Start(List<string> args)
     {
         const string usage =
-            "Usage: coop.debug.battle.guard_fixture_start battle-instance-id guard-agent-id guard-authority striker-agent-id striker-authority foot|mounted calibration|guard|attack";
+            "Usage: coop.debug.battle.guard_fixture_start battle-instance-id guard-agent-id guard-authority striker-agent-id striker-authority foot|mounted calibration|guard|attack [up|down|left|right]";
         if (ModInformation.IsClient)
             return "This function can only be used by the server";
-        if (args.Count != 7 ||
+        if ((args.Count != 7 && args.Count != 8) ||
             string.IsNullOrEmpty(args[0]) ||
             !Guid.TryParse(args[1], out Guid guardAgentId) ||
             !Guid.TryParse(args[3], out Guid strikerAgentId) ||
@@ -29,7 +29,10 @@ public static class BattleGuardFixtureDebugCommand
             string.IsNullOrEmpty(args[4]))
             return usage;
         if (!TryParseMode(args[5], out BattleGuardFixtureMode mode) ||
-            !TryParsePhase(args[6], out BattleGuardFixturePhase phase))
+            !TryParsePhase(args[6], out BattleGuardFixturePhase phase) ||
+            !TryParseDirection(
+                args.Count == 8 ? args[7] : "up",
+                out BattleGuardFixtureDirection direction))
         {
             return usage;
         }
@@ -41,12 +44,13 @@ public static class BattleGuardFixtureDebugCommand
             strikerAgentId,
             args[4],
             mode,
-            phase);
+            phase,
+            direction);
         if (!TryDispatch(command, out string error))
             return error;
         return $"BATTLE_GUARD_FIXTURE_SENT instance={args[0]} guard={guardAgentId} " +
             $"guardAuthority={args[2]} striker={strikerAgentId} " +
-            $"strikerAuthority={args[4]} mode={mode} phase={phase}";
+            $"strikerAuthority={args[4]} mode={mode} phase={phase} direction={direction}";
     }
 
     [CommandLineArgumentFunction("guard_fixture_reset", "coop.debug.battle")]
@@ -128,6 +132,20 @@ public static class BattleGuardFixtureDebugCommand
         }
 
         phase = default;
+        return false;
+    }
+
+    private static bool TryParseDirection(
+        string value,
+        out BattleGuardFixtureDirection direction)
+    {
+        if (Enum.TryParse(value, true, out direction) &&
+            Enum.IsDefined(typeof(BattleGuardFixtureDirection), direction))
+        {
+            return true;
+        }
+
+        direction = default;
         return false;
     }
 }

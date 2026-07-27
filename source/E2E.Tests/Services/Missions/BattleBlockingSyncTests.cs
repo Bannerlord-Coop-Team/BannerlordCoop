@@ -342,6 +342,104 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollActions_MountedGuardDirectionChange_UsesInputBeforeNativeGuardCatchesUp()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+
+            mirror.GuardMode = Agent.GuardMode.Left;
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            mirror.Action1Index = 202;
+            mirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            mirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionData leftGuard = Assert.Single(
+                Assert.Single(
+                    context.Network.NetworkSentPackets
+                        .GetPackets<AgentActionPacket>())
+                    .Actions);
+            Assert.Equal(Agent.GuardMode.Left, leftGuard.GuardMode);
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            AgentActionData rightGuard = Assert.Single(packet.Actions);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                rightGuard.DefendFlags);
+            Assert.Equal(Agent.GuardMode.Right, rightGuard.GuardMode);
+            Assert.Equal(2L, Assert.Single(packet.Sequences));
+        });
+    }
+
+    [Fact]
+    public void MountedPuppet_GuardDirectionChange_RecommandsWithoutRestartingAction()
+    {
+        RunScenario("peer", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+
+            ownerMirror.GuardMode = Agent.GuardMode.Left;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            ownerMirror.Action1Index = 202;
+            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            ownerMirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+            puppetMirror.Action1Index = 202;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(Agent.GuardMode.Left, puppetMirror.GuardMode);
+            Assert.Equal(1, puppetMirror.SetWeaponGuardCalls);
+            int actionCommandCount = puppetMirror.SetActionChannelCalls;
+
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                AgentActionData.GetDefendMovementFlags(
+                    puppetMirror.MovementFlags));
+            Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(actionCommandCount, puppetMirror.SetActionChannelCalls);
+        });
+    }
+
+    [Fact]
     public void PollActions_MixedPlayerAndAiBatch_LabelsEachControllerRole()
     {
         RunScenario("owner", context =>
