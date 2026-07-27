@@ -297,6 +297,10 @@ public class CoopBattleController : CoopMissionController
     internal void ApplyGuardFixturePlayerInput() =>
         guardFixture.ApplyPlayerInput(coopMissionComponent.AgentRegistry);
 
+    internal void ApplyGuardFixturePostAgentTickInput() =>
+        guardFixture.ApplyPostAgentTickGuardInput(
+            coopMissionComponent.AgentRegistry);
+
     internal string GetGuardFixtureState() =>
         guardFixture.GetState(
             coopMissionComponent.AgentRegistry,

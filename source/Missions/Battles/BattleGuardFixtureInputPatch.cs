@@ -33,4 +33,19 @@ internal static class BattleGuardFixtureInputPatch
             .ApplyGuardFixturePlayerInput();
     }
 }
+
+[HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
+[HarmonyPatch(
+    typeof(Mission),
+    nameof(Mission.TickAgentsAndTeamsImp),
+    new[] { typeof(float), typeof(bool) })]
+internal static class BattleGuardFixturePostAgentTickPatch
+{
+    private static void Postfix()
+    {
+        Mission.Current?
+            .GetMissionBehavior<CoopBattleController>()?
+            .ApplyGuardFixturePostAgentTickInput();
+    }
+}
 #endif

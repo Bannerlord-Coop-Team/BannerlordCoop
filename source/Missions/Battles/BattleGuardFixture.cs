@@ -24,6 +24,7 @@ public interface IBattleGuardFixture
     bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
+    void ApplyPostAgentTickGuardInput(INetworkAgentRegistry agentRegistry);
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
     void SamplePreReplayDisplayedState(
         float dt,
@@ -341,6 +342,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         TickGuard(agentRegistry);
         TickStriker(agentRegistry);
         TickEvidenceCamera(agentRegistry);
+    }
+
+    public void ApplyPostAgentTickGuardInput(
+        INetworkAgentRegistry agentRegistry)
+    {
         ApplyPendingMountedGuardPresentationAction(agentRegistry);
     }
 
@@ -606,6 +612,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"guardPresentationApplied={guardDriver?.MountedPresentationApplied == true} " +
             $"guardPresentationRequestedAction={guardDriver?.MountedPresentationRequestedActionIndex ?? -1} " +
             $"guardPresentationImmediateAction={guardDriver?.MountedPresentationImmediateActionIndex ?? -1} " +
+            $"guardPresentationImmediateMode={guardDriver?.MountedPresentationImmediateGuardMode ?? "None"} " +
             $"guardAction={sample.LatchedActionIndex} " +
             $"guardAnimation={sample.LatchedAnimationIndex} " +
             $"visualAction={sample.VisualActionIndex} visualAnimation={sample.VisualAnimationIndex} " +
@@ -1283,6 +1290,12 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (actionName == null)
             return;
 
+        AgentActionData.ApplyGuardDirectionTransition(
+            agent,
+            GetGuardMode(driver.Direction));
+        AgentActionData.ApplyDefendMovementFlags(
+            agent,
+            GetDefendFlags(driver.Direction));
         ActionIndexCache action = ActionIndexCache.Create(actionName);
         driver.MountedPresentationAttempts++;
         driver.MountedPresentationRequestedActionIndex = action.Index;
@@ -1293,6 +1306,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             additionalFlags: AnimFlags.anf_restart);
         driver.MountedPresentationImmediateActionIndex =
             agent.GetCurrentAction(1).Index;
+        driver.MountedPresentationImmediateGuardMode =
+            agent.CurrentGuardMode.ToString();
     }
 
     private static bool TryPositionGuard(Agent agent, GuardDriver driver)
@@ -3189,6 +3204,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         public bool MountedPresentationApplied { get; set; }
         public int MountedPresentationRequestedActionIndex { get; set; } = -1;
         public int MountedPresentationImmediateActionIndex { get; set; } = -1;
+        public string MountedPresentationImmediateGuardMode { get; set; } =
+            "None";
         public uint AppliedRiderMovementFlags { get; private set; }
         public uint AppliedNativeDefendMovementFlags { get; private set; }
         public string AppliedAction0Direction { get; private set; } = "None";
