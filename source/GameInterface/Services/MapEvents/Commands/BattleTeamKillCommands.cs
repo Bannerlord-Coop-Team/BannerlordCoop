@@ -224,6 +224,9 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
             .OfType<PartyBase>()
             .Distinct()
             .ToArray();
+        var scoreboardPlayerParties = scoreboardParties
+            .Where(party => party.MobileParty?.IsPlayerParty() == true)
+            .ToArray();
         var missingParties = expectedParties.Except(scoreboardParties).ToArray();
         var missingPlayerParties = expectedPlayerParties.Except(scoreboardParties).ToArray();
         var expandedPartyDetails = 0;
@@ -244,6 +247,7 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
                $"Expected parties ({expectedParties.Length}): {FormatPartyNames(expectedParties)}; " +
                $"Expected player parties ({expectedPlayerParties.Length}): {FormatPartyNames(expectedPlayerParties)}; " +
                $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
+               $"Scoreboard player parties ({scoreboardPlayerParties.Length}): {FormatPartyNames(scoreboardPlayerParties)}; " +
                $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}; " +
                $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}; " +
                $"Native widgets loaded: {nativeWidgetsLoaded}; " +
