@@ -1,12 +1,9 @@
 ﻿using Common;
-using GameInterface.Extentions;
 using GameInterface.Services.MapTracks.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapTracks.Patches;
 
@@ -59,27 +56,9 @@ internal class MapTracksCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return false;
 
-        float skipTrackChance = Campaign.Current.Models.MapTrackModel.GetSkipTrackChance(mobileParty);
-        if (MBRandom.RandomFloat < skipTrackChance)
-        {
-            __result = false;
-            return false;
-        }
+        ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface);
 
-        // Find the closest party to determine if the track should be dropped
-        // Safe to use server MainParty as baseline as MainParty.IsActive is false
-        MobileParty closestParty = MobileParty.MainParty;
-        foreach (var playerParty in Campaign.Current.CampaignObjectManager.GetPlayerMobileParties())
-        {
-            if (mobileParty.Position.DistanceSquared(playerParty.Position) < mobileParty.Position.DistanceSquared(closestParty.Position))
-            {
-                closestParty = playerParty;
-            }
-        }
-
-        float closestPlayerPartyDistance = mobileParty.Position.DistanceSquared(closestParty.Position);
-        float num2 = closestParty.IsActive ? (closestParty._lastCalculatedSpeed * Campaign.Current.Models.MapTrackModel.MaxTrackLife) : 0f;
-        __result = num2 * num2 > closestPlayerPartyDistance;
+        __result = mapTracksCampaignBehaviorInterface.IsTrackDropped(__instance, mobileParty);
 
         return false;
     }

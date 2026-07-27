@@ -7,6 +7,7 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapTracks.Interfaces;
 using GameInterface.Services.MapTracks.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -39,6 +40,8 @@ internal class MapTracksHandler : IHandler
 
         messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
         messageBroker.Subscribe<NetworkInitializePlayerTracksKeys>(Handle_NetworkInitializePlayerTracksKeys);
+
+        messageBroker.Subscribe<NetworkUpdateClientInitialVisibleTracks>(Handle_NetworkUpdateClientInitialVisibleTracks);
     }
 
     public void Dispose()
@@ -48,47 +51,35 @@ internal class MapTracksHandler : IHandler
 
         messageBroker.Unsubscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
         messageBroker.Unsubscribe<NetworkInitializePlayerTracksKeys>(Handle_NetworkInitializePlayerTracksKeys);
+
+        messageBroker.Unsubscribe<NetworkUpdateClientInitialVisibleTracks>(Handle_NetworkUpdateClientInitialVisibleTracks);
     }
 
     private void Handle_UpdateClientsMapTrackData(MessagePayload<UpdateClientsMapTrackData> obj)
     {
         GameThread.RunSafe(() =>
         {
-            var message = new NetworkUpdateClientsMapTrackData(obj.What.PlayerMapTracksData);
+            var message = new NetworkUpdateClientsMapTrackData(obj.What.VisibleTrackChange, obj.What.IsRemovingTracks);
             network.SendAll(message);
         });
     }
 
     private void Handle_NetworkUpdateClientsMapTrackData(MessagePayload<NetworkUpdateClientsMapTrackData> obj)
     {
-        if (!TryGetMapTracksBehavior(out var mapTracksBehavior)) return;
-
         // Update tracks on clients
         GameThread.RunSafe(() =>
         {
             if (!TryGetMapTracksBehavior(out var mapTracksBehavior)) return;
 
-            foreach (var playerTracks in obj.What.PlayerMapTracksData.PlayerDetectedTracks)
+            foreach (var playerTrackChanges in obj.What.VisibleTrackChange)
             {
-                if (!objectManager.TryGetObjectWithLogging<MobileParty>(playerTracks.Key, out var playerParty)) continue;
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(playerTrackChanges.Key, out var playerParty)) continue;
 
                 // Only update tracks for associated player
                 if (playerParty != MobileParty.MainParty) continue;
 
-                // Clear existing tracks
-                foreach (var track in mapTracksBehavior._detectedTracksCache)
-                {
-                    CampaignEventDispatcher.Instance.TrackLost(track);
-                }
-
-                // Update with new tracks
-                mapTracksBehavior._detectedTracksCache = playerTracks.Value;
-                foreach (var track in mapTracksBehavior._detectedTracksCache)
-                {
-                    track.IsDetected = true;
-                    //track.IsEnemy = FactionManager.IsAtWarAgainstFaction(Hero.MainHero.MapFaction, party.MapFaction);
-                    CampaignEventDispatcher.Instance.TrackDetected(track);
-                }
+                var visibleTrackChanges = playerTrackChanges.Value;
+                mapTracksCampaignBehaviorInterface.ApplyVisibleTrackChanges(mapTracksBehavior, visibleTrackChanges, obj.What.IsRemovingTracks);
             }
         });
     }
@@ -109,16 +100,27 @@ internal class MapTracksHandler : IHandler
         {
             if (!TryGetMapTracksBehavior(out var mapTracksBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.PlayerPartyId, out var playerParty)) return;
-            
-            // Track data is not kept as part of the save game even in vanilla Bannerlord.
-            // When a player joins, calculate the tracks for their party and update
-            var shouldUpdateClients = mapTracksCampaignBehaviorInterface.DetectTracksForPlayerParty(mapTracksBehavior, playerParty);
-            if (shouldUpdateClients)
-            {
-                mapTracksCampaignBehaviorInterface.PublishUpdateClientsMapTrackData();
-            }
 
             mapTracksCampaignBehaviorInterface.AddPlayerPartyKeys(obj.What.PlayerPartyId);
+
+            // Track data is not kept as part of the save game even in vanilla Bannerlord.
+            // When a player joins, calculate the tracks for their party and update
+            var visibleTrackChanges = mapTracksCampaignBehaviorInterface.DetectTracksForPlayerParty(mapTracksBehavior, playerParty);
+
+            if (visibleTrackChanges.Count > 0)
+            {
+                network.Send(obj.Who as NetPeer, new NetworkUpdateClientInitialVisibleTracks(visibleTrackChanges));
+            }
+        });
+    }
+
+    private void Handle_NetworkUpdateClientInitialVisibleTracks(MessagePayload<NetworkUpdateClientInitialVisibleTracks> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetMapTracksBehavior(out var mapTracksBehavior)) return;
+
+            mapTracksCampaignBehaviorInterface.ApplyVisibleTrackChanges(mapTracksBehavior, obj.What.VisibleTrackChanges, false);
         });
     }
 

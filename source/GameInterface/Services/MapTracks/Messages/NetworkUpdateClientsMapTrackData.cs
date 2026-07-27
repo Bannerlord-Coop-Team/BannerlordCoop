@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.MapTracks.Data;
 using ProtoBuf;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.MapTracks.Messages;
 
@@ -8,10 +9,16 @@ namespace GameInterface.Services.MapTracks.Messages;
 public readonly struct NetworkUpdateClientsMapTrackData : ICommand
 {
     [ProtoMember(1)]
-    public readonly PlayerMapTracksData PlayerMapTracksData;
+    public readonly Dictionary<string, List<Track>> VisibleTrackChange;
 
-    public NetworkUpdateClientsMapTrackData(PlayerMapTracksData playerMapTracksData)
+    [ProtoMember(2)]
+    public readonly bool IsRemovingTracks;
+
+    public NetworkUpdateClientsMapTrackData(
+        Dictionary<string, List<Track>> visibleTrackChange,
+        bool isRemovingTracks)
     {
-        PlayerMapTracksData = playerMapTracksData;
+        VisibleTrackChange = visibleTrackChange;
+        IsRemovingTracks = isRemovingTracks;
     }
 }
