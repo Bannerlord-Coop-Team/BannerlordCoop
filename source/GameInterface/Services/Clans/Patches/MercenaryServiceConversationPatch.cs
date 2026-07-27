@@ -25,8 +25,7 @@ internal class MercenaryServiceConversationPatch
         if (ModInformation.IsClient)
         {
             var kingdom = Hero.OneToOneConversationHero.Clan.Kingdom;
-            var clan = Hero.OneToOneConversationHero.Clan;
-            MessageBroker.Instance.Publish(__instance, new MercenaryServiceAccepted(kingdom, mercenaryAwardFactor, clan));
+            MessageBroker.Instance.Publish(__instance, new MercenaryServiceAccepted(kingdom, mercenaryAwardFactor, Clan.PlayerClan));
             return false;
         }
 
