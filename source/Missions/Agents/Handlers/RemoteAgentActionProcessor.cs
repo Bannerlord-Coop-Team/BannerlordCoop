@@ -946,6 +946,16 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         bool missingGuardDirectionRecovery =
             mountedGuardDirectionMissing
             && guardState.CanRecoverMissingGuardDirection;
+        // Only a steady-state defending sibling can keep the native guard timeline.
+        bool missingGuardDirectionRequiresNativeCommand =
+            missingGuardDirectionRecovery
+            && (mountChanged
+                || reacquiringGuard
+                || agent.GetCurrentAction(
+                    guardState.GuardActionChannel) == guardState.GuardAction
+                || !AgentActionData.IsDefendingAction(
+                    agent.GetCurrentActionType(
+                        guardState.GuardActionChannel)));
         bool directionTransitionPending =
             guardState.NeedsGuardDirectionTransition
             || missingGuardDirectionRecovery;
@@ -963,7 +973,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         {
             if (agent.HasMount
                 && (guardModeChanged
-                    || directionTransitionPending))
+                    || guardState.NeedsGuardDirectionTransition
+                    || missingGuardDirectionRequiresNativeCommand))
             {
                 AgentActionData.ApplyGuardDirectionTransition(
                     agent,
@@ -973,6 +984,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 {
                     guardState.NeedsGuardPresentationTransition = true;
                 }
+            }
+            else if (missingGuardDirectionRecovery)
+            {
+                guardState.CanRecoverMissingGuardDirection = false;
+                guardState.NeedsGuardPresentationTransition = true;
             }
             else
             {

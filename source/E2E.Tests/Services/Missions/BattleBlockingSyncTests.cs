@@ -948,6 +948,145 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 actionCommandsBeforePostNativeRecovery + 1,
                 puppetMirror.SetActionChannelCalls);
+
+            puppetMirror.Action1Index = 3078;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendLeft1h;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendLeft;
+            puppetMirror.SkeletonAction1Index = 3078;
+            puppetMirror.RawVisualAction1Index = 2991;
+            int guardCommandsBeforePeriodicDisplacement =
+                puppetMirror.SetWeaponGuardCalls;
+            int guardResetsBeforePeriodicDisplacement =
+                puppetMirror.ResetGuardCalls;
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(
+                guardCommandsBeforePeriodicDisplacement,
+                puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(
+                guardResetsBeforePeriodicDisplacement,
+                puppetMirror.ResetGuardCalls);
+
+            controller.OnPreDisplayMissionTick(0.1f);
+
+            Assert.Equal(3070, puppetMirror.Action1Index);
+            Assert.Equal(
+                actionCommandsBeforePostNativeRecovery + 2,
+                puppetMirror.SetActionChannelCalls);
+            Assert.Equal(
+                guardCommandsBeforePeriodicDisplacement,
+                puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(
+                guardResetsBeforePeriodicDisplacement,
+                puppetMirror.ResetGuardCalls);
+
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendRight;
+            controller.OnPreMissionTick(0.1f);
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendLeft;
+            int guardCommandsBeforeSameActionDirectionDrift =
+                puppetMirror.SetWeaponGuardCalls;
+            int guardResetsBeforeSameActionDirectionDrift =
+                puppetMirror.ResetGuardCalls;
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(
+                guardCommandsBeforeSameActionDirectionDrift + 1,
+                puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(
+                guardResetsBeforeSameActionDirectionDrift + 1,
+                puppetMirror.ResetGuardCalls);
+        });
+    }
+
+    [Fact]
+    public void PreMissionTick_MountedDisplacedGuard_StillRunsForcedCommands()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            context.Mock.SpawnMount(puppet);
+            context.Mock.SpawnMount(owner);
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 3070;
+            ownerMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendRight1h;
+            ownerMirror.Action1Direction =
+                Agent.UsageDirection.DefendRight;
+            puppetMirror.Action1Index = 3070;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendRight1h;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendRight;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            puppetMirror.Action1Index = 4000;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.BlockedMelee;
+            controller.OnPreDisplayMissionTick(0.1f);
+            puppetMirror.Action1Index = 3078;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendLeft1h;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendLeft;
+            int guardCommandsBeforeReacquisition =
+                puppetMirror.SetWeaponGuardCalls;
+            int guardResetsBeforeReacquisition =
+                puppetMirror.ResetGuardCalls;
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(
+                guardCommandsBeforeReacquisition + 1,
+                puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(
+                guardResetsBeforeReacquisition + 1,
+                puppetMirror.ResetGuardCalls);
+
+            puppetMirror.Action1Index = 3070;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendRight1h;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendRight;
+            controller.OnPreMissionTick(0.1f);
+            context.Mock.SpawnMount(puppet);
+            puppetMirror.Action1Index = 3078;
+            puppetMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendLeft1h;
+            puppetMirror.Action1Direction =
+                Agent.UsageDirection.DefendLeft;
+            int guardCommandsBeforeMountChange =
+                puppetMirror.SetWeaponGuardCalls;
+            int guardResetsBeforeMountChange =
+                puppetMirror.ResetGuardCalls;
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(
+                guardCommandsBeforeMountChange + 1,
+                puppetMirror.SetWeaponGuardCalls);
+            Assert.Equal(
+                guardResetsBeforeMountChange + 1,
+                puppetMirror.ResetGuardCalls);
         });
     }
 
