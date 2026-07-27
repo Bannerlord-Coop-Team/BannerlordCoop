@@ -747,8 +747,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             AgentActionData.GetGuardModeFromDefendingAction(
                 agent,
                 guardActionChannel);
-        return AgentActionData.IsGuardMode(currentGuardMode)
-            && currentGuardMode != data.GuardMode;
+        return currentGuardMode != data.GuardMode;
     }
 
     private void PromotePendingMigration(

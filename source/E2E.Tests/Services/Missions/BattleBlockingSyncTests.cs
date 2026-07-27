@@ -693,6 +693,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             ownerMirror.Action1Index = 3070;
             ownerMirror.Action1Progress = 0.05f;
             ownerMirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            puppetMirror.Action1Index = -1;
+            puppetMirror.Action1CodeType = Agent.ActionCodeType.Idle;
             puppetMirror.SetActionChannelResult = false;
             ApplyOwnerAction(context.Component, 3L, agentId, owner);
 
@@ -704,7 +706,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.Action0CodeType = Agent.ActionCodeType.StrikeMedium;
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
-            Assert.Equal(3078, puppetMirror.Action1Index);
+            Assert.Equal(-1, puppetMirror.Action1Index);
             Assert.Equal(
                 rejectedActionCommands,
                 puppetMirror.SetActionChannelCalls);
@@ -715,7 +717,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             puppetMirror.Action0CodeType = Agent.ActionCodeType.Idle;
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
-            Assert.Equal(3078, puppetMirror.Action1Index);
+            Assert.Equal(-1, puppetMirror.Action1Index);
             Assert.Equal(
                 rejectedActionCommands,
                 puppetMirror.SetActionChannelCalls);
