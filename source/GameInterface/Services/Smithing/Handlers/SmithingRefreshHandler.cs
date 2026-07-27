@@ -86,7 +86,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
         {
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
                 currentSmeltingVM?.RefreshValues();
                 currentSmeltingVM?.RefreshList();
@@ -104,10 +104,10 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkRefreshRefinement> obj)
         {
-            if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
-
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
+                if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
+
                 currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
                 currentCraftingVM?.OnRefinementSelectionChange();
 
@@ -117,7 +117,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<RefreshCraftingVM> obj)
         {
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
                 RefreshCraftingVM();
             });
@@ -134,7 +134,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
 
             // Have to run on main thread to avoid UI related crashes
-            GameThread.Run(() =>
+            GameThread.RunSafe(() =>
             {
                 using (new AllowedThread())
                 {

@@ -48,6 +48,16 @@ public record WeaponDesignVMCreated : IEvent
     }
 }
 
+public record WeaponDesignResultPopupVMCreated : IEvent
+{
+    public WeaponDesignResultPopupVM WeaponDesignResultPopupVM;
+
+    public WeaponDesignResultPopupVMCreated(WeaponDesignResultPopupVM weaponDesignResultPopupVM)
+    {
+        WeaponDesignResultPopupVM = weaponDesignResultPopupVM;
+    }
+}
+
 public record RefreshWeaponDesignVM : IEvent
 {
     public Town Town;

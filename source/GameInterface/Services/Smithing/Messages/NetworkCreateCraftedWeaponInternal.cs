@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using System.Collections.Generic;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Messages;
 
@@ -17,25 +18,25 @@ public class NetworkCreateCraftedWeaponInternalServer : ICommand
     public string CraftingHeroId;
 
     [ProtoMember(4)]
-    public byte[] CraftedItemObjectData;
+    public TextObject Name;
 
     [ProtoMember(5)]
-    public string CraftingTemplateId;
+    public string CultureId;
 
     [ProtoMember(6)]
-    public string WeaponName;
+    public string CraftingTemplateId;
 
     [ProtoMember(7)]
-    public List<string> WeaponDesignElementCraftingPieceIds;
+    public string WeaponName;
 
     [ProtoMember(8)]
-    public List<int> WeaponDesignElementScalePercentages;
+    public List<string> WeaponDesignElementCraftingPieceIds;
 
     [ProtoMember(9)]
-    public string WeaponModifierId;
+    public List<int> WeaponDesignElementScalePercentages;
 
     [ProtoMember(10)]
-    public string NextCraftedItemId;
+    public string WeaponModifierId;
 
     [ProtoMember(11)]
     public string PlayerHeroId;
@@ -47,26 +48,26 @@ public class NetworkCreateCraftedWeaponInternalServer : ICommand
         string craftingCampaignBehaviorId,
         bool isFreeMode,
         string craftingHeroId,
-        byte[] craftedItemObjectData,
+        TextObject name,
+        string cultureId,
         string craftingTemplateId,
         string weaponName,
         List<string> weaponDesignElementCraftingPieceIds,
         List<int> weaponDesignElementScalePercentages,
         string weaponModifierId,
-        string nextCraftedItemId,
         string playerHeroId,
         string itemModifierGroupId)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         IsFreeMode = isFreeMode;
         CraftingHeroId = craftingHeroId;
-        CraftedItemObjectData = craftedItemObjectData;
+        Name = name;
+        CultureId = cultureId;
         CraftingTemplateId = craftingTemplateId;
         WeaponName = weaponName;
         WeaponDesignElementCraftingPieceIds = weaponDesignElementCraftingPieceIds;
         WeaponDesignElementScalePercentages = weaponDesignElementScalePercentages;
         WeaponModifierId = weaponModifierId;
-        NextCraftedItemId = nextCraftedItemId;
         PlayerHeroId = playerHeroId;
         ItemModifierGroupId = itemModifierGroupId;
     }
@@ -79,10 +80,10 @@ public class NetworkCreateCraftedWeaponInternalClients : ICommand
     public string CraftingCampaignBehaviorId;
 
     [ProtoMember(2)]
-    public byte[] CraftedItemObjectData;
+    public TextObject Name;
 
     [ProtoMember(3)]
-    public string NextCraftedItemId;
+    public string CultureId;
 
     [ProtoMember(4)]
     public string WeaponModifierId;
@@ -108,11 +109,14 @@ public class NetworkCreateCraftedWeaponInternalClients : ICommand
     [ProtoMember(11)]
     public string PlayerHeroId;
 
-    public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject)
+    [ProtoMember(12)]
+    public string NextCraftedItemId;
+
+    public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject, string nextCraftedItemId)
     {
         CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
-        CraftedItemObjectData = cloneObject.CraftedItemObjectData;
-        NextCraftedItemId = cloneObject.NextCraftedItemId;
+        Name = cloneObject.Name;
+        CultureId = cloneObject.CultureId;
         WeaponModifierId = cloneObject.WeaponModifierId;
         IsFreeMode = cloneObject.IsFreeMode;
         CraftingTemplateId = cloneObject.CraftingTemplateId;
@@ -121,5 +125,6 @@ public class NetworkCreateCraftedWeaponInternalClients : ICommand
         WeaponDesignElementScalePercentages = cloneObject.WeaponDesignElementScalePercentages;
         ItemModifierGroupId = cloneObject.ItemModifierGroupId;
         PlayerHeroId = cloneObject.PlayerHeroId;
+        NextCraftedItemId = nextCraftedItemId;
     }
 }

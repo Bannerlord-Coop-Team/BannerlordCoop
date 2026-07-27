@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Messages;
 
@@ -13,16 +14,16 @@ public class NetworkBehaviorSetCraftedWeaponNameServer : ICommand
     public string CraftedWeaponId;
 
     [ProtoMember(3)]
-    public string StringName;
+    public TextObject Name;
 
     public NetworkBehaviorSetCraftedWeaponNameServer(
         string craftingCampaignBehaviorId,
         string craftedWeaponId,
-        string stringName)
+        TextObject name)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         CraftedWeaponId = craftedWeaponId;
-        StringName = stringName;
+        Name = name;
     }
 }
 
@@ -36,12 +37,12 @@ public class NetworkBehaviorSetCraftedWeaponNameClients : ICommand
     public string CraftedWeaponId;
 
     [ProtoMember(3)]
-    public string StringName;
+    public TextObject Name;
 
     public NetworkBehaviorSetCraftedWeaponNameClients(NetworkBehaviorSetCraftedWeaponNameServer cloneObject)
     {
         CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
         CraftedWeaponId = cloneObject.CraftedWeaponId;
-        StringName = cloneObject.StringName;
+        Name = cloneObject.Name;
     }
 }

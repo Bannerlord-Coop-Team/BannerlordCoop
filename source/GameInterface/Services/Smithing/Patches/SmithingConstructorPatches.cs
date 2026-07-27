@@ -7,11 +7,15 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CraftingSystem;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Inventory;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.Core;
+using TaleWorlds.Core.ViewModelCollection;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Patches
 {
@@ -80,6 +84,23 @@ namespace GameInterface.Services.Smithing.Patches
             if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
             MessageBroker.Instance.Publish(__instance, new WeaponDesignVMCreated(__instance));
+        }
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignResultPopupVM))]
+    internal class WeaponDesignResultPopupVMPatch
+    {
+        private static readonly ILogger Logger = LogManager.GetLogger<WeaponDesignResultPopupVM>();
+
+        [HarmonyPatch(MethodType.Constructor)]
+        [HarmonyPatch(new Type[] { typeof(ItemObject), typeof(TextObject), typeof(Action), typeof(Crafting), typeof(CraftingOrder), typeof(ItemCollectionElementViewModel), typeof(MBBindingList<ItemFlagVM>), typeof(Func<CraftingSecondaryUsageItemVM, MBBindingList<WeaponDesignResultPropertyItemVM>>), typeof(Action<CraftingSecondaryUsageItemVM>) })]
+        [HarmonyPostfix]
+        public static void WeaponDesignResultPopupVMConstructorPostfix(WeaponDesignResultPopupVM __instance)
+        {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+            MessageBroker.Instance.Publish(__instance, new WeaponDesignResultPopupVMCreated(__instance));
         }
     }
 }
