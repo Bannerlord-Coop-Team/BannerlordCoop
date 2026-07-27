@@ -501,6 +501,34 @@ public class BattleGuardFixtureEvidenceTests
                 guardCommandDirection));
     }
 
+    [Theory]
+    [InlineData(
+        BattleGuardFixtureDirection.Left,
+        "act_defend_left_1h_passive")]
+    [InlineData(
+        BattleGuardFixtureDirection.Right,
+        "act_defend_right_1h_passive")]
+    public void MountedGuardPresentationAction_MapsHorizontalTransitions(
+        BattleGuardFixtureDirection direction,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.GetMountedGuardPresentationActionName(
+                direction));
+    }
+
+    [Theory]
+    [InlineData(BattleGuardFixtureDirection.Up)]
+    [InlineData(BattleGuardFixtureDirection.Down)]
+    public void MountedGuardPresentationAction_DoesNotMapVerticalDirections(
+        BattleGuardFixtureDirection direction)
+    {
+        Assert.Null(
+            BattleGuardFixture.GetMountedGuardPresentationActionName(
+                direction));
+    }
+
     [Fact]
     public void MountedStrikerPosition_RecreatesSideInterceptionGeometry()
     {

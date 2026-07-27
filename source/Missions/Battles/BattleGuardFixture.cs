@@ -48,6 +48,10 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const string GuardWeaponId = "empire_lance_1_t3_blunt";
     private const string FootStrikerWeaponId = "empire_sword_1_t2_blunt";
     private const string MountedStrikerWeaponId = "empire_menavlion_1_t3_blunt";
+    private const string MountedLeftGuardAction =
+        "act_defend_left_1h_passive";
+    private const string MountedRightGuardAction =
+        "act_defend_right_1h_passive";
     private const string WaitingForMountedGuardRouteError =
         "waiting for mounted guard route";
     private const float SampleIntervalSeconds = 0.05f;
@@ -309,6 +313,10 @@ public class BattleGuardFixture : IBattleGuardFixture
                     guardMode,
                     force: guarding);
             }
+            if (guarding)
+                ApplyMountedGuardPresentationAction(
+                    agent,
+                    guardDriver.Direction);
             guardDriver.MountedPostNativeGuardCommandPending = false;
             guardDriver.MountedPostNativeDirectionChanged = false;
         }
@@ -1235,6 +1243,32 @@ public class BattleGuardFixture : IBattleGuardFixture
             BattleGuardFixtureDirection.Right => Agent.GuardMode.Right,
             _ => Agent.GuardMode.Up
         };
+
+    internal static string GetMountedGuardPresentationActionName(
+        BattleGuardFixtureDirection direction) =>
+        direction switch
+        {
+            BattleGuardFixtureDirection.Left => MountedLeftGuardAction,
+            BattleGuardFixtureDirection.Right => MountedRightGuardAction,
+            _ => null
+        };
+
+    private static void ApplyMountedGuardPresentationAction(
+        Agent agent,
+        BattleGuardFixtureDirection direction)
+    {
+        string actionName =
+            GetMountedGuardPresentationActionName(direction);
+        if (actionName == null)
+            return;
+
+        ActionIndexCache action = ActionIndexCache.Create(actionName);
+        agent.SetActionChannel(
+            1,
+            in action,
+            ignorePriority: true,
+            additionalFlags: AnimFlags.anf_restart);
+    }
 
     private static bool TryPositionGuard(Agent agent, GuardDriver driver)
     {
