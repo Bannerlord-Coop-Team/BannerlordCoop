@@ -39,20 +39,17 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
-    private readonly ILocalBattlePartyResolver localBattlePartyResolver;
 
     public CoopSiegeBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget,
-        ILocalBattlePartyResolver localBattlePartyResolver)
+        IBattleAgentBudget agentBudget)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
-        this.localBattlePartyResolver = localBattlePartyResolver;
     }
 
     public Mission OpenCoopSiegeBattle(MissionInitializerRecord rec, float[] wallHitPointRatios,
@@ -65,11 +62,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             return null;
         }
 
-        var playerPartyId = localBattlePartyResolver.Resolve(mapEvent);
-        if (playerPartyId == null)
-            Logger.Error("[BattleSync] Local player party is not resolvable; opening the siege battle so its mission lifecycle can reject it safely");
-
-        var mission = CreateCoopSiegeBattle(rec, mapEventId, playerPartyId,
+        var mission = CreateCoopSiegeBattle(rec, mapEventId,
             wallHitPointRatios, attackerWeapons, defenderWeapons);
         if (mission == null) return null;
 
@@ -81,7 +74,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     }
 
     private Mission CreateCoopSiegeBattle(MissionInitializerRecord rec, string mapEventId,
-        string playerPartyId, float[] wallHitPointRatios,
+        float[] wallHitPointRatios,
         List<MissionSiegeWeapon> attackerWeapons, List<MissionSiegeWeapon> defenderWeapons)
     {
         bool hasAnySiegeTower = attackerWeapons.Exists(weapon => weapon.Type == DefaultSiegeEngineTypes.SiegeTower);
@@ -137,7 +130,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             }
 
             behaviors.Add(new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
-                PartyBase.MainParty.Side, playerPartyId));
+                PartyBase.MainParty.Side));
             behaviors.Add(spawnLogic);
             behaviors.Add(new BattlePowerCalculationLogic());
             behaviors.Add(new BattleObserverMissionLogic());

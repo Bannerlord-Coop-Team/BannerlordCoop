@@ -45,20 +45,17 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
-    private readonly ILocalBattlePartyResolver localBattlePartyResolver;
 
     public CoopFieldBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget,
-        ILocalBattlePartyResolver localBattlePartyResolver)
+        IBattleAgentBudget agentBudget)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
-        this.localBattlePartyResolver = localBattlePartyResolver;
     }
 
     public Mission OpenCoopFieldBattle(MissionInitializerRecord rec)
@@ -70,11 +67,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
             return null;
         }
 
-        var playerPartyId = localBattlePartyResolver.Resolve(mapEvent);
-        if (playerPartyId == null)
-            Logger.Error("[BattleSync] Local player party is not resolvable; opening the field battle so its mission lifecycle can reject it safely");
-
-        var mission = CreateCoopFieldBattle(rec, mapEventId, playerPartyId);
+        var mission = CreateCoopFieldBattle(rec, mapEventId);
         if (mission == null) return null;
 
         // Same post-open coop entry the native path drove via BattleMissionEntryPatch: the controller requests
@@ -85,7 +78,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         return mission;
     }
 
-    private Mission CreateCoopFieldBattle(MissionInitializerRecord rec, string mapEventId, string playerPartyId)
+    private Mission CreateCoopFieldBattle(MissionInitializerRecord rec, string mapEventId)
     {
         bool isPlayerSergeant = MobileParty.MainParty.MapEvent.IsPlayerSergeant();
         bool isPlayerInArmy = MobileParty.MainParty.Army != null;
@@ -126,7 +119,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 new BattlePowerCalculationLogic(),
                 new BattleSpawnLogic("battle_set"),
                 new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
-                    PartyBase.MainParty.Side, playerPartyId),
+                    PartyBase.MainParty.Side),
                 new CampaignMissionComponent(),
                 new BattleAgentLogic(),
                 new MountAgentLogic(),

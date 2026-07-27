@@ -102,10 +102,6 @@ public class MissionModule : Module
             .As<ICoopBattleBehaviorAttacher>()
             .InstancePerLifetimeScope();
 
-        builder.RegisterType<LocalBattlePartyResolver>()
-            .As<ILocalBattlePartyResolver>()
-            .InstancePerDependency();
-
         // Builds the coop field-battle mission (mirrors SandBoxMissions.OpenBattleMission with coop suppliers,
         // no deployment phase, and the coop behaviors attached). Resolved from the container by the GameInterface
         // battle flow (OpenAttackMission) as ICoopFieldBattleLauncher; lives in Missions so it can reference the

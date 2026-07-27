@@ -111,7 +111,11 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             var entriesArray = new TroopReserveEntry[entries.Count];
             for (int i = 0; i < entries.Count; i++) entriesArray[i] = entries[i];
 
-            var reserve = new PartyReserve(partyId, supplied, entriesArray);
+            var reserve = new PartyReserve(
+                partyId,
+                supplied,
+                entriesArray,
+                isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId));
             if ((party.Party?.Side ?? BattleSideEnum.None) == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else
