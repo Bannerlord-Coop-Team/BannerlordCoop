@@ -64,13 +64,46 @@ namespace GameInterface.Services.Workshops.Handlers
             WorkshopsCampaignBehavior workshopsCampaignBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
 
             workshopsCampaignBehavior._warehouseRosterPerSettlement = GetWarehouseRosterPerSettlement(playerHeroId, playerHero);
+            WorkshopRepairer.RepairClientWorkshopData(workshopsCampaignBehavior, playerHero);
 
             network.SendAll(new NetworkInitializeServerWorkshopDataKeys(playerHeroId));
         }
 
         private void Handle(MessagePayload<NetworkInitializeServerWorkshopDataKeys> obj)
         {
-            sessionWorkshopPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            string playerHeroId = obj.What.PlayerHeroId;
+            sessionWorkshopPlayerDataInterface.AddPlayerKeys(playerHeroId);
+
+            if (!objectManager.TryGetObjectWithLogging(playerHeroId, out Hero playerHero)) return;
+
+            WorkshopRepairer.RepairServerWorkshopData(playerHero, playerHeroId, objectManager, sessionWorkshopPlayerDataInterface);
+        }
+
+        internal static IEnumerable<Workshop> GetWorkshopsOwnedBy(Hero playerHero)
+        {
+            // Hero._ownedWorkshops and Workshop._owner can diverge in coop (only the list is
+            // synced mid-session), and the Clan screen lists workshops by Workshop.Owner, so
+            // cover both sources.
+            var ownedWorkshops = new List<Workshop>();
+            if (playerHero.OwnedWorkshops != null)
+            {
+                ownedWorkshops.AddRange(playerHero.OwnedWorkshops);
+            }
+
+            foreach (Town town in Town.AllTowns)
+            {
+                if (town?.Workshops == null) continue;
+
+                foreach (Workshop workshop in town.Workshops)
+                {
+                    if (workshop?.Owner == playerHero && !ownedWorkshops.Contains(workshop))
+                    {
+                        ownedWorkshops.Add(workshop);
+                    }
+                }
+            }
+
+            return ownedWorkshops;
         }
 
         private KeyValuePair<Settlement, ItemRoster>[] GetWarehouseRosterPerSettlement(string playerHeroId, Hero playerHero)
@@ -107,7 +140,7 @@ namespace GameInterface.Services.Workshops.Handlers
                     }
                 }
 
-                AddMissingOwnedWorkshopRosters(warehouseRosterPerSettlement, playerHero.OwnedWorkshops);
+                AddMissingOwnedWorkshopRosters(warehouseRosterPerSettlement, GetWorkshopsOwnedBy(playerHero));
             }, blocking: true);
 
             return CreateWarehouseRosterSlots(warehouseRosterPerSettlement, maxWorkshopCount);
