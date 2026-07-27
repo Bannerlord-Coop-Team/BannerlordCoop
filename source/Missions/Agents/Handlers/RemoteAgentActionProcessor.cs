@@ -946,7 +946,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         bool missingGuardDirectionRecovery =
             mountedGuardDirectionMissing
             && guardState.CanRecoverMissingGuardDirection;
-        // Only a steady-state defending sibling can keep the native guard timeline.
+        // A steady-state defending sibling needs a direction repair without restarting its timeline.
         bool missingGuardDirectionRequiresNativeCommand =
             missingGuardDirectionRecovery
             && (mountChanged
@@ -987,6 +987,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             }
             else if (missingGuardDirectionRecovery)
             {
+                AgentActionData.ApplyGuardState(
+                    agent,
+                    guardMode,
+                    force: true);
                 guardState.CanRecoverMissingGuardDirection = false;
                 guardState.NeedsGuardPresentationTransition = true;
             }

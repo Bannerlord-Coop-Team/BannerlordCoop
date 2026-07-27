@@ -964,11 +964,17 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             controller.OnPreMissionTick(0.1f);
 
             Assert.Equal(
-                guardCommandsBeforePeriodicDisplacement,
+                guardCommandsBeforePeriodicDisplacement + 1,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
                 guardResetsBeforePeriodicDisplacement,
                 puppetMirror.ResetGuardCalls);
+            Assert.Equal(
+                Agent.UsageDirection.AttackRight,
+                puppetMirror.LastSetWeaponGuardDirection);
+            Assert.Equal(
+                Agent.GuardMode.Right,
+                puppetMirror.GuardMode);
 
             controller.OnPreDisplayMissionTick(0.1f);
 
@@ -977,7 +983,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 actionCommandsBeforePostNativeRecovery + 2,
                 puppetMirror.SetActionChannelCalls);
             Assert.Equal(
-                guardCommandsBeforePeriodicDisplacement,
+                guardCommandsBeforePeriodicDisplacement + 1,
                 puppetMirror.SetWeaponGuardCalls);
             Assert.Equal(
                 guardResetsBeforePeriodicDisplacement,
