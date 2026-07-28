@@ -1723,6 +1723,24 @@ public class MapEventDebugCommands
         return "Local deployment finished; the field battle is active.";
     }
 
+    // coop.debug.mapevent.late_join_mode_disable_dying
+    /// <summary>Prevents the live-test battle from resolving before both client views are captured.</summary>
+    [CommandLineArgumentFunction("late_join_mode_disable_dying", "coop.debug.mapevent")]
+    public static string DisableLateJoinModeFixtureDying(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.late_join_mode_disable_dying";
+
+        var mission = Mission.Current;
+        if (mission == null)
+            return "No mission is active.";
+
+        mission.DisableDying = true;
+        return "Dying disabled for the local fixture mission.";
+    }
+
     // coop.debug.mapevent.late_join_mode_exit_missions
     /// <summary>Asks every fixture mission member to return to campaign before authoritative cleanup.</summary>
     [CommandLineArgumentFunction("late_join_mode_exit_missions", "coop.debug.mapevent")]
