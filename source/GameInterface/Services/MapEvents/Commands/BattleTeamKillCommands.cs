@@ -69,6 +69,23 @@ Activates the deployment Ready button's native UI callback.";
 
 Finishes the current battle deployment through the native deployment handler.";
 
+    [CommandLineArgumentFunction("deployment_state", "coop.debug.mapevent")]
+    public static string DeploymentState(List<string> args)
+    {
+        var ctx = new CommandContext("deployment_state", "Usage: coop.debug.mapevent.deployment_state", args);
+        if (!ctx.RequireArgCount(0, out var error))
+            return error;
+
+        var mission = Mission.Current;
+        if (mission == null)
+            return "Deployment state: mission=False, controller=False, teamSetupOver=False, handler=False.";
+
+        var controller = mission.GetMissionBehavior<DeploymentMissionController>();
+        var handler = mission.GetMissionBehavior<DeploymentHandler>();
+        return $"Deployment state: mission=True, controller={controller != null}, " +
+               $"teamSetupOver={controller?.TeamSetupOver ?? false}, handler={handler != null}.";
+    }
+
     [CommandLineArgumentFunction("finish_deployment", "coop.debug.mapevent")]
     public static string FinishDeployment(List<string> args)
     {
@@ -185,6 +202,8 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
         var dataSource = scoreboard?.DataSource;
         if (dataSource == null)
             return "Failed: no battle scoreboard UI.";
+        if (dataSource.Attackers?.Parties == null || dataSource.Defenders?.Parties == null)
+            return "Failed: battle scoreboard parties are not loaded.";
 
         var mapEvent = MobileParty.MainParty?.MapEvent;
         if (mapEvent == null)
@@ -204,6 +223,9 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
             .Select(party => party.BattleCombatant)
             .OfType<PartyBase>()
             .Distinct()
+            .ToArray();
+        var scoreboardPlayerParties = scoreboardParties
+            .Where(party => party.MobileParty?.IsPlayerParty() == true)
             .ToArray();
         var missingParties = expectedParties.Except(scoreboardParties).ToArray();
         var missingPlayerParties = expectedPlayerParties.Except(scoreboardParties).ToArray();
@@ -225,6 +247,7 @@ Lists the map-event parties and party rows currently loaded by the battle scoreb
                $"Expected parties ({expectedParties.Length}): {FormatPartyNames(expectedParties)}; " +
                $"Expected player parties ({expectedPlayerParties.Length}): {FormatPartyNames(expectedPlayerParties)}; " +
                $"Scoreboard parties ({scoreboardParties.Length}): {FormatPartyNames(scoreboardParties)}; " +
+               $"Scoreboard player parties ({scoreboardPlayerParties.Length}): {FormatPartyNames(scoreboardPlayerParties)}; " +
                $"Missing parties ({missingParties.Length}): {FormatPartyNames(missingParties)}; " +
                $"Missing player parties ({missingPlayerParties.Length}): {FormatPartyNames(missingPlayerParties)}; " +
                $"Native widgets loaded: {nativeWidgetsLoaded}; " +
