@@ -66,6 +66,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float MountedStrikeForwardBias = 1f;
     private const float MountedStrikeMaximumStageLateral = 3f;
     private const float MountedStrikeMinimumTravelGuardAlignment = 0.99f;
+    private const float MountedStrikeMinimumContactAlignment = 0.95f;
     private const float MountedStrikeMinimumLeadDistance = 6f;
     private const float MountedStrikeMaximumLeadDistance = 10f;
     private const float MountedStrikeMinimumReleaseLeadSeconds = 0.25f;
@@ -1853,6 +1854,14 @@ public class BattleGuardFixture : IBattleGuardFixture
             route.RemainingDistance >= MountedStrikeMinimumRunway;
     }
 
+    internal static bool HasMountedStrikeStagingRunway(
+        BattleGuardMountedRoute route,
+        bool guardLocallyDriven)
+    {
+        return !guardLocallyDriven ||
+            HasMountedStrikeRunway(route);
+    }
+
     internal static float GetMountedStrikeTravelAlignment(
         Vec3 travelDirection,
         Vec3 guardLookDirection)
@@ -1880,6 +1889,19 @@ public class BattleGuardFixture : IBattleGuardFixture
             travelDirection,
             guardLookDirection) >=
             MountedStrikeMinimumTravelGuardAlignment;
+    }
+
+    internal static bool HasMountedStrikeStagingAlignment(
+        Vec3 travelDirection,
+        Vec3 guardLookDirection,
+        bool guardLocallyDriven)
+    {
+        float minimumAlignment = guardLocallyDriven
+            ? MountedStrikeMinimumTravelGuardAlignment
+            : MountedStrikeMinimumContactAlignment;
+        return GetMountedStrikeTravelAlignment(
+            travelDirection,
+            guardLookDirection) >= minimumAlignment;
     }
 
     internal static bool ShouldCommandMountedGuardState(
@@ -2004,6 +2026,19 @@ public class BattleGuardFixture : IBattleGuardFixture
             speed >=
                 calibratedPlateauSpeed *
                 MountedStrikeMinimumCalibratedSpeedRatio;
+    }
+
+    internal static float GetMountedStrikeSpeedBaseline(
+        float calibratedPlateauSpeed,
+        bool guardLocallyDriven)
+    {
+        if (calibratedPlateauSpeed > 0f ||
+            guardLocallyDriven)
+        {
+            return calibratedPlateauSpeed;
+        }
+
+        return BattleGuardMountedSpeedLimiter.MaximumSpeed;
     }
 
     internal static float GetMountedStrikeReleaseLeadSeconds(
@@ -4182,18 +4217,27 @@ public class BattleGuardFixture : IBattleGuardFixture
                 StageAttempt();
                 return;
             }
+            // Attack is owner-gated, so collision authority trusts the route and shared speed cap.
+            float speedBaseline =
+                GetMountedStrikeSpeedBaseline(
+                    guardDriver.CalibratedPlateauSpeed,
+                    guardDriver.DrivesAgent);
             SpeedReady = HasMountedStrikeSpeed(
                 guardDriver.CurrentHorizontalSpeed,
-                guardDriver.CalibratedPlateauSpeed);
+                speedBaseline);
             RunwayReady =
-                HasMountedStrikeRunway(guardDriver.MountedRoute);
+                HasMountedStrikeStagingRunway(
+                    guardDriver.MountedRoute,
+                    guardDriver.DrivesAgent);
             TravelLookAlignment =
                 GetMountedStrikeTravelAlignment(
                     guardDriver.CurrentHorizontalDirection,
                     guard.LookDirection);
             TravelAligned =
-                TravelLookAlignment >=
-                MountedStrikeMinimumTravelGuardAlignment;
+                HasMountedStrikeStagingAlignment(
+                    guardDriver.CurrentHorizontalDirection,
+                    guard.LookDirection,
+                    guardDriver.DrivesAgent);
             if (!guard.HasMount ||
                 !SpeedReady ||
                 !RunwayReady ||

@@ -415,6 +415,19 @@ public class BattleGuardFixtureEvidenceTests
             BattleGuardFixture.HasMountedStrikeRunway(route));
     }
 
+    [Fact]
+    public void MountedStrikeRunway_RemoteStrikerTrustsOwnerGate()
+    {
+        Assert.False(
+            BattleGuardFixture.HasMountedStrikeStagingRunway(
+                route: null,
+                guardLocallyDriven: true));
+        Assert.True(
+            BattleGuardFixture.HasMountedStrikeStagingRunway(
+                route: null,
+                guardLocallyDriven: false));
+    }
+
     [Theory]
     [InlineData(3f, true)]
     [InlineData(3.01f, false)]
@@ -455,6 +468,24 @@ public class BattleGuardFixtureEvidenceTests
             BattleGuardFixture.HasMountedStrikeTravelAlignment(
                 new Vec3(travelX, travelY, 0f),
                 new Vec3(lookX, lookY, 0f)));
+    }
+
+    [Theory]
+    [InlineData(0.15f, 0.989f, true, false)]
+    [InlineData(0.15f, 0.989f, false, true)]
+    [InlineData(0.33f, 0.944f, false, false)]
+    public void MountedStrikeTravelAlignment_RemoteStrikerUsesContactOracle(
+        float lookX,
+        float lookY,
+        bool guardLocallyDriven,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.HasMountedStrikeStagingAlignment(
+                new Vec3(0f, 1f, 0f),
+                new Vec3(lookX, lookY, 0f),
+                guardLocallyDriven));
     }
 
     [Theory]
@@ -837,6 +868,23 @@ public class BattleGuardFixtureEvidenceTests
             BattleGuardFixture.HasMountedStrikeSpeed(
                 speed,
                 calibratedPlateauSpeed));
+    }
+
+    [Theory]
+    [InlineData(-1f, true, -1f)]
+    [InlineData(-1f, false, 7.5f)]
+    [InlineData(7.4f, false, 7.4f)]
+    public void MountedStrikeSpeed_RemoteStrikerUsesFixtureSpeedLimit(
+        float calibratedPlateauSpeed,
+        bool guardLocallyDriven,
+        float expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.GetMountedStrikeSpeedBaseline(
+                calibratedPlateauSpeed,
+                guardLocallyDriven),
+            precision: 3);
     }
 
     [Theory]
