@@ -418,7 +418,7 @@ public class AgentActionHandler : IAgentActionHandler
     public void ReplayRemoteGuardReactions()
     {
         guardReactionHandler.ProcessPendingReactions();
-        remoteActionProcessor.ReplayRemoteGuardReactions();
+        remoteActionProcessor.AdvanceRemoteGuardStatesAfterNativeTick();
     }
 
     public void ObserveBlockedHit(

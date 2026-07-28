@@ -395,14 +395,13 @@ namespace Missions.Agents.Packets
                 agent.Controller == AgentControllerType.Player;
         }
 
-        public bool Apply(
+        public void Apply(
             Agent agent,
             IAgentVisualActionAccessor visualActionAccessor,
             bool suppressMountedGuardActionTransition = false,
             bool neutralizeMountedGuardDirection = false)
         {
             Agent.MovementControlFlag movementFlags = (Agent.MovementControlFlag)MovementFlag;
-            bool mountedGuardDirectionTransitionApplied = false;
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
             if (neutralizeMountedGuardDirection)
             {
@@ -444,7 +443,6 @@ namespace Missions.Agents.Packets
                         ApplyGuardDirectionTransition(
                             agent,
                             GuardMode);
-                        mountedGuardDirectionTransitionApplied = true;
                         actionFlags |= AnimFlags.anf_restart;
                     }
                     agent.SetActionChannel(
@@ -487,7 +485,6 @@ namespace Missions.Agents.Packets
                         ApplyGuardDirectionTransition(
                             agent,
                             GuardMode);
-                        mountedGuardDirectionTransitionApplied = true;
                         actionFlags |= AnimFlags.anf_restart;
                     }
                     agent.SetActionChannel(
@@ -498,8 +495,6 @@ namespace Missions.Agents.Packets
                         startProgress: Action1Progress);
                 }
             }
-
-            return mountedGuardDirectionTransitionApplied;
         }
 
         private bool TryResolveActionTransition(

@@ -240,13 +240,6 @@ public class BattleGuardFixture : IBattleGuardFixture
                 roles.GuardAuthority,
                 out CoopAgentInfo guardInfo))
         {
-            BattleGuardNativeTrace.SetTarget(
-                guardInfo.Agent,
-                guardInfo.AgentId,
-                command.CommandId,
-                command.Mode,
-                command.Phase,
-                command.Direction);
             bool drivesGuard =
                 controllerIdProvider.ControllerId == roles.GuardAuthority &&
                 agentRegistry.IsLocallyControlled(roles.GuardAgentId);
@@ -334,10 +327,8 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     public void ApplyPlayerInput(INetworkAgentRegistry agentRegistry)
     {
-        BattleGuardNativeTrace.Mark("fixture-input-entry");
         if (TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
             DriveGuardInput(agent, guardDriver);
-        BattleGuardNativeTrace.Mark("fixture-input-exit");
     }
 
     public bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry)
@@ -349,12 +340,8 @@ public class BattleGuardFixture : IBattleGuardFixture
     public void ReapplyPlayerGuardInput(
         INetworkAgentRegistry agentRegistry)
     {
-        BattleGuardNativeTrace.Mark("fixture-reapply-entry");
         if (!TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
-        {
-            BattleGuardNativeTrace.Mark("fixture-reapply-exit");
             return;
-        }
 
         bool guarding =
             guardDriver.Phase != BattleGuardFixturePhase.Calibration &&
@@ -396,7 +383,6 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         // Both production action polls must observe the same held fixture presentation.
         ApplyMountedGuardPresentationAction(agentRegistry);
-        BattleGuardNativeTrace.Mark("fixture-reapply-exit");
     }
 
     public void RefreshOwnedMountedStrikeLook(
@@ -427,9 +413,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     public void ApplyPostAgentTickGuardInput(
         INetworkAgentRegistry agentRegistry)
     {
-        BattleGuardNativeTrace.Mark("fixture-post-agent-entry");
         ApplyMountedGuardPresentationAction(agentRegistry);
-        BattleGuardNativeTrace.Mark("fixture-post-agent-exit");
     }
 
     public void SamplePreReplayDisplayedState(
@@ -841,7 +825,6 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"strikeOriginalSwingSpeed={strikeOriginalSwingSpeed:0.###} " +
             $"strikeSwingSpeed={strikeSwingSpeed:0.###} " +
             $"evidenceCamera={GetEvidenceCameraToken()} " +
-            $"nativeGuardTrace={BattleGuardNativeTrace.GetToken(32)} " +
             "visualTraceSchema=c:a:n:r:mr:d:md:pmin:pmax:span:adv:stall:reset:maxStep:sCur:sMin:sMax:sMean " +
             $"preVisualTraces={sample.PreReplayAnimationEvidence.GetToken()} " +
             $"visualTraces={sample.AnimationEvidence.GetToken()} " +
@@ -946,7 +929,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         lastError = pendingGuardRestore == null
             ? null
             : "guard remount is still pending";
-        BattleGuardNativeTrace.Stop();
     }
 
     private string GetEvidenceCameraToken()
@@ -1430,9 +1412,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
 
         agent.LookDirection = lookDirection;
-        BattleGuardNativeTrace.Record(
-            agent,
-            "fixture-owned-strike-look-refresh");
         return true;
     }
 

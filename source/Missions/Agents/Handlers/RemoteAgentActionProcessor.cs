@@ -19,7 +19,7 @@ public interface IRemoteAgentActionProcessor : IDisposable
     void ClearForLocalAgent(Guid agentId, Agent agent);
     void ApplyRemoteGuardStates();
     void RefreshRemoteGuardStatesAfterMovement();
-    void ReplayRemoteGuardReactions();
+    void AdvanceRemoteGuardStatesAfterNativeTick();
     void Receive(AgentActionPacket packet);
     void HandleBattleHostAssigned(NetworkBattleHostAssigned message);
 }
@@ -52,13 +52,13 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private sealed class RemoteAgentActionState
     {
-        public RemoteGuardState? RetainedGuard;
+        public RemoteGuardState RetainedGuard;
         public RemoteActionSequence? LastSequence;
         public Dictionary<string, RemoteAction> PendingByController;
         public MigratedActionAuthority? MigratedAuthority;
 
         public bool IsEmpty =>
-            !RetainedGuard.HasValue
+            RetainedGuard == null
             && !LastSequence.HasValue
             && (PendingByController == null || PendingByController.Count == 0)
             && !MigratedAuthority.HasValue;
@@ -80,18 +80,20 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         DesiredInput
     }
 
-    private struct RemoteGuardState
+    private enum RemoteGuardTickPhase
+    {
+        BeforeNativeTick,
+        AfterMovement,
+        AfterNativeTick
+    }
+
+    private sealed class RemoteGuardState
     {
         public readonly RemoteAction Action;
         public readonly int GuardActionChannel;
         public readonly ActionIndexCache GuardAction;
-        public readonly ActionIndexCache DisplacedGuardAction;
         public readonly bool DrivesMountedReactionPresentation;
         public bool HasGuardCommand;
-        public bool NeedsGuardDirectionTransition;
-        public bool NeedsGuardPresentationTransition;
-        public bool CanRecoverMissingGuardDirection;
-        public bool GuardCommandAppliedWithAction;
         public MountedGuardRearmPhase MountedGuardRearm;
         public Agent.GuardMode LastCommandedGuardMode;
         public int LastCommandedMountIndex;
@@ -100,16 +102,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             RemoteAction action,
             int guardActionChannel,
             ActionIndexCache guardAction,
-            RemoteGuardState? previousGuard,
-            bool needsGuardDirectionTransition)
+            RemoteGuardState previousGuard)
         {
             Action = action;
             GuardActionChannel = guardActionChannel;
             GuardAction = guardAction;
-            DisplacedGuardAction = GetDisplacedGuardAction(
-                guardActionChannel,
-                guardAction,
-                previousGuard);
             DrivesMountedReactionPresentation =
                 action.Data.IsPlayerControlled
                 && action.Data.GuardActionIsReaction
@@ -117,31 +114,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             HasGuardCommand = DrivesMountedReactionPresentation
                 ? false
                 : previousGuard?.HasGuardCommand ?? false;
-            NeedsGuardDirectionTransition =
-                !DrivesMountedReactionPresentation
-                && needsGuardDirectionTransition;
-            NeedsGuardPresentationTransition =
-                !DrivesMountedReactionPresentation
-                && action.Data.IsMounted
-                && action.Data.IsPlayerControlled
-                && action.Data.GuardActionIsDefending
-                && !action.Data.GuardActionIsReaction
-                && AgentActionData.IsGuardMode(action.Data.GuardMode)
-                && guardAction != ActionIndexCache.act_none
-                && previousGuard.HasValue
-                && previousGuard.Value.GuardActionChannel
-                    == guardActionChannel
-                && previousGuard.Value.GuardAction
-                    != ActionIndexCache.act_none
-                && previousGuard.Value.GuardAction != guardAction;
-            CanRecoverMissingGuardDirection =
-                !DrivesMountedReactionPresentation
-                && previousGuard.HasValue
-                && previousGuard.Value.GuardActionChannel
-                    == guardActionChannel
-                && previousGuard.Value.GuardAction == guardAction
-                && previousGuard.Value.CanRecoverMissingGuardDirection;
-            GuardCommandAppliedWithAction = false;
             MountedGuardRearm = MountedGuardRearmPhase.None;
             LastCommandedGuardMode = previousGuard?.LastCommandedGuardMode
                 ?? Agent.GuardMode.None;
@@ -156,42 +128,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             Action = action;
             GuardActionChannel = retainedGuard.GuardActionChannel;
             GuardAction = retainedGuard.GuardAction;
-            DisplacedGuardAction = retainedGuard.DisplacedGuardAction;
             DrivesMountedReactionPresentation =
                 action.Data.IsPlayerControlled
                 && retainedGuard.DrivesMountedReactionPresentation;
             HasGuardCommand = retainedGuard.HasGuardCommand;
-            NeedsGuardDirectionTransition =
-                retainedGuard.NeedsGuardDirectionTransition;
-            NeedsGuardPresentationTransition =
-                retainedGuard.NeedsGuardPresentationTransition;
-            CanRecoverMissingGuardDirection =
-                retainedGuard.CanRecoverMissingGuardDirection;
-            GuardCommandAppliedWithAction = false;
             MountedGuardRearm = retainedGuard.MountedGuardRearm;
             LastCommandedGuardMode = retainedGuard.LastCommandedGuardMode;
             LastCommandedMountIndex = retainedGuard.LastCommandedMountIndex;
         }
-    }
-
-    private static ActionIndexCache GetDisplacedGuardAction(
-        int guardActionChannel,
-        ActionIndexCache guardAction,
-        RemoteGuardState? previousGuard)
-    {
-        if (!previousGuard.HasValue)
-            return ActionIndexCache.act_none;
-
-        RemoteGuardState retainedGuard = previousGuard.Value;
-        if (retainedGuard.GuardAction != ActionIndexCache.act_none
-            && (guardAction == ActionIndexCache.act_none
-                || (retainedGuard.GuardActionChannel == guardActionChannel
-                    && retainedGuard.GuardAction != guardAction)))
-        {
-            return retainedGuard.GuardAction;
-        }
-
-        return retainedGuard.DisplacedGuardAction;
     }
 
     private readonly struct RemoteAction
@@ -297,7 +241,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         _agentStates.Remove(agentId);
         _pendingActionAgentIds.Remove(agentId);
         _retainedGuardAgentIds.Remove(agentId);
-        if (!state.RetainedGuard.HasValue) return;
+        if (state.RetainedGuard == null) return;
         if (agent == null || agent.Mission != Mission.Current || !agent.IsActive()) return;
 
         using (new AllowedThread())
@@ -312,8 +256,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
         ApplyPendingRemoteActions();
         ApplyRetainedRemoteGuardStates(
-            replayGuardAction: false,
-            refreshMountedGuardCommand: false);
+            RemoteGuardTickPhase.BeforeNativeTick);
     }
 
     public void RefreshRemoteGuardStatesAfterMovement()
@@ -321,26 +264,27 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (_disposed || Mission.Current == null) return;
 
         ApplyRetainedRemoteGuardStates(
-            replayGuardAction: false,
-            refreshMountedGuardCommand: true);
+            RemoteGuardTickPhase.AfterMovement);
     }
 
-    public void ReplayRemoteGuardReactions()
+    public void AdvanceRemoteGuardStatesAfterNativeTick()
     {
         if (_disposed || Mission.Current == null) return;
 
         ApplyRetainedRemoteGuardStates(
-            replayGuardAction: true,
-            refreshMountedGuardCommand: false);
+            RemoteGuardTickPhase.AfterNativeTick);
     }
 
     private void ApplyRetainedRemoteGuardStates(
-        bool replayGuardAction,
-        bool refreshMountedGuardCommand)
+        RemoteGuardTickPhase phase)
     {
         if (_disposed || Mission.Current == null) return;
         if (_retainedGuardAgentIds.Count == 0) return;
 
+        bool afterMovement =
+            phase == RemoteGuardTickPhase.AfterMovement;
+        bool afterNativeTick =
+            phase == RemoteGuardTickPhase.AfterNativeTick;
         List<Guid> staleIds = null;
         using (new AllowedThread())
         {
@@ -349,7 +293,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 if (!_agentStates.TryGetValue(
                     agentId,
                     out RemoteAgentActionState state)
-                    || !state.RetainedGuard.HasValue)
+                    || state.RetainedGuard == null)
                 {
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
@@ -370,7 +314,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
-                RemoteGuardState guardState = state.RetainedGuard.Value;
+                RemoteGuardState guardState = state.RetainedGuard;
                 if (!IsCurrentActionAuthority(
                     info,
                     guardState.Action.ControllerId,
@@ -386,53 +330,37 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 {
                     ApplyMountedGuardRearm(
                         agent,
-                        ref guardState,
-                        replayGuardAction,
-                        refreshMountedGuardCommand);
-                    state.RetainedGuard = guardState;
+                        guardState,
+                        phase);
                     continue;
                 }
 
-                if (replayGuardAction)
-                {
-                    RestoreMountedGuardDirectionPresentation(
-                        agent,
-                        ref guardState);
-                }
-
-                if (!replayGuardAction)
+                if (!afterNativeTick)
                 {
                     AgentActionData data = guardState.Action.Data;
-                    if (!refreshMountedGuardCommand)
+                    if (!afterMovement)
                     {
                         AgentActionData.ApplyDefendMovementFlags(
                             agent,
                             data.DefendFlags);
                     }
-                    bool guardCommandApplied = ApplyRetainedGuardCommand(
+                    ApplyRetainedGuardCommand(
                         agent,
-                        ref guardState,
+                        guardState,
                         data.DefendFlags,
                         restoreNativeGuardState:
                             data.IsPlayerControlled || !agent.HasMount,
                         refreshMountedGuardCommand:
-                            refreshMountedGuardCommand);
-                    if (refreshMountedGuardCommand && guardCommandApplied)
-                    {
-                        ReplayMountedGuardTransitionAfterMovement(
-                            agent,
-                            guardState);
-                    }
+                            afterMovement);
                 }
 
                 bool hasGuardReaction =
-                    replayGuardAction
+                    afterNativeTick
                     && HasGuardReactionAction(agent, guardState);
                 if (hasGuardReaction)
                 {
                     guardState.HasGuardCommand = false;
                 }
-                state.RetainedGuard = guardState;
             }
         }
 
@@ -779,21 +707,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         bool hasMountedGuardPresentation =
             action.Data.IsPlayerControlled
             && GetMountedGuardPresentationChannel(action.Data) >= 0;
-        RemoteGuardState? previousGuard = existingState?.RetainedGuard;
-        bool needsGuardDirectionTransition =
-            NeedsMountedGuardDirectionTransition(
-                agent,
-                action.Data,
-                guardActionChannel,
-                guardAction,
-                previousGuard);
+        RemoteGuardState previousGuard = existingState?.RetainedGuard;
         MountedGuardRearmPhase mountedGuardRearm =
             GetMountedGuardRearmPhase(
                 agent,
                 action.Data,
                 guardActionChannel,
                 previousGuard);
-        bool mountedGuardDirectionTransitionApplied = action.Data.Apply(
+        action.Data.Apply(
             agent,
             agentVisualActionAccessor,
             suppressMountedGuardActionTransition:
@@ -803,11 +724,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     == MountedGuardRearmPhase.NeutralInput
                 || mountedGuardRearm
                     == MountedGuardRearmPhase.NeutralInputObserved);
-        if (mountedGuardDirectionTransitionApplied)
-        {
-            needsGuardDirectionTransition = false;
-        }
-
         bool retainsGuard = action.Data.DefendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(action.Data.GuardMode)
             || (hasMountedGuardPresentation
@@ -815,18 +731,18 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         RemoteGuardState appliedGuardState;
         if (retainsGuard
             && guardActionChannel < 0
-            && previousGuard.HasValue
-            && previousGuard.Value.Action.Data.GuardMode
+            && previousGuard != null
+            && previousGuard.Action.Data.GuardMode
                 == action.Data.GuardMode
-            && previousGuard.Value.Action.Data.IsMounted
+            && previousGuard.Action.Data.IsMounted
                 == action.Data.IsMounted
-            && previousGuard.Value.Action.Data.IsPlayerControlled
+            && previousGuard.Action.Data.IsPlayerControlled
                 == action.Data.IsPlayerControlled
-            && !previousGuard.Value.DrivesMountedReactionPresentation)
+            && !previousGuard.DrivesMountedReactionPresentation)
         {
             appliedGuardState = new RemoteGuardState(
                 action,
-                previousGuard.Value);
+                previousGuard);
         }
         else
         {
@@ -834,28 +750,12 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 action,
                 guardActionChannel,
                 guardAction,
-                previousGuard,
-                needsGuardDirectionTransition);
+                previousGuard);
         }
         appliedGuardState.MountedGuardRearm = mountedGuardRearm;
         if (mountedGuardRearm != MountedGuardRearmPhase.None)
         {
             appliedGuardState.HasGuardCommand = false;
-            appliedGuardState.NeedsGuardDirectionTransition = false;
-            appliedGuardState.NeedsGuardPresentationTransition = false;
-            appliedGuardState.CanRecoverMissingGuardDirection = false;
-            appliedGuardState.GuardCommandAppliedWithAction = false;
-        }
-        if (mountedGuardDirectionTransitionApplied)
-        {
-            appliedGuardState.HasGuardCommand = true;
-            appliedGuardState.NeedsGuardDirectionTransition = false;
-            appliedGuardState.CanRecoverMissingGuardDirection = false;
-            appliedGuardState.GuardCommandAppliedWithAction = true;
-            appliedGuardState.LastCommandedGuardMode =
-                action.Data.GuardMode;
-            appliedGuardState.LastCommandedMountIndex =
-                agent.MountAgent?.Index ?? -1;
         }
         RecordRemoteActionSequence(agentId, action);
         UpdateRemoteGuardState(
@@ -870,7 +770,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         Agent agent,
         AgentActionData data,
         int guardActionChannel,
-        RemoteGuardState? previousGuard)
+        RemoteGuardState previousGuard)
     {
         if (agent.Controller != AgentControllerType.None
             || !agent.HasMount
@@ -899,13 +799,13 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (currentGuardMode == data.GuardMode)
             return MountedGuardRearmPhase.None;
 
-        if (previousGuard.HasValue
-            && previousGuard.Value.MountedGuardRearm
+        if (previousGuard != null
+            && previousGuard.MountedGuardRearm
                 != MountedGuardRearmPhase.None
-            && previousGuard.Value.Action.Data.GuardMode
+            && previousGuard.Action.Data.GuardMode
                 == data.GuardMode)
         {
-            return previousGuard.Value.MountedGuardRearm;
+            return previousGuard.MountedGuardRearm;
         }
 
         if (!data.GuardActionIsDefending)
@@ -929,12 +829,11 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private static void ApplyMountedGuardRearm(
         Agent agent,
-        ref RemoteGuardState guardState,
-        bool replayGuardAction,
-        bool refreshMountedGuardCommand)
+        RemoteGuardState guardState,
+        RemoteGuardTickPhase phase)
     {
         AgentActionData data = guardState.Action.Data;
-        if (replayGuardAction)
+        if (phase == RemoteGuardTickPhase.AfterNativeTick)
         {
             if (guardState.MountedGuardRearm
                 == MountedGuardRearmPhase.NeutralInput)
@@ -953,7 +852,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 guardState.MountedGuardRearm =
                     MountedGuardRearmPhase.None;
                 guardState.HasGuardCommand = true;
-                guardState.CanRecoverMissingGuardDirection = true;
                 guardState.LastCommandedGuardMode = data.GuardMode;
                 guardState.LastCommandedMountIndex =
                     agent.MountAgent?.Index ?? -1;
@@ -965,7 +863,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 == MountedGuardRearmPhase.NeutralInput
             || (guardState.MountedGuardRearm
                     == MountedGuardRearmPhase.NeutralInputObserved
-                && !refreshMountedGuardCommand))
+                && phase != RemoteGuardTickPhase.AfterMovement))
         {
             return;
         }
@@ -984,36 +882,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         AgentActionData.ApplyDefendMovementFlags(
             agent,
             data.DefendFlags);
-    }
-
-    private bool NeedsMountedGuardDirectionTransition(
-        Agent agent,
-        AgentActionData data,
-        int guardActionChannel,
-        ActionIndexCache guardAction,
-        RemoteGuardState? previousGuard)
-    {
-        if (!previousGuard.HasValue)
-        {
-            return false;
-        }
-
-        RemoteGuardState retainedGuard = previousGuard.Value;
-        if (!retainedGuard.HasGuardCommand
-            || retainedGuard.LastCommandedGuardMode != data.GuardMode)
-        {
-            return false;
-        }
-
-        return IsMountedGuardDirectionMissing(
-            agent,
-            data,
-            guardActionChannel,
-            guardAction,
-            GetDisplacedGuardAction(
-                guardActionChannel,
-                guardAction,
-                previousGuard));
     }
 
     private void PromotePendingMigration(
@@ -1073,7 +941,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
         }
 
-        RemoteGuardState? releasedGuard = null;
+        RemoteGuardState releasedGuard = null;
         if (_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
         {
             releasedGuard = state.RetainedGuard;
@@ -1084,9 +952,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         ClearRemoteDefendState(agent, releasedGuard);
     }
 
-    private bool ApplyRetainedGuardCommand(
+    private void ApplyRetainedGuardCommand(
         Agent agent,
-        ref RemoteGuardState guardState,
+        RemoteGuardState guardState,
         Agent.MovementControlFlag defendFlags,
         bool restoreNativeGuardState,
         bool refreshMountedGuardCommand)
@@ -1094,19 +962,19 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         Agent.GuardMode guardMode = guardState.Action.Data.GuardMode;
         if (!AgentActionData.IsGuardMode(guardMode))
         {
-            return false;
+            return;
         }
 
         if (HasInterruptingGuardAction(agent, guardState))
         {
             guardState.HasGuardCommand = false;
-            return false;
+            return;
         }
 
         if (HasGuardReactionAction(agent, guardState)
             || guardState.DrivesMountedReactionPresentation)
         {
-            return false;
+            return;
         }
 
         int mountIndex = agent.MountAgent?.Index ?? -1;
@@ -1117,7 +985,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && guardState.LastCommandedMountIndex != mountIndex;
         bool guardModeChanged = guardState.HasGuardCommand
             && guardState.LastCommandedGuardMode != guardMode;
-        bool tracksMountedGuardDirection =
+        bool refreshesMountedGuard =
             agent.HasMount
             && guardState.Action.Data.IsMounted
             && guardState.Action.Data.IsPlayerControlled
@@ -1126,48 +994,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && guardState.GuardActionChannel >= 0
             && guardState.GuardActionChannel <= 1
             && guardState.GuardAction != ActionIndexCache.act_none;
-        bool mountedGuardDirectionMissing =
-            tracksMountedGuardDirection
-            && IsMountedGuardDirectionMissing(
-                agent,
-                guardState.Action.Data,
-                guardState.GuardActionChannel,
-                guardState.GuardAction,
-                guardState.DisplacedGuardAction);
-        if (tracksMountedGuardDirection
-            && !mountedGuardDirectionMissing)
-        {
-            guardState.CanRecoverMissingGuardDirection = true;
-        }
-        bool missingGuardDirectionRecovery =
-            mountedGuardDirectionMissing
-            && guardState.CanRecoverMissingGuardDirection;
-        // A steady-state defending sibling needs a direction repair without restarting its timeline.
-        bool missingGuardDirectionRequiresNativeCommand =
-            missingGuardDirectionRecovery
-            && (mountChanged
-                || reacquiringGuard
-                || agent.GetCurrentAction(
-                    guardState.GuardActionChannel) == guardState.GuardAction
-                || !AgentActionData.IsDefendingAction(
-                    agent.GetCurrentActionType(
-                        guardState.GuardActionChannel)));
-        bool directionTransitionPending =
-            guardState.NeedsGuardDirectionTransition
-            || missingGuardDirectionRecovery;
-        bool shouldRefreshMountedGuardCommand =
-            refreshMountedGuardCommand
-            && tracksMountedGuardDirection
-            && guardState.HasGuardCommand
-            && !guardState.GuardCommandAppliedWithAction
-            && !directionTransitionPending
-            && !mountChanged
-            && !guardModeChanged;
-        guardState.GuardCommandAppliedWithAction = false;
         if (refreshMountedGuardCommand
-            && !shouldRefreshMountedGuardCommand)
+            && !refreshesMountedGuard)
         {
-            return false;
+            return;
         }
         bool nativeGuardStateMissing =
             restoreNativeGuardState
@@ -1179,8 +1009,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             !guardState.HasGuardCommand
             || mountChanged
             || guardModeChanged
-            || directionTransitionPending
-            || shouldRefreshMountedGuardCommand
+            || refreshMountedGuardCommand
             || nativeGuardStateMissing;
         if (shouldApplyGuardCommand)
         {
@@ -1192,261 +1021,25 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     agent,
                     defendFlags);
             }
-            if (agent.HasMount
-                && (guardModeChanged
-                    || guardState.NeedsGuardDirectionTransition
-                    || missingGuardDirectionRequiresNativeCommand))
-            {
-                AgentActionData.ApplyGuardDirectionTransition(
-                    agent,
-                    guardMode);
-                guardState.CanRecoverMissingGuardDirection = false;
-                if (missingGuardDirectionRecovery)
-                {
-                    guardState.NeedsGuardPresentationTransition = true;
-                }
-            }
-            else if (missingGuardDirectionRecovery)
-            {
-                AgentActionData.ApplyGuardState(
-                    agent,
-                    guardMode,
-                    force: true);
-                guardState.CanRecoverMissingGuardDirection = false;
-                guardState.NeedsGuardPresentationTransition = true;
-            }
-            else
-            {
-                bool forceGuardCommand =
-                    mountChanged
-                    || reacquiringGuard
-                    || shouldRefreshMountedGuardCommand
-                    || nativeGuardStateMissing;
-                AgentActionData.ApplyGuardState(
-                    agent,
-                    guardMode,
-                    force: forceGuardCommand);
-            }
+            bool forceGuardCommand =
+                mountChanged
+                || reacquiringGuard
+                || refreshMountedGuardCommand
+                || nativeGuardStateMissing;
+            AgentActionData.ApplyGuardState(
+                agent,
+                guardMode,
+                force: forceGuardCommand);
         }
 
         guardState.HasGuardCommand = true;
-        guardState.NeedsGuardDirectionTransition = false;
         guardState.LastCommandedGuardMode = guardMode;
         guardState.LastCommandedMountIndex = mountIndex;
-        return shouldApplyGuardCommand;
-    }
-
-    private void RestoreMountedGuardDirectionPresentation(
-        Agent agent,
-        ref RemoteGuardState guardState)
-    {
-        if (!guardState.NeedsGuardPresentationTransition
-            || guardState.DrivesMountedReactionPresentation
-            || HasGuardReactionAction(agent, guardState)
-            || HasInterruptingGuardAction(agent, guardState))
-        {
-            return;
-        }
-
-        int channel = guardState.GuardActionChannel;
-        if (agentVisualActionAccessor.IsActionVisible(
-            agent,
-            channel,
-            in guardState.GuardAction))
-        {
-            if (guardState.CanRecoverMissingGuardDirection)
-            {
-                guardState.NeedsGuardPresentationTransition = false;
-            }
-            return;
-        }
-
-        if (agent.GetCurrentAction(channel) == guardState.GuardAction)
-            return;
-
-        if (!IsMountedGuardDirectionMissing(
-                agent,
-                guardState.Action.Data,
-                channel,
-                guardState.GuardAction,
-                guardState.DisplacedGuardAction))
-        {
-            return;
-        }
-
-        if (!TryGetMountedGuardPresentationMetadata(
-                guardState,
-                out AnimFlags actionFlags,
-                out float actionProgress))
-        {
-            return;
-        }
-
-        Agent.GuardMode guardMode = guardState.Action.Data.GuardMode;
-        AgentActionData.ApplyGuardState(
-            agent,
-            guardMode,
-            force: true);
-        SetMountedGuardPresentation(
-            agent,
-            guardState,
-            actionFlags,
-            actionProgress);
-        if (agentVisualActionAccessor.IsActionVisible(
-            agent,
-            channel,
-            in guardState.GuardAction))
-        {
-            guardState.HasGuardCommand = true;
-            guardState.NeedsGuardPresentationTransition = false;
-            guardState.CanRecoverMissingGuardDirection = true;
-            guardState.GuardCommandAppliedWithAction = true;
-            guardState.LastCommandedGuardMode = guardMode;
-            guardState.LastCommandedMountIndex =
-                agent.MountAgent?.Index ?? -1;
-        }
-    }
-
-    private void ReplayMountedGuardTransitionAfterMovement(
-        Agent agent,
-        in RemoteGuardState guardState)
-    {
-        if (!guardState.NeedsGuardPresentationTransition
-            || guardState.DrivesMountedReactionPresentation
-            || HasGuardReactionAction(agent, guardState)
-            || HasInterruptingGuardAction(agent, guardState))
-        {
-            return;
-        }
-
-        if (!TryGetMountedGuardPresentationMetadata(
-                guardState,
-                out AnimFlags actionFlags,
-                out float actionProgress))
-        {
-            return;
-        }
-
-        int channel = guardState.GuardActionChannel;
-        ActionIndexCache currentAction = agent.GetCurrentAction(channel);
-        if (currentAction != guardState.GuardAction
-            && currentAction != guardState.DisplacedGuardAction)
-        {
-            return;
-        }
-
-        SetMountedGuardPresentation(
-            agent,
-            guardState,
-            actionFlags,
-            actionProgress);
-    }
-
-    private static void SetMountedGuardPresentation(
-        Agent agent,
-        in RemoteGuardState guardState,
-        AnimFlags actionFlags,
-        float actionProgress)
-    {
-        agent.SetActionChannel(
-            guardState.GuardActionChannel,
-            guardState.GuardAction,
-            ignorePriority: true,
-            additionalFlags: actionFlags | AnimFlags.anf_restart,
-            startProgress: actionProgress);
-    }
-
-    private static bool TryGetMountedGuardPresentationMetadata(
-        in RemoteGuardState guardState,
-        out AnimFlags actionFlags,
-        out float actionProgress)
-    {
-        int channel = guardState.GuardActionChannel;
-        actionFlags = (AnimFlags)0uL;
-        actionProgress = 0f;
-        if (channel < 0 || channel > 1)
-            return false;
-
-        AgentActionData data = guardState.Action.Data;
-        int actionIndex = channel == 0
-            ? data.Action0Index
-            : data.Action1Index;
-        if (GetGuardActionChannel(data) != channel
-            || actionIndex != guardState.GuardAction.Index)
-        {
-            return false;
-        }
-
-        actionFlags = (AnimFlags)(channel == 0
-            ? data.Action0Flag
-            : data.Action1Flag);
-        actionProgress = channel == 0
-            ? data.Action0Progress
-            : data.Action1Progress;
-        return true;
-    }
-
-    private bool IsMountedGuardDirectionMissing(
-        Agent agent,
-        AgentActionData data,
-        int channel,
-        ActionIndexCache guardAction,
-        ActionIndexCache displacedGuardAction)
-    {
-        if (!agent.HasMount
-            || !data.IsMounted
-            || !data.IsPlayerControlled
-            || !data.GuardActionIsDefending
-            || data.GuardActionIsReaction
-            || channel < 0
-            || channel > 1
-            || !AgentActionData.IsGuardMode(data.GuardMode))
-        {
-            return false;
-        }
-
-        ActionIndexCache currentAction = agent.GetCurrentAction(channel);
-        if (currentAction == ActionIndexCache.act_none
-            && agentVisualActionAccessor.IsActionVisible(
-                agent,
-                channel,
-                in guardAction))
-        {
-            return false;
-        }
-        if (currentAction == ActionIndexCache.act_none
-            && displacedGuardAction != ActionIndexCache.act_none
-            && agentVisualActionAccessor.IsActionVisible(
-                agent,
-                channel,
-                in displacedGuardAction))
-        {
-            return true;
-        }
-        if (currentAction == ActionIndexCache.act_none
-            && agentVisualActionAccessor.HasVisibleAction(
-                agent,
-                channel))
-        {
-            return false;
-        }
-        if (currentAction != ActionIndexCache.act_none
-            && !AgentActionData.IsDefendingAction(
-                agent.GetCurrentActionType(channel)))
-        {
-            return false;
-        }
-
-        Agent.GuardMode currentGuardMode =
-            AgentActionData.GetGuardModeFromDefendingAction(
-                agent,
-                channel);
-        return currentGuardMode != data.GuardMode;
     }
 
     private static bool HasInterruptingGuardAction(
         Agent agent,
-        in RemoteGuardState guardState)
+        RemoteGuardState guardState)
     {
         if (HasGuardReactionAction(agent, guardState))
             return false;
@@ -1459,14 +1052,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private static bool HasGuardReactionAction(
         Agent agent,
-        in RemoteGuardState guardState) =>
+        RemoteGuardState guardState) =>
         IsGuardReactionAction(agent, 0, guardState)
         || IsGuardReactionAction(agent, 1, guardState);
 
     private static bool IsGuardReactionAction(
         Agent agent,
         int channel,
-        in RemoteGuardState guardState)
+        RemoteGuardState guardState)
     {
         Agent.ActionCodeType actionType =
             agent.GetCurrentActionType(channel);
@@ -1495,16 +1088,15 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private void ClearRetainedGuardAction(
         Agent agent,
-        RemoteGuardState? retainedGuard)
+        RemoteGuardState retainedGuard)
     {
-        if (!retainedGuard.HasValue) return;
+        if (retainedGuard == null) return;
 
-        RemoteGuardState guardState = retainedGuard.Value;
-        int channel = guardState.GuardActionChannel;
+        int channel = retainedGuard.GuardActionChannel;
         if (channel < 0 || channel > 1) return;
 
         ActionIndexCache currentAction = agent.GetCurrentAction(channel);
-        bool ownsAgentAction = currentAction == guardState.GuardAction;
+        bool ownsAgentAction = currentAction == retainedGuard.GuardAction;
         if (!ownsAgentAction && currentAction != ActionIndexCache.act_none)
             return;
 
@@ -1512,7 +1104,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && !agentVisualActionAccessor.IsActionVisible(
                 agent,
                 channel,
-                guardState.GuardAction))
+                retainedGuard.GuardAction))
         {
             return;
         }
@@ -1529,7 +1121,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private void ClearRemoteDefendState(
         Agent agent,
-        RemoteGuardState? retainedGuard = null)
+        RemoteGuardState retainedGuard = null)
     {
         ClearRetainedGuardAction(agent, retainedGuard);
         AgentActionData.ApplyDefendMovementFlags(

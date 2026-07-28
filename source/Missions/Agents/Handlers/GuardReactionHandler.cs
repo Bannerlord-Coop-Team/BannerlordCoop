@@ -137,25 +137,6 @@ public class GuardReactionHandler : IGuardReactionHandler
         CombatCollisionResult collisionResult,
         int battleHostEpoch)
     {
-#if DEBUG
-        bool attackerLocallyControlled =
-            !disposed &&
-            Mission.Current != null &&
-            isBlocked &&
-            !isMissile &&
-            affectedAgent != null &&
-            affectorAgent != null &&
-            agentRegistry.IsLocallyControlled(affectorAgent);
-        if (BattleGuardNativeTrace.IsTarget(affectedAgent))
-        {
-            BattleGuardNativeTrace.Record(
-                affectedAgent,
-                "reaction-observe",
-                $"attacker={affectorAgent?.Index ?? -1},blocked={isBlocked}," +
-                $"missile={isMissile},collision={collisionResult}," +
-                $"attackerLocal={attackerLocallyControlled},epoch={battleHostEpoch}");
-        }
-#endif
         if (disposed
             || Mission.Current == null
             || !isBlocked
@@ -170,11 +151,6 @@ public class GuardReactionHandler : IGuardReactionHandler
                 affectorAgent,
                 out CoopAgentInfo affectorInfo))
         {
-#if DEBUG
-            BattleGuardNativeTrace.CompleteCollisionCapture(
-                affectedAgent,
-                "reaction-observe-rejected");
-#endif
             return;
         }
 
@@ -186,12 +162,6 @@ public class GuardReactionHandler : IGuardReactionHandler
                 battleHostEpoch,
                 agentRegistry.IsLocallyControlled(
                     affectedAgent));
-#if DEBUG
-        BattleGuardNativeTrace.Record(
-            affectedAgent,
-            "reaction-queued",
-            $"attackerId={affectorInfo.AgentId},epoch={battleHostEpoch}");
-#endif
     }
 
     public void ProcessPendingReactions()
@@ -214,21 +184,10 @@ public class GuardReactionHandler : IGuardReactionHandler
                     || agent.Mission != Mission.Current
                     || !agent.IsActive())
                 {
-#if DEBUG
-                    BattleGuardNativeTrace.CompleteCollisionCapture(
-                        agent,
-                        "reaction-agent-invalid");
-#endif
                     completedIds.Add(agentId);
                     continue;
                 }
 
-#if DEBUG
-                BattleGuardNativeTrace.Record(
-                    agent,
-                    "reaction-capture-attempt",
-                    $"attempt={pending.CaptureAttempts + 1}");
-#endif
                 if (!TryGetGuardReaction(
                         agent,
                         out int reactionChannel,
@@ -246,13 +205,6 @@ public class GuardReactionHandler : IGuardReactionHandler
                             in reactionAction,
                             reactionFlags))
                     {
-#if DEBUG
-                        BattleGuardNativeTrace.Record(
-                            agent,
-                            "reaction-synthetic-applied",
-                            $"channel={reactionChannel}," +
-                            $"action={reactionAction.Index}");
-#endif
                         SendReaction(
                             pending,
                             agent,
@@ -260,12 +212,6 @@ public class GuardReactionHandler : IGuardReactionHandler
                             in reactionAction,
                             progress: 0f,
                             reactionFlags);
-#if DEBUG
-                        BattleGuardNativeTrace.CompleteCollisionCapture(
-                            agent,
-                            $"reaction-sent,sequence={sequence}," +
-                            "source=synthetic");
-#endif
                         completedIds.Add(agentId);
                         continue;
                     }
@@ -273,21 +219,10 @@ public class GuardReactionHandler : IGuardReactionHandler
                     pending.CaptureAttempts++;
                     if (pending.CaptureAttempts >= MaximumCaptureAttempts)
                     {
-#if DEBUG
-                        BattleGuardNativeTrace.CompleteCollisionCapture(
-                            agent,
-                            $"reaction-capture-dropped,attempts={pending.CaptureAttempts}");
-#endif
                         completedIds.Add(agentId);
                     }
                     else
                     {
-#if DEBUG
-                        BattleGuardNativeTrace.Record(
-                            agent,
-                            "reaction-capture-miss",
-                            $"attempt={pending.CaptureAttempts}");
-#endif
                         pendingReactions[agentId] = pending;
                     }
                     continue;
@@ -295,14 +230,6 @@ public class GuardReactionHandler : IGuardReactionHandler
 
                 float progress = ClampProgress(
                     agent.GetCurrentActionProgress(reactionChannel));
-#if DEBUG
-                BattleGuardNativeTrace.Record(
-                    agent,
-                    "reaction-capture-found",
-                    $"attempt={pending.CaptureAttempts + 1}," +
-                    $"channel={reactionChannel},action={reactionAction.Index}," +
-                    $"progress={progress:0.###}");
-#endif
                 SendReaction(
                     pending,
                     agent,
@@ -311,12 +238,6 @@ public class GuardReactionHandler : IGuardReactionHandler
                     progress,
                     agent.GetCurrentAnimationFlag(
                         reactionChannel));
-#if DEBUG
-                BattleGuardNativeTrace.CompleteCollisionCapture(
-                    agent,
-                    $"reaction-sent,sequence={sequence}," +
-                    "source=native");
-#endif
                 completedIds.Add(agentId);
             }
 

@@ -46,57 +46,36 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnPreMissionTick(float dt)
     {
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-pre-entry");
-#endif
         base.OnPreMissionTick(dt);
 
         // Restore queued remote guard state at the mission input boundary so collision reads the same held
         // defend state as the owning client.
         coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-pre-after-guard");
-#endif
     }
 
     public override void OnMissionTick(float dt)
     {
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-mission-entry");
-#endif
         base.OnMissionTick(dt);
 
         // Capture continuous movement on the game thread so each snapshot reads one coherent engine state. A
         // background poll can race native movement/input updates and send a moved position with stale input,
         // leaving peers to interpolate a sliding puppet with no locomotion animation.
         coopMissionComponent.AgentMovementHandler.PollMovement(dt);
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-mission-after-poll-movement");
-#endif
 
         // Smoothly reconcile received puppets toward their owners' last-reported positions every frame; the
         // per-packet correction was bound to the bursty movement-poll cadence and looked stepped. Subclasses that
         // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
         // override it, so this runs for both battle and location missions.
         coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-mission-after-interpolation");
-#endif
 
         // Continuous movement setters run after the mission input boundary. Refresh the retained mounted
         // direction here so the upcoming native Agent cycle cannot select the previous guard sibling.
         coopMissionComponent.AgentActionHandler.RefreshRemoteGuardStatesAfterMovement();
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-mission-after-guard-refresh");
-#endif
 
         // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action
         // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-mission-after-action-poll");
-#endif
 
         coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
@@ -104,32 +83,19 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnPreDisplayMissionTick(float dt)
     {
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-display-entry");
-#endif
         base.OnPreDisplayMissionTick(dt);
 
         // Native Agent processing can rewrite a puppet's look after OnMissionTick replayed it.
         // Restore only that display input here; movement setters can consume the active guard flags.
         coopMissionComponent.AgentMovementHandler.Interpolator
             .ReplayLookDirections();
-#if DEBUG
-        BattleGuardNativeTrace.Mark(
-            "remote-display-after-look-replay");
-#endif
 
         // The prior native Agent tick can realize an action after OnMissionTick sampled its input.
         // Diff again here so peers receive that exact action instead of retaining the earlier pose.
         coopMissionComponent.AgentActionHandler.PollActions();
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-display-after-action-poll");
-#endif
 
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
         coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
-#if DEBUG
-        BattleGuardNativeTrace.Mark("remote-display-after-replay");
-#endif
     }
 
     public virtual void Dispose()

@@ -316,9 +316,6 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent.AgentRegistry,
             coopMissionComponent.AgentMovementHandler.Interpolator);
 
-    internal string GetGuardFixtureTrace() =>
-        BattleGuardNativeTrace.GetReport();
-
     internal string GetGuardFixtureCandidates(List<string> args) =>
         guardFixture.GetCandidates(coopMissionComponent.AgentRegistry, args);
 
@@ -438,17 +435,6 @@ public class CoopBattleController : CoopMissionController
         float hitDistance,
         float shotDifficulty)
     {
-#if DEBUG
-        if (BattleGuardNativeTrace.IsTarget(affectedAgent))
-        {
-            BattleGuardNativeTrace.RecordCollision(
-                affectedAgent,
-                "score-hit-entry",
-                in collisionData,
-                $"attacker={affectorAgent?.Index ?? -1},blocked={isBlocked}," +
-                $"missile={blow.IsMissile},damagedHp={damagedHp:0.###}");
-        }
-#endif
         base.OnScoreHit(
             affectedAgent,
             affectorAgent,
