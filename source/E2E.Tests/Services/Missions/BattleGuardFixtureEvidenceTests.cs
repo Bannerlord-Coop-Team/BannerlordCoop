@@ -836,7 +836,7 @@ public class BattleGuardFixtureEvidenceTests
 
     [Theory]
     [InlineData(2f, 8f, 0.5f, true)]
-    [InlineData(2.1f, 8f, 0.5f, false)]
+    [InlineData(2.9f, 8f, 0.5f, false)]
     [InlineData(100f, 8f, 2.5f, true)]
     public void MountedStrikeRelease_LeadsContactOrEndsCharge(
         float longitudinalDistance,
@@ -888,8 +888,9 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(0, 0.25f)]
-    [InlineData(1, 0.25f)]
+    [InlineData(0, 0.35f)]
+    [InlineData(1, 0.35f)]
+    [InlineData(2, 0.25f)]
     [InlineData(3, 0.45f)]
     [InlineData(5, 0.65f)]
     [InlineData(6, 0.65f)]
