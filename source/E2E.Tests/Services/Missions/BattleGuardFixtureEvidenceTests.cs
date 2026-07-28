@@ -1296,6 +1296,73 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MountedStrikeLifecycle_AuthoritativeDefinition_RoundTrips(
+        bool active)
+    {
+        Guid commandId = Guid.NewGuid();
+        Guid guardAgentId = Guid.NewGuid();
+        Guid strikerAgentId = Guid.NewGuid();
+        var original = new NetworkBattleGuardFixtureStrike(
+            "battle",
+            commandId,
+            guardAgentId,
+            "guard-owner",
+            strikerAgentId,
+            "striker-owner",
+            active,
+            active ? 0.6f : 0f,
+            active ? 0.8f : 0f,
+            active ? 0.7f : 0f,
+            active ? 0.7f : 0f,
+            active ? 12f : 0f,
+            active ? 34f : 0f);
+        using var stream = new MemoryStream();
+
+        Serializer.Serialize(stream, original);
+        stream.Position = 0;
+        NetworkBattleGuardFixtureStrike received =
+            Serializer.Deserialize<NetworkBattleGuardFixtureStrike>(stream);
+
+        Assert.Equal(original.BattleInstanceId, received.BattleInstanceId);
+        Assert.Equal(commandId, received.CommandId);
+        Assert.Equal(guardAgentId, received.GuardAgentId);
+        Assert.Equal("guard-owner", received.GuardAuthority);
+        Assert.Equal(strikerAgentId, received.StrikerAgentId);
+        Assert.Equal("striker-owner", received.StrikerAuthority);
+        Assert.Equal(active, received.Active);
+        Assert.Equal(original.TravelDirectionX, received.TravelDirectionX);
+        Assert.Equal(original.TravelDirectionY, received.TravelDirectionY);
+        Assert.Equal(original.GuardLookDirectionX, received.GuardLookDirectionX);
+        Assert.Equal(original.GuardLookDirectionY, received.GuardLookDirectionY);
+        Assert.Equal(original.TargetX, received.TargetX);
+        Assert.Equal(original.TargetY, received.TargetY);
+        Assert.True(BattleGuardFixture.IsValidMountedStrike(received));
+    }
+
+    [Fact]
+    public void MountedStrikeLifecycle_ActiveUpdateRequiresFiniteGeometry()
+    {
+        var invalid = new NetworkBattleGuardFixtureStrike(
+            "battle",
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "guard-owner",
+            Guid.NewGuid(),
+            "striker-owner",
+            active: true,
+            travelDirectionX: 0f,
+            travelDirectionY: 1f,
+            guardLookDirectionX: 1f,
+            guardLookDirectionY: 0f,
+            targetX: float.NaN,
+            targetY: 34f);
+
+        Assert.False(BattleGuardFixture.IsValidMountedStrike(invalid));
+    }
+
+    [Theory]
     [InlineData(
         BattleGuardFixtureDirection.Up,
         Agent.MovementControlFlag.DefendUp,

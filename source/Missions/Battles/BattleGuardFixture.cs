@@ -21,6 +21,7 @@ public interface IBattleGuardFixture
 {
     void Apply(NetworkBattleGuardFixtureCommand command, INetworkAgentRegistry agentRegistry);
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
+    void ApplyMountedStrike(NetworkBattleGuardFixtureStrike strike);
     bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
@@ -118,6 +119,8 @@ public class BattleGuardFixture : IBattleGuardFixture
     private bool previousAllowInputWithCustomCamera;
     private Guid evidenceCameraTargetId;
     private NetworkBattleGuardFixtureRoute pendingMountedRoute;
+    private NetworkBattleGuardFixtureStrike pendingMountedStrike;
+    private string currentBattleInstanceId;
     private Guid currentCommandId;
 
     public BattleGuardFixture(
@@ -168,6 +171,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (fixtureChanged)
         {
             NetworkBattleGuardFixtureRoute nextRoute = pendingMountedRoute;
+            NetworkBattleGuardFixtureStrike nextStrike =
+                pendingMountedStrike;
             Reset(agentRegistry);
             if (command.Mode == BattleGuardFixtureMode.Mounted &&
                 MatchesMountedRoute(
@@ -177,6 +182,16 @@ public class BattleGuardFixture : IBattleGuardFixture
                     command.CommandId))
             {
                 pendingMountedRoute = nextRoute;
+            }
+            if (command.Mode == BattleGuardFixtureMode.Mounted &&
+                command.Phase == BattleGuardFixturePhase.Attack &&
+                MatchesMountedStrike(
+                    nextStrike,
+                    commandRoles,
+                    command.CommandId,
+                    command.BattleInstanceId))
+            {
+                pendingMountedStrike = nextStrike;
             }
         }
         if (pendingGuardRestore != null)
@@ -194,6 +209,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
 
         roles = commandRoles;
+        currentBattleInstanceId = command.BattleInstanceId;
         currentCommandId = command.CommandId;
         if (command.Phase != BattleGuardFixturePhase.Attack &&
             strikerDriver != null)
@@ -241,6 +257,9 @@ public class BattleGuardFixture : IBattleGuardFixture
             sample.HasBaselineHealth = true;
         }
 
+        if (command.Phase == BattleGuardFixturePhase.Attack)
+            TryApplyPendingMountedStrike(command);
+
         if (command.Phase == BattleGuardFixturePhase.Attack &&
             TryGetExactAgent(
                 agentRegistry,
@@ -281,6 +300,26 @@ public class BattleGuardFixture : IBattleGuardFixture
         SetReceivedMountedRoute(guardDriver, route);
         pendingMountedRoute = null;
         lastError = ClearMountedRouteWaitError(lastError);
+    }
+
+    public void ApplyMountedStrike(NetworkBattleGuardFixtureStrike strike)
+    {
+        if (!IsValidMountedStrike(strike))
+            return;
+        if (!MatchesMountedStrike(
+                strike,
+                roles,
+                currentCommandId,
+                currentBattleInstanceId) ||
+            guardDriver == null ||
+            guardDriver.Phase != BattleGuardFixturePhase.Attack)
+        {
+            pendingMountedStrike = strike;
+            return;
+        }
+
+        SetReceivedMountedStrike(guardDriver, strike);
+        pendingMountedStrike = null;
     }
 
     public void ApplyPlayerInput(INetworkAgentRegistry agentRegistry)
@@ -869,6 +908,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         strikerDriver = null;
         roles = null;
         pendingMountedRoute = null;
+        pendingMountedStrike = null;
+        currentBattleInstanceId = null;
         currentCommandId = Guid.Empty;
         sampleElapsed = 0f;
         sample = new SampleState();
@@ -1149,7 +1190,12 @@ public class BattleGuardFixture : IBattleGuardFixture
         strikerDriver.ApplyFixtureSwingSpeed(
             agent,
             FixtureStrikerSwingSpeedMultiplier);
-        strikerDriver.AttachAttackDriver(agent, guard, guardDriver);
+        strikerDriver.AttachAttackDriver(
+            agent,
+            guard,
+            guardDriver,
+            SendMountedStrike,
+            SendMountedStrikeEnd);
         ClearDefendFlags(agent, strikerDriver.OriginalMovementFlags);
         strikerDriver.EnsureFixtureWeaponReady(
             agent,
@@ -1618,6 +1664,59 @@ public class BattleGuardFixture : IBattleGuardFixture
                 command.Phase));
     }
 
+    private void SendMountedStrike(
+        Vec3 travelDirection,
+        Vec3 guardLookDirection,
+        Vec3 target)
+    {
+        SendMountedStrikeLifecycle(
+            true,
+            travelDirection,
+            guardLookDirection,
+            target);
+    }
+
+    private void SendMountedStrikeEnd()
+    {
+        SendMountedStrikeLifecycle(
+            false,
+            Vec3.Zero,
+            Vec3.Zero,
+            Vec3.Zero);
+    }
+
+    private void SendMountedStrikeLifecycle(
+        bool active,
+        Vec3 travelDirection,
+        Vec3 guardLookDirection,
+        Vec3 target)
+    {
+        FixtureRoles currentRoles = roles;
+        if (currentRoles == null ||
+            string.IsNullOrEmpty(currentBattleInstanceId) ||
+            currentCommandId == Guid.Empty)
+        {
+            return;
+        }
+
+        network.SendAllBut(
+            controllerIdProvider.ControllerId,
+            new NetworkBattleGuardFixtureStrike(
+                currentBattleInstanceId,
+                currentCommandId,
+                currentRoles.GuardAgentId,
+                currentRoles.GuardAuthority,
+                currentRoles.StrikerAgentId,
+                currentRoles.StrikerAuthority,
+                active,
+                travelDirection.x,
+                travelDirection.y,
+                guardLookDirection.x,
+                guardLookDirection.y,
+                target.x,
+                target.y));
+    }
+
     private static void SetReceivedMountedRoute(
         GuardDriver driver,
         NetworkBattleGuardFixtureRoute route)
@@ -1627,6 +1726,103 @@ public class BattleGuardFixture : IBattleGuardFixture
             new Vec3(route.StartX, route.StartY, route.StartZ),
             new Vec3(route.DirectionX, route.DirectionY, 0f),
             route.Length);
+    }
+
+    private bool TryApplyPendingMountedStrike(
+        NetworkBattleGuardFixtureCommand command)
+    {
+        NetworkBattleGuardFixtureStrike strike = pendingMountedStrike;
+        if (!MatchesMountedStrike(
+                strike,
+                roles,
+                command.CommandId,
+                command.BattleInstanceId) ||
+            guardDriver == null)
+        {
+            return false;
+        }
+
+        SetReceivedMountedStrike(guardDriver, strike);
+        pendingMountedStrike = null;
+        return true;
+    }
+
+    private static void SetReceivedMountedStrike(
+        GuardDriver driver,
+        NetworkBattleGuardFixtureStrike strike)
+    {
+        if (!strike.Active)
+        {
+            driver.EndMountedStrike();
+            return;
+        }
+
+        driver.BeginMountedStrike(
+            new Vec3(
+                strike.TravelDirectionX,
+                strike.TravelDirectionY,
+                0f),
+            new Vec3(
+                strike.GuardLookDirectionX,
+                strike.GuardLookDirectionY,
+                0f),
+            new Vec3(strike.TargetX, strike.TargetY, 0f));
+    }
+
+    internal static bool IsValidMountedStrike(
+        NetworkBattleGuardFixtureStrike strike)
+    {
+        if (strike == null ||
+            string.IsNullOrEmpty(strike.BattleInstanceId) ||
+            strike.CommandId == Guid.Empty ||
+            strike.GuardAgentId == Guid.Empty ||
+            string.IsNullOrEmpty(strike.GuardAuthority) ||
+            strike.StrikerAgentId == Guid.Empty ||
+            string.IsNullOrEmpty(strike.StrikerAuthority))
+        {
+            return false;
+        }
+        if (!strike.Active)
+            return true;
+        if (!IsFinite(strike.TravelDirectionX) ||
+            !IsFinite(strike.TravelDirectionY) ||
+            !IsFinite(strike.GuardLookDirectionX) ||
+            !IsFinite(strike.GuardLookDirectionY) ||
+            !IsFinite(strike.TargetX) ||
+            !IsFinite(strike.TargetY))
+        {
+            return false;
+        }
+
+        float travelLengthSquared =
+            (strike.TravelDirectionX * strike.TravelDirectionX) +
+            (strike.TravelDirectionY * strike.TravelDirectionY);
+        float lookLengthSquared =
+            (strike.GuardLookDirectionX * strike.GuardLookDirectionX) +
+            (strike.GuardLookDirectionY * strike.GuardLookDirectionY);
+        return travelLengthSquared > 0.0001f &&
+            lookLengthSquared > 0.0001f;
+    }
+
+    private static bool MatchesMountedStrike(
+        NetworkBattleGuardFixtureStrike strike,
+        FixtureRoles expectedRoles,
+        Guid commandId,
+        string battleInstanceId)
+    {
+        return IsValidMountedStrike(strike) &&
+            expectedRoles != null &&
+            strike.BattleInstanceId == battleInstanceId &&
+            strike.CommandId == commandId &&
+            strike.GuardAgentId == expectedRoles.GuardAgentId &&
+            strike.GuardAuthority == expectedRoles.GuardAuthority &&
+            strike.StrikerAgentId == expectedRoles.StrikerAgentId &&
+            strike.StrikerAuthority == expectedRoles.StrikerAuthority;
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     private static bool IsValidMountedRoute(
@@ -3515,7 +3711,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         public int GuardActionIndex => guardActionIndex;
         private Vec3 mountedStrikeTravelDirection;
         private Vec3 mountedStrikeLookDirection;
-        private Agent mountedStrikeLookTarget;
+        private Vec3 mountedStrikeLookTarget;
+        private bool hasMountedStrikeLookTarget;
         private bool hasMountedStrikeDirections;
         private int guardChannel = -1;
         private int guardActionIndex = -1;
@@ -3582,7 +3779,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         public void BeginMountedStrike(
             Vec3 travelDirection,
             Vec3 lookDirection,
-            Agent lookTarget)
+            Vec3 lookTarget)
         {
             EndMountedStrike();
             travelDirection.z = 0f;
@@ -3598,6 +3795,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             mountedStrikeTravelDirection = travelDirection;
             mountedStrikeLookDirection = lookDirection;
             mountedStrikeLookTarget = lookTarget;
+            hasMountedStrikeLookTarget = true;
             hasMountedStrikeDirections = true;
         }
 
@@ -3607,13 +3805,12 @@ public class BattleGuardFixture : IBattleGuardFixture
             out Vec3 lookDirection)
         {
             travelDirection = mountedStrikeTravelDirection;
-            lookDirection =
-                mountedStrikeLookTarget == null
-                    ? mountedStrikeLookDirection
-                    : GetMountedStrikeTrackedLookDirection(
-                        guard.Position,
-                        mountedStrikeLookTarget.Position,
-                        mountedStrikeLookDirection);
+            lookDirection = hasMountedStrikeLookTarget
+                ? GetMountedStrikeTrackedLookDirection(
+                    guard.Position,
+                    mountedStrikeLookTarget,
+                    mountedStrikeLookDirection)
+                : mountedStrikeLookDirection;
             return hasMountedStrikeDirections;
         }
 
@@ -3621,7 +3818,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         {
             mountedStrikeTravelDirection = Vec3.Zero;
             mountedStrikeLookDirection = Vec3.Zero;
-            mountedStrikeLookTarget = null;
+            mountedStrikeLookTarget = Vec3.Zero;
+            hasMountedStrikeLookTarget = false;
             hasMountedStrikeDirections = false;
         }
 
@@ -3961,7 +4159,9 @@ public class BattleGuardFixture : IBattleGuardFixture
         public void AttachAttackDriver(
             Agent agent,
             Agent guard,
-            GuardDriver guardDriver)
+            GuardDriver guardDriver,
+            Action<Vec3, Vec3, Vec3> mountedStrikeStarted,
+            Action mountedStrikeEnded)
         {
             if (attackDriver != null)
                 return;
@@ -3970,7 +4170,9 @@ public class BattleGuardFixture : IBattleGuardFixture
                 agent,
                 guard,
                 guardDriver,
-                this);
+                this,
+                mountedStrikeStarted,
+                mountedStrikeEnded);
             agent.AddComponent(attackDriver);
             agent.SetHasOnAiInputSetCallback(true);
         }
@@ -4071,23 +4273,30 @@ public class BattleGuardFixture : IBattleGuardFixture
         private readonly Agent guard;
         private readonly GuardDriver guardDriver;
         private readonly StrikerDriver hitEvidence;
+        private readonly Action<Vec3, Vec3, Vec3> mountedStrikeStarted;
+        private readonly Action mountedStrikeEnded;
         private InterceptionState state = InterceptionState.WaitingForSpeed;
         private Vec3 laneDirection;
         private Vec3 contactPoint;
         private float stateElapsed;
         private int attemptStartHitCount;
+        private bool mountedStrikeLifecycleActive;
 
         public GuardInterceptionStrikeComponent(
             Agent striker,
             Agent guard,
             GuardDriver guardDriver,
-            StrikerDriver hitEvidence)
+            StrikerDriver hitEvidence,
+            Action<Vec3, Vec3, Vec3> mountedStrikeStarted,
+            Action mountedStrikeEnded)
             : base(striker)
         {
             this.striker = striker;
             this.guard = guard;
             this.guardDriver = guardDriver;
             this.hitEvidence = hitEvidence;
+            this.mountedStrikeStarted = mountedStrikeStarted;
+            this.mountedStrikeEnded = mountedStrikeEnded;
         }
 
         public override void OnTick(float dt)
@@ -4100,7 +4309,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             if (!IsActiveMissionAgent(striker) ||
                 !IsActiveMissionAgent(guard))
             {
-                guardDriver.EndMountedStrike();
+                EndMountedStrikeLifecycle();
                 state = InterceptionState.Exhausted;
                 return;
             }
@@ -4147,14 +4356,14 @@ public class BattleGuardFixture : IBattleGuardFixture
             ObserveNativeAttack();
             if (guardDriver.Mode == BattleGuardFixtureMode.Mounted)
                 ObserveMountedGeometry();
-            guardDriver.EndMountedStrike();
+            EndMountedStrikeLifecycle();
             state = InterceptionState.Succeeded;
             stateElapsed = 0f;
         }
 
         public void Stop()
         {
-            guardDriver.EndMountedStrike();
+            EndMountedStrikeLifecycle();
         }
 
         public void ObserveHit(
@@ -4292,11 +4501,6 @@ public class BattleGuardFixture : IBattleGuardFixture
             Vec3 guardedLookDirection =
                 GetMountedStrikeGuardedLookDirection(
                     laneDirection);
-            guardDriver.BeginMountedStrike(
-                laneDirection,
-                guardedLookDirection,
-                striker);
-            guard.LookDirection = guardedLookDirection;
             StageRoute =
                 guardDriver.MountedRoute?.State ?? "none";
             StageProgress =
@@ -4327,6 +4531,16 @@ public class BattleGuardFixture : IBattleGuardFixture
             SetGroundHeight(ref strikerPosition);
             striker.TeleportToPosition(strikerPosition);
             FacePoint(striker, strikeTargetPoint);
+            guardDriver.BeginMountedStrike(
+                laneDirection,
+                guardedLookDirection,
+                strikerPosition);
+            guard.LookDirection = guardedLookDirection;
+            mountedStrikeLifecycleActive = true;
+            mountedStrikeStarted?.Invoke(
+                laneDirection,
+                guardedLookDirection,
+                strikerPosition);
             ProfileReleaseLead =
                 GetMountedStrikeReleaseLeadSeconds(Attempts);
 
@@ -4506,9 +4720,19 @@ public class BattleGuardFixture : IBattleGuardFixture
             return false;
         }
 
-        private void RecordMiss()
+        private void EndMountedStrikeLifecycle()
         {
             guardDriver.EndMountedStrike();
+            if (!mountedStrikeLifecycleActive)
+                return;
+
+            mountedStrikeLifecycleActive = false;
+            mountedStrikeEnded?.Invoke();
+        }
+
+        private void RecordMiss()
+        {
+            EndMountedStrikeLifecycle();
             state = InterceptionState.Recovery;
             stateElapsed = 0f;
         }
@@ -4517,7 +4741,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         {
             if (Attempts >= MaximumAttempts)
             {
-                guardDriver.EndMountedStrike();
+                EndMountedStrikeLifecycle();
                 state = InterceptionState.Exhausted;
                 stateElapsed = 0f;
                 return;
