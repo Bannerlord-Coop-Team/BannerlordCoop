@@ -1719,8 +1719,12 @@ public class MapEventDebugCommands
         if (deploymentHandler == null)
             return "The field battle is already active.";
 
+        mission.DisableDying = true;
         deploymentHandler.FinishDeployment();
-        return "Local deployment finished; the field battle is active.";
+        if (!ProtectLateJoinModeFixturePlayer(mission))
+            return "Local deployment finished, but the local player agent was not assigned.";
+
+        return "Local deployment finished; the field battle is active and the local player is protected.";
     }
 
     // coop.debug.mapevent.late_join_mode_disable_dying
@@ -1738,7 +1742,21 @@ public class MapEventDebugCommands
             return "No mission is active.";
 
         mission.DisableDying = true;
-        return "Dying disabled for the local fixture mission.";
+        var playerProtected = ProtectLateJoinModeFixturePlayer(mission);
+        return playerProtected
+            ? "Dying disabled for the local fixture mission; the local player is protected."
+            : "Dying disabled for the local fixture mission; the local player is not assigned yet.";
+    }
+
+    private static bool ProtectLateJoinModeFixturePlayer(Mission mission)
+    {
+        var mainAgent = mission.MainAgent;
+        if (mainAgent == null)
+            return false;
+
+        mainAgent.SetMortalityState(Agent.MortalityState.Immortal);
+        mainAgent.Health = mainAgent.HealthLimit;
+        return true;
     }
 
     // coop.debug.mapevent.late_join_mode_exit_missions
