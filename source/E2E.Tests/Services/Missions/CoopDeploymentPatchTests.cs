@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.Reflection;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
@@ -32,7 +32,7 @@ public class CoopDeploymentPatchTests
         try
         {
             // CreateClassProcessor(...).Patch() is exactly what PatchAll runs per type. With no class-level
-            // [HarmonyPatch] it returns NOTHING (the bug); with it, it hooks the two target methods below.
+            // [HarmonyPatch] it returns NOTHING (the bug); with it, it hooks the target methods below.
             var patched = harmony.CreateClassProcessor(patchType).Patch()
                           ?? new System.Collections.Generic.List<MethodInfo>();
 
@@ -40,6 +40,7 @@ public class CoopDeploymentPatchTests
             // MethodInfo identity. Empty/missing entries = the class wasn't processed = the patch never installs.
             Assert.Contains(patched, m => m.Name.Contains("IsPlanMade"));
             Assert.Contains(patched, m => m.Name.Contains("MakeTeamPlans"));
+            Assert.Contains(patched, m => m.Name.Contains("OnSideDeploymentOver"));
         }
         finally
         {

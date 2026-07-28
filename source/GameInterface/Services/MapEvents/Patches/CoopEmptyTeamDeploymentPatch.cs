@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Common.Logging;
 using HarmonyLib;
 using Serilog;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -18,20 +19,20 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// as the spawn gate, NOT while <c>MakeTeamPlans</c> is running. <c>MakeTeamPlans</c> uses the SAME
 /// <c>IsPlanMade(team)</c> as its "already planned?" guard, and at plan time EVERY team is still empty (troops spawn
 /// later), so forcing it true there would skip making the real plans — the troops then spawn into an unplanned team
-/// and crash (the host's <c>SpawnAgent</c> "Nullable object must have a value"). The <see cref="_inMakeTeamPlans"/>
+/// and crash (the host's <c>SpawnAgent</c> "Nullable object must have a value"). The <see cref="_buildingDeploymentPlan"/>
 /// flag scopes the override out of that path. <c>IsReinforcementPlanMade</c> is deliberately NOT overridden: leaving
 /// it false for an empty team keeps <c>CheckDeployment</c>'s plan-making loop alive (it gates the SKIP on
 /// <c>IsPlanMade &amp;&amp; IsReinforcementPlanMade</c>) so the fillable teams still get real plans. Scoped to coop.
 /// </para>
 /// </summary>
-[HarmonyPatch] // bare class-level marker so PatchAll discovers this multi-target (MakeTeamPlans + IsPlanMade) class
+[HarmonyPatch]
 internal class CoopEmptyTeamDeploymentPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopEmptyTeamDeploymentPatch>();
 
     // True while the engine is building a team's deployment plan — see the class remarks for why the override must
     // stand down here. Game-thread only; ThreadStatic is belt-and-suspenders.
-    [ThreadStatic] private static bool _inMakeTeamPlans;
+    [ThreadStatic] private static bool _buildingDeploymentPlan;
 
     // TEMP diagnostic: log each distinct team we treat as planned, once, so a live run confirms this build is active
     // and the override is firing on the foreign (puppet) team. Remove once the non-host spawn is confirmed solid.
@@ -39,18 +40,18 @@ internal class CoopEmptyTeamDeploymentPatch
 
     [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
     [HarmonyPrefix]
-    private static void MakeTeamPlans_Prefix() => _inMakeTeamPlans = true;
+    private static void MakeTeamPlans_Prefix() => _buildingDeploymentPlan = true;
 
     // Finalizer (not postfix) so the flag is cleared even if MakeTeamPlans throws.
     [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
     [HarmonyFinalizer]
-    private static void MakeTeamPlans_Finalizer() => _inMakeTeamPlans = false;
+    private static void MakeTeamPlans_Finalizer() => _buildingDeploymentPlan = false;
 
     [HarmonyPatch(typeof(DefaultMissionDeploymentPlan), nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) })]
     [HarmonyPostfix]
     private static void IsPlanMade_Postfix(Team team, ref bool __result)
     {
-        if (!__result && !_inMakeTeamPlans
+        if (!__result && !_buildingDeploymentPlan
             && BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive
             && IsForeignTeam(team))
         {
@@ -58,6 +59,47 @@ internal class CoopEmptyTeamDeploymentPatch
             if (_loggedOverrides.Add(team))
                 Logger.Information("[BattleDiag] Treating foreign team side={Side} (activeAgents={Count}) as deployment-planned so it doesn't stall the local spawn gate",
                     team.Side, team.ActiveAgents.Count);
+        }
+    }
+
+    [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), nameof(DefaultBattleMissionAgentSpawnLogic.OnSideDeploymentOver))]
+    [HarmonyPrefix]
+    private static void OnSideDeploymentOver_Prefix(DefaultBattleMissionAgentSpawnLogic __instance, BattleSideEnum battleSide)
+    {
+        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+
+        var mission = __instance.Mission;
+        var deploymentPlan = __instance._deploymentPlan;
+        if (mission == null || deploymentPlan == null) return;
+
+        bool wasBuildingDeploymentPlan = _buildingDeploymentPlan;
+        _buildingDeploymentPlan = true;
+        try
+        {
+            foreach (var team in mission.Teams)
+            {
+                if (team.Side != battleSide || deploymentPlan.IsPlanMade(team)) continue;
+
+                deploymentPlan.MakeDeploymentPlan(team);
+                if (deploymentPlan.IsPlanMade(team))
+                {
+                    Logger.Information(
+                        "[BattleSync] Created missing deployment plan before completing side {Side} for team {TeamIndex}",
+                        battleSide,
+                        team.TeamIndex);
+                }
+                else
+                {
+                    Logger.Error(
+                        "[BattleSync] Failed to create missing deployment plan before completing side {Side} for team {TeamIndex}",
+                        battleSide,
+                        team.TeamIndex);
+                }
+            }
+        }
+        finally
+        {
+            _buildingDeploymentPlan = wasBuildingDeploymentPlan;
         }
     }
 

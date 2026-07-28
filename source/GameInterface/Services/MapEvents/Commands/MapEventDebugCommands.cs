@@ -40,6 +40,7 @@ using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -50,6 +51,7 @@ public class MapEventDebugCommands
     private static WoundedAlliedFixture woundedAlliedFixture;
     private static BattleRewardFixture battleRewardFixture;
     private static PlayerFieldBattleFixture playerFieldBattleFixture;
+    private static RemoteDeploymentFixture remoteDeploymentFixture;
 
     private sealed class WoundedAlliedFixture
     {
@@ -95,6 +97,23 @@ public class MapEventDebugCommands
         public IFaction AttackerFaction;
         public IFaction DefenderFaction;
         public bool WasAtWar;
+    }
+
+    private sealed class RemoteDeploymentFixture
+    {
+        public string NonHostControllerId;
+        public string HostControllerId;
+        public RemoteDeploymentPartyState NonHostParty;
+        public RemoteDeploymentPartyState HostParty;
+        public MapEvent MapEvent;
+        public PartyBase[] InvolvedParties;
+    }
+
+    private sealed class RemoteDeploymentPartyState
+    {
+        public MobileParty Party;
+        public TroopRosterElement[] OriginalRoster;
+        public CampaignVec2 OriginalPosition;
     }
 
     /// <summary>
@@ -1198,8 +1217,8 @@ public class MapEventDebugCommands
             if (!fixture.MapEvent.IsFinalized)
                 fixture.MapEvent.FinalizeEvent();
 
-            if (HasAttachedFixtureParties(fixture))
-                RecoverPartiallyFinalizedMapEvent(fixture);
+            if (HasAttachedFixtureParties(fixture.MapEvent, fixture.InvolvedParties))
+                RecoverPartiallyFinalizedMapEvent(fixture.MapEvent, fixture.InvolvedParties);
         }
 
         fixture.PlayerHero.HitPoints = fixture.OriginalHitPoints;
@@ -1228,16 +1247,16 @@ public class MapEventDebugCommands
         }
     }
 
-    private static bool HasAttachedFixtureParties(WoundedAlliedFixture fixture) =>
-        fixture.InvolvedParties?.Any(p => p?._mapEventSide?.MapEvent == fixture.MapEvent) == true ||
-        fixture.MapEvent.AttackerSide?.Parties.Count > 0 ||
-        fixture.MapEvent.DefenderSide?.Parties.Count > 0;
+    private static bool HasAttachedFixtureParties(MapEvent mapEvent, PartyBase[] involvedParties) =>
+        involvedParties?.Any(p => p?._mapEventSide?.MapEvent == mapEvent) == true ||
+        mapEvent.AttackerSide?.Parties.Count > 0 ||
+        mapEvent.DefenderSide?.Parties.Count > 0;
 
-    private static void RecoverPartiallyFinalizedMapEvent(WoundedAlliedFixture fixture)
+    private static void RecoverPartiallyFinalizedMapEvent(MapEvent mapEvent, PartyBase[] involvedParties)
     {
-        foreach (var party in fixture.InvolvedParties ?? Array.Empty<PartyBase>())
+        foreach (var party in involvedParties ?? Array.Empty<PartyBase>())
         {
-            if (party?._mapEventSide?.MapEvent != fixture.MapEvent) continue;
+            if (party?._mapEventSide?.MapEvent != mapEvent) continue;
 
             party._mapEventSide = null;
             if (party.MobileParty != null)
@@ -1245,13 +1264,13 @@ public class MapEventDebugCommands
             party.SetVisualAsDirty();
         }
 
-        fixture.MapEvent.AttackerSide?.Clear();
-        fixture.MapEvent.DefenderSide?.Clear();
-        if (HasAttachedFixtureParties(fixture))
+        mapEvent.AttackerSide?.Clear();
+        mapEvent.DefenderSide?.Clear();
+        if (HasAttachedFixtureParties(mapEvent, involvedParties))
             throw new InvalidOperationException("The partially finalized fixture still has attached parties.");
 
-        MessageBroker.Instance.Publish(fixture.MapEvent, new MapEventFinalized(fixture.MapEvent));
-        MessageBroker.Instance.Publish(fixture.MapEvent, new InstanceDestroyed<MapEvent>(fixture.MapEvent));
+        MessageBroker.Instance.Publish(mapEvent, new MapEventFinalized(mapEvent));
+        MessageBroker.Instance.Publish(mapEvent, new InstanceDestroyed<MapEvent>(mapEvent));
     }
 
     private static bool TryRestoreWoundedAlliedFixture(WoundedAlliedFixture fixture, out string error)
@@ -1265,6 +1284,207 @@ public class MapEventDebugCommands
         catch (Exception e)
         {
             Logger.Error(e, "Failed to restore wounded allied force fixture");
+            error = e.Message;
+            return false;
+        }
+    }
+
+    [CommandLineArgumentFunction("remote_deployment_fixture_start", "coop.debug.mapevent")]
+    public static string StartRemoteDeploymentFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.remote_deployment_fixture_start <nonHostControllerId> <hostControllerId>";
+
+        if (remoteDeploymentFixture != null)
+            return $"Fixture already active for {remoteDeploymentFixture.NonHostControllerId} and {remoteDeploymentFixture.HostControllerId}.";
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var nonHostParty, out var error))
+            return error;
+        if (!TryGetPlayerParty(args[1], requireReady: true, out _, out var hostParty, out error))
+            return error;
+        if (nonHostParty == hostParty)
+            return "The non-host and host controller ids resolve to the same party.";
+        if (nonHostParty.PartyMoveMode != MoveModeType.Hold || hostParty.PartyMoveMode != MoveModeType.Hold)
+            return "Both player parties must be holding before the fixture starts.";
+
+        var fixtureTroop = MBObjectManager.Instance?.GetObject<CharacterObject>("imperial_infantryman");
+        if (fixtureTroop == null)
+            return "Unable to resolve imperial_infantryman for the fixture.";
+        if (!ContainerProvider.TryResolve<INetwork>(out var network))
+            return "Unable to resolve network.";
+
+        var fixture = new RemoteDeploymentFixture
+        {
+            NonHostControllerId = args[0],
+            HostControllerId = args[1],
+            NonHostParty = CaptureRemoteDeploymentParty(nonHostParty),
+            HostParty = CaptureRemoteDeploymentParty(hostParty),
+        };
+
+        try
+        {
+            EnsureHealthyTroops(nonHostParty, fixtureTroop, 60);
+            EnsureHealthyTroops(hostParty, fixtureTroop, 60);
+
+            fixture.MapEvent = MapEventBattleFactory.CreateMapEvent(hostParty.Party, nonHostParty.Party, default);
+            if (fixture.MapEvent == null)
+                throw new InvalidOperationException("The player-party field encounter did not create a map event.");
+
+            fixture.InvolvedParties = fixture.MapEvent.InvolvedParties.ToArray();
+            if (!objectManager.TryGetId(hostParty.Party, out string hostPartyId) ||
+                !objectManager.TryGetId(nonHostParty.Party, out string nonHostPartyId) ||
+                !objectManager.TryGetId(fixture.MapEvent, out string mapEventId))
+            {
+                throw new InvalidOperationException("Unable to resolve the fixture's network ids.");
+            }
+
+            network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
+                $"debug-2346-{Guid.NewGuid():N}",
+                hostPartyId,
+                nonHostPartyId,
+                mapEventId));
+            remoteDeploymentFixture = fixture;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to create remote deployment fixture");
+            remoteDeploymentFixture = fixture;
+            if (TryRestoreRemoteDeploymentFixture(fixture, out var restoreError))
+                remoteDeploymentFixture = null;
+            else
+                return $"Fixture setup failed: {e.Message}. Cleanup failed: {restoreError}. Run the restore command.";
+
+            return $"Fixture setup failed: {e.Message}";
+        }
+
+        objectManager.TryGetId(fixture.MapEvent, out string fixtureMapEventId);
+        return $"Remote deployment fixture started: nonHost={args[0]}, host={args[1]}, " +
+               $"mapEvent={fixtureMapEventId}, nonHostHealthy={nonHostParty.Party.NumberOfHealthyMembers}, " +
+               $"hostHealthy={hostParty.Party.NumberOfHealthyMembers}.";
+    }
+
+    [CommandLineArgumentFunction("remote_deployment_fixture_state", "coop.debug.mapevent")]
+    public static string GetRemoteDeploymentFixtureState(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.remote_deployment_fixture_state <nonHostControllerId> <hostControllerId>";
+
+        if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var nonHostParty, out var error))
+            return error;
+        if (!TryGetPlayerParty(args[1], requireReady: false, out _, out var hostParty, out error))
+            return error;
+
+        var mapEvent = nonHostParty.MapEvent;
+        string mapEventId = null;
+        if (mapEvent != null)
+            objectManager.TryGetId(mapEvent, out mapEventId);
+        var localParty = MobileParty.MainParty;
+        var localRole = localParty == nonHostParty ? "non-host" : localParty == hostParty ? "host" : "server";
+
+        return $"Remote deployment fixture state: localRole={localRole}, sameMapEvent={mapEvent != null && hostParty.MapEvent == mapEvent}, " +
+               $"mapEvent={mapEventId ?? "none"}, nonHostSide={nonHostParty.Party.MapEventSide?.MissionSide}, " +
+               $"hostSide={hostParty.Party.MapEventSide?.MissionSide}, " +
+               $"nonHostHealthy={nonHostParty.Party.NumberOfHealthyMembers}, hostHealthy={hostParty.Party.NumberOfHealthyMembers}.";
+    }
+
+    [CommandLineArgumentFunction("remote_deployment_fixture_restore", "coop.debug.mapevent")]
+    public static string RestoreRemoteDeploymentFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.remote_deployment_fixture_restore <nonHostControllerId> <hostControllerId>";
+
+        if (remoteDeploymentFixture == null ||
+            remoteDeploymentFixture.NonHostControllerId != args[0] ||
+            remoteDeploymentFixture.HostControllerId != args[1])
+        {
+            return $"No active fixture exists for {args[0]} and {args[1]}.";
+        }
+
+        var fixture = remoteDeploymentFixture;
+        if (!TryRestoreRemoteDeploymentFixture(fixture, out var error))
+            return $"Fixture restore failed: {error}. Retry the restore command.";
+
+        remoteDeploymentFixture = null;
+        return $"Remote deployment fixture restored: nonHost={args[0]}, host={args[1]}.";
+    }
+
+    private static RemoteDeploymentPartyState CaptureRemoteDeploymentParty(MobileParty party)
+    {
+        return new RemoteDeploymentPartyState
+        {
+            Party = party,
+            OriginalRoster = party.MemberRoster.GetTroopRoster().ToArray(),
+            OriginalPosition = party.Position,
+        };
+    }
+
+    private static void EnsureHealthyTroops(MobileParty party, CharacterObject troop, int minimum)
+    {
+        int missing = minimum - party.Party.NumberOfHealthyMembers;
+        if (missing > 0)
+            party.MemberRoster.AddToCounts(troop, missing, false, 0, 0, true);
+    }
+
+    private static void RestoreRemoteDeploymentFixture(RemoteDeploymentFixture fixture)
+    {
+        if (fixture.MapEvent != null)
+        {
+            if (!fixture.MapEvent.IsFinalized)
+                fixture.MapEvent.FinalizeEvent();
+
+            if (HasAttachedFixtureParties(fixture.MapEvent, fixture.InvolvedParties))
+                RecoverPartiallyFinalizedMapEvent(fixture.MapEvent, fixture.InvolvedParties);
+        }
+
+        RestoreRemoteDeploymentParty(fixture.NonHostParty);
+        RestoreRemoteDeploymentParty(fixture.HostParty);
+    }
+
+    private static void RestoreRemoteDeploymentParty(RemoteDeploymentPartyState state)
+    {
+        var party = state.Party;
+        party.Position = state.OriginalPosition;
+        party.SetMoveModeHold();
+        party.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(MapEventDebugCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea,
+                resetMovementToHold: true));
+
+        var roster = party.MemberRoster;
+        for (int i = roster.Count - 1; i >= 0; i--)
+        {
+            var element = roster.GetElementCopyAtIndex(i);
+            roster.AddToCountsAtIndex(i, -element.Number, -element.WoundedNumber, 0, false);
+        }
+
+        foreach (var element in state.OriginalRoster)
+            roster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, true);
+    }
+
+    private static bool TryRestoreRemoteDeploymentFixture(RemoteDeploymentFixture fixture, out string error)
+    {
+        try
+        {
+            RestoreRemoteDeploymentFixture(fixture);
+            error = null;
+            return true;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to restore remote deployment fixture");
             error = e.Message;
             return false;
         }

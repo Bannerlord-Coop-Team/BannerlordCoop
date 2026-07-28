@@ -37,12 +37,15 @@ internal static class BattleDebugCommands
         }
 
         var enemies = new List<Agent>();
+        var enemyTeams = new List<Team>();
+        var enemySide = BattleSideEnum.None;
         int enemyParties = 0;
         if (playerTeam != null)
         {
-            var enemySide = playerTeam.Side == BattleSideEnum.Attacker
+            enemySide = playerTeam.Side == BattleSideEnum.Attacker
                 ? BattleSideEnum.Defender
                 : BattleSideEnum.Attacker;
+            enemyTeams.AddRange(mission.Teams.Where(team => team.Side == enemySide));
             enemies.AddRange(mission.Agents
                 .Where(agent => agent.IsActive() && agent.IsHuman && agent.Team?.Side == enemySide));
             enemyParties = playerTeam.Side == BattleSideEnum.Attacker
@@ -62,12 +65,23 @@ internal static class BattleDebugCommands
         }
 
         bool deploymentReady = mission.GetMissionBehavior<DeploymentMissionController>()?.TeamSetupOver == true;
+        var spawnLogic = mission.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();
+        int enemyInitialSpawn = enemySide == BattleSideEnum.None || spawnLogic == null
+            ? -1
+            : spawnLogic.GetActivePhaseForSide(enemySide).InitialSpawnNumber;
+        var defaultDeploymentPlan = mission.DeploymentPlan as DefaultMissionDeploymentPlan;
+        int enemyRawPlansMade = defaultDeploymentPlan == null
+            ? -1
+            : enemyTeams.Count(team => defaultDeploymentPlan.GetTeamPlan(team).IsPlanMade());
+        int enemyGeneralFormations = enemyTeams.Count(team => team.GeneralsFormation != null);
         int activeAgents = mission.Agents.Count(agent => agent.IsActive());
 
         return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
             $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
             $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
-            $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyMovedSinceLast={moved}";
+            $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyMovedSinceLast={moved} " +
+            $"enemyInitialSpawn={enemyInitialSpawn} enemyRawPlans={enemyRawPlansMade}/{enemyTeams.Count} " +
+            $"enemyGeneralFormations={enemyGeneralFormations}";
     }
 }
