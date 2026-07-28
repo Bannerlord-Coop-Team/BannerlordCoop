@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
@@ -43,6 +44,10 @@ internal class VassalServiceHandler : IHandler
         messageBroker.Subscribe<VassalServiceAccepted>(HandleVassalServiceAccepted);
         messageBroker.Subscribe<RequestVassalService>(HandleRequestVassalService);
         messageBroker.Subscribe<VassalServiceResult>(HandleVassalServiceResult);
+        messageBroker.Subscribe<VassalServiceLeft>(HandleVassalServiceLeft);
+        messageBroker.Subscribe<RequestLeaveVassalService>(HandleRequestLeaveVassalService);
+        messageBroker.Subscribe<StartRebellion>(HandleStartRebellion);
+        messageBroker.Subscribe<NetworkStartRebellion>(HandleNetworkStartRebellion);
     }
 
     public void Dispose()
@@ -50,6 +55,10 @@ internal class VassalServiceHandler : IHandler
         messageBroker.Unsubscribe<VassalServiceAccepted>(HandleVassalServiceAccepted);
         messageBroker.Unsubscribe<RequestVassalService>(HandleRequestVassalService);
         messageBroker.Unsubscribe<VassalServiceResult>(HandleVassalServiceResult);
+        messageBroker.Unsubscribe<VassalServiceLeft>(HandleVassalServiceLeft);
+        messageBroker.Unsubscribe<RequestLeaveVassalService>(HandleRequestLeaveVassalService);
+        messageBroker.Unsubscribe<StartRebellion>(HandleStartRebellion);
+        messageBroker.Unsubscribe<NetworkStartRebellion>(HandleNetworkStartRebellion);
     }
 
     private void HandleVassalServiceAccepted(MessagePayload<VassalServiceAccepted> payload)
@@ -183,5 +192,33 @@ internal class VassalServiceHandler : IHandler
                 new TextObject("{=tKW8m6bZ}Reward Troops"));
             behavior._receivedVassalRewards = true;
         }, context: nameof(VassalServiceHandler));
+    }
+    private void HandleVassalServiceLeft(MessagePayload<VassalServiceLeft> payload )
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
+
+        network.SendAll(new RequestLeaveVassalService(clanId));
+    }
+    private void HandleRequestLeaveVassalService(MessagePayload<RequestLeaveVassalService> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+            ChangeKingdomAction.ApplyByLeaveKingdom(clan, true);
+        });
+    }
+    private void HandleStartRebellion(MessagePayload<StartRebellion> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
+
+        network.SendAll(new NetworkStartRebellion(clanId));
+    }
+    private void HandleNetworkStartRebellion(MessagePayload<NetworkStartRebellion> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+            ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(clan, true);
+        });
     }
 }
