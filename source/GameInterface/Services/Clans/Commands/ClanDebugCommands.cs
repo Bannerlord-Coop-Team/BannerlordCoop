@@ -432,6 +432,30 @@ namespace GameInterface.Services.GameDebug.Commands
             sb.AppendLine($"Members: {string.Join(", ", clan.Heroes.Select(h => h.Name))}");
             return sb.ToString();
         }
+
+        [CommandLineArgumentFunction("daily_gold_change", "coop.debug.clan")]
+        public static string ViewPredicatedDailyGoldChange(List<string> args)
+        {
+            if (args.Count != 1)
+                return "Usage: coop.debug.clan.info <clanId>";
+
+            if (!TryGetObjectManager(out IObjectManager objectManager))
+                return "Unable to resolve ObjectManager";
+
+            if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
+                return $"Unable to get Clan with {args[0]}";
+
+            var goldChange = Campaign.Current.Models.ClanFinanceModel.CalculateClanGoldChange(clan, true, false, true);
+
+            var sb = new StringBuilder();
+            foreach (var explanation in goldChange._explainer.Lines)
+            {
+                sb.AppendLine($"{explanation.Name}: {explanation.Number}");
+            }
+            sb.AppendLine($"Total: {goldChange.ResultNumber}");
+
+            return sb.ToString();
+        }
     }
 }
 //coop.debug.clan.add_renown Player 1000

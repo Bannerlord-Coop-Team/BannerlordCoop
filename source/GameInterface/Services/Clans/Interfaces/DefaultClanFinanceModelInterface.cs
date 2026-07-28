@@ -4,6 +4,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -13,6 +14,8 @@ public interface IDefaultClanFinanceModelInterface : IGameAbstraction
 {
     int AddExpenseFromLeaderParty(DefaultClanFinanceModel model, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals);
     void CalculateClanIncomeInternal(DefaultClanFinanceModel model, Clan clan, ref ExplainedNumber goldChange, bool applyWithdrawals = false, bool includeDetails = false);
+    void CalculateClanExpensesForPlayerClan(DefaultClanFinanceModel __instance, Clan clan, ref ExplainedNumber goldChange, bool applyWithdrawals = false, bool includeDetails = false);
+    int AddPartyExpense(DefaultClanFinanceModel __instance, MobileParty party, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals);
 }
 
 public class DefaultClanFinanceModelInterface : IDefaultClanFinanceModelInterface
@@ -82,6 +85,66 @@ public class DefaultClanFinanceModelInterface : IDefaultClanFinanceModelInterfac
         }
     }
 
+    public void CalculateClanExpensesForPlayerClan(DefaultClanFinanceModel __instance, Clan clan, ref ExplainedNumber goldChange, bool applyWithdrawals = false, bool includeDetails = false)
+    {
+        __instance.AddExpensesFromPartiesAndGarrisons(clan, ref goldChange, applyWithdrawals, includeDetails);
+        if (!clan.IsUnderMercenaryService)
+        {
+            __instance.AddExpensesForHiredMercenaries(clan, ref goldChange, applyWithdrawals);
+            __instance.AddExpensesForTributes(clan, ref goldChange, applyWithdrawals);
+        }
+        __instance.AddExpensesForAutoRecruitment(clan, ref goldChange, applyWithdrawals);
+        if (clan.DebtToKingdom > 0)
+        {
+            __instance.AddPaymentForDebts(clan, ref goldChange, applyWithdrawals);
+        }
+        if (!clan.IsUnderMercenaryService)
+        {
+            __instance.AddExpensesForCallToWarAgreements(clan, ref goldChange, applyWithdrawals);
+        }
+        AddExpenseForPlayerWorkshops(clan, ref goldChange);
+    }
+
+    public int AddPartyExpense(DefaultClanFinanceModel __instance, MobileParty party, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals)
+    {
+        int initialGoldAfterChange = clan.Gold + (int)goldChange.ResultNumber;
+        int actualGoldAfterChange = initialGoldAfterChange;
+        if (initialGoldAfterChange < (party.IsGarrison ? 8000 : 4000) && applyWithdrawals && !clan.IsPlayerClan()) // Replace usage of clan != Clan.PlayerClan
+        {
+            actualGoldAfterChange = ((party.LeaderHero != null && party.PartyTradeGold < 500) ? MathF.Min(initialGoldAfterChange, 250) : 0);
+        }
+        int partyWage = __instance.CalculatePartyWage(party, actualGoldAfterChange, applyWithdrawals);
+
+        int partyTradeGold = party.PartyTradeGold;
+        if (applyWithdrawals)
+        {
+            if (party.IsLordParty && party.LeaderHero == null)
+            {
+                party.ActualClan.Leader.Gold -= partyWage;
+            }
+            else
+            {
+                party.PartyTradeGold -= partyWage;
+            }
+        }
+        partyTradeGold -= partyWage;
+        if (partyTradeGold < __instance.PartyGoldLowerThreshold)
+        {
+            int wage = __instance.PartyGoldLowerThreshold - partyTradeGold;
+            if (party.IsLordParty && party.LeaderHero == null)
+            {
+                wage = partyWage;
+            }
+            if (applyWithdrawals)
+            {
+                wage = MathF.Min(wage, actualGoldAfterChange);
+                party.PartyTradeGold += wage;
+            }
+            return -wage;
+        }
+        return 0;
+    }
+
     private void AddIncomeFromOwnedAlleys(Clan clan, ref ExplainedNumber goldChange)
     {
         int income = 0;
@@ -98,6 +161,24 @@ public class DefaultClanFinanceModelInterface : IDefaultClanFinanceModelInterfac
         if (income != 0)
         {
             goldChange.Add(income, AlleyIncomeText);
+        }
+    }
+
+    private void AddExpenseForPlayerWorkshops(Clan clan, ref ExplainedNumber goldChange)
+    {
+        foreach (var hero in clan.Heroes)
+        {
+            if (!hero.IsAlive) continue;
+
+            int expense = 0;
+            foreach (Workshop workshop in hero.OwnedWorkshops)
+            {
+                if (workshop.Capital < Campaign.Current.Models.WorkshopModel.CapitalLowLimit)
+                {
+                    expense -= workshop.Expense;
+                }
+            }
+            goldChange.Add((float)expense, DefaultClanFinanceModel._shopExpenseText, null);
         }
     }
 }
