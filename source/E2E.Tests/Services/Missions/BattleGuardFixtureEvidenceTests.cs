@@ -1220,27 +1220,35 @@ public class BattleGuardFixtureEvidenceTests
     [InlineData(
         BattleGuardFixtureDirection.Up,
         Agent.MovementControlFlag.DefendUp,
+        Agent.MovementControlFlag.AttackUp,
         Agent.GuardMode.Up)]
     [InlineData(
         BattleGuardFixtureDirection.Down,
         Agent.MovementControlFlag.DefendDown,
+        Agent.MovementControlFlag.AttackDown,
         Agent.GuardMode.Down)]
     [InlineData(
         BattleGuardFixtureDirection.Left,
         Agent.MovementControlFlag.DefendLeft,
+        Agent.MovementControlFlag.AttackRight,
         Agent.GuardMode.Left)]
     [InlineData(
         BattleGuardFixtureDirection.Right,
         Agent.MovementControlFlag.DefendRight,
+        Agent.MovementControlFlag.AttackLeft,
         Agent.GuardMode.Right)]
     public void GuardDirection_MapsToExactNativeInput(
         BattleGuardFixtureDirection direction,
         Agent.MovementControlFlag directionFlag,
+        Agent.MovementControlFlag attackFlag,
         Agent.GuardMode guardMode)
     {
         Assert.Equal(
             Agent.MovementControlFlag.DefendBlock | directionFlag,
             BattleGuardFixture.GetDefendFlags(direction));
+        Assert.Equal(
+            attackFlag,
+            BattleGuardFixture.GetAttackFlagForGuard(direction));
         Assert.Equal(
             guardMode,
             BattleGuardFixture.GetGuardMode(direction));

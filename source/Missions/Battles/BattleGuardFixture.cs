@@ -1278,6 +1278,19 @@ public class BattleGuardFixture : IBattleGuardFixture
         return Agent.MovementControlFlag.DefendBlock | directionFlag;
     }
 
+    internal static Agent.MovementControlFlag GetAttackFlagForGuard(
+        BattleGuardFixtureDirection direction) =>
+        direction switch
+        {
+            BattleGuardFixtureDirection.Down =>
+                Agent.MovementControlFlag.AttackDown,
+            BattleGuardFixtureDirection.Left =>
+                Agent.MovementControlFlag.AttackRight,
+            BattleGuardFixtureDirection.Right =>
+                Agent.MovementControlFlag.AttackLeft,
+            _ => Agent.MovementControlFlag.AttackUp
+        };
+
     internal static Agent.GuardMode GetGuardMode(
         BattleGuardFixtureDirection direction) =>
         direction switch
@@ -3827,7 +3840,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         {
             eventFlag = Agent.EventControlFlag.None;
             movementFlag = state == InterceptionState.Charging
-                ? Agent.MovementControlFlag.AttackUp
+                ? GetAttackFlagForGuard(guardDriver.Direction)
                 : Agent.MovementControlFlag.None;
             inputVector = Vec2.Zero;
         }
