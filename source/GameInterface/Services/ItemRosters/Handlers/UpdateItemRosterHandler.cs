@@ -4,8 +4,11 @@ using Common.Messaging;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
@@ -19,11 +22,16 @@ internal class UpdateItemRosterHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<UpdateItemRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider;
 
-    public UpdateItemRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public UpdateItemRosterHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.partyScreenRosterBaselineProvider = partyScreenRosterBaselineProvider;
 
         messageBroker.Subscribe<UpdateItemRoster>(Handle);
     }
@@ -59,7 +67,14 @@ internal class UpdateItemRosterHandler : IHandler
                     return;
                 }
 
-                ItemRosterPatch.AddToCountsOverride(itemRoster, new EquipmentElement(item, modifier), msg.Amount);
+                var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+                var baseline = partyScreenRosterBaselineProvider.GetBaselineRoster(logic, itemRoster);
+                var element = new EquipmentElement(item, modifier);
+                ItemRosterPatch.AddToCountsOverride(itemRoster, element, msg.Amount);
+                if (baseline != null)
+                {
+                    ItemRosterPatch.AddToCountsOverride(baseline, element, msg.Amount);
+                }
             }
             catch (Exception e)
             {

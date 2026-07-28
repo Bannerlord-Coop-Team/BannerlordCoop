@@ -40,14 +40,14 @@ internal class TroopRosterDeltaHandler : IHandler
     private readonly INetwork network;
     private readonly ISendCoalescer coalescer;
     private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
-    private readonly IPartyScreenRosterRebaser partyScreenRosterRebaser;
+    private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
 
     public TroopRosterDeltaHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         IEncounterMenuConditionRefresher encounterMenuConditionRefresher,
-        IPartyScreenRosterRebaser partyScreenRosterRebaser,
+        IPartyScreenRosterRefresher partyScreenRosterRefresher,
         ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -55,7 +55,7 @@ internal class TroopRosterDeltaHandler : IHandler
         this.network = network;
         this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
         this.coalescer = coalescer;
-        this.partyScreenRosterRebaser = partyScreenRosterRebaser;
+        this.partyScreenRosterRefresher = partyScreenRosterRefresher;
 
         // Authority send path: the roster patches publish these local events (server-only) with the server index.
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
@@ -269,7 +269,7 @@ internal class TroopRosterDeltaHandler : IHandler
             using (new AllowedThread())
             {
                 if (!objectManager.TryGetObjectWithLogging(rosterId, out roster)) return;
-                if (!partyScreenRosterRebaser.TryRemoveZeroCounts(roster))
+                if (!partyScreenRosterRefresher.TryRemoveZeroCounts(roster))
                 {
                     roster.RemoveZeroCounts();
                     roster.InitializeCachedData();
@@ -296,7 +296,7 @@ internal class TroopRosterDeltaHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging(rosterId, out roster)) return;
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character)) return;
 
-                if (!partyScreenRosterRebaser.TryApply(roster, character, apply))
+                if (!partyScreenRosterRefresher.TryApply(roster, character, apply))
                 {
                     apply(roster, character);
                 }

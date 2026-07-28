@@ -1,37 +1,43 @@
-﻿using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.Party;
+﻿using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.Party;
 
 internal interface IPartyScreenRosterBaselineProvider
 {
-    TroopRoster GetBaselineRoster(TroopRoster roster);
+    TroopRoster GetBaselineRoster(PartyScreenLogic logic, TroopRoster roster);
+
+    ItemRoster GetBaselineRoster(PartyScreenLogic logic, ItemRoster roster);
 }
 
 internal class PartyScreenRosterBaselineProvider : IPartyScreenRosterBaselineProvider
 {
-    public TroopRoster GetBaselineRoster(TroopRoster roster)
-    {
-        var logic = Game.Current?.GameStateManager?.LastOrDefault<PartyState>()?.PartyScreenLogic;
-        return GetBaselineRoster(logic, roster);
-    }
-
-    internal TroopRoster GetBaselineRoster(PartyScreenLogic logic, TroopRoster roster)
+    public TroopRoster GetBaselineRoster(PartyScreenLogic logic, TroopRoster roster)
     {
         if (logic == null || roster == null)
             return null;
 
-        if (ReferenceEquals(roster, logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]))
+        if (ReferenceEquals(roster, logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]) ||
+            ReferenceEquals(roster, logic.RightOwnerParty?.MemberRoster))
             return logic._initialData.RightMemberRoster;
-        if (ReferenceEquals(roster, logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left]))
+        if (ReferenceEquals(roster, logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left]) ||
+            ReferenceEquals(roster, logic.LeftOwnerParty?.MemberRoster))
             return logic._initialData.LeftMemberRoster;
-        if (ReferenceEquals(roster, logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right]))
+        if (ReferenceEquals(roster, logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right]) ||
+            ReferenceEquals(roster, logic.RightOwnerParty?.PrisonRoster))
             return logic._initialData.RightPrisonerRoster;
-        if (ReferenceEquals(roster, logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left]))
+        if (ReferenceEquals(roster, logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left]) ||
+            ReferenceEquals(roster, logic.LeftOwnerParty?.PrisonRoster))
             return logic._initialData.LeftPrisonerRoster;
 
         return null;
+    }
+
+    public ItemRoster GetBaselineRoster(PartyScreenLogic logic, ItemRoster roster)
+    {
+        if (logic == null || roster == null) return null;
+        return ReferenceEquals(roster, logic.CurrentData.RightItemRoster)
+            ? logic._initialData.RightItemRoster
+            : null;
     }
 }

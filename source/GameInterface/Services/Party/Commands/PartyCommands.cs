@@ -218,34 +218,68 @@ internal class PartyCommands
     public static string SetTroopWoundedCommand(List<string> strings)
     {
         if (!ModInformation.IsServer) return "Command can only be run on the server.";
-        if (strings.Count < 3)
-            return "Usage: coop.debug.mobileparty.set_troop_wounded <hero name or id> <character id> <wounded count>";
+        if (strings.Count != 3)
+            return "Usage: coop.debug.mobileparty.set_troop_wounded <party id> <character id> <wounded count>";
 
-        if (!int.TryParse(strings[strings.Count - 1], out var woundedCount))
+        if (!int.TryParse(strings[2], out var woundedCount))
             return "Please enter an integer for wounded count.";
 
-        var characterId = strings[strings.Count - 2];
-        var heroNameOrId = string.Join(" ", strings.Take(strings.Count - 2));
-        if (!TryGetHeroWithParty(heroNameOrId, out var hero, out var error)) return error;
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
-        if (!objectManager.TryGetObject(characterId, out CharacterObject character))
-            return $"Character with id {characterId} not found.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found.";
+        if (!objectManager.TryGetObject(strings[1], out CharacterObject character))
+            return $"Character with id {strings[1]} not found.";
 
-        var roster = hero.PartyBelongedTo.MemberRoster;
+        var roster = party.MemberRoster;
         var index = roster.FindIndexOfTroop(character);
         if (index < 0)
-            return $"{characterId} is not in {hero.Name}'s member roster.";
+            return $"{strings[1]} is not in {party.Name}'s member roster.";
 
         var element = roster.GetElementCopyAtIndex(index);
         if (woundedCount < 0 || woundedCount > element.Number)
             return $"Wounded count must be between 0 and {element.Number}.";
 
         roster.SetElementWoundedNumber(index, woundedCount);
-        return $"Set {characterId} wounded count to {woundedCount} in {hero.Name}'s member roster.";
+        return $"Set {strings[1]} oldWounded={element.WoundedNumber} newWounded={woundedCount}.";
     }
 
     /// <summary>
-    /// Reports the live roster, rebased baseline, and rendered VM state for one open party-screen row.
+    /// Creates a real pending Party-screen transfer for live synchronization tests.
+    /// </summary>
+    [CommandLineArgumentFunction("stage_party_screen_transfer", "coop.debug.mobileparty")]
+    public static string StagePartyScreenTransferCommand(List<string> strings)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (strings.Count != 1)
+            return "Usage: coop.debug.mobileparty.stage_party_screen_transfer <character id>";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
+            return $"Character with id {strings[0]} not found.";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
+            return "No active party screen.";
+
+        var logic = partyState.PartyScreenLogic;
+        var source = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right];
+        int index = source.FindIndexOfTroop(character);
+        if (index < 0) return $"{strings[0]} is not in the right member roster.";
+
+        var element = source.GetElementCopyAtIndex(index);
+        var command = new PartyScreenLogic.PartyCommand();
+        command.FillForTransferTroop(
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Member,
+            character,
+            1,
+            element.Number == element.WoundedNumber ? 1 : 0,
+            logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left].Count);
+        if (!logic.ValidateCommand(command)) return "The Party screen rejected the transfer.";
+
+        logic.AddCommand(command);
+        return $"PARTY_SCREEN_EDIT_STAGED pending={logic.IsThereAnyChanges()}";
+    }
+
+    /// <summary>
+    /// Reports the visible roster, Done baseline, and rendered VM state for one open Party-screen row.
     /// </summary>
     [CommandLineArgumentFunction("party_screen_troop_state", "coop.debug.mobileparty")]
     public static string PartyScreenTroopStateCommand(List<string> strings)
@@ -264,28 +298,18 @@ internal class PartyCommands
         var baseline = GetRosterElement(logic._initialData.RightMemberRoster, character);
         var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
         var row = partyVm?.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
-        if (row != null)
-        {
-            if (row.IsSelected)
-            {
-                partyVm.SetSelectedCharacter(row);
-            }
-            else
-            {
-                partyVm.ExecuteSelectCharacterTuple(row);
-            }
-        }
         var rendered = row == null
-            ? (number: -1, wounded: -1, xp: -1)
-            : (number: row.Troop.Number, wounded: row.Troop.WoundedNumber, xp: row.Troop.Xp);
+            ? (number: -1, wounded: -1)
+            : (number: row.Troop.Number, wounded: row.Troop.WoundedNumber);
 
         return $"PARTY_SCREEN_TROOP_STATE character={strings[0]} " +
-               $"visibleNumber={visible.number} visibleWounded={visible.wounded} visibleXp={visible.xp} " +
-               $"baselineNumber={baseline.number} baselineWounded={baseline.wounded} baselineXp={baseline.xp} " +
-               $"vmNumber={rendered.number} vmWounded={rendered.wounded} vmXp={rendered.xp}";
+               $"visibleNumber={visible.number} visibleWounded={visible.wounded} " +
+               $"baselineNumber={baseline.number} baselineWounded={baseline.wounded} " +
+               $"vmNumber={rendered.number} vmWounded={rendered.wounded} " +
+               $"pending={logic.IsThereAnyChanges()}";
     }
 
-    private static (int number, int wounded, int xp) GetRosterElement(
+    private static (int number, int wounded) GetRosterElement(
         TroopRoster roster,
         CharacterObject character)
     {
@@ -293,7 +317,7 @@ internal class PartyCommands
         if (index < 0) return default;
 
         var element = roster.GetElementCopyAtIndex(index);
-        return (element.Number, element.WoundedNumber, element.Xp);
+        return (element.Number, element.WoundedNumber);
     }
 
     /// <summary>

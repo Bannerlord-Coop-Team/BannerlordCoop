@@ -4,9 +4,13 @@ using Common.Messaging;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.ItemRosters.Handlers
 {
@@ -18,10 +22,15 @@ namespace GameInterface.Services.ItemRosters.Handlers
         private static readonly ILogger Logger = LogManager.GetLogger<ClearItemRosterHandler>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
+        private readonly IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider;
 
-        public ClearItemRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager) {
+        public ClearItemRosterHandler(
+            IMessageBroker messageBroker,
+            IObjectManager objectManager,
+            IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider) {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
+            this.partyScreenRosterBaselineProvider = partyScreenRosterBaselineProvider;
 
             messageBroker.Subscribe<ClearItemRoster>(Handle);
         }
@@ -36,7 +45,10 @@ namespace GameInterface.Services.ItemRosters.Handlers
                 {
                     if (!objectManager.TryGetObjectWithLogging<ItemRoster>(data.ItemRosterId, out var itemRoster)) return;
 
+                    var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+                    var baseline = partyScreenRosterBaselineProvider.GetBaselineRoster(logic, itemRoster);
                     ItemRosterPatch.ClearOverride(itemRoster);
+                    if (baseline != null) ItemRosterPatch.ClearOverride(baseline);
                 }
                 catch (Exception e)
                 {

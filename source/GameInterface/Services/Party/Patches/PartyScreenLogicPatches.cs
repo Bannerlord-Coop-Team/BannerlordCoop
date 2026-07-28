@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Party.Messages;
@@ -11,7 +10,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
 using MathF = TaleWorlds.Library.MathF;
 
@@ -28,99 +26,6 @@ internal class PartyScreenLogicPatches
         get => _inCommit;
         private set => _inCommit = value;
     }
-
-    [HarmonyPatch(nameof(PartyScreenLogic.RemoveZeroCounts))]
-    [HarmonyPrefix]
-    internal static void RemoveZeroCountsPrefix(
-        PartyScreenLogic __instance,
-        out List<PreservedZeroRow> __state)
-    {
-        __state = null;
-        if (!ModInformation.IsClient) return;
-
-        bool preserveMissingBaseline =
-            PartyVMInitializationPatches.IsInitializing(__instance);
-        var preservedRows = new List<PreservedZeroRow>();
-        CaptureOwnerZeroRows(
-            __instance.MemberRosters[0],
-            __instance._initialData.LeftMemberRoster,
-            __instance.LeftOwnerParty?.MemberRoster,
-            preserveMissingBaseline,
-            preservedRows);
-        CaptureOwnerZeroRows(
-            __instance.PrisonerRosters[0],
-            __instance._initialData.LeftPrisonerRoster,
-            __instance.LeftOwnerParty?.PrisonRoster,
-            preserveMissingBaseline,
-            preservedRows);
-        CaptureOwnerZeroRows(
-            __instance.MemberRosters[1],
-            __instance._initialData.RightMemberRoster,
-            __instance.RightOwnerParty?.MemberRoster,
-            preserveMissingBaseline,
-            preservedRows);
-        CaptureOwnerZeroRows(
-            __instance.PrisonerRosters[1],
-            __instance._initialData.RightPrisonerRoster,
-            __instance.RightOwnerParty?.PrisonRoster,
-            preserveMissingBaseline,
-            preservedRows);
-
-        if (preservedRows.Count > 0)
-        {
-            __state = preservedRows;
-        }
-    }
-
-    [HarmonyPatch(nameof(PartyScreenLogic.RemoveZeroCounts))]
-    [HarmonyPostfix]
-    internal static void RemoveZeroCountsPostfix(List<PreservedZeroRow> __state)
-    {
-        if (__state == null) return;
-
-        foreach (var preservedRow in __state)
-        {
-            RosterElementState.Write(
-                preservedRow.Visible,
-                preservedRow.Character,
-                preservedRow.VisibleState);
-            if (preservedRow.SeedBaseline)
-            {
-                RosterElementState.Write(
-                    preservedRow.Baseline,
-                    preservedRow.Character,
-                    preservedRow.VisibleState);
-            }
-        }
-    }
-
-    internal static void CaptureOwnerZeroRows(
-        TroopRoster visible,
-        TroopRoster baseline,
-        TroopRoster owner,
-        bool preserveMissingBaseline,
-        List<PreservedZeroRow> preservedRows)
-    {
-        if (!ReferenceEquals(visible, owner)) return;
-
-        for (int index = 0; index < visible.Count; index++)
-        {
-            var element = visible.GetElementCopyAtIndex(index);
-            if (element.Number != 0) continue;
-
-            var baselineState = RosterElementState.Read(baseline, element.Character);
-            if (baselineState.Exists && baselineState.Number != 0) continue;
-            if (!baselineState.Exists && !preserveMissingBaseline) continue;
-
-            preservedRows.Add(new PreservedZeroRow(
-                visible,
-                baseline,
-                element.Character,
-                RosterElementState.Read(visible, element.Character),
-                seedBaseline: !baselineState.Exists));
-        }
-    }
-
     [HarmonyPatch(nameof(PartyScreenLogic.DoneLogic))]
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
@@ -273,57 +178,5 @@ internal class PartyScreenLogicPatches
     {
         __result = ExecutionDisabledReason;
         return false;
-    }
-
-    internal readonly struct PreservedZeroRow
-    {
-        public readonly TroopRoster Visible;
-        public readonly TroopRoster Baseline;
-        public readonly CharacterObject Character;
-        public readonly RosterElementState VisibleState;
-        public readonly bool SeedBaseline;
-
-        public PreservedZeroRow(
-            TroopRoster visible,
-            TroopRoster baseline,
-            CharacterObject character,
-            RosterElementState visibleState,
-            bool seedBaseline)
-        {
-            Visible = visible;
-            Baseline = baseline;
-            Character = character;
-            VisibleState = visibleState;
-            SeedBaseline = seedBaseline;
-        }
-    }
-}
-
-[HarmonyPatch(typeof(PartyVM), MethodType.Constructor, typeof(PartyScreenLogic))]
-internal static class PartyVMInitializationPatches
-{
-    [ThreadStatic]
-    private static PartyScreenLogic _initializingPartyScreenLogic;
-
-    internal static bool IsInitializing(PartyScreenLogic partyScreenLogic) =>
-        partyScreenLogic != null &&
-        ReferenceEquals(_initializingPartyScreenLogic, partyScreenLogic);
-
-    [HarmonyPrefix]
-    internal static void Prefix(
-        PartyScreenLogic partyScreenLogic,
-        out PartyScreenLogic __state)
-    {
-        __state = _initializingPartyScreenLogic;
-        _initializingPartyScreenLogic = partyScreenLogic;
-    }
-
-    [HarmonyFinalizer]
-    internal static Exception Finalizer(
-        PartyScreenLogic __state,
-        Exception __exception)
-    {
-        _initializingPartyScreenLogic = __state;
-        return __exception;
     }
 }

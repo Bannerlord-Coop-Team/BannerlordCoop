@@ -40,14 +40,14 @@ public class TroopRosterDeltaHandlerRefreshTests
 
         using var refreshed = new ManualResetEventSlim(false);
         var refresher = new RecordingEncounterMenuConditionRefresher(refreshed);
-        var rebaser = new ApplyingPartyScreenRosterRebaser();
+        var partyScreenRefresher = new ApplyingPartyScreenRosterRefresher();
 
         using var handler = new TroopRosterDeltaHandler(
             messageBroker.Object,
             objectManager.Object,
             new Mock<INetwork>().Object,
             refresher,
-            rebaser);
+            partyScreenRefresher);
 
         Assert.NotNull(subscriber);
         subscriber!(new MessagePayload<NetworkTroopRosterElementBatch>(
@@ -66,7 +66,7 @@ public class TroopRosterDeltaHandlerRefreshTests
         Assert.Same(roster, refresher.RefreshedRoster);
         Assert.Equal(1, refresher.HealthyCountAtRefresh);
         Assert.Equal(1, refresher.RefreshCount);
-        Assert.Equal(1, rebaser.ApplyCount);
+        Assert.Equal(1, partyScreenRefresher.ApplyCount);
     }
 
     private sealed class RecordingEncounterMenuConditionRefresher : IEncounterMenuConditionRefresher
@@ -95,7 +95,7 @@ public class TroopRosterDeltaHandlerRefreshTests
         }
     }
 
-    private sealed class ApplyingPartyScreenRosterRebaser : IPartyScreenRosterRebaser
+    private sealed class ApplyingPartyScreenRosterRefresher : IPartyScreenRosterRefresher
     {
         public int ApplyCount { get; private set; }
 

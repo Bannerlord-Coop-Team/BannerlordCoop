@@ -50,8 +50,7 @@ public interface ITroopRosterInterface : IGameAbstraction
     /// applied before any additions across every roster so transferred heroes retain their party linkage.
     /// </summary>
     bool TryApplyTroopRosterDeltas(
-        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas,
-        out string rejectionReason);
+        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas);
 
     /// <summary>
     /// Runs troop recruitment logic for client requests.
@@ -171,203 +170,87 @@ internal class TroopRosterInterface : ITroopRosterInterface
     }
 
     public bool TryApplyTroopRosterDeltas(
-        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas,
-        out string rejectionReason)
+        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas)
     {
-        if (!TryPrepareDeltaElements(deltas, out var elements, out rejectionReason))
-            return false;
+        if (deltas == null) return false;
 
-        // AddToCounts(hero, -n) nulls the hero's party linkage, so additions must be the last operation.
-        ApplyDeltaElements(elements, applyAdditions: false);
-        ApplyDeltaElements(elements, applyAdditions: true);
-        rejectionReason = null;
-        return true;
-    }
-
-    private bool TryPrepareDeltaElements(
-        IReadOnlyList<(TroopRoster roster, TroopRosterData delta)> deltas,
-        out List<ResolvedRosterDelta> resolvedElements,
-        out string rejectionReason)
-    {
-        resolvedElements = new List<ResolvedRosterDelta>();
-        rejectionReason = null;
-
-        if (deltas == null)
-        {
-            rejectionReason = "The party changes were empty. Reopen the party screen and try again.";
-            return false;
-        }
-
+        var elements = new List<(
+            TroopRoster roster,
+            CharacterObject character,
+            TroopRosterElementData delta)>();
+        var uniqueElements = new HashSet<(TroopRoster roster, CharacterObject character)>();
         foreach (var (roster, delta) in deltas)
         {
-            if (roster == null)
-            {
-                rejectionReason = "The party changed before these edits were applied. Reopen the party screen and try again.";
-                return false;
-            }
+            if (roster == null) return false;
 
             if (delta.Data == null) continue;
+            var currentByCharacter = SumByCharacter(roster);
 
             foreach (var elementData in delta.Data)
             {
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.CharacterId, out var character))
+                    return false;
+                if (!uniqueElements.Add((roster, character))) return false;
+
+                currentByCharacter.TryGetValue(character, out var current);
+                long finalNumber = current.number + elementData.Number;
+                long finalWounded = current.wounded + elementData.WoundedNumber;
+                long finalXp = current.xp + elementData.Xp;
+                if (finalNumber < 0 ||
+                    finalNumber > int.MaxValue ||
+                    finalWounded < 0 ||
+                    finalWounded > finalNumber ||
+                    finalXp < 0 ||
+                    finalXp > int.MaxValue ||
+                    (finalNumber == 0 && finalXp != 0))
                 {
-                    rejectionReason = "A troop changed before these edits were applied. Reopen the party screen and try again.";
+                    Logger.Warning(
+                        "Rejected troop roster delta for {CharacterId}: current=({CurrentNumber},{CurrentWounded},{CurrentXp}) delta=({NumberDelta},{WoundedDelta},{XpDelta})",
+                        elementData.CharacterId,
+                        current.number,
+                        current.wounded,
+                        current.xp,
+                        elementData.Number,
+                        elementData.WoundedNumber,
+                        elementData.Xp);
                     return false;
                 }
 
-                var resolved = FindResolvedDelta(resolvedElements, roster, character);
-                if (resolved == null)
-                {
-                    resolved = new ResolvedRosterDelta(roster, character, elementData.CharacterId);
-                    resolvedElements.Add(resolved);
-                }
-
-                resolved.Number += elementData.Number;
-                resolved.Wounded += elementData.WoundedNumber;
-                resolved.Xp += elementData.Xp;
+                elements.Add((roster, character, elementData));
             }
         }
 
-        for (int i = resolvedElements.Count - 1; i >= 0; i--)
-        {
-            if (resolvedElements[i].IsEmpty)
-            {
-                resolvedElements.RemoveAt(i);
-                continue;
-            }
-
-            if (!TryValidateResolvedDelta(resolvedElements[i], out rejectionReason))
-                return false;
-        }
-
+        // AddToCounts(hero, -n) nulls the hero's party linkage, so additions must be the last operation.
+        ApplyDeltaElements(elements, applyAdditions: false);
+        ApplyDeltaElements(elements, applyAdditions: true);
         return true;
     }
 
-    private static ResolvedRosterDelta FindResolvedDelta(
-        List<ResolvedRosterDelta> elements,
-        TroopRoster roster,
-        CharacterObject character)
+    private void ApplyDeltaElements(
+        IReadOnlyList<(TroopRoster roster, CharacterObject character, TroopRosterElementData delta)> elements,
+        bool applyAdditions)
     {
         foreach (var element in elements)
         {
-            if (ReferenceEquals(element.Roster, roster) &&
-                ReferenceEquals(element.Character, character))
-            {
-                return element;
-            }
-        }
-
-        return null;
-    }
-
-    private bool TryValidateResolvedDelta(ResolvedRosterDelta element, out string rejectionReason)
-    {
-        var current = GetElementState(element.Roster, element.Character);
-        long finalNumber = current.number + element.Number;
-        long finalWounded = current.wounded + element.Wounded;
-        long finalXp = current.xp + element.Xp;
-
-        bool exceedsIntegerRange =
-            element.Number < int.MinValue || element.Number > int.MaxValue ||
-            element.Wounded < int.MinValue || element.Wounded > int.MaxValue ||
-            element.Xp < int.MinValue || element.Xp > int.MaxValue ||
-            finalNumber > int.MaxValue ||
-            finalWounded > int.MaxValue ||
-            finalXp > int.MaxValue;
-
-        // Retained XP at zero count means the source changed after the client snapshot.
-        bool invalidResult =
-            exceedsIntegerRange ||
-            finalNumber < 0 ||
-            finalWounded < 0 ||
-            finalWounded > finalNumber ||
-            finalXp < 0 ||
-            (finalNumber == 0 && finalXp != 0);
-
-        if (!invalidResult)
-        {
-            rejectionReason = null;
-            return true;
-        }
-
-        Logger.Warning(
-            "Rejected troop roster delta for {CharacterId}: current=({CurrentNumber},{CurrentWounded},{CurrentXp}) delta=({NumberDelta},{WoundedDelta},{XpDelta})",
-            element.CharacterId,
-            current.number,
-            current.wounded,
-            current.xp,
-            element.Number,
-            element.Wounded,
-            element.Xp);
-        rejectionReason = "The party changed before these edits were applied. Reopen the party screen and try again.";
-        return false;
-    }
-
-    private void ApplyDeltaElements(IReadOnlyList<ResolvedRosterDelta> elements, bool applyAdditions)
-    {
-        foreach (var element in elements)
-        {
-            bool isAddition = element.Number >= 0;
+            bool isAddition = element.delta.Number >= 0;
             if (isAddition != applyAdditions) continue;
 
             troopRosterLogger.Debug(
-                element.Roster,
+                element.roster,
                 "APPLY-DELTA pass={Pass} character={CharacterId} numberDelta={Number} woundedDelta={Wounded} xpDelta={Xp}",
                 applyAdditions ? "add" : "remove",
-                element.CharacterId,
-                element.Number,
-                element.Wounded,
-                element.Xp);
+                element.delta.CharacterId,
+                element.delta.Number,
+                element.delta.WoundedNumber,
+                element.delta.Xp);
 
-            element.Roster.AddToCounts(
-                element.Character,
-                (int)element.Number,
+            element.roster.AddToCounts(
+                element.character,
+                element.delta.Number,
                 false,
-                (int)element.Wounded,
-                (int)element.Xp,
+                element.delta.WoundedNumber,
+                element.delta.Xp,
                 true);
-        }
-    }
-
-    private static (long number, long wounded, long xp) GetElementState(
-        TroopRoster roster,
-        CharacterObject character)
-    {
-        long number = 0;
-        long wounded = 0;
-        long xp = 0;
-
-        foreach (TroopRosterElement element in roster.data)
-        {
-            if (!ReferenceEquals(element.Character, character)) continue;
-
-            number += element.Number;
-            wounded += element.WoundedNumber;
-            xp += element.Xp;
-        }
-
-        return (number, wounded, xp);
-    }
-
-    private sealed class ResolvedRosterDelta
-    {
-        public TroopRoster Roster { get; }
-        public CharacterObject Character { get; }
-        public string CharacterId { get; }
-        public long Number { get; set; }
-        public long Wounded { get; set; }
-        public long Xp { get; set; }
-        public bool IsEmpty => Number == 0 && Wounded == 0 && Xp == 0;
-
-        public ResolvedRosterDelta(
-            TroopRoster roster,
-            CharacterObject character,
-            string characterId)
-        {
-            Roster = roster;
-            Character = character;
-            CharacterId = characterId;
         }
     }
 

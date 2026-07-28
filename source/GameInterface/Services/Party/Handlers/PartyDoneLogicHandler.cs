@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
@@ -24,12 +25,14 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Party.Handlers;
 
 internal class PartyDoneLogicHandler : IHandler
 {
+    private const string PartyChangedMessage =
+        "The party changed before these edits were applied. Reopen the party screen and try again.";
+
     private static readonly ILogger logger = LogManager.GetLogger<PartyDoneLogicHandler>();
 
     private readonly IMessageBroker messageBroker;
@@ -50,14 +53,12 @@ internal class PartyDoneLogicHandler : IHandler
 
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
-        messageBroker.Subscribe<NetworkPartyDoneLogicRejected>(Handle_NetworkPartyDoneLogicRejected);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Unsubscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
-        messageBroker.Unsubscribe<NetworkPartyDoneLogicRejected>(Handle_NetworkPartyDoneLogicRejected);
     }
 
     // Client
@@ -118,21 +119,6 @@ internal class PartyDoneLogicHandler : IHandler
         );
 
         network.SendAll(message);
-    }
-
-    private static void Handle_NetworkPartyDoneLogicRejected(
-        MessagePayload<NetworkPartyDoneLogicRejected> obj)
-    {
-        if (ModInformation.IsServer) return;
-
-        var reason = string.IsNullOrWhiteSpace(obj.What.Reason)
-            ? "The server rejected the party changes. Reopen the party screen and try again."
-            : obj.What.Reason;
-
-        logger.Warning("Party changes were rejected by the server: {Reason}", reason);
-        GameThread.RunSafe(
-            () => MBInformationManager.AddQuickInformation(new TextObject(reason)),
-            context: nameof(Handle_NetworkPartyDoneLogicRejected));
     }
 
     private static CampaignVec2 GetReleaserPartyPosition(Hero mainHero)
@@ -215,15 +201,15 @@ internal class PartyDoneLogicHandler : IHandler
             // Only apply deltas if not ransoming. SellPrisonersAction already changes troop rosters
             if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
             {
-                if (!troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas, out var rejectionReason))
+                if (!troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
                 {
                     logger.Warning(
                         "Rejected party changes for {MainHeroId}: {Reason}",
                         message.MainHeroId,
-                        rejectionReason);
+                        PartyChangedMessage);
                     if (requester != null)
                     {
-                        network.Send(requester, new NetworkPartyDoneLogicRejected(rejectionReason));
+                        network.Send(requester, new SendInformationMessage(PartyChangedMessage));
                     }
                     return;
                 }
