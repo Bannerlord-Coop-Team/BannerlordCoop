@@ -162,5 +162,4 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         Logger.Information(PendingChangesResetMessage);
         MBInformationManager.AddQuickInformation(new TextObject(PendingChangesResetMessage));
     }
-
 }
