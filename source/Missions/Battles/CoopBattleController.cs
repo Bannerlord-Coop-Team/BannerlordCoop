@@ -304,6 +304,14 @@ public class CoopBattleController : CoopMissionController
         guardFixture.IsDrivingPlayerInput(
             coopMissionComponent.AgentRegistry);
 
+    internal bool PrepareGuardFixtureNativePlayerInput() =>
+        guardFixture.PrepareNativePlayerInput(
+            coopMissionComponent.AgentRegistry);
+
+    internal bool IsGuardFixtureHoldingNativePlayerBlock() =>
+        guardFixture.IsHoldingNativePlayerBlock(
+            coopMissionComponent.AgentRegistry);
+
     internal void ApplyGuardFixturePlayerInput() =>
         guardFixture.ApplyPlayerInput(coopMissionComponent.AgentRegistry);
 

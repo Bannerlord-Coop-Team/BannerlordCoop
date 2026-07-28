@@ -528,6 +528,23 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(BattleGuardFixtureMode.Mounted, true, true)]
+    [InlineData(BattleGuardFixtureMode.Mounted, false, false)]
+    [InlineData(BattleGuardFixtureMode.Foot, true, false)]
+    [InlineData(BattleGuardFixtureMode.Foot, false, false)]
+    public void MovementFlagGuardInput_UsesNativePlayerDirectionCollector(
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldUseNativePlayerGuardInput(
+                mode,
+                useMovementFlagGuardInput));
+    }
+
+    [Theory]
     [InlineData(true, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]

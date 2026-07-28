@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Screens;
@@ -26,6 +27,8 @@ public interface IBattleGuardFixture
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
     void ApplyMountedStrike(NetworkBattleGuardFixtureStrike strike);
     bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
+    bool PrepareNativePlayerInput(INetworkAgentRegistry agentRegistry);
+    bool IsHoldingNativePlayerBlock(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
     void RefreshOwnedMountedStrikeLook(INetworkAgentRegistry agentRegistry);
@@ -337,16 +340,46 @@ public class BattleGuardFixture : IBattleGuardFixture
             ReferenceEquals(agent, Mission.Current?.MainAgent);
     }
 
+    public bool PrepareNativePlayerInput(
+        INetworkAgentRegistry agentRegistry)
+    {
+        if (!TryGetDrivenGuardAgent(agentRegistry, out Agent agent) ||
+            !ReferenceEquals(agent, Mission.Current?.MainAgent) ||
+            !ShouldUseNativePlayerGuardInput(
+                guardDriver.Mode,
+                guardDriver.UseMovementFlagGuardInput))
+        {
+            return false;
+        }
+
+        if (IsGuarding(agent, guardDriver))
+        {
+            Input.PressKey(
+                GetNativePlayerGuardDirectionKey(
+                    guardDriver.Direction));
+        }
+
+        return true;
+    }
+
+    public bool IsHoldingNativePlayerBlock(
+        INetworkAgentRegistry agentRegistry)
+    {
+        return TryGetDrivenGuardAgent(agentRegistry, out Agent agent) &&
+            ReferenceEquals(agent, Mission.Current?.MainAgent) &&
+            ShouldUseNativePlayerGuardInput(
+                guardDriver.Mode,
+                guardDriver.UseMovementFlagGuardInput) &&
+            IsGuarding(agent, guardDriver);
+    }
+
     public void ReapplyPlayerGuardInput(
         INetworkAgentRegistry agentRegistry)
     {
         if (!TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
             return;
 
-        bool guarding =
-            guardDriver.Phase != BattleGuardFixturePhase.Calibration &&
-            (guardDriver.Mode != BattleGuardFixtureMode.Foot ||
-             !agent.HasMount);
+        bool guarding = IsGuarding(agent, guardDriver);
         Agent.MovementControlFlag defendFlags = guarding
             ? GetDefendFlags(guardDriver.Direction)
             : Agent.MovementControlFlag.None;
@@ -1284,9 +1317,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         bool moving =
             !dismounting &&
             driver.Mode == BattleGuardFixtureMode.Mounted;
-        bool guarding =
-            !dismounting &&
-            driver.Phase != BattleGuardFixturePhase.Calibration;
+        bool guarding = IsGuarding(agent, driver);
         Agent.MovementControlFlag defendFlags =
             GetDefendFlags(driver.Direction);
 
@@ -1395,6 +1426,13 @@ public class BattleGuardFixture : IBattleGuardFixture
         driver.ObserveAppliedInput(agent);
     }
 
+    private static bool IsGuarding(Agent agent, GuardDriver driver)
+    {
+        return !(driver.Mode == BattleGuardFixtureMode.Foot &&
+                 agent.HasMount) &&
+            driver.Phase != BattleGuardFixturePhase.Calibration;
+    }
+
     private static bool ApplyOwnedMountedStrikeLook(
         Agent agent,
         GuardDriver driver)
@@ -1487,6 +1525,27 @@ public class BattleGuardFixture : IBattleGuardFixture
         return mode == BattleGuardFixtureMode.Mounted &&
             !useMovementFlagGuardInput;
     }
+
+    internal static bool ShouldUseNativePlayerGuardInput(
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput)
+    {
+        return mode == BattleGuardFixtureMode.Mounted &&
+            useMovementFlagGuardInput;
+    }
+
+    private static InputKey GetNativePlayerGuardDirectionKey(
+        BattleGuardFixtureDirection direction) =>
+        direction switch
+        {
+            BattleGuardFixtureDirection.Down =>
+                InputKey.ControllerRStickDown,
+            BattleGuardFixtureDirection.Left =>
+                InputKey.ControllerRStickLeft,
+            BattleGuardFixtureDirection.Right =>
+                InputKey.ControllerRStickRight,
+            _ => InputKey.ControllerRStickUp
+        };
 
     internal static bool ShouldMaintainMountedGuardPresentation(
         BattleGuardFixtureMode mode,
