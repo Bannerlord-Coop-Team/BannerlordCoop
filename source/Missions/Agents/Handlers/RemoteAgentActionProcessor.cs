@@ -72,6 +72,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         WrongAuthority
     }
 
+    private enum MountedGuardRearmPhase
+    {
+        None,
+        NeutralInput,
+        NeutralInputObserved,
+        DesiredInput
+    }
+
     private struct RemoteGuardState
     {
         public readonly RemoteAction Action;
@@ -84,6 +92,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public bool NeedsGuardPresentationTransition;
         public bool CanRecoverMissingGuardDirection;
         public bool GuardCommandAppliedWithAction;
+        public MountedGuardRearmPhase MountedGuardRearm;
         public Agent.GuardMode LastCommandedGuardMode;
         public int LastCommandedMountIndex;
 
@@ -133,6 +142,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 && previousGuard.Value.GuardAction == guardAction
                 && previousGuard.Value.CanRecoverMissingGuardDirection;
             GuardCommandAppliedWithAction = false;
+            MountedGuardRearm = MountedGuardRearmPhase.None;
             LastCommandedGuardMode = previousGuard?.LastCommandedGuardMode
                 ?? Agent.GuardMode.None;
             LastCommandedMountIndex = previousGuard?.LastCommandedMountIndex
@@ -158,6 +168,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             CanRecoverMissingGuardDirection =
                 retainedGuard.CanRecoverMissingGuardDirection;
             GuardCommandAppliedWithAction = false;
+            MountedGuardRearm = retainedGuard.MountedGuardRearm;
             LastCommandedGuardMode = retainedGuard.LastCommandedGuardMode;
             LastCommandedMountIndex = retainedGuard.LastCommandedMountIndex;
         }
@@ -367,6 +378,18 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 {
                     ClearRemoteDefendState(agent, guardState);
                     (staleIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
+
+                if (guardState.MountedGuardRearm
+                    != MountedGuardRearmPhase.None)
+                {
+                    ApplyMountedGuardRearm(
+                        agent,
+                        ref guardState,
+                        replayGuardAction,
+                        refreshMountedGuardCommand);
+                    state.RetainedGuard = guardState;
                     continue;
                 }
 
@@ -764,9 +787,22 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 guardActionChannel,
                 guardAction,
                 previousGuard);
+        MountedGuardRearmPhase mountedGuardRearm =
+            GetMountedGuardRearmPhase(
+                agent,
+                action.Data,
+                guardActionChannel,
+                previousGuard);
         bool mountedGuardDirectionTransitionApplied = action.Data.Apply(
             agent,
-            agentVisualActionAccessor);
+            agentVisualActionAccessor,
+            suppressMountedGuardActionTransition:
+                mountedGuardRearm != MountedGuardRearmPhase.None,
+            neutralizeMountedGuardDirection:
+                mountedGuardRearm
+                    == MountedGuardRearmPhase.NeutralInput
+                || mountedGuardRearm
+                    == MountedGuardRearmPhase.NeutralInputObserved);
         if (mountedGuardDirectionTransitionApplied)
         {
             needsGuardDirectionTransition = false;
@@ -801,6 +837,15 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 previousGuard,
                 needsGuardDirectionTransition);
         }
+        appliedGuardState.MountedGuardRearm = mountedGuardRearm;
+        if (mountedGuardRearm != MountedGuardRearmPhase.None)
+        {
+            appliedGuardState.HasGuardCommand = false;
+            appliedGuardState.NeedsGuardDirectionTransition = false;
+            appliedGuardState.NeedsGuardPresentationTransition = false;
+            appliedGuardState.CanRecoverMissingGuardDirection = false;
+            appliedGuardState.GuardCommandAppliedWithAction = false;
+        }
         if (mountedGuardDirectionTransitionApplied)
         {
             appliedGuardState.HasGuardCommand = true;
@@ -819,6 +864,126 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             agent);
 
         return RemoteActionApplyResult.Applied;
+    }
+
+    private static MountedGuardRearmPhase GetMountedGuardRearmPhase(
+        Agent agent,
+        AgentActionData data,
+        int guardActionChannel,
+        RemoteGuardState? previousGuard)
+    {
+        if (agent.Controller != AgentControllerType.None
+            || !agent.HasMount
+            || !data.IsMounted
+            || !data.IsPlayerControlled
+            || data.GuardActionIsReaction
+            || !AgentActionData.IsGuardMode(data.GuardMode)
+            || (data.DefendFlags
+                & Agent.MovementControlFlag.DefendBlock) == 0
+            || AgentActionData.GetGuardModeFromDefendFlags(
+                data.DefendFlags) != data.GuardMode
+            || AgentActionData.IsGuardReactionAction(
+                agent.GetCurrentActionType(0))
+            || AgentActionData.IsGuardReactionAction(
+                agent.GetCurrentActionType(1)))
+        {
+            return MountedGuardRearmPhase.None;
+        }
+
+        Agent.GuardMode currentGuardMode =
+            guardActionChannel >= 0 && guardActionChannel <= 1
+                ? AgentActionData.GetGuardModeFromDefendingAction(
+                    agent,
+                    guardActionChannel)
+                : AgentActionData.GetGuardModeFromDefendingAction(agent);
+        if (currentGuardMode == data.GuardMode)
+            return MountedGuardRearmPhase.None;
+
+        if (previousGuard.HasValue
+            && previousGuard.Value.MountedGuardRearm
+                != MountedGuardRearmPhase.None
+            && previousGuard.Value.Action.Data.GuardMode
+                == data.GuardMode)
+        {
+            return previousGuard.Value.MountedGuardRearm;
+        }
+
+        if (!data.GuardActionIsDefending)
+            return MountedGuardRearmPhase.None;
+
+        Agent.GuardMode previousGuardMode =
+            previousGuard?.Action.Data.GuardMode
+                ?? Agent.GuardMode.None;
+        if ((AgentActionData.IsGuardMode(currentGuardMode)
+                && currentGuardMode != data.GuardMode)
+            || (AgentActionData.IsGuardMode(previousGuardMode)
+                && previousGuardMode != data.GuardMode))
+        {
+            // None-controlled mounted puppets accept the opposite guard sibling
+            // after one directionless input cycle.
+            return MountedGuardRearmPhase.NeutralInput;
+        }
+
+        return MountedGuardRearmPhase.None;
+    }
+
+    private static void ApplyMountedGuardRearm(
+        Agent agent,
+        ref RemoteGuardState guardState,
+        bool replayGuardAction,
+        bool refreshMountedGuardCommand)
+    {
+        AgentActionData data = guardState.Action.Data;
+        if (replayGuardAction)
+        {
+            if (guardState.MountedGuardRearm
+                == MountedGuardRearmPhase.NeutralInput)
+            {
+                // This replay runs after the native Agent cycle.
+                guardState.MountedGuardRearm =
+                    MountedGuardRearmPhase.NeutralInputObserved;
+                return;
+            }
+
+            if (guardState.MountedGuardRearm
+                    == MountedGuardRearmPhase.DesiredInput
+                && AgentActionData.GetGuardModeFromDefendingAction(
+                    agent) == data.GuardMode)
+            {
+                guardState.MountedGuardRearm =
+                    MountedGuardRearmPhase.None;
+                guardState.HasGuardCommand = true;
+                guardState.CanRecoverMissingGuardDirection = true;
+                guardState.LastCommandedGuardMode = data.GuardMode;
+                guardState.LastCommandedMountIndex =
+                    agent.MountAgent?.Index ?? -1;
+            }
+            return;
+        }
+
+        if (guardState.MountedGuardRearm
+                == MountedGuardRearmPhase.NeutralInput
+            || (guardState.MountedGuardRearm
+                    == MountedGuardRearmPhase.NeutralInputObserved
+                && !refreshMountedGuardCommand))
+        {
+            return;
+        }
+
+        if (guardState.MountedGuardRearm
+            == MountedGuardRearmPhase.NeutralInputObserved)
+        {
+            AgentActionData.ApplyDefendMovementFlags(
+                agent,
+                data.DefendFlags);
+            guardState.MountedGuardRearm =
+                MountedGuardRearmPhase.DesiredInput;
+            return;
+        }
+
+        AgentActionData.ApplyDefendMovementFlags(
+            agent,
+            data.DefendFlags);
     }
 
     private bool NeedsMountedGuardDirectionTransition(

@@ -397,26 +397,35 @@ namespace Missions.Agents.Packets
 
         public bool Apply(
             Agent agent,
-            IAgentVisualActionAccessor visualActionAccessor)
+            IAgentVisualActionAccessor visualActionAccessor,
+            bool suppressMountedGuardActionTransition = false,
+            bool neutralizeMountedGuardDirection = false)
         {
             Agent.MovementControlFlag movementFlags = (Agent.MovementControlFlag)MovementFlag;
             bool mountedGuardDirectionTransitionApplied = false;
             agent.EventControlFlags |= (Agent.EventControlFlag)EventFlag;
+            if (neutralizeMountedGuardDirection)
+            {
+                movementFlags &=
+                    ~Agent.MovementControlFlag.DefendDirMask;
+            }
             // Apply held input before action transitions so an explicit guard direction remains the final native command.
             ApplyDefendMovementFlags(agent, movementFlags);
 
             // Install action transitions, but let an unchanged native action advance on its local timeline.
-            if (NeedsActionTransition(
-                agent,
-                0,
-                Action0Index,
-                visualActionAccessor,
-                preserveVisibleAction:
-                    IsMounted && GuardActionChannel == 0,
-                preserveCurrentGuardReaction:
-                    ShouldPreserveCurrentGuardReaction(
-                        agent,
-                        0)))
+            if ((!suppressMountedGuardActionTransition
+                    || GuardActionChannel != 0)
+                && NeedsActionTransition(
+                    agent,
+                    0,
+                    Action0Index,
+                    visualActionAccessor,
+                    preserveVisibleAction:
+                        IsMounted && GuardActionChannel == 0,
+                    preserveCurrentGuardReaction:
+                        ShouldPreserveCurrentGuardReaction(
+                            agent,
+                            0)))
             {
                 if (TryResolveActionTransition(
                     agent,
@@ -447,17 +456,19 @@ namespace Missions.Agents.Packets
                 }
             }
 
-            if (NeedsActionTransition(
-                agent,
-                1,
-                Action1Index,
-                visualActionAccessor,
-                preserveVisibleAction:
-                    IsMounted && GuardActionChannel == 1,
-                preserveCurrentGuardReaction:
-                    ShouldPreserveCurrentGuardReaction(
-                        agent,
-                        1)))
+            if ((!suppressMountedGuardActionTransition
+                    || GuardActionChannel != 1)
+                && NeedsActionTransition(
+                    agent,
+                    1,
+                    Action1Index,
+                    visualActionAccessor,
+                    preserveVisibleAction:
+                        IsMounted && GuardActionChannel == 1,
+                    preserveCurrentGuardReaction:
+                        ShouldPreserveCurrentGuardReaction(
+                            agent,
+                            1)))
             {
                 if (TryResolveActionTransition(
                     agent,
