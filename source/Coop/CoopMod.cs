@@ -250,12 +250,6 @@ namespace Coop
 
         private void TryStartCrashReporter(string role)
         {
-            if (isAutoConnect)
-            {
-                Logger.Debug("Crash reporter skipped for the automated test process");
-                return;
-            }
-
             try
             {
                 string moduleDirectory = System.IO.Path.GetDirectoryName(
