@@ -15,147 +15,167 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign.Order;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.Smithing.Handlers
+namespace GameInterface.Services.Smithing.Handlers;
+
+internal class SmithingRefreshHandler : IHandler
 {
-    internal class SmithingRefreshHandler : IHandler
+    private static readonly ILogger Logger = LogManager.GetLogger<SmithingRefreshHandler>();
+
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+
+    private SmeltingVM currentSmeltingVM;
+    private RefinementVM currentRefinementVM;
+    private CraftingVM currentCraftingVM;
+    private WeaponDesignVM currentWeaponDesignVM;
+
+    public SmithingRefreshHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<SmithingRefreshHandler>();
-        private readonly IMessageBroker messageBroker;
-        private readonly IObjectManager objectManager;
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
 
-        private SmeltingVM currentSmeltingVM;
-        private RefinementVM currentRefinementVM;
-        private CraftingVM currentCraftingVM;
-        private WeaponDesignVM currentWeaponDesignVM;
+        messageBroker.Subscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
+        messageBroker.Subscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
+        messageBroker.Subscribe<CraftingVMCreated>(Handle_CraftingVMCreated);
+        messageBroker.Subscribe<WeaponDesignVMCreated>(Handle_WeaponDesignVMCreated);
 
-        public SmithingRefreshHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+        messageBroker.Subscribe<RefreshWeaponDesignVM>(Handle_RefreshWeaponDesignVM);
+        messageBroker.Subscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
+        messageBroker.Subscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
+        messageBroker.Subscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
+
+        messageBroker.Subscribe<CompleteOrderFromVM>(Handle_CompleteOrderFromVM);
+
+        currentSmeltingVM = null;
+        currentRefinementVM = null;
+        currentCraftingVM = null;
+        currentWeaponDesignVM = null;
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
+        messageBroker.Unsubscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
+        messageBroker.Unsubscribe<CraftingVMCreated>(Handle_CraftingVMCreated);
+        messageBroker.Unsubscribe<WeaponDesignVMCreated>(Handle_WeaponDesignVMCreated);
+
+        messageBroker.Unsubscribe<RefreshWeaponDesignVM>(Handle_RefreshWeaponDesignVM);
+        messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
+        messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
+        messageBroker.Unsubscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
+
+        messageBroker.Unsubscribe<CompleteOrderFromVM>(Handle_CompleteOrderFromVM);
+    }
+
+    private void Handle_SmeltingVMCreated(MessagePayload<SmeltingVMCreated> obj)
+    {
+        currentSmeltingVM = obj.What.SmeltingVM;
+    }
+
+    private void Handle_RefinementVMCreated(MessagePayload<RefinementVMCreated> obj)
+    {
+        currentRefinementVM = obj.What.RefinementVM;
+    }
+
+    private void Handle_CraftingVMCreated(MessagePayload<CraftingVMCreated> obj)
+    {
+        currentCraftingVM = obj.What.CraftingVM;
+    }
+
+    private void Handle_WeaponDesignVMCreated(MessagePayload<WeaponDesignVMCreated> obj)
+    {
+        currentWeaponDesignVM = obj.What.WeaponDesignVM;
+    }
+
+    private void Handle_RefreshWeaponDesignVM(MessagePayload<RefreshWeaponDesignVM> obj)
+    {
+        RefreshWeaponDesignVM(obj.What.Town);
+    }
+
+    private void Handle_NetworkRefreshSmelting(MessagePayload<NetworkRefreshSmelting> obj)
+    {
+        GameThread.RunSafe(() =>
         {
-            this.messageBroker = messageBroker;
-            this.objectManager = objectManager;
-            messageBroker.Subscribe<SmeltingVMCreated>(Handle);
-            messageBroker.Subscribe<RefinementVMCreated>(Handle);
-            messageBroker.Subscribe<CraftingVMCreated>(Handle);
-            messageBroker.Subscribe<WeaponDesignVMCreated>(Handle);
-            messageBroker.Subscribe<RefreshWeaponDesignVM>(Handle);
-            messageBroker.Subscribe<NetworkRefreshSmelting>(Handle);
-            messageBroker.Subscribe<NetworkRefreshRefinement>(Handle);
-            messageBroker.Subscribe<RefreshCraftingVM>(Handle);
+            currentSmeltingVM?.RefreshValues();
+            currentSmeltingVM?.RefreshList();
 
-            currentSmeltingVM = null;
-            currentRefinementVM = null;
-            currentCraftingVM = null;
-            currentWeaponDesignVM = null;
-        }
-
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<SmeltingVMCreated>(Handle);
-            messageBroker.Unsubscribe<RefinementVMCreated>(Handle);
-            messageBroker.Unsubscribe<CraftingVMCreated>(Handle);
-            messageBroker.Unsubscribe<WeaponDesignVMCreated>(Handle);
-            messageBroker.Unsubscribe<RefreshWeaponDesignVM>(Handle);
-            messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle);
-            messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle);
-            messageBroker.Unsubscribe<RefreshCraftingVM>(Handle);
-        }
-
-        private void Handle(MessagePayload<SmeltingVMCreated> obj)
-        {
-            currentSmeltingVM = obj.What.SmeltingVM;
-        }
-
-        private void Handle(MessagePayload<RefinementVMCreated> obj)
-        {
-            currentRefinementVM = obj.What.RefinementVM;
-        }
-
-        private void Handle(MessagePayload<CraftingVMCreated> obj)
-        {
-            currentCraftingVM = obj.What.CraftingVM;
-        }
-
-        private void Handle(MessagePayload<WeaponDesignVMCreated> obj)
-        {
-            currentWeaponDesignVM = obj.What.WeaponDesignVM;
-        }
-
-        private void Handle(MessagePayload<RefreshWeaponDesignVM> obj)
-        {
-            RefreshWeaponDesignVM(obj.What.Town);
-        }
-
-        private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
-        {
-            GameThread.RunSafe(() =>
+            if (currentSmeltingVM?.CurrentSelectedItem != null)
             {
-                currentSmeltingVM?.RefreshValues();
-                currentSmeltingVM?.RefreshList();
+                int num = (int)(currentSmeltingVM?.SmeltableItemList.FindIndex((SmeltingItemVM i) => i.EquipmentElement.Item == currentSmeltingVM?.CurrentSelectedItem.EquipmentElement.Item));
+                SmeltingItemVM newItem = (num != -1) ? currentSmeltingVM?.SmeltableItemList[num] : currentSmeltingVM?.SmeltableItemList.FirstOrDefault<SmeltingItemVM>();
+                currentSmeltingVM?.OnItemSelection(newItem);
+            }
 
-                if (currentSmeltingVM?.CurrentSelectedItem != null)
+            RefreshCraftingVM();
+        });
+    }
+
+    private void Handle_NetworkRefreshRefinement(MessagePayload<NetworkRefreshRefinement> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
+
+            currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
+            currentCraftingVM?.OnRefinementSelectionChange();
+
+            RefreshCraftingVM();
+        });
+    }
+
+    private void Handle_RefreshCraftingVM(MessagePayload<RefreshCraftingVM> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            RefreshCraftingVM();
+        });
+    }
+
+    private void Handle_CompleteOrderFromVM(MessagePayload<CompleteOrderFromVM> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (currentWeaponDesignVM == null) return;
+
+            currentWeaponDesignVM._craftingBehavior.CompleteOrder(
+                Settlement.CurrentSettlement.Town,
+                currentWeaponDesignVM.ActiveCraftingOrder.CraftingOrder,
+                obj.What.CraftedItemObject,
+                currentWeaponDesignVM._getCurrentCraftingHero().Hero);
+        });
+    }
+
+    private void RefreshCraftingVM()
+    {
+        currentCraftingVM?.RefreshValues();
+        currentCraftingVM?.UpdateAll();
+    }
+
+    private void RefreshWeaponDesignVM(Town town)
+    {
+        if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
+
+        GameThread.RunSafe(() =>
+        {
+            using (new AllowedThread())
+            {
+                currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
+                if (!(bool)(currentWeaponDesignVM?.IsInOrderMode))
                 {
-                    int num = (int)(currentSmeltingVM?.SmeltableItemList.FindIndex((SmeltingItemVM i) => i.EquipmentElement.Item == currentSmeltingVM?.CurrentSelectedItem.EquipmentElement.Item));
-                    SmeltingItemVM newItem = (num != -1) ? currentSmeltingVM?.SmeltableItemList[num] : currentSmeltingVM?.SmeltableItemList.FirstOrDefault<SmeltingItemVM>();
-                    currentSmeltingVM?.OnItemSelection(newItem);
+                    currentWeaponDesignVM?.RefreshValues();
+                    return;
                 }
 
-                RefreshCraftingVM();
-            });
-        }
-
-        private void Handle(MessagePayload<NetworkRefreshRefinement> obj)
-        {
-            GameThread.RunSafe(() =>
-            {
-                if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
-
-                currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
-                currentCraftingVM?.OnRefinementSelectionChange();
-
-                RefreshCraftingVM();
-            });
-        }
-
-        private void Handle(MessagePayload<RefreshCraftingVM> obj)
-        {
-            GameThread.RunSafe(() =>
-            {
-                RefreshCraftingVM();
-            });
-        }
-
-        private void RefreshCraftingVM()
-        {
-            currentCraftingVM?.RefreshValues();
-            currentCraftingVM?.UpdateAll();
-        }
-
-        private void RefreshWeaponDesignVM(Town town)
-        {
-            if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
-
-            // Have to run on main thread to avoid UI related crashes
-            GameThread.RunSafe(() =>
-            {
-                using (new AllowedThread())
+                CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
+                if (craftingOrderItemVM != null)
                 {
-                    currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
-                    if (!(bool)(currentWeaponDesignVM?.IsInOrderMode))
-                    {
-                        currentWeaponDesignVM?.RefreshValues();
-                        return;
-                    }
-    
-                    CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
-                    if (craftingOrderItemVM != null)
-                    {
-                        currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);
-                    }
-                    else
-                    {
-                        currentWeaponDesignVM?.ExecuteOpenFreeBuildTab();
-                    }
+                    currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);
                 }
-            });
-        }
+                else
+                {
+                    currentWeaponDesignVM?.ExecuteOpenFreeBuildTab();
+                }
+            }
+        });
     }
 }

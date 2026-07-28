@@ -6,7 +6,6 @@ using GameInterface.Services.ItemObjects.Messages;
 using GameInterface.Services.ItemObjects.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -15,6 +14,7 @@ namespace GameInterface.Services.ItemObjects.Handlers;
 internal class SetCraftedWeaponNameHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SetCraftedWeaponNameHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -27,19 +27,20 @@ internal class SetCraftedWeaponNameHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        messageBroker.Subscribe<CraftedWeaponNameSet>(Handle);
-        messageBroker.Subscribe<NetworkSetCraftedWeaponNameServer>(Handle);
-        messageBroker.Subscribe<NetworkSetCraftedWeaponNameClients>(Handle);
+
+        messageBroker.Subscribe<SetCraftedWeaponName>(Handle_SetCraftedWeaponName);
+        messageBroker.Subscribe<NetworkSetCraftedWeaponNameServer>(Handle_NetworkSetCraftedWeaponNameServer);
+        messageBroker.Subscribe<NetworkSetCraftedWeaponNameClients>(Handle_NetworkSetCraftedWeaponNameClients);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<CraftedWeaponNameSet>(Handle);
-        messageBroker.Unsubscribe<NetworkSetCraftedWeaponNameServer>(Handle);
-        messageBroker.Unsubscribe<NetworkSetCraftedWeaponNameClients>(Handle);
+        messageBroker.Unsubscribe<SetCraftedWeaponName>(Handle_SetCraftedWeaponName);
+        messageBroker.Unsubscribe<NetworkSetCraftedWeaponNameServer>(Handle_NetworkSetCraftedWeaponNameServer);
+        messageBroker.Unsubscribe<NetworkSetCraftedWeaponNameClients>(Handle_NetworkSetCraftedWeaponNameClients);
     }
 
-    private void Handle(MessagePayload<CraftedWeaponNameSet> obj)
+    private void Handle_SetCraftedWeaponName(MessagePayload<SetCraftedWeaponName> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.Weapon, out var weaponId)) return;
 
@@ -51,7 +52,7 @@ internal class SetCraftedWeaponNameHandler : IHandler
         network.SendAll(message);
     }
 
-    private void Handle(MessagePayload<NetworkSetCraftedWeaponNameServer> obj)
+    private void Handle_NetworkSetCraftedWeaponNameServer(MessagePayload<NetworkSetCraftedWeaponNameServer> obj)
     {
         NetworkSetCraftedWeaponNameClients nameChange = new(obj.What);
 
@@ -64,7 +65,7 @@ internal class SetCraftedWeaponNameHandler : IHandler
         });
     }
 
-    private void Handle(MessagePayload<NetworkSetCraftedWeaponNameClients> obj)
+    private void Handle_NetworkSetCraftedWeaponNameClients(MessagePayload<NetworkSetCraftedWeaponNameClients> obj)
     {
         GameThread.RunSafe(() =>
         {

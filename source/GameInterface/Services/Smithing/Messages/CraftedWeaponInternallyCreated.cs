@@ -1,25 +1,22 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Messages;
 
-public record CraftedWeaponInternallyCreated : IEvent
+public readonly struct CreatedCraftedWeaponInternal : IEvent
 {
-    public CraftingCampaignBehavior CraftingCampaignBehavior;
-    public bool IsFreeMode;
-    public Hero CraftingHero;
-    public TextObject Name;
-    public BasicCultureObject CultureObject;
-    public WeaponDesign WeaponDesign;
-    public ItemModifier WeaponModifier;
-    public Hero PlayerHero;
-    public Crafting CraftingLogic;
+    public readonly bool IsFreeMode;
+    public readonly Hero CraftingHero;
+    public readonly TextObject Name;
+    public readonly BasicCultureObject CultureObject;
+    public readonly WeaponDesign WeaponDesign;
+    public readonly ItemModifier WeaponModifier;
+    public readonly Hero PlayerHero;
+    public readonly Crafting CraftingLogic;
 
-    public CraftedWeaponInternallyCreated(
-        CraftingCampaignBehavior craftingCampaignBehavior,
+    public CreatedCraftedWeaponInternal(
         bool isFreeMode,
         Hero craftingHero,
         TextObject name,
@@ -29,7 +26,6 @@ public record CraftedWeaponInternallyCreated : IEvent
         Hero playerHero,
         Crafting craftingLogic)
     {
-        CraftingCampaignBehavior = craftingCampaignBehavior;
         IsFreeMode = isFreeMode;
         CraftingHero = craftingHero;
         Name = name;

@@ -16,6 +16,7 @@ namespace GameInterface.Services.Smithing.Handlers;
 internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehaviorWeaponNameHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -31,29 +32,29 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
 
-        messageBroker.Subscribe<WeaponDesignResultPopupVMCreated>(Handle);
+        messageBroker.Subscribe<WeaponDesignResultPopupVMCreated>(Handle_WeaponDesignResultPopupVMCreated);
 
-        messageBroker.Subscribe<BehaviorCraftedWeaponNameSet>(Handle);
-        messageBroker.Subscribe<NetworkBehaviorSetCraftedWeaponNameServer>(Handle);
-        messageBroker.Subscribe<NetworkBehaviorSetCraftedWeaponNameClients>(Handle);
+        messageBroker.Subscribe<BehaviorCraftedWeaponNameSet>(Handle_BehaviorCraftedWeaponNameSet);
+        messageBroker.Subscribe<NetworkBehaviorSetCraftedWeaponNameServer>(Handle_NetworkBehaviorSetCraftedWeaponNameServer);
+        messageBroker.Subscribe<NetworkBehaviorSetCraftedWeaponNameClients>(Handle_NetworkBehaviorSetCraftedWeaponNameClients);
 
-        messageBroker.Subscribe<UpdateCraftedItem>(Handle);
+        messageBroker.Subscribe<UpdateCraftedItem>(Handle_UpdateCraftedItem);
 
         currentWeaponDesignResultPopupVM = null;
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<WeaponDesignResultPopupVMCreated>(Handle);
+        messageBroker.Unsubscribe<WeaponDesignResultPopupVMCreated>(Handle_WeaponDesignResultPopupVMCreated);
 
-        messageBroker.Unsubscribe<BehaviorCraftedWeaponNameSet>(Handle);
-        messageBroker.Unsubscribe<NetworkBehaviorSetCraftedWeaponNameServer>(Handle);
-        messageBroker.Unsubscribe<NetworkBehaviorSetCraftedWeaponNameClients>(Handle);
+        messageBroker.Unsubscribe<BehaviorCraftedWeaponNameSet>(Handle_BehaviorCraftedWeaponNameSet);
+        messageBroker.Unsubscribe<NetworkBehaviorSetCraftedWeaponNameServer>(Handle_NetworkBehaviorSetCraftedWeaponNameServer);
+        messageBroker.Unsubscribe<NetworkBehaviorSetCraftedWeaponNameClients>(Handle_NetworkBehaviorSetCraftedWeaponNameClients);
 
-        messageBroker.Unsubscribe<UpdateCraftedItem>(Handle);
+        messageBroker.Unsubscribe<UpdateCraftedItem>(Handle_UpdateCraftedItem);
     }
 
-    private void Handle(MessagePayload<WeaponDesignResultPopupVMCreated> obj)
+    private void Handle_WeaponDesignResultPopupVMCreated(MessagePayload<WeaponDesignResultPopupVMCreated> obj)
     {
         GameThread.RunSafe(() =>
         {
@@ -61,7 +62,7 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
         });  
     }
 
-    private void Handle(MessagePayload<BehaviorCraftedWeaponNameSet> obj)
+    private void Handle_BehaviorCraftedWeaponNameSet(MessagePayload<BehaviorCraftedWeaponNameSet> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
 
@@ -74,7 +75,7 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
         network.SendAll(message);
     }
 
-    private void Handle(MessagePayload<NetworkBehaviorSetCraftedWeaponNameServer> obj)
+    private void Handle_NetworkBehaviorSetCraftedWeaponNameServer(MessagePayload<NetworkBehaviorSetCraftedWeaponNameServer> obj)
     {
         // obj.What.CraftedItemId
         NetworkBehaviorSetCraftedWeaponNameClients nameChange = new(obj.What);
@@ -88,7 +89,7 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
         });
     }
 
-    private void Handle(MessagePayload<NetworkBehaviorSetCraftedWeaponNameClients> obj)
+    private void Handle_NetworkBehaviorSetCraftedWeaponNameClients(MessagePayload<NetworkBehaviorSetCraftedWeaponNameClients> obj)
     {
         SetCraftedWeaponName(obj.What);
     }
@@ -101,16 +102,6 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
             ItemObject mbCraftedWeapon = MBObjectManager.Instance.GetObject<ItemObject>(obj.CraftedWeaponId);
             if (mbCraftedWeapon == null) return;
 
-            /*
-            if (craftingCampaignBehavior._craftedItemDictionary.TryGetValue(mbCraftedWeapon, out CraftingCampaignBehavior.CraftedItemInitializationData craftedItemInitializationData))
-            {
-                craftingCampaignBehavior._craftedItemDictionary[mbCraftedWeapon] = new CraftingCampaignBehavior.CraftedItemInitializationData(
-                    craftedItemInitializationData.CraftedData,
-                    new TextObject(obj.StringName),
-                    craftedItemInitializationData.Culture);
-            }
-            */
-
             using (new AllowedThread())
             {
                 craftingCampaignBehavior.SetCraftedWeaponName(mbCraftedWeapon, obj.Name);
@@ -118,7 +109,7 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
         });
     }
 
-    private void Handle(MessagePayload<UpdateCraftedItem> obj)
+    private void Handle_UpdateCraftedItem(MessagePayload<UpdateCraftedItem> obj)
     {
         GameThread.RunSafe(() =>
         {

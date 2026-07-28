@@ -21,12 +21,11 @@ internal class CreateCraftedWeaponInternalPatch
 
     [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateCraftedWeaponInternal))]
     [HarmonyPrefix]
-    public static bool CreateCraftedWeaponInternal(CraftingCampaignBehavior __instance, ref ItemObject __result, bool isFreeMode, Hero crafterHero, WeaponDesign weaponDesign, ItemModifier weaponModifier = null)
+    public static bool CreateCraftedWeaponInternalPrefix(CraftingCampaignBehavior __instance, ref ItemObject __result, bool isFreeMode, Hero crafterHero, WeaponDesign weaponDesign, ItemModifier weaponModifier = null)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        //string nextCraftedItemId = __instance.GetNextCraftedItemId(); // Move crafted item to be server managed
         ItemObject craftedItemObject;
         using (new AllowedThread())
         {
@@ -34,8 +33,6 @@ internal class CreateCraftedWeaponInternalPatch
             ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
 
             MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
-
-            //CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode); // Move to run with rest of clients
         }
         Crafting craftingLogic = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic;
 
@@ -46,7 +43,7 @@ internal class CreateCraftedWeaponInternalPatch
         __instance.AddResearchPoints(weaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, crafterHero, isFreeMode));
 
         // Publish message with data
-        var message = new CraftedWeaponInternallyCreated(__instance, isFreeMode, crafterHero, craftedItemObject.Name, craftedItemObject.Culture, weaponDesign, weaponModifier, Hero.MainHero, craftingLogic);
+        var message = new CreatedCraftedWeaponInternal(isFreeMode, crafterHero, craftedItemObject.Name, craftedItemObject.Culture, weaponDesign, weaponModifier, Hero.MainHero, craftingLogic);
         MessageBroker.Instance.Publish(__instance, message);
 
         // Skip original to override original client saving

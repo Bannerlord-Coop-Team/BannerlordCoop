@@ -5,12 +5,13 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Smithing.Messages;
 
-public record SmeltingVMCreated : IEvent
+public readonly struct SmeltingVMCreated : IEvent
 {
-    public SmeltingVM SmeltingVM;
+    public readonly SmeltingVM SmeltingVM;
 
     public SmeltingVMCreated(SmeltingVM smeltingVM)
     {
@@ -18,9 +19,9 @@ public record SmeltingVMCreated : IEvent
     }
 }
 
-public record RefinementVMCreated : IEvent
+public readonly struct RefinementVMCreated : IEvent
 {
-    public RefinementVM RefinementVM;
+    public readonly RefinementVM RefinementVM;
 
     public RefinementVMCreated(RefinementVM refinementVM)
     {
@@ -28,9 +29,9 @@ public record RefinementVMCreated : IEvent
     }
 }
 
-public record CraftingVMCreated : IEvent
+public readonly struct CraftingVMCreated : IEvent
 {
-    public CraftingVM CraftingVM;
+    public readonly CraftingVM CraftingVM;
 
     public CraftingVMCreated(CraftingVM craftingVM)
     {
@@ -38,9 +39,9 @@ public record CraftingVMCreated : IEvent
     }
 }
 
-public record WeaponDesignVMCreated : IEvent
+public readonly struct WeaponDesignVMCreated : IEvent
 {
-    public WeaponDesignVM WeaponDesignVM;
+    public readonly WeaponDesignVM WeaponDesignVM;
 
     public WeaponDesignVMCreated(WeaponDesignVM weaponDesignVM)
     {
@@ -48,9 +49,9 @@ public record WeaponDesignVMCreated : IEvent
     }
 }
 
-public record WeaponDesignResultPopupVMCreated : IEvent
+public readonly struct WeaponDesignResultPopupVMCreated : IEvent
 {
-    public WeaponDesignResultPopupVM WeaponDesignResultPopupVM;
+    public readonly WeaponDesignResultPopupVM WeaponDesignResultPopupVM;
 
     public WeaponDesignResultPopupVMCreated(WeaponDesignResultPopupVM weaponDesignResultPopupVM)
     {
@@ -58,9 +59,9 @@ public record WeaponDesignResultPopupVMCreated : IEvent
     }
 }
 
-public record RefreshWeaponDesignVM : IEvent
+public readonly struct RefreshWeaponDesignVM : IEvent
 {
-    public Town Town;
+    public readonly Town Town;
 
     public RefreshWeaponDesignVM(Town town)
     {
@@ -68,26 +69,26 @@ public record RefreshWeaponDesignVM : IEvent
     }
 }
 
-public class RefreshCraftingVM : IEvent
+public readonly struct CompleteOrderFromVM : IEvent
 {
-    public RefreshCraftingVM()
+    public readonly ItemObject CraftedItemObject;
+
+    public CompleteOrderFromVM(ItemObject craftedItemObject)
     {
+        CraftedItemObject = craftedItemObject;
     }
 }
 
-[ProtoContract(SkipConstructor = true)]
-public class NetworkRefreshSmelting : ICommand
-{
-    public NetworkRefreshSmelting()
-    {
-    }
-}
+public readonly struct RefreshCraftingVM : IEvent {}
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkRefreshRefinement : ICommand
+public readonly struct NetworkRefreshSmelting : ICommand {}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkRefreshRefinement : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingHeroId;
+    public readonly string CraftingHeroId;
 
     public NetworkRefreshRefinement(string craftingHeroId)
     {

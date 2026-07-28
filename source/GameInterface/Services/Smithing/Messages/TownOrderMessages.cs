@@ -1,54 +1,47 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Smithing.Messages;
 
-public record TownOrderCreated : IEvent
+public readonly struct TownOrderCreated : IEvent
 {
-    public CraftingCampaignBehavior CraftingCampaignBehavior;
-    public Hero OrderOwner;
-    public int OrderSlot;
+    public readonly Hero OrderOwner;
+    public readonly int OrderSlot;
 
-    public TownOrderCreated(CraftingCampaignBehavior craftingCampaignBehavior, Hero orderOwner, int orderSlot)
+    public TownOrderCreated(Hero orderOwner, int orderSlot)
     {
-        CraftingCampaignBehavior = craftingCampaignBehavior;
         OrderOwner = orderOwner;
         OrderSlot = orderSlot;
     }
 }
 
-public record CraftingOrderReplaced : IEvent
+public readonly struct CraftingOrderReplaced : IEvent
 {
-    public CraftingCampaignBehavior CraftingCampaignBehavior;
-    public Town Town;
-    public int DifficultyLevel;
+    public readonly Town Town;
+    public readonly int DifficultyLevel;
 
-    public CraftingOrderReplaced(CraftingCampaignBehavior craftingCampaignBehavior, Town town, int difficultyLevel)
+    public CraftingOrderReplaced(Town town, int difficultyLevel)
     {
-        CraftingCampaignBehavior = craftingCampaignBehavior;
         Town = town;
         DifficultyLevel = difficultyLevel;
     }
 }
 
-public record OrderCompleted : IEvent
+public readonly struct OrderCompleted : IEvent
 {
-    public CraftingCampaignBehavior CraftingCampaignBehavior;
-    public Town Town;
-    public CraftingOrder CraftingOrder;
-    public ItemObject CraftedItem;
-    public Hero CompleterHero;
-    public Hero MainHero;
-    public bool Flag;
+    public readonly Town Town;
+    public readonly CraftingOrder CraftingOrder;
+    public readonly ItemObject CraftedItem;
+    public readonly Hero CompleterHero;
+    public readonly Hero MainHero;
+    public readonly bool Flag;
 
-    public OrderCompleted(CraftingCampaignBehavior craftingCampaignBehavior, Town town, CraftingOrder craftingOrder, ItemObject craftedItem, Hero completerHero, Hero mainHero, bool flag)
+    public OrderCompleted(Town town, CraftingOrder craftingOrder, ItemObject craftedItem, Hero completerHero, Hero mainHero, bool flag)
     {
-        CraftingCampaignBehavior = craftingCampaignBehavior;
         Town = town;
         CraftingOrder = craftingOrder;
         CraftedItem = craftedItem;
@@ -59,29 +52,25 @@ public record OrderCompleted : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkCreateTownOrder : ICommand
+internal readonly struct NetworkCreateTownOrder : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly string OrderOwnerId;
 
     [ProtoMember(2)]
-    public string OrderOwnerId;
+    public readonly string CraftingOrderId;
 
     [ProtoMember(3)]
-    public string CraftingOrderId;
+    public readonly string RandomElementId; // CraftingTemplateId
 
     [ProtoMember(4)]
-    public string RandomElementId; // CraftingTemplateId
+    public readonly int PieceTier;
 
     [ProtoMember(5)]
-    public int PieceTier;
+    public readonly string NextTownOrderId;
 
-    [ProtoMember(6)]
-    public string NextTownOrderId;
-
-    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, string orderOwnerId, string craftingOrderId, string randomElementId, int pieceTier, string nextTownOrderId)
+    public NetworkCreateTownOrder(string orderOwnerId, string craftingOrderId, string randomElementId, int pieceTier, string nextTownOrderId)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         OrderOwnerId = orderOwnerId;
         CraftingOrderId = craftingOrderId;
         RandomElementId = randomElementId;
@@ -91,52 +80,44 @@ public class NetworkCreateTownOrder : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkReplaceCraftingOrder : ICommand
+internal readonly struct NetworkReplaceCraftingOrder : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly string TownId;
 
     [ProtoMember(2)]
-    public string TownId;
+    public readonly int DifficultyLevel;
 
-    [ProtoMember(3)]
-    public int DifficultyLevel;
-
-    public NetworkReplaceCraftingOrder(string craftingCampaignBehaviorId, string townId, int difficultyLevel)
+    public NetworkReplaceCraftingOrder(string townId, int difficultyLevel)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         TownId = townId;
         DifficultyLevel = difficultyLevel;
     }
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkCompleteOrderServer : ICommand
+internal readonly struct NetworkCompleteOrderServer : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly string TownId;
 
     [ProtoMember(2)]
-    public string TownId;
+    public readonly string CraftingOrderId;
 
     [ProtoMember(3)]
-    public string CraftingOrderId;
+    public readonly string CraftedItemId;
 
     [ProtoMember(4)]
-    public string CraftedItemId;
+    public readonly string CompleterHeroId;
 
     [ProtoMember(5)]
-    public string CompleterHeroId;
+    public readonly string MainHeroId;
 
     [ProtoMember(6)]
-    public string MainHeroId;
+    public readonly bool Flag;
 
-    [ProtoMember(7)]
-    public bool Flag;
-
-    public NetworkCompleteOrderServer(string craftingCampaignBehaviorId, string townId, string craftingOrderId, string craftedItemId, string completerHeroId, string mainHeroId, bool flag)
+    public NetworkCompleteOrderServer(string townId, string craftingOrderId, string craftedItemId, string completerHeroId, string mainHeroId, bool flag)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         TownId = townId;
         CraftingOrderId = craftingOrderId;
         CraftedItemId = craftedItemId;
@@ -147,26 +128,22 @@ public class NetworkCompleteOrderServer : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkCompleteOrderClients : ICommand
+internal readonly struct NetworkCompleteOrderClients : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly string TownId;
 
     [ProtoMember(2)]
-    public string TownId;
+    public readonly string CraftingOrderId;
 
     [ProtoMember(3)]
-    public string CraftingOrderId;
+    public readonly string CraftedItemId;
 
     [ProtoMember(4)]
-    public string CraftedItemId;
-
-    [ProtoMember(5)]
-    public string CompleterHeroId;
+    public readonly string CompleterHeroId;
 
     public NetworkCompleteOrderClients(NetworkCompleteOrderServer cloneObject)
     {
-        CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
         TownId = cloneObject.TownId;
         CraftingOrderId = cloneObject.CraftingOrderId;
         CraftedItemId = cloneObject.CraftedItemId;

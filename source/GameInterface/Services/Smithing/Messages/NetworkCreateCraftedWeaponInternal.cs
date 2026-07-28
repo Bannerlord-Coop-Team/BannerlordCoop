@@ -6,46 +6,42 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Smithing.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkCreateCraftedWeaponInternalServer : ICommand
+public readonly struct NetworkCreateCraftedWeaponInternalServer : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly bool IsFreeMode;
 
     [ProtoMember(2)]
-    public bool IsFreeMode;
+    public readonly string CraftingHeroId;
 
     [ProtoMember(3)]
-    public string CraftingHeroId;
+    public readonly TextObject Name;
 
     [ProtoMember(4)]
-    public TextObject Name;
+    public readonly string CultureId;
 
     [ProtoMember(5)]
-    public string CultureId;
+    public readonly string CraftingTemplateId;
 
     [ProtoMember(6)]
-    public string CraftingTemplateId;
+    public readonly string WeaponName;
 
     [ProtoMember(7)]
-    public string WeaponName;
+    public readonly List<string> WeaponDesignElementCraftingPieceIds;
 
     [ProtoMember(8)]
-    public List<string> WeaponDesignElementCraftingPieceIds;
+    public readonly List<int> WeaponDesignElementScalePercentages;
 
     [ProtoMember(9)]
-    public List<int> WeaponDesignElementScalePercentages;
+    public readonly string WeaponModifierId;
 
     [ProtoMember(10)]
-    public string WeaponModifierId;
+    public readonly string PlayerHeroId;
 
     [ProtoMember(11)]
-    public string PlayerHeroId;
-
-    [ProtoMember(12)]
-    public string ItemModifierGroupId;
+    public readonly string ItemModifierGroupId;
 
     public NetworkCreateCraftedWeaponInternalServer(
-        string craftingCampaignBehaviorId,
         bool isFreeMode,
         string craftingHeroId,
         TextObject name,
@@ -58,7 +54,6 @@ public class NetworkCreateCraftedWeaponInternalServer : ICommand
         string playerHeroId,
         string itemModifierGroupId)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         IsFreeMode = isFreeMode;
         CraftingHeroId = craftingHeroId;
         Name = name;
@@ -74,47 +69,43 @@ public class NetworkCreateCraftedWeaponInternalServer : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkCreateCraftedWeaponInternalClients : ICommand
+public readonly struct NetworkCreateCraftedWeaponInternalClients : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly TextObject Name;
 
     [ProtoMember(2)]
-    public TextObject Name;
+    public readonly string CultureId;
 
     [ProtoMember(3)]
-    public string CultureId;
+    public readonly string WeaponModifierId;
 
     [ProtoMember(4)]
-    public string WeaponModifierId;
+    public readonly bool IsFreeMode;
 
     [ProtoMember(5)]
-    public bool IsFreeMode;
+    public readonly string CraftingTemplateId;
 
     [ProtoMember(6)]
-    public string CraftingTemplateId;
+    public readonly string WeaponName;
 
     [ProtoMember(7)]
-    public string WeaponName;
+    public readonly List<string> WeaponDesignElementCraftingPieceIds;
 
     [ProtoMember(8)]
-    public List<string> WeaponDesignElementCraftingPieceIds;
+    public readonly List<int> WeaponDesignElementScalePercentages;
 
     [ProtoMember(9)]
-    public List<int> WeaponDesignElementScalePercentages;
+    public readonly string ItemModifierGroupId;
 
     [ProtoMember(10)]
-    public string ItemModifierGroupId;
+    public readonly string PlayerHeroId;
 
     [ProtoMember(11)]
-    public string PlayerHeroId;
-
-    [ProtoMember(12)]
-    public string NextCraftedItemId;
+    public readonly string NextCraftedItemId;
 
     public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject, string nextCraftedItemId)
     {
-        CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
         Name = cloneObject.Name;
         CultureId = cloneObject.CultureId;
         WeaponModifierId = cloneObject.WeaponModifierId;

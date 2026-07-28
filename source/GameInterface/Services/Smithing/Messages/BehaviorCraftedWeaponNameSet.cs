@@ -4,11 +4,11 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Messages;
 
-public record BehaviorCraftedWeaponNameSet : IEvent
+public readonly struct BehaviorCraftedWeaponNameSet : IEvent
 {
-    public CraftingCampaignBehavior CraftingCampaignBehavior;
-    public string CraftedWeaponId;
-    public TextObject Name;
+    public readonly CraftingCampaignBehavior CraftingCampaignBehavior;
+    public readonly string CraftedWeaponId;
+    public readonly TextObject Name;
 
     public BehaviorCraftedWeaponNameSet(CraftingCampaignBehavior craftingCampaignBehavior, string craftedWeaponId, TextObject name)
     {
