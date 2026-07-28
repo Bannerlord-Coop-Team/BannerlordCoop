@@ -1626,6 +1626,119 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void CollisionAuthority_RemoteDefenderWithoutNativeReaction_UsesGuardParry()
+    {
+        RunScenario("attacker", context =>
+        {
+            var attackerId = Guid.NewGuid();
+            var defenderId = Guid.NewGuid();
+
+            Agent attacker = SpawnRegisteredAgent(
+                context,
+                "attacker",
+                attackerId,
+                AgentControllerType.Player,
+                out _);
+            Agent defender = SpawnRegisteredAgent(
+                context,
+                "defender",
+                defenderId,
+                AgentControllerType.None,
+                out MirrorAgent defenderMirror);
+            defenderMirror.Action1Index = 3102;
+            defenderMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+            defenderMirror.Action1Stage =
+                Agent.ActionStage.Defend;
+
+            context.Component.AgentActionHandler.ObserveBlockedHit(
+                defender,
+                attacker,
+                isBlocked: true,
+                isMissile: false,
+                collisionResult: CombatCollisionResult.Blocked);
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+
+            NetworkAgentGuardReaction message = Assert.Single(
+                context.Network.NetworkSentMessages
+                    .GetMessages<NetworkAgentGuardReaction>());
+            Assert.Equal(attackerId, message.AttackerAgentId);
+            Assert.Equal(defenderId, message.AgentId);
+            Assert.Equal(1, message.ReactionChannel);
+            Assert.Equal(3104, message.ReactionActionIndex);
+            Assert.Equal(0f, message.Progress);
+            Assert.Equal(
+                (ulong)AnimFlags.amf_priority_defend,
+                message.AnimationFlags);
+            Assert.Equal(1, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(3104, defenderMirror.Action1Index);
+        });
+    }
+
+    [Theory]
+    [InlineData(
+        "act_defend_up_1h_passive",
+        "act_defend_up_1h_parry_light")]
+    [InlineData(
+        "act_defend_right_2h_active_left_stance",
+        "act_defend_right_2h_parry_light_left_stance")]
+    [InlineData(
+        "act_defend_shield_left_1h_passive_down",
+        "act_defend_shield_left_1h_parry_light_down")]
+    [InlineData(null, null)]
+    [InlineData("act_strike_left_1h", null)]
+    public void GuardReactionActionResolver_MapsHeldGuardToLightParry(
+        string? guardActionName,
+        string? expected)
+    {
+        Assert.Equal(
+            expected,
+            GuardReactionActionResolver
+                .GetParryLightActionName(guardActionName));
+    }
+
+    [Fact]
+    public void CollisionAuthority_LocalDefenderWaitsForNativeReaction()
+    {
+        RunScenario("attacker", context =>
+        {
+            Agent attacker = SpawnRegisteredAgent(
+                context,
+                "attacker",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            Agent defender = SpawnRegisteredAgent(
+                context,
+                "attacker",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out MirrorAgent defenderMirror);
+            defenderMirror.Action1Index = 3102;
+            defenderMirror.Action1CodeType =
+                Agent.ActionCodeType.Guard;
+            defenderMirror.Action1Stage =
+                Agent.ActionStage.Defend;
+
+            context.Component.AgentActionHandler.ObserveBlockedHit(
+                defender,
+                attacker,
+                isBlocked: true,
+                isMissile: false,
+                collisionResult: CombatCollisionResult.Blocked);
+            context.Component.AgentActionHandler
+                .ReplayRemoteGuardReactions();
+
+            Assert.Empty(
+                context.Network.NetworkSentMessages
+                    .GetMessages<NetworkAgentGuardReaction>());
+            Assert.Equal(0, defenderMirror.SetActionChannelCalls);
+            Assert.Equal(3102, defenderMirror.Action1Index);
+        });
+    }
+
     [Theory]
     [InlineData(false, false, CombatCollisionResult.Blocked)]
     [InlineData(true, true, CombatCollisionResult.Blocked)]

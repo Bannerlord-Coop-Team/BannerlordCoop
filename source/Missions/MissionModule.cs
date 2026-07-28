@@ -175,6 +175,9 @@ public class MissionModule : Module
         builder.RegisterType<RemoteAgentActionProcessor>()
             .As<IRemoteAgentActionProcessor>()
             .InstancePerDependency();
+        builder.RegisterType<GuardReactionActionResolver>()
+            .As<IGuardReactionActionResolver>()
+            .InstancePerDependency();
         builder.RegisterType<GuardReactionHandler>()
             .As<IGuardReactionHandler>()
             .InstancePerDependency();

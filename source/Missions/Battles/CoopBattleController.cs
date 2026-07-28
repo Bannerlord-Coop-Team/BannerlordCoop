@@ -220,6 +220,12 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent.AgentRegistry);
 #endif
         base.OnMissionTick(dt);
+#if DEBUG
+        // Remote interpolation just ran in the base tick. Recompute the shared strike target now so the
+        // upcoming native collision reads the exact current guard-to-striker direction on every peer.
+        guardFixture.RefreshMountedStrikeLook(
+            coopMissionComponent.AgentRegistry);
+#endif
 
         // The mission host is the single siege authority (engine deployment and machine simulation);
         // host election can settle after the mission opens, so keep the patch-visible flags current

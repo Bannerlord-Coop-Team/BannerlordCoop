@@ -5,7 +5,7 @@ using System;
 namespace Missions.Agents.Messages;
 
 /// <summary>
-/// Replicates the defender's native one-shot melee guard reaction from the collision-authority peer.
+/// Replicates the defender's one-shot melee guard reaction selected by the collision-authority peer.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkAgentGuardReaction : IEvent

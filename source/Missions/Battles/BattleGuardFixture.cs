@@ -25,6 +25,7 @@ public interface IBattleGuardFixture
     bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
+    void RefreshMountedStrikeLook(INetworkAgentRegistry agentRegistry);
     void ApplyPostAgentTickGuardInput(INetworkAgentRegistry agentRegistry);
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
     void SamplePreReplayDisplayedState(
@@ -386,6 +387,31 @@ public class BattleGuardFixture : IBattleGuardFixture
         // Both production action polls must observe the same held fixture presentation.
         ApplyMountedGuardPresentationAction(agentRegistry);
         BattleGuardNativeTrace.Mark("fixture-reapply-exit");
+    }
+
+    public void RefreshMountedStrikeLook(
+        INetworkAgentRegistry agentRegistry)
+    {
+        if (guardDriver?.Mode ==
+                BattleGuardFixtureMode.Mounted
+            && guardDriver.Phase ==
+                BattleGuardFixturePhase.Attack
+            && roles != null
+            && TryGetExactAgent(
+                agentRegistry,
+                roles.GuardAgentId,
+                roles.GuardAuthority,
+                out CoopAgentInfo guardInfo)
+            && guardDriver.TryGetMountedStrikeDirections(
+                guardInfo.Agent,
+                out _,
+                out Vec3 lookDirection))
+        {
+            guardInfo.Agent.LookDirection = lookDirection;
+            BattleGuardNativeTrace.Record(
+                guardInfo.Agent,
+                "fixture-strike-look-refresh");
+        }
     }
 
     public void Tick(float dt, INetworkAgentRegistry agentRegistry)

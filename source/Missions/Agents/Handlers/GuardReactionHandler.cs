@@ -37,6 +37,7 @@ public class GuardReactionHandler : IGuardReactionHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleHostRegistry battleHostRegistry;
+    private readonly IGuardReactionActionResolver reactionActionResolver;
     private readonly Dictionary<Guid, PendingGuardReaction> pendingReactions =
         new Dictionary<Guid, PendingGuardReaction>();
     private readonly Dictionary<Guid, PendingRemoteGuardReaction>
@@ -63,18 +64,21 @@ public class GuardReactionHandler : IGuardReactionHandler
         public readonly Guid AttackerAgentId;
         public readonly Agent Agent;
         public readonly int BattleHostEpoch;
+        public readonly bool DefenderLocallyControlled;
         public int CaptureAttempts;
 
         public PendingGuardReaction(
             Guid agentId,
             Guid attackerAgentId,
             Agent agent,
-            int battleHostEpoch)
+            int battleHostEpoch,
+            bool defenderLocallyControlled)
         {
             AgentId = agentId;
             AttackerAgentId = attackerAgentId;
             Agent = agent;
             BattleHostEpoch = battleHostEpoch;
+            DefenderLocallyControlled = defenderLocallyControlled;
             CaptureAttempts = 0;
         }
     }
@@ -111,13 +115,15 @@ public class GuardReactionHandler : IGuardReactionHandler
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
-        IBattleHostRegistry battleHostRegistry)
+        IBattleHostRegistry battleHostRegistry,
+        IGuardReactionActionResolver reactionActionResolver)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.battleHostRegistry = battleHostRegistry;
+        this.reactionActionResolver = reactionActionResolver;
 
         messageBroker.Subscribe<NetworkAgentGuardReaction>(
             Handle_NetworkAgentGuardReaction);
@@ -177,7 +183,9 @@ public class GuardReactionHandler : IGuardReactionHandler
                 affectedInfo.AgentId,
                 affectorInfo.AgentId,
                 affectedAgent,
-                battleHostEpoch);
+                battleHostEpoch,
+                agentRegistry.IsLocallyControlled(
+                    affectedAgent));
 #if DEBUG
         BattleGuardNativeTrace.Record(
             affectedAgent,
@@ -226,6 +234,42 @@ public class GuardReactionHandler : IGuardReactionHandler
                         out int reactionChannel,
                         out ActionIndexCache reactionAction))
                 {
+                    if (!pending.DefenderLocallyControlled
+                        && reactionActionResolver.TryResolve(
+                            agent,
+                            out reactionChannel,
+                            out reactionAction,
+                            out AnimFlags reactionFlags)
+                        && TryApplySyntheticReaction(
+                            agent,
+                            reactionChannel,
+                            in reactionAction,
+                            reactionFlags))
+                    {
+#if DEBUG
+                        BattleGuardNativeTrace.Record(
+                            agent,
+                            "reaction-synthetic-applied",
+                            $"channel={reactionChannel}," +
+                            $"action={reactionAction.Index}");
+#endif
+                        SendReaction(
+                            pending,
+                            agent,
+                            reactionChannel,
+                            in reactionAction,
+                            progress: 0f,
+                            reactionFlags);
+#if DEBUG
+                        BattleGuardNativeTrace.CompleteCollisionCapture(
+                            agent,
+                            $"reaction-sent,sequence={sequence}," +
+                            "source=synthetic");
+#endif
+                        completedIds.Add(agentId);
+                        continue;
+                    }
+
                     pending.CaptureAttempts++;
                     if (pending.CaptureAttempts >= MaximumCaptureAttempts)
                     {
@@ -259,23 +303,19 @@ public class GuardReactionHandler : IGuardReactionHandler
                     $"channel={reactionChannel},action={reactionAction.Index}," +
                     $"progress={progress:0.###}");
 #endif
-                sequence++;
-                network.SendAll(
-                    new NetworkAgentGuardReaction(
-                        controllerIdProvider.ControllerId,
-                        sequence,
-                        pending.BattleHostEpoch,
-                        pending.AttackerAgentId,
-                        pending.AgentId,
-                        reactionChannel,
-                        reactionAction.Index,
-                        progress,
-                        (ulong)agent.GetCurrentAnimationFlag(reactionChannel),
-                        agent.HasMount));
+                SendReaction(
+                    pending,
+                    agent,
+                    reactionChannel,
+                    in reactionAction,
+                    progress,
+                    agent.GetCurrentAnimationFlag(
+                        reactionChannel));
 #if DEBUG
                 BattleGuardNativeTrace.CompleteCollisionCapture(
                     agent,
-                    $"reaction-sent,sequence={sequence}");
+                    $"reaction-sent,sequence={sequence}," +
+                    "source=native");
 #endif
                 completedIds.Add(agentId);
             }
@@ -285,6 +325,48 @@ public class GuardReactionHandler : IGuardReactionHandler
         }
 
         ApplyPendingRemoteReactions();
+    }
+
+    private bool TryApplySyntheticReaction(
+        Agent agent,
+        int channel,
+        in ActionIndexCache reactionAction,
+        AnimFlags animationFlags)
+    {
+        if (HasInterruptingAction(agent))
+            return false;
+
+        using (new AllowedThread())
+        {
+            return agent.SetActionChannel(
+                channel,
+                in reactionAction,
+                additionalFlags: animationFlags,
+                startProgress: 0f);
+        }
+    }
+
+    private void SendReaction(
+        PendingGuardReaction pending,
+        Agent agent,
+        int reactionChannel,
+        in ActionIndexCache reactionAction,
+        float progress,
+        AnimFlags animationFlags)
+    {
+        sequence++;
+        network.SendAll(
+            new NetworkAgentGuardReaction(
+                controllerIdProvider.ControllerId,
+                sequence,
+                pending.BattleHostEpoch,
+                pending.AttackerAgentId,
+                pending.AgentId,
+                reactionChannel,
+                reactionAction.Index,
+                progress,
+                (ulong)animationFlags,
+                agent.HasMount));
     }
 
     private void Handle_NetworkAgentGuardReaction(
