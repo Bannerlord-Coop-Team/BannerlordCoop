@@ -38,6 +38,7 @@ public class CoopDeploymentPatchTests
 
             // Patch() returns the hooked methods (Harmony renames them <Name>_PatchN), so match by name, not by
             // MethodInfo identity. Empty/missing entries = the class wasn't processed = the patch never installs.
+            Assert.Contains(patched, m => m.Name.Contains("CheckDeployment"));
             Assert.Contains(patched, m => m.Name.Contains("IsPlanMade"));
             Assert.Contains(patched, m => m.Name.Contains("MakeTeamPlans"));
             Assert.Contains(patched, m => m.Name.Contains("OnSideDeploymentOver"));

@@ -16,13 +16,16 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// own troops (a spectator).
 /// <para>
 /// Treat an empty team as already-planned so the spawn gate proceeds — BUT only when <c>CheckDeployment</c> reads it
-/// as the spawn gate, NOT while <c>MakeTeamPlans</c> is running. <c>MakeTeamPlans</c> uses the SAME
+/// as the spawn gate, NOT for every other plan consumer or while <c>MakeTeamPlans</c> is running.
+/// <c>MakeTeamPlans</c> uses the SAME
 /// <c>IsPlanMade(team)</c> as its "already planned?" guard, and at plan time EVERY team is still empty (troops spawn
 /// later), so forcing it true there would skip making the real plans — the troops then spawn into an unplanned team
-/// and crash (the host's <c>SpawnAgent</c> "Nullable object must have a value"). The <see cref="_buildingDeploymentPlan"/>
-/// flag scopes the override out of that path. <c>IsReinforcementPlanMade</c> is deliberately NOT overridden: leaving
-/// it false for an empty team keeps <c>CheckDeployment</c>'s plan-making loop alive (it gates the SKIP on
-/// <c>IsPlanMade &amp;&amp; IsReinforcementPlanMade</c>) so the fillable teams still get real plans. Scoped to coop.
+/// and crash (the host's <c>SpawnAgent</c> "Nullable object must have a value"). The
+/// <see cref="_checkingDeployment"/> and <see cref="_buildingDeploymentPlan"/> flags confine the override to the
+/// spawn gate and expose the real state to plan construction. <c>IsReinforcementPlanMade</c> is deliberately NOT
+/// overridden: leaving it false for an empty team keeps <c>CheckDeployment</c>'s plan-making loop alive (it gates
+/// the SKIP on <c>IsPlanMade &amp;&amp; IsReinforcementPlanMade</c>) so the fillable teams still get real plans.
+/// Scoped to coop.
 /// </para>
 /// </summary>
 [HarmonyPatch]
@@ -30,13 +33,22 @@ internal class CoopEmptyTeamDeploymentPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopEmptyTeamDeploymentPatch>();
 
-    // True while the engine is building a team's deployment plan — see the class remarks for why the override must
-    // stand down here. Game-thread only; ThreadStatic is belt-and-suspenders.
+    // These private engine paths are game-thread only; ThreadStatic also prevents another thread from observing
+    // their transient override state.
+    [ThreadStatic] private static bool _checkingDeployment;
     [ThreadStatic] private static bool _buildingDeploymentPlan;
 
     // TEMP diagnostic: log each distinct team we treat as planned, once, so a live run confirms this build is active
     // and the override is firing on the foreign (puppet) team. Remove once the non-host spawn is confirmed solid.
     private static readonly HashSet<Team> _loggedOverrides = new HashSet<Team>();
+
+    [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment")]
+    [HarmonyPrefix]
+    private static void CheckDeployment_Prefix() => _checkingDeployment = true;
+
+    [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment")]
+    [HarmonyFinalizer]
+    private static void CheckDeployment_Finalizer() => _checkingDeployment = false;
 
     [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
     [HarmonyPrefix]
@@ -51,7 +63,7 @@ internal class CoopEmptyTeamDeploymentPatch
     [HarmonyPostfix]
     private static void IsPlanMade_Postfix(Team team, ref bool __result)
     {
-        if (!__result && !_buildingDeploymentPlan
+        if (!__result && _checkingDeployment && !_buildingDeploymentPlan
             && BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive
             && IsForeignTeam(team))
         {
