@@ -1338,10 +1338,13 @@ public class BattleGuardFixture : IBattleGuardFixture
     internal static bool ShouldMaintainMountedGuardPresentation(
         BattleGuardFixtureMode mode,
         BattleGuardFixturePhase phase,
-        BattleGuardFixtureDirection direction)
+        BattleGuardFixtureDirection direction,
+        bool reactionActive)
     {
         return mode == BattleGuardFixtureMode.Mounted &&
-            phase == BattleGuardFixturePhase.Guard &&
+            (phase == BattleGuardFixturePhase.Guard ||
+             (phase == BattleGuardFixturePhase.Attack &&
+              !reactionActive)) &&
             GetMountedGuardPresentationActionName(direction) != null;
     }
 
@@ -1368,13 +1371,17 @@ public class BattleGuardFixture : IBattleGuardFixture
             return;
         }
 
+        bool reactionActive =
+            driver.Phase == BattleGuardFixturePhase.Attack &&
+            IsReaction(agent, driver.GuardActionIndex);
         if (!ShouldApplyExplicitMountedGuardInput(
                 driver.Mode,
                 driver.UseMovementFlagGuardInput) ||
             !ShouldMaintainMountedGuardPresentation(
                 driver.Mode,
                 driver.Phase,
-                driver.Direction) ||
+                driver.Direction,
+                reactionActive) ||
             !agent.HasMount)
         {
             driver.MountedPresentationActionPending = false;

@@ -605,36 +605,49 @@ public class BattleGuardFixtureEvidenceTests
         BattleGuardFixtureMode.Mounted,
         BattleGuardFixturePhase.Guard,
         BattleGuardFixtureDirection.Left,
+        false,
         true)]
     [InlineData(
         BattleGuardFixtureMode.Mounted,
         BattleGuardFixturePhase.Guard,
         BattleGuardFixtureDirection.Right,
+        false,
         true)]
     [InlineData(
         BattleGuardFixtureMode.Mounted,
         BattleGuardFixturePhase.Calibration,
         BattleGuardFixtureDirection.Right,
+        false,
         false)]
     [InlineData(
         BattleGuardFixtureMode.Mounted,
         BattleGuardFixturePhase.Attack,
         BattleGuardFixtureDirection.Right,
+        false,
+        true)]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Attack,
+        BattleGuardFixtureDirection.Right,
+        true,
         false)]
     [InlineData(
         BattleGuardFixtureMode.Foot,
         BattleGuardFixturePhase.Guard,
         BattleGuardFixtureDirection.Right,
+        false,
         false)]
     [InlineData(
         BattleGuardFixtureMode.Mounted,
         BattleGuardFixturePhase.Guard,
         BattleGuardFixtureDirection.Up,
+        false,
         false)]
-    public void MountedGuardPresentationAction_MaintainsOnlyGuardPhase(
+    public void MountedGuardPresentationAction_MaintainsUntilAttackReaction(
         BattleGuardFixtureMode mode,
         BattleGuardFixturePhase phase,
         BattleGuardFixtureDirection direction,
+        bool reactionActive,
         bool expected)
     {
         Assert.Equal(
@@ -642,7 +655,8 @@ public class BattleGuardFixtureEvidenceTests
             BattleGuardFixture.ShouldMaintainMountedGuardPresentation(
                 mode,
                 phase,
-                direction));
+                direction,
+                reactionActive));
     }
 
     [Theory]
