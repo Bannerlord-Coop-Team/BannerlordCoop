@@ -124,7 +124,8 @@ jobs:
             esac
             cp "$file" "$binary/"
           done
-          for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll; do
+          cp source/Coop/bin/Release/Coop.CrashReporter.exe "$binary/"
+          for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll Coop.CrashReporter.exe; do
             test -s "$binary/$required"
           done
           cp deploy/start-client.bat 'deploy/Server Instructions.md' "$module/"
