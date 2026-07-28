@@ -40,11 +40,14 @@ internal class TroopRosterDeltaHandler : IHandler
     private readonly INetwork network;
     private readonly ISendCoalescer coalescer;
     private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
-    private readonly IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider;
+    private readonly IPartyScreenRosterRebaser partyScreenRosterRebaser;
 
-    public TroopRosterDeltaHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network,
+    public TroopRosterDeltaHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network,
         IEncounterMenuConditionRefresher encounterMenuConditionRefresher,
-        IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider,
+        IPartyScreenRosterRebaser partyScreenRosterRebaser,
         ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -52,7 +55,7 @@ internal class TroopRosterDeltaHandler : IHandler
         this.network = network;
         this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
         this.coalescer = coalescer;
-        this.partyScreenRosterBaselineProvider = partyScreenRosterBaselineProvider;
+        this.partyScreenRosterRebaser = partyScreenRosterRebaser;
 
         // Authority send path: the roster patches publish these local events (server-only) with the server index.
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
@@ -266,14 +269,11 @@ internal class TroopRosterDeltaHandler : IHandler
             using (new AllowedThread())
             {
                 if (!objectManager.TryGetObjectWithLogging(rosterId, out roster)) return;
-                roster.RemoveZeroCounts();
-                var baselineRoster = partyScreenRosterBaselineProvider.GetBaselineRoster(roster);
-                if (baselineRoster != null)
+                if (!partyScreenRosterRebaser.TryRemoveZeroCounts(roster))
                 {
-                    baselineRoster.RemoveZeroCounts();
-                    baselineRoster.InitializeCachedData();
+                    roster.RemoveZeroCounts();
+                    roster.InitializeCachedData();
                 }
-                roster.InitializeCachedData();
             }
 
             encounterMenuConditionRefresher.RefreshForRoster(roster);
@@ -296,13 +296,9 @@ internal class TroopRosterDeltaHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging(rosterId, out roster)) return;
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character)) return;
 
-                apply(roster, character);
-                // Done resets live rosters from this snapshot, so authority changes must update both copies.
-                var baselineRoster = partyScreenRosterBaselineProvider.GetBaselineRoster(roster);
-                if (baselineRoster != null)
+                if (!partyScreenRosterRebaser.TryApply(roster, character, apply))
                 {
-                    apply(baselineRoster, character);
-                    baselineRoster.InitializeCachedData();
+                    apply(roster, character);
                 }
             }
 

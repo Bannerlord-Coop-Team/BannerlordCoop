@@ -13,7 +13,7 @@ using static GameInterface.Services.ObjectManager.ObjectManager;
 namespace E2E.Tests.Services.TroopRosters;
 
 /// <summary>
-/// Exercises the delta apply path (<see cref="ITroopRosterInterface.ApplyTroopRosterDeltas"/>) for the two
+/// Exercises the delta apply path (<see cref="ITroopRosterInterface.TryApplyTroopRosterDeltas"/>) for the two
 /// cases where a roster element is a <see cref="Hero"/> and therefore carries party linkage that AddToCounts
 /// mutates as a side effect: a companion (member roster) and a prisoner (prison roster).
 ///
@@ -32,8 +32,8 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
-    private static TroopRosterData Delta(string characterId, int number)
-        => new TroopRosterData(new[] { new TroopRosterElementData(characterId, number, 0, 0) });
+    private static TroopRosterData Delta(string characterId, int number, int xp = 0)
+        => new TroopRosterData(new[] { new TroopRosterElementData(characterId, number, 0, xp) });
 
     [Fact]
     public void CompanionTransfer_MainToOtherParty_ViaDelta_SyncsRostersAndPartyBelongedTo()
@@ -68,11 +68,11 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(rightPartyId, out var rightParty));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leftPartyId, out var leftParty));
 
-            troopRosterInterface.ApplyTroopRosterDeltas(new[]
+            Assert.True(troopRosterInterface.TryApplyTroopRosterDeltas(new[]
             {
                 (leftParty.MemberRoster, Delta(companionCharacterId, 1)),
                 (rightParty.MemberRoster, Delta(companionCharacterId, -1)),
-            });
+            }, out var rejectionReason), rejectionReason);
         });
         TestEnvironment.FlushCoalescer();
 
@@ -121,11 +121,11 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(rightPartyId, out var rightParty));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leftPartyId, out var leftParty));
 
-            troopRosterInterface.ApplyTroopRosterDeltas(new[]
+            Assert.True(troopRosterInterface.TryApplyTroopRosterDeltas(new[]
             {
                 (leftParty.Party.PrisonRoster, Delta(prisonerCharacterId, 1)),
                 (rightParty.Party.PrisonRoster, Delta(prisonerCharacterId, -1)),
-            });
+            }, out var rejectionReason), rejectionReason);
         });
         TestEnvironment.FlushCoalescer();
 
@@ -139,6 +139,141 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.Equal(0, rightParty.Party.PrisonRoster.GetTroopCount(prisoner.CharacterObject));
             Assert.Equal(1, leftParty.Party.PrisonRoster.GetTroopCount(prisoner.CharacterObject));
             Assert.Same(leftParty.Party, prisoner.PartyBelongedToAsPrisoner);
+        }
+    }
+
+    [Fact]
+    public void FullStackTransferAfterConcurrentSourceXpChange_IsRejectedAtomically()
+    {
+        string rightPartyId = null;
+        string leftPartyId = null;
+        string memberCharacterId = null;
+        string prisonerCharacterId = null;
+
+        Server.Call(() =>
+        {
+            var rightParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var leftParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var memberCharacter = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            var prisonerCharacter = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+
+            int memberIndex = rightParty.MemberRoster.AddToCounts(memberCharacter, 3);
+            rightParty.MemberRoster.data[memberIndex].Xp = 65;
+            int prisonerIndex = rightParty.PrisonRoster.AddToCounts(prisonerCharacter, 2);
+            rightParty.PrisonRoster.data[prisonerIndex].Xp = 47;
+
+            Assert.True(Server.ObjectManager.TryGetId(rightParty, out rightPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(leftParty, out leftPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(memberCharacter, out memberCharacterId));
+            Assert.True(Server.ObjectManager.TryGetId(prisonerCharacter, out prisonerCharacterId));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Server.Call(() =>
+        {
+            var troopRosterInterface = Server.Resolve<ITroopRosterInterface>();
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(rightPartyId, out var rightParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leftPartyId, out var leftParty));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(memberCharacterId, out var memberCharacter));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(prisonerCharacterId, out var prisonerCharacter));
+            Assert.Equal(65, rightParty.MemberRoster.GetElementXp(
+                rightParty.MemberRoster.FindIndexOfTroop(memberCharacter)));
+            Assert.Equal(47, rightParty.PrisonRoster.GetElementXp(
+                rightParty.PrisonRoster.FindIndexOfTroop(prisonerCharacter)));
+
+            var applied = troopRosterInterface.TryApplyTroopRosterDeltas(new[]
+            {
+                (leftParty.MemberRoster, Delta(memberCharacterId, 3, 60)),
+                (rightParty.MemberRoster, Delta(memberCharacterId, -3, -60)),
+                (leftParty.PrisonRoster, Delta(prisonerCharacterId, 2, 40)),
+                (rightParty.PrisonRoster, Delta(prisonerCharacterId, -2, -40)),
+            }, out var rejectionReason);
+
+            Assert.False(applied);
+            Assert.NotEmpty(rejectionReason);
+            Assert.Equal(3, rightParty.MemberRoster.GetTroopCount(memberCharacter));
+            Assert.Equal(65, rightParty.MemberRoster.GetElementXp(
+                rightParty.MemberRoster.FindIndexOfTroop(memberCharacter)));
+            Assert.Equal(2, rightParty.PrisonRoster.GetTroopCount(prisonerCharacter));
+            Assert.Equal(47, rightParty.PrisonRoster.GetElementXp(
+                rightParty.PrisonRoster.FindIndexOfTroop(prisonerCharacter)));
+            Assert.Equal(0, leftParty.MemberRoster.GetTroopCount(memberCharacter));
+            Assert.Equal(0, leftParty.PrisonRoster.GetTroopCount(prisonerCharacter));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(rightPartyId, out var rightParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(leftPartyId, out var leftParty));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(memberCharacterId, out var memberCharacter));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(prisonerCharacterId, out var prisonerCharacter));
+
+            Assert.Equal(3, rightParty.MemberRoster.GetTroopCount(memberCharacter));
+            Assert.Equal(2, rightParty.PrisonRoster.GetTroopCount(prisonerCharacter));
+            Assert.Equal(0, leftParty.MemberRoster.GetTroopCount(memberCharacter));
+            Assert.Equal(0, leftParty.PrisonRoster.GetTroopCount(prisonerCharacter));
+        }
+    }
+
+    [Fact]
+    public void InvalidDeltaBatch_DoesNotApplyAnyRosterChanges()
+    {
+        string firstRosterId = null;
+        string secondRosterId = null;
+        string firstCharacterId = null;
+        string secondCharacterId = null;
+
+        Server.Call(() =>
+        {
+            var firstRoster = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+            var secondRoster = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+            var firstCharacter = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            var secondCharacter = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+
+            firstRoster.AddToCounts(firstCharacter, 2);
+            secondRoster.AddToCounts(secondCharacter, 1);
+
+            Assert.True(Server.ObjectManager.TryGetId(firstRoster, out firstRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(secondRoster, out secondRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(firstCharacter, out firstCharacterId));
+            Assert.True(Server.ObjectManager.TryGetId(secondCharacter, out secondCharacterId));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Server.Call(() =>
+        {
+            var troopRosterInterface = Server.Resolve<ITroopRosterInterface>();
+            Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(firstRosterId, out var firstRoster));
+            Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(secondRosterId, out var secondRoster));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(firstCharacterId, out var firstCharacter));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(secondCharacterId, out var secondCharacter));
+
+            var applied = troopRosterInterface.TryApplyTroopRosterDeltas(new[]
+            {
+                (firstRoster, Delta(firstCharacterId, -1)),
+                (secondRoster, new TroopRosterData(new[]
+                {
+                    new TroopRosterElementData(secondCharacterId, 0, -1, 0),
+                })),
+            }, out var rejectionReason);
+
+            Assert.False(applied);
+            Assert.NotEmpty(rejectionReason);
+            Assert.Equal(2, firstRoster.GetTroopCount(firstCharacter));
+            Assert.Equal(1, secondRoster.GetTroopCount(secondCharacter));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(firstRosterId, out var firstRoster));
+            Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(secondRosterId, out var secondRoster));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(firstCharacterId, out var firstCharacter));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(secondCharacterId, out var secondCharacter));
+
+            Assert.Equal(2, firstRoster.GetTroopCount(firstCharacter));
+            Assert.Equal(1, secondRoster.GetTroopCount(secondCharacter));
         }
     }
 
