@@ -15,10 +15,10 @@ public static class BattleGuardFixtureDebugCommand
     public static string Start(List<string> args)
     {
         const string usage =
-            "Usage: coop.debug.battle.guard_fixture_start battle-instance-id guard-agent-id guard-authority striker-agent-id striker-authority foot|mounted calibration|guard|attack [up|down|left|right]";
+            "Usage: coop.debug.battle.guard_fixture_start battle-instance-id guard-agent-id guard-authority striker-agent-id striker-authority foot|mounted calibration|guard|attack [up|down|left|right] [movement-flags]";
         if (ModInformation.IsClient)
             return "This function can only be used by the server";
-        if ((args.Count != 7 && args.Count != 8) ||
+        if ((args.Count < 7 || args.Count > 9) ||
             string.IsNullOrEmpty(args[0]) ||
             !Guid.TryParse(args[1], out Guid guardAgentId) ||
             !Guid.TryParse(args[3], out Guid strikerAgentId) ||
@@ -31,11 +31,18 @@ public static class BattleGuardFixtureDebugCommand
         if (!TryParseMode(args[5], out BattleGuardFixtureMode mode) ||
             !TryParsePhase(args[6], out BattleGuardFixturePhase phase) ||
             !TryParseDirection(
-                args.Count == 8 ? args[7] : "up",
+                args.Count >= 8 ? args[7] : "up",
                 out BattleGuardFixtureDirection direction))
         {
             return usage;
         }
+        bool useMovementFlagGuardInput = args.Count == 9 &&
+            string.Equals(
+                args[8],
+                "movement-flags",
+                StringComparison.OrdinalIgnoreCase);
+        if (args.Count == 9 && !useMovementFlagGuardInput)
+            return usage;
         var command = new NetworkBattleGuardFixtureCommand(
             args[0],
             Guid.NewGuid(),
@@ -45,12 +52,14 @@ public static class BattleGuardFixtureDebugCommand
             args[4],
             mode,
             phase,
-            direction);
+            direction,
+            useMovementFlagGuardInput);
         if (!TryDispatch(command, out string error))
             return error;
         return $"BATTLE_GUARD_FIXTURE_SENT instance={args[0]} guard={guardAgentId} " +
             $"guardAuthority={args[2]} striker={strikerAgentId} " +
-            $"strikerAuthority={args[4]} mode={mode} phase={phase} direction={direction}";
+            $"strikerAuthority={args[4]} mode={mode} phase={phase} direction={direction} " +
+            $"input={(useMovementFlagGuardInput ? "MovementFlags" : "ExplicitGuard")}";
     }
 
     [CommandLineArgumentFunction("guard_fixture_reset", "coop.debug.battle")]

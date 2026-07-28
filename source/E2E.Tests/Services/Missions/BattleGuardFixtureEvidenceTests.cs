@@ -480,6 +480,23 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(BattleGuardFixtureMode.Mounted, false, true)]
+    [InlineData(BattleGuardFixtureMode.Mounted, true, false)]
+    [InlineData(BattleGuardFixtureMode.Foot, false, false)]
+    [InlineData(BattleGuardFixtureMode.Foot, true, false)]
+    public void MovementFlagGuardInput_BypassesExplicitMountedCommands(
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldApplyExplicitMountedGuardInput(
+                mode,
+                useMovementFlagGuardInput));
+    }
+
+    [Theory]
     [InlineData(true, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]
@@ -1241,7 +1258,8 @@ public class BattleGuardFixtureEvidenceTests
             "striker-owner",
             BattleGuardFixtureMode.Mounted,
             BattleGuardFixturePhase.Guard,
-            BattleGuardFixtureDirection.Right);
+            BattleGuardFixtureDirection.Right,
+            useMovementFlagGuardInput: true);
         using var stream = new MemoryStream();
 
         Serializer.Serialize(stream, original);
@@ -1252,6 +1270,7 @@ public class BattleGuardFixtureEvidenceTests
         Assert.Equal(
             BattleGuardFixtureDirection.Right,
             received.Direction);
+        Assert.True(received.UseMovementFlagGuardInput);
     }
 
     [Fact]

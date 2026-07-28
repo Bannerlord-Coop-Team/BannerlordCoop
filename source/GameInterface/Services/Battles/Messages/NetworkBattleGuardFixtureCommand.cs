@@ -59,6 +59,9 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
     [ProtoMember(10)]
     public BattleGuardFixtureDirection Direction { get; }
 
+    [ProtoMember(11)]
+    public bool UseMovementFlagGuardInput { get; }
+
     public NetworkBattleGuardFixtureCommand(
         string battleInstanceId,
         Guid commandId,
@@ -70,6 +73,7 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
         BattleGuardFixturePhase phase,
         BattleGuardFixtureDirection direction =
             BattleGuardFixtureDirection.Up,
+        bool useMovementFlagGuardInput = false,
         bool reset = false)
     {
         BattleInstanceId = battleInstanceId;
@@ -81,6 +85,7 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
         Mode = mode;
         Phase = phase;
         Direction = direction;
+        UseMovementFlagGuardInput = useMovementFlagGuardInput;
         Reset = reset;
     }
 }
