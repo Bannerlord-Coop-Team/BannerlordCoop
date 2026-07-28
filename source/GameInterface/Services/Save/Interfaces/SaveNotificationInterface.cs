@@ -1,6 +1,8 @@
 ﻿using Common;
 using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Save.Interfaces;
 
@@ -15,6 +17,13 @@ internal class SaveNotificationInterface : ISaveNotificationInterface
     {
         GameThread.RunSafe(() =>
         {
+            if (!ShouldApplySavingState(
+                    isSaving,
+                    GameStateManager.Current?.ActiveState is MapState))
+            {
+                return;
+            }
+
             var dataSource = MapScreen.Instance?
                 .GetMapView<GauntletMapSaveView>()?
                 ._dataSource;
@@ -30,4 +39,7 @@ internal class SaveNotificationInterface : ISaveNotificationInterface
             }
         }, context: nameof(SaveNotificationInterface));
     }
+
+    internal static bool ShouldApplySavingState(bool isSaving, bool isCampaignMapActive) =>
+        !isSaving || isCampaignMapActive;
 }

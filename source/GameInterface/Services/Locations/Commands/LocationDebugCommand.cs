@@ -6,8 +6,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Locations.Commands;
@@ -17,6 +20,61 @@ namespace GameInterface.Services.Locations.Commands;
 /// </summary>
 public class LocationDebugCommand
 {
+    [CommandLineArgumentFunction("enter", "coop.debug.location")]
+    public static string EnterLocation(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.location.enter <LocationId>";
+
+        if (TryResolveLocation(args[0], out var location, out var error) == false)
+            return error;
+
+        var settlement = Campaign.Current.Settlements.FirstOrDefault(
+            candidate => candidate.LocationComplex?
+                .GetListOfLocations()
+                .Contains(location) == true);
+        if (settlement == null)
+            return $"Unable to resolve the settlement for location '{args[0]}'.";
+
+        if (PlayerEncounter.Current == null)
+        {
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            return $"Requested an encounter with '{settlement.StringId}'.";
+        }
+
+        if (PlayerEncounter.EncounterSettlement != settlement)
+            return $"A player encounter with another settlement is already active.";
+
+        if (Mission.Current != null)
+            return "A mission is already active.";
+
+        PlayerEncounter.EnterSettlement();
+        var mission = PlayerEncounter.LocationEncounter?
+            .CreateAndOpenMissionController(location);
+        return mission == null
+            ? $"Unable to open location '{args[0]}'."
+            : $"Opening location '{args[0]}'.";
+    }
+
+    [CommandLineArgumentFunction("leave", "coop.debug.location")]
+    public static string LeaveLocation(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.location.leave";
+
+        if (Mission.Current == null)
+            return "No mission is active.";
+
+        Mission.Current.EndMission();
+        return "Ending the current location mission.";
+    }
+
     // coop.debug.location.list
     /// <summary>
     /// Lists all registered locations
