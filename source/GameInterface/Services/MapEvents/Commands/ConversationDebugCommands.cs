@@ -73,5 +73,4 @@ internal class ConversationDebugCommands
             $"DoNotMakeNewDecisions={party.Ai?.DoNotMakeNewDecisions == true}\n" +
             $"InConversation={ConversationPartyHold.IsInPlayerConversation(party)}";
     }
-
 }
