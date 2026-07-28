@@ -306,6 +306,57 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void MountedTargetFrame_ReportsTheLatestOwnerUpdateSequence()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceRider = SpawnRider(mock);
+            mock.SpawnMount(sourceRider);
+            Agent puppetRider = SpawnRider(mock);
+            mock.SpawnMount(puppetRider);
+            Assert.True(AgentMirror.TryGet(
+                sourceRider,
+                out var sourceRiderMirror));
+
+            var interpolator = new AgentPositionInterpolator();
+            sourceRiderMirror.LookDirection =
+                new Vec3(1f, 0f, 0f);
+            interpolator.SetMountedRiderTarget(
+                puppetRider,
+                new AgentData(sourceRider));
+
+            Assert.True(
+                interpolator.TryGetTargetFrame(
+                    puppetRider,
+                    out Vec3 firstPosition,
+                    out Vec3 firstLook,
+                    out long firstSequence));
+            Assert.Equal(sourceRiderMirror.Position, firstPosition);
+            Assert.Equal(new Vec3(1f, 0f, 0f), firstLook);
+
+            sourceRiderMirror.LookDirection =
+                new Vec3(0f, 1f, 0f);
+            interpolator.SetMountedRiderTarget(
+                puppetRider,
+                new AgentData(sourceRider));
+
+            Assert.True(
+                interpolator.TryGetTargetFrame(
+                    puppetRider,
+                    out Vec3 secondPosition,
+                    out Vec3 secondLook,
+                    out long secondSequence));
+            Assert.Equal(sourceRiderMirror.Position, secondPosition);
+            Assert.Equal(new Vec3(0f, 1f, 0f), secondLook);
+            Assert.True(secondSequence > firstSequence);
+        });
+    }
+
+    [Fact]
     public void OnFootFollow_ReplaysTheLatestOwnerInputsAfterNativeClearsThePuppet()
     {
         using var fixture = new MissionEngineFixture();

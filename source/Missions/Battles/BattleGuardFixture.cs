@@ -19,13 +19,16 @@ namespace Missions.Battles;
 
 public interface IBattleGuardFixture
 {
-    void Apply(NetworkBattleGuardFixtureCommand command, INetworkAgentRegistry agentRegistry);
+    void Apply(
+        NetworkBattleGuardFixtureCommand command,
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator interpolator);
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
     void ApplyMountedStrike(NetworkBattleGuardFixtureStrike strike);
     bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
-    void RefreshMountedStrikeLook(INetworkAgentRegistry agentRegistry);
+    void RefreshOwnedMountedStrikeLook(INetworkAgentRegistry agentRegistry);
     void ApplyPostAgentTickGuardInput(INetworkAgentRegistry agentRegistry);
     void Tick(float dt, INetworkAgentRegistry agentRegistry);
     void SamplePreReplayDisplayedState(
@@ -59,6 +62,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         "waiting for mounted guard route";
     private const float SampleIntervalSeconds = 0.05f;
     private const float ProgressEpsilon = 0.001f;
+    private const float FixtureAttackPressSeconds = 0.35f;
     private const float FixtureLaneOffset = 25f;
     private const float MountedRouteLength = 120f;
     private const float MountedRouteRadius = 5f;
@@ -69,6 +73,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float MountedStrikeMaximumStageLateral = 3f;
     private const float MountedStrikeMinimumTravelGuardAlignment = 0.99f;
     private const float MountedStrikeMinimumContactAlignment = 0.95f;
+    private const float MountedStrikeMinimumReplicatedLookAlignment = 0.999f;
     private const float MountedStrikeMinimumLeadDistance = 6f;
     private const float MountedStrikeMaximumLeadDistance = 10f;
     private const float MountedStrikeMinimumReleaseLeadSeconds = 0.25f;
@@ -139,9 +144,12 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     public void Apply(
         NetworkBattleGuardFixtureCommand command,
-        INetworkAgentRegistry agentRegistry)
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator interpolator)
     {
-        if (command == null || agentRegistry == null)
+        if (command == null ||
+            agentRegistry == null ||
+            interpolator == null)
             return;
         if (command.Reset)
         {
@@ -279,7 +287,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             ApplyStriker(
                 strikerInfo.Agent,
                 attackGuardInfo.Agent,
-                drivesStriker);
+                drivesStriker,
+                interpolator);
         }
     }
 
@@ -383,35 +392,18 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         AgentActionData.ApplyDefendMovementFlags(agent, defendFlags);
         guardDriver.ObserveAppliedInput(agent);
+        ApplyOwnedMountedStrikeLook(agent, guardDriver);
 
         // Both production action polls must observe the same held fixture presentation.
         ApplyMountedGuardPresentationAction(agentRegistry);
         BattleGuardNativeTrace.Mark("fixture-reapply-exit");
     }
 
-    public void RefreshMountedStrikeLook(
+    public void RefreshOwnedMountedStrikeLook(
         INetworkAgentRegistry agentRegistry)
     {
-        if (guardDriver?.Mode ==
-                BattleGuardFixtureMode.Mounted
-            && guardDriver.Phase ==
-                BattleGuardFixturePhase.Attack
-            && roles != null
-            && TryGetExactAgent(
-                agentRegistry,
-                roles.GuardAgentId,
-                roles.GuardAuthority,
-                out CoopAgentInfo guardInfo)
-            && guardDriver.TryGetMountedStrikeDirections(
-                guardInfo.Agent,
-                out _,
-                out Vec3 lookDirection))
-        {
-            guardInfo.Agent.LookDirection = lookDirection;
-            BattleGuardNativeTrace.Record(
-                guardInfo.Agent,
-                "fixture-strike-look-refresh");
-        }
+        if (TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
+            ApplyOwnedMountedStrikeLook(agent, guardDriver);
     }
 
     public void Tick(float dt, INetworkAgentRegistry agentRegistry)
@@ -641,6 +633,14 @@ public class BattleGuardFixture : IBattleGuardFixture
             strikerDriver?.StrikeGeometrySamples ?? 0;
         float strikeCurrentGuardLookAlignment =
             strikerDriver?.StrikeCurrentGuardLookAlignment ?? -1f;
+        bool strikeReplicatedLookObserved =
+            strikerDriver?.StrikeReplicatedLookObserved ?? false;
+        float strikeReplicatedLookAlignment =
+            strikerDriver?.StrikeReplicatedLookAlignment ?? -1f;
+        long strikeStagedLookUpdateSequence =
+            strikerDriver?.StrikeStagedLookUpdateSequence ?? 0;
+        long strikeCurrentLookUpdateSequence =
+            strikerDriver?.StrikeCurrentLookUpdateSequence ?? 0;
         float strikeCurrentStandoff =
             strikerDriver?.StrikeCurrentStandoff ?? -1f;
         float strikeClosestStandoff =
@@ -815,10 +815,14 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"strikeReleaseActionChannel={strikeReleaseActionChannel} " +
             $"strikeReleaseActionProgress={strikeReleaseActionProgress:0.###} " +
             $"strikeReleasedFromReady={strikeReleasedFromReady} " +
-            $"strikeReleaseObserved={strikeReleaseObserved} " +
-            $"strikeGeometrySamples={strikeGeometrySamples} " +
-            $"strikeCurrentGuardLookAlignment={strikeCurrentGuardLookAlignment:0.###} " +
-            $"strikeCurrentStandoff={strikeCurrentStandoff:0.###} " +
+              $"strikeReleaseObserved={strikeReleaseObserved} " +
+              $"strikeGeometrySamples={strikeGeometrySamples} " +
+              $"strikeCurrentGuardLookAlignment={strikeCurrentGuardLookAlignment:0.###} " +
+              $"strikeReplicatedLookObserved={strikeReplicatedLookObserved} " +
+              $"strikeReplicatedLookAlignment={strikeReplicatedLookAlignment:0.###} " +
+              $"strikeStagedLookSequence={strikeStagedLookUpdateSequence} " +
+              $"strikeCurrentLookSequence={strikeCurrentLookUpdateSequence} " +
+              $"strikeCurrentStandoff={strikeCurrentStandoff:0.###} " +
             $"strikeClosestStandoff={strikeClosestStandoff:0.###} " +
             $"strikeAttemptHitCount={strikeAttemptHitCount} " +
             $"strikeLastHitAttempt={strikeLastHitAttempt} " +
@@ -1188,7 +1192,8 @@ public class BattleGuardFixture : IBattleGuardFixture
     private void ApplyStriker(
         Agent agent,
         Agent guard,
-        bool drivesStriker)
+        bool drivesStriker,
+        IAgentPositionInterpolator interpolator)
     {
         string weaponId =
             GetFixtureStrikerWeaponId(guardDriver.Mode);
@@ -1221,6 +1226,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             agent,
             guard,
             guardDriver,
+            interpolator,
             SendMountedStrike,
             SendMountedStrikeEnd);
         ClearDefendFlags(agent, strikerDriver.OriginalMovementFlags);
@@ -1405,6 +1411,29 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (dismounting)
             agent.EventControlFlags |= Agent.EventControlFlag.Dismount;
         driver.ObserveAppliedInput(agent);
+    }
+
+    private static bool ApplyOwnedMountedStrikeLook(
+        Agent agent,
+        GuardDriver driver)
+    {
+        if (!ShouldApplyOwnedMountedStrikeLook(
+                driver.DrivesAgent,
+                driver.Mode,
+                driver.Phase) ||
+            !driver.TryGetMountedStrikeDirections(
+                agent,
+                out _,
+                out Vec3 lookDirection))
+        {
+            return false;
+        }
+
+        agent.LookDirection = lookDirection;
+        BattleGuardNativeTrace.Record(
+            agent,
+            "fixture-owned-strike-look-refresh");
+        return true;
     }
 
     internal static Agent.MovementControlFlag GetDefendFlags(
@@ -2127,6 +2156,48 @@ public class BattleGuardFixture : IBattleGuardFixture
             guardLookDirection) >= minimumAlignment;
     }
 
+    internal static bool ShouldApplyOwnedMountedStrikeLook(
+        bool guardLocallyDriven,
+        BattleGuardFixtureMode mode,
+        BattleGuardFixturePhase phase)
+    {
+        return guardLocallyDriven &&
+            mode == BattleGuardFixtureMode.Mounted &&
+            phase == BattleGuardFixturePhase.Attack;
+    }
+
+    internal static bool HasMountedStrikeContactAlignment(float alignment)
+    {
+        return alignment >= MountedStrikeMinimumContactAlignment;
+    }
+
+    internal static bool HasObservedReplicatedMountedStrikeLook(
+        bool guardLocallyDriven,
+        bool hasReplicatedLook,
+        long stagedUpdateSequence,
+        long currentUpdateSequence,
+        float replicatedLookAlignment)
+    {
+        return guardLocallyDriven ||
+            (hasReplicatedLook &&
+             currentUpdateSequence > stagedUpdateSequence &&
+             replicatedLookAlignment >=
+                MountedStrikeMinimumReplicatedLookAlignment);
+    }
+
+    internal static bool HasMountedStrikeChargeTimedOut(float chargeSeconds)
+    {
+        return chargeSeconds >= MountedStrikeMaximumChargeSeconds;
+    }
+
+    internal static bool ShouldReleaseTimedOutMountedStrike(
+        float alignment,
+        float alignedSeconds)
+    {
+        return HasMountedStrikeContactAlignment(alignment) &&
+            alignedSeconds >= FixtureAttackPressSeconds;
+    }
+
     internal static bool ShouldCommandMountedGuardState(
         bool guarding,
         bool guardCommandActive,
@@ -2238,7 +2309,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         float timeToContact =
             longitudinalDistance / Math.Max(0.1f, speed);
         return timeToContact <= releaseLeadSeconds ||
-            chargeSeconds >= MountedStrikeMaximumChargeSeconds;
+            HasMountedStrikeChargeTimedOut(chargeSeconds);
     }
 
     internal static bool HasMountedStrikeSpeed(
@@ -4012,6 +4083,14 @@ public class BattleGuardFixture : IBattleGuardFixture
             attackDriver?.GeometrySamples ?? 0;
         public float StrikeCurrentGuardLookAlignment =>
             attackDriver?.CurrentGuardLookAlignment ?? -1f;
+        public bool StrikeReplicatedLookObserved =>
+            attackDriver?.ReplicatedLookObserved ?? false;
+        public float StrikeReplicatedLookAlignment =>
+            attackDriver?.ReplicatedLookAlignment ?? -1f;
+        public long StrikeStagedLookUpdateSequence =>
+            attackDriver?.StagedLookUpdateSequence ?? 0;
+        public long StrikeCurrentLookUpdateSequence =>
+            attackDriver?.CurrentLookUpdateSequence ?? 0;
         public float StrikeCurrentStandoff =>
             attackDriver?.CurrentStandoff ?? -1f;
         public float StrikeClosestStandoff =>
@@ -4196,6 +4275,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             Agent agent,
             Agent guard,
             GuardDriver guardDriver,
+            IAgentPositionInterpolator interpolator,
             Action<Vec3, Vec3, Vec3> mountedStrikeStarted,
             Action mountedStrikeEnded)
         {
@@ -4207,6 +4287,7 @@ public class BattleGuardFixture : IBattleGuardFixture
                 guard,
                 guardDriver,
                 this,
+                interpolator,
                 mountedStrikeStarted,
                 mountedStrikeEnded);
             agent.AddComponent(attackDriver);
@@ -4256,7 +4337,6 @@ public class BattleGuardFixture : IBattleGuardFixture
 
     private sealed class GuardInterceptionStrikeComponent : AgentComponent
     {
-        private const float AttackPressSeconds = 0.35f;
         private const float OutcomeWaitSeconds = 1.25f;
         private const float MaximumOutcomeWaitSeconds = 2.5f;
         private const float RetryRecoverySeconds = 0.5f;
@@ -4292,6 +4372,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         public bool ReleaseObserved { get; private set; }
         public int GeometrySamples { get; private set; }
         public float CurrentGuardLookAlignment { get; private set; } = -1f;
+        public bool ReplicatedLookObserved { get; private set; }
+        public float ReplicatedLookAlignment { get; private set; } = -1f;
+        public long StagedLookUpdateSequence { get; private set; }
+        public long CurrentLookUpdateSequence { get; private set; }
         public float CurrentStandoff { get; private set; } = -1f;
         public float ClosestStandoff { get; private set; } = -1f;
         public int AttemptHitCount =>
@@ -4309,12 +4393,17 @@ public class BattleGuardFixture : IBattleGuardFixture
         private readonly Agent guard;
         private readonly GuardDriver guardDriver;
         private readonly StrikerDriver hitEvidence;
+        private readonly IAgentPositionInterpolator interpolator;
         private readonly Action<Vec3, Vec3, Vec3> mountedStrikeStarted;
         private readonly Action mountedStrikeEnded;
         private InterceptionState state = InterceptionState.WaitingForSpeed;
         private Vec3 laneDirection;
         private Vec3 contactPoint;
         private float stateElapsed;
+        private float chargeElapsed;
+        private Vec3 stagedGuardLookDirection;
+        private Vec3 stagedGuardLookTarget;
+        private long stagedGuardLookUpdateSequence;
         private int attemptStartHitCount;
         private bool mountedStrikeLifecycleActive;
 
@@ -4323,6 +4412,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             Agent guard,
             GuardDriver guardDriver,
             StrikerDriver hitEvidence,
+            IAgentPositionInterpolator interpolator,
             Action<Vec3, Vec3, Vec3> mountedStrikeStarted,
             Action mountedStrikeEnded)
             : base(striker)
@@ -4331,6 +4421,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             this.guard = guard;
             this.guardDriver = guardDriver;
             this.hitEvidence = hitEvidence;
+            this.interpolator = interpolator;
             this.mountedStrikeStarted = mountedStrikeStarted;
             this.mountedStrikeEnded = mountedStrikeEnded;
         }
@@ -4356,7 +4447,10 @@ public class BattleGuardFixture : IBattleGuardFixture
             {
                 ObserveMountedGeometry();
             }
-            stateElapsed += Math.Max(0f, dt);
+            float elapsedStep = Math.Max(0f, dt);
+            stateElapsed += elapsedStep;
+            if (state == InterceptionState.Charging)
+                chargeElapsed += elapsedStep;
             switch (state)
             {
                 case InterceptionState.WaitingForSpeed:
@@ -4500,6 +4594,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         {
             Attempts++;
             stateElapsed = 0f;
+            chargeElapsed = 0f;
             ResetAttemptEvidence();
             if (guardDriver.Mode == BattleGuardFixtureMode.Mounted)
                 StageMountedInterception();
@@ -4525,6 +4620,10 @@ public class BattleGuardFixture : IBattleGuardFixture
             ReleaseObserved = false;
             GeometrySamples = 0;
             CurrentGuardLookAlignment = -1f;
+            ReplicatedLookObserved = false;
+            ReplicatedLookAlignment = -1f;
+            StagedLookUpdateSequence = 0;
+            CurrentLookUpdateSequence = 0;
             CurrentStandoff = -1f;
             ClosestStandoff = -1f;
             attemptStartHitCount = hitEvidence.HitCount;
@@ -4537,6 +4636,14 @@ public class BattleGuardFixture : IBattleGuardFixture
             Vec3 guardedLookDirection =
                 GetMountedStrikeGuardedLookDirection(
                     laneDirection);
+            stagedGuardLookDirection = guardedLookDirection;
+            interpolator.TryGetTargetFrame(
+                guard,
+                out _,
+                out _,
+                out stagedGuardLookUpdateSequence);
+            StagedLookUpdateSequence =
+                stagedGuardLookUpdateSequence;
             StageRoute =
                 guardDriver.MountedRoute?.State ?? "none";
             StageProgress =
@@ -4565,13 +4672,13 @@ public class BattleGuardFixture : IBattleGuardFixture
                     strikeTargetPoint,
                     laneDirection);
             SetGroundHeight(ref strikerPosition);
+            stagedGuardLookTarget = strikerPosition;
             striker.TeleportToPosition(strikerPosition);
             FacePoint(striker, strikeTargetPoint);
             guardDriver.BeginMountedStrike(
                 laneDirection,
                 guardedLookDirection,
                 strikerPosition);
-            guard.LookDirection = guardedLookDirection;
             mountedStrikeLifecycleActive = true;
             mountedStrikeStarted?.Invoke(
                 laneDirection,
@@ -4609,7 +4716,33 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         private void TickCharging()
         {
-            if (stateElapsed < AttackPressSeconds)
+            if (guardDriver.Mode == BattleGuardFixtureMode.Mounted)
+            {
+                ObserveReplicatedMountedStrikeLook();
+                if (HasMountedStrikeChargeTimedOut(chargeElapsed))
+                {
+                    if (ReplicatedLookObserved &&
+                        ShouldReleaseTimedOutMountedStrike(
+                            CurrentGuardLookAlignment,
+                            stateElapsed))
+                    {
+                        ReleaseAttack();
+                    }
+                    else
+                    {
+                        RecordMiss();
+                    }
+                    return;
+                }
+                if (!ReplicatedLookObserved ||
+                    !HasMountedStrikeContactAlignment(
+                        CurrentGuardLookAlignment))
+                {
+                    stateElapsed = 0f;
+                    return;
+                }
+            }
+            if (stateElapsed < FixtureAttackPressSeconds)
                 return;
             if (guardDriver.Mode != BattleGuardFixtureMode.Mounted)
             {
@@ -4621,18 +4754,45 @@ public class BattleGuardFixture : IBattleGuardFixture
             if (ShouldReleaseMountedStrike(
                     longitudinalDistance,
                     guardDriver.CurrentHorizontalSpeed,
-                    stateElapsed,
+                    chargeElapsed,
                     ProfileReleaseLead) &&
-                ((TryGetNativeAttack(
+                TryGetNativeAttack(
                       out _,
                       out Agent.ActionStage actionStage,
                       out _,
                       out _) &&
-                  IsNativeAttackReady(actionStage)) ||
-                 stateElapsed >= MountedStrikeMaximumChargeSeconds))
+                IsNativeAttackReady(actionStage))
             {
                 ReleaseAttack();
             }
+        }
+
+        private void ObserveReplicatedMountedStrikeLook()
+        {
+            bool hasReplicatedLook =
+                interpolator.TryGetTargetFrame(
+                    guard,
+                    out Vec3 replicatedPosition,
+                    out Vec3 replicatedLookDirection,
+                    out long currentUpdateSequence);
+            CurrentLookUpdateSequence = currentUpdateSequence;
+            Vec3 expectedLookDirection =
+                GetMountedStrikeTrackedLookDirection(
+                    replicatedPosition,
+                    stagedGuardLookTarget,
+                    stagedGuardLookDirection);
+            ReplicatedLookAlignment = hasReplicatedLook
+                ? GetMountedStrikeTravelAlignment(
+                    expectedLookDirection,
+                    replicatedLookDirection)
+                : -1f;
+            ReplicatedLookObserved =
+                HasObservedReplicatedMountedStrikeLook(
+                    guardDriver.DrivesAgent,
+                    hasReplicatedLook,
+                    stagedGuardLookUpdateSequence,
+                    currentUpdateSequence,
+                    ReplicatedLookAlignment);
         }
 
         private void TickReleased()

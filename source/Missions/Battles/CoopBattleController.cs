@@ -221,9 +221,8 @@ public class CoopBattleController : CoopMissionController
 #endif
         base.OnMissionTick(dt);
 #if DEBUG
-        // Remote interpolation just ran in the base tick. Recompute the shared strike target now so the
-        // upcoming native collision reads the exact current guard-to-striker direction on every peer.
-        guardFixture.RefreshMountedStrikeLook(
+        // Publish and consume the staged look through normal movement replication.
+        guardFixture.RefreshOwnedMountedStrikeLook(
             coopMissionComponent.AgentRegistry);
 #endif
 
@@ -333,7 +332,10 @@ public class CoopBattleController : CoopMissionController
                 if (command.BattleInstanceId != Session.InstanceId)
                     return;
 
-                guardFixture.Apply(command, coopMissionComponent.AgentRegistry);
+                guardFixture.Apply(
+                    command,
+                    coopMissionComponent.AgentRegistry,
+                    coopMissionComponent.AgentMovementHandler.Interpolator);
             },
             context: nameof(Handle_BattleGuardFixtureCommand));
     }

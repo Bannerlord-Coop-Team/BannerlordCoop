@@ -25,6 +25,13 @@ public interface IAgentPositionInterpolator
         out uint riderMovementFlags,
         out uint mountMovementFlags);
 
+    /// <summary>Read the latest owner-reported position, look, and local receive sequence.</summary>
+    bool TryGetTargetFrame(
+        Agent agent,
+        out Vec3 position,
+        out Vec3 lookDirection,
+        out long updateSequence);
+
     /// <summary>[Game thread] Apply each tracked agent's latest native target frame.</summary>
     void Tick(float dt);
 
@@ -60,6 +67,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
+    private long updateSequence;
 
     public void SetRiderTarget(Agent agent, AgentData data)
     {
@@ -74,7 +82,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             hasMountSnapPosition: false,
             Vec3.Zero,
             default,
-            updatedAt: elapsed);
+            updatedAt: elapsed,
+            updateSequence: GetNextUpdateSequence());
     }
 
     public void SetMountedRiderTarget(Agent agent, AgentData data)
@@ -96,7 +105,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 data.LookDirection,
                 agent.MovementInputVector,
                 data.MovementFlag),
-            elapsed);
+            elapsed,
+            GetNextUpdateSequence());
     }
 
     public void SetMountTarget(Agent mountAgent, AgentMountData data)
@@ -112,7 +122,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             hasMountSnapPosition: false,
             Vec3.Zero,
             default,
-            updatedAt: elapsed);
+            updatedAt: elapsed,
+            updateSequence: GetNextUpdateSequence());
     }
 
     public void SetMountedRiderTarget(
@@ -130,7 +141,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             hasMountSnapPosition: true,
             mountSnapPosition,
             ContinuousState.Capture(agent, riderMovementDirection),
-            elapsed);
+            elapsed,
+            GetNextUpdateSequence());
     }
 
     public void Forget(Agent agent)
@@ -162,7 +174,36 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         return true;
     }
 
+    public bool TryGetTargetFrame(
+        Agent agent,
+        out Vec3 position,
+        out Vec3 lookDirection,
+        out long targetUpdateSequence)
+    {
+        position = Vec3.Zero;
+        lookDirection = Vec3.Zero;
+        targetUpdateSequence = 0;
+        if (agent == null ||
+            !_targets.TryGetValue(agent, out TargetFrame target))
+        {
+            return false;
+        }
+
+        position = target.Position;
+        lookDirection = target.HasMountSnapPosition
+            ? target.MountedRiderState.LookDirection
+            : target.AgentState.LookDirection;
+        targetUpdateSequence = target.UpdateSequence;
+        return true;
+    }
+
     public void Clear() => _targets.Clear();
+
+    private long GetNextUpdateSequence()
+    {
+        updateSequence++;
+        return updateSequence;
+    }
 
     public void ReplayLookDirections()
     {
@@ -323,7 +364,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 hasMountSnapPosition: false,
                 Vec3.Zero,
                 default,
-                target.UpdatedAt));
+                target.UpdatedAt,
+                target.UpdateSequence));
         }
         else
         {
@@ -343,7 +385,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             bool hasMountSnapPosition,
             Vec3 mountSnapPosition,
             ContinuousState mountedRiderState,
-            float updatedAt)
+            float updatedAt,
+            long updateSequence)
         {
             Position = position;
             AgentState = agentState;
@@ -351,6 +394,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             MountSnapPosition = mountSnapPosition;
             MountedRiderState = mountedRiderState;
             UpdatedAt = updatedAt;
+            UpdateSequence = updateSequence;
         }
 
         public Vec3 Position { get; }
@@ -359,6 +403,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         public Vec3 MountSnapPosition { get; }
         public ContinuousState MountedRiderState { get; }
         public float UpdatedAt { get; }
+        public long UpdateSequence { get; }
     }
 
     private readonly struct ContinuousState

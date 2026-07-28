@@ -835,6 +835,113 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(
+        true,
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Attack,
+        true)]
+    [InlineData(
+        false,
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Attack,
+        false)]
+    [InlineData(
+        true,
+        BattleGuardFixtureMode.Mounted,
+        BattleGuardFixturePhase.Guard,
+        false)]
+    [InlineData(
+        true,
+        BattleGuardFixtureMode.Foot,
+        BattleGuardFixturePhase.Attack,
+        false)]
+    public void MountedStrikeLook_IsWrittenOnlyByOwningMountedGuard(
+        bool guardLocallyDriven,
+        BattleGuardFixtureMode mode,
+        BattleGuardFixturePhase phase,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldApplyOwnedMountedStrikeLook(
+                guardLocallyDriven,
+                mode,
+                phase));
+    }
+
+    [Theory]
+    [InlineData(1f, true)]
+    [InlineData(0.95f, true)]
+    [InlineData(0.949f, false)]
+    [InlineData(-0.278f, false)]
+    public void MountedStrikeCharge_WaitsForReplicatedContactLook(
+        float alignment,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.HasMountedStrikeContactAlignment(
+                alignment));
+    }
+
+    [Theory]
+    [InlineData(true, false, 7, 7, -1f, true)]
+    [InlineData(false, true, 7, 8, 1f, true)]
+    [InlineData(false, true, 7, 8, 0.999f, true)]
+    [InlineData(false, true, 7, 7, 1f, false)]
+    [InlineData(false, true, 7, 8, 0.998f, false)]
+    [InlineData(false, true, 7, 8, 0.707f, false)]
+    [InlineData(false, true, 7, 8, 0.949f, false)]
+    [InlineData(false, false, 7, 8, 1f, false)]
+    public void MountedStrikeCharge_RequiresPostStageOwnerLookEvidence(
+        bool guardLocallyDriven,
+        bool hasReplicatedLook,
+        long stagedUpdateSequence,
+        long currentUpdateSequence,
+        float replicatedLookAlignment,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.HasObservedReplicatedMountedStrikeLook(
+                guardLocallyDriven,
+                hasReplicatedLook,
+                stagedUpdateSequence,
+                currentUpdateSequence,
+                replicatedLookAlignment));
+    }
+
+    [Theory]
+    [InlineData(2.499f, false)]
+    [InlineData(2.5f, true)]
+    [InlineData(3f, true)]
+    public void MountedStrikeCharge_PreservesTotalAttemptTimeout(
+        float chargeSeconds,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.HasMountedStrikeChargeTimedOut(
+                chargeSeconds));
+    }
+
+    [Theory]
+    [InlineData(1f, 0.35f, true)]
+    [InlineData(1f, 0.349f, false)]
+    [InlineData(0.949f, 1f, false)]
+    public void MountedStrikeCharge_DeadlineRequiresCompletedAlignedPress(
+        float alignment,
+        float alignedSeconds,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldReleaseTimedOutMountedStrike(
+                alignment,
+                alignedSeconds));
+    }
+
+    [Theory]
     [InlineData(2f, 8f, 0.5f, true)]
     [InlineData(2.9f, 8f, 0.5f, false)]
     [InlineData(100f, 8f, 2.5f, true)]
