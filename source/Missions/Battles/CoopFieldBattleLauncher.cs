@@ -67,11 +67,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
             return null;
         }
 
-        var playerPartyId = GetLocalPlayerPartyId(mapEvent, objectManager);
-        if (playerPartyId == null)
-            Logger.Error("[BattleSync] Local player party is not resolvable; opening the field battle so its mission lifecycle can reject it safely");
-
-        var mission = CreateCoopFieldBattle(rec, mapEventId, playerPartyId);
+        var mission = CreateCoopFieldBattle(rec, mapEventId);
         if (mission == null) return null;
 
         // Same post-open coop entry the native path drove via BattleMissionEntryPatch: the controller requests
@@ -82,7 +78,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         return mission;
     }
 
-    private Mission CreateCoopFieldBattle(MissionInitializerRecord rec, string mapEventId, string playerPartyId)
+    private Mission CreateCoopFieldBattle(MissionInitializerRecord rec, string mapEventId)
     {
         bool isPlayerSergeant = MobileParty.MainParty.MapEvent.IsPlayerSergeant();
         bool isPlayerInArmy = MobileParty.MainParty.Army != null;
@@ -106,9 +102,9 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
             // Each client fields only what it OWNS. Registered so the server reserve (requested below via
             // PlayerEnteredBattle) feeds these during scene load; the spawn handler then sizes each side.
             var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager,
-                agentBudget, playerPartyId);
+                agentBudget);
             var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager,
-                agentBudget, playerPartyId);
+                agentBudget);
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 
@@ -125,7 +121,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 new BattlePowerCalculationLogic(),
                 new BattleSpawnLogic("battle_set"),
                 new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
-                    PartyBase.MainParty.Side, playerPartyId),
+                    PartyBase.MainParty.Side),
                 new CampaignMissionComponent(),
                 new BattleAgentLogic(),
                 new MountAgentLogic(),
@@ -176,14 +172,6 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         Logger.Information("[BattleSync] Opened coop field battle for {MapEventId} (player side {Side})",
             mapEventId, PartyBase.MainParty.Side);
         return mission;
-    }
-
-    internal static string GetLocalPlayerPartyId(MapEvent mapEvent, IObjectManager objectManager)
-    {
-        var mapEventParty = mapEvent?.FindMapEventParty(PartyBase.MainParty);
-        return mapEventParty != null && objectManager.TryGetId(mapEventParty, out var playerPartyId)
-            ? playerPartyId
-            : null;
     }
 
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest

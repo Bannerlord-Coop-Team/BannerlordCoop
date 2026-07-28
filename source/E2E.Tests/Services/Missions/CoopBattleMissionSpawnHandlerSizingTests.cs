@@ -112,6 +112,29 @@ public class CoopBattleMissionSpawnHandlerSizingTests
     }
 
     [Fact]
+    public void ServerAssignedPlayerPartyId_IsUsedAsTheLocalOrigin()
+    {
+        var agentBudget = new BattleAgentBudget();
+        var attacker = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, null, agentBudget);
+        var defender = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null, agentBudget);
+        attacker.SetReserve(new[]
+        {
+            new PartyReserve("MapEventParty_Created_34", 0, new[]
+            {
+                new TroopReserveEntry(1, "main-hero", formationClass: 0),
+            }, isReceiverPlayerParty: true),
+        });
+        defender.SetReserve(Array.Empty<PartyReserve>());
+
+        Assert.Equal("MapEventParty_Created_34", attacker.PlayerPartyId);
+        Assert.True(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(
+            BattleSideEnum.Attacker, attacker.PlayerPartyId, defender, attacker));
+
+        attacker.SetReserve(Array.Empty<PartyReserve>());
+        Assert.Null(attacker.PlayerPartyId);
+    }
+
+    [Fact]
     public void ExhaustedLocalParty_DoesNotOpenDeployment()
     {
         var agentBudget = new BattleAgentBudget();

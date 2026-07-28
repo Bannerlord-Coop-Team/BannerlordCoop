@@ -21,8 +21,9 @@ public class CoopTroopSupplierTests
         return entries;
     }
 
-    private static PartyReserve Party(string id, int count, int supplied = 0, int seedBase = 500)
-        => new PartyReserve(id, supplied, Entries(count, seedBase));
+    private static PartyReserve Party(string id, int count, int supplied = 0, int seedBase = 500,
+        bool isReceiverPlayerParty = false)
+        => new PartyReserve(id, supplied, Entries(count, seedBase), isReceiverPlayerParty);
 
     private static int SuppliedFor(CoopTroopSupplier supplier, string partyId)
         => supplier.GetSuppliedByParty().First(p => p.partyId == partyId).supplied;
@@ -93,12 +94,11 @@ public class CoopTroopSupplierTests
     [Fact]
     public void Supply_PrioritizesLocalPartyBeforeOtherOwnedParties()
     {
-        var supplier = new CoopTroopSupplier(
-            "M1", BattleSideEnum.Attacker, null, new BattleAgentBudget(), preferredPartyId: "player");
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[]
         {
             Party("army-member", 3, seedBase: 100),
-            Party("player", 2, seedBase: 200),
+            Party("player", 2, seedBase: 200, isReceiverPlayerParty: true),
         });
 
         supplier.SupplyTroops(1);
