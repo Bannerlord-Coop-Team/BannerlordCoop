@@ -3874,6 +3874,66 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void MissionPreMissionTick_RestoresMountedLookForCollision()
+    {
+        RunScenario("peer", context =>
+        {
+            var controller = context.Instance.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), context.Component));
+            var agentId = Guid.NewGuid();
+
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
+            Agent puppetMount = context.Mock.SpawnMount(puppet);
+            Agent ownerMount = context.Mock.SpawnMount(owner);
+            Assert.True(AgentMirror.TryGet(puppetMount, out MirrorAgent puppetMountMirror));
+            Assert.True(AgentMirror.TryGet(ownerMount, out MirrorAgent ownerMountMirror));
+
+            ownerMirror.LookDirection = new Vec3(0f, 1f, 0f);
+            ownerMountMirror.LookDirection = new Vec3(1f, 0f, 0f);
+            ownerMirror.GuardMode = Agent.GuardMode.Right;
+            ownerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            ownerMirror.Action1Index = 3070;
+            ownerMirror.Action1CodeType =
+                Agent.ActionCodeType.DefendRight1h;
+            ownerMirror.Action1Direction =
+                Agent.UsageDirection.DefendRight;
+            puppetMirror.Action1Index = ownerMirror.Action1Index;
+            puppetMirror.Action1CodeType = ownerMirror.Action1CodeType;
+            puppetMirror.Action1Direction = ownerMirror.Action1Direction;
+
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            context.Component.AgentMovementHandler.Interpolator
+                .SetMountedRiderTarget(
+                    puppet,
+                    new global::Missions.Agents.Packets.AgentData(owner));
+
+            puppetMirror.LookDirection = new Vec3(-1f, 0f, 0f);
+            puppetMountMirror.LookDirection = new Vec3(0f, -1f, 0f);
+            puppetMirror.MovementFlags = Agent.MovementControlFlag.Forward;
+            puppetMirror.GuardMode = Agent.GuardMode.None;
+
+            controller.OnPreMissionTick(0.1f);
+
+            Assert.Equal(ownerMirror.LookDirection, puppetMirror.LookDirection);
+            Assert.Equal(
+                ownerMountMirror.LookDirection,
+                puppetMountMirror.LookDirection);
+            Assert.Equal(
+                Agent.MovementControlFlag.Forward
+                    | Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendRight,
+                puppetMirror.MovementFlags);
+        });
+    }
+
+    [Fact]
     public void MissionTick_MountedGuardNativeStateClears_RefreshesWithoutReplayingVisual()
     {
         RunScenario("peer", context =>

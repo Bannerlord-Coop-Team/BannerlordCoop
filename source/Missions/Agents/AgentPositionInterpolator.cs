@@ -35,7 +35,7 @@ public interface IAgentPositionInterpolator
     /// <summary>[Game thread] Apply each tracked agent's latest native target frame.</summary>
     void Tick(float dt);
 
-    /// <summary>[Game thread] Restore received look directions after the native Agent tick.</summary>
+    /// <summary>[Game thread] Restore received look directions at a native Agent cycle boundary.</summary>
     void ReplayLookDirections();
 
     /// <summary>Drop all tracked targets (mission end).</summary>

@@ -48,8 +48,10 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         base.OnPreMissionTick(dt);
 
-        // Restore queued remote guard state at the mission input boundary so collision reads the same held
-        // defend state as the owning client.
+        // Agent ticking follows OnMissionTick and can replace the retained look before the next collision window.
+        // Restore the owner frame before its guard so native collision reads one coherent input.
+        coopMissionComponent.AgentMovementHandler.Interpolator
+            .ReplayLookDirections();
         coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
     }
 
