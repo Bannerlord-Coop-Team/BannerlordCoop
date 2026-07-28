@@ -110,7 +110,7 @@ public class MapEventDebugCommands
         return container.TryResolve(out objectManager);
     }
 
-    private static bool MatchesPartyId(IObjectManager objectManager, MobileParty party, string id)
+    internal static bool MatchesPartyId(IObjectManager objectManager, MobileParty party, string id)
     {
         if (party == null || string.IsNullOrEmpty(id)) return false;
         if (party.StringId == id) return true;
@@ -1511,7 +1511,7 @@ public class MapEventDebugCommands
             playerParty);
     }
 
-    private static bool TryGetPlayerParty(
+    internal static bool TryGetPlayerParty(
         string controllerId,
         bool requireReady,
         out IObjectManager objectManager,

@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Villages.Commands;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -17,21 +18,27 @@ internal class ConversationDebugCommands
     [CommandLineArgumentFunction("start_nearest_ai", "coop.debug.conversation")]
     public static string StartNearestAi(List<string> args)
     {
-        if (ModInformation.IsServer)
-            return "Run coop.debug.conversation.start_nearest_ai on a client only";
-        if (args.Count != 0)
-            return "Usage: coop.debug.conversation.start_nearest_ai";
+        if (ModInformation.IsClient)
+            return "Run coop.debug.conversation.start_nearest_ai on the server only";
+        if (args.Count < 1 || args.Count > 2)
+            return "Usage: coop.debug.conversation.start_nearest_ai <controllerId> [excludedPartyId]";
 
-        var playerParty = MobileParty.MainParty;
-        if (playerParty == null)
-            return "The local player has no party";
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-            return $"Unable to get {nameof(IObjectManager)}";
+        if (!MapEventDebugCommands.TryGetPlayerParty(
+                args[0],
+                requireReady: true,
+                out var objectManager,
+                out var playerParty,
+                out var error))
+            return error;
+        if (playerParty.CurrentSettlement != null)
+            return $"Player {args[0]} must be outside a settlement";
 
+        var excludedPartyId = args.Count == 2 ? args[1] : null;
         var playerPosition = playerParty.Position.ToVec2();
         var target = MobileParty.All
             .Where(party => party.IsActive &&
                 !party.IsPlayerParty() &&
+                !MapEventDebugCommands.MatchesPartyId(objectManager, party, excludedPartyId) &&
                 party.LeaderHero != null &&
                 party.MapEvent == null &&
                 party.CurrentSettlement == null &&
@@ -42,11 +49,13 @@ internal class ConversationDebugCommands
             .FirstOrDefault();
         if (target == null)
             return "No active AI lord party is available";
-        if (!objectManager.TryGetId(target.Party, out var partyId))
-            return "Unable to get the AI party id";
+        if (!objectManager.TryGetId(target, out var mobilePartyId) ||
+            !objectManager.TryGetId(target.Party, out var partyBaseId))
+            return "Unable to get the AI party ids";
 
         EncounterManager.StartPartyEncounter(playerParty.Party, target.Party);
-        return $"Started AI conversation with {target.StringId}; PartyId={partyId}";
+        return $"Started AI conversation with {target.Name} (StringId {target.StringId}, " +
+            $"registry id {mobilePartyId}, PartyBase id {partyBaseId}) against player {args[0]}";
     }
 
     [CommandLineArgumentFunction("state", "coop.debug.conversation")]
