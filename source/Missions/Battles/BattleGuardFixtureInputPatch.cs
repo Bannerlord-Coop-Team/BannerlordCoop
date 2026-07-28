@@ -38,11 +38,12 @@ internal static class BattleGuardFixtureNativeDefendInput
     // v1.4.7 caches defend input in both the agent and mission input buffer.
     private const int AgentDefendDirectionOffset = 0x834;
     private const int AgentInputPointerOffset = 0xAB8;
-    private const int DefendUpWeightOffset = 0x1184394;
-    private const int DefendDownWeightOffset = 0x1184398;
-    private const int DefendLeftWeightOffset = 0x118439C;
-    private const int DefendRightWeightOffset = 0x11843A0;
+    private const int DefendRightWeightOffset = 0x1184394;
+    private const int DefendLeftWeightOffset = 0x1184398;
+    private const int DefendDownWeightOffset = 0x118439C;
+    private const int DefendUpWeightOffset = 0x11843A0;
     private const int ControllerDefendDirectionOffset = 0x1184A50;
+    private const int ActiveWeightBits = 0x3F800000;
 
     internal static void Inject(
         Agent agent,
@@ -72,6 +73,10 @@ internal static class BattleGuardFixtureNativeDefendInput
         Marshal.WriteInt32(inputPointer, DefendRightWeightOffset, 0);
         Marshal.WriteInt32(
             inputPointer,
+            GetActiveWeightOffset(direction),
+            ActiveWeightBits);
+        Marshal.WriteInt32(
+            inputPointer,
             ControllerDefendDirectionOffset,
             cacheValue);
         Marshal.WriteInt32(
@@ -93,6 +98,27 @@ internal static class BattleGuardFixtureNativeDefendInput
                 return 2;
             case BattleGuardFixtureDirection.Right:
                 return 3;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(direction),
+                    direction,
+                    null);
+        }
+    }
+
+    internal static int GetActiveWeightOffset(
+        BattleGuardFixtureDirection direction)
+    {
+        switch (direction)
+        {
+            case BattleGuardFixtureDirection.Up:
+                return DefendUpWeightOffset;
+            case BattleGuardFixtureDirection.Down:
+                return DefendDownWeightOffset;
+            case BattleGuardFixtureDirection.Left:
+                return DefendLeftWeightOffset;
+            case BattleGuardFixtureDirection.Right:
+                return DefendRightWeightOffset;
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(direction),

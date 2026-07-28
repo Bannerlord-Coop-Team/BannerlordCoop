@@ -621,6 +621,21 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(BattleGuardFixtureDirection.Up, 0x11843A0)]
+    [InlineData(BattleGuardFixtureDirection.Down, 0x118439C)]
+    [InlineData(BattleGuardFixtureDirection.Left, 0x1184398)]
+    [InlineData(BattleGuardFixtureDirection.Right, 0x1184394)]
+    public void NativePlayerDefendDirection_UsesExactNativeWeightOffset(
+        BattleGuardFixtureDirection direction,
+        int expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixtureNativeDefendInput.GetActiveWeightOffset(
+                direction));
+    }
+
+    [Theory]
     [InlineData(true, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]
