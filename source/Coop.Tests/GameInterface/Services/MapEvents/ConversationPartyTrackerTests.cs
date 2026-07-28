@@ -1,14 +1,22 @@
-﻿using GameInterface.Services.MapEvents;
+﻿using Common.Messaging;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using Xunit;
 
 namespace Coop.Tests.GameInterface.Services.MapEvents;
 
 public class ConversationPartyTrackerTests
 {
-    private readonly ConversationPartyTracker tracker = new ConversationPartyTracker(objectManager: null);
+    private readonly MessageBroker messageBroker = new MessageBroker();
+    private readonly ConversationPartyTracker tracker;
 
     private readonly object firstPlayer = new object();
     private readonly object secondPlayer = new object();
+
+    public ConversationPartyTrackerTests()
+    {
+        tracker = new ConversationPartyTracker(objectManager: null, messageBroker: messageBroker);
+    }
 
     [Fact]
     public void TryBeginEngagement_WhenPartyUnengaged_BeginsEngagement()
@@ -119,6 +127,43 @@ public class ConversationPartyTrackerTests
         Assert.False(tracker.IsEngagedByOther("lord1", firstPlayer));
         Assert.True(tracker.IsEngagedByOther("lord1", secondPlayer));
         Assert.False(tracker.IsEngagedByOther("lord2", secondPlayer));
+    }
+
+    [Fact]
+    public void IsPlayerPartyEngaged_TracksAiAndPvpConversationParticipants()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: false);
+        tracker.BeginPvpConversation("player2", "player3");
+
+        Assert.True(tracker.IsPlayerPartyEngaged("player1"));
+        Assert.True(tracker.IsPlayerPartyEngaged("player2"));
+        Assert.True(tracker.IsPlayerPartyEngaged("player3"));
+        Assert.False(tracker.IsPlayerPartyEngaged("lord1"));
+
+        tracker.TryEndEngagement(firstPlayer, out _, out _);
+        tracker.EndPvpConversation("player2");
+
+        Assert.False(tracker.IsPlayerPartyEngaged("player1"));
+        Assert.False(tracker.IsPlayerPartyEngaged("player2"));
+        Assert.False(tracker.IsPlayerPartyEngaged("player3"));
+    }
+
+    [Fact]
+    public void ConversationStateChanges_PublishOnlyForTransitions()
+    {
+        var changes = 0;
+        messageBroker.Subscribe<PlayerConversationChanged>(_ => changes++);
+
+        Assert.True(tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: false));
+        Assert.True(tracker.TryBeginEngagement(firstPlayer, "player1", "lord1", wasAiDisabled: true));
+        tracker.BeginPvpConversation("player2", "player3");
+        tracker.BeginPvpConversation("player2", "player3");
+        Assert.True(tracker.TryEndEngagement(firstPlayer, out _, out _));
+        Assert.False(tracker.TryEndEngagement(firstPlayer, out _, out _));
+        tracker.EndPvpConversation("player2");
+        tracker.EndPvpConversation("player2");
+
+        Assert.Equal(4, changes);
     }
 
     [Fact]

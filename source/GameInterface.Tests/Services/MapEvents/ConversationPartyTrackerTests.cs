@@ -1,3 +1,4 @@
+﻿using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Moq;
@@ -10,7 +11,9 @@ public class ConversationPartyTrackerTests
     [Fact]
     public void RefreshingSameEngagement_RecordsServerDetectedDefender()
     {
-        var tracker = new ConversationPartyTracker(new Mock<IObjectManager>().Object);
+        var tracker = new ConversationPartyTracker(
+            new Mock<IObjectManager>().Object,
+            new MessageBroker());
         var peer = new object();
 
         Assert.True(tracker.TryBeginEngagement(peer, "player-party", "bandit-party", false));

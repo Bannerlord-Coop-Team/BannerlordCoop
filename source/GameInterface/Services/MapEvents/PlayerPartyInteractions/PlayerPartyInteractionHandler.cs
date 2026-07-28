@@ -175,6 +175,15 @@ internal class PlayerPartyInteractionHandler : IHandler
         return true;
     }
 
+    internal bool TryEndSessionForDebug(string partyId)
+    {
+        var session = FindExistingSession(partyId);
+        if (session == null) return false;
+
+        EndSession(session, PlayerPartyInteractionOutcomeType.Left);
+        return true;
+    }
+
     private void Handle_NetworkPlayerPartyInteractionStarted(MessagePayload<NetworkPlayerPartyInteractionStarted> payload)
     {
         if (ModInformation.IsServer) return;

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +25,7 @@ internal sealed class ConversationPartyTracker : IHandler
     internal static ConversationPartyTracker Instance { get; private set; }
 
     private readonly object stateLock = new object();
+    private readonly IMessageBroker messageBroker;
     private readonly Dictionary<object, Engagement> engagements =
         new Dictionary<object, Engagement>(ReferenceObjectComparer.Instance);
 
@@ -50,9 +52,10 @@ internal sealed class ConversationPartyTracker : IHandler
     /// </summary>
     internal IObjectManager ObjectManager { get; }
 
-    public ConversationPartyTracker(IObjectManager objectManager)
+    public ConversationPartyTracker(IObjectManager objectManager, IMessageBroker messageBroker)
     {
         ObjectManager = objectManager;
+        this.messageBroker = messageBroker;
         Instance = this;
     }
 
@@ -156,8 +159,10 @@ internal sealed class ConversationPartyTracker : IHandler
                 engagerIsDefender,
                 wasAiDisabled));
             isEmpty = false;
-            return true;
         }
+
+        PublishConversationChanged();
+        return true;
     }
 
     /// <summary>Gets the engagement owned by the given player, if any.</summary>
@@ -192,8 +197,10 @@ internal sealed class ConversationPartyTracker : IHandler
             engagements.Remove(engagerKey);
             shouldReleaseParty = !engagements.Values.Any(x => x.PartyId == endedPartyId);
             isEmpty = engagements.Count == 0;
-            return true;
         }
+
+        PublishConversationChanged();
+        return true;
     }
 
     public bool TryEndEngagement(object engagerKey, out string partyId, out Engagement engagement) =>
@@ -223,6 +230,18 @@ internal sealed class ConversationPartyTracker : IHandler
         }
     }
 
+    /// <summary>True when a player party is participating in an AI or player conversation.</summary>
+    public bool IsPlayerPartyEngaged(string partyId)
+    {
+        if (partyId == null) return false;
+
+        lock (stateLock)
+        {
+            return engagements.Values.Any(x => x.EngagerPartyId == partyId) ||
+                pvpPartnersByPartyId.ContainsKey(partyId);
+        }
+    }
+
     /// <summary>True when the party is engaged by a player other than <paramref name="engagerKey"/>.</summary>
     public bool IsEngagedByOther(string partyId, object engagerKey)
     {
@@ -243,10 +262,16 @@ internal sealed class ConversationPartyTracker : IHandler
         lock (stateLock)
         {
             if (disposed) return;
+            if (pvpPartnersByPartyId.TryGetValue(partyIdA, out var partnerId) && partnerId == partyIdB &&
+                pvpPartnersByPartyId.TryGetValue(partyIdB, out partnerId) && partnerId == partyIdA)
+                return;
+
             pvpPartnersByPartyId[partyIdA] = partyIdB;
             pvpPartnersByPartyId[partyIdB] = partyIdA;
             pvpIsEmpty = false;
         }
+
+        PublishConversationChanged();
     }
 
     /// <summary>Ends the PvP conversation containing the given party, releasing both it and its partner.</summary>
@@ -254,6 +279,7 @@ internal sealed class ConversationPartyTracker : IHandler
     {
         if (partyId == null) return;
 
+        var changed = false;
         lock (stateLock)
         {
             if (pvpPartnersByPartyId.TryGetValue(partyId, out var partnerId))
@@ -262,10 +288,13 @@ internal sealed class ConversationPartyTracker : IHandler
                 pvpPartnersByPartyId.Remove(partnerId);
                 RemovePvpPeer(partyId);
                 RemovePvpPeer(partnerId);
+                changed = true;
             }
 
             pvpIsEmpty = pvpPartnersByPartyId.Count == 0;
         }
+
+        if (changed) PublishConversationChanged();
     }
 
     /// <summary>Gets the conversation partner of a party in a PvP conversation, if any.</summary>
@@ -313,6 +342,11 @@ internal sealed class ConversationPartyTracker : IHandler
             pvpPeerByPartyId.Remove(partyId);
             pvpPartyIdByPeer.Remove(peer);
         }
+    }
+
+    private void PublishConversationChanged()
+    {
+        messageBroker.Publish(this, new PlayerConversationChanged());
     }
 
     private sealed class ReferenceObjectComparer : IEqualityComparer<object>

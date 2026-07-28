@@ -1,13 +1,17 @@
 ﻿using Coop.Core.Server.Services.Stances.Messages;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Common.Util;
+using Coop.Core.Server.Services.Time.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Barters.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.Locations.Messages.Conversation;
@@ -59,9 +63,15 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     [Fact]
     public void ClientRequest_PlayerPartyInteraction_StartsServerDrivenDialogStates()
     {
-        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client1.NetPeer);
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", client2.NetPeer);
+        Server.NetworkSentMessages.Clear();
 
         RequestInteraction(client1, initiatorPartyId, responderPartyId);
+
+        var timeControlChange = Server.NetworkSentMessages.GetMessages<NetworkChangeTimeControlMode>().Single();
+        Assert.Equal(TimeControlEnum.Pause, timeControlChange.NewControlMode);
 
         var started = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single();
         Assert.Equal(initiatorPartyId, started.InitiatorPartyId);
@@ -160,7 +170,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     public void TradeProposal_AcceptedByResponder_EntersTradeActiveForBothParties()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client1.NetPeer);
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", client2.NetPeer);
+        Server.NetworkSentMessages.Clear();
         RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        Assert.Equal(
+            TimeControlEnum.Pause,
+            Server.NetworkSentMessages.GetMessages<NetworkChangeTimeControlMode>().Single().NewControlMode);
         var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
         var initiatorInitialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
             s.SessionId == sessionId &&
@@ -204,6 +220,9 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var tradeStates = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().ToArray();
         Assert.Contains(tradeStates, s => s.PartyId == initiatorPartyId && s.Phase == PlayerPartyInteractionPhase.TradeActive);
         Assert.Contains(tradeStates, s => s.PartyId == responderPartyId && s.Phase == PlayerPartyInteractionPhase.TradeActive);
+        Server.Call(() => Assert.Equal(
+            TimeControlEnum.Pause,
+            Server.Resolve<ITimeControlInterface>().GetTimeControl()));
     }
 
     [Fact]
@@ -1373,10 +1392,15 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void AiPartyConversation_UsesExistingAllowPath()
+    public void AiPartyConversation_HoldsTargetWhileOtherPlayerKeepsTimeRunning_ThenPausesWhenFreePlayerDisconnects()
     {
-        var (client1, _, initiatorPartyId, _) = CreateTwoPlayerParties();
+        var (client1, client2, initiatorPartyId, _) = CreateTwoPlayerParties();
         var aiPartyId = CreateMobilePartyBase();
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client1.NetPeer);
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", client2.NetPeer);
+        Server.Call(() => Server.Resolve<ITimeControlInterface>().ServerSetTimeControl(TimeControlEnum.Play_1x));
+        Server.NetworkSentMessages.Clear();
 
         RequestInteraction(client1, initiatorPartyId, aiPartyId);
 
@@ -1385,8 +1409,33 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(aiPartyId, allowed.DefenderId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>());
         AssertInteractionStateCleared(client1);
+        Server.Call(() =>
+        {
+            Assert.Equal(TimeControlEnum.Play_1x, Server.Resolve<ITimeControlInterface>().GetTimeControl());
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.Equal(MoveModeType.Hold, aiParty.MobileParty.PartyMoveMode);
+            Assert.True(aiParty.MobileParty.Ai.IsDisabled);
+            Assert.True(aiParty.MobileParty.Ai.DoNotMakeNewDecisions);
+        });
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().ClearPeer(client2.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(client2.NetPeer, default));
+        });
+
+        var timeControlChange = Server.NetworkSentMessages.GetMessages<NetworkChangeTimeControlMode>().Single();
+        Assert.Equal(TimeControlEnum.Pause, timeControlChange.NewControlMode);
 
         client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.False(aiParty.MobileParty.Ai.IsDisabled);
+            Assert.False(aiParty.MobileParty.Ai.DoNotMakeNewDecisions);
+        });
     }
 
     [Fact]
