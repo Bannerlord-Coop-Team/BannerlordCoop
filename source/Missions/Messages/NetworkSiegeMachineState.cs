@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using TaleWorlds.Library;
 
 namespace Missions.Messages;
 
@@ -48,23 +47,6 @@ public class NetworkSiegeMachineState : IEvent
     /// </summary>
     [ProtoMember(11)]
     public readonly int HostEpoch;
-    /// <summary>Authority ladder skeleton channel speed; -1 for non-ladders.</summary>
-    [ProtoMember(12)]
-    public readonly float LadderAnimationSpeed;
-    /// <summary>Authority ladder skeleton channel progress; -1 for non-ladders.</summary>
-    [ProtoMember(13)]
-    public readonly float LadderAnimationProgress;
-    /// <summary>SiegeLadder.LadderAnimationState; -1 for non-ladders.</summary>
-    [ProtoMember(14)]
-    public readonly int LadderAnimationState;
-    [ProtoMember(15)]
-    public readonly float LadderFallAngularSpeed;
-    [ProtoMember(16)]
-    public readonly MatrixFrame LadderFrame;
-    /// <summary>Authority ladder skeleton channel animation index; -1 when no channel animation is active.</summary>
-    [ProtoMember(17)]
-    public readonly int LadderAnimationIndex;
-
     public NetworkSiegeMachineState(
         int machineId,
         float hitPoints,
@@ -76,13 +58,7 @@ public class NetworkSiegeMachineState : IEvent
         int weaponState,
         float aimDirection,
         float aimReleaseAngle,
-        int hostEpoch = 0,
-        float ladderAnimationSpeed = -1f,
-        float ladderAnimationProgress = -1f,
-        int ladderAnimationState = -1,
-        float ladderFallAngularSpeed = 0f,
-        MatrixFrame ladderFrame = default,
-        int ladderAnimationIndex = -1)
+        int hostEpoch = 0)
     {
         MachineId = machineId;
         HitPoints = hitPoints;
@@ -95,11 +71,5 @@ public class NetworkSiegeMachineState : IEvent
         AimDirection = aimDirection;
         AimReleaseAngle = aimReleaseAngle;
         HostEpoch = hostEpoch;
-        LadderAnimationSpeed = ladderAnimationSpeed;
-        LadderAnimationProgress = ladderAnimationProgress;
-        LadderAnimationState = ladderAnimationState;
-        LadderFallAngularSpeed = ladderFallAngularSpeed;
-        LadderFrame = ladderFrame;
-        LadderAnimationIndex = ladderAnimationIndex;
     }
 }
