@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -13,7 +14,7 @@ internal class MobilePartyAIPatches
 {
     [HarmonyPatch(nameof(MobilePartyAi.CheckPartyNeedsUpdate))]
     [HarmonyPrefix]
-    static void Prefix(ref MobilePartyAi __instance)
+    private static void CheckPartyNeedsUpdatePrefix(MobilePartyAi __instance)
     {
         // Default path on server
         if (ModInformation.IsServer) return;
@@ -25,8 +26,25 @@ internal class MobilePartyAIPatches
             return;
         }
 
-        __instance.DefaultBehaviorNeedsUpdate = true;
+        // Client encounter polling must continue even when vanilla has no AI update to apply.
+        if (!__instance.DefaultBehaviorNeedsUpdate)
+            EncounterManager.HandleEncounterForMobileParty(__instance._mobileParty, 0f);
     }
+
+#if DEBUG
+    private static long mainPartyBehaviorCalculationCount;
+
+    internal static long MainPartyBehaviorCalculationCount =>
+        System.Threading.Interlocked.Read(ref mainPartyBehaviorCalculationCount);
+
+    [HarmonyPatch(nameof(MobilePartyAi.GetBehaviors))]
+    [HarmonyPrefix]
+    private static void GetBehaviorsPrefix(MobilePartyAi __instance)
+    {
+        if (ModInformation.IsClient && __instance._mobileParty == MobileParty.MainParty)
+            System.Threading.Interlocked.Increment(ref mainPartyBehaviorCalculationCount);
+    }
+#endif
 
     [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter), HarmonyPrefix]
     private static void AiBehaviorInteractablePrefix(MobilePartyAi __instance, IInteractablePoint value, out bool __state) =>
