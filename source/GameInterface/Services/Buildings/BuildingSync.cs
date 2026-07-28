@@ -21,7 +21,7 @@ namespace GameInterface.Services.Buildings
 
             // Targetmethods
             AutoSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeDefaultBuilding)));
-            AutoSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingHelper.CheckIfBuildingIsComplete)));
+            AutoSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.CheckIfBuildingIsComplete)));
             AutoSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.BuildDevelopmentsAtGameStart)));
             AutoSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.TickCurrentBuildingForTown)));
         }
