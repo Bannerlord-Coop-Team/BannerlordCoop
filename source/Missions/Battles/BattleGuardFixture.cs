@@ -26,13 +26,6 @@ public interface IBattleGuardFixture
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
     void ApplyMountedStrike(NetworkBattleGuardFixtureStrike strike);
     bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
-    bool ShouldRunNativePlayerControlTick(
-        INetworkAgentRegistry agentRegistry);
-    bool TryGetNativePlayerDefendDirection(
-        INetworkAgentRegistry agentRegistry,
-        Agent agent,
-        out BattleGuardFixtureDirection direction);
-    bool IsHoldingNativePlayerBlock(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
     void RefreshOwnedMountedStrikeLook(INetworkAgentRegistry agentRegistry);
@@ -342,48 +335,6 @@ public class BattleGuardFixture : IBattleGuardFixture
     {
         return TryGetDrivenGuardAgent(agentRegistry, out Agent agent) &&
             ReferenceEquals(agent, Mission.Current?.MainAgent);
-    }
-
-    public bool ShouldRunNativePlayerControlTick(
-        INetworkAgentRegistry agentRegistry)
-    {
-        return TryGetDrivenGuardAgent(agentRegistry, out Agent agent) &&
-            ReferenceEquals(agent, Mission.Current?.MainAgent) &&
-            ShouldUseNativePlayerGuardInput(
-                guardDriver.Mode,
-                guardDriver.UseMovementFlagGuardInput);
-    }
-
-    public bool TryGetNativePlayerDefendDirection(
-        INetworkAgentRegistry agentRegistry,
-        Agent agent,
-        out BattleGuardFixtureDirection direction)
-    {
-        direction = BattleGuardFixtureDirection.Up;
-        if (!ReferenceEquals(agent, Mission.Current?.MainAgent) ||
-            !TryGetDrivenGuardAgent(agentRegistry, out Agent drivenAgent) ||
-            !ReferenceEquals(agent, drivenAgent) ||
-            !ShouldInjectNativePlayerDefendDirection(
-                guardDriver.Mode,
-                guardDriver.UseMovementFlagGuardInput,
-                guardDriver.Phase))
-        {
-            return false;
-        }
-
-        direction = guardDriver.Direction;
-        return true;
-    }
-
-    public bool IsHoldingNativePlayerBlock(
-        INetworkAgentRegistry agentRegistry)
-    {
-        return TryGetDrivenGuardAgent(agentRegistry, out Agent agent) &&
-            ReferenceEquals(agent, Mission.Current?.MainAgent) &&
-            ShouldUseNativePlayerGuardInput(
-                guardDriver.Mode,
-                guardDriver.UseMovementFlagGuardInput) &&
-            IsGuarding(agent, guardDriver);
     }
 
     public void ReapplyPlayerGuardInput(
@@ -1393,9 +1344,12 @@ public class BattleGuardFixture : IBattleGuardFixture
                 driver.MountedGuardCommandActive,
                 driver.Direction,
                 driver.MountedGuardCommandDirection);
-        if (ShouldApplyExplicitMountedGuardInput(
+        bool applyExplicitPresentation =
+            ShouldApplyExplicitMountedGuardInput(
                 driver.Mode,
-                driver.UseMovementFlagGuardInput) &&
+                driver.UseMovementFlagGuardInput);
+        // Seed direction changes once; held movement flags retain the action.
+        if (ShouldApplyMountedGuardCommand(driver.Mode) &&
             ShouldCommandMountedGuardState(
                 guarding,
                 driver.MountedGuardCommandActive,
@@ -1420,9 +1374,12 @@ public class BattleGuardFixture : IBattleGuardFixture
             }
             driver.MountedGuardCommandActive = guarding;
             driver.MountedGuardCommandDirection = driver.Direction;
-            driver.MountedPostNativeGuardCommandPending = true;
-            driver.MountedPostNativeDirectionChanged =
-                mountedGuardDirectionChanged;
+            if (applyExplicitPresentation)
+            {
+                driver.MountedPostNativeGuardCommandPending = true;
+                driver.MountedPostNativeDirectionChanged =
+                    mountedGuardDirectionChanged;
+            }
             driver.MountedGuardStateChanges++;
         }
         agent.MovementFlags = flags;
@@ -1543,24 +1500,9 @@ public class BattleGuardFixture : IBattleGuardFixture
             !useMovementFlagGuardInput;
     }
 
-    internal static bool ShouldUseNativePlayerGuardInput(
-        BattleGuardFixtureMode mode,
-        bool useMovementFlagGuardInput)
-    {
-        return mode == BattleGuardFixtureMode.Mounted &&
-            useMovementFlagGuardInput;
-    }
-
-    internal static bool ShouldInjectNativePlayerDefendDirection(
-        BattleGuardFixtureMode mode,
-        bool useMovementFlagGuardInput,
-        BattleGuardFixturePhase phase)
-    {
-        return ShouldUseNativePlayerGuardInput(
-                mode,
-                useMovementFlagGuardInput) &&
-            phase != BattleGuardFixturePhase.Calibration;
-    }
+    internal static bool ShouldApplyMountedGuardCommand(
+        BattleGuardFixtureMode mode) =>
+        mode == BattleGuardFixtureMode.Mounted;
 
     internal static bool ShouldMaintainMountedGuardPresentation(
         BattleGuardFixtureMode mode,

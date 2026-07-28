@@ -2,7 +2,6 @@
 using GameInterface.Services.Battles.Messages;
 using Missions.Battles;
 using ProtoBuf;
-using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -516,7 +515,7 @@ public class BattleGuardFixtureEvidenceTests
     [InlineData(BattleGuardFixtureMode.Mounted, true, false)]
     [InlineData(BattleGuardFixtureMode.Foot, false, false)]
     [InlineData(BattleGuardFixtureMode.Foot, true, false)]
-    public void MovementFlagGuardInput_BypassesExplicitMountedCommands(
+    public void MovementFlagGuardInput_BypassesExplicitPresentationReplay(
         BattleGuardFixtureMode mode,
         bool useMovementFlagGuardInput,
         bool expected)
@@ -529,135 +528,15 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(BattleGuardFixtureMode.Mounted, true, true)]
-    [InlineData(BattleGuardFixtureMode.Mounted, false, false)]
-    [InlineData(BattleGuardFixtureMode.Foot, true, false)]
-    [InlineData(BattleGuardFixtureMode.Foot, false, false)]
-    public void MovementFlagGuardInput_UsesNativePlayerDirectionCollector(
+    [InlineData(BattleGuardFixtureMode.Mounted, true)]
+    [InlineData(BattleGuardFixtureMode.Foot, false)]
+    public void MountedGuardInput_UsesOneShotNativeCommand(
         BattleGuardFixtureMode mode,
-        bool useMovementFlagGuardInput,
         bool expected)
     {
         Assert.Equal(
             expected,
-            BattleGuardFixture.ShouldUseNativePlayerGuardInput(
-                mode,
-                useMovementFlagGuardInput));
-    }
-
-    [Theory]
-    [InlineData(
-        BattleGuardFixtureDirection.Up,
-        Agent.MovementControlFlag.DefendUp)]
-    [InlineData(
-        BattleGuardFixtureDirection.Down,
-        Agent.MovementControlFlag.DefendDown)]
-    [InlineData(
-        BattleGuardFixtureDirection.Left,
-        Agent.MovementControlFlag.DefendLeft)]
-    [InlineData(
-        BattleGuardFixtureDirection.Right,
-        Agent.MovementControlFlag.DefendRight)]
-    public void NativePlayerDefendDirection_UsesRequestedFixtureDirection(
-        BattleGuardFixtureDirection direction,
-        Agent.MovementControlFlag expected)
-    {
-        Assert.Equal(
-            expected,
-            BattleGuardFixture.GetDefendDirectionFlag(direction));
-    }
-
-    [Theory]
-    [InlineData(
-        BattleGuardFixtureMode.Mounted,
-        true,
-        BattleGuardFixturePhase.Guard,
-        true)]
-    [InlineData(
-        BattleGuardFixtureMode.Mounted,
-        true,
-        BattleGuardFixturePhase.Attack,
-        true)]
-    [InlineData(
-        BattleGuardFixtureMode.Mounted,
-        true,
-        BattleGuardFixturePhase.Calibration,
-        false)]
-    [InlineData(
-        BattleGuardFixtureMode.Mounted,
-        false,
-        BattleGuardFixturePhase.Guard,
-        false)]
-    [InlineData(
-        BattleGuardFixtureMode.Foot,
-        true,
-        BattleGuardFixturePhase.Guard,
-        false)]
-    public void NativePlayerDefendDirection_InjectsOnlyHeldMountedMovementFixture(
-        BattleGuardFixtureMode mode,
-        bool useMovementFlagGuardInput,
-        BattleGuardFixturePhase phase,
-        bool expected)
-    {
-        Assert.Equal(
-            expected,
-            BattleGuardFixture.ShouldInjectNativePlayerDefendDirection(
-                mode,
-                useMovementFlagGuardInput,
-                phase));
-    }
-
-    [Theory]
-    [InlineData(BattleGuardFixtureDirection.Up, 0)]
-    [InlineData(BattleGuardFixtureDirection.Down, 1)]
-    [InlineData(BattleGuardFixtureDirection.Left, 2)]
-    [InlineData(BattleGuardFixtureDirection.Right, 3)]
-    public void NativePlayerDefendDirection_UsesExactNativeCacheValue(
-        BattleGuardFixtureDirection direction,
-        int expected)
-    {
-        Assert.Equal(
-            expected,
-            BattleGuardFixtureNativeDefendInput.GetCacheValue(direction));
-    }
-
-    [Theory]
-    [InlineData(BattleGuardFixtureDirection.Up, 0x11843A0)]
-    [InlineData(BattleGuardFixtureDirection.Down, 0x118439C)]
-    [InlineData(BattleGuardFixtureDirection.Left, 0x1184398)]
-    [InlineData(BattleGuardFixtureDirection.Right, 0x1184394)]
-    public void NativePlayerDefendDirection_UsesExactNativeWeightOffset(
-        BattleGuardFixtureDirection direction,
-        int expected)
-    {
-        Assert.Equal(
-            expected,
-            BattleGuardFixtureNativeDefendInput.GetActiveWeightOffset(
-                direction));
-    }
-
-    [Fact]
-    public void NativePlayerDefendDirection_PreservesStateForPostControlTickInjection()
-    {
-        const BindingFlags flags =
-            BindingFlags.NonPublic | BindingFlags.Static;
-        MethodInfo prefix = typeof(BattleGuardFixtureControlPatch)
-            .GetMethod("Prefix", flags);
-        MethodInfo postfix = typeof(BattleGuardFixtureControlPatch)
-            .GetMethod("Postfix", flags);
-
-        Assert.NotNull(prefix);
-        Assert.NotNull(postfix);
-        ParameterInfo prefixState = Assert.Single(
-            prefix.GetParameters(),
-            parameter => parameter.Name == "__state");
-        ParameterInfo postfixState = Assert.Single(
-            postfix.GetParameters(),
-            parameter => parameter.Name == "__state");
-        Assert.True(prefixState.IsOut);
-        Assert.Equal(
-            prefixState.ParameterType.GetElementType(),
-            postfixState.ParameterType);
+            BattleGuardFixture.ShouldApplyMountedGuardCommand(mode));
     }
 
     [Theory]
