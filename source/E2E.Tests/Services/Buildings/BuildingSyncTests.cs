@@ -19,7 +19,6 @@ namespace E2E.Tests.Services.Buildings
         public void Server_Building_Fields()
         {
             TestEnvironment.AssertField<Building, float>(nameof(Building._hitpoints),12345, defaultValue: 100);
-            TestEnvironment.AssertField<Building, int>(nameof(Building._currentLevel), 2);
             TestEnvironment.AssertField<Building, bool>(nameof(Building.IsCurrentlyDefault), true);
             TestEnvironment.AssertField<Building, float>(nameof(Building.BuildingProgress), 24);
         }
@@ -33,6 +32,7 @@ namespace E2E.Tests.Services.Buildings
 
             // Assert
             TestEnvironment.AssertReferenceProperty<Building, Town>(nameof(Building.Town));
+            TestEnvironment.AssertProperty<Building, int>(nameof(Building.CurrentLevel), 3);
         }
     }
 }

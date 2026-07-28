@@ -32,7 +32,6 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     private readonly CoopTroopSupplier _attackerSupplier;
     private readonly IMessageBroker _messageBroker;
     private readonly BattleSideEnum _playerSide;
-    private readonly string _playerPartyId;
 
     // Latched once the sides are sized jointly; both are held at zero until then.
     private bool _sized;
@@ -46,13 +45,12 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     public bool IsSized => _sized;
 
     public CoopBattleMissionSpawnHandler(CoopTroopSupplier defenderSupplier, CoopTroopSupplier attackerSupplier,
-        IMessageBroker messageBroker, BattleSideEnum playerSide, string playerPartyId)
+        IMessageBroker messageBroker, BattleSideEnum playerSide)
     {
         _defenderSupplier = defenderSupplier;
         _attackerSupplier = attackerSupplier;
         _messageBroker = messageBroker;
         _playerSide = playerSide;
-        _playerPartyId = playerPartyId;
     }
 
     public override void AfterStart()
@@ -125,15 +123,22 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     private void AbortInvalidBattle(SideSizing sizing)
     {
         _invalidBattleAbortRequested = true;
+        var playerPartyId = GetLocalPlayerPartyId();
         Logger.Error("[BattleSync] Local player origin missing from battle reserves (side={Side}, party={PartyId}, Def populated={DefP}, Atk populated={AtkP}); ending invalid mission",
-            _playerSide, _playerPartyId, sizing.DefenderPopulated, sizing.AttackerPopulated);
+            _playerSide, playerPartyId, sizing.DefenderPopulated, sizing.AttackerPopulated);
         _messageBroker.Publish(this, new SendInformationMessage(InvalidPlayerReserveMessage));
         base.Mission.EndMission();
     }
 
     private bool HasLocalPlayerOrigin()
     {
-        return HasLocalPlayerOrigin(_playerSide, _playerPartyId, _defenderSupplier, _attackerSupplier);
+        return HasLocalPlayerOrigin(_playerSide, GetLocalPlayerPartyId(), _defenderSupplier, _attackerSupplier);
+    }
+
+    private string GetLocalPlayerPartyId()
+    {
+        var playerSupplier = _playerSide == BattleSideEnum.Attacker ? _attackerSupplier : _defenderSupplier;
+        return playerSupplier.PlayerPartyId;
     }
 
     internal static bool HasLocalPlayerOrigin(BattleSideEnum playerSide, string playerPartyId,

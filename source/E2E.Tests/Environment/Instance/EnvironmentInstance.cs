@@ -202,7 +202,9 @@ public abstract class EnvironmentInstance : IDisposable
         {
             var disableMethod = AccessTools.Method(typeof(PatchScope), nameof(Disable));
             methods = disableMethods.ToArray();
-            patches = methods.Select(m => new HarmonyMethod(disableMethod)).ToArray();
+            patches = methods
+                .Select(_ => new HarmonyMethod(disableMethod) { priority = Priority.First })
+                .ToArray();
 
             for (int i = 0; i < methods.Length; i++)
             {

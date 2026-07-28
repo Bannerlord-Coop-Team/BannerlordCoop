@@ -53,6 +53,7 @@ public class KingdomDebugCommand
         Remove,
     }
 
+    private static readonly string CreateUsage = "Usage: coop.debug.kingdom.create <leaderHeroName> <kingdomName> (run on the server; use '_' for spaces in the hero name)";
     private static readonly string CollectionAddUsage = "Usage: coop.debug.kingdom.collection_add <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <proposerClanId> <ignoreInfluenceCost> <decisionType> <decisionTypeArgs>";
     private static readonly string CollectionRemoveUsage = "Usage: coop.debug.kingdom.collection_remove <collection> <kingdomId> <valueId> | unresolvedDecisions <kingdomId> <index>";
     private static readonly string RemoveUsage = "Usage: coop.debug.kingdom.remove_decision <kingdomId> <Index>";
@@ -120,6 +121,74 @@ public class KingdomDebugCommand
         if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
         return container.TryResolve(out voteManager);
+    }
+
+    // coop.debug.kingdom.create Derthert Vlandia_Reborn
+    /// <summary>
+    /// Creates a kingdom ruled by the named hero's clan and replicates it to every client through the
+    /// same notification the governor "create kingdom" dialog uses. Server only.
+    /// </summary>
+    /// <param name="args">leader hero (coop id, game StringId, or name with '_' for spaces), then the kingdom name</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("create", "coop.debug.kingdom")]
+    public static string CreateKingdomCommand(List<string> args)
+    {
+        if (!ModInformation.IsServer) return "This command can only be run on the server.";
+        if (args.Count < 2) return CreateUsage;
+        if (Campaign.Current == null) return "No campaign is loaded.";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager";
+        if (!ContainerProvider.TryResolve<IKingdomCreator>(out var kingdomCreator)) return "Unable to resolve KingdomCreator";
+
+        if (!TryGetLeaderHero(objectManager, args[0], out Hero leader, out string heroError)) return heroError;
+        if (leader.IsDead) return $"{leader.Name} ({leader.StringId}) is dead and cannot rule a kingdom.";
+
+        Clan clan = leader.Clan;
+        if (clan == null) return $"{leader.Name} ({leader.StringId}) does not belong to a clan.";
+
+        // A kingdom is ruled by its ruling clan's leader, and clan leadership changes have no sync yet,
+        // so reject rather than silently create a kingdom ruled by a different hero.
+        if (clan.Leader != leader) return $"{leader.Name} does not lead clan {clan.StringId}. Pass the clan leader instead.";
+
+        // The console splits arguments on spaces, so everything after the hero is the kingdom name.
+        string kingdomName = string.Join(" ", args.Skip(1)).Trim();
+        if (!KingdomHandler.CanCreateKingdomForClan(clan, kingdomName, out string reason))
+        {
+            return $"Unable to create kingdom {kingdomName}: {reason}.";
+        }
+
+        CultureObject culture = clan.Culture ?? leader.Culture;
+        if (culture == null) return $"Clan {clan.StringId} has no culture for the new kingdom to inherit.";
+
+        // A debug-created kingdom usually has no owning player; an empty controller id makes the
+        // notification's settlement-restore steps a no-op on the server and every client.
+        TryGetPlayerManager(out var playerManager);
+        objectManager.TryGetId(clan, out string clanId);
+        string controllerId = playerManager?.Players.FirstOrDefault(player => player.ClanId == clanId)?.ControllerId ?? string.Empty;
+
+        if (!kingdomCreator.TryCreateKingdom(clan, kingdomName, culture, controllerId, out string kingdomId, out string createError))
+        {
+            return $"Unable to create kingdom {kingdomName}: {createError}.";
+        }
+
+        return $"Created kingdom '{kingdomName}' ({kingdomId}) ruled by {leader.Name} of clan {clan.StringId}.";
+    }
+
+    /// <summary>
+    /// Resolves the leader from a coop object manager id, a game StringId, or a hero name ('_' stands in
+    /// for a space because the console splits arguments on spaces).
+    /// </summary>
+    private static bool TryGetLeaderHero(IObjectManager objectManager, string nameOrId, out Hero hero, out string error)
+    {
+        error = null;
+        if (objectManager.TryGetObject(nameOrId, out hero)) return true;
+
+        string heroName = nameOrId.Replace('_', ' ').Trim();
+        hero = Hero.AllAliveHeroes.FirstOrDefault(candidate => candidate.StringId == nameOrId)
+            ?? Hero.AllAliveHeroes.FirstOrDefault(candidate => string.Equals(candidate.Name?.ToString(), heroName, StringComparison.OrdinalIgnoreCase));
+        if (hero != null) return true;
+
+        error = $"No hero '{nameOrId}' found by coop id, game StringId, or name. Run coop.debug.hero.id <hero name> to look one up.";
+        return false;
     }
 
     // coop.debug.kingdom.list

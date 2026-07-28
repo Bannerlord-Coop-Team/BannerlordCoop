@@ -1,12 +1,10 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
@@ -93,10 +91,9 @@ internal class KingdomInterface : IKingdomInterface
             int influenceCost = kingdomDecision.GetInfluenceCost(proposerClan);
             ChangeClanInfluenceAction.Apply(proposerClan, (float)(-(float)influenceCost));
         }
-        bool isPlayerInvolved = IsCoopPlayerInvolved(kingdomDecision);
-        CampaignEventDispatcher.Instance.OnKingdomDecisionAdded(kingdomDecision, isPlayerInvolved);
-        var playerParties = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties();
-        if (playerParties.All(party => party.ActualClan.Kingdom != kingdomDecision.Kingdom))
+        bool hasEligiblePlayerClan = decisionVoteManager.HasEligiblePlayerClan(kingdomDecision);
+        CampaignEventDispatcher.Instance.OnKingdomDecisionAdded(kingdomDecision, hasEligiblePlayerClan);
+        if (!hasEligiblePlayerClan)
         {
             CoopKingdomElection election = new CoopKingdomElection(kingdomDecision, randomFloat);
             election.StartElectionCoop();
@@ -140,16 +137,6 @@ internal class KingdomInterface : IKingdomInterface
                 }
             }
         });
-    }
-    private bool IsCoopPlayerInvolved(KingdomDecision kingdomDecision)
-    {
-        if (decisionVoteManager.HasEligiblePlayerClan(kingdomDecision))
-        {
-            return true;
-        }
-        var playerParties = Campaign.Current?.CampaignObjectManager?.GetPlayerMobileParties();
-        if (playerParties == null) return false;
-        return playerParties.Any(party => party?.ActualClan?.Kingdom == kingdomDecision.Kingdom);
     }
     private static void RunKingdomMutation(Action action)
     {
