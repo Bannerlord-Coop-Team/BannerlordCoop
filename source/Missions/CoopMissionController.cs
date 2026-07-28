@@ -94,7 +94,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
         // The prior native Agent tick can realize an action after OnMissionTick sampled its input.
         // Diff again here so peers receive that exact action instead of retaining the earlier pose.
-        coopMissionComponent.AgentActionHandler.PollActions();
+        coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick();
 
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
         coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();

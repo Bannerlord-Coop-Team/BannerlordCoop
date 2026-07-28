@@ -419,6 +419,83 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void AfterNativePoll_MountedPlayerRetainsInputDirectionAcrossNativeFlagRewrite()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+
+            Agent agent = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.Player,
+                out MirrorAgent mirror);
+            context.Mock.SpawnMount(agent);
+
+            mirror.GuardMode = Agent.GuardMode.Up;
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendUp;
+            mirror.Action1Index = 3062;
+            mirror.Action1CodeType = Agent.ActionCodeType.DefendUp1h;
+            mirror.Action1Direction = Agent.UsageDirection.DefendUp;
+            context.Component.AgentActionHandler.PollActions();
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendRight;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket requestedRightPacket = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            AgentActionData requestedRight =
+                Assert.Single(requestedRightPacket.Actions);
+            Assert.Equal(Agent.GuardMode.Right, requestedRight.GuardMode);
+            Assert.Equal(2L, Assert.Single(requestedRightPacket.Sequences));
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendUp;
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            mirror.GuardMode = Agent.GuardMode.Right;
+            mirror.Action1Index = 3070;
+            mirror.Action1CodeType = Agent.ActionCodeType.DefendRight1h;
+            mirror.Action1Direction = Agent.UsageDirection.DefendRight;
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+
+            AgentActionPacket realizedRightPacket = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            AgentActionData realizedRight =
+                Assert.Single(realizedRightPacket.Actions);
+            Assert.Equal(3070, realizedRight.Action1Index);
+            Assert.Equal(Agent.GuardMode.Right, realizedRight.GuardMode);
+            Assert.Equal(3L, Assert.Single(realizedRightPacket.Sequences));
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            mirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendUp;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket backToUpPacket = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            AgentActionData backToUp = Assert.Single(backToUpPacket.Actions);
+            Assert.Equal(Agent.GuardMode.Up, backToUp.GuardMode);
+            Assert.Equal(4L, Assert.Single(backToUpPacket.Sequences));
+        });
+    }
+
+    [Fact]
     public void PreDisplayPoll_MountedGuardActionCatchingUp_BroadcastsVisibleDirection()
     {
         RunScenario("owner", context =>

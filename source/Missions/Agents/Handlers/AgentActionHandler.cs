@@ -17,11 +17,12 @@ namespace Missions.Agents.Handlers;
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
     /// <summary>
-    /// [Game thread] Detect discrete action, defend-input, and realized guard changes on owned agents and broadcast them. Driven from
-    /// CoopMissionController.OnPreDisplayMissionTick after the completed native Agent tick and again from OnMissionTick after behavior input:
-    /// these are the game-thread boundaries where a one-frame transition can be observed without racing the engine.
+    /// [Game thread] Detect discrete action and defend-input changes on owned agents after the player-input boundary.
     /// </summary>
     void PollActions();
+
+    /// <summary>[Game thread] Detect realized action changes after the completed native Agent tick.</summary>
+    void PollActionsAfterNativeTick();
 
     /// <summary>[Any thread] Send held defend and guard state for owned agents to a joining peer.</summary>
     void CatchUpJoiner(string controllerId);
@@ -90,6 +91,9 @@ public class AgentActionHandler : IAgentActionHandler
         public bool HasAction1DefendingAction;
         public int Action0DefendingAction;
         public int Action1DefendingAction;
+        public bool HasInputBoundaryObservation;
+        public Agent.MovementControlFlag InputBoundaryDefendFlags;
+        public Agent.GuardMode InputBoundaryGuardMode;
         public long Sequence;
     }
 
@@ -118,6 +122,16 @@ public class AgentActionHandler : IAgentActionHandler
 
     public void PollActions()
     {
+        PollActions(afterNativeTick: false);
+    }
+
+    public void PollActionsAfterNativeTick()
+    {
+        PollActions(afterNativeTick: true);
+    }
+
+    private void PollActions(bool afterNativeTick)
+    {
         if (Mission.Current == null) return;
 
         List<Guid> ids = null;
@@ -139,17 +153,40 @@ public class AgentActionHandler : IAgentActionHandler
 
             int action0 = agent.GetCurrentAction(0).Index;
             int action1 = agent.GetCurrentAction(1).Index;
-            var defendFlags = AgentActionData.GetEffectiveDefendMovementFlags(agent);
-
             _localAgentStates.TryGetValue(info.AgentId, out var state);
             bool hadState = state.HasObservation;
+            bool isMountedPlayer =
+                agent.HasMount
+                && agent.Controller == AgentControllerType.Player;
+            bool retainInputBoundary =
+                afterNativeTick
+                && isMountedPlayer
+                && state.HasInputBoundaryObservation;
+            var defendFlags = retainInputBoundary
+                ? state.InputBoundaryDefendFlags
+                : AgentActionData.GetEffectiveDefendMovementFlags(agent);
             Agent.GuardMode actionGuardMode =
                 AgentActionData.GetGuardModeFromDefendingAction(agent);
-            Agent.GuardMode guardMode = GetEffectiveGuardMode(
-                info.AgentId,
-                agent,
-                defendFlags,
-                actionGuardMode);
+            Agent.GuardMode guardMode = retainInputBoundary
+                ? state.InputBoundaryGuardMode
+                : GetEffectiveGuardMode(
+                    info.AgentId,
+                    agent,
+                    defendFlags,
+                    actionGuardMode);
+            if (!afterNativeTick && isMountedPlayer)
+            {
+                state.HasInputBoundaryObservation = true;
+                state.InputBoundaryDefendFlags = defendFlags;
+                state.InputBoundaryGuardMode = guardMode;
+            }
+            else if (!isMountedPlayer)
+            {
+                state.HasInputBoundaryObservation = false;
+                state.InputBoundaryDefendFlags =
+                    Agent.MovementControlFlag.None;
+                state.InputBoundaryGuardMode = Agent.GuardMode.None;
+            }
             bool defendChanged;
             if (hadState)
             {
@@ -198,7 +235,7 @@ public class AgentActionHandler : IAgentActionHandler
                 && !guardedMountStateChanged
                 && !guardedControllerRoleChanged)
             {
-                if (hadState && agent.HasMount)
+                if (hadState)
                 {
                     state.DefendFlags = defendFlags;
                     state.ActionGuardMode = actionGuardMode;
@@ -307,13 +344,13 @@ public class AgentActionHandler : IAgentActionHandler
                 continue;
 
             long sequence = NextActionSequence(info.AgentId);
+            var actionData = new AgentActionData(
+                agent,
+                defendFlags,
+                guardMode,
+                guardReactionChannel);
             (ids ??= new List<Guid>()).Add(info.AgentId);
-            (actions ??= new List<AgentActionData>()).Add(
-                new AgentActionData(
-                    agent,
-                    defendFlags,
-                    guardMode,
-                    guardReactionChannel));
+            (actions ??= new List<AgentActionData>()).Add(actionData);
             (sequences ??= new List<long>()).Add(sequence);
         }
 
@@ -343,14 +380,32 @@ public class AgentActionHandler : IAgentActionHandler
                 if (agent == null || agent.Mission == null || !agent.IsActive() || agent.Health <= 0 || agent.IsMount)
                     continue;
 
-                var defendFlags = AgentActionData.GetEffectiveDefendMovementFlags(agent);
-                Agent.GuardMode actionGuardMode =
-                    AgentActionData.GetGuardModeFromDefendingAction(agent);
-                Agent.GuardMode guardMode = GetEffectiveGuardMode(
+                _localAgentStates.TryGetValue(
                     info.AgentId,
-                    agent,
-                    defendFlags,
-                    actionGuardMode);
+                    out LocalAgentActionState state);
+                bool useInputBoundary =
+                    agent.HasMount
+                    && agent.Controller == AgentControllerType.Player
+                    && state.HasInputBoundaryObservation;
+                Agent.MovementControlFlag defendFlags;
+                Agent.GuardMode guardMode;
+                if (useInputBoundary)
+                {
+                    defendFlags = state.InputBoundaryDefendFlags;
+                    guardMode = state.InputBoundaryGuardMode;
+                }
+                else
+                {
+                    defendFlags =
+                        AgentActionData.GetEffectiveDefendMovementFlags(agent);
+                    Agent.GuardMode actionGuardMode =
+                        AgentActionData.GetGuardModeFromDefendingAction(agent);
+                    guardMode = GetEffectiveGuardMode(
+                        info.AgentId,
+                        agent,
+                        defendFlags,
+                        actionGuardMode);
+                }
                 if (defendFlags == Agent.MovementControlFlag.None
                     && !AgentActionData.IsGuardMode(guardMode))
                     continue;
