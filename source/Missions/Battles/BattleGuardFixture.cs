@@ -1061,8 +1061,9 @@ public class BattleGuardFixture : IBattleGuardFixture
         Vec3 side = Vec3.CrossProduct(forward, Vec3.Up);
         side.Normalize();
 
-        float distance = guard.HasMount ? 9f : 5.5f;
-        float height = guard.HasMount ? 1.5f : 0.7f;
+        // Keep the fixed observer above battlefield vegetation without hiding the pose.
+        float distance = guard.HasMount ? 7f : 4.5f;
+        float height = guard.HasMount ? 4f : 3f;
         Vec3 origin = target +
             (side * distance) -
             (forward * (distance * 0.25f)) +
