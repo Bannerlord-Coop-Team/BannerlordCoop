@@ -308,13 +308,13 @@ public class CoopBattleController : CoopMissionController
         guardFixture.ShouldRunNativePlayerControlTick(
             coopMissionComponent.AgentRegistry);
 
-    internal bool TryGetGuardFixtureNativePlayerDefendMovementFlag(
+    internal bool TryGetGuardFixtureNativePlayerDefendDirection(
         Agent agent,
-        out Agent.MovementControlFlag movementFlag) =>
-        guardFixture.TryGetNativePlayerDefendMovementFlag(
+        out BattleGuardFixtureDirection direction) =>
+        guardFixture.TryGetNativePlayerDefendDirection(
             coopMissionComponent.AgentRegistry,
             agent,
-            out movementFlag);
+            out direction);
 
     internal bool IsGuardFixtureHoldingNativePlayerBlock() =>
         guardFixture.IsHoldingNativePlayerBlock(

@@ -1,5 +1,8 @@
 ﻿#if DEBUG
+using GameInterface.Services.Battles.Messages;
 using HarmonyLib;
+using System;
+using System.Runtime.InteropServices;
 using TaleWorlds.InputSystem;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.MissionViews;
@@ -17,25 +20,84 @@ internal static class BattleGuardFixtureControlPatch
         if (controller?.IsGuardFixtureDrivingPlayerInput() != true)
             return true;
 
-        return controller.ShouldRunGuardFixtureNativePlayerControlTick();
+        if (!controller.ShouldRunGuardFixtureNativePlayerControlTick())
+            return false;
+
+        Agent agent = Mission.Current.MainAgent;
+        if (controller.TryGetGuardFixtureNativePlayerDefendDirection(
+                agent,
+                out BattleGuardFixtureDirection direction))
+            BattleGuardFixtureNativeDefendInput.Inject(agent, direction);
+
+        return true;
     }
 }
 
-[HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
-[HarmonyPatch(typeof(Agent), nameof(Agent.GetDefendMovementFlag))]
-internal static class BattleGuardFixtureDefendDirectionPatch
+internal static class BattleGuardFixtureNativeDefendInput
 {
-    private static void Postfix(
-        Agent __instance,
-        ref Agent.MovementControlFlag __result)
+    // v1.4.7 caches defend input in both the agent and mission input buffer.
+    private const int AgentDefendDirectionOffset = 0x834;
+    private const int AgentInputPointerOffset = 0xAB8;
+    private const int DefendUpWeightOffset = 0x1184394;
+    private const int DefendDownWeightOffset = 0x1184398;
+    private const int DefendLeftWeightOffset = 0x118439C;
+    private const int DefendRightWeightOffset = 0x11843A0;
+    private const int ControllerDefendDirectionOffset = 0x1184A50;
+
+    internal static void Inject(
+        Agent agent,
+        BattleGuardFixtureDirection direction)
     {
-        CoopBattleController controller = Mission.Current?
-            .GetMissionBehavior<CoopBattleController>();
-        if (controller?.TryGetGuardFixtureNativePlayerDefendMovementFlag(
-                __instance,
-                out Agent.MovementControlFlag movementFlag) == true)
+        if (agent == null)
+            throw new ArgumentNullException(nameof(agent));
+
+        UIntPtr nativeAgent = agent.GetPtr();
+        if (nativeAgent == UIntPtr.Zero)
+            throw new InvalidOperationException(
+                "Guard fixture agent has no native pointer.");
+
+        IntPtr agentPointer = new IntPtr(
+            unchecked((long)nativeAgent.ToUInt64()));
+        IntPtr inputPointer = Marshal.ReadIntPtr(
+            agentPointer,
+            AgentInputPointerOffset);
+        if (inputPointer == IntPtr.Zero)
+            throw new InvalidOperationException(
+                "Guard fixture agent has no native input pointer.");
+
+        int cacheValue = GetCacheValue(direction);
+        Marshal.WriteInt32(inputPointer, DefendUpWeightOffset, 0);
+        Marshal.WriteInt32(inputPointer, DefendDownWeightOffset, 0);
+        Marshal.WriteInt32(inputPointer, DefendLeftWeightOffset, 0);
+        Marshal.WriteInt32(inputPointer, DefendRightWeightOffset, 0);
+        Marshal.WriteInt32(
+            inputPointer,
+            ControllerDefendDirectionOffset,
+            cacheValue);
+        Marshal.WriteInt32(
+            agentPointer,
+            AgentDefendDirectionOffset,
+            cacheValue);
+    }
+
+    internal static int GetCacheValue(
+        BattleGuardFixtureDirection direction)
+    {
+        switch (direction)
         {
-            __result = movementFlag;
+            case BattleGuardFixtureDirection.Up:
+                return 0;
+            case BattleGuardFixtureDirection.Down:
+                return 1;
+            case BattleGuardFixtureDirection.Left:
+                return 2;
+            case BattleGuardFixtureDirection.Right:
+                return 3;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(direction),
+                    direction,
+                    null);
         }
     }
 }

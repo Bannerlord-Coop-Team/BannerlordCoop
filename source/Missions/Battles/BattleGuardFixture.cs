@@ -28,10 +28,10 @@ public interface IBattleGuardFixture
     bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
     bool ShouldRunNativePlayerControlTick(
         INetworkAgentRegistry agentRegistry);
-    bool TryGetNativePlayerDefendMovementFlag(
+    bool TryGetNativePlayerDefendDirection(
         INetworkAgentRegistry agentRegistry,
         Agent agent,
-        out Agent.MovementControlFlag movementFlag);
+        out BattleGuardFixtureDirection direction);
     bool IsHoldingNativePlayerBlock(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
@@ -354,16 +354,16 @@ public class BattleGuardFixture : IBattleGuardFixture
                 guardDriver.UseMovementFlagGuardInput);
     }
 
-    public bool TryGetNativePlayerDefendMovementFlag(
+    public bool TryGetNativePlayerDefendDirection(
         INetworkAgentRegistry agentRegistry,
         Agent agent,
-        out Agent.MovementControlFlag movementFlag)
+        out BattleGuardFixtureDirection direction)
     {
-        movementFlag = Agent.MovementControlFlag.None;
+        direction = BattleGuardFixtureDirection.Up;
         if (!ReferenceEquals(agent, Mission.Current?.MainAgent) ||
             !TryGetDrivenGuardAgent(agentRegistry, out Agent drivenAgent) ||
             !ReferenceEquals(agent, drivenAgent) ||
-            !ShouldOverrideNativePlayerDefendMovementFlag(
+            !ShouldInjectNativePlayerDefendDirection(
                 guardDriver.Mode,
                 guardDriver.UseMovementFlagGuardInput,
                 guardDriver.Phase))
@@ -371,7 +371,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             return false;
         }
 
-        movementFlag = GetDefendDirectionFlag(guardDriver.Direction);
+        direction = guardDriver.Direction;
         return true;
     }
 
@@ -1551,7 +1551,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             useMovementFlagGuardInput;
     }
 
-    internal static bool ShouldOverrideNativePlayerDefendMovementFlag(
+    internal static bool ShouldInjectNativePlayerDefendDirection(
         BattleGuardFixtureMode mode,
         bool useMovementFlagGuardInput,
         BattleGuardFixturePhase phase)

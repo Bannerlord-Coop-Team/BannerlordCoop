@@ -592,7 +592,7 @@ public class BattleGuardFixtureEvidenceTests
         true,
         BattleGuardFixturePhase.Guard,
         false)]
-    public void NativePlayerDefendDirection_OverridesOnlyHeldMountedMovementFixture(
+    public void NativePlayerDefendDirection_InjectsOnlyHeldMountedMovementFixture(
         BattleGuardFixtureMode mode,
         bool useMovementFlagGuardInput,
         BattleGuardFixturePhase phase,
@@ -600,10 +600,24 @@ public class BattleGuardFixtureEvidenceTests
     {
         Assert.Equal(
             expected,
-            BattleGuardFixture.ShouldOverrideNativePlayerDefendMovementFlag(
+            BattleGuardFixture.ShouldInjectNativePlayerDefendDirection(
                 mode,
                 useMovementFlagGuardInput,
                 phase));
+    }
+
+    [Theory]
+    [InlineData(BattleGuardFixtureDirection.Up, 0)]
+    [InlineData(BattleGuardFixtureDirection.Down, 1)]
+    [InlineData(BattleGuardFixtureDirection.Left, 2)]
+    [InlineData(BattleGuardFixtureDirection.Right, 3)]
+    public void NativePlayerDefendDirection_UsesExactNativeCacheValue(
+        BattleGuardFixtureDirection direction,
+        int expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixtureNativeDefendInput.GetCacheValue(direction));
     }
 
     [Theory]
