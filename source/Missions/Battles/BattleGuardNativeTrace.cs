@@ -1,6 +1,7 @@
 ﻿#if DEBUG
-using HarmonyLib;
+using Common.Util;
 using GameInterface.Services.Battles.Messages;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,8 +16,12 @@ namespace Missions.Battles;
 internal static class BattleGuardNativeTrace
 {
     private const int Capacity = 256;
+    private const int CollisionCapacity = 512;
     private static readonly object Sync = new();
     private static readonly List<string> Records = new(Capacity);
+    // Keep one contact window separate so per-frame writer records cannot evict callback order.
+    private static readonly List<string> CollisionRecords =
+        new(CollisionCapacity);
     private static readonly int ProcessId = Process.GetCurrentProcess().Id;
     private static readonly string ProcessRole =
         ReadCommandLineArgument("/platformId")
@@ -28,10 +33,14 @@ internal static class BattleGuardNativeTrace
     private static Guid commandId;
     private static long ordinal;
     private static string phase = "unscoped";
+    private static bool collisionCaptureActive;
+    private static bool collisionCaptureCompletionPending;
+    private static bool meleeCallbackActive;
 
     internal static bool IsTarget(Agent agent)
     {
-        return ReferenceEquals(Volatile.Read(ref target), agent);
+        return agent != null &&
+            ReferenceEquals(Volatile.Read(ref target), agent);
     }
 
     internal static void SetTarget(
@@ -57,7 +66,11 @@ internal static class BattleGuardNativeTrace
             if (commandChanged)
             {
                 Records.Clear();
+                CollisionRecords.Clear();
                 ordinal = 0;
+                collisionCaptureActive = false;
+                collisionCaptureCompletionPending = false;
+                meleeCallbackActive = false;
             }
         }
 
@@ -77,6 +90,9 @@ internal static class BattleGuardNativeTrace
         {
             Volatile.Write(ref target, null);
             phase = "stopped";
+            collisionCaptureActive = false;
+            collisionCaptureCompletionPending = false;
+            meleeCallbackActive = false;
         }
     }
 
@@ -118,12 +134,13 @@ internal static class BattleGuardNativeTrace
             ActionIndexCache action0 = agent.GetCurrentAction(0);
             ActionIndexCache action1 = agent.GetCurrentAction(1);
             state =
-                $"a0={action0.Index},{agent.GetCurrentActionType(0)},{agent.GetCurrentActionDirection(0)}|" +
-                $"a1={action1.Index},{agent.GetCurrentActionType(1)},{agent.GetCurrentActionDirection(1)}|" +
+                $"a0={GetActionState(agent, 0, action0)}|" +
+                $"a1={GetActionState(agent, 1, action1)}|" +
                 $"guard={agent.CurrentGuardMode}|" +
                 $"move={(uint)agent.MovementFlags}|" +
                 $"defend={(uint)agent.GetDefendMovementFlag()}|" +
-                $"mount={agent.MountAgent?.Index ?? -1}";
+                $"mount={agent.MountAgent?.Index ?? -1}|" +
+                $"allowed={AllowedThread.IsThisThreadAllowed()}";
         }
         catch (Exception exception)
         {
@@ -155,6 +172,12 @@ internal static class BattleGuardNativeTrace
             if (Records.Count == Capacity)
                 Records.RemoveAt(0);
             Records.Add(token);
+            if (collisionCaptureActive)
+            {
+                if (CollisionRecords.Count == CollisionCapacity)
+                    CollisionRecords.RemoveAt(0);
+                CollisionRecords.Add(token);
+            }
         }
     }
 
@@ -164,6 +187,7 @@ internal static class BattleGuardNativeTrace
         in AttackCollisionData collisionData,
         string argument = null)
     {
+        BeginCollisionCapture(agent, operation);
         string collision =
             $"result={collisionData.CollisionResult}," +
             $"attack={collisionData.AttackDirection}," +
@@ -177,6 +201,27 @@ internal static class BattleGuardNativeTrace
         if (!string.IsNullOrEmpty(argument))
             collision += $",{argument}";
         Record(agent, operation, collision);
+        CompleteMeleeCallback(operation);
+    }
+
+    internal static void CompleteCollisionCapture(
+        Agent agent,
+        string outcome)
+    {
+        if (!IsTarget(agent))
+            return;
+
+        Record(agent, "collision-capture-complete", outcome);
+        lock (Sync)
+        {
+            if (ReferenceEquals(Volatile.Read(ref target), agent))
+            {
+                if (meleeCallbackActive)
+                    collisionCaptureCompletionPending = true;
+                else
+                    collisionCaptureActive = false;
+            }
+        }
     }
 
     internal static string GetToken(int maximumRecords)
@@ -205,12 +250,83 @@ internal static class BattleGuardNativeTrace
         {
             string header =
                 $"processId={ProcessId} role={Sanitize(ProcessRole)} runToken={Sanitize(RunToken)} " +
-                $"agentId={targetId} commandId={commandId} records={Records.Count}";
-            if (Records.Count == 0)
+                $"agentId={targetId} commandId={commandId} records={Records.Count} " +
+                $"collisionRecords={CollisionRecords.Count}";
+            if (Records.Count == 0 && CollisionRecords.Count == 0)
                 return header;
 
-            return header + Environment.NewLine +
-                string.Join(Environment.NewLine, Records);
+            var builder = new StringBuilder(header);
+            if (Records.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine("TRACE=rolling");
+                builder.Append(
+                    string.Join(Environment.NewLine, Records));
+            }
+            if (CollisionRecords.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine("TRACE=collision");
+                builder.Append(
+                    string.Join(
+                        Environment.NewLine,
+                        CollisionRecords));
+            }
+            return builder.ToString();
+        }
+    }
+
+    private static void BeginCollisionCapture(
+        Agent agent,
+        string operation)
+    {
+        if (!IsTarget(agent))
+            return;
+
+        lock (Sync)
+        {
+            if (!ReferenceEquals(Volatile.Read(ref target), agent))
+            {
+                return;
+            }
+
+            if (string.Equals(
+                    operation,
+                    "melee-prefix",
+                    StringComparison.Ordinal))
+            {
+                CollisionRecords.Clear();
+                collisionCaptureActive = true;
+                collisionCaptureCompletionPending = false;
+                meleeCallbackActive = true;
+            }
+            else if (!collisionCaptureActive &&
+                !collisionCaptureCompletionPending)
+            {
+                CollisionRecords.Clear();
+                collisionCaptureActive = true;
+            }
+        }
+    }
+
+    private static void CompleteMeleeCallback(string operation)
+    {
+        if (!string.Equals(
+                operation,
+                "melee-postfix",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        lock (Sync)
+        {
+            meleeCallbackActive = false;
+            if (collisionCaptureCompletionPending)
+            {
+                collisionCaptureActive = false;
+                collisionCaptureCompletionPending = false;
+            }
         }
     }
 
@@ -226,6 +342,19 @@ internal static class BattleGuardNativeTrace
             .Replace('\n', '_')
             .Replace(';', ',')
             .Replace('|', '/');
+    }
+
+    private static string GetActionState(
+        Agent agent,
+        int channel,
+        ActionIndexCache action)
+    {
+        return
+            $"{action.Index}," +
+            $"{agent.GetCurrentActionType(channel)}," +
+            $"{agent.GetCurrentActionStage(channel)}," +
+            $"{agent.GetCurrentActionDirection(channel)}," +
+            $"{agent.GetCurrentActionProgress(channel).ToString("0.000", CultureInfo.InvariantCulture)}";
     }
 
     private static bool HasCommandLineArgument(string name)
@@ -362,6 +491,22 @@ internal static class BattleGuardBlockedHitTracePatch
             BattleGuardNativeTrace.RecordCollision(
                 affectedAgent,
                 "blocked-prefix",
+                in collisionData,
+                $"attacker={affectorAgent?.Index ?? -1},missile={isMissile}");
+        }
+    }
+
+    private static void Postfix(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        ref AttackCollisionData collisionData,
+        bool isMissile)
+    {
+        if (BattleGuardNativeTrace.IsTarget(affectedAgent))
+        {
+            BattleGuardNativeTrace.RecordCollision(
+                affectedAgent,
+                "blocked-postfix",
                 in collisionData,
                 $"attacker={affectorAgent?.Index ?? -1},missile={isMissile}");
         }

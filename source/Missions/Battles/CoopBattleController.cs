@@ -411,6 +411,17 @@ public class CoopBattleController : CoopMissionController
         float hitDistance,
         float shotDifficulty)
     {
+#if DEBUG
+        if (BattleGuardNativeTrace.IsTarget(affectedAgent))
+        {
+            BattleGuardNativeTrace.RecordCollision(
+                affectedAgent,
+                "score-hit-entry",
+                in collisionData,
+                $"attacker={affectorAgent?.Index ?? -1},blocked={isBlocked}," +
+                $"missile={blow.IsMissile},damagedHp={damagedHp:0.###}");
+        }
+#endif
         base.OnScoreHit(
             affectedAgent,
             affectorAgent,
