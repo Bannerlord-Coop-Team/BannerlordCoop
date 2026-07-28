@@ -1,9 +1,12 @@
 ﻿using Common.Messaging;
+using Common.Network;
+using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.Save.Messages;
 using System.Linq;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
@@ -17,20 +20,24 @@ internal class SaveGameHandler : IHandler
     private readonly ICoopSaveManager saveManager;
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IPlayerManager playerRegistry;
+    private readonly INetwork network;
 
     public SaveGameHandler(
         IMessageBroker messageBroker,
         ICoopSaveManager saveManager,
         ICoopSessionProvider coopSessionProvider,
-        IPlayerManager playerRegistry) 
+        IPlayerManager playerRegistry,
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.saveManager = saveManager;
         this.coopSessionProvider = coopSessionProvider;
         this.playerRegistry = playerRegistry;
+        this.network = network;
 
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
+        messageBroker.Subscribe<GameSaveStateChanged>(Handle_GameSaveStateChanged);
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
@@ -39,8 +46,14 @@ internal class SaveGameHandler : IHandler
     {
         messageBroker.Unsubscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Unsubscribe<GameLoaded>(Handle_GameLoaded);
+        messageBroker.Unsubscribe<GameSaveStateChanged>(Handle_GameSaveStateChanged);
 
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+    }
+
+    private void Handle_GameSaveStateChanged(MessagePayload<GameSaveStateChanged> payload)
+    {
+        network.SendAll(new NetworkGameSaveStateChanged(payload.What.IsSaving));
     }
 
     private void Handle_GameSaved(MessagePayload<GameSaved> obj)

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
+using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Caravans.Messages;
@@ -8,6 +9,7 @@ using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager.Messages;
 using GameInterface.Services.Smithing.Messages;
+using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler;
@@ -18,18 +20,29 @@ namespace Coop.Core.Client.Services.Save.Handler;
 internal class SaveDataHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
+    private readonly ISaveNotificationInterface saveNotificationInterface;
     private NetworkGameSaveDataReceived saveDataMessage;
 
-    public SaveDataHandler(IMessageBroker messageBroker)
+    public SaveDataHandler(
+        IMessageBroker messageBroker,
+        ISaveNotificationInterface saveNotificationInterface)
     {
         this.messageBroker = messageBroker;
+        this.saveNotificationInterface = saveNotificationInterface;
 
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+        messageBroker.Subscribe<NetworkGameSaveStateChanged>(Handle_NetworkGameSaveStateChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+        messageBroker.Unsubscribe<NetworkGameSaveStateChanged>(Handle_NetworkGameSaveStateChanged);
+    }
+
+    private void Handle_NetworkGameSaveStateChanged(MessagePayload<NetworkGameSaveStateChanged> payload)
+    {
+        saveNotificationInterface.SetSaving(payload.What.IsSaving);
     }
 
     private void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)

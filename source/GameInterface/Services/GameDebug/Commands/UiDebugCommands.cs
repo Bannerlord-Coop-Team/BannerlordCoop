@@ -1,5 +1,7 @@
 ﻿using Common.Logging;
 using GameInterface.Utils.Commands;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -71,5 +73,20 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
             return "Usage: coop.debug.ui.active_state";
 
         return Game.Current?.GameStateManager?.ActiveState?.GetType().Name ?? "none";
+    }
+
+    [CommandLineArgumentFunction("saving_overlay_state", "coop.debug.ui")]
+    public static string SavingOverlayState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.saving_overlay_state";
+
+        var dataSource = MapScreen.Instance?
+            .GetMapView<GauntletMapSaveView>()?
+            ._dataSource;
+        if (dataSource == null)
+            return "Saving overlay: UNAVAILABLE.";
+
+        return $"Saving overlay: {(dataSource.IsActive ? "ACTIVE" : "INACTIVE")}.";
     }
 }
