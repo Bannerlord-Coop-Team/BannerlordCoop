@@ -66,34 +66,15 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
 
                 int totalWageForTroopType = character.TroopWage * numberOfTroopsToPayWages;
                 totalWage += totalWageForTroopType;
-                if (character.Culture.IsBandit)
-                {
-                    banditsWage += totalWageForTroopType;
-                }
-                if (character.IsInfantry)
-                {
-                    infantryWage += totalWageForTroopType;
-                }
-                if (character.IsMounted)
-                {
-                    cavalryWage += totalWageForTroopType;
-                }
-                if (character.Occupation == Occupation.CaravanGuard)
-                {
-                    caravanGuardsWage += totalWageForTroopType;
-                }
-                if (character.Occupation == Occupation.Mercenary)
-                {
-                    mercenariesWage += totalWageForTroopType;
-                }
-                if (character.IsRanged)
-                {
-                    archersWage += totalWageForTroopType;
-                    if (character.Tier >= 4)
-                    {
-                        eliteArchersWage += totalWageForTroopType;
-                    }
-                }
+
+                // Calculate wages for individual troop types
+                if (character.Culture.IsBandit) banditsWage += totalWageForTroopType;
+                if (character.IsInfantry) infantryWage += totalWageForTroopType;
+                if (character.IsMounted) cavalryWage += totalWageForTroopType;
+                if (character.Occupation == Occupation.CaravanGuard) caravanGuardsWage += totalWageForTroopType;
+                if (character.Occupation == Occupation.Mercenary) mercenariesWage += totalWageForTroopType;
+                if (character.IsRanged) archersWage += totalWageForTroopType;
+                if (character.IsRanged && character.Tier >= 4) eliteArchersWage += totalWageForTroopType;
             }
         }
 
