@@ -823,6 +823,23 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(7.5f, 7.5f, true)]
+    [InlineData(7.125f, 7.5f, true)]
+    [InlineData(7.124f, 7.5f, false)]
+    [InlineData(7.5f, -1f, false)]
+    public void MountedStrikeSpeed_RequiresCalibratedPlateauRetention(
+        float speed,
+        float calibratedPlateauSpeed,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.HasMountedStrikeSpeed(
+                speed,
+                calibratedPlateauSpeed));
+    }
+
+    [Theory]
     [InlineData(0, 0.25f)]
     [InlineData(1, 0.25f)]
     [InlineData(3, 0.45f)]

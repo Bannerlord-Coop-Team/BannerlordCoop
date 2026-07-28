@@ -72,6 +72,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     private const float MountedStrikeReleaseLeadStepSeconds = 0.1f;
     private const int MountedStrikeReleaseLeadProfiles = 5;
     private const float MountedStrikeMaximumChargeSeconds = 2.5f;
+    private const float MountedStrikeMinimumCalibratedSpeedRatio = 0.95f;
     private const float FixtureStrikerSwingSpeedMultiplier = 1f;
     private const float MountedStrikeMinimumRunway =
         BattleGuardMountedRoute.StrikeClearanceDistance +
@@ -1970,6 +1971,16 @@ public class BattleGuardFixture : IBattleGuardFixture
             longitudinalDistance / Math.Max(0.1f, speed);
         return timeToContact <= releaseLeadSeconds ||
             chargeSeconds >= MountedStrikeMaximumChargeSeconds;
+    }
+
+    internal static bool HasMountedStrikeSpeed(
+        float speed,
+        float calibratedPlateauSpeed)
+    {
+        return calibratedPlateauSpeed > 0f &&
+            speed >=
+                calibratedPlateauSpeed *
+                MountedStrikeMinimumCalibratedSpeedRatio;
     }
 
     internal static float GetMountedStrikeReleaseLeadSeconds(
@@ -3945,7 +3956,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         private const float RetryRecoverySeconds = 0.5f;
         private const float FixtureWieldRetrySeconds = 0.5f;
         private const float MountedSpeedReadySeconds = 0.5f;
-        private const float MinimumMountedStrikeSpeed = 5f;
         private const int MaximumAttempts = 5;
 
         public string State => state.ToString();
@@ -4124,8 +4134,9 @@ public class BattleGuardFixture : IBattleGuardFixture
                 return;
             }
             if (!guard.HasMount ||
-                guardDriver.CurrentHorizontalSpeed <
-                    MinimumMountedStrikeSpeed ||
+                !HasMountedStrikeSpeed(
+                    guardDriver.CurrentHorizontalSpeed,
+                    guardDriver.CalibratedPlateauSpeed) ||
                 !HasMountedStrikeRunway(guardDriver.MountedRoute) ||
                 !HasMountedStrikeTravelAlignment(
                     guardDriver.CurrentHorizontalDirection,
