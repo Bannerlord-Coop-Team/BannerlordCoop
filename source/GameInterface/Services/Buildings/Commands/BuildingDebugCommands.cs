@@ -10,7 +10,7 @@ namespace GameInterface.Services.Buildings.Commands;
 
 internal class BuildingDebugCommands
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CaravansCommands>();
+    private static readonly ILogger Logger = LogManager.GetLogger<BuildingDebugCommands>();
 
     /// <summary>
     /// View all buildings in a town with their levels and progress
