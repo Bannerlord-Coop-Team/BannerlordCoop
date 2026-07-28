@@ -398,7 +398,7 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void MountedStrikeRunway_ReturnLegWaitsForForwardStraight()
+    public void MountedStrikeRunway_ReturnLegCanStageStraightStrike()
     {
         var route = new BattleGuardMountedRoute(
             new Vec3(0f, 0f, 0f),
@@ -411,7 +411,7 @@ public class BattleGuardFixtureEvidenceTests
 
         Assert.Equal("Return", route.State);
         Assert.True(route.CanStageStrike);
-        Assert.False(
+        Assert.True(
             BattleGuardFixture.HasMountedStrikeRunway(route));
     }
 

@@ -158,6 +158,27 @@ internal static class BattleGuardNativeTrace
         }
     }
 
+    internal static void RecordCollision(
+        Agent agent,
+        string operation,
+        in AttackCollisionData collisionData,
+        string argument = null)
+    {
+        string collision =
+            $"result={collisionData.CollisionResult}," +
+            $"attack={collisionData.AttackDirection}," +
+            $"progress={collisionData.AttackProgress.ToString("0.000", CultureInfo.InvariantCulture)}," +
+            $"distance={collisionData.CollisionDistanceOnWeapon.ToString("0.000", CultureInfo.InvariantCulture)}," +
+            $"bone={collisionData.CollisionBoneIndex}," +
+            $"body={collisionData.VictimHitBodyPart}," +
+            $"shield={collisionData.AttackBlockedWithShield}," +
+            $"correctShield={collisionData.CorrectSideShieldBlock}," +
+            $"flags={(uint)collisionData.CollisionHitResultFlags}";
+        if (!string.IsNullOrEmpty(argument))
+            collision += $",{argument}";
+        Record(agent, operation, collision);
+    }
+
     internal static string GetToken(int maximumRecords)
     {
         lock (Sync)
@@ -237,6 +258,113 @@ internal static class BattleGuardNativeTrace
             }
         }
         return null;
+    }
+}
+
+[HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
+[HarmonyPatch(typeof(Mission), "GetDefendCollisionResults")]
+internal static class BattleGuardDefendCollisionTracePatch
+{
+    private static void Prefix(
+        Agent attackerAgent,
+        Agent defenderAgent,
+        CombatCollisionResult collisionResult,
+        int attackerWeaponSlotIndex,
+        bool isAlternativeAttack,
+        StrikeType strikeType,
+        Agent.UsageDirection attackDirection,
+        float collisionDistanceOnWeapon,
+        float attackProgress,
+        bool attackIsParried,
+        bool isPassiveUsageHit,
+        bool isHeavyAttack,
+        ref bool crushedThrough)
+    {
+        if (!BattleGuardNativeTrace.IsTarget(defenderAgent))
+            return;
+
+        BattleGuardNativeTrace.Record(
+            defenderAgent,
+            "defend-prefix",
+            $"attacker={attackerAgent?.Index ?? -1}," +
+            $"result={collisionResult},slot={attackerWeaponSlotIndex}," +
+            $"alternative={isAlternativeAttack},strike={strikeType}," +
+            $"attack={attackDirection}," +
+            $"distance={collisionDistanceOnWeapon.ToString("0.000", CultureInfo.InvariantCulture)}," +
+            $"progress={attackProgress.ToString("0.000", CultureInfo.InvariantCulture)}," +
+            $"parried={attackIsParried},passive={isPassiveUsageHit}," +
+            $"heavy={isHeavyAttack},crushed={crushedThrough}");
+    }
+
+    private static void Postfix(
+        Agent defenderAgent,
+        ref bool crushedThrough)
+    {
+        if (BattleGuardNativeTrace.IsTarget(defenderAgent))
+        {
+            BattleGuardNativeTrace.Record(
+                defenderAgent,
+                "defend-postfix",
+                $"crushed={crushedThrough}");
+        }
+    }
+}
+
+[HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
+[HarmonyPatch(typeof(Mission), "MeleeHitCallback")]
+internal static class BattleGuardMeleeHitTracePatch
+{
+    private static void Prefix(
+        ref AttackCollisionData collisionData,
+        Agent attacker,
+        Agent victim,
+        ref MeleeCollisionReaction colReaction)
+    {
+        if (BattleGuardNativeTrace.IsTarget(victim))
+        {
+            BattleGuardNativeTrace.RecordCollision(
+                victim,
+                "melee-prefix",
+                in collisionData,
+                $"attacker={attacker?.Index ?? -1},reaction={colReaction}");
+        }
+    }
+
+    private static void Postfix(
+        ref AttackCollisionData collisionData,
+        Agent attacker,
+        Agent victim,
+        ref MeleeCollisionReaction colReaction)
+    {
+        if (BattleGuardNativeTrace.IsTarget(victim))
+        {
+            BattleGuardNativeTrace.RecordCollision(
+                victim,
+                "melee-postfix",
+                in collisionData,
+                $"attacker={attacker?.Index ?? -1},reaction={colReaction}");
+        }
+    }
+}
+
+[HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
+[HarmonyPatch(typeof(Mission), "OnAgentHitBlocked")]
+internal static class BattleGuardBlockedHitTracePatch
+{
+    private static void Prefix(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        ref AttackCollisionData collisionData,
+        bool isMissile)
+    {
+        if (BattleGuardNativeTrace.IsTarget(affectedAgent))
+        {
+            BattleGuardNativeTrace.RecordCollision(
+                affectedAgent,
+                "blocked-prefix",
+                in collisionData,
+                $"attacker={affectorAgent?.Index ?? -1},missile={isMissile}");
+        }
     }
 }
 

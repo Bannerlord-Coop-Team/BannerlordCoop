@@ -529,6 +529,16 @@ public class BattleGuardFixture : IBattleGuardFixture
             strikerDriver?.ExpectedWeaponId;
         int strikeExpectedUsage =
             strikerDriver?.ExpectedWeaponUsageIndex ?? -1;
+        bool strikeSpeedReady =
+            strikerDriver?.StrikeSpeedReady ?? false;
+        bool strikeRunwayReady =
+            strikerDriver?.StrikeRunwayReady ?? false;
+        bool strikeTravelAligned =
+            strikerDriver?.StrikeTravelAligned ?? false;
+        float strikeTravelLookAlignment =
+            strikerDriver?.StrikeTravelLookAlignment ?? -1f;
+        float strikeReadySeconds =
+            strikerDriver?.StrikeReadySeconds ?? 0f;
         string strikeStageRoute =
             strikerDriver?.StrikeStageRoute ?? "none";
         float strikeStageProgress =
@@ -719,6 +729,11 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"strikeWeaponItem={GetTokenValue(strikeWeaponItem)} " +
             $"strikeExpectedWeapon={GetTokenValue(strikeExpectedWeapon)} " +
             $"strikeExpectedUsage={strikeExpectedUsage} " +
+            $"strikeSpeedReady={strikeSpeedReady} " +
+            $"strikeRunwayReady={strikeRunwayReady} " +
+            $"strikeTravelAligned={strikeTravelAligned} " +
+            $"strikeTravelLookAlignment={strikeTravelLookAlignment:0.###} " +
+            $"strikeReadySeconds={strikeReadySeconds:0.###} " +
             $"strikeStageRoute={strikeStageRoute} " +
             $"strikeStageProgress={strikeStageProgress:0.###} " +
             $"strikeStageLateral={strikeStageLateral:0.###} " +
@@ -1833,13 +1848,12 @@ public class BattleGuardFixture : IBattleGuardFixture
         BattleGuardMountedRoute route)
     {
         return route?.CanStageStrike == true &&
-            route.IsHeadingToEnd &&
             Math.Abs(route.LateralOffset) <=
                 MountedStrikeMaximumStageLateral &&
             route.RemainingDistance >= MountedStrikeMinimumRunway;
     }
 
-    internal static bool HasMountedStrikeTravelAlignment(
+    internal static float GetMountedStrikeTravelAlignment(
         Vec3 travelDirection,
         Vec3 guardLookDirection)
     {
@@ -1848,12 +1862,21 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (travelDirection.LengthSquared < 0.0001f ||
             guardLookDirection.LengthSquared < 0.0001f)
         {
-            return false;
+            return -1f;
         }
 
         travelDirection.Normalize();
         guardLookDirection.Normalize();
         return Vec3.DotProduct(
+            travelDirection,
+            guardLookDirection);
+    }
+
+    internal static bool HasMountedStrikeTravelAlignment(
+        Vec3 travelDirection,
+        Vec3 guardLookDirection)
+    {
+        return GetMountedStrikeTravelAlignment(
             travelDirection,
             guardLookDirection) >=
             MountedStrikeMinimumTravelGuardAlignment;
@@ -3674,6 +3697,16 @@ public class BattleGuardFixture : IBattleGuardFixture
             attackDriver?.State ?? "none";
         public int AttackAttempts =>
             attackDriver?.Attempts ?? 0;
+        public bool StrikeSpeedReady =>
+            attackDriver?.SpeedReady ?? false;
+        public bool StrikeRunwayReady =>
+            attackDriver?.RunwayReady ?? false;
+        public bool StrikeTravelAligned =>
+            attackDriver?.TravelAligned ?? false;
+        public float StrikeTravelLookAlignment =>
+            attackDriver?.TravelLookAlignment ?? -1f;
+        public float StrikeReadySeconds =>
+            attackDriver?.ReadySeconds ?? 0f;
         public string StrikeStageRoute =>
             attackDriver?.StageRoute ?? "none";
         public float StrikeStageProgress =>
@@ -3960,6 +3993,14 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         public string State => state.ToString();
         public int Attempts { get; private set; }
+        public bool SpeedReady { get; private set; }
+        public bool RunwayReady { get; private set; }
+        public bool TravelAligned { get; private set; }
+        public float TravelLookAlignment { get; private set; } = -1f;
+        public float ReadySeconds =>
+            state == InterceptionState.WaitingForSpeed
+                ? stateElapsed
+                : 0f;
         public string StageRoute { get; private set; } = "none";
         public float StageProgress { get; private set; }
         public float StageLateral { get; private set; }
@@ -4106,6 +4147,10 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         private void TickWaitingForSpeed()
         {
+            SpeedReady = false;
+            RunwayReady = false;
+            TravelAligned = false;
+            TravelLookAlignment = -1f;
             if (Attempts >= MaximumAttempts)
                 return;
             bool retryDue =
@@ -4130,17 +4175,29 @@ public class BattleGuardFixture : IBattleGuardFixture
             }
             if (guardDriver.Mode != BattleGuardFixtureMode.Mounted)
             {
+                SpeedReady = true;
+                RunwayReady = true;
+                TravelAligned = true;
+                TravelLookAlignment = 1f;
                 StageAttempt();
                 return;
             }
-            if (!guard.HasMount ||
-                !HasMountedStrikeSpeed(
-                    guardDriver.CurrentHorizontalSpeed,
-                    guardDriver.CalibratedPlateauSpeed) ||
-                !HasMountedStrikeRunway(guardDriver.MountedRoute) ||
-                !HasMountedStrikeTravelAlignment(
+            SpeedReady = HasMountedStrikeSpeed(
+                guardDriver.CurrentHorizontalSpeed,
+                guardDriver.CalibratedPlateauSpeed);
+            RunwayReady =
+                HasMountedStrikeRunway(guardDriver.MountedRoute);
+            TravelLookAlignment =
+                GetMountedStrikeTravelAlignment(
                     guardDriver.CurrentHorizontalDirection,
-                    guard.LookDirection))
+                    guard.LookDirection);
+            TravelAligned =
+                TravelLookAlignment >=
+                MountedStrikeMinimumTravelGuardAlignment;
+            if (!guard.HasMount ||
+                !SpeedReady ||
+                !RunwayReady ||
+                !TravelAligned)
             {
                 stateElapsed = 0f;
                 return;
