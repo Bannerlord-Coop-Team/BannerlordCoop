@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Heroes.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -73,7 +74,7 @@ public class DefaultClanFinanceModelInterface : IDefaultClanFinanceModelInterfac
                 model.AddIncomeFromTradeAgreements(clan, ref goldChange, applyWithdrawals, includeDetails);
             }
         }
-        if (clan.Gold < 30000 && clan.Kingdom != null && clan.Leader != Hero.MainHero && !clan.IsUnderMercenaryService)
+        if (clan.Gold < 30000 && clan.Kingdom != null && !clan.Leader.IsPlayerHero() && !clan.IsUnderMercenaryService)
         {
             model.AddIncomeFromKingdomBudget(clan, ref goldChange, applyWithdrawals);
         }
@@ -98,11 +99,11 @@ public class DefaultClanFinanceModelInterface : IDefaultClanFinanceModelInterfac
         {
             __instance.AddPaymentForDebts(clan, ref goldChange, applyWithdrawals);
         }
+        AddExpenseForPlayerWorkshops(clan, ref goldChange);
         if (!clan.IsUnderMercenaryService)
         {
             __instance.AddExpensesForCallToWarAgreements(clan, ref goldChange, applyWithdrawals);
         }
-        AddExpenseForPlayerWorkshops(clan, ref goldChange);
     }
 
     public int AddPartyExpense(DefaultClanFinanceModel __instance, MobileParty party, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals)

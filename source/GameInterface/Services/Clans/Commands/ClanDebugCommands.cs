@@ -437,7 +437,7 @@ namespace GameInterface.Services.GameDebug.Commands
         public static string ViewPredicatedDailyGoldChange(List<string> args)
         {
             if (args.Count != 1)
-                return "Usage: coop.debug.clan.info <clanId>";
+                return "Usage: coop.debug.clan.daily_gold_change <clanId>";
 
             if (!TryGetObjectManager(out IObjectManager objectManager))
                 return "Unable to resolve ObjectManager";

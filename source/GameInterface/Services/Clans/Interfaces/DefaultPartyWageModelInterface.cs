@@ -101,7 +101,7 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
 
         AddPerkFactor(mobileParty, DefaultPerks.Trade.SwordForBarter, caravanGuardsWage, true, ref result);
         AddPerkFactor(mobileParty, DefaultPerks.Steward.Contractors, mercenariesWage, false, ref result);
-        AddPerkFactor(mobileParty, DefaultPerks.Trade.MercenaryConnections, mercenariesWage, false, ref result);
+        AddPerkFactor(mobileParty, DefaultPerks.Trade.MercenaryConnections, mercenariesWage, true, ref result);
 
         var militaryCoronaeValue = (mobileParty.LeaderHero != null && mobileParty.LeaderHero.Clan.Kingdom != null && !mobileParty.LeaderHero.Clan.IsUnderMercenaryService && mobileParty.LeaderHero.Clan.Kingdom.ActivePolicies.Contains(DefaultPolicies.MilitaryCoronae)) ? 0.1f : 0f;
         result.AddFactor(militaryCoronaeValue, DefaultPolicies.MilitaryCoronae.Name);
