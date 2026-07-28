@@ -31,21 +31,6 @@ internal class MobilePartyAIPatches
             EncounterManager.HandleEncounterForMobileParty(__instance._mobileParty, 0f);
     }
 
-#if DEBUG
-    private static long mainPartyBehaviorCalculationCount;
-
-    internal static long MainPartyBehaviorCalculationCount =>
-        System.Threading.Interlocked.Read(ref mainPartyBehaviorCalculationCount);
-
-    [HarmonyPatch(nameof(MobilePartyAi.GetBehaviors))]
-    [HarmonyPrefix]
-    private static void GetBehaviorsPrefix(MobilePartyAi __instance)
-    {
-        if (ModInformation.IsClient && __instance._mobileParty == MobileParty.MainParty)
-            System.Threading.Interlocked.Increment(ref mainPartyBehaviorCalculationCount);
-    }
-#endif
-
     [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter), HarmonyPrefix]
     private static void AiBehaviorInteractablePrefix(MobilePartyAi __instance, IInteractablePoint value, out bool __state) =>
         __state = ModInformation.IsServer &&

@@ -160,7 +160,6 @@ internal class PartyCommands
         return $"Restored {party.StringId} to {party.Position.X:R},{party.Position.Y:R} in Hold mode.";
     }
 
-#if DEBUG
     [CommandLineArgumentFunction("move_to_settlement", "coop.debug.mobileparty")]
     public static string MoveToSettlementCommand(List<string> strings)
     {
@@ -196,7 +195,6 @@ internal class PartyCommands
 
         return $"Ordered {party.StringId} to {settlement.StringId}.";
     }
-#endif
 
     /// <summary>
     /// View character ids in a hero's party

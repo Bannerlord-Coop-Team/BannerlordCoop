@@ -1,9 +1,6 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.MobileParties.Audit;
-#if DEBUG
-using GameInterface.Services.MobilePartyAIs.Patches;
-#endif
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
@@ -25,25 +22,6 @@ namespace GameInterface.Services.MobileParties.Commands;
 internal class MobilePartyDebugCommand
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyDebugCommand>();
-
-#if DEBUG
-    [CommandLineArgumentFunction("ai_behavior_calculation_count", "coop.debug.mobileparty")]
-    public static string AiBehaviorCalculationCount(List<string> args)
-    {
-        if (args.Count != 0)
-            return "Usage: coop.debug.mobileparty.ai_behavior_calculation_count";
-
-        if (ModInformation.IsServer)
-            return "ai_behavior_calculation_count is client-only";
-
-        var mainParty = MobileParty.MainParty;
-        return
-            $"MainPartyId={mainParty?.StringId ?? "none"}\n" +
-            $"MainPartyActive={mainParty?.IsActive.ToString() ?? "none"}\n" +
-            $"DefaultBehaviorNeedsUpdate={mainParty?.Ai?.DefaultBehaviorNeedsUpdate.ToString() ?? "none"}\n" +
-            $"GetBehaviorsCount={MobilePartyAIPatches.MainPartyBehaviorCalculationCount}";
-    }
-#endif
 
     [CommandLineArgumentFunction("info", "coop.debug.mobileparty")]
     public static string Info(List<string> args)
