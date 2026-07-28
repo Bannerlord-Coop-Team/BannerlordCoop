@@ -475,6 +475,17 @@ public class BattleGuardFixture : IBattleGuardFixture
         INetworkAgentRegistry agentRegistry,
         IAgentPositionInterpolator interpolator)
     {
+        if (strikerDriver != null &&
+            roles != null &&
+            TryGetExactAgent(
+                agentRegistry,
+                strikerDriver.AgentId,
+                roles.StrikerAuthority,
+                out CoopAgentInfo strikerInfo))
+        {
+            strikerDriver.ObserveFixtureWeaponState(strikerInfo.Agent);
+        }
+
         string guard = guardDriver == null
             ? "none"
             : $"{guardDriver.AgentId}:{guardDriver.Mode}:{guardDriver.Phase}:armed={guardDriver.GuardArmed}";
@@ -495,6 +506,28 @@ public class BattleGuardFixture : IBattleGuardFixture
             strikerDriver?.AttackState ?? "none";
         int strikeAttempts =
             strikerDriver?.AttackAttempts ?? 0;
+        bool strikeWeaponReady =
+            strikerDriver?.FixtureWeaponReady ?? false;
+        bool strikeWeaponAvailable =
+            strikerDriver?.FixtureWeaponAvailable ?? false;
+        int strikeWieldRequests =
+            strikerDriver?.FixtureWieldRequests ?? 0;
+        int strikeOffHandSheathRequests =
+            strikerDriver?.FixtureOffHandSheathRequests ?? 0;
+        int strikeMainHand =
+            (int)(strikerDriver?.FixtureMainHandIndex ??
+                EquipmentIndex.None);
+        int strikeOffHand =
+            (int)(strikerDriver?.FixtureOffHandIndex ??
+                EquipmentIndex.None);
+        int strikeMainUsage =
+            strikerDriver?.FixtureMainHandUsageIndex ?? -1;
+        string strikeWeaponItem =
+            strikerDriver?.FixtureMainHandItemId;
+        string strikeExpectedWeapon =
+            strikerDriver?.ExpectedWeaponId;
+        int strikeExpectedUsage =
+            strikerDriver?.ExpectedWeaponUsageIndex ?? -1;
         string strikeStageRoute =
             strikerDriver?.StrikeStageRoute ?? "none";
         float strikeStageProgress =
@@ -675,6 +708,16 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"replayMaxProgressDelta={sample.ReplayEvidence.MaxProgressDelta:0.###} " +
             $"replayMaxSpeedDelta={sample.ReplayEvidence.MaxSpeedDelta:0.###} " +
             $"strikeState={strikeState} strikeAttempts={strikeAttempts} " +
+            $"strikeWeaponReady={strikeWeaponReady} " +
+            $"strikeWeaponAvailable={strikeWeaponAvailable} " +
+            $"strikeWieldRequests={strikeWieldRequests} " +
+            $"strikeOffHandSheathRequests={strikeOffHandSheathRequests} " +
+            $"strikeMainHand={strikeMainHand} " +
+            $"strikeOffHand={strikeOffHand} " +
+            $"strikeMainUsage={strikeMainUsage} " +
+            $"strikeWeaponItem={GetTokenValue(strikeWeaponItem)} " +
+            $"strikeExpectedWeapon={GetTokenValue(strikeExpectedWeapon)} " +
+            $"strikeExpectedUsage={strikeExpectedUsage} " +
             $"strikeStageRoute={strikeStageRoute} " +
             $"strikeStageProgress={strikeStageProgress:0.###} " +
             $"strikeStageLateral={strikeStageLateral:0.###} " +
@@ -1062,13 +1105,16 @@ public class BattleGuardFixture : IBattleGuardFixture
         Agent guard,
         bool drivesStriker)
     {
-        if (strikerDriver == null)
-            strikerDriver = new StrikerDriver(roles.StrikerAgentId, agent);
-
         string weaponId =
-            guardDriver.Mode == BattleGuardFixtureMode.Mounted
-                ? MountedStrikerWeaponId
-                : FootStrikerWeaponId;
+            GetFixtureStrikerWeaponId(guardDriver.Mode);
+        if (strikerDriver == null)
+        {
+            strikerDriver = new StrikerDriver(
+                roles.StrikerAgentId,
+                agent,
+                guardDriver.Mode);
+        }
+
         if (!strikerDriver.EquipmentReplaced &&
             !EquipFixtureWeapon(agent, weaponId, out string error))
         {
@@ -1079,11 +1125,20 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (!drivesStriker)
             return;
 
+        SetControllerDirect(agent, AgentControllerType.AI);
+        agent.SetTargetAgent(guard);
+        agent.SetWatchState(Agent.WatchState.Alarmed);
+        agent.SetIsAIPaused(false);
         strikerDriver.ApplyFixtureSwingSpeed(
             agent,
             FixtureStrikerSwingSpeedMultiplier);
         strikerDriver.AttachAttackDriver(agent, guard, guardDriver);
         ClearDefendFlags(agent, strikerDriver.OriginalMovementFlags);
+        strikerDriver.EnsureFixtureWeaponReady(
+            agent,
+            strikerDriver.AttackAttempts,
+            retryDue: false);
+        AgentAiWaker.Wake(agent);
     }
 
     private void TickGuard(INetworkAgentRegistry agentRegistry)
@@ -1998,6 +2053,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         strikerDriver.ApplyFixtureSwingSpeed(
             striker,
             FixtureStrikerSwingSpeedMultiplier);
+        strikerDriver.ObserveFixtureWeaponState(striker);
     }
 
     private void DetachMigratedStrikerDriver(
@@ -2058,6 +2114,49 @@ public class BattleGuardFixture : IBattleGuardFixture
             mainHandUsageIndex == expectedUsageIndex &&
             mainHandItemId == GuardWeaponId;
     }
+
+    internal static bool IsFixtureStrikerWieldState(
+        BattleGuardFixtureMode mode,
+        EquipmentIndex mainHandIndex,
+        EquipmentIndex offHandIndex,
+        int mainHandUsageIndex,
+        string mainHandItemId)
+    {
+        string expectedWeaponId =
+            GetFixtureStrikerWeaponId(mode);
+        int expectedUsageIndex =
+            GetFixtureStrikerWeaponUsageIndex(mode);
+        return mainHandIndex == EquipmentIndex.Weapon0 &&
+            offHandIndex == EquipmentIndex.None &&
+            mainHandUsageIndex == expectedUsageIndex &&
+            mainHandItemId == expectedWeaponId;
+    }
+
+    internal static bool ShouldRequestFixtureStrikerWield(
+        bool weaponAvailable,
+        bool weaponReady,
+        int lastRequestAttempt,
+        int attempt,
+        bool retryDue) =>
+        weaponAvailable &&
+        (lastRequestAttempt != attempt ||
+         (!weaponReady && retryDue));
+
+    internal static bool ShouldSheathFixtureStrikerOffHand(
+        bool weaponAvailable,
+        EquipmentIndex offHandIndex) =>
+        weaponAvailable &&
+        offHandIndex != EquipmentIndex.None;
+
+    private static string GetFixtureStrikerWeaponId(
+        BattleGuardFixtureMode mode) =>
+        mode == BattleGuardFixtureMode.Mounted
+            ? MountedStrikerWeaponId
+            : FootStrikerWeaponId;
+
+    private static int GetFixtureStrikerWeaponUsageIndex(
+        BattleGuardFixtureMode mode) =>
+        mode == BattleGuardFixtureMode.Mounted ? 1 : 0;
 
     private static void ReplaceWeapon(
         Agent agent,
@@ -3534,6 +3633,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Guid AgentId { get; }
         public Agent.MovementControlFlag OriginalMovementFlags { get; }
         public Agent.MovementControlFlag OriginalDefendFlags { get; }
+        public BattleGuardFixtureMode Mode { get; }
+        public string ExpectedWeaponId =>
+            GetFixtureStrikerWeaponId(Mode);
+        public int ExpectedWeaponUsageIndex =>
+            GetFixtureStrikerWeaponUsageIndex(Mode);
         public MissionWeapon OriginalWeapon0 { get; }
         public MissionWeapon OriginalWeapon1 { get; }
         public AgentEquipmentData OriginalWieldedEquipment { get; }
@@ -3544,6 +3648,16 @@ public class BattleGuardFixture : IBattleGuardFixture
         public Vec3 OriginalPosition { get; }
         public Vec3 OriginalLookDirection { get; }
         public bool EquipmentReplaced { get; set; }
+        public bool FixtureWeaponAvailable { get; private set; }
+        public bool FixtureWeaponReady { get; private set; }
+        public int FixtureWieldRequests { get; private set; }
+        public int FixtureOffHandSheathRequests { get; private set; }
+        public EquipmentIndex FixtureMainHandIndex { get; private set; } =
+            EquipmentIndex.None;
+        public EquipmentIndex FixtureOffHandIndex { get; private set; } =
+            EquipmentIndex.None;
+        public int FixtureMainHandUsageIndex { get; private set; } = -1;
+        public string FixtureMainHandItemId { get; private set; }
         public bool HasAttackDriver => attackDriver != null;
         public string AttackState =>
             attackDriver?.State ?? "none";
@@ -3616,13 +3730,18 @@ public class BattleGuardFixture : IBattleGuardFixture
         public float CurrentSwingSpeedMultiplier =>
             Agent?.AgentDrivenProperties?.SwingSpeedMultiplier ?? -1f;
         private readonly bool originalHasOnAiInputSetCallback;
+        private int lastFixtureWieldRequestAttempt = -1;
         private bool swingSpeedNormalized;
         private GuardInterceptionStrikeComponent attackDriver;
 
-        public StrikerDriver(Guid agentId, Agent agent)
+        public StrikerDriver(
+            Guid agentId,
+            Agent agent,
+            BattleGuardFixtureMode mode)
         {
             Agent = agent;
             AgentId = agentId;
+            Mode = mode;
             OriginalMovementFlags = agent.MovementFlags;
             OriginalDefendFlags =
                 AgentActionData.GetDefendMovementFlags(agent.MovementFlags);
@@ -3639,6 +3758,90 @@ public class BattleGuardFixture : IBattleGuardFixture
                 agent.AgentDrivenProperties?.SwingSpeedMultiplier ?? -1f;
             originalHasOnAiInputSetCallback =
                 agent.GetHasOnAiInputSetCallback();
+        }
+
+        public bool EnsureFixtureWeaponReady(
+            Agent agent,
+            int attempt,
+            bool retryDue)
+        {
+            ObserveFixtureWeaponState(agent);
+            if (ShouldRequestFixtureStrikerWield(
+                    FixtureWeaponAvailable,
+                    FixtureWeaponReady,
+                    lastFixtureWieldRequestAttempt,
+                    attempt,
+                    retryDue))
+            {
+                lastFixtureWieldRequestAttempt = attempt;
+                FixtureWieldRequests++;
+                if (ShouldSheathFixtureStrikerOffHand(
+                        FixtureWeaponAvailable,
+                        FixtureOffHandIndex))
+                {
+                    FixtureOffHandSheathRequests++;
+                    agent.TryToSheathWeaponInHand(
+                        Agent.HandIndex.OffHand,
+                        Agent.WeaponWieldActionType.Instant);
+                }
+                agent.SetUsageIndexOfWeaponInSlotAsClient(
+                    EquipmentIndex.Weapon0,
+                    ExpectedWeaponUsageIndex);
+                agent.TryToWieldWeaponInSlot(
+                    EquipmentIndex.Weapon0,
+                    Agent.WeaponWieldActionType.Instant,
+                    false);
+            }
+
+            ObserveFixtureWeaponState(agent);
+            return FixtureWeaponReady;
+        }
+
+        public void ObserveFixtureWeaponState(Agent agent)
+        {
+            if (!AgentEquipmentData.HasSafeWeaponSlots(agent?.Equipment))
+            {
+                FixtureWeaponAvailable = false;
+                FixtureMainHandIndex = EquipmentIndex.None;
+                FixtureOffHandIndex = EquipmentIndex.None;
+                FixtureMainHandUsageIndex = -1;
+                FixtureMainHandItemId = null;
+                FixtureWeaponReady = false;
+                return;
+            }
+
+            MissionWeapon fixtureWeapon =
+                agent.Equipment[EquipmentIndex.Weapon0];
+            FixtureWeaponAvailable =
+                fixtureWeapon.Item?.StringId == ExpectedWeaponId &&
+                ExpectedWeaponUsageIndex >= 0 &&
+                ExpectedWeaponUsageIndex < fixtureWeapon.WeaponsCount;
+            FixtureMainHandIndex =
+                agent.GetPrimaryWieldedItemIndex();
+            FixtureOffHandIndex =
+                agent.GetOffhandWieldedItemIndex();
+            FixtureMainHandUsageIndex = -1;
+            FixtureMainHandItemId = null;
+            if (FixtureMainHandIndex >=
+                    EquipmentIndex.WeaponItemBeginSlot &&
+                FixtureMainHandIndex <
+                    EquipmentIndex.NumAllWeaponSlots)
+            {
+                MissionWeapon mainHandWeapon =
+                    agent.Equipment[FixtureMainHandIndex];
+                FixtureMainHandUsageIndex =
+                    mainHandWeapon.CurrentUsageIndex;
+                FixtureMainHandItemId =
+                    mainHandWeapon.Item?.StringId;
+            }
+
+            FixtureWeaponReady =
+                IsFixtureStrikerWieldState(
+                    Mode,
+                    FixtureMainHandIndex,
+                    FixtureOffHandIndex,
+                    FixtureMainHandUsageIndex,
+                    FixtureMainHandItemId);
         }
 
         public void ApplyFixtureSwingSpeed(
@@ -3740,6 +3943,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         private const float OutcomeWaitSeconds = 1.25f;
         private const float MaximumOutcomeWaitSeconds = 2.5f;
         private const float RetryRecoverySeconds = 0.5f;
+        private const float FixtureWieldRetrySeconds = 0.5f;
         private const float MountedSpeedReadySeconds = 0.5f;
         private const float MinimumMountedStrikeSpeed = 5f;
         private const int MaximumAttempts = 5;
@@ -3893,6 +4097,21 @@ public class BattleGuardFixture : IBattleGuardFixture
         private void TickWaitingForSpeed()
         {
             if (Attempts >= MaximumAttempts)
+                return;
+            bool retryDue =
+                stateElapsed >= FixtureWieldRetrySeconds;
+            int wieldRequests = hitEvidence.FixtureWieldRequests;
+            bool weaponReady =
+                hitEvidence.EnsureFixtureWeaponReady(
+                    striker,
+                    Attempts,
+                    retryDue);
+            if (hitEvidence.FixtureWieldRequests != wieldRequests)
+            {
+                stateElapsed = 0f;
+                return;
+            }
+            if (!weaponReady)
                 return;
             if (TryGetNativeAttack(out _, out _, out _, out _))
             {

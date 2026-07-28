@@ -1353,6 +1353,94 @@ public class BattleGuardFixtureEvidenceTests
                 "empire_lance_1_t3_blunt"));
     }
 
+    [Fact]
+    public void FixtureStrikerWieldState_RequiresExactModeWeaponUsageAndNoOffhand()
+    {
+        Assert.True(
+            BattleGuardFixture.IsFixtureStrikerWieldState(
+                BattleGuardFixtureMode.Mounted,
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.None,
+                1,
+                "empire_menavlion_1_t3_blunt"));
+        Assert.True(
+            BattleGuardFixture.IsFixtureStrikerWieldState(
+                BattleGuardFixtureMode.Foot,
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.None,
+                0,
+                "empire_sword_1_t2_blunt"));
+        Assert.False(
+            BattleGuardFixture.IsFixtureStrikerWieldState(
+                BattleGuardFixtureMode.Mounted,
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.None,
+                1,
+                "empire_sword_1_t2_blunt"));
+        Assert.False(
+            BattleGuardFixture.IsFixtureStrikerWieldState(
+                BattleGuardFixtureMode.Mounted,
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.Weapon1,
+                1,
+                "empire_menavlion_1_t3_blunt"));
+        Assert.False(
+            BattleGuardFixture.IsFixtureStrikerWieldState(
+                BattleGuardFixtureMode.Mounted,
+                EquipmentIndex.None,
+                EquipmentIndex.None,
+                1,
+                "empire_menavlion_1_t3_blunt"));
+        Assert.False(
+            BattleGuardFixture.IsFixtureStrikerWieldState(
+                BattleGuardFixtureMode.Mounted,
+                EquipmentIndex.Weapon0,
+                EquipmentIndex.None,
+                0,
+                "empire_menavlion_1_t3_blunt"));
+    }
+
+    [Theory]
+    [InlineData(false, false, -1, 0, false, false)]
+    [InlineData(true, false, -1, 0, false, true)]
+    [InlineData(true, true, 0, 0, true, false)]
+    [InlineData(true, false, 0, 0, false, false)]
+    [InlineData(true, false, 0, 0, true, true)]
+    [InlineData(true, true, 0, 1, false, true)]
+    public void FixtureStrikerWieldRequest_RetriesOnCadenceOrNewAttempt(
+        bool weaponAvailable,
+        bool weaponReady,
+        int lastRequestAttempt,
+        int attempt,
+        bool retryDue,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldRequestFixtureStrikerWield(
+                weaponAvailable,
+                weaponReady,
+                lastRequestAttempt,
+                attempt,
+                retryDue));
+    }
+
+    [Theory]
+    [InlineData(false, EquipmentIndex.Weapon2, false)]
+    [InlineData(true, EquipmentIndex.None, false)]
+    [InlineData(true, EquipmentIndex.Weapon2, true)]
+    public void FixtureStrikerOffHandRepair_OnlySheathesAvailableWeapon(
+        bool weaponAvailable,
+        EquipmentIndex offHandIndex,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldSheathFixtureStrikerOffHand(
+                weaponAvailable,
+                offHandIndex));
+    }
+
     private static BattleGuardAnimationFrame Frame(
         int channel,
         int animationIndex,
