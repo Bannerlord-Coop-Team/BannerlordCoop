@@ -1,9 +1,12 @@
 using Common;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Workshops.Handlers;
 using GameInterface.Services.Workshops.Interfaces;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -18,11 +21,12 @@ namespace GameInterface.Services.Workshops;
 /// (GetOutputDailyChange dereferences the missing data) and faults the server's production tick.
 /// </summary>
 /// <remarks>
-/// Temporary; remove this file once poisoned saves are no longer in circulation. Its only
+/// Temporary; remove this file (and its InstancePerDependency registration in
+/// <see cref="GameInterfaceModule"/>) once poisoned saves are no longer in circulation. Its only
 /// consumer is <see cref="WorkshopsCampaignBehaviorInitializationHandler"/> (constructor
 /// injection plus the two repair calls).
 /// </remarks>
-internal interface IWorkshopRepairer : IGameAbstraction
+internal interface IWorkshopRepairer
 {
     /// <summary>
     /// Backfills the local behavior storage for every workshop the player hero owns. Runs blocking
@@ -31,9 +35,11 @@ internal interface IWorkshopRepairer : IGameAbstraction
     void RepairClientWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, Hero playerHero);
 
     /// <summary>
-    /// Backfills the server behavior storage and the session-store warehouse entries for every
-    /// workshop the player hero owns. The AddNewWorkshopData server prefix broadcasts each
-    /// restored entry to every client.
+    /// Backfills the server behavior storage and the session-store warehouse entries for the
+    /// announcing hero and every other registered player hero. Offline players stay registered
+    /// (the saved session reloads them on server start), so their workshops must repair on any
+    /// player's join rather than waiting for each owner to reconnect. The AddNewWorkshopData
+    /// server prefix broadcasts each restored entry to every client.
     /// </summary>
     void RepairServerWorkshopData(Hero playerHero, string playerHeroId);
 }
@@ -43,13 +49,16 @@ internal class WorkshopRepairer : IWorkshopRepairer
 {
     private readonly IObjectManager objectManager;
     private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
+    private readonly IPlayerManager playerManager;
 
     public WorkshopRepairer(
         IObjectManager objectManager,
-        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
+        IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
+        this.playerManager = playerManager;
     }
 
     public void RepairClientWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, Hero playerHero)
@@ -71,21 +80,50 @@ internal class WorkshopRepairer : IWorkshopRepairer
             WorkshopsCampaignBehavior workshopsCampaignBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
             if (workshopsCampaignBehavior == null) return;
 
-            IEnumerable<Workshop> ownedWorkshops = WorkshopsCampaignBehaviorInitializationHandler.GetWorkshopsOwnedBy(playerHero);
-
             workshopsCampaignBehavior.EnsureBehaviorDataSize();
-            AddMissingWorkshopData(workshopsCampaignBehavior, ownedWorkshops);
 
-            // Restore the session-store warehouse entries after every WorkshopData entry is
-            // back, so a session-store failure cannot cost workshop data.
-            foreach (Workshop workshop in ownedWorkshops)
+            foreach ((Hero hero, string heroId) in GetSavedPlayerHeroes(playerHero, playerHeroId))
             {
-                if (workshop.Settlement != null && objectManager.TryGetIdWithLogging(workshop.Settlement, out string settlementId))
-                {
-                    sessionWorkshopPlayerDataInterface.AddNewWarehouseDataIfNeeded(playerHeroId, settlementId);
-                }
+                RepairPlayerWorkshopData(workshopsCampaignBehavior, hero, heroId);
             }
         }, context: nameof(WorkshopRepairer));
+    }
+
+    /// <summary>
+    /// The announcing hero plus every other hero registered as a player, offline ones included.
+    /// </summary>
+    private List<(Hero Hero, string HeroId)> GetSavedPlayerHeroes(Hero playerHero, string playerHeroId)
+    {
+        var savedPlayerHeroes = new List<(Hero, string)> { (playerHero, playerHeroId) };
+
+        foreach (Player player in playerManager.Players.ToArray())
+        {
+            if (string.IsNullOrEmpty(player.HeroId) || player.HeroId == playerHeroId) continue;
+            if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero hero)) continue;
+
+            savedPlayerHeroes.Add((hero, player.HeroId));
+        }
+
+        return savedPlayerHeroes;
+    }
+
+    private void RepairPlayerWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, Hero playerHero, string playerHeroId)
+    {
+        IEnumerable<Workshop> ownedWorkshops = WorkshopsCampaignBehaviorInitializationHandler.GetWorkshopsOwnedBy(playerHero);
+
+        AddMissingWorkshopData(workshopsCampaignBehavior, ownedWorkshops);
+
+        // Grow the player's session-store slots first (poisoned saves sized them at the vanilla
+        // cap), then restore the warehouse entries after every WorkshopData entry is back, so a
+        // session-store failure cannot cost workshop data.
+        sessionWorkshopPlayerDataInterface.AddPlayerKeys(playerHeroId);
+        foreach (Workshop workshop in ownedWorkshops)
+        {
+            if (workshop.Settlement != null && objectManager.TryGetIdWithLogging(workshop.Settlement, out string settlementId))
+            {
+                sessionWorkshopPlayerDataInterface.AddNewWarehouseDataIfNeeded(playerHeroId, settlementId);
+            }
+        }
     }
 
     private static void AddMissingWorkshopData(WorkshopsCampaignBehavior workshopsCampaignBehavior, IEnumerable<Workshop> ownedWorkshops)

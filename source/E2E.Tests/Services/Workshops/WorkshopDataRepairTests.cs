@@ -2,6 +2,8 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Workshops;
 using GameInterface.Services.Workshops.Handlers;
 using GameInterface.Services.Workshops.Messages;
@@ -68,6 +70,49 @@ public class WorkshopDataRepairTests : IDisposable
 
             var workshopPlayerData = Server.Resolve<ICoopSessionProvider>().CoopSession.WorkshopPlayerData;
             var warehouseSlots = Assert.Contains(heroId, workshopPlayerData.PlayerWarehouseRosterPerSettlement);
+            Assert.Contains(warehouseSlots, slot => slot.Key == settlementId);
+        });
+    }
+
+    [Fact]
+    public void ServerWorkshopDataKeys_WhenOfflinePlayerWorkshopMissingBehaviorData_RestoresDataWithoutOwnerJoining()
+    {
+        var client = Clients.First();
+        var joiningWorkshopId = TestEnvironment.CreateRegisteredObject<Workshop>();
+        var joiningHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var offlineWorkshopId = TestEnvironment.CreateRegisteredObject<Workshop>();
+        var offlineHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            PreparePoisonedWorkshopState(instance, joiningWorkshopId, joiningHeroId, trackInOwnedList: true);
+            PreparePoisonedWorkshopState(instance, offlineWorkshopId, offlineHeroId, trackInOwnedList: true);
+        }
+
+        // The offline player never announces; the server only knows them through the player
+        // registry, which the saved session repopulates on load.
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().AddPlayer(
+                new Player("OfflineController", offlineHeroId, null, null, null));
+        });
+
+        client.Call(() => client.Resolve<Common.Network.INetwork>().SendAll(
+            new NetworkInitializeServerWorkshopDataKeys(joiningHeroId)));
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            AssertWorkshopDataRestored(instance, joiningWorkshopId);
+            AssertWorkshopDataRestored(instance, offlineWorkshopId);
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(offlineWorkshopId, out var workshop));
+            Assert.True(Server.ObjectManager.TryGetId(workshop.Settlement, out var settlementId));
+
+            var workshopPlayerData = Server.Resolve<ICoopSessionProvider>().CoopSession.WorkshopPlayerData;
+            var warehouseSlots = Assert.Contains(offlineHeroId, workshopPlayerData.PlayerWarehouseRosterPerSettlement);
             Assert.Contains(warehouseSlots, slot => slot.Key == settlementId);
         });
     }
