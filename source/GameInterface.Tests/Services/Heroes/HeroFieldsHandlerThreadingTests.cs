@@ -1,5 +1,6 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Handlers;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
@@ -9,6 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Heroes;
@@ -43,23 +45,71 @@ public class HeroFieldsHandlerThreadingTests
             .Setup(o => o.TryGetObjectWithLogging("hero-1", out hero))
             .Returns(() => Volatile.Read(ref registered));
 
-        Action<MessagePayload<ChangeName>> subscriber = null;
+        Action<MessagePayload<ChangeName>> nameSubscriber = null;
+        Action<MessagePayload<ChangeFirstName>> firstNameSubscriber = null;
         var messageBroker = new Mock<IMessageBroker>();
         messageBroker
             .Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<ChangeName>>>()))
-            .Callback<Action<MessagePayload<ChangeName>>>(s => subscriber = s);
+            .Callback<Action<MessagePayload<ChangeName>>>(s => nameSubscriber = s);
+        messageBroker
+            .Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<ChangeFirstName>>>()))
+            .Callback<Action<MessagePayload<ChangeFirstName>>>(s => firstNameSubscriber = s);
 
         using var handler = new HeroFieldsHandler(messageBroker.Object, objectManager.Object);
-        Assert.NotNull(subscriber);
+        Assert.NotNull(nameSubscriber);
+        Assert.NotNull(firstNameSubscriber);
 
+        PublishWhileCreationIsQueued(
+            () => Volatile.Write(ref registered, true),
+            () =>
+            {
+                nameSubscriber(new MessagePayload<ChangeName>(this, new ChangeName("New Name", "hero-1")));
+                firstNameSubscriber(new MessagePayload<ChangeFirstName>(this, new ChangeFirstName("First", "hero-1")));
+            });
+
+        Assert.NotNull(hero._name);
+        Assert.Equal("New Name", hero._name.Value);
+        Assert.NotNull(hero._firstName);
+        Assert.Equal("First", hero._firstName.Value);
+    }
+
+    [Fact]
+    public void ChangeHeroName_PublishedWhileCreationIsStillQueued_AppliesAfterTheQueueDrains()
+    {
+        var hero = new Hero { StringId = "hero-2" };
+        bool registered = false;
+
+        var objectManager = new Mock<IObjectManager>();
+        objectManager
+            .Setup(o => o.TryGetObjectWithLogging(hero.StringId, out hero))
+            .Returns(() => Volatile.Read(ref registered));
+
+        Action<MessagePayload<ChangeHeroName>> subscriber = null;
+        var messageBroker = new Mock<IMessageBroker>();
+        messageBroker
+            .Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<ChangeHeroName>>>()))
+            .Callback<Action<MessagePayload<ChangeHeroName>>>(s => subscriber = s);
+
+        using var handler = new HeroDataHandler(messageBroker.Object, objectManager.Object);
+        Assert.NotNull(subscriber);
+        var data = new HeroChangeNameData(hero, new TextObject("Full Name"), new TextObject("First"));
+
+        PublishWhileCreationIsQueued(
+            () => Volatile.Write(ref registered, true),
+            () => subscriber(new MessagePayload<ChangeHeroName>(this, new ChangeHeroName(data))));
+
+        Assert.Equal("Full Name", hero._name.Value);
+        Assert.Equal("First", hero._firstName.Value);
+    }
+
+    private static void PublishWhileCreationIsQueued(Action register, Action publish)
+    {
         // Not disposed deliberately: the blocker runs on the shared pump thread, and disposing an
         // event it may still be touching would throw inside the pump and kill it for every later test.
         var gate = new ManualResetEventSlim(false);
         var pumpBlocked = new ManualResetEventSlim(false);
         try
         {
-            // Park the pump so the queued "creation" below is provably still pending when the
-            // message is handled, mirroring a game loop that is not draining (e.g. while alt-tabbed).
             GameThread.RunSafe(() =>
             {
                 pumpBlocked.Set();
@@ -67,24 +117,14 @@ public class HeroFieldsHandlerThreadingTests
             });
             Assert.True(pumpBlocked.Wait(TimeSpan.FromSeconds(10)), "the pump never picked up the blocker");
 
-            // The marshaled hero creation, still waiting in the game-thread queue.
-            GameThread.EnqueueSafe(() => Volatile.Write(ref registered, true));
-
-            // The one-shot name apply arrives on the poller thread while the creation is still
-            // queued. Resolving here instead of in queue order would drop the name forever.
-            subscriber(new MessagePayload<ChangeName>(this, new ChangeName("New Name", "hero-1")));
-            Assert.Null(hero._name);
+            GameThread.EnqueueSafe(register);
+            publish();
         }
         finally
         {
             gate.Set();
         }
 
-        // A blocking probe queued after the apply completes only after everything ahead of it in
-        // the queue has drained, so the creation and the apply have both run by the time it returns.
         GameThread.Run(() => { }, blocking: true);
-
-        Assert.NotNull(hero._name);
-        Assert.Equal("New Name", hero._name.Value);
     }
 }

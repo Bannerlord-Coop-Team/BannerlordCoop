@@ -16,6 +16,41 @@ namespace GameInterface.Services.Template.Commands;
 
 internal class SettlementCommands
 {
+#if DEBUG
+    [CommandLineArgumentFunction("enter", "coop.debug.settlements")]
+    public static string EnterSettlement(List<string> args)
+    {
+        if (ModInformation.IsServer)
+        {
+            return "Command can only be run on a client.";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.settlements.enter <settlementId>";
+        }
+
+        if (ContainerProvider.TryGetContainer(out var container) == false)
+        {
+            return "Unable to resolve the container.";
+        }
+
+        var objectManager = container.Resolve<IObjectManager>();
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(args[0], out var settlement))
+        {
+            return $"Unable to find settlement '{args[0]}'.";
+        }
+
+        if (MobileParty.MainParty == null || MobileParty.MainParty.CurrentSettlement != null)
+        {
+            return "The client must have a party outside a settlement.";
+        }
+
+        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        return $"Requested entry into {settlement.Name} ({settlement.StringId}).";
+    }
+#endif
+
     [CommandLineArgumentFunction("enter_random_castle", "coop.debug.settlements")]
     public static string EnterRandomCastle(List<string> strings)
     {
