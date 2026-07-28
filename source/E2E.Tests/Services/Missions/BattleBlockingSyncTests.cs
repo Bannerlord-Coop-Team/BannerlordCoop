@@ -4444,9 +4444,24 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(3070, puppetMirror.Action1Index);
             Assert.Equal(3070, puppetMirror.SkeletonAction1Index);
-            Assert.Equal(
-                new[] { "set-guard", "set-action" },
-                puppetMirror.ActionAndGuardCallOrder);
+            int displayContinuousStateIndex =
+                puppetMirror.ActionAndGuardCallOrder.LastIndexOf(
+                    "continuous-state");
+            int displayGuardIndex =
+                puppetMirror.ActionAndGuardCallOrder.LastIndexOf(
+                    "set-guard");
+            int displayActionIndex =
+                puppetMirror.ActionAndGuardCallOrder.LastIndexOf(
+                    "set-action");
+            Assert.True(displayContinuousStateIndex >= 0);
+            Assert.True(displayGuardIndex > displayContinuousStateIndex);
+            Assert.True(displayActionIndex > displayGuardIndex);
+            Assert.Single(
+                puppetMirror.ActionAndGuardCallOrder,
+                call => call == "set-guard");
+            Assert.Single(
+                puppetMirror.ActionAndGuardCallOrder,
+                call => call == "set-action");
             Assert.Equal(
                 actionCommandsBeforeMovement + 2,
                 puppetMirror.SetActionChannelCalls);

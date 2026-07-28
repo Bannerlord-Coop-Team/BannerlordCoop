@@ -28,6 +28,9 @@ public interface IAgentPositionInterpolator
     /// <summary>[Game thread] Apply each tracked agent's latest native target frame.</summary>
     void Tick(float dt);
 
+    /// <summary>[Game thread] Restore received continuous state after the native Agent tick.</summary>
+    void ReplayContinuousStates();
+
     /// <summary>Drop all tracked targets (mission end).</summary>
     void Clear();
 }
@@ -160,6 +163,31 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     }
 
     public void Clear() => _targets.Clear();
+
+    public void ReplayContinuousStates()
+    {
+        foreach (var pair in _targets)
+        {
+            Agent agent = pair.Key;
+            if (!agent.IsActive() ||
+                agent.Health <= 0f ||
+                elapsed - pair.Value.UpdatedAt > StaleTargetSeconds)
+            {
+                continue;
+            }
+
+            TargetFrame target = pair.Value;
+            if (agent.MountAgent != null && target.HasMountSnapPosition)
+            {
+                target.MountedRiderState.Apply(agent);
+                target.AgentState.Apply(agent.MountAgent);
+            }
+            else
+            {
+                target.AgentState.Apply(agent);
+            }
+        }
+    }
 
     public void Tick(float dt)
     {

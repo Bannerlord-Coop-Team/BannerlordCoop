@@ -109,6 +109,15 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 #endif
         base.OnPreDisplayMissionTick(dt);
 
+        // Native Agent processing can rewrite a puppet's look and movement state after OnMissionTick replayed it.
+        // Restore the latest owner snapshot at the display boundary so the rendered pose matches its owner.
+        coopMissionComponent.AgentMovementHandler.Interpolator
+            .ReplayContinuousStates();
+#if DEBUG
+        BattleGuardNativeTrace.Mark(
+            "remote-display-after-continuous-replay");
+#endif
+
         // The prior native Agent tick can realize an action after OnMissionTick sampled its input.
         // Diff again here so peers receive that exact action instead of retaining the earlier pose.
         coopMissionComponent.AgentActionHandler.PollActions();
