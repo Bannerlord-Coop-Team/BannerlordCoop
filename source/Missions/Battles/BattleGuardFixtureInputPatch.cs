@@ -17,8 +17,26 @@ internal static class BattleGuardFixtureControlPatch
         if (controller?.IsGuardFixtureDrivingPlayerInput() != true)
             return true;
 
-        // Movement flags alone bypass the native player-direction cache.
-        return controller.PrepareGuardFixtureNativePlayerInput();
+        return controller.ShouldRunGuardFixtureNativePlayerControlTick();
+    }
+}
+
+[HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
+[HarmonyPatch(typeof(Agent), nameof(Agent.GetDefendMovementFlag))]
+internal static class BattleGuardFixtureDefendDirectionPatch
+{
+    private static void Postfix(
+        Agent __instance,
+        ref Agent.MovementControlFlag __result)
+    {
+        CoopBattleController controller = Mission.Current?
+            .GetMissionBehavior<CoopBattleController>();
+        if (controller?.TryGetGuardFixtureNativePlayerDefendMovementFlag(
+                __instance,
+                out Agent.MovementControlFlag movementFlag) == true)
+        {
+            __result = movementFlag;
+        }
     }
 }
 

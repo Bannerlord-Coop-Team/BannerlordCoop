@@ -545,6 +545,68 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(
+        BattleGuardFixtureDirection.Up,
+        Agent.MovementControlFlag.DefendUp)]
+    [InlineData(
+        BattleGuardFixtureDirection.Down,
+        Agent.MovementControlFlag.DefendDown)]
+    [InlineData(
+        BattleGuardFixtureDirection.Left,
+        Agent.MovementControlFlag.DefendLeft)]
+    [InlineData(
+        BattleGuardFixtureDirection.Right,
+        Agent.MovementControlFlag.DefendRight)]
+    public void NativePlayerDefendDirection_UsesRequestedFixtureDirection(
+        BattleGuardFixtureDirection direction,
+        Agent.MovementControlFlag expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.GetDefendDirectionFlag(direction));
+    }
+
+    [Theory]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        true,
+        BattleGuardFixturePhase.Guard,
+        true)]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        true,
+        BattleGuardFixturePhase.Attack,
+        true)]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        true,
+        BattleGuardFixturePhase.Calibration,
+        false)]
+    [InlineData(
+        BattleGuardFixtureMode.Mounted,
+        false,
+        BattleGuardFixturePhase.Guard,
+        false)]
+    [InlineData(
+        BattleGuardFixtureMode.Foot,
+        true,
+        BattleGuardFixturePhase.Guard,
+        false)]
+    public void NativePlayerDefendDirection_OverridesOnlyHeldMountedMovementFixture(
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput,
+        BattleGuardFixturePhase phase,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldOverrideNativePlayerDefendMovementFlag(
+                mode,
+                useMovementFlagGuardInput,
+                phase));
+    }
+
+    [Theory]
     [InlineData(true, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]

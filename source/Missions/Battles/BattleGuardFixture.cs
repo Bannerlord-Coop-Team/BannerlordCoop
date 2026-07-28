@@ -9,7 +9,6 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
-using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Screens;
@@ -27,7 +26,12 @@ public interface IBattleGuardFixture
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
     void ApplyMountedStrike(NetworkBattleGuardFixtureStrike strike);
     bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
-    bool PrepareNativePlayerInput(INetworkAgentRegistry agentRegistry);
+    bool ShouldRunNativePlayerControlTick(
+        INetworkAgentRegistry agentRegistry);
+    bool TryGetNativePlayerDefendMovementFlag(
+        INetworkAgentRegistry agentRegistry,
+        Agent agent,
+        out Agent.MovementControlFlag movementFlag);
     bool IsHoldingNativePlayerBlock(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
@@ -340,25 +344,34 @@ public class BattleGuardFixture : IBattleGuardFixture
             ReferenceEquals(agent, Mission.Current?.MainAgent);
     }
 
-    public bool PrepareNativePlayerInput(
+    public bool ShouldRunNativePlayerControlTick(
         INetworkAgentRegistry agentRegistry)
     {
-        if (!TryGetDrivenGuardAgent(agentRegistry, out Agent agent) ||
-            !ReferenceEquals(agent, Mission.Current?.MainAgent) ||
-            !ShouldUseNativePlayerGuardInput(
+        return TryGetDrivenGuardAgent(agentRegistry, out Agent agent) &&
+            ReferenceEquals(agent, Mission.Current?.MainAgent) &&
+            ShouldUseNativePlayerGuardInput(
                 guardDriver.Mode,
-                guardDriver.UseMovementFlagGuardInput))
+                guardDriver.UseMovementFlagGuardInput);
+    }
+
+    public bool TryGetNativePlayerDefendMovementFlag(
+        INetworkAgentRegistry agentRegistry,
+        Agent agent,
+        out Agent.MovementControlFlag movementFlag)
+    {
+        movementFlag = Agent.MovementControlFlag.None;
+        if (!ReferenceEquals(agent, Mission.Current?.MainAgent) ||
+            !TryGetDrivenGuardAgent(agentRegistry, out Agent drivenAgent) ||
+            !ReferenceEquals(agent, drivenAgent) ||
+            !ShouldOverrideNativePlayerDefendMovementFlag(
+                guardDriver.Mode,
+                guardDriver.UseMovementFlagGuardInput,
+                guardDriver.Phase))
         {
             return false;
         }
 
-        if (IsGuarding(agent, guardDriver))
-        {
-            Input.PressKey(
-                GetNativePlayerGuardDirectionKey(
-                    guardDriver.Direction));
-        }
-
+        movementFlag = GetDefendDirectionFlag(guardDriver.Direction);
         return true;
     }
 
@@ -1456,7 +1469,13 @@ public class BattleGuardFixture : IBattleGuardFixture
     internal static Agent.MovementControlFlag GetDefendFlags(
         BattleGuardFixtureDirection direction)
     {
-        Agent.MovementControlFlag directionFlag = direction switch
+        return Agent.MovementControlFlag.DefendBlock |
+            GetDefendDirectionFlag(direction);
+    }
+
+    internal static Agent.MovementControlFlag GetDefendDirectionFlag(
+        BattleGuardFixtureDirection direction) =>
+        direction switch
         {
             BattleGuardFixtureDirection.Down =>
                 Agent.MovementControlFlag.DefendDown,
@@ -1466,8 +1485,6 @@ public class BattleGuardFixture : IBattleGuardFixture
                 Agent.MovementControlFlag.DefendRight,
             _ => Agent.MovementControlFlag.DefendUp
         };
-        return Agent.MovementControlFlag.DefendBlock | directionFlag;
-    }
 
     internal static Agent.MovementControlFlag GetAttackFlagForGuard(
         BattleGuardFixtureDirection direction) =>
@@ -1534,18 +1551,16 @@ public class BattleGuardFixture : IBattleGuardFixture
             useMovementFlagGuardInput;
     }
 
-    private static InputKey GetNativePlayerGuardDirectionKey(
-        BattleGuardFixtureDirection direction) =>
-        direction switch
-        {
-            BattleGuardFixtureDirection.Down =>
-                InputKey.ControllerRStickDown,
-            BattleGuardFixtureDirection.Left =>
-                InputKey.ControllerRStickLeft,
-            BattleGuardFixtureDirection.Right =>
-                InputKey.ControllerRStickRight,
-            _ => InputKey.ControllerRStickUp
-        };
+    internal static bool ShouldOverrideNativePlayerDefendMovementFlag(
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput,
+        BattleGuardFixturePhase phase)
+    {
+        return ShouldUseNativePlayerGuardInput(
+                mode,
+                useMovementFlagGuardInput) &&
+            phase != BattleGuardFixturePhase.Calibration;
+    }
 
     internal static bool ShouldMaintainMountedGuardPresentation(
         BattleGuardFixtureMode mode,
