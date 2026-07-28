@@ -13,8 +13,16 @@ namespace Missions.Battles;
 [HarmonyPatch(typeof(MissionMainAgentController), "ControlTick")]
 internal static class BattleGuardFixtureControlPatch
 {
-    private static bool Prefix()
+    private struct NativeDefendState
     {
+        internal bool Inject;
+        internal Agent Agent;
+        internal BattleGuardFixtureDirection Direction;
+    }
+
+    private static bool Prefix(out NativeDefendState __state)
+    {
+        __state = default;
         CoopBattleController controller = Mission.Current?
             .GetMissionBehavior<CoopBattleController>();
         if (controller?.IsGuardFixtureDrivingPlayerInput() != true)
@@ -27,9 +35,29 @@ internal static class BattleGuardFixtureControlPatch
         if (controller.TryGetGuardFixtureNativePlayerDefendDirection(
                 agent,
                 out BattleGuardFixtureDirection direction))
-            BattleGuardFixtureNativeDefendInput.Inject(agent, direction);
+        {
+            BattleGuardFixtureNativeDefendInput.InjectBeforeControlTick(
+                agent,
+                direction);
+            __state = new NativeDefendState
+            {
+                Inject = true,
+                Agent = agent,
+                Direction = direction,
+            };
+        }
 
         return true;
+    }
+
+    private static void Postfix(NativeDefendState __state)
+    {
+        if (!__state.Inject)
+            return;
+
+        BattleGuardFixtureNativeDefendInput.InjectAfterControlTick(
+            __state.Agent,
+            __state.Direction);
     }
 }
 
@@ -45,27 +73,20 @@ internal static class BattleGuardFixtureNativeDefendInput
     private const int ControllerDefendDirectionOffset = 0x1184A50;
     private const int ActiveWeightBits = 0x3F800000;
 
-    internal static void Inject(
+    internal static void InjectBeforeControlTick(
         Agent agent,
         BattleGuardFixtureDirection direction)
     {
-        if (agent == null)
-            throw new ArgumentNullException(nameof(agent));
+        ResolvePointers(agent, out IntPtr agentPointer, out IntPtr inputPointer);
+        int cacheValue = GetCacheValue(direction);
+        WriteDirectionCache(agentPointer, inputPointer, cacheValue);
+    }
 
-        UIntPtr nativeAgent = agent.GetPtr();
-        if (nativeAgent == UIntPtr.Zero)
-            throw new InvalidOperationException(
-                "Guard fixture agent has no native pointer.");
-
-        IntPtr agentPointer = new IntPtr(
-            unchecked((long)nativeAgent.ToUInt64()));
-        IntPtr inputPointer = Marshal.ReadIntPtr(
-            agentPointer,
-            AgentInputPointerOffset);
-        if (inputPointer == IntPtr.Zero)
-            throw new InvalidOperationException(
-                "Guard fixture agent has no native input pointer.");
-
+    internal static void InjectAfterControlTick(
+        Agent agent,
+        BattleGuardFixtureDirection direction)
+    {
+        ResolvePointers(agent, out IntPtr agentPointer, out IntPtr inputPointer);
         int cacheValue = GetCacheValue(direction);
         Marshal.WriteInt32(inputPointer, DefendUpWeightOffset, 0);
         Marshal.WriteInt32(inputPointer, DefendDownWeightOffset, 0);
@@ -75,6 +96,37 @@ internal static class BattleGuardFixtureNativeDefendInput
             inputPointer,
             GetActiveWeightOffset(direction),
             ActiveWeightBits);
+        WriteDirectionCache(agentPointer, inputPointer, cacheValue);
+    }
+
+    private static void ResolvePointers(
+        Agent agent,
+        out IntPtr agentPointer,
+        out IntPtr inputPointer)
+    {
+        if (agent == null)
+            throw new ArgumentNullException(nameof(agent));
+
+        UIntPtr nativeAgent = agent.GetPtr();
+        if (nativeAgent == UIntPtr.Zero)
+            throw new InvalidOperationException(
+                "Guard fixture agent has no native pointer.");
+
+        agentPointer = new IntPtr(
+            unchecked((long)nativeAgent.ToUInt64()));
+        inputPointer = Marshal.ReadIntPtr(
+            agentPointer,
+            AgentInputPointerOffset);
+        if (inputPointer == IntPtr.Zero)
+            throw new InvalidOperationException(
+                "Guard fixture agent has no native input pointer.");
+    }
+
+    private static void WriteDirectionCache(
+        IntPtr agentPointer,
+        IntPtr inputPointer,
+        int cacheValue)
+    {
         Marshal.WriteInt32(
             inputPointer,
             ControllerDefendDirectionOffset,

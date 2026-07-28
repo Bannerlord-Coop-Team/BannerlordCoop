@@ -2,6 +2,7 @@
 using GameInterface.Services.Battles.Messages;
 using Missions.Battles;
 using ProtoBuf;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -633,6 +634,30 @@ public class BattleGuardFixtureEvidenceTests
             expected,
             BattleGuardFixtureNativeDefendInput.GetActiveWeightOffset(
                 direction));
+    }
+
+    [Fact]
+    public void NativePlayerDefendDirection_PreservesStateForPostControlTickInjection()
+    {
+        const BindingFlags flags =
+            BindingFlags.NonPublic | BindingFlags.Static;
+        MethodInfo prefix = typeof(BattleGuardFixtureControlPatch)
+            .GetMethod("Prefix", flags);
+        MethodInfo postfix = typeof(BattleGuardFixtureControlPatch)
+            .GetMethod("Postfix", flags);
+
+        Assert.NotNull(prefix);
+        Assert.NotNull(postfix);
+        ParameterInfo prefixState = Assert.Single(
+            prefix.GetParameters(),
+            parameter => parameter.Name == "__state");
+        ParameterInfo postfixState = Assert.Single(
+            postfix.GetParameters(),
+            parameter => parameter.Name == "__state");
+        Assert.True(prefixState.IsOut);
+        Assert.Equal(
+            prefixState.ParameterType.GetElementType(),
+            postfixState.ParameterType);
     }
 
     [Theory]
