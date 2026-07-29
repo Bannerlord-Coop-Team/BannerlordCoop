@@ -98,6 +98,4 @@ internal class LordConversationsCampaignBehaviorPatches
 
         return false;
     }
-
-    // ????? conversation_talk_lord_defeat_to_lord_capture_and_kill_on_consequence
 }
