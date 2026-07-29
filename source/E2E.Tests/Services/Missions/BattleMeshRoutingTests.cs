@@ -165,9 +165,8 @@ public class BattleMeshRoutingTests : MissionTestEnvironment
                     victimPuppetOnAttacker,
                     strikerOnAttacker,
                     isBlocked: true,
-                    isMissile: false,
-                    collisionResult:
-                        CombatCollisionResult.StrikeAgent);
+                    in blow,
+                    in collisionData);
             GetDamageRouter(attackerController).Tick(0.016f);
         });
 
@@ -179,6 +178,104 @@ public class BattleMeshRoutingTests : MissionTestEnvironment
                 victimPuppetOnAttacker,
                 out var puppetMirror));
         Assert.Equal(100f, puppetMirror.Health);
+
+        GC.KeepAlive(ownerController);
+        GC.KeepAlive(attackerController);
+    }
+
+    [Fact]
+    public void CleanGuardWithoutCandidate_DoesNotCancelFollowingDamage()
+    {
+        using var fixture = new MissionEngineFixture();
+        var attacker = Clients.First();
+        var owner = Clients.Skip(1).First();
+        SetControllerId(attacker, "attacker");
+        SetControllerId(owner, "owner");
+
+        var victimId = Guid.NewGuid();
+        Agent victimOnOwner = null;
+        Agent victimPuppetOnAttacker = null;
+        Agent strikerOnAttacker = null;
+        CoopBattleController ownerController = null;
+        CoopBattleController attackerController = null;
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            ownerController = owner.Resolve<CoopBattleController>();
+            victimOnOwner = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.AI));
+            owner.Resolve<INetworkAgentRegistry>()
+                .TryRegisterAgent(
+                    "owner",
+                    victimId,
+                    victimOnOwner);
+        });
+
+        attacker.Call(() =>
+        {
+            var mock = fixture.CreateMission(attacker);
+            attackerController =
+                attacker.Resolve<CoopBattleController>();
+            victimPuppetOnAttacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+            strikerOnAttacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.AI));
+            var registry =
+                attacker.Resolve<INetworkAgentRegistry>();
+            registry.TryRegisterAgent(
+                "owner",
+                victimId,
+                victimPuppetOnAttacker);
+            registry.TryRegisterAgent(
+                "attacker",
+                Guid.NewGuid(),
+                strikerOnAttacker);
+
+            var guardedBlow =
+                new Blow(strikerOnAttacker.Index);
+            var guardedCollision = new AttackCollisionData
+            {
+                _collisionResult =
+                    (int)CombatCollisionResult.Blocked
+            };
+            GetBattleComponent(attackerController)
+                .AgentActionHandler.ObserveBlockedHit(
+                    victimPuppetOnAttacker,
+                    strikerOnAttacker,
+                    isBlocked: true,
+                    in guardedBlow,
+                    in guardedCollision);
+
+            var damagingBlow = new Blow(
+                strikerOnAttacker.Index)
+            {
+                InflictedDamage = 36,
+                DamageType = DamageTypes.Cut
+            };
+            var damagingCollision = new AttackCollisionData
+            {
+                _collisionResult =
+                    (int)CombatCollisionResult.StrikeAgent
+            };
+            attacker.Resolve<IMessageBroker>().Publish(
+                this,
+                new BattlePuppetHit(
+                    victimPuppetOnAttacker,
+                    strikerOnAttacker,
+                    damagingBlow,
+                    damagingCollision));
+            GetDamageRouter(attackerController).Tick(0.016f);
+        });
+
+        Assert.True(
+            AgentMirror.TryGet(
+                victimOnOwner,
+                out var ownerMirror));
+        Assert.Equal(64f, ownerMirror.Health);
 
         GC.KeepAlive(ownerController);
         GC.KeepAlive(attackerController);
@@ -257,9 +354,8 @@ public class BattleMeshRoutingTests : MissionTestEnvironment
                 victim,
                 shooter,
                 isBlocked: true,
-                isMissile: true,
-                collisionResult:
-                    CombatCollisionResult.StrikeAgent);
+                in blow,
+                in collisionData);
             damageRouter.Tick(0.016f);
 
             var network = Assert.IsType<MockBattleNetwork>(

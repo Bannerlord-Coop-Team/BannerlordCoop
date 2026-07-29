@@ -89,6 +89,7 @@ public class CoopTournamentController : CoopMissionController
         public Blow Blow { get; }
         public AttackCollisionData CollisionData { get; }
         public long ReadyEpoch { get; }
+        public long GuardCandidateId { get; }
 
         public PendingLocalTournamentDamage(
             string matchId,
@@ -98,7 +99,8 @@ public class CoopTournamentController : CoopMissionController
             Guid attackerId,
             Blow blow,
             AttackCollisionData collisionData,
-            long readyEpoch)
+            long readyEpoch,
+            long guardCandidateId)
         {
             MatchId = matchId;
             Victim = victim;
@@ -108,6 +110,7 @@ public class CoopTournamentController : CoopMissionController
             Blow = blow;
             CollisionData = collisionData;
             ReadyEpoch = readyEpoch;
+            GuardCandidateId = guardCandidateId;
         }
     }
 
@@ -437,6 +440,12 @@ public class CoopTournamentController : CoopMissionController
 
         if (blow.InflictedDamage > 0)
         {
+            long guardCandidateId =
+                guardedHitWindow.RegisterCandidate(
+                    victim,
+                    attacker,
+                    in blow,
+                    in collisionData);
             pendingLocalDamage.Enqueue(
                 new PendingLocalTournamentDamage(
                 snapshot.CurrentMatchId,
@@ -446,7 +455,8 @@ public class CoopTournamentController : CoopMissionController
                 attackerId,
                 blow,
                 collisionData,
-                guardedHitWindow.Epoch + 1));
+                guardedHitWindow.Epoch + 1,
+                guardCandidateId));
         }
         return false;
     }
@@ -1014,9 +1024,8 @@ public class CoopTournamentController : CoopMissionController
                 continue;
             }
 
-            if (guardedHitWindow.TryConsumeGuarded(
-                    pending.Victim,
-                    pending.Attacker))
+            if (guardedHitWindow.CompleteCandidate(
+                    pending.GuardCandidateId))
             {
                 continue;
             }

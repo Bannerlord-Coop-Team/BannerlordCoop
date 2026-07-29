@@ -18,8 +18,8 @@ public delegate void TournamentGuardReactionRecorder(
     Agent affectedAgent,
     Agent affectorAgent,
     bool isBlocked,
-    bool isMissile,
-    CombatCollisionResult collisionResult);
+    in Blow blow,
+    in AttackCollisionData collisionData);
 
 /// <summary>Native fight rules with result authority handled by the coop tournament controller.</summary>
 public class CoopTournamentFightMissionController : TournamentFightMissionController
@@ -77,8 +77,8 @@ public class CoopTournamentFightMissionController : TournamentFightMissionContro
             affectedAgent,
             affectorAgent,
             isBlocked,
-            blow.IsMissile,
-            collisionData.CollisionResult);
+            in blow,
+            in collisionData);
         hitProgressionRecorder?.Invoke(
             affectedAgent,
             affectorAgent,

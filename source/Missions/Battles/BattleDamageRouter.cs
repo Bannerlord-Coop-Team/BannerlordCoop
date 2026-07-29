@@ -100,19 +100,22 @@ public class BattleDamageRouter : IBattleDamageRouter
         public long ShotSequence { get; }
         public WeaponComponentData AttackerWeapon { get; }
         public long ReadyEpoch { get; }
+        public long GuardCandidateId { get; }
 
         public PendingLocalDamage(
             BattlePuppetHit hit,
             Guid attackerId,
             long shotSequence,
             WeaponComponentData attackerWeapon,
-            long readyEpoch)
+            long readyEpoch,
+            long guardCandidateId)
         {
             Hit = hit;
             AttackerId = attackerId;
             ShotSequence = shotSequence;
             AttackerWeapon = attackerWeapon;
             ReadyEpoch = readyEpoch;
+            GuardCandidateId = guardCandidateId;
         }
     }
 
@@ -262,12 +265,23 @@ public class BattleDamageRouter : IBattleDamageRouter
             }
         }
 
+        Blow candidateBlow = payload.What.Blow;
+        AttackCollisionData candidateCollision =
+            payload.What.CollisionData;
+        long guardCandidateId = payload.What.IsMount
+            ? 0
+            : guardedHitWindow.RegisterCandidate(
+                payload.What.Victim,
+                payload.What.Attacker,
+                in candidateBlow,
+                in candidateCollision);
         var pending = new PendingLocalDamage(
             payload.What,
             attackerId,
             shotSequence,
             attackerWeapon,
-            guardedHitWindow.Epoch + 1);
+            guardedHitWindow.Epoch + 1,
+            guardCandidateId);
 
         if (payload.What.IsMount)
         {
@@ -291,9 +305,8 @@ public class BattleDamageRouter : IBattleDamageRouter
                 continue;
             }
 
-            if (guardedHitWindow.TryConsumeGuarded(
-                    pending.Hit.Victim,
-                    pending.Hit.Attacker))
+            if (guardedHitWindow.CompleteCandidate(
+                    pending.GuardCandidateId))
             {
                 continue;
             }

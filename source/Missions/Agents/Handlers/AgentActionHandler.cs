@@ -35,8 +35,8 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
         Agent affectedAgent,
         Agent affectorAgent,
         bool isBlocked,
-        bool isMissile,
-        CombatCollisionResult collisionResult);
+        in Blow blow,
+        in AttackCollisionData collisionData);
 
     /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
@@ -496,8 +496,8 @@ public class AgentActionHandler : IAgentActionHandler
         Agent affectedAgent,
         Agent affectorAgent,
         bool isBlocked,
-        bool isMissile,
-        CombatCollisionResult collisionResult)
+        in Blow blow,
+        in AttackCollisionData collisionData)
     {
         if (isBlocked
             && affectedAgent != null
@@ -508,15 +508,17 @@ public class AgentActionHandler : IAgentActionHandler
                 this,
                 new LocalAgentGuardedHit(
                     affectedAgent,
-                    affectorAgent));
+                    affectorAgent,
+                    in blow,
+                    in collisionData));
         }
 
         guardReactionHandler.ObserveBlockedHit(
             affectedAgent,
             affectorAgent,
             isBlocked,
-            isMissile,
-            collisionResult,
+            blow.IsMissile,
+            collisionData.CollisionResult,
             remoteActionProcessor.GetOutgoingBattleHostEpoch());
     }
 

@@ -330,8 +330,8 @@ public class CoopBattleController : CoopMissionController
             affectedAgent,
             affectorAgent,
             isBlocked,
-            blow.IsMissile,
-            collisionData.CollisionResult);
+            in blow,
+            in collisionData);
     }
 
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the

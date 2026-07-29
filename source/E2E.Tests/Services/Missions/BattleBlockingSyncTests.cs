@@ -1595,13 +1595,18 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             defenderMirror.Action1Index = 3102;
             defenderMirror.Action1CodeType =
                 Agent.ActionCodeType.Guard;
+            var blow = new Blow(attacker.Index);
+            var collisionData = new AttackCollisionData
+            {
+                _collisionResult = (int)collisionResult
+            };
 
             context.Component.AgentActionHandler.ObserveBlockedHit(
                 defender,
                 attacker,
                 isBlocked: true,
-                isMissile: false,
-                collisionResult: collisionResult);
+                in blow,
+                in collisionData);
 
             defenderMirror.Action0Index = 3104;
             defenderMirror.Action0Progress = 0.2f;
@@ -1658,13 +1663,19 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Agent.ActionCodeType.Guard;
             defenderMirror.Action1Stage =
                 Agent.ActionStage.Defend;
+            var blow = new Blow(attacker.Index);
+            var collisionData = new AttackCollisionData
+            {
+                _collisionResult =
+                    (int)CombatCollisionResult.Blocked
+            };
 
             context.Component.AgentActionHandler.ObserveBlockedHit(
                 defender,
                 attacker,
                 isBlocked: true,
-                isMissile: false,
-                collisionResult: CombatCollisionResult.Blocked);
+                in blow,
+                in collisionData);
             context.Component.AgentActionHandler
                 .ReplayRemoteGuardReactions();
 
@@ -1728,13 +1739,19 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Agent.ActionCodeType.Guard;
             defenderMirror.Action1Stage =
                 Agent.ActionStage.Defend;
+            var blow = new Blow(attacker.Index);
+            var collisionData = new AttackCollisionData
+            {
+                _collisionResult =
+                    (int)CombatCollisionResult.Blocked
+            };
 
             context.Component.AgentActionHandler.ObserveBlockedHit(
                 defender,
                 attacker,
                 isBlocked: true,
-                isMissile: false,
-                collisionResult: CombatCollisionResult.Blocked);
+                in blow,
+                in collisionData);
             context.Component.AgentActionHandler
                 .ReplayRemoteGuardReactions();
 
@@ -1773,13 +1790,19 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Agent.ActionCodeType.Guard;
             defenderMirror.Action1Stage =
                 Agent.ActionStage.DefendParry;
+            var blow = new Blow(attacker.Index);
+            blow.WeaponRecord._isMissile = isMissile;
+            var collisionData = new AttackCollisionData
+            {
+                _collisionResult = (int)collisionResult
+            };
 
             context.Component.AgentActionHandler.ObserveBlockedHit(
                 defender,
                 attacker,
                 isBlocked,
-                isMissile,
-                collisionResult);
+                in blow,
+                in collisionData);
             context.Component.AgentActionHandler
                 .ReplayRemoteGuardReactions();
 

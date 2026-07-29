@@ -3,6 +3,7 @@ using Missions.Agents.Messages;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents;
@@ -11,16 +12,21 @@ public interface IGuardedHitWindow : IDisposable
 {
     long Epoch { get; }
     void Advance();
-    bool TryConsumeGuarded(Agent affectedAgent, Agent affectorAgent);
+    long RegisterCandidate(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        in Blow blow,
+        in AttackCollisionData collisionData);
+    bool CompleteCandidate(long candidateId);
     void Reset();
 }
 
 public sealed class GuardedHitWindow : IGuardedHitWindow
 {
-    private const int RetainedEpochs = 2;
-
     private readonly IMessageBroker messageBroker;
-    private readonly Dictionary<HitPair, Queue<long>> guardedUntilEpoch = new();
+    private readonly Dictionary<long, GuardCandidate> candidates = new();
+    private readonly Dictionary<HitPair, List<long>> candidatesByPair = new();
+    private long nextCandidateId;
     private bool disposed;
 
     public long Epoch { get; private set; }
@@ -34,60 +40,74 @@ public sealed class GuardedHitWindow : IGuardedHitWindow
 
     public void Advance()
     {
-        if (disposed)
-            return;
-
-        Epoch++;
-        if (guardedUntilEpoch.Count == 0)
-            return;
-
-        var expired = new List<HitPair>();
-        foreach (var guardedHit in guardedUntilEpoch)
-        {
-            RemoveExpired(guardedHit.Value);
-            if (guardedHit.Value.Count == 0)
-                expired.Add(guardedHit.Key);
-        }
-
-        foreach (HitPair pair in expired)
-            guardedUntilEpoch.Remove(pair);
+        if (!disposed)
+            Epoch++;
     }
 
-    public bool TryConsumeGuarded(
+    public long RegisterCandidate(
         Agent affectedAgent,
-        Agent affectorAgent)
+        Agent affectorAgent,
+        in Blow blow,
+        in AttackCollisionData collisionData)
     {
         if (disposed ||
             affectedAgent == null ||
             affectorAgent == null)
         {
-            return false;
+            return 0;
         }
 
+        long candidateId = ++nextCandidateId;
         var pair = new HitPair(affectedAgent, affectorAgent);
-        if (!guardedUntilEpoch.TryGetValue(
+        candidates.Add(
+            candidateId,
+            new GuardCandidate(
                 pair,
-                out Queue<long> retainedUntil))
+                blow,
+                collisionData,
+                Epoch));
+
+        if (!candidatesByPair.TryGetValue(
+                pair,
+                out List<long> candidateIds))
+        {
+            candidateIds = new List<long>();
+            candidatesByPair.Add(pair, candidateIds);
+        }
+
+        candidateIds.Add(candidateId);
+        return candidateId;
+    }
+
+    public bool CompleteCandidate(long candidateId)
+    {
+        if (disposed ||
+            candidateId == 0 ||
+            !candidates.TryGetValue(
+                candidateId,
+                out GuardCandidate candidate))
         {
             return false;
         }
 
-        RemoveExpired(retainedUntil);
-        if (retainedUntil.Count == 0)
+        candidates.Remove(candidateId);
+        if (candidatesByPair.TryGetValue(
+                candidate.Pair,
+                out List<long> candidateIds))
         {
-            guardedUntilEpoch.Remove(pair);
-            return false;
+            candidateIds.Remove(candidateId);
+            if (candidateIds.Count == 0)
+                candidatesByPair.Remove(candidate.Pair);
         }
 
-        retainedUntil.Dequeue();
-        if (retainedUntil.Count == 0)
-            guardedUntilEpoch.Remove(pair);
-        return true;
+        return candidate.IsGuarded;
     }
 
     public void Reset()
     {
-        guardedUntilEpoch.Clear();
+        candidates.Clear();
+        candidatesByPair.Clear();
+        nextCandidateId = 0;
         Epoch = 0;
     }
 
@@ -99,7 +119,8 @@ public sealed class GuardedHitWindow : IGuardedHitWindow
         disposed = true;
         messageBroker.Unsubscribe<LocalAgentGuardedHit>(
             Handle_LocalAgentGuardedHit);
-        guardedUntilEpoch.Clear();
+        candidates.Clear();
+        candidatesByPair.Clear();
     }
 
     private void Handle_LocalAgentGuardedHit(
@@ -116,23 +137,111 @@ public sealed class GuardedHitWindow : IGuardedHitWindow
         var pair = new HitPair(
             guardedHit.AffectedAgent,
             guardedHit.AffectorAgent);
-        if (!guardedUntilEpoch.TryGetValue(
+        if (!candidatesByPair.TryGetValue(
                 pair,
-                out Queue<long> retainedUntil))
+                out List<long> candidateIds))
         {
-            retainedUntil = new Queue<long>();
-            guardedUntilEpoch.Add(pair, retainedUntil);
+            // Clean blocks can produce this callback without RegisterBlow, so unmatched evidence must be discarded.
+            return;
         }
 
-        retainedUntil.Enqueue(Epoch + RetainedEpochs);
+        for (int i = candidateIds.Count - 1; i >= 0; i--)
+        {
+            if (!candidates.TryGetValue(
+                    candidateIds[i],
+                    out GuardCandidate candidate))
+            {
+                candidateIds.RemoveAt(i);
+                continue;
+            }
+
+            if (candidate.Epoch != Epoch ||
+                !IsSameCollision(
+                    candidate,
+                    guardedHit))
+            {
+                continue;
+            }
+
+            candidate.IsGuarded = true;
+            return;
+        }
     }
 
-    private void RemoveExpired(Queue<long> retainedUntil)
+    private static bool IsSameCollision(
+        GuardCandidate candidate,
+        LocalAgentGuardedHit guardedHit)
     {
-        while (retainedUntil.Count > 0 &&
-               retainedUntil.Peek() < Epoch)
+        Blow candidateBlow = candidate.Blow;
+        Blow guardedBlow = guardedHit.Blow;
+        AttackCollisionData candidateCollision =
+            candidate.CollisionData;
+        AttackCollisionData guardedCollision =
+            guardedHit.CollisionData;
+
+        // Damage and block-result fields differ between callbacks, so compare only stable collision data.
+        return candidateBlow.IsMissile == guardedBlow.IsMissile
+            && candidateBlow.AttackType == guardedBlow.AttackType
+            && candidateBlow.StrikeType == guardedBlow.StrikeType
+            && candidateBlow.DamageType == guardedBlow.DamageType
+            && candidateBlow.BoneIndex == guardedBlow.BoneIndex
+            && SameVector(
+                candidateBlow.GlobalPosition,
+                guardedBlow.GlobalPosition)
+            && SameVector(
+                candidateBlow.Direction,
+                guardedBlow.Direction)
+            && SameVector(
+                candidateBlow.SwingDirection,
+                guardedBlow.SwingDirection)
+            && candidateCollision
+                   .AffectorWeaponSlotOrMissileIndex
+               == guardedCollision
+                   .AffectorWeaponSlotOrMissileIndex
+            && candidateCollision.StrikeType
+               == guardedCollision.StrikeType
+            && candidateCollision.DamageType
+               == guardedCollision.DamageType
+            && candidateCollision.CollisionBoneIndex
+               == guardedCollision.CollisionBoneIndex
+            && candidateCollision.AttackBoneIndex
+               == guardedCollision.AttackBoneIndex
+            && candidateCollision.AttackDirection
+               == guardedCollision.AttackDirection
+            && candidateCollision.AttackProgress
+               == guardedCollision.AttackProgress
+            && candidateCollision.CollisionDistanceOnWeapon
+               == guardedCollision.CollisionDistanceOnWeapon
+            && SameVector(
+                candidateCollision.CollisionGlobalPosition,
+                guardedCollision.CollisionGlobalPosition);
+    }
+
+    private static bool SameVector(Vec3 left, Vec3 right)
+    {
+        return left.x == right.x
+            && left.y == right.y
+            && left.z == right.z;
+    }
+
+    private sealed class GuardCandidate
+    {
+        public HitPair Pair { get; }
+        public Blow Blow { get; }
+        public AttackCollisionData CollisionData { get; }
+        public long Epoch { get; }
+        public bool IsGuarded { get; set; }
+
+        public GuardCandidate(
+            HitPair pair,
+            in Blow blow,
+            in AttackCollisionData collisionData,
+            long epoch)
         {
-            retainedUntil.Dequeue();
+            Pair = pair;
+            Blow = blow;
+            CollisionData = collisionData;
+            Epoch = epoch;
         }
     }
 

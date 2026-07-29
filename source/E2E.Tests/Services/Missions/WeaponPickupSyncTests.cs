@@ -1,10 +1,12 @@
 ﻿using Common;
 using Common.Util;
+using GameInterface;
 using HarmonyLib;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
+using Missions.Agents.Patches;
 using Missions.Tournaments;
 using Missions.Tournaments.Messages;
 using ProtoBuf;
@@ -56,6 +58,34 @@ public class WeaponPickupSyncTests
         Assert.Equal((int)EquipmentIndex.Weapon0, received.MainHandIndex);
         Assert.Equal((int)EquipmentIndex.Weapon2, received.OffHandIndex);
         Assert.Equal(0, received.MainHandUsageIndex);
+    }
+
+    [Fact]
+    public void MissionModule_RegistersWeaponPickupPatchCategory()
+    {
+        HarmonyPatchCategoryRegistration registration = Assert.Single(
+            MissionModule.CreatePatchCategoryRegistrations(),
+            candidate => candidate.Category == MissionModule.WeaponPickupPatchCategory);
+        var harmony = new Harmony(
+            $"{nameof(MissionModule_RegistersWeaponPickupPatchCategory)}.{System.Guid.NewGuid()}");
+        MethodInfo target = AccessTools.Method(typeof(Agent), "OnItemPickup");
+
+        try
+        {
+            registration.Apply(harmony);
+
+            Patches patches = Harmony.GetPatchInfo(target);
+            Assert.Contains(
+                patches.Postfixes,
+                patch => patch.owner == harmony.Id);
+        }
+        finally
+        {
+            harmony.Unpatch(
+                target,
+                HarmonyPatchType.All,
+                harmony.Id);
+        }
     }
 
     [Fact]

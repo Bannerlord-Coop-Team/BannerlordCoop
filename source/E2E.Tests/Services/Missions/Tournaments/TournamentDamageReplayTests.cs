@@ -9,6 +9,7 @@ using Missions.Tournaments;
 using Missions.Tournaments.Messages;
 using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
 
@@ -123,21 +124,21 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                 _collisionResult =
                     (int)CombatCollisionResult.StrikeAgent
             };
+            var blow = new Blow(attacker.Index)
+            {
+                InflictedDamage = 36,
+                DamageType = DamageTypes.Cut
+            };
             bool runOriginal = controller.InterceptBlow(
                 victim,
-                new Blow(attacker.Index)
-                {
-                    InflictedDamage = 36,
-                    DamageType = DamageTypes.Cut
-                },
+                blow,
                 collisionData);
             component.AgentActionHandler.ObserveBlockedHit(
                 victim,
                 attacker,
                 isBlocked: true,
-                isMissile: false,
-                collisionResult:
-                    CombatCollisionResult.StrikeAgent);
+                in blow,
+                in collisionData);
             InvokeProcessPendingLocalDamage(controller);
 
             var network = Assert.IsType<MockBattleNetwork>(
@@ -219,7 +220,84 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void GuardEvidence_CancelsOnlyOneCandidateFromSamePair()
+    public void CleanGuardWithoutCandidate_DoesNotCancelFollowingDamage()
+    {
+        using var fixture = new MissionEngineFixture();
+        var attackerClient = Clients.First();
+        SetControllerId(attackerClient, "attacker-owner");
+
+        attackerClient.Call(() =>
+        {
+            var mock = fixture.CreateMission(attackerClient);
+            var controller =
+                attackerClient.Resolve<CoopTournamentController>();
+            SetField(controller, "snapshot", CreateLiveSnapshot());
+            ICoopMissionComponent component =
+                GetTournamentComponent(controller);
+            var registry =
+                attackerClient.Resolve<INetworkAgentRegistry>();
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.AI));
+
+            Assert.True(registry.TryRegisterAgent(
+                "victim-owner",
+                Guid.NewGuid(),
+                victim));
+            Assert.True(registry.TryRegisterAgent(
+                "attacker-owner",
+                Guid.NewGuid(),
+                attacker));
+
+            var guardedBlow = new Blow(attacker.Index);
+            var guardedCollision = new AttackCollisionData
+            {
+                _collisionResult =
+                    (int)CombatCollisionResult.Blocked
+            };
+            component.AgentActionHandler.ObserveBlockedHit(
+                victim,
+                attacker,
+                isBlocked: true,
+                in guardedBlow,
+                in guardedCollision);
+
+            var damagingBlow = new Blow(attacker.Index)
+            {
+                InflictedDamage = 36,
+                DamageType = DamageTypes.Cut
+            };
+            var damagingCollision = new AttackCollisionData
+            {
+                _collisionResult =
+                    (int)CombatCollisionResult.StrikeAgent
+            };
+            Assert.False(controller.InterceptBlow(
+                victim,
+                damagingBlow,
+                damagingCollision));
+
+            InvokeProcessPendingLocalDamage(controller);
+
+            var network = Assert.IsType<MockBattleNetwork>(
+                attackerClient.Resolve<IBattleNetwork>());
+            Assert.Equal(
+                1,
+                network.NetworkSentMessages.GetMessageCount<
+                    NetworkApplyTournamentDamage>());
+            Assert.True(
+                AgentMirror.TryGet(
+                    victim,
+                    out var mirror));
+            Assert.Equal(64f, mirror.Health);
+        });
+    }
+
+    [Fact]
+    public void GuardEvidence_CancelsMatchingCandidateFromSamePair()
     {
         using var fixture = new MissionEngineFixture();
         var attackerClient = Clients.First();
@@ -256,29 +334,32 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                 _collisionResult =
                     (int)CombatCollisionResult.StrikeAgent
             };
+            var firstBlow = new Blow(attacker.Index)
+            {
+                InflictedDamage = 36,
+                DamageType = DamageTypes.Cut,
+                GlobalPosition = new Vec3(1f, 2f, 3f)
+            };
+            var secondBlow = new Blow(attacker.Index)
+            {
+                InflictedDamage = 10,
+                DamageType = DamageTypes.Cut,
+                GlobalPosition = new Vec3(4f, 5f, 6f)
+            };
             Assert.False(controller.InterceptBlow(
                 victim,
-                new Blow(attacker.Index)
-                {
-                    InflictedDamage = 36,
-                    DamageType = DamageTypes.Cut
-                },
+                firstBlow,
                 collisionData));
             Assert.False(controller.InterceptBlow(
                 victim,
-                new Blow(attacker.Index)
-                {
-                    InflictedDamage = 10,
-                    DamageType = DamageTypes.Cut
-                },
+                secondBlow,
                 collisionData));
             component.AgentActionHandler.ObserveBlockedHit(
                 victim,
                 attacker,
                 isBlocked: true,
-                isMissile: false,
-                collisionResult:
-                    CombatCollisionResult.StrikeAgent);
+                in secondBlow,
+                in collisionData);
 
             InvokeProcessPendingLocalDamage(controller);
 
@@ -289,7 +370,7 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                 network.NetworkSentMessages.GetMessageCount<
                     NetworkApplyTournamentDamage>());
             Assert.True(AgentMirror.TryGet(victim, out var mirror));
-            Assert.Equal(90f, mirror.Health);
+            Assert.Equal(64f, mirror.Health);
         });
     }
 

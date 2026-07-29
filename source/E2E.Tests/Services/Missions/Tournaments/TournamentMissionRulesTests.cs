@@ -358,16 +358,17 @@ public class TournamentMissionRulesTests
         CombatCollisionResult recordedCollision = default;
         controller.SetGuardReactionRecorder(
             (
-                affectedAgent,
-                affectorAgent,
-                isBlocked,
-                isMissile,
-                collisionResult) =>
+                Agent affectedAgent,
+                Agent affectorAgent,
+                bool isBlocked,
+                in Blow recordedBlow,
+                in AttackCollisionData recordedCollisionData) =>
             {
                 recorded = true;
                 recordedBlocked = isBlocked;
-                recordedMissile = isMissile;
-                recordedCollision = collisionResult;
+                recordedMissile = recordedBlow.IsMissile;
+                recordedCollision =
+                    recordedCollisionData.CollisionResult;
             });
         var blow = new Blow();
         var collisionData = new AttackCollisionData();

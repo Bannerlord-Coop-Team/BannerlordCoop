@@ -12,6 +12,7 @@ namespace Missions.Agents.Patches
     /// Patch on ItemPickups for WeaponPickupHandler
     /// </summary>
     [HarmonyPatch(typeof(Agent), "OnItemPickup")]
+    [HarmonyPatchCategory(MissionModule.WeaponPickupPatchCategory)]
     public class AgentPickupPatch
     {
         static void Postfix(SpawnedItemEntity spawnedItemEntity, EquipmentIndex weaponPickUpSlotIndex, Agent __instance)
