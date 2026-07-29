@@ -61,9 +61,6 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly INetworkConfig configuration;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
-#if DEBUG
-    private readonly MapEventCreationDebugHook debugHook = new MapEventCreationDebugHook();
-#endif
     private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new ConcurrentDictionary<string, PendingRequest>();
 
     public MapEventCreationCoordinator(
@@ -205,19 +202,6 @@ internal class MapEventCreationCoordinator : IHandler
             return;
         }
 
-#if DEBUG
-        if (debugHook.TryConsume(request))
-        {
-            Logger.Warning(
-                "DEBUG rejected map event creation after ownership validation. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}",
-                request.RequestId,
-                request.AttackerId,
-                request.DefenderId);
-            SendCreatedReply(requestingPeer, request, MapEventCreationOutcome.Rejected, null);
-            return;
-        }
-#endif
-
         if (TryHandleExistingMapEventRequest(
                 request,
                 attacker,
@@ -253,18 +237,6 @@ internal class MapEventCreationCoordinator : IHandler
             request.RequestId);
         network.Send(requestingPeer, new NetworkMapEventCreated(request.RequestId, outcome, mapEventId));
     }
-
-#if DEBUG
-    internal string ArmDebugRejection(string attackerId, string defenderId)
-    {
-        debugHook.Arm(attackerId, defenderId);
-        return debugHook.Describe();
-    }
-
-    internal string GetDebugRejectionState() => debugHook.Describe();
-
-    internal void ClearDebugRejection() => debugHook.Clear();
-#endif
 
     private static bool TryGetRequestingPeer(
         MessagePayload<NetworkRequestCreateMapEvent> payload,

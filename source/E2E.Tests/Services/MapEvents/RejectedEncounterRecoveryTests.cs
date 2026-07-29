@@ -299,24 +299,84 @@ public class RejectedEncounterRecoveryTests : MapEventTestBase
             playerPartyId,
             targetPartyId,
             new CampaignVec2(new Vec2(34f, 36f), true));
-        var disabledMethods = MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetPositionAfterMapChange)))
-            .Append(AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)))
-            .ToList();
 
         client.Call(() =>
         {
             using (new AllowedThread())
             {
-                MobileParty.MainParty._besiegerCamp = GameObjectCreator.CreateInitializedObject<BesiegerCamp>();
+                MobileParty.MainParty._besiegerCamp = new BesiegerCamp(null, null);
             }
 
             MenuHelper.EncounterLeaveConsequence();
+        }, MapEventDisabledMethods);
 
+        client.Call(() =>
+        {
             Assert.Null(PlayerEncounter.Current);
             Assert.Null(MobileParty.MainParty.BesiegerCamp);
-        }, disabledMethods);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void EncounterLeave_WithLiveBesiegerCampAndNoBattleReference_UsesSiegeLeaveFlow()
+    {
+        var client = Clients.First();
+        var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
+        var targetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var pendingEncounter = SetupPendingEncounter(
+            client,
+            playerPartyId,
+            targetPartyId,
+            new CampaignVec2(new Vec2(38f, 40f), true));
+
+        client.Call(() =>
+        {
+            var siegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
+            var besiegerCamp = new BesiegerCamp(siegeEvent, null);
+            using (new AllowedThread())
+            {
+                MobileParty.MainParty._besiegerCamp = besiegerCamp;
+            }
+
+            var prefix = AccessTools.Method(
+                typeof(PlayerEncounterPatches),
+                "EncounterLeaveWithoutMapEventPrefix");
+
+            Assert.True((bool)prefix.Invoke(null, Array.Empty<object>()));
+            Assert.Same(pendingEncounter, PlayerEncounter.Current);
+            Assert.Same(besiegerCamp, MobileParty.MainParty.BesiegerCamp);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void EncounterLeave_WithNoBattleReferenceInsideSettlement_PreservesSettlement()
+    {
+        var client = Clients.First();
+        var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
+        var targetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        EnableHeadlessEncounterFinish(client);
+        SetupPendingEncounter(
+            client,
+            playerPartyId,
+            targetPartyId,
+            new CampaignVec2(new Vec2(42f, 44f), true));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            MobileParty.MainParty._currentSettlement = settlement;
+            Assert.Same(settlement, MobileParty.MainParty.CurrentSettlement);
+
+            MenuHelper.EncounterLeaveConsequence();
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Same(settlement, MobileParty.MainParty.CurrentSettlement);
+        }, MapEventDisabledMethods);
     }
 
     [Fact]

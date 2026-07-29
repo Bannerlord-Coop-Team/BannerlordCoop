@@ -161,7 +161,9 @@ internal class PlayerEncounterPatches
         }
     }
 
-    private static bool RecoverEncounterWithoutMapEvent(PlayerEncounter encounter)
+    private static bool RecoverEncounterWithoutMapEvent(
+        PlayerEncounter encounter,
+        bool forcePlayerOutFromSettlement = true)
     {
         if (encounter == null || !ReferenceEquals(PlayerEncounter.Current, encounter))
             return false;
@@ -170,7 +172,7 @@ internal class PlayerEncounterPatches
             return false;
 
         PlayerEncounter.LeaveEncounter = true;
-        PlayerEncounter.Finish();
+        PlayerEncounter.Finish(forcePlayerOutFromSettlement);
         return true;
     }
 
@@ -201,10 +203,18 @@ internal class PlayerEncounterPatches
         if (encounter._mapEvent != null || encounteredBattle != null)
             return true;
 
-        if (MobileParty.MainParty?.BesiegerCamp != null)
-            MobileParty.MainParty.BesiegerCamp = null;
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.BesiegerCamp != null)
+        {
+            if (mainParty.BesiegerCamp.SiegeEvent != null)
+                return true;
 
-        RecoverEncounterWithoutMapEvent(encounter);
+            mainParty._besiegerCamp = null;
+        }
+
+        RecoverEncounterWithoutMapEvent(
+            encounter,
+            forcePlayerOutFromSettlement: mainParty.CurrentSettlement == null);
         return false;
     }
 
