@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
 using GameInterface.Services.MapEvents;
@@ -9,6 +9,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -172,6 +173,43 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(LocalEpoch + 2, buffered.Value.HostEpoch);
     }
 
+    [Fact]
+    public void PendingAnimationAfterDiscreteState_IsRetainedForOrderedApply()
+    {
+        broker.Publish(this, MachineState(machineId: 26, hostEpoch: LocalEpoch));
+        broker.Publish(this, LadderAnimationState(ladderId: 26, hostEpoch: LocalEpoch));
+        DrainGameThread();
+
+        Assert.True(PendingStates().ContainsKey(26));
+        Assert.True(PendingLadderAnimations().ContainsKey(26));
+    }
+
+    [Fact]
+    public void LaterDiscreteState_RetainsTheLatestPendingAnimation()
+    {
+        broker.Publish(this, LadderAnimationState(ladderId: 27, hostEpoch: LocalEpoch));
+        broker.Publish(this, MachineState(machineId: 27, hostEpoch: LocalEpoch));
+        DrainGameThread();
+
+        Assert.True(PendingStates().ContainsKey(27));
+        Assert.True(PendingLadderAnimations().ContainsKey(27));
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-102")]
+    public void PendingAnimationFromASupersededEpoch_IsDroppedBeforeRegistration()
+    {
+        broker.Publish(this, LadderAnimationState(ladderId: 28, hostEpoch: LocalEpoch));
+        broker.Publish(this, LadderAnimationState(ladderId: 29, hostEpoch: LocalEpoch + 1));
+        DrainGameThread();
+
+        InvokePrivate("DrainPendingMachineStates");
+
+        var pending = Assert.Single(PendingLadderAnimations());
+        Assert.Equal(29, pending.Key);
+        Assert.Equal(LocalEpoch + 1, pending.Value.HostEpoch);
+    }
+
     // ------------------------------------------------------------------
     // Sender stamping
     // ------------------------------------------------------------------
@@ -228,7 +266,11 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         // (A MissionObject test double is impossible here: materializing one runs the
         // ScriptComponentBehavior type initializer, which requires the native engine.)
         var method = typeof(SiegeMachineStateReplicator).GetMethod(
-            "Stamp", BindingFlags.Instance | BindingFlags.NonPublic);
+            "Stamp",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(NetworkSiegeMachineState) },
+            null);
         Assert.NotNull(method);
 
         var captured = new NetworkSiegeMachineState(
@@ -252,6 +294,41 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         Assert.Equal(0.25f, stamped.AimReleaseAngle);
     }
 
+    [Fact]
+    [Trait("Requirement", "BR-102")]
+    public void OutgoingLadderAnimationState_IsStampedWithTheSendersEpoch_PreservingEveryField()
+    {
+        var method = typeof(SiegeMachineStateReplicator).GetMethod(
+            "Stamp",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(NetworkSiegeLadderAnimationState) },
+            null);
+        Assert.NotNull(method);
+
+        var frame = new MatrixFrame(Mat3.Identity, new Vec3(1f, 2f, 3f));
+        var captured = new NetworkSiegeLadderAnimationState(
+            ladderId: 30,
+            animationSpeed: 1.73f,
+            animationProgress: 0.42f,
+            animationState: 2,
+            fallAngularSpeed: -0.5f,
+            frame: frame,
+            animationIndex: 17);
+
+        var stamped = Assert.IsType<NetworkSiegeLadderAnimationState>(
+            method!.Invoke(sut, new object[] { captured }));
+
+        Assert.Equal(LocalEpoch, stamped.HostEpoch);
+        Assert.Equal(30, stamped.LadderId);
+        Assert.Equal(1.73f, stamped.AnimationSpeed);
+        Assert.Equal(0.42f, stamped.AnimationProgress);
+        Assert.Equal(2, stamped.AnimationState);
+        Assert.Equal(-0.5f, stamped.FallAngularSpeed);
+        Assert.Equal(frame.origin, stamped.Frame.origin);
+        Assert.Equal(17, stamped.AnimationIndex);
+    }
+
     // ------------------------------------------------------------------
     // Plumbing
     // ------------------------------------------------------------------
@@ -260,6 +337,10 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
         => new(machineId, hitPoints: -1f, destructionState: -1, gateState: -1, ladderState: -1,
             moveDistance: -1f, hasArrived: false, weaponState: -1, aimDirection: -1000f,
             aimReleaseAngle: -1000f, hostEpoch: hostEpoch);
+
+    private static NetworkSiegeLadderAnimationState LadderAnimationState(int ladderId, int hostEpoch)
+        => new(ladderId, animationSpeed: -1f, animationProgress: -1f, animationState: 0,
+            fallAngularSpeed: 0f, frame: MatrixFrame.Identity, animationIndex: -1, hostEpoch: hostEpoch);
 
     private Dictionary<int, string> ClaimedMachines()
         => GetField<Dictionary<int, string>>("claimedMachines");
@@ -273,6 +354,17 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
 
     private Dictionary<int, NetworkSiegeMachineState> PendingStates()
         => GetField<Dictionary<int, NetworkSiegeMachineState>>("pendingByMachineId");
+
+    private Dictionary<int, NetworkSiegeLadderAnimationState> PendingLadderAnimations()
+        => GetField<Dictionary<int, NetworkSiegeLadderAnimationState>>("pendingLadderAnimationsById");
+
+    private void InvokePrivate(string methodName)
+    {
+        var method = typeof(SiegeMachineStateReplicator).GetMethod(
+            methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(sut, Array.Empty<object>());
+    }
 
     private T GetField<T>(string fieldName)
     {
