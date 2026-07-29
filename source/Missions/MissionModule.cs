@@ -141,6 +141,10 @@ public class MissionModule : Module
             .AsSelf()
             .InstancePerLifetimeScope()
             .AutoActivate();
+        builder.RegisterType<BattleDebugRouteHandler>()
+            .AsSelf()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
 
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).

@@ -19,6 +19,7 @@ public sealed class MirrorAgent
     public bool IsActive { get; set; } = true;
     public bool IsHuman { get; set; } = true;
     public bool WasKilled { get; set; }
+    public int OnFleeingCalls { get; set; }
     public bool IsAiPaused { get; set; }
     public int DeathAction { get; set; } = -1;
     public Vec3 Position { get; set; }

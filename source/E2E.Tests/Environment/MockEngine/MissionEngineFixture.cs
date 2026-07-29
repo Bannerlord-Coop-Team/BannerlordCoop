@@ -34,6 +34,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_Current", nameof(Mission_get_Current));
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
+        Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
         // The BR-110 agent budget counts the mission's live agents via Mission.Agents.
         Prefix(typeof(Mission), "get_Agents", nameof(Mission_get_Agents));
@@ -76,6 +77,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Equipment", nameof(Agent_get_Equipment));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
+        Prefix(typeof(Agent), nameof(Agent.OnFleeing), nameof(Agent_OnFleeing));
         // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
         Prefix(typeof(Agent), "get_IsHuman", nameof(Agent_get_IsHuman));
         Prefix(typeof(Agent), "get_IsMount", nameof(Agent_get_IsMount));
@@ -217,6 +219,15 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         mock.EndMissionCalled = true;
+        return false;
+    }
+
+    private static bool Mission_OnAgentFleeing(Mission __instance, Agent agent)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        mock.AgentFleeingCalls++;
+        mock.LastFleeingAgent = agent;
+        agent.OnFleeing();
         return false;
     }
 
@@ -513,6 +524,14 @@ public sealed class MissionEngineFixture : IDisposable
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         m.Formation = value;
         if (value != null && MockFormation.ForShell(value, out var mf)) mf.AddUnit(__instance);
+        return false;
+    }
+
+    private static bool Agent_OnFleeing(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.OnFleeingCalls++;
+        __instance.Formation = null;
         return false;
     }
 

@@ -83,6 +83,8 @@ public class BattleAgentSpawnData
     public readonly string MountOriginalOwnerControllerId;
     [ProtoMember(22)]
     public readonly string MountMovementScopeId;
+    [ProtoMember(23)]
+    public readonly bool IsRunningAway;
 
     public BattleAgentSpawnData(
         Guid agentId,
@@ -104,7 +106,8 @@ public class BattleAgentSpawnData
         AgentEquipmentData? currentEquipment = null,
         string movementScopeId = null,
         string mountOriginalOwnerControllerId = null,
-        string mountMovementScopeId = null)
+        string mountMovementScopeId = null,
+        bool isRunningAway = false)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -128,5 +131,6 @@ public class BattleAgentSpawnData
         MountMovementScopeId = mountMovementScopeId ?? MovementScopeId;
         CurrentEquipment = currentEquipment.GetValueOrDefault();
         HasCurrentEquipment = currentEquipment.HasValue;
+        IsRunningAway = isRunningAway;
     }
 }

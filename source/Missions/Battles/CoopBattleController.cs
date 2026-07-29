@@ -101,13 +101,13 @@ public class CoopBattleController : CoopMissionController
         replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
-        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget);
+        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
+        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget, puppetRoutApplier);
         puppetDeathApplier = new PuppetDeathApplier(
             messageBroker,
             coopMissionComponent,
             casualties,
             puppetMountStateRepairer);
-        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
@@ -290,6 +290,12 @@ public class CoopBattleController : CoopMissionController
         base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
 
         deathReporter.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+    }
+
+    public override void OnAgentFleeing(Agent affectedAgent)
+    {
+        base.OnAgentFleeing(affectedAgent);
+        routReporter.OnAgentFleeing(affectedAgent);
     }
 
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the
