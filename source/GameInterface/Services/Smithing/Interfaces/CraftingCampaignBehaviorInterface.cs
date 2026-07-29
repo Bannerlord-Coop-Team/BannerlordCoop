@@ -159,7 +159,6 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         {
             craftedItemObject = new();
             ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
-            //craftedItemObject.ItemComponent = null; // Need to clear the generated item component from the client, otherwise get duplicate weapons in Crafting.Generateitem from Add() instead of a new list
             Crafting.GenerateItem(
                 weaponDesign,
                 name,

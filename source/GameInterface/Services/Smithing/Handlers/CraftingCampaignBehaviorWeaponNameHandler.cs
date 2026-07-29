@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -20,21 +21,24 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface;
 
     private WeaponDesignResultPopupVM currentWeaponDesignResultPopupVM;
 
     public CraftingCampaignBehaviorWeaponNameHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.craftingCampaignBehaviorInterface = craftingCampaignBehaviorInterface;
 
         messageBroker.Subscribe<WeaponDesignResultPopupVMCreated>(Handle_WeaponDesignResultPopupVMCreated);
 
-        messageBroker.Subscribe<BehaviorCraftedWeaponNameSet>(Handle_BehaviorCraftedWeaponNameSet);
+        messageBroker.Subscribe<SetBehaviorCraftedWeaponName>(Handle_SetBehaviorCraftedWeaponName);
         messageBroker.Subscribe<NetworkBehaviorSetCraftedWeaponNameServer>(Handle_NetworkBehaviorSetCraftedWeaponNameServer);
         messageBroker.Subscribe<NetworkBehaviorSetCraftedWeaponNameClients>(Handle_NetworkBehaviorSetCraftedWeaponNameClients);
 
@@ -47,7 +51,7 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
     {
         messageBroker.Unsubscribe<WeaponDesignResultPopupVMCreated>(Handle_WeaponDesignResultPopupVMCreated);
 
-        messageBroker.Unsubscribe<BehaviorCraftedWeaponNameSet>(Handle_BehaviorCraftedWeaponNameSet);
+        messageBroker.Unsubscribe<SetBehaviorCraftedWeaponName>(Handle_SetBehaviorCraftedWeaponName);
         messageBroker.Unsubscribe<NetworkBehaviorSetCraftedWeaponNameServer>(Handle_NetworkBehaviorSetCraftedWeaponNameServer);
         messageBroker.Unsubscribe<NetworkBehaviorSetCraftedWeaponNameClients>(Handle_NetworkBehaviorSetCraftedWeaponNameClients);
 
@@ -62,13 +66,10 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
         });  
     }
 
-    private void Handle_BehaviorCraftedWeaponNameSet(MessagePayload<BehaviorCraftedWeaponNameSet> obj)
+    private void Handle_SetBehaviorCraftedWeaponName(MessagePayload<SetBehaviorCraftedWeaponName> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
-
         // Send to server from client
         NetworkBehaviorSetCraftedWeaponNameServer message = new(
-            craftingCampaignBehaviorId,
             obj.What.CraftedWeaponId,
             obj.What.Name
         );
@@ -98,13 +99,14 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
+
             ItemObject mbCraftedWeapon = MBObjectManager.Instance.GetObject<ItemObject>(obj.CraftedWeaponId);
             if (mbCraftedWeapon == null) return;
 
             using (new AllowedThread())
             {
-                craftingCampaignBehavior.SetCraftedWeaponName(mbCraftedWeapon, obj.Name);
+                craftingBehavior.SetCraftedWeaponName(mbCraftedWeapon, obj.Name);
             }
         });
     }

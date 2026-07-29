@@ -26,13 +26,18 @@ internal class CreateCraftedWeaponInternalPatch
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
+        // Locally create string id. Without a string id, the result popup will not render new weapons.
+        // This isn't sent to the server, won't matter after the item is crafted and won't persist across save games.
+        // If the server uses this string id, two clients crafting at the same time can cause mismatched ids/crafted item counts.
+        // Probable old cause of issue reported that gave crafted items to other players when two clients crafted at the same time.
+        string nextCraftedItemId = $"ClientVisual_{__instance.GetNextCraftedItemId()}";
         ItemObject craftedItemObject;
         using (new AllowedThread())
         {
-            craftedItemObject = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic.GetCurrentCraftedItemObject(true, null);
+            craftedItemObject = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic.GetCurrentCraftedItemObject(true, nextCraftedItemId);
             ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
 
-            MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
+            ItemObject registeredObject = MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
         }
         Crafting craftingLogic = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic;
 
@@ -42,7 +47,8 @@ internal class CreateCraftedWeaponInternalPatch
         // Patched separately for sending to server
         __instance.AddResearchPoints(weaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, crafterHero, isFreeMode));
 
-        // Publish message with data
+        // Publish message with data. Local ClientVisual not sent.
+        // Actual item created on server and all clients in CraftingCampaignBehaviorCraftingHandler.
         var message = new CreatedCraftedWeaponInternal(isFreeMode, crafterHero, craftedItemObject.Name, craftedItemObject.Culture, weaponDesign, weaponModifier, Hero.MainHero, craftingLogic);
         MessageBroker.Instance.Publish(__instance, message);
 

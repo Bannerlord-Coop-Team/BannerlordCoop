@@ -8,20 +8,15 @@ namespace GameInterface.Services.Smithing.Messages;
 public readonly struct NetworkBehaviorSetCraftedWeaponNameServer : ICommand
 {
     [ProtoMember(1)]
-    public readonly string CraftingCampaignBehaviorId;
-
-    [ProtoMember(2)]
     public readonly string CraftedWeaponId;
 
-    [ProtoMember(3)]
+    [ProtoMember(2)]
     public readonly TextObject Name;
 
     public NetworkBehaviorSetCraftedWeaponNameServer(
-        string craftingCampaignBehaviorId,
         string craftedWeaponId,
         TextObject name)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         CraftedWeaponId = craftedWeaponId;
         Name = name;
     }
@@ -31,17 +26,13 @@ public readonly struct NetworkBehaviorSetCraftedWeaponNameServer : ICommand
 public readonly struct NetworkBehaviorSetCraftedWeaponNameClients : ICommand
 {
     [ProtoMember(1)]
-    public readonly string CraftingCampaignBehaviorId;
-
-    [ProtoMember(2)]
     public readonly string CraftedWeaponId;
 
-    [ProtoMember(3)]
+    [ProtoMember(2)]
     public readonly TextObject Name;
 
     public NetworkBehaviorSetCraftedWeaponNameClients(NetworkBehaviorSetCraftedWeaponNameServer cloneObject)
     {
-        CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
         CraftedWeaponId = cloneObject.CraftedWeaponId;
         Name = cloneObject.Name;
     }

@@ -142,6 +142,8 @@ internal class SmithingRefreshHandler : IHandler
                 currentWeaponDesignVM.ActiveCraftingOrder.CraftingOrder,
                 obj.What.CraftedItemObject,
                 currentWeaponDesignVM._getCurrentCraftingHero().Hero);
+
+            currentWeaponDesignVM.CraftedItemObject = null;
         });
     }
 

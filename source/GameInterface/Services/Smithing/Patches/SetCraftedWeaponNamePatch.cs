@@ -23,7 +23,7 @@ internal class SetCraftedWeaponNamePatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // Publish message with data
-        var message = new BehaviorCraftedWeaponNameSet(__instance, craftedWeaponItem.StringId, name);
+        var message = new SetBehaviorCraftedWeaponName(craftedWeaponItem.StringId, name);
         MessageBroker.Instance.Publish(__instance, message);
 
         // Skip original to override original client saving
