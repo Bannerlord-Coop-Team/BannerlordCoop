@@ -357,10 +357,10 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
                 int partition = LobbyDataCodec.GetDiscoveryPartition(lobbyId);
                 if (!activeLobbyListRange.Contains(partition))
                 {
-                    Logger.Error(
+                    Logger.Warning(
                         "Steam lobby {LobbyId} was outside the requested discovery partition",
                         lobbyId.ToString());
-                    CompleteLobbyListRequest(Array.Empty<ulong>(), false);
+                    CompleteLobbyListRequest(lobbyListQueryPlan.Results, true);
                     return;
                 }
 

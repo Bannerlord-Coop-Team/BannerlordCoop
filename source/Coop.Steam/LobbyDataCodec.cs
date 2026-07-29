@@ -34,7 +34,7 @@ public static class LobbyDataCodec
             value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
             value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
             value ^= value >> 31;
-            return (int)(value & int.MaxValue);
+            return (int)(value % int.MaxValue) + 1;
         }
     }
 

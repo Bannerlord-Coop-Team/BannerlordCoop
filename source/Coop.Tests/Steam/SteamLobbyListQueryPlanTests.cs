@@ -33,14 +33,15 @@ public class SteamLobbyListQueryPlanTests
 
         Assert.True(plan.TryGetNext(out var lowerRange));
         Assert.False(lowerRange.IsUnfiltered);
-        Assert.Equal(0, lowerRange.Minimum);
-        Assert.Equal(1073741823, lowerRange.Maximum);
-        Assert.True(lowerRange.Contains(0));
-        Assert.True(lowerRange.Contains(1073741823));
-        Assert.False(lowerRange.Contains(1073741824));
+        Assert.Equal(1, lowerRange.Minimum);
+        Assert.Equal(1073741824, lowerRange.Maximum);
+        Assert.False(lowerRange.Contains(0));
+        Assert.True(lowerRange.Contains(1));
+        Assert.True(lowerRange.Contains(1073741824));
+        Assert.False(lowerRange.Contains(1073741825));
 
         Assert.True(plan.TryGetNext(out var upperRange));
-        Assert.Equal(1073741824, upperRange.Minimum);
+        Assert.Equal(1073741825, upperRange.Minimum);
         Assert.Equal(int.MaxValue, upperRange.Maximum);
     }
 
@@ -52,19 +53,19 @@ public class SteamLobbyListQueryPlanTests
         plan.AddResults(initialRange, LobbyIds(1));
 
         Assert.True(plan.TryGetNext(out var lowerRange));
-        Assert.Equal(0, lowerRange.Minimum);
-        Assert.Equal(1073741823, lowerRange.Maximum);
+        Assert.Equal(1, lowerRange.Minimum);
+        Assert.Equal(1073741824, lowerRange.Maximum);
 
         plan.AddResults(lowerRange, LobbyIds(26));
 
         Assert.True(plan.TryGetNext(out var lowerQuarterRange));
-        Assert.Equal(0, lowerQuarterRange.Minimum);
-        Assert.Equal(536870911, lowerQuarterRange.Maximum);
+        Assert.Equal(1, lowerQuarterRange.Minimum);
+        Assert.Equal(536870912, lowerQuarterRange.Maximum);
         plan.AddResults(lowerQuarterRange, LobbyIds(51, 25));
 
         Assert.True(plan.TryGetNext(out var upperQuarterRange));
-        Assert.Equal(536870912, upperQuarterRange.Minimum);
-        Assert.Equal(1073741823, upperQuarterRange.Maximum);
+        Assert.Equal(536870913, upperQuarterRange.Minimum);
+        Assert.Equal(1073741824, upperQuarterRange.Maximum);
         plan.AddResults(upperQuarterRange, Array.Empty<ulong>());
 
         Assert.True(plan.TryGetNext(out var upperRange));
@@ -128,7 +129,7 @@ public class SteamLobbyListQueryPlanTests
             .Select(offset => LobbyDataCodec.GetDiscoveryPartition(109775240917155000UL + (ulong)offset))
             .ToArray();
 
-        Assert.All(partitions, partition => Assert.InRange(partition, 0, int.MaxValue));
+        Assert.All(partitions, partition => Assert.InRange(partition, 1, int.MaxValue));
         Assert.Contains(partitions, partition => partition < int.MaxValue / 2);
         Assert.Contains(partitions, partition => partition >= int.MaxValue / 2);
         Assert.Equal(partitions.Length, partitions.Distinct().Count());

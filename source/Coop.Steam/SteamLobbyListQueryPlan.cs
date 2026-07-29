@@ -6,7 +6,7 @@ namespace Coop.Steam;
 internal readonly struct SteamLobbyListQueryRange
 {
     public static readonly SteamLobbyListQueryRange Unfiltered =
-        new SteamLobbyListQueryRange(0, int.MaxValue, true);
+        new SteamLobbyListQueryRange(1, int.MaxValue, true);
 
     public int Minimum { get; }
     public int Maximum { get; }
@@ -72,7 +72,7 @@ internal sealed class SteamLobbyListQueryPlan
 
         if (range.IsUnfiltered)
         {
-            PushSplitRanges(0, int.MaxValue);
+            PushSplitRanges(1, int.MaxValue);
             return;
         }
 
