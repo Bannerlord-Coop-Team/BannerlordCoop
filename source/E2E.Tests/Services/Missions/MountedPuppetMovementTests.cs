@@ -607,7 +607,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MountedFollow_HeldGuard_DoesNotTeleportTheRiderTimeline()
+    public void MountedFollow_HeldGuard_SnapsMeasurablePositionDrift()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -633,19 +633,76 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             interpolator.Tick(1f / 60f);
 
-            Assert.Equal(0, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(1, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(new Vec3(2f, 0f, 0f), horseMirror.Position);
             Assert.Equal(new Vec2(0f, 1f), horseMirror.MovementDirection);
             Assert.Equal(new Vec2(1f, 0f), riderMirror.MovementDirection);
+
+            horseMirror.Position = new Vec3(3f, 0f, 0f);
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(1, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(new Vec3(3f, 0f, 0f), horseMirror.Position);
+
+            interpolator.SetMountedRiderTarget(
+                rider,
+                new Vec3(4f, 0f, 0f),
+                new Vec2(1f, 0f),
+                new Vec2(0f, 1f),
+                new Vec3(4f, 0f, 0f));
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(2, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(new Vec3(4f, 0f, 0f), horseMirror.Position);
 
             riderMirror.MovementFlags = Agent.MovementControlFlag.None;
             interpolator.Tick(1f / 60f);
 
-            Assert.Equal(1, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(2, horseMirror.TeleportToPositionCalls);
         });
     }
 
     [Fact]
-    public void MountedFollow_GuardReaction_DoesNotTeleportTheRiderTimeline()
+    public void MountedFollow_HeldGuard_DoesNotCorrectSubToleranceDrift()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            riderMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock |
+                Agent.MovementControlFlag.DefendRight;
+
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetMountedRiderTarget(
+                rider,
+                new Vec3(0.1f, 0f, 0f),
+                new Vec2(1f, 0f),
+                new Vec2(0f, 1f),
+                new Vec3(0.1f, 0f, 0f));
+
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(0, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(new Vec2(0f, 1f), horseMirror.MovementDirection);
+            Assert.Equal(new Vec2(1f, 0f), riderMirror.MovementDirection);
+
+            horseMirror.Position = new Vec3(1f, 0f, 0f);
+            interpolator.Tick(1f / 60f);
+
+            Assert.Equal(0, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(new Vec3(1f, 0f, 0f), horseMirror.Position);
+        });
+    }
+
+    [Fact]
+    public void MountedFollow_GuardReaction_SnapsMeasurablePositionDrift()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -670,7 +727,8 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             interpolator.Tick(1f / 60f);
 
-            Assert.Equal(0, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(1, horseMirror.TeleportToPositionCalls);
+            Assert.Equal(new Vec3(2f, 0f, 0f), horseMirror.Position);
         });
     }
 

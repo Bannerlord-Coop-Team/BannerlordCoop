@@ -44,8 +44,9 @@ public interface IAgentPositionInterpolator
 
 /// <summary>
 /// [Game thread] Drives received puppets toward the position their owner last reported. On-foot puppets use the
-/// engine's native target-frame path; mounted puppets are eased directly onto the owner's reported mount position
-/// while visible guard presentations defer that correction. Teleport handles large spawn/desync gaps.
+/// engine's native target-frame path; mounted puppets are eased directly onto the owner's reported mount position.
+/// A visible guard may snap meaningful drift once per received owner frame, but never chases the same stale frame.
+/// Teleport handles large spawn/desync gaps.
 /// <para>
 /// All access is on the game thread — packet applies run inside <c>AgentMovementHandler</c>'s
 /// <c>GameThread.RunSafe</c> and <see cref="Tick"/> runs in <c>OnMissionTick</c>, both serialized on the game
@@ -62,8 +63,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     // closed each frame, so it tracks the owner with a small lag and settles when the owner stops.
     private const float MountedFollowRate = 12f;
     private const float MountedPositionEpsilon = 0.0001f;
+    private const float MountedGuardPositionTolerance = 0.15f;
 
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
+    private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
+        new Dictionary<Agent, long>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
@@ -150,6 +154,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         if (agent == null) return;
 
         _targets.Remove(agent);
+        _mountedGuardProcessedSequences.Remove(agent);
     }
 
     public bool TryGetTargetMovementFlags(
@@ -197,7 +202,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         return true;
     }
 
-    public void Clear() => _targets.Clear();
+    public void Clear()
+    {
+        _targets.Clear();
+        _mountedGuardProcessedSequences.Clear();
+    }
 
     private long GetNextUpdateSequence()
     {
@@ -273,7 +282,10 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         if (_evict.Count > 0)
         {
             foreach (Agent agent in _evict)
+            {
                 _targets.Remove(agent);
+                _mountedGuardProcessedSequences.Remove(agent);
+            }
             _evict.Clear();
         }
     }
@@ -288,9 +300,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         agent.SetTargetPositionAndDirection(in targetPosition, in targetDirection);
     }
 
-    // Ease the horse directly toward the owner's reported position without a physical seek. A guard presentation
-    // defers this semantic teleport because TeleportToPosition also teleports the rider and resets its components.
-    private static void FollowMounted(Agent rider, TargetFrame target, float dt)
+    // Ease the horse directly toward the owner's reported position without a physical seek. A guarded puppet gets
+    // at most one semantic teleport per owner frame because TeleportToPosition also resets rider components.
+    private void FollowMounted(Agent rider, TargetFrame target, float dt)
     {
         Agent mount = rider.MountAgent;
         if (mount == null || !mount.IsActive()) return;
@@ -301,10 +313,21 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         Vec3 mountTarget = target.HasMountSnapPosition ? target.MountSnapPosition : target.Position;
         Vec3 cur = mount.Position;
         float distance = cur.Distance(mountTarget);
-        if (HasGuardPresentation(rider) && distance <= MountSnapDistance)
+        bool hasGuardPresentation = HasGuardPresentation(rider);
+        if (hasGuardPresentation)
         {
-            // Defer smoothing teleports that disturb the rider's mounted guard timeline.
-            return;
+            if (_mountedGuardProcessedSequences.TryGetValue(
+                    rider,
+                    out long processedSequence) &&
+                processedSequence == target.UpdateSequence)
+            {
+                return;
+            }
+
+            _mountedGuardProcessedSequences[rider] =
+                target.UpdateSequence;
+            if (distance <= MountedGuardPositionTolerance)
+                return;
         }
         if (distance <= MountedPositionEpsilon)
         {
@@ -312,7 +335,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         }
 
         float alpha = System.Math.Min(1f, MountedFollowRate * dt);
-        Vec3 next = distance > MountSnapDistance ? mountTarget : cur + ((mountTarget - cur) * alpha);
+        // Snap a guarded puppet only after measurable drift, then leave its action timeline alone again.
+        Vec3 next = hasGuardPresentation ||
+                    distance > MountSnapDistance
+            ? mountTarget
+            : cur + ((mountTarget - cur) * alpha);
 
         mount.TeleportToPosition(next);
         // Teleporting a horse rewrites its rider's movement basis. Put both owner snapshots back in the same
