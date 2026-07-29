@@ -1388,7 +1388,9 @@ public class BattleGuardFixture : IBattleGuardFixture
         Agent.GuardMode mountedGuardMode = guarding
             ? GetGuardMode(driver.Direction)
             : Agent.GuardMode.None;
-        if (ShouldApplyMountedGuardCommand(driver.Mode) &&
+        if (ShouldApplyMountedGuardCommand(
+                driver.Mode,
+                driver.UseMovementFlagGuardInput) &&
             ShouldCommandMountedGuardState(
                 guarding,
                 driver.MountedGuardCommandActive,
@@ -1553,8 +1555,10 @@ public class BattleGuardFixture : IBattleGuardFixture
     }
 
     internal static bool ShouldApplyMountedGuardCommand(
-        BattleGuardFixtureMode mode) =>
-        mode == BattleGuardFixtureMode.Mounted;
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput) =>
+        mode == BattleGuardFixtureMode.Mounted &&
+        !useMovementFlagGuardInput;
 
     internal static bool ShouldMaintainMountedGuardPresentation(
         BattleGuardFixtureMode mode,

@@ -1,7 +1,11 @@
 ﻿#if DEBUG
+using GameInterface;
 using GameInterface.Services.Battles.Messages;
+using HarmonyLib;
+using Missions;
 using Missions.Battles;
 using ProtoBuf;
+using System;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -619,15 +623,119 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(BattleGuardFixtureMode.Mounted, true)]
-    [InlineData(BattleGuardFixtureMode.Foot, false)]
-    public void MountedGuardInput_UsesNativeGuardCommand(
-        BattleGuardFixtureMode mode,
+    [InlineData(10, false, true, true)]
+    [InlineData(10, false, false, false)]
+    [InlineData(10, true, false, true)]
+    [InlineData(9, false, true, false)]
+    public void NativeDefendInput_HoldsOnlyTheFixtureBlockKey(
+        int gameKey,
+        bool isDown,
+        bool hasFixtureInput,
         bool expected)
     {
         Assert.Equal(
             expected,
-            BattleGuardFixture.ShouldApplyMountedGuardCommand(mode));
+            BattleGuardFixtureDefendKeyPatch
+                .ShouldReportDefendGameKeyDown(
+                    gameKey,
+                    isDown,
+                    hasFixtureInput));
+    }
+
+    [Theory]
+    [InlineData(BattleGuardFixtureDirection.Up, Agent.MovementControlFlag.DefendUp)]
+    [InlineData(BattleGuardFixtureDirection.Down, Agent.MovementControlFlag.DefendDown)]
+    [InlineData(BattleGuardFixtureDirection.Left, Agent.MovementControlFlag.DefendLeft)]
+    [InlineData(BattleGuardFixtureDirection.Right, Agent.MovementControlFlag.DefendRight)]
+    public void NativeDefendInput_ReplacesDirectionOnlyForTheFixtureAgent(
+        BattleGuardFixtureDirection direction,
+        Agent.MovementControlFlag expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixtureDefendDirectionPatch
+                .ResolveDefendMovementFlag(
+                    Agent.MovementControlFlag.DefendUp,
+                    hasFixtureInput: true,
+                    direction));
+        Assert.Equal(
+            Agent.MovementControlFlag.DefendLeft,
+            BattleGuardFixtureDefendDirectionPatch
+                .ResolveDefendMovementFlag(
+                    Agent.MovementControlFlag.DefendLeft,
+                    hasFixtureInput: false,
+                    direction));
+    }
+
+    [Fact]
+    public void NativeDefendInput_TargetsVanillaManagedInputBoundary()
+    {
+        Type inputContextType = Type.GetType(
+            "TaleWorlds.InputSystem.InputContext, TaleWorlds.InputSystem",
+            throwOnError: true)!;
+        Type mainControllerType = Type.GetType(
+            "TaleWorlds.MountAndBlade.View.MissionViews." +
+            "MissionMainAgentController, TaleWorlds.MountAndBlade.View",
+            throwOnError: true)!;
+        var inputTarget = AccessTools.Method(
+            inputContextType,
+            "IsGameKeyDown",
+            new[] { typeof(int) });
+        var directionTarget = AccessTools.Method(
+            typeof(Agent),
+            nameof(Agent.GetDefendMovementFlag),
+            Type.EmptyTypes);
+        var controllerTarget = AccessTools.Method(
+            mainControllerType,
+            "OnPreMissionTick",
+            new[] { typeof(float) });
+        HarmonyPatchCategoryRegistration registration = Assert.Single(
+            MissionModule.CreatePatchCategoryRegistrations(),
+            candidate =>
+                candidate.Category ==
+                    MissionModule.BattleGuardFixtureInputPatchCategory);
+        var harmony = new Harmony(
+            $"{nameof(NativeDefendInput_TargetsVanillaManagedInputBoundary)}." +
+            $"{Guid.NewGuid()}");
+
+        try
+        {
+            registration.Apply(harmony);
+
+            Assert.Contains(
+                Harmony.GetPatchInfo(inputTarget).Postfixes,
+                patch => patch.owner == harmony.Id);
+            Assert.Contains(
+                Harmony.GetPatchInfo(directionTarget).Postfixes,
+                patch => patch.owner == harmony.Id);
+            Assert.Contains(
+                Harmony.GetPatchInfo(controllerTarget).Prefixes,
+                patch => patch.owner == harmony.Id);
+            Assert.Contains(
+                Harmony.GetPatchInfo(controllerTarget).Postfixes,
+                patch => patch.owner == harmony.Id);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [Theory]
+    [InlineData(BattleGuardFixtureMode.Mounted, false, true)]
+    [InlineData(BattleGuardFixtureMode.Mounted, true, false)]
+    [InlineData(BattleGuardFixtureMode.Foot, false, false)]
+    [InlineData(BattleGuardFixtureMode.Foot, true, false)]
+    public void MountedGuardInput_UsesNativeCommandOnlyForExplicitPresentation(
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldApplyMountedGuardCommand(
+                mode,
+                useMovementFlagGuardInput));
     }
 
     [Theory]

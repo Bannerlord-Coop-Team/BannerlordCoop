@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using TaleWorlds.InputSystem;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.MissionViews;
 
@@ -17,14 +18,22 @@ namespace Missions.Battles;
     new[] { typeof(float) })]
 internal static class BattleGuardFixtureInputPatch
 {
+    private static void Prefix()
+    {
+        if (TryGetNativeFixtureInput(
+                out _,
+                out Agent agent,
+                out BattleGuardFixtureDirection direction))
+        {
+            BattleGuardFixtureNativeDefendInput.Inject(agent, direction);
+        }
+    }
+
     private static void Postfix()
     {
-        CoopBattleController controller = Mission.Current?
-            .GetMissionBehavior<CoopBattleController>();
-        Agent agent = Mission.Current?.MainAgent;
-        if (controller == null ||
-            !controller.TryGetGuardFixtureNativePlayerDefendDirection(
-                agent,
+        if (!TryGetNativeFixtureInput(
+                out CoopBattleController controller,
+                out Agent agent,
                 out BattleGuardFixtureDirection direction))
         {
             controller?.ApplyGuardFixturePlayerInput();
@@ -34,6 +43,88 @@ internal static class BattleGuardFixtureInputPatch
         BattleGuardFixtureNativeDefendInput.Inject(agent, direction);
         controller.ApplyGuardFixturePlayerInput();
         BattleGuardFixtureNativeDefendInput.Inject(agent, direction);
+    }
+
+    internal static bool TryGetNativeFixtureInput(
+        out CoopBattleController controller,
+        out Agent agent,
+        out BattleGuardFixtureDirection direction)
+    {
+        controller = Mission.Current?
+            .GetMissionBehavior<CoopBattleController>();
+        agent = Mission.Current?.MainAgent;
+        direction = BattleGuardFixtureDirection.Up;
+        return controller != null &&
+            controller.TryGetGuardFixtureNativePlayerDefendDirection(
+                agent,
+                out direction);
+    }
+}
+
+[HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
+[HarmonyPatch(
+    typeof(InputContext),
+    nameof(InputContext.IsGameKeyDown),
+    new[] { typeof(int) })]
+internal static class BattleGuardFixtureDefendKeyPatch
+{
+    // Vanilla ControlTick reads game key 10 before GetDefendMovementFlag.
+    internal const int DefendGameKey = 10;
+
+    private static void Postfix(int gameKey, ref bool __result)
+    {
+        if (__result || gameKey != DefendGameKey)
+            return;
+
+        bool hasFixtureInput =
+            BattleGuardFixtureInputPatch.TryGetNativeFixtureInput(
+                out _,
+                out _,
+                out _);
+        __result = ShouldReportDefendGameKeyDown(
+            gameKey,
+            __result,
+            hasFixtureInput);
+    }
+
+    internal static bool ShouldReportDefendGameKeyDown(
+        int gameKey,
+        bool isDown,
+        bool hasFixtureInput)
+    {
+        return isDown ||
+            (gameKey == DefendGameKey && hasFixtureInput);
+    }
+}
+
+[HarmonyPatchCategory(MissionModule.BattleGuardFixtureInputPatchCategory)]
+[HarmonyPatch(typeof(Agent), nameof(Agent.GetDefendMovementFlag))]
+internal static class BattleGuardFixtureDefendDirectionPatch
+{
+    private static void Postfix(
+        Agent __instance,
+        ref Agent.MovementControlFlag __result)
+    {
+        bool hasFixtureInput =
+            BattleGuardFixtureInputPatch.TryGetNativeFixtureInput(
+                out _,
+                out Agent fixtureAgent,
+                out BattleGuardFixtureDirection direction) &&
+            ReferenceEquals(__instance, fixtureAgent);
+        __result = ResolveDefendMovementFlag(
+            __result,
+            hasFixtureInput,
+            direction);
+    }
+
+    internal static Agent.MovementControlFlag ResolveDefendMovementFlag(
+        Agent.MovementControlFlag nativeFlag,
+        bool hasFixtureInput,
+        BattleGuardFixtureDirection direction)
+    {
+        return hasFixtureInput
+            ? BattleGuardFixture.GetDefendDirectionFlag(direction)
+            : nativeFlag;
     }
 }
 
