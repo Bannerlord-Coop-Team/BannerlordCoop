@@ -420,16 +420,32 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void MountedStrikeRunway_RemoteStrikerTrustsOwnerGate()
+    public void MountedStrikeRunway_StagingRequiresCurrentRoute()
     {
         Assert.False(
             BattleGuardFixture.HasMountedStrikeStagingRunway(
-                route: null,
-                guardLocallyDriven: true));
+                route: null));
+
+        var route = new BattleGuardMountedRoute(
+            new Vec3(0f, 0f, 0f),
+            new Vec3(0f, 1f, 0f),
+            120f);
+
+        route.Update(
+            new Vec3(3.01f, 60f, 0f),
+            new Vec3(0f, 1f, 0f));
+
+        Assert.False(
+            BattleGuardFixture.HasMountedStrikeStagingRunway(
+                route));
+
+        route.Update(
+            new Vec3(3f, 60f, 0f),
+            new Vec3(0f, 1f, 0f));
+
         Assert.True(
             BattleGuardFixture.HasMountedStrikeStagingRunway(
-                route: null,
-                guardLocallyDriven: false));
+                route));
     }
 
     [Theory]
@@ -1234,7 +1250,7 @@ public class BattleGuardFixtureEvidenceTests
 
     [Theory]
     [InlineData(2f, 8f, 0.5f, true)]
-    [InlineData(4.5f, 8f, 0.5f, false)]
+    [InlineData(2.9f, 8f, 0.5f, false)]
     [InlineData(100f, 8f, 2.5f, true)]
     public void MountedStrikeRelease_LeadsContactOrEndsCharge(
         float longitudinalDistance,
@@ -1286,13 +1302,13 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(0, 0.55f)]
-    [InlineData(1, 0.55f)]
-    [InlineData(2, 0.45f)]
-    [InlineData(3, 0.65f)]
-    [InlineData(4, 0.35f)]
-    [InlineData(5, 0.25f)]
-    [InlineData(6, 0.25f)]
+    [InlineData(0, 0.35f)]
+    [InlineData(1, 0.35f)]
+    [InlineData(2, 0.25f)]
+    [InlineData(3, 0.45f)]
+    [InlineData(4, 0.55f)]
+    [InlineData(5, 0.65f)]
+    [InlineData(6, 0.65f)]
     public void MountedStrikeRelease_ProfilesBracketNativeImpactTiming(
         int attempt,
         float expected)

@@ -2204,11 +2204,9 @@ public class BattleGuardFixture : IBattleGuardFixture
     }
 
     internal static bool HasMountedStrikeStagingRunway(
-        BattleGuardMountedRoute route,
-        bool guardLocallyDriven)
+        BattleGuardMountedRoute route)
     {
-        return !guardLocallyDriven ||
-            HasMountedStrikeRunway(route);
+        return HasMountedStrikeRunway(route);
     }
 
     internal static float GetMountedStrikeTravelAlignment(
@@ -2488,24 +2486,24 @@ public class BattleGuardFixture : IBattleGuardFixture
             Math.Min(
                 MountedStrikeReleaseLeadProfiles,
                 attempt));
-        // Try the proven rider-contact lead first so retries do not consume the runway.
+        // Try the full-speed release profile before the bounded timing bracket.
         int releaseLeadSteps;
         switch (profile)
         {
             case 1:
-                releaseLeadSteps = 3;
-                break;
-            case 2:
-                releaseLeadSteps = 2;
-                break;
-            case 3:
-                releaseLeadSteps = 4;
-                break;
-            case 4:
                 releaseLeadSteps = 1;
                 break;
-            default:
+            case 2:
                 releaseLeadSteps = 0;
+                break;
+            case 3:
+                releaseLeadSteps = 2;
+                break;
+            case 4:
+                releaseLeadSteps = 3;
+                break;
+            default:
+                releaseLeadSteps = 4;
                 break;
         }
         return MountedStrikeMinimumReleaseLeadSeconds +
@@ -4770,7 +4768,7 @@ public class BattleGuardFixture : IBattleGuardFixture
                 StageAttempt();
                 return;
             }
-            // Attack is owner-gated, so collision authority trusts the route and shared speed cap.
+            // Recheck the current route after weapon preparation consumes runway.
             float speedBaseline =
                 GetMountedStrikeSpeedBaseline(
                     guardDriver.CalibratedPlateauSpeed,
@@ -4780,8 +4778,7 @@ public class BattleGuardFixture : IBattleGuardFixture
                 speedBaseline);
             RunwayReady =
                 HasMountedStrikeStagingRunway(
-                    guardDriver.MountedRoute,
-                    guardDriver.DrivesAgent);
+                    guardDriver.MountedRoute);
             TravelLookAlignment =
                 GetMountedStrikeTravelAlignment(
                     guardDriver.CurrentHorizontalDirection,
