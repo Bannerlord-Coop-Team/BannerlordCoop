@@ -214,7 +214,6 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
         onListCompleted = onCompleted;
         listInFlight = true;
         lobbyListQueryPlan = new SteamLobbyListQueryPlan();
-        lobbyMatchList ??= CallResult<LobbyMatchList_t>.Create();
 
         try
         {
@@ -254,6 +253,9 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
                 ELobbyComparison.k_ELobbyComparisonEqualToOrLessThan);
         }
 
+        // Steamworks clears a completed CallResult after its handler returns, so reusing that
+        // instance inside the handler would unregister the next partition request.
+        lobbyMatchList = CallResult<LobbyMatchList_t>.Create();
         lobbyMatchList.Set(SteamMatchmaking.RequestLobbyList(), OnLobbyMatchList);
     }
 
