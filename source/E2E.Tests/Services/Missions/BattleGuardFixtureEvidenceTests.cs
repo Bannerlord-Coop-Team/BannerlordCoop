@@ -1351,6 +1351,43 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, true)]
+    public void MountedStrikeInput_HoldsDuringPreparationAndCharge(
+        bool isCharging,
+        bool isPreparingMountedAttack,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldHoldStrikeAttackInput(
+                isCharging,
+                isPreparingMountedAttack));
+    }
+
+    [Theory]
+    [InlineData(false, true, Agent.ActionStage.AttackReady, false)]
+    [InlineData(true, false, Agent.ActionStage.AttackReady, false)]
+    [InlineData(true, true, Agent.ActionStage.AttackRelease, false)]
+    [InlineData(true, true, Agent.ActionStage.AttackReady, true)]
+    [InlineData(true, true, Agent.ActionStage.AttackQuickReady, true)]
+    public void MountedStrikeStaging_RequiresPreparedNativeAttack(
+        bool isPreparingMountedAttack,
+        bool hasNativeAttack,
+        Agent.ActionStage actionStage,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.IsMountedStrikeAttackPrepared(
+                isPreparingMountedAttack,
+                hasNativeAttack,
+                actionStage));
+    }
+
+    [Theory]
     [InlineData(true, true, true)]
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]

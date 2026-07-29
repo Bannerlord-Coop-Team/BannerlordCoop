@@ -2518,6 +2518,23 @@ public class BattleGuardFixture : IBattleGuardFixture
             actionStage == Agent.ActionStage.AttackQuickReady;
     }
 
+    internal static bool ShouldHoldStrikeAttackInput(
+        bool isCharging,
+        bool isPreparingMountedAttack)
+    {
+        return isCharging || isPreparingMountedAttack;
+    }
+
+    internal static bool IsMountedStrikeAttackPrepared(
+        bool isPreparingMountedAttack,
+        bool hasNativeAttack,
+        Agent.ActionStage actionStage)
+    {
+        return isPreparingMountedAttack &&
+            hasNativeAttack &&
+            IsNativeAttackReady(actionStage);
+    }
+
     internal static bool ShouldCompleteStrikeFromScoreHit(
         bool isBlocked,
         bool isExactGuard)
@@ -4618,6 +4635,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         private long stagedGuardLookUpdateSequence;
         private int attemptStartHitCount;
         private bool mountedStrikeLifecycleActive;
+        private bool mountedAttackPreparing;
 
         public GuardInterceptionStrikeComponent(
             Agent striker,
@@ -4687,7 +4705,9 @@ public class BattleGuardFixture : IBattleGuardFixture
             ref Vec2 inputVector)
         {
             eventFlag = Agent.EventControlFlag.None;
-            movementFlag = state == InterceptionState.Charging
+            movementFlag = ShouldHoldStrikeAttackInput(
+                    state == InterceptionState.Charging,
+                    mountedAttackPreparing)
                 ? GetAttackFlagForGuard(guardDriver.Direction)
                 : Agent.MovementControlFlag.None;
             inputVector = Vec2.Zero;
@@ -4754,13 +4774,18 @@ public class BattleGuardFixture : IBattleGuardFixture
             }
             if (!weaponReady)
                 return;
-            if (TryGetNativeAttack(out _, out _, out _, out _))
-            {
-                stateElapsed = 0f;
-                return;
-            }
+            bool hasNativeAttack = TryGetNativeAttack(
+                out _,
+                out Agent.ActionStage nativeAttackStage,
+                out _,
+                out _);
             if (guardDriver.Mode != BattleGuardFixtureMode.Mounted)
             {
+                if (hasNativeAttack)
+                {
+                    stateElapsed = 0f;
+                    return;
+                }
                 SpeedReady = true;
                 RunwayReady = true;
                 TravelAligned = true;
@@ -4768,7 +4793,27 @@ public class BattleGuardFixture : IBattleGuardFixture
                 StageAttempt();
                 return;
             }
-            // Recheck the current route after weapon preparation consumes runway.
+            if (!mountedAttackPreparing)
+            {
+                if (hasNativeAttack)
+                {
+                    stateElapsed = 0f;
+                    return;
+                }
+
+                mountedAttackPreparing = true;
+                stateElapsed = 0f;
+                return;
+            }
+            if (!IsMountedStrikeAttackPrepared(
+                    mountedAttackPreparing,
+                    hasNativeAttack,
+                    nativeAttackStage))
+            {
+                stateElapsed = 0f;
+                return;
+            }
+            // Recheck the current route after native attack preparation consumes runway.
             float speedBaseline =
                 GetMountedStrikeSpeedBaseline(
                     guardDriver.CalibratedPlateauSpeed,
@@ -4803,6 +4848,7 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         private void StageAttempt()
         {
+            mountedAttackPreparing = false;
             Attempts++;
             stateElapsed = 0f;
             chargeElapsed = 0f;
@@ -5129,6 +5175,7 @@ public class BattleGuardFixture : IBattleGuardFixture
 
         private void EndMountedStrikeLifecycle()
         {
+            mountedAttackPreparing = false;
             guardDriver.EndMountedStrike();
             if (!mountedStrikeLifecycleActive)
                 return;
