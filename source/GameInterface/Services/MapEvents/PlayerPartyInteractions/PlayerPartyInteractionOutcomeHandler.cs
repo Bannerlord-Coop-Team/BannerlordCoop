@@ -381,6 +381,25 @@ internal class PlayerPartyInteractionOutcomeHandler
     {
         foreach (var transfer in transfers)
         {
+            var character = transfer.Character;
+            if (character.IsHero && character.HeroObject.IsWanderer)
+            {
+                var companion = character.HeroObject;
+
+                // Skip clan remove/re-add to support same two players in the same clan trading companions
+                if (sourceParty.MobileParty.ActualClan != destinationParty.MobileParty.ActualClan)
+                {
+                    // Use ApplyAfterQuest to avoid doing extra logic for making the companion fugitive and resetting equipment
+                    RemoveCompanionAction.ApplyAfterQuest(sourceParty.MobileParty.ActualClan, companion);
+
+                    companion.CompanionOf = destinationParty.MobileParty.ActualClan;
+                    CampaignEventDispatcher.Instance.OnNewCompanionAdded(companion);
+                }
+
+                AddHeroToPartyAction.Apply(companion, destinationParty.MobileParty);
+                continue;
+            }
+
             sourceParty.MemberRoster.AddToCounts(
                 transfer.Character,
                 -transfer.Amount,

@@ -26,6 +26,7 @@ using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
@@ -1416,6 +1417,9 @@ public class VillageHostileActionTests : MapEventTestBase
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
 
+        // Simulate atleast one connected player so that unPause policy in ITimeControl for no connected players is not triggered
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "PlayerOne");
+
         Server.Call(() => Server.Resolve<ITimeControlInterface>().ServerSetTimeControl(TimeControlEnum.Play_2x));
         Server.NetworkSentMessages.Clear();
 
@@ -1886,6 +1890,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
         Assert.Equal(woundedPartyId, left.PartyId);
+        Assert.False(left.LeaveSiege);
 
         AssertHostileActionJoinerLeft(Server, hostileAction.MapEventId, hostileAction.AttackerPartyId, woundedPartyId!);
         foreach (var syncedClient in Clients)
@@ -2176,6 +2181,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
         Assert.Equal(joinerPartyId, left.PartyId);
+        Assert.False(left.LeaveSiege);
 
         AssertHostileActionJoinerLeft(Server, hostileAction.MapEventId, hostileAction.AttackerPartyId, joinerPartyId);
         foreach (var leftClient in Clients)

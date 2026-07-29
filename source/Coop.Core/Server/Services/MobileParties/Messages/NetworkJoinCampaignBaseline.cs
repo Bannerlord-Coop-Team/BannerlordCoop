@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.MobileParties.Data;
 using ProtoBuf;
 
@@ -19,12 +20,17 @@ public readonly struct NetworkJoinCampaignBaseline : IMessage
     [ProtoMember(3)]
     public readonly bool IsComplete;
 
+    [ProtoMember(4)]
+    public readonly TimeControlEnum TimeControlMode;
+
     public NetworkJoinCampaignBaseline(
         long serverTicks,
+        TimeControlEnum timeControlMode,
         MobilePartyJoinState[] partyStates,
         bool isComplete = true)
     {
         ServerTicks = serverTicks;
+        TimeControlMode = timeControlMode;
         PartyStates = partyStates;
         IsComplete = isComplete;
     }
