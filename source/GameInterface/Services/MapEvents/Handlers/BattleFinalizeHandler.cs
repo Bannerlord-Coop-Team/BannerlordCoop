@@ -15,6 +15,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Patches;
+using GameInterface.Services.Villages.Commands;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -144,6 +145,9 @@ internal class BattleFinalizeHandler : IHandler
 
             return;
         }
+
+        if (requester != null && MapEventDebugCommands.ShouldHoldBattleRewardFixtureFinalize(mapEvent))
+            return;
 
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");

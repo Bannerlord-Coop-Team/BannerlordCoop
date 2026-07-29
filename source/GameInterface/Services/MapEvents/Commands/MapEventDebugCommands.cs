@@ -51,6 +51,9 @@ public class MapEventDebugCommands
     private static BattleRewardFixture battleRewardFixture;
     private static PlayerFieldBattleFixture playerFieldBattleFixture;
 
+    internal static bool ShouldHoldBattleRewardFixtureFinalize(MapEvent mapEvent) =>
+        battleRewardFixture?.MapEvent == mapEvent && mapEvent.BattleState == BattleState.None;
+
     private sealed class WoundedAlliedFixture
     {
         public string ControllerId;
