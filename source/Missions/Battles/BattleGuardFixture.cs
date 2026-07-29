@@ -25,6 +25,10 @@ public interface IBattleGuardFixture
         IAgentPositionInterpolator interpolator);
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
     void ApplyMountedStrike(NetworkBattleGuardFixtureStrike strike);
+    bool TryGetNativePlayerDefendDirection(
+        INetworkAgentRegistry agentRegistry,
+        Agent agent,
+        out BattleGuardFixtureDirection direction);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
     void RefreshOwnedMountedStrikeLook(INetworkAgentRegistry agentRegistry);
@@ -328,6 +332,27 @@ public class BattleGuardFixture : IBattleGuardFixture
     {
         if (TryGetDrivenGuardAgent(agentRegistry, out Agent agent))
             DriveGuardInput(agent, guardDriver);
+    }
+
+    public bool TryGetNativePlayerDefendDirection(
+        INetworkAgentRegistry agentRegistry,
+        Agent agent,
+        out BattleGuardFixtureDirection direction)
+    {
+        direction = BattleGuardFixtureDirection.Up;
+        if (!ReferenceEquals(agent, Mission.Current?.MainAgent) ||
+            !TryGetDrivenGuardAgent(agentRegistry, out Agent drivenAgent) ||
+            !ReferenceEquals(agent, drivenAgent) ||
+            !ShouldInjectNativePlayerDefendDirection(
+                guardDriver.Mode,
+                guardDriver.UseMovementFlagGuardInput,
+                guardDriver.Phase))
+        {
+            return false;
+        }
+
+        direction = guardDriver.Direction;
+        return true;
     }
 
     public void ReapplyPlayerGuardInput(
@@ -1512,6 +1537,16 @@ public class BattleGuardFixture : IBattleGuardFixture
             !useMovementFlagGuardInput;
     }
 
+    internal static bool ShouldInjectNativePlayerDefendDirection(
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput,
+        BattleGuardFixturePhase phase)
+    {
+        return mode == BattleGuardFixtureMode.Mounted &&
+            useMovementFlagGuardInput &&
+            phase != BattleGuardFixturePhase.Calibration;
+    }
+
     internal static bool ShouldApplyMountedGuardCommand(
         BattleGuardFixtureMode mode) =>
         mode == BattleGuardFixtureMode.Mounted;
@@ -2220,7 +2255,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             guardCommandDirection) ||
             (!reactionActive &&
              (guarding
-                ? observedGuardMode != GetGuardMode(direction)
+                ? AgentActionData.IsGuardMode(observedGuardMode) &&
+                    observedGuardMode != GetGuardMode(direction)
                 : AgentActionData.IsGuardMode(observedGuardMode)));
     }
 

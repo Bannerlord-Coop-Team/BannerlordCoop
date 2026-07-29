@@ -491,7 +491,7 @@ public class BattleGuardFixtureEvidenceTests
     [Theory]
     [InlineData(true, false, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.Left, false, true)]
     [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.Left, false, false)]
-    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Right, false, true)]
     [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, true)]
     [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, false)]
@@ -573,6 +573,45 @@ public class BattleGuardFixtureEvidenceTests
             BattleGuardFixture.ShouldApplyExplicitMountedGuardInput(
                 mode,
                 useMovementFlagGuardInput));
+    }
+
+    [Theory]
+    [InlineData(BattleGuardFixtureMode.Mounted, true, BattleGuardFixturePhase.Calibration, false)]
+    [InlineData(BattleGuardFixtureMode.Mounted, true, BattleGuardFixturePhase.Guard, true)]
+    [InlineData(BattleGuardFixtureMode.Mounted, true, BattleGuardFixturePhase.Attack, true)]
+    [InlineData(BattleGuardFixtureMode.Mounted, false, BattleGuardFixturePhase.Guard, false)]
+    [InlineData(BattleGuardFixtureMode.Foot, true, BattleGuardFixturePhase.Guard, false)]
+    public void NativeDefendDirection_OnlyInjectsAuthenticMountedGuardInput(
+        BattleGuardFixtureMode mode,
+        bool useMovementFlagGuardInput,
+        BattleGuardFixturePhase phase,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldInjectNativePlayerDefendDirection(
+                mode,
+                useMovementFlagGuardInput,
+                phase));
+    }
+
+    [Theory]
+    [InlineData(BattleGuardFixtureDirection.Up, 0, 0x11843A0)]
+    [InlineData(BattleGuardFixtureDirection.Down, 1, 0x118439C)]
+    [InlineData(BattleGuardFixtureDirection.Left, 2, 0x1184398)]
+    [InlineData(BattleGuardFixtureDirection.Right, 3, 0x1184394)]
+    public void NativeDefendDirection_UsesVerifiedV147Layout(
+        BattleGuardFixtureDirection direction,
+        int expectedCacheValue,
+        int expectedWeightOffset)
+    {
+        Assert.Equal(
+            expectedCacheValue,
+            BattleGuardFixtureNativeDefendInput.GetCacheValue(direction));
+        Assert.Equal(
+            expectedWeightOffset,
+            BattleGuardFixtureNativeDefendInput.GetActiveWeightOffset(
+                direction));
     }
 
     [Theory]

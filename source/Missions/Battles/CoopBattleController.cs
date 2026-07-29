@@ -300,6 +300,14 @@ public class CoopBattleController : CoopMissionController
     }
 
 #if DEBUG
+    internal bool TryGetGuardFixtureNativePlayerDefendDirection(
+        Agent agent,
+        out BattleGuardFixtureDirection direction) =>
+        guardFixture.TryGetNativePlayerDefendDirection(
+            coopMissionComponent.AgentRegistry,
+            agent,
+            out direction);
+
     internal void ApplyGuardFixturePlayerInput() =>
         guardFixture.ApplyPlayerInput(coopMissionComponent.AgentRegistry);
 
