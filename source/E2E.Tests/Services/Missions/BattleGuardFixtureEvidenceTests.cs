@@ -489,22 +489,25 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(true, false, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.Left, false, true)]
-    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.Left, false, false)]
-    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, false)]
-    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Right, false, true)]
-    [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, true)]
-    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, false)]
-    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Up, false, true)]
-    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.None, true, false)]
-    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.Up, true, false)]
-    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Up, true, true)]
+    [InlineData(true, false, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.Left, false, false, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.Left, false, false, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, false, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Right, true, false, true)]
+    [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, false, true)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, false, false)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Up, false, false, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.None, false, true, false)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.Up, false, true, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Up, true, true, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.Up, false, false, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.Up, true, false, false)]
     public void MountedGuardState_CommandsNativeStateOnTransitionOrDrift(
         bool guarding,
         bool guardCommandActive,
         BattleGuardFixtureDirection direction,
         BattleGuardFixtureDirection guardCommandDirection,
         Agent.GuardMode observedGuardMode,
+        bool nativeDefendDirectionMatches,
         bool reactionActive,
         bool expected)
     {
@@ -516,6 +519,7 @@ public class BattleGuardFixtureEvidenceTests
                 direction,
                 guardCommandDirection,
                 observedGuardMode,
+                nativeDefendDirectionMatches,
                 reactionActive));
     }
 

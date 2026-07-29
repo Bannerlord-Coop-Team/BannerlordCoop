@@ -1363,6 +1363,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         bool reactionActive =
             driver.Phase == BattleGuardFixturePhase.Attack &&
             IsReaction(agent, driver.GuardActionIndex);
+        bool nativeDefendDirectionMatches =
+            driver.UseMovementFlagGuardInput &&
+            agent.GetDefendMovementFlag() ==
+                GetDefendDirectionFlag(driver.Direction);
         bool mountedGuardCommandTransition =
             IsMountedGuardCommandTransition(
                 guarding,
@@ -1391,6 +1395,7 @@ public class BattleGuardFixture : IBattleGuardFixture
                 driver.Direction,
                 driver.MountedGuardCommandDirection,
                 observedMountedGuardMode,
+                nativeDefendDirectionMatches,
                 reactionActive))
         {
             if (mountedGuardNeedsReset)
@@ -2246,6 +2251,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         BattleGuardFixtureDirection direction,
         BattleGuardFixtureDirection guardCommandDirection,
         Agent.GuardMode observedGuardMode,
+        bool nativeDefendDirectionMatches,
         bool reactionActive)
     {
         return IsMountedGuardCommandTransition(
@@ -2255,7 +2261,8 @@ public class BattleGuardFixture : IBattleGuardFixture
             guardCommandDirection) ||
             (!reactionActive &&
              (guarding
-                ? AgentActionData.IsGuardMode(observedGuardMode) &&
+                ? !nativeDefendDirectionMatches &&
+                    AgentActionData.IsGuardMode(observedGuardMode) &&
                     observedGuardMode != GetGuardMode(direction)
                 : AgentActionData.IsGuardMode(observedGuardMode)));
     }
