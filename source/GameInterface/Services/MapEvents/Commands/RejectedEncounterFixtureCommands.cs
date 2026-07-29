@@ -271,12 +271,46 @@ public class RejectedEncounterFixtureCommands
             : null;
         var mobileParty = party.MobileParty;
         var mapFaction = mobileParty?.MapFaction;
+        var nearestTownOrVillage = mobileParty == null
+            ? null
+            : SettlementHelper.FindNearestSettlementToMobileParty(
+                mobileParty,
+                MobileParty.NavigationType.All,
+                candidate => candidate.IsTown || candidate.IsVillage);
         var ready = mobileParty != null &&
+                    mobileParty.IsActive &&
                     mapFaction != null &&
-                    conversationCharacter != null;
-        return $"Fixture party {args[0]}: ready={ready}, resolved=True, memberCount={memberCount}, " +
+                    conversationCharacter != null &&
+                    nearestTownOrVillage != null;
+        return $"Fixture party {args[0]}: ready={ready}, resolved=True, active={mobileParty?.IsActive == true}, " +
+               $"position={mobileParty?.Position.X:R}|{mobileParty?.Position.Y:R}, memberCount={memberCount}, " +
                $"mapFaction={mapFaction?.StringId ?? "<null>"}, " +
-               $"conversationCharacter={conversationCharacter?.StringId ?? "<null>"}.";
+               $"conversationCharacter={conversationCharacter?.StringId ?? "<null>"}, " +
+               $"nearestTownOrVillage={nearestTownOrVillage?.StringId ?? "<null>"}.";
+    }
+
+    [CommandLineArgumentFunction("rejected_encounter_fixture_conversation_state", "coop.debug.mapevent")]
+    public static string ConversationState(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.rejected_encounter_fixture_conversation_state";
+
+        var conversationManager = Campaign.Current?.ConversationManager;
+        var sentenceStarted = conversationManager?._currentSentence >= 0;
+        var sentenceText = sentenceStarted == true
+            ? conversationManager.CurrentSentenceText
+            : string.Empty;
+        var optionCount = conversationManager?.CurOptions?.Count ?? 0;
+        var ready = conversationManager?.IsConversationInProgress == true &&
+                    !string.IsNullOrWhiteSpace(sentenceText) &&
+                    optionCount > 0;
+        return $"Fixture conversation: ready={ready}, " +
+               $"inProgress={conversationManager?.IsConversationInProgress == true}, " +
+               $"sentenceStarted={sentenceStarted}, sentenceLength={sentenceText.Length}, " +
+               $"optionCount={optionCount}.";
     }
 
     [CommandLineArgumentFunction("rejected_encounter_fixture_state", "coop.debug.mapevent")]
