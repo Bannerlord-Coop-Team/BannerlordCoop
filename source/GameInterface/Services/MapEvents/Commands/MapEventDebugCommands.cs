@@ -1328,6 +1328,10 @@ public class MapEventDebugCommands
         if (PlayerEncounter.Current == null)
             return "No active encounter.";
 
+        var conversationManager = Campaign.Current?.ConversationManager;
+        if (conversationManager?.IsConversationInProgress == true)
+            conversationManager.EndConversation();
+
         if (PlayerEncounter.Battle == null)
         {
             if (PlayerEncounter.StartBattle() == null)

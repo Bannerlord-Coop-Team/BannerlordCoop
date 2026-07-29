@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -182,6 +183,10 @@ public class RejectedEncounterFixtureCommands
         if (PlayerEncounter.Current == null)
             return "No active encounter.";
 
+        var conversationManager = Campaign.Current?.ConversationManager;
+        if (conversationManager?.IsConversationInProgress == true)
+            conversationManager.EndConversation();
+
         var mapEvent = PlayerEncounter.Battle ?? PlayerEncounter.StartBattle();
         if (mapEvent == null)
             return "Unable to create the authoritative map event.";
@@ -240,6 +245,31 @@ public class RejectedEncounterFixtureCommands
             ? "Player party: <null>."
             : $"Player party: position={playerParty.Position.X:R}|{playerParty.Position.Y:R}, " +
               $"isCurrentlyAtSea={playerParty.IsCurrentlyAtSea}.";
+    }
+
+    [CommandLineArgumentFunction("rejected_encounter_fixture_party_state", "coop.debug.mapevent")]
+    public static string PartyState(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.rejected_encounter_fixture_party_state <partyBaseId>";
+
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetObject<PartyBase>(args[0], out var party))
+            return $"Fixture party {args[0]}: ready=False, resolved=False.";
+
+        var memberRoster = party.MemberRoster;
+        var memberCount = memberRoster?.TotalManCount ?? 0;
+        var conversationCharacter = memberCount > 0
+            ? ConversationHelper.GetConversationCharacterPartyLeader(party)
+            : null;
+        var mobileParty = party.MobileParty;
+        var mapFaction = mobileParty?.MapFaction;
+        var ready = mobileParty != null &&
+                    mapFaction != null &&
+                    conversationCharacter != null;
+        return $"Fixture party {args[0]}: ready={ready}, resolved=True, memberCount={memberCount}, " +
+               $"mapFaction={mapFaction?.StringId ?? "<null>"}, " +
+               $"conversationCharacter={conversationCharacter?.StringId ?? "<null>"}.";
     }
 
     [CommandLineArgumentFunction("rejected_encounter_fixture_state", "coop.debug.mapevent")]
