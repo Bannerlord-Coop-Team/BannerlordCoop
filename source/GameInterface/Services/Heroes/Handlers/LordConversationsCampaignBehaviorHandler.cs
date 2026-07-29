@@ -9,8 +9,6 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -21,21 +19,18 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
-    private readonly ISendCoalescer sendCoalescer;
 
-    private const int prisonerLiberationRelationReward = 10;
-    private const int letLordGoReward = 4;
+    private const int PrisonerLiberationRelationReward = 10;
+    private const int LetLordGoReward = 4;
 
     public LordConversationsCampaignBehaviorHandler(
         IObjectManager objectManager,
         INetwork network,
-        IMessageBroker messageBroker,
-        ISendCoalescer sendCoalescer = null)
+        IMessageBroker messageBroker)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
-        this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<LiberateLordPrisoner>(Handle_LiberateLordPrisoner);
         messageBroker.Subscribe<NetworkLiberateLordPrisoner>(Handle_NetworkLiberateLordPrisoner);
@@ -88,7 +83,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var playerHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
 
-            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, conversationHero, prisonerLiberationRelationReward);
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, conversationHero, PrisonerLiberationRelationReward);
 
             if (conversationHero.IsPrisoner)
             {
@@ -174,7 +169,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
                 MakeHeroFugitiveAction.Apply(conversationHero, false);
             }
 
-            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, conversationHero, letLordGoReward);
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, conversationHero, LetLordGoReward);
         },
         context: nameof(Handle_NetworkLordDefeatToRelease));
     }
@@ -200,7 +195,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
             {
                 EndCaptivityAction.ApplyByReleasedByChoice(conversationHero, mainHero);
             }
-            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, conversationHero, letLordGoReward);
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, conversationHero, LetLordGoReward);
             
             // TODO
             //TraitLevelingHelper.OnLordFreed(conversationHero);

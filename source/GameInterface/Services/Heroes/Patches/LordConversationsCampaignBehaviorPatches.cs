@@ -13,88 +13,81 @@ internal class LordConversationsCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_player_liberates_prisoner_on_consequence))]
     [HarmonyPrefix]
-    public static bool ConversationPlayerLiberatesPrisonerOnConsequencePrefix(
-        LordConversationsCampaignBehavior __instance)
+    public static bool ConversationPlayerLiberatesPrisonerOnConsequencePrefix()
     {
         var message = new LiberateLordPrisoner(Hero.MainHero, Hero.OneToOneConversationHero);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(null, message);
 
         return false;
     }
 
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_player_fails_to_release_prisoner_on_consequence))]
     [HarmonyPrefix]
-    public static bool ConversationPlayerFailsToReleasePrisonerOnConsequencePrefix(
-        LordConversationsCampaignBehavior __instance)
+    public static bool ConversationPlayerFailsToReleasePrisonerOnConsequencePrefix()
     {
         if (!Hero.OneToOneConversationHero.IsPrisoner) return false;
 
         var message = new TakeLordPrisoner(Campaign.Current.MainParty.Party, Hero.OneToOneConversationHero);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(null, message);
 
         return false;
     }
 
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_ally_thanks_meet_after_helping_in_battle_2_on_consequence))]
     [HarmonyPrefix]
-    public static bool ConversationAllyThanksMeetAfterHelpingInBattle2OnConsequencePrefix(
-        LordConversationsCampaignBehavior __instance)
+    public static bool ConversationAllyThanksMeetAfterHelpingInBattle2OnConsequencePrefix()
     {
         // TODO: PlayerMapEvent will be null here. Need to get the relation change without it
         //int playerGainedRelationAmount = Campaign.Current.Models.BattleRewardModel.GetPlayerGainedRelationAmount(MapEvent.PlayerMapEvent, Hero.OneToOneConversationHero);
 
         var message = new LordHelpedInBattle(Hero.MainHero, Hero.OneToOneConversationHero); // playerGainedRelationAmount
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(null, message);
 
         return false;
     }
 
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_talk_lord_defeat_to_lord_capture_on_consequence))]
     [HarmonyPrefix]
-    public static bool ConversationTalkLordDefeatToLordCaptureOnConsequencePrefix(
-        LordConversationsCampaignBehavior __instance)
+    public static bool ConversationTalkLordDefeatToLordCaptureOnConsequencePrefix()
     {
         Campaign.Current.CurrentConversationContext = ConversationContext.Default;
 
         var message = new TakeLordPrisoner(Campaign.Current.MainParty.Party, CharacterObject.OneToOneConversationCharacter.HeroObject);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(null, message);
 
         return false;
     }
 
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_talk_lord_defeat_to_lord_release_on_consequence))]
     [HarmonyPrefix]
-    public static bool ConversationTalkLordDefeatToLordReleaseOnConsequencePrefix(
-        LordConversationsCampaignBehavior __instance)
+    public static bool ConversationTalkLordDefeatToLordReleaseOnConsequencePrefix()
     {
         DialogHelper.SetDialogString("DEFEAT_LORD_ANSWER", "str_prisoner_released");
 
         var message = new LordDefeatToRelease(Hero.MainHero, Hero.OneToOneConversationHero);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(null, message);
 
         return false;
     }
 
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_talk_lord_freed_to_lord_capture_on_consequence))]
     [HarmonyPrefix]
-    public static bool ConversationTalkLordFreedToLordCaptureOnConsequencePrefix(
-        LordConversationsCampaignBehavior __instance)
+    public static bool ConversationTalkLordFreedToLordCaptureOnConsequencePrefix()
     {
         Campaign.Current.CurrentConversationContext = ConversationContext.Default;
 
         var message = new TakeLordPrisoner(Campaign.Current.MainParty.Party, Hero.OneToOneConversationHero);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(null, message);
 
         return false;
     }
 
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_talk_lord_freed_to_lord_release_on_consequence))]
     [HarmonyPrefix]
-    public static bool ConversationTalkLordFreedToLordReleaseOnConsequencePrefix(
-        LordConversationsCampaignBehavior __instance)
+    public static bool ConversationTalkLordFreedToLordReleaseOnConsequencePrefix()
     {
         var message = new LordFreedToRelease(Hero.MainHero, Hero.OneToOneConversationHero);
-        MessageBroker.Instance.Publish(__instance, message);
+        MessageBroker.Instance.Publish(null, message);
 
         return false;
     }
