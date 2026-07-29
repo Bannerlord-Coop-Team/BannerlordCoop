@@ -70,8 +70,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // override it, so this runs for both battle and location missions.
         coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
 
-        // Continuous movement setters run after the mission input boundary. Refresh the retained mounted
-        // direction here so the upcoming native Agent cycle cannot select the previous guard sibling.
+        // Continuous movement setters can replace defend input after the mission boundary. Restore the held
+        // flags without restarting the guard command so native animation keeps its own timeline.
         coopMissionComponent.AgentActionHandler.RefreshRemoteGuardStatesAfterMovement();
 
         // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action

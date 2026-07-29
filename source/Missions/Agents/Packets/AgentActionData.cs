@@ -172,9 +172,10 @@ namespace Missions.Agents.Packets
             if (IsGuardMode(guardMode))
                 return guardMode;
 
-            guardMode = GetGuardModeFromDefendFlags(defendFlags);
-            if (IsGuardMode(guardMode))
-                return guardMode;
+            Agent.GuardMode flagGuardMode =
+                GetGuardModeFromDefendFlags(defendFlags);
+            if (IsGuardMode(flagGuardMode))
+                return flagGuardMode;
 
             guardMode = GetGuardModeFromDefendDirection(
                 agent.GetCurrentActionDirection(1));
@@ -342,12 +343,19 @@ namespace Missions.Agents.Packets
         {
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
+            bool isPlayerControlled =
+                agent.Controller == AgentControllerType.Player;
 
-            if (agent.HasMount)
+            if (IsGuardMode(guardMode))
             {
                 defendFlags = AlignDefendDirection(
                     defendFlags,
                     guardMode);
+                if (isPlayerControlled)
+                {
+                    defendFlags |=
+                        Agent.MovementControlFlag.DefendBlock;
+                }
             }
 
             Agent.MovementControlFlag movementFlags = agent.MovementFlags;
@@ -392,8 +400,7 @@ namespace Missions.Agents.Packets
                         agent.GetCurrentActionType(
                             GuardActionChannel)));
             IsMounted = agent.HasMount;
-            IsPlayerControlled =
-                agent.Controller == AgentControllerType.Player;
+            IsPlayerControlled = isPlayerControlled;
         }
 
         public void Apply(
@@ -413,7 +420,8 @@ namespace Missions.Agents.Packets
             ApplyDefendMovementFlags(agent, movementFlags);
 
             // Install action transitions, but let an unchanged native action advance on its local timeline.
-            if ((!suppressMountedGuardActionTransition
+            if (!ShouldSuppressReleasedPlayerGuardAction(0)
+                && (!suppressMountedGuardActionTransition
                     || GuardActionChannel != 0)
                 && NeedsActionTransition(
                     agent,
@@ -455,7 +463,8 @@ namespace Missions.Agents.Packets
                 }
             }
 
-            if ((!suppressMountedGuardActionTransition
+            if (!ShouldSuppressReleasedPlayerGuardAction(1)
+                && (!suppressMountedGuardActionTransition
                     || GuardActionChannel != 1)
                 && NeedsActionTransition(
                     agent,
@@ -496,6 +505,16 @@ namespace Missions.Agents.Packets
                         startProgress: Action1Progress);
                 }
             }
+        }
+
+        private bool ShouldSuppressReleasedPlayerGuardAction(
+            int channel)
+        {
+            return IsPlayerControlled
+                && GuardActionChannel == channel
+                && GuardActionIsDefending
+                && DefendFlags == Agent.MovementControlFlag.None
+                && !IsGuardMode(GuardMode);
         }
 
         private bool TryResolveActionTransition(

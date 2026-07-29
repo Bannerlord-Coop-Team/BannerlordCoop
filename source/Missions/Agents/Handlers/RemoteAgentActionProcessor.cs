@@ -338,20 +338,17 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 if (!afterNativeTick)
                 {
                     AgentActionData data = guardState.Action.Data;
+                    AgentActionData.ApplyDefendMovementFlags(
+                        agent,
+                        data.DefendFlags);
                     if (!afterMovement)
                     {
-                        AgentActionData.ApplyDefendMovementFlags(
+                        ApplyRetainedGuardCommand(
                             agent,
-                            data.DefendFlags);
+                            guardState,
+                            restoreNativeGuardState:
+                                data.IsPlayerControlled || !agent.HasMount);
                     }
-                    ApplyRetainedGuardCommand(
-                        agent,
-                        guardState,
-                        data.DefendFlags,
-                        restoreNativeGuardState:
-                            data.IsPlayerControlled || !agent.HasMount,
-                        refreshMountedGuardCommand:
-                            afterMovement);
                 }
 
                 bool hasGuardReaction =
@@ -955,9 +952,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private void ApplyRetainedGuardCommand(
         Agent agent,
         RemoteGuardState guardState,
-        Agent.MovementControlFlag defendFlags,
-        bool restoreNativeGuardState,
-        bool refreshMountedGuardCommand)
+        bool restoreNativeGuardState)
     {
         Agent.GuardMode guardMode = guardState.Action.Data.GuardMode;
         if (!AgentActionData.IsGuardMode(guardMode))
@@ -985,20 +980,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && guardState.LastCommandedMountIndex != mountIndex;
         bool guardModeChanged = guardState.HasGuardCommand
             && guardState.LastCommandedGuardMode != guardMode;
-        bool refreshesMountedGuard =
-            agent.HasMount
-            && guardState.Action.Data.IsMounted
-            && guardState.Action.Data.IsPlayerControlled
-            && guardState.Action.Data.GuardActionIsDefending
-            && !guardState.Action.Data.GuardActionIsReaction
-            && guardState.GuardActionChannel >= 0
-            && guardState.GuardActionChannel <= 1
-            && guardState.GuardAction != ActionIndexCache.act_none;
-        if (refreshMountedGuardCommand
-            && !refreshesMountedGuard)
-        {
-            return;
-        }
         bool nativeGuardStateMissing =
             restoreNativeGuardState
             && !agent.HasMount
@@ -1009,27 +990,26 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             !guardState.HasGuardCommand
             || mountChanged
             || guardModeChanged
-            || refreshMountedGuardCommand
             || nativeGuardStateMissing;
         if (shouldApplyGuardCommand)
         {
-            if (refreshMountedGuardCommand)
-            {
-                // Movement replay writes after the pre-mission guard apply. Refresh its defend flags first so
-                // the explicit synchronized guard direction is the final native command for this frame.
-                AgentActionData.ApplyDefendMovementFlags(
-                    agent,
-                    defendFlags);
-            }
             bool forceGuardCommand =
                 mountChanged
                 || reacquiringGuard
-                || refreshMountedGuardCommand
                 || nativeGuardStateMissing;
-            AgentActionData.ApplyGuardState(
-                agent,
-                guardMode,
-                force: forceGuardCommand);
+            if (guardModeChanged)
+            {
+                AgentActionData.ApplyGuardDirectionTransition(
+                    agent,
+                    guardMode);
+            }
+            else
+            {
+                AgentActionData.ApplyGuardState(
+                    agent,
+                    guardMode,
+                    force: forceGuardCommand);
+            }
         }
 
         guardState.HasGuardCommand = true;
