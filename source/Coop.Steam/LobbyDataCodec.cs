@@ -19,9 +19,24 @@ public static class LobbyDataCodec
     public const string ConnectedPlayersKey = "coop_connected_players";
     public const string LobbyTypeKey = "coop_lobby_type";
     public const string VisibilityKey = "coop_visibility";
+    public const string DiscoveryPartitionKey = "coop_discovery_partition";
     public const string StandaloneLobbyType = "standalone";
     public const string HiddenStandaloneLobbyType = "standalone_hidden";
     public const string PlayerLobbyType = "player";
+
+    public static int GetDiscoveryPartition(ulong lobbyId)
+    {
+        unchecked
+        {
+            // Steam lobby ids are allocated in clusters, so hash the full id before range
+            // partitioning to keep saturated discovery queries balanced.
+            ulong value = lobbyId;
+            value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+            value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+            value ^= value >> 31;
+            return (int)(value & int.MaxValue);
+        }
+    }
 
     public static string EncodeVisibility(ServerVisibility visibility) => visibility switch
     {

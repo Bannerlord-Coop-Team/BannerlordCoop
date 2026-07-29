@@ -31,6 +31,8 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
     private Action<ulong, bool> onCreateCompleted;
     private Action<ulong, bool> onJoinCompleted;
     private Action<IReadOnlyList<ulong>, bool> onListCompleted;
+    private SteamLobbyListQueryPlan lobbyListQueryPlan;
+    private SteamLobbyListQueryRange activeLobbyListRange;
     private readonly Dictionary<ulong, List<Action<bool>>> lobbyDataRequests = new();
 
     public SteamLobbyApi()
@@ -211,23 +213,48 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
 
         onListCompleted = onCompleted;
         listInFlight = true;
+        lobbyListQueryPlan = new SteamLobbyListQueryPlan();
         lobbyMatchList ??= CallResult<LobbyMatchList_t>.Create();
 
         try
         {
-            SteamMatchmaking.AddRequestLobbyListDistanceFilter(ELobbyDistanceFilter.k_ELobbyDistanceFilterWorldwide);
-            SteamMatchmaking.AddRequestLobbyListStringFilter(
-                LobbyDataCodec.LobbyTypeKey,
-                LobbyDataCodec.StandaloneLobbyType,
-                ELobbyComparison.k_ELobbyComparisonEqual);
-
-            lobbyMatchList.Set(SteamMatchmaking.RequestLobbyList(), OnLobbyMatchList);
+            RequestNextLobbyListPage();
         }
         catch
         {
-            listInFlight = false;
+            ClearLobbyListRequest();
             throw;
         }
+    }
+
+    private void RequestNextLobbyListPage()
+    {
+        if (!lobbyListQueryPlan.TryGetNext(out activeLobbyListRange))
+        {
+            CompleteLobbyListRequest(lobbyListQueryPlan.Results, true);
+            return;
+        }
+
+        SteamMatchmaking.AddRequestLobbyListDistanceFilter(ELobbyDistanceFilter.k_ELobbyDistanceFilterWorldwide);
+        SteamMatchmaking.AddRequestLobbyListStringFilter(
+            LobbyDataCodec.LobbyTypeKey,
+            LobbyDataCodec.StandaloneLobbyType,
+            ELobbyComparison.k_ELobbyComparisonEqual);
+        SteamMatchmaking.AddRequestLobbyListResultCountFilter(SteamLobbyListQueryPlan.MaxResultsPerQuery);
+
+        if (!activeLobbyListRange.IsUnfiltered)
+        {
+            SteamMatchmaking.AddRequestLobbyListNumericalFilter(
+                LobbyDataCodec.DiscoveryPartitionKey,
+                activeLobbyListRange.Minimum,
+                ELobbyComparison.k_ELobbyComparisonEqualToOrGreaterThan);
+            SteamMatchmaking.AddRequestLobbyListNumericalFilter(
+                LobbyDataCodec.DiscoveryPartitionKey,
+                activeLobbyListRange.Maximum,
+                ELobbyComparison.k_ELobbyComparisonEqualToOrLessThan);
+        }
+
+        lobbyMatchList.Set(SteamMatchmaking.RequestLobbyList(), OnLobbyMatchList);
     }
 
     public IReadOnlyList<ulong> GetFriendLobbyIds()
@@ -312,30 +339,61 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
 
     private void OnLobbyMatchList(LobbyMatchList_t result, bool ioFailure)
     {
-        listInFlight = false;
-
         try
         {
             if (ioFailure)
             {
                 Logger.Error("Steam lobby search failed");
-                onListCompleted?.Invoke(Array.Empty<ulong>(), false);
+                CompleteLobbyListRequest(Array.Empty<ulong>(), false);
                 return;
             }
 
             var lobbyIds = new List<ulong>((int)result.m_nLobbiesMatching);
             for (uint i = 0; i < result.m_nLobbiesMatching; i++)
             {
-                lobbyIds.Add(SteamMatchmaking.GetLobbyByIndex((int)i).m_SteamID);
+                ulong lobbyId = SteamMatchmaking.GetLobbyByIndex((int)i).m_SteamID;
+                int partition = LobbyDataCodec.GetDiscoveryPartition(lobbyId);
+                if (!activeLobbyListRange.Contains(partition))
+                {
+                    Logger.Error(
+                        "Steam lobby {LobbyId} was outside the requested discovery partition",
+                        lobbyId.ToString());
+                    CompleteLobbyListRequest(Array.Empty<ulong>(), false);
+                    return;
+                }
+
+                lobbyIds.Add(lobbyId);
             }
 
-            onListCompleted?.Invoke(lobbyIds, true);
+            lobbyListQueryPlan.AddResults(activeLobbyListRange, lobbyIds);
+            if (lobbyListQueryPlan.WasTruncated)
+            {
+                Logger.Warning(
+                    "Steam lobby discovery could not split a saturated partition; results may be incomplete");
+            }
+
+            RequestNextLobbyListPage();
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "LobbyMatchList handler failed");
-            onListCompleted?.Invoke(Array.Empty<ulong>(), false);
+            if (listInFlight) CompleteLobbyListRequest(Array.Empty<ulong>(), false);
         }
+    }
+
+    private void CompleteLobbyListRequest(IReadOnlyList<ulong> lobbyIds, bool success)
+    {
+        var completion = onListCompleted;
+        ClearLobbyListRequest();
+        completion?.Invoke(lobbyIds, success);
+    }
+
+    private void ClearLobbyListRequest()
+    {
+        listInFlight = false;
+        onListCompleted = null;
+        lobbyListQueryPlan = null;
+        activeLobbyListRange = default;
     }
 
     public void LeaveLobby(ulong lobbyId)

@@ -1,6 +1,7 @@
-using Common;
+﻿using Common;
 using Common.Network.Session;
 using System;
+using System.Globalization;
 using System.Threading;
 
 namespace Coop.Steam;
@@ -67,8 +68,19 @@ public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
     }
 
     protected override bool ApplyAdditionalLobbyData(ulong targetLobbyId)
-        => lobbyApi.SetLobbyData(
-            targetLobbyId, LobbyDataCodec.VisibilityKey, LobbyDataCodec.EncodeVisibility(visibility));
+    {
+        if (!lobbyApi.SetLobbyData(
+            targetLobbyId, LobbyDataCodec.VisibilityKey, LobbyDataCodec.EncodeVisibility(visibility)))
+        {
+            return false;
+        }
+
+        int discoveryPartition = LobbyDataCodec.GetDiscoveryPartition(targetLobbyId);
+        return lobbyApi.SetLobbyData(
+            targetLobbyId,
+            LobbyDataCodec.DiscoveryPartitionKey,
+            discoveryPartition.ToString(CultureInfo.InvariantCulture));
+    }
 
     protected override void OnLobbyUnavailable(SessionJoinInfo info)
     {
