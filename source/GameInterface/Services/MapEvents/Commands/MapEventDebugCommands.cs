@@ -1329,11 +1329,18 @@ public class MapEventDebugCommands
             return "No active encounter.";
 
         var conversationManager = Campaign.Current?.ConversationManager;
-        if (conversationManager?.IsConversationInProgress == true)
+        var conversationInProgress = conversationManager?.IsConversationInProgress == true;
+        var encounterMeetingActive =
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == "encounter_meeting" &&
+            conversationInProgress;
+        if (conversationInProgress)
             conversationManager.EndConversation();
 
         if (PlayerEncounter.Battle == null)
         {
+            if (encounterMeetingActive)
+                return "The encounter meeting did not create a battle.";
+
             if (PlayerEncounter.StartBattle() == null)
                 return "Unable to start the current battle.";
 

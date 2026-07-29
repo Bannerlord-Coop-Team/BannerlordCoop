@@ -78,6 +78,25 @@ public class RejectedEncounterRecoveryTests : MapEventTestBase
 
             Assert.Null(result);
             Assert.Same(pendingEncounter, PlayerEncounter.Current);
+            Assert.False(PlayerEncounter.LeaveEncounter);
+        }, MapEventDisabledMethods);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(targetPartyId, out var targetParty));
+            using (new AllowedThread())
+            {
+                targetParty.IsActive = true;
+            }
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            var retryResult = (MapEvent?)StartBattleInternal.Invoke(pendingEncounter, Array.Empty<object>());
+
+            Assert.Null(retryResult);
+            Assert.Null(pendingEncounter._mapEvent);
+            Assert.Null(MobileParty.MainParty.MapEvent);
         }, MapEventDisabledMethods);
 
         client.Call(() => GameThread.Instance.Update(TimeSpan.Zero), MapEventDisabledMethods);
@@ -123,6 +142,50 @@ public class RejectedEncounterRecoveryTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
             Assert.Same(authoritativeMapEvent, playerParty.MapEvent);
         });
+    }
+
+    [Fact]
+    public void ServerRejectedFieldEncounter_AuthoritativeEventAttachedBeforeRecoveryIsPreserved()
+    {
+        var client = Clients.First();
+        var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
+        var targetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        RegisterPeer(client, "PlayerOne");
+        var pendingEncounter = SetupPendingEncounter(
+            client,
+            playerPartyId,
+            targetPartyId,
+            new CampaignVec2(new Vec2(16f, 18f), true));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(targetPartyId, out var targetParty));
+            using (new AllowedThread())
+            {
+                targetParty.IsActive = false;
+            }
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            var rejectedResult = (MapEvent?)StartBattleInternal.Invoke(
+                pendingEncounter,
+                Array.Empty<object>());
+            Assert.Null(rejectedResult);
+
+            var authoritativeMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+            pendingEncounter._mapEvent = authoritativeMapEvent;
+
+            var retryResult = (MapEvent?)StartBattleInternal.Invoke(
+                pendingEncounter,
+                Array.Empty<object>());
+            Assert.Same(authoritativeMapEvent, retryResult);
+
+            GameThread.Instance.Update(TimeSpan.Zero);
+
+            Assert.Same(pendingEncounter, PlayerEncounter.Current);
+            Assert.False(PlayerEncounter.LeaveEncounter);
+            Assert.Same(authoritativeMapEvent, pendingEncounter._mapEvent);
+        }, MapEventDisabledMethods);
     }
 
     [Fact]

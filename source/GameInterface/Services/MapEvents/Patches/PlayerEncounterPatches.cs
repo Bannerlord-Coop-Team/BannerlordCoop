@@ -16,6 +16,7 @@ using HarmonyLib;
 using Helpers;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -30,6 +31,9 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class PlayerEncounterPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterPatches>();
+    private static readonly object rejectedEncounterRecoveryLock = new object();
+    private static readonly HashSet<PlayerEncounter> pendingRejectedEncounterRecoveries =
+        new HashSet<PlayerEncounter>();
 
     [HarmonyPatch(nameof(PlayerEncounter.RestartPlayerEncounter))]
     [HarmonyPrefix]
@@ -71,6 +75,13 @@ internal class PlayerEncounterPatches
         if (__instance._mapEvent != null)
         {
             __result = __instance._mapEvent;
+            return false;
+        }
+
+        // The encounter menus can retry StartBattle before deferred rejected-encounter recovery runs.
+        if (IsRejectedEncounterRecoveryPending(__instance))
+        {
+            __result = null;
             return false;
         }
 
@@ -118,9 +129,36 @@ internal class PlayerEncounterPatches
 
     private static void QueueRejectedEncounterRecovery(PlayerEncounter rejectedEncounter)
     {
+        lock (rejectedEncounterRecoveryLock)
+        {
+            if (!pendingRejectedEncounterRecoveries.Add(rejectedEncounter))
+                return;
+        }
+
         GameThread.EnqueueSafe(
-            () => RecoverEncounterWithoutMapEvent(rejectedEncounter),
+            () =>
+            {
+                try
+                {
+                    RecoverEncounterWithoutMapEvent(rejectedEncounter);
+                }
+                finally
+                {
+                    lock (rejectedEncounterRecoveryLock)
+                    {
+                        pendingRejectedEncounterRecoveries.Remove(rejectedEncounter);
+                    }
+                }
+            },
             nameof(QueueRejectedEncounterRecovery));
+    }
+
+    private static bool IsRejectedEncounterRecoveryPending(PlayerEncounter encounter)
+    {
+        lock (rejectedEncounterRecoveryLock)
+        {
+            return pendingRejectedEncounterRecoveries.Contains(encounter);
+        }
     }
 
     private static bool RecoverEncounterWithoutMapEvent(PlayerEncounter encounter)

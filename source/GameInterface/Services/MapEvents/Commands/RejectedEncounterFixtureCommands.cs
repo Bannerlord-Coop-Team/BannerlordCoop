@@ -184,10 +184,17 @@ public class RejectedEncounterFixtureCommands
             return "No active encounter.";
 
         var conversationManager = Campaign.Current?.ConversationManager;
-        if (conversationManager?.IsConversationInProgress == true)
+        var conversationInProgress = conversationManager?.IsConversationInProgress == true;
+        var encounterMeetingActive =
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == "encounter_meeting" &&
+            conversationInProgress;
+        if (conversationInProgress)
             conversationManager.EndConversation();
 
-        var mapEvent = PlayerEncounter.Battle ?? PlayerEncounter.StartBattle();
+        var mapEvent = PlayerEncounter.Battle;
+        if (mapEvent == null && !encounterMeetingActive)
+            mapEvent = PlayerEncounter.StartBattle();
+
         if (mapEvent == null)
             return "Unable to create the authoritative map event.";
 
