@@ -663,7 +663,7 @@ public class MapEventDebugCommands
                 new Vec2(danustica.GatePosition.X - 1.5f, danustica.GatePosition.Y),
                 isOnLand: true);
             fixture.FixturePosition = fixturePosition;
-            PrepareBattleRewardPlayer(initiator, totalTroops: 18, fixturePosition);
+            PrepareBattleRewardPlayer(initiator, totalTroops: 60, fixturePosition);
             PrepareBattleRewardPlayer(
                 lateJoiner,
                 totalTroops: 20,
