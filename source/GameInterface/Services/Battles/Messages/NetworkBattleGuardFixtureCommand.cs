@@ -62,6 +62,15 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
     [ProtoMember(11)]
     public bool UseMovementFlagGuardInput { get; }
 
+    [ProtoMember(12)]
+    public bool HasScheduledDirectionTransition { get; }
+
+    [ProtoMember(13)]
+    public BattleGuardFixtureDirection ScheduledDirection { get; }
+
+    [ProtoMember(14)]
+    public int ScheduledDirectionDelayMilliseconds { get; }
+
     public NetworkBattleGuardFixtureCommand(
         string battleInstanceId,
         Guid commandId,
@@ -74,7 +83,11 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
         BattleGuardFixtureDirection direction =
             BattleGuardFixtureDirection.Up,
         bool useMovementFlagGuardInput = false,
-        bool reset = false)
+        bool reset = false,
+        bool hasScheduledDirectionTransition = false,
+        BattleGuardFixtureDirection scheduledDirection =
+            BattleGuardFixtureDirection.Up,
+        int scheduledDirectionDelayMilliseconds = 0)
     {
         BattleInstanceId = battleInstanceId;
         CommandId = commandId;
@@ -87,6 +100,11 @@ public sealed class NetworkBattleGuardFixtureCommand : IEvent
         Direction = direction;
         UseMovementFlagGuardInput = useMovementFlagGuardInput;
         Reset = reset;
+        HasScheduledDirectionTransition =
+            hasScheduledDirectionTransition;
+        ScheduledDirection = scheduledDirection;
+        ScheduledDirectionDelayMilliseconds =
+            scheduledDirectionDelayMilliseconds;
     }
 }
 #endif

@@ -604,6 +604,37 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(false, BattleGuardFixtureMode.Mounted, BattleGuardFixturePhase.Guard, true, BattleGuardFixtureDirection.Up, BattleGuardFixtureDirection.Right, 0, true)]
+    [InlineData(false, BattleGuardFixtureMode.Mounted, BattleGuardFixturePhase.Guard, true, BattleGuardFixtureDirection.Up, BattleGuardFixtureDirection.Right, 1, false)]
+    [InlineData(true, BattleGuardFixtureMode.Mounted, BattleGuardFixturePhase.Guard, true, BattleGuardFixtureDirection.Up, BattleGuardFixtureDirection.Right, 50, true)]
+    [InlineData(true, BattleGuardFixtureMode.Mounted, BattleGuardFixturePhase.Guard, true, BattleGuardFixtureDirection.Up, BattleGuardFixtureDirection.Right, 100, false)]
+    [InlineData(true, BattleGuardFixtureMode.Foot, BattleGuardFixturePhase.Guard, true, BattleGuardFixtureDirection.Up, BattleGuardFixtureDirection.Right, 50, false)]
+    [InlineData(true, BattleGuardFixtureMode.Mounted, BattleGuardFixturePhase.Calibration, true, BattleGuardFixtureDirection.Up, BattleGuardFixtureDirection.Right, 50, false)]
+    [InlineData(true, BattleGuardFixtureMode.Mounted, BattleGuardFixturePhase.Guard, false, BattleGuardFixtureDirection.Up, BattleGuardFixtureDirection.Right, 50, false)]
+    [InlineData(true, BattleGuardFixtureMode.Mounted, BattleGuardFixturePhase.Guard, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, 50, false)]
+    public void ScheduledDirectionTransition_RequiresImmediateMountedMovementInput(
+        bool hasScheduledDirectionTransition,
+        BattleGuardFixtureMode mode,
+        BattleGuardFixturePhase phase,
+        bool useMovementFlagGuardInput,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection scheduledDirection,
+        int delayMilliseconds,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.IsValidScheduledDirectionTransition(
+                hasScheduledDirectionTransition,
+                mode,
+                phase,
+                useMovementFlagGuardInput,
+                direction,
+                scheduledDirection,
+                delayMilliseconds));
+    }
+
+    [Theory]
     [InlineData(BattleGuardFixtureDirection.Up, 0, 0x11843A0)]
     [InlineData(BattleGuardFixtureDirection.Down, 1, 0x118439C)]
     [InlineData(BattleGuardFixtureDirection.Left, 2, 0x1184398)]
@@ -1744,7 +1775,7 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Fact]
-    public void GuardCommand_DirectionRoundTrips()
+    public void GuardCommand_ScheduledDirectionTransitionRoundTrips()
     {
         var original = new NetworkBattleGuardFixtureCommand(
             "battle",
@@ -1755,8 +1786,11 @@ public class BattleGuardFixtureEvidenceTests
             "striker-owner",
             BattleGuardFixtureMode.Mounted,
             BattleGuardFixturePhase.Guard,
-            BattleGuardFixtureDirection.Right,
-            useMovementFlagGuardInput: true);
+            BattleGuardFixtureDirection.Up,
+            useMovementFlagGuardInput: true,
+            hasScheduledDirectionTransition: true,
+            scheduledDirection: BattleGuardFixtureDirection.Right,
+            scheduledDirectionDelayMilliseconds: 50);
         using var stream = new MemoryStream();
 
         Serializer.Serialize(stream, original);
@@ -1765,9 +1799,16 @@ public class BattleGuardFixtureEvidenceTests
             Serializer.Deserialize<NetworkBattleGuardFixtureCommand>(stream);
 
         Assert.Equal(
-            BattleGuardFixtureDirection.Right,
+            BattleGuardFixtureDirection.Up,
             received.Direction);
         Assert.True(received.UseMovementFlagGuardInput);
+        Assert.True(received.HasScheduledDirectionTransition);
+        Assert.Equal(
+            BattleGuardFixtureDirection.Right,
+            received.ScheduledDirection);
+        Assert.Equal(
+            50,
+            received.ScheduledDirectionDelayMilliseconds);
     }
 
     [Fact]

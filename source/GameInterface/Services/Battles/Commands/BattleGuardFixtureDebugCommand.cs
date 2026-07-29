@@ -15,10 +15,10 @@ public static class BattleGuardFixtureDebugCommand
     public static string Start(List<string> args)
     {
         const string usage =
-            "Usage: coop.debug.battle.guard_fixture_start battle-instance-id guard-agent-id guard-authority striker-agent-id striker-authority foot|mounted calibration|guard|attack [up|down|left|right] [movement-flags]";
+            "Usage: coop.debug.battle.guard_fixture_start battle-instance-id guard-agent-id guard-authority striker-agent-id striker-authority foot|mounted calibration|guard|attack [up|down|left|right] [movement-flags [transition-direction transition-delay-ms]]";
         if (ModInformation.IsClient)
             return "This function can only be used by the server";
-        if ((args.Count < 7 || args.Count > 9) ||
+        if ((args.Count < 7 || args.Count > 11 || args.Count == 10) ||
             string.IsNullOrEmpty(args[0]) ||
             !Guid.TryParse(args[1], out Guid guardAgentId) ||
             !Guid.TryParse(args[3], out Guid strikerAgentId) ||
@@ -36,13 +36,30 @@ public static class BattleGuardFixtureDebugCommand
         {
             return usage;
         }
-        bool useMovementFlagGuardInput = args.Count == 9 &&
+        bool useMovementFlagGuardInput = args.Count >= 9 &&
             string.Equals(
                 args[8],
                 "movement-flags",
                 StringComparison.OrdinalIgnoreCase);
-        if (args.Count == 9 && !useMovementFlagGuardInput)
+        if (args.Count >= 9 && !useMovementFlagGuardInput)
             return usage;
+        bool hasScheduledDirectionTransition = args.Count == 11;
+        BattleGuardFixtureDirection scheduledDirection =
+            BattleGuardFixtureDirection.Up;
+        int scheduledDirectionDelayMilliseconds = 0;
+        if (hasScheduledDirectionTransition &&
+            (!TryParseDirection(args[9], out scheduledDirection) ||
+             !int.TryParse(
+                 args[10],
+                 out scheduledDirectionDelayMilliseconds) ||
+             mode != BattleGuardFixtureMode.Mounted ||
+             phase != BattleGuardFixturePhase.Guard ||
+             direction == scheduledDirection ||
+             scheduledDirectionDelayMilliseconds < 1 ||
+             scheduledDirectionDelayMilliseconds > 99))
+        {
+            return usage;
+        }
         var command = new NetworkBattleGuardFixtureCommand(
             args[0],
             Guid.NewGuid(),
@@ -53,13 +70,19 @@ public static class BattleGuardFixtureDebugCommand
             mode,
             phase,
             direction,
-            useMovementFlagGuardInput);
+            useMovementFlagGuardInput,
+            hasScheduledDirectionTransition:
+                hasScheduledDirectionTransition,
+            scheduledDirection: scheduledDirection,
+            scheduledDirectionDelayMilliseconds:
+                scheduledDirectionDelayMilliseconds);
         if (!TryDispatch(command, out string error))
             return error;
         return $"BATTLE_GUARD_FIXTURE_SENT instance={args[0]} guard={guardAgentId} " +
             $"guardAuthority={args[2]} striker={strikerAgentId} " +
             $"strikerAuthority={args[4]} mode={mode} phase={phase} direction={direction} " +
-            $"input={(useMovementFlagGuardInput ? "MovementFlags" : "ExplicitGuard")}";
+            $"input={(useMovementFlagGuardInput ? "MovementFlags" : "ExplicitGuard")} " +
+            $"transition={(hasScheduledDirectionTransition ? $"{scheduledDirection}:{scheduledDirectionDelayMilliseconds}ms" : "none")}";
     }
 
     [CommandLineArgumentFunction("guard_fixture_reset", "coop.debug.battle")]

@@ -54,6 +54,8 @@ public interface IBattleGuardFixture
 
 public class BattleGuardFixture : IBattleGuardFixture
 {
+    internal const int MaximumScheduledDirectionTransitionDelayMilliseconds =
+        99;
     private const string GuardWeaponId = "empire_lance_1_t3_blunt";
     private const string FootStrikerWeaponId = "empire_sword_1_t2_blunt";
     private const string MountedStrikerWeaponId = "empire_menavlion_1_t3_blunt";
@@ -167,6 +169,18 @@ public class BattleGuardFixture : IBattleGuardFixture
         if (!TryCreateRoles(command, out FixtureRoles commandRoles))
         {
             lastError = "invalid guard fixture role command";
+            return;
+        }
+        if (!IsValidScheduledDirectionTransition(
+                command.HasScheduledDirectionTransition,
+                command.Mode,
+                command.Phase,
+                command.UseMovementFlagGuardInput,
+                command.Direction,
+                command.ScheduledDirection,
+                command.ScheduledDirectionDelayMilliseconds))
+        {
+            lastError = "invalid scheduled guard direction transition";
             return;
         }
 
@@ -421,6 +435,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             aiPauseStates.Clear();
         }
         TickGuard(agentRegistry);
+        guardDriver?.AdvanceScheduledDirectionTransition(dt);
         TickStriker(agentRegistry);
         TickEvidenceCamera(agentRegistry);
     }
@@ -737,6 +752,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             $"appliedAction1Direction={guardDriver?.AppliedAction1Direction ?? "None"} " +
             $"rawProgress={sample.RawProgress:0.###} guardChannel={sample.LatchedChannel} " +
             $"guardDirection={guardDriver?.Direction.ToString() ?? "none"} " +
+            $"guardTransition={guardDriver?.ScheduledDirectionTransitionState ?? "none"} " +
             $"guardMode={sample.GuardMode} " +
             $"guardStateChanges={guardDriver?.MountedGuardStateChanges ?? 0} " +
             $"guardPresentationPending={guardDriver?.MountedPresentationActionPending == true} " +
@@ -1132,6 +1148,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             guardDriver.UseMovementFlagGuardInput =
                 command.UseMovementFlagGuardInput;
         }
+        guardDriver.ConfigureScheduledDirectionTransition(command);
         if (command.Phase != BattleGuardFixturePhase.Attack)
             guardDriver.EndMountedStrike();
 
@@ -1552,6 +1569,27 @@ public class BattleGuardFixture : IBattleGuardFixture
         return mode == BattleGuardFixtureMode.Mounted &&
             useMovementFlagGuardInput &&
             phase != BattleGuardFixturePhase.Calibration;
+    }
+
+    internal static bool IsValidScheduledDirectionTransition(
+        bool hasScheduledDirectionTransition,
+        BattleGuardFixtureMode mode,
+        BattleGuardFixturePhase phase,
+        bool useMovementFlagGuardInput,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection scheduledDirection,
+        int delayMilliseconds)
+    {
+        if (!hasScheduledDirectionTransition)
+            return delayMilliseconds == 0;
+
+        return mode == BattleGuardFixtureMode.Mounted &&
+            phase == BattleGuardFixturePhase.Guard &&
+            useMovementFlagGuardInput &&
+            direction != scheduledDirection &&
+            delayMilliseconds >= 1 &&
+            delayMilliseconds <=
+                MaximumScheduledDirectionTransitionDelayMilliseconds;
     }
 
     internal static bool ShouldApplyMountedGuardCommand(
@@ -3911,6 +3949,17 @@ public class BattleGuardFixture : IBattleGuardFixture
         public string AppliedAction0Direction { get; private set; } = "None";
         public string AppliedAction1Direction { get; private set; } = "None";
         public int MountedGuardStateChanges { get; set; }
+        public string ScheduledDirectionTransitionState
+        {
+            get
+            {
+                if (scheduledDirectionTransitionPending)
+                    return $"{scheduledDirection}:pending";
+                if (scheduledDirectionTransitionCompleted)
+                    return $"{scheduledDirection}:completed";
+                return "none";
+            }
+        }
         public BattleGuardMountedSpeedLimiter MountedSpeedLimiter { get; } =
             new();
         public bool DrivesAgent { get; private set; }
@@ -3920,6 +3969,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         private Vec3 mountedStrikeLookTarget;
         private bool hasMountedStrikeLookTarget;
         private bool hasMountedStrikeDirections;
+        private bool scheduledDirectionTransitionPending;
+        private bool scheduledDirectionTransitionCompleted;
+        private bool scheduledDirectionTransitionStarted;
+        private BattleGuardFixtureDirection scheduledDirection;
+        private float scheduledDirectionTransitionSecondsRemaining;
         private int guardChannel = -1;
         private int guardActionIndex = -1;
         private int guardAnimationIndex = -1;
@@ -3962,6 +4016,38 @@ public class BattleGuardFixture : IBattleGuardFixture
         public void BeginDriving()
         {
             DrivesAgent = true;
+        }
+
+        public void ConfigureScheduledDirectionTransition(
+            NetworkBattleGuardFixtureCommand command)
+        {
+            scheduledDirectionTransitionPending =
+                command.HasScheduledDirectionTransition;
+            scheduledDirectionTransitionCompleted = false;
+            scheduledDirectionTransitionStarted = false;
+            scheduledDirection = command.ScheduledDirection;
+            scheduledDirectionTransitionSecondsRemaining =
+                command.ScheduledDirectionDelayMilliseconds / 1000f;
+        }
+
+        public void AdvanceScheduledDirectionTransition(float dt)
+        {
+            if (!scheduledDirectionTransitionPending)
+                return;
+            if (!scheduledDirectionTransitionStarted)
+            {
+                scheduledDirectionTransitionStarted = true;
+                return;
+            }
+
+            scheduledDirectionTransitionSecondsRemaining -=
+                Math.Max(dt, 0f);
+            if (scheduledDirectionTransitionSecondsRemaining > 0f)
+                return;
+
+            Direction = scheduledDirection;
+            scheduledDirectionTransitionPending = false;
+            scheduledDirectionTransitionCompleted = true;
         }
 
         public void StopDriving()
