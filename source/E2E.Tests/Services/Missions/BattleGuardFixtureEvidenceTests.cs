@@ -635,6 +635,31 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(
+        false,
+        BattleGuardFixtureDirection.Up,
+        BattleGuardFixtureDirection.Right,
+        BattleGuardFixtureDirection.Up)]
+    [InlineData(
+        true,
+        BattleGuardFixtureDirection.Up,
+        BattleGuardFixtureDirection.Right,
+        BattleGuardFixtureDirection.Right)]
+    public void GuardEvidenceDirection_UsesScheduledFinalDirection(
+        bool hasScheduledDirectionTransition,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection scheduledDirection,
+        BattleGuardFixtureDirection expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.GetGuardEvidenceDirection(
+                direction,
+                hasScheduledDirectionTransition,
+                scheduledDirection));
+    }
+
+    [Theory]
     [InlineData(BattleGuardFixtureDirection.Up, 0, 0x11843A0)]
     [InlineData(BattleGuardFixtureDirection.Down, 1, 0x118439C)]
     [InlineData(BattleGuardFixtureDirection.Left, 2, 0x1184398)]

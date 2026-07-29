@@ -1592,6 +1592,14 @@ public class BattleGuardFixture : IBattleGuardFixture
                 MaximumScheduledDirectionTransitionDelayMilliseconds;
     }
 
+    internal static BattleGuardFixtureDirection GetGuardEvidenceDirection(
+        BattleGuardFixtureDirection direction,
+        bool hasScheduledDirectionTransition,
+        BattleGuardFixtureDirection scheduledDirection) =>
+        hasScheduledDirectionTransition
+            ? scheduledDirection
+            : direction;
+
     internal static bool ShouldApplyMountedGuardCommand(
         BattleGuardFixtureMode mode,
         bool useMovementFlagGuardInput) =>
@@ -3606,7 +3614,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             if (guardDriver != null &&
                 !ShouldLatchGuardPresentation(
                     guardDriver.Phase,
-                    guardDriver.Direction,
+                    guardDriver.EvidenceDirection,
                     AgentActionData.GetGuardModeFromDefendingAction(
                         agent,
                         channel)))
@@ -3902,6 +3910,11 @@ public class BattleGuardFixture : IBattleGuardFixture
         public BattleGuardFixtureMode Mode { get; set; }
         public BattleGuardFixturePhase Phase { get; set; }
         public BattleGuardFixtureDirection Direction { get; set; }
+        public BattleGuardFixtureDirection EvidenceDirection
+        {
+            get;
+            private set;
+        }
         public bool UseMovementFlagGuardInput { get; set; }
         public Agent.MovementControlFlag OriginalMovementFlags { get; }
         public Vec2 OriginalMovementInputVector { get; }
@@ -3992,6 +4005,7 @@ public class BattleGuardFixture : IBattleGuardFixture
             Mode = mode;
             Phase = phase;
             Direction = direction;
+            EvidenceDirection = direction;
             UseMovementFlagGuardInput = useMovementFlagGuardInput;
             MountedGuardCommandDirection = direction;
             OriginalMovementFlags = agent.MovementFlags;
@@ -4028,6 +4042,10 @@ public class BattleGuardFixture : IBattleGuardFixture
             scheduledDirection = command.ScheduledDirection;
             scheduledDirectionTransitionSecondsRemaining =
                 command.ScheduledDirectionDelayMilliseconds / 1000f;
+            EvidenceDirection = GetGuardEvidenceDirection(
+                command.Direction,
+                command.HasScheduledDirectionTransition,
+                command.ScheduledDirection);
         }
 
         public void AdvanceScheduledDirectionTransition(float dt)
