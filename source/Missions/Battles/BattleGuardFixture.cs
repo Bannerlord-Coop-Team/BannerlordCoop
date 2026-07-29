@@ -2488,17 +2488,28 @@ public class BattleGuardFixture : IBattleGuardFixture
             Math.Min(
                 MountedStrikeReleaseLeadProfiles,
                 attempt));
-        // Start with the profile that reaches the rider before the horse loses calibrated speed.
-        if (profile == 1)
+        // Try the proven rider-contact lead first so retries do not consume the runway.
+        int releaseLeadSteps;
+        switch (profile)
         {
-            return MountedStrikeMinimumReleaseLeadSeconds +
-                MountedStrikeReleaseLeadStepSeconds;
+            case 1:
+                releaseLeadSteps = 3;
+                break;
+            case 2:
+                releaseLeadSteps = 2;
+                break;
+            case 3:
+                releaseLeadSteps = 4;
+                break;
+            case 4:
+                releaseLeadSteps = 1;
+                break;
+            default:
+                releaseLeadSteps = 0;
+                break;
         }
-        if (profile == 2)
-            return MountedStrikeMinimumReleaseLeadSeconds;
-
         return MountedStrikeMinimumReleaseLeadSeconds +
-            ((profile - 1) *
+            (releaseLeadSteps *
              MountedStrikeReleaseLeadStepSeconds);
     }
 
