@@ -540,6 +540,26 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, true, false, true)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, true, true)]
+    public void MountedGuardPresentation_ReplaysMovementFlagTransitionOnceAfterAgentTick(
+        bool explicitPresentation,
+        bool postAgentTick,
+        bool transitionPending,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldApplyMountedGuardPresentation(
+                explicitPresentation,
+                postAgentTick,
+                transitionPending));
+    }
+
+    [Theory]
     [InlineData(true, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, false)]
     [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]

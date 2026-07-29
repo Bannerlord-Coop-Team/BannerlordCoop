@@ -379,7 +379,9 @@ public class BattleGuardFixture : IBattleGuardFixture
         ApplyOwnedMountedStrikeLook(agent, guardDriver);
 
         // Both production action polls must observe the same held fixture presentation.
-        ApplyMountedGuardPresentationAction(agentRegistry);
+        ApplyMountedGuardPresentationAction(
+            agentRegistry,
+            postAgentTick: false);
     }
 
     public void RefreshOwnedMountedStrikeLook(
@@ -410,7 +412,9 @@ public class BattleGuardFixture : IBattleGuardFixture
     public void ApplyPostAgentTickGuardInput(
         INetworkAgentRegistry agentRegistry)
     {
-        ApplyMountedGuardPresentationAction(agentRegistry);
+        ApplyMountedGuardPresentationAction(
+            agentRegistry,
+            postAgentTick: true);
     }
 
     public void SamplePreReplayDisplayedState(
@@ -1380,6 +1384,13 @@ public class BattleGuardFixture : IBattleGuardFixture
                 driver.MountedPostNativeDirectionChanged =
                     mountedGuardDirectionChanged;
             }
+            else
+            {
+                driver.MountedPresentationActionPending =
+                    ShouldQueueMountedGuardPresentation(
+                        guarding,
+                        driver.Direction);
+            }
             driver.MountedGuardStateChanges++;
         }
         agent.MovementFlags = flags;
@@ -1504,6 +1515,13 @@ public class BattleGuardFixture : IBattleGuardFixture
         BattleGuardFixtureMode mode) =>
         mode == BattleGuardFixtureMode.Mounted;
 
+    internal static bool ShouldApplyMountedGuardPresentation(
+        bool explicitPresentation,
+        bool postAgentTick,
+        bool transitionPending) =>
+        explicitPresentation ||
+        (postAgentTick && transitionPending);
+
     internal static bool ShouldMaintainMountedGuardPresentation(
         BattleGuardFixtureMode mode,
         BattleGuardFixturePhase phase,
@@ -1531,7 +1549,8 @@ public class BattleGuardFixture : IBattleGuardFixture
     }
 
     private void ApplyMountedGuardPresentationAction(
-        INetworkAgentRegistry agentRegistry)
+        INetworkAgentRegistry agentRegistry,
+        bool postAgentTick)
     {
         GuardDriver driver = guardDriver;
         if (driver == null ||
@@ -1543,10 +1562,20 @@ public class BattleGuardFixture : IBattleGuardFixture
         bool reactionActive =
             driver.Phase == BattleGuardFixturePhase.Attack &&
             IsReaction(agent, driver.GuardActionIndex);
-        if (!ShouldApplyExplicitMountedGuardInput(
+        bool explicitPresentation =
+            ShouldApplyExplicitMountedGuardInput(
                 driver.Mode,
-                driver.UseMovementFlagGuardInput) ||
-            !ShouldMaintainMountedGuardPresentation(
+                driver.UseMovementFlagGuardInput);
+        bool transitionPending =
+            driver.MountedPresentationActionPending;
+        if (!ShouldApplyMountedGuardPresentation(
+                explicitPresentation,
+                postAgentTick,
+                transitionPending))
+        {
+            return;
+        }
+        if (!ShouldMaintainMountedGuardPresentation(
                 driver.Mode,
                 driver.Phase,
                 driver.Direction,
@@ -1560,8 +1589,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         string actionName =
             GetMountedGuardPresentationActionName(driver.Direction);
         ActionIndexCache action = ActionIndexCache.Create(actionName);
-        bool transitionPending =
-            driver.MountedPresentationActionPending;
         bool actionChanged =
             agent.GetCurrentAction(1).Index != action.Index;
 
