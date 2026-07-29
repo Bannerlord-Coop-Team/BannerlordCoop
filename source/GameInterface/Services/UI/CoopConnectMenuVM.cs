@@ -43,7 +43,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string DonateButtonText => "Donate";
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
-    public string SteamLobbiesHeaderText => $"Hosted Steam Servers ({SteamLobbies.Count})";
+    public string SteamLobbiesHeaderText =>
+        $"Hosted Steam Servers ({SteamLobbies.Count} servers; " +
+        $"{SteamLobbies.Sum(lobby => (long)lobby.ConnectedPlayers)} players)";
     public string HostSearchLabelText => "Host Name";
     public string HostSearchPlaceholderText => "Type a host name...";
     public string HostColumnText => "Host Name";

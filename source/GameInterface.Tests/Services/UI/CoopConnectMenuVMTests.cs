@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network.Session;
 using GameInterface.Services.UI;
@@ -28,7 +28,7 @@ public class CoopConnectMenuVMTests
         var match = Assert.Single(viewModel.SteamLobbies);
         Assert.Equal("Mountain King", match.HostText);
         Assert.Equal("3", match.ConnectedPlayersText);
-        Assert.Equal("Hosted Steam Servers (1)", viewModel.SteamLobbiesHeaderText);
+        Assert.Equal("Hosted Steam Servers (1 servers; 3 players)", viewModel.SteamLobbiesHeaderText);
         Assert.Equal(string.Empty, viewModel.SteamLobbyStatusText);
         Assert.Equal(1, browser.RequestCount);
     }
@@ -45,7 +45,7 @@ public class CoopConnectMenuVMTests
             CreateLobby(1, string.Empty),
             CreateLobby(2, "River Trader"));
 
-        Assert.Equal("Hosted Steam Servers (2)", viewModel.SteamLobbiesHeaderText);
+        Assert.Equal("Hosted Steam Servers (2 servers; 0 players)", viewModel.SteamLobbiesHeaderText);
 
         viewModel.SteamLobbyHostSearchText = "UNKNOWN HOST";
         viewModel.ActionSearchSteamLobbies();
@@ -56,33 +56,35 @@ public class CoopConnectMenuVMTests
         viewModel.ActionSearchSteamLobbies();
 
         Assert.Empty(viewModel.SteamLobbies);
-        Assert.Equal("Hosted Steam Servers (0)", viewModel.SteamLobbiesHeaderText);
+        Assert.Equal("Hosted Steam Servers (0 servers; 0 players)", viewModel.SteamLobbiesHeaderText);
         Assert.Equal("No hosts match 'missing'.", viewModel.SteamLobbyStatusText);
 
         viewModel.SteamLobbyHostSearchText = "  ";
         viewModel.ActionSearchSteamLobbies();
 
         Assert.Equal(2, viewModel.SteamLobbies.Count);
-        Assert.Equal("Hosted Steam Servers (2)", viewModel.SteamLobbiesHeaderText);
+        Assert.Equal("Hosted Steam Servers (2 servers; 0 players)", viewModel.SteamLobbiesHeaderText);
         Assert.Equal(string.Empty, viewModel.SteamLobbyStatusText);
     }
 
     [Fact]
-    public void SteamLobbyHeader_StartsAtZeroAndRefreshClearsTheCount()
+    public void SteamLobbyHeader_ShowsServerAndPlayerCountsAndRefreshClearsThem()
     {
         var browser = new TestSteamLobbyBrowser();
         using var messageBroker = new MessageBroker();
         using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
 
-        Assert.Equal("Hosted Steam Servers (0)", viewModel.SteamLobbiesHeaderText);
+        Assert.Equal("Hosted Steam Servers (0 servers; 0 players)", viewModel.SteamLobbiesHeaderText);
 
         SelectSteamLobbiesTab(viewModel);
-        browser.Complete(CreateLobby(1, "Mountain King"));
-        Assert.Equal("Hosted Steam Servers (1)", viewModel.SteamLobbiesHeaderText);
+        browser.Complete(
+            CreateLobby(1, "Mountain King", connectedPlayers: 3),
+            CreateLobby(2, "River Trader", connectedPlayers: 4));
+        Assert.Equal("Hosted Steam Servers (2 servers; 7 players)", viewModel.SteamLobbiesHeaderText);
 
         viewModel.ActionRefreshSteamLobbies();
 
-        Assert.Equal("Hosted Steam Servers (0)", viewModel.SteamLobbiesHeaderText);
+        Assert.Equal("Hosted Steam Servers (0 servers; 0 players)", viewModel.SteamLobbiesHeaderText);
     }
 
     [Fact]
