@@ -17,7 +17,6 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -65,10 +64,14 @@ public class RejectedEncounterFixtureCommands
         if (settlement == null)
             return $"Fixture settlement {settlementId} was not found.";
 
-        var kindClan = Clan.All.FirstOrDefault(clan => clan.StringId == (args[1] == "deserter" ? "deserters" : "looters"));
-        var partyTemplate = Campaign.Current.CampaignObjectManager.Find<PartyTemplateObject>("looters_template");
-        if (kindClan == null || partyTemplate == null)
-            return "The deserter/looter party template is unavailable.";
+        var kindClanId = args[1] == "deserter" ? "deserters" : "looters";
+        var kindClan = Clan.BanditFactions.FirstOrDefault(clan => clan.StringId == kindClanId);
+        if (kindClan == null)
+            return $"Bandit faction {kindClanId} is unavailable.";
+
+        var partyTemplate = kindClan.DefaultPartyTemplate;
+        if (partyTemplate == null)
+            return $"Bandit faction {kindClanId} has no default party template.";
 
         var playerPosition = new CampaignVec2(
             new Vec2(settlement.GatePosition.X + 3f, settlement.GatePosition.Y + 1f),
