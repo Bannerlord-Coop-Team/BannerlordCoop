@@ -1,11 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-#if DEBUG
-using Common;
-using GameInterface.Services.Battles.Messages;
-using System.Collections.Generic;
-#endif
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
@@ -75,9 +70,6 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly ISiegeEngineStateReporter siegeEngineStateReporter;
     private readonly IBattleHostRegistry hostRegistryRef;
-#if DEBUG
-    private readonly IBattleGuardFixture guardFixture;
-#endif
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
@@ -98,11 +90,7 @@ public class CoopBattleController : CoopMissionController
         IHostEpochPolicy hostEpochPolicy,
         IBattleAgentBudget agentBudget,
         IGuardedHitWindow guardedHitWindow,
-        IPuppetMountStateRepairer puppetMountStateRepairer
-#if DEBUG
-        , IBattleGuardFixture guardFixture
-#endif
-        )
+        IPuppetMountStateRepairer puppetMountStateRepairer)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -143,15 +131,6 @@ public class CoopBattleController : CoopMissionController
         Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(objectManager, session, hostRegistry);
         siegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
-#if DEBUG
-        this.guardFixture = guardFixture;
-        messageBroker.Subscribe<NetworkBattleGuardFixtureCommand>(
-            Handle_BattleGuardFixtureCommand);
-        messageBroker.Subscribe<NetworkBattleGuardFixtureRoute>(
-            Handle_BattleGuardFixtureRoute);
-        messageBroker.Subscribe<NetworkBattleGuardFixtureStrike>(
-            Handle_BattleGuardFixtureStrike);
-#endif
 
         // Decode order clips during battle setup so the first issued order does not hitch.
         coopMissionComponent.AgentVoiceHandler.WarmUp();
@@ -173,15 +152,6 @@ public class CoopBattleController : CoopMissionController
         siegeMachineState.Dispose();
         siegeWeaponFire.Dispose();
         Deployment.Dispose();
-#if DEBUG
-        messageBroker.Unsubscribe<NetworkBattleGuardFixtureCommand>(
-            Handle_BattleGuardFixtureCommand);
-        messageBroker.Unsubscribe<NetworkBattleGuardFixtureRoute>(
-            Handle_BattleGuardFixtureRoute);
-        messageBroker.Unsubscribe<NetworkBattleGuardFixtureStrike>(
-            Handle_BattleGuardFixtureStrike);
-        guardFixture.Reset(coopMissionComponent.AgentRegistry);
-#endif
 
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
@@ -214,17 +184,7 @@ public class CoopBattleController : CoopMissionController
 
     public override void OnMissionTick(float dt)
     {
-#if DEBUG
-        // Native can replace fixture defend input after the main-controller postfix.
-        guardFixture.ReapplyPlayerGuardInput(
-            coopMissionComponent.AgentRegistry);
-#endif
         base.OnMissionTick(dt);
-#if DEBUG
-        // Publish and consume the staged look through normal movement replication.
-        guardFixture.RefreshOwnedMountedStrikeLook(
-            coopMissionComponent.AgentRegistry);
-#endif
 
         // The mission host is the single siege authority (engine deployment and machine simulation);
         // host election can settle after the mission opens, so keep the patch-visible flags current
@@ -275,102 +235,13 @@ public class CoopBattleController : CoopMissionController
         // BR-025: expire the local deployment time limit (auto-finishes deployment via the native Start
         // Battle path when the game-configured limit elapses; a no-op once deployment has finished).
         Deployment.Tick(dt);
-#if DEBUG
-        guardFixture.Tick(dt, coopMissionComponent.AgentRegistry);
-#endif
     }
 
     public override void OnPreDisplayMissionTick(float dt)
     {
-#if DEBUG
-        ApplyGuardFixturePostAgentTickInput();
-        guardFixture.SamplePreReplayDisplayedState(
-            dt,
-            coopMissionComponent.AgentRegistry);
-#endif
         base.OnPreDisplayMissionTick(dt);
-#if DEBUG
-        guardFixture.SamplePostReplayDisplayedState(
-            coopMissionComponent.AgentRegistry);
-#endif
         damageRouter.Tick(dt);
-#if DEBUG
-        guardFixture.SampleFinalDisplayedState(dt, coopMissionComponent.AgentRegistry);
-#endif
     }
-
-#if DEBUG
-    internal bool TryGetGuardFixtureNativePlayerDefendDirection(
-        Agent agent,
-        out BattleGuardFixtureDirection direction) =>
-        guardFixture.TryGetNativePlayerDefendDirection(
-            coopMissionComponent.AgentRegistry,
-            agent,
-            out direction);
-
-    internal void ApplyGuardFixturePlayerInput() =>
-        guardFixture.ApplyPlayerInput(coopMissionComponent.AgentRegistry);
-
-    internal void ApplyGuardFixturePostAgentTickInput() =>
-        guardFixture.ApplyPostAgentTickGuardInput(
-            coopMissionComponent.AgentRegistry);
-
-    internal string GetGuardFixtureState() =>
-        guardFixture.GetState(
-            coopMissionComponent.AgentRegistry,
-            coopMissionComponent.AgentMovementHandler.Interpolator);
-
-    internal string GetGuardFixtureCandidates(List<string> args) =>
-        guardFixture.GetCandidates(coopMissionComponent.AgentRegistry, args);
-
-    private void Handle_BattleGuardFixtureCommand(
-        MessagePayload<NetworkBattleGuardFixtureCommand> payload)
-    {
-        NetworkBattleGuardFixtureCommand command = payload.What;
-        GameThread.RunSafe(
-            () =>
-            {
-                if (command.BattleInstanceId != Session.InstanceId)
-                    return;
-
-                guardFixture.Apply(
-                    command,
-                    coopMissionComponent.AgentRegistry,
-                    coopMissionComponent.AgentMovementHandler.Interpolator);
-            },
-            context: nameof(Handle_BattleGuardFixtureCommand));
-    }
-
-    private void Handle_BattleGuardFixtureRoute(
-        MessagePayload<NetworkBattleGuardFixtureRoute> payload)
-    {
-        NetworkBattleGuardFixtureRoute route = payload.What;
-        GameThread.RunSafe(
-            () =>
-            {
-                if (route.BattleInstanceId != Session.InstanceId)
-                    return;
-
-                guardFixture.ApplyMountedRoute(route);
-            },
-            context: nameof(Handle_BattleGuardFixtureRoute));
-    }
-
-    private void Handle_BattleGuardFixtureStrike(
-        MessagePayload<NetworkBattleGuardFixtureStrike> payload)
-    {
-        NetworkBattleGuardFixtureStrike strike = payload.What;
-        GameThread.RunSafe(
-            () =>
-            {
-                if (strike.BattleInstanceId != Session.InstanceId)
-                    return;
-
-                guardFixture.ApplyMountedStrike(strike);
-            },
-            context: nameof(Handle_BattleGuardFixtureStrike));
-    }
-#endif
 
     // A side counts as fielded once some team of it has a live human agent (puppets qualify; they join
     // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.
@@ -456,14 +327,6 @@ public class CoopBattleController : CoopMissionController
             isBlocked,
             blow.IsMissile,
             collisionData.CollisionResult);
-#if DEBUG
-        guardFixture.ObserveScoreHit(
-            affectedAgent,
-            affectorAgent,
-            isBlocked,
-            in collisionData,
-            damagedHp);
-#endif
     }
 
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the

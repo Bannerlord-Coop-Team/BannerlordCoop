@@ -30,10 +30,6 @@ public class MissionModule : Module
     internal const string MissilePatchCategory = "CoopMissilePatches";
     internal const string ShieldDamagePatchCategory = "CoopShieldDamagePatches";
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
-#if DEBUG
-    internal const string BattleGuardFixtureInputPatchCategory =
-        "CoopBattleGuardFixtureInputPatches";
-#endif
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -125,15 +121,6 @@ public class MissionModule : Module
             .AsSelf()
             .InstancePerDependency();
 
-#if DEBUG
-        builder.RegisterType<TournamentCombatFixture>()
-            .As<ITournamentCombatFixture>()
-            .InstancePerDependency();
-        builder.RegisterType<BattleGuardFixture>()
-            .As<IBattleGuardFixture>()
-            .InstancePerDependency();
-#endif
-
         builder.RegisterType<TournamentSpectatorAgentManagerFactory>()
             .As<ITournamentSpectatorAgentManagerFactory>()
             .InstancePerLifetimeScope();
@@ -204,10 +191,5 @@ public class MissionModule : Module
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AgentVoicePatch).Assembly,
             AgentVoicePatchCategory);
-#if DEBUG
-        yield return new HarmonyPatchCategoryRegistration(
-            typeof(BattleGuardFixtureInputPatch).Assembly,
-            BattleGuardFixtureInputPatchCategory);
-#endif
     }
 }

@@ -42,9 +42,6 @@ public class CoopTournamentController : CoopMissionController
     private readonly TournamentAgentSpawner agentSpawner;
     private readonly ITournamentSpectatorAgentManager spectatorAgentManager;
     private readonly TournamentSpawnManifestBuilder manifestBuilder;
-#if DEBUG
-    private readonly ITournamentCombatFixture combatFixture;
-#endif
     private TournamentSessionSnapshot snapshot;
     private CoopTournamentBehavior tournamentBehavior;
     private CoopTournamentFightMissionController fightController;
@@ -123,11 +120,7 @@ public class CoopTournamentController : CoopMissionController
         ICoopMissionComponent coopMissionComponent,
         INetworkWorldItemRegistry worldItemRegistry,
         ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory,
-        IGuardedHitWindow guardedHitWindow
-#if DEBUG
-        , ITournamentCombatFixture combatFixture
-#endif
-        )
+        IGuardedHitWindow guardedHitWindow)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         this.relayNetwork = relayNetwork;
@@ -138,9 +131,6 @@ public class CoopTournamentController : CoopMissionController
         matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
         agentSpawner = new TournamentAgentSpawner(objectManager, controllerIdProvider, coopMissionComponent);
         manifestBuilder = new TournamentSpawnManifestBuilder(objectManager, coopMissionComponent);
-#if DEBUG
-        this.combatFixture = combatFixture;
-#endif
 
         messageBroker.Subscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
         messageBroker.Subscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
@@ -148,9 +138,6 @@ public class CoopTournamentController : CoopMissionController
         messageBroker.Subscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
         messageBroker.Subscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
         messageBroker.Subscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
-#if DEBUG
-        messageBroker.Subscribe<NetworkTournamentCombatFixtureCommand>(Handle_CombatFixtureCommand);
-#endif
     }
 
     public ITournamentMissionSession Session => session;
@@ -1005,9 +992,6 @@ public class CoopTournamentController : CoopMissionController
             spectatorAgentManager.Reconcile(snapshot);
         }
         base.OnMissionTick(dt);
-#if DEBUG
-        combatFixture.Tick(dt, coopMissionComponent.AgentRegistry);
-#endif
         if (snapshot == null || !session.IsLocalHost) return;
 
         TryStartHostMatch();
@@ -2002,63 +1986,8 @@ public class CoopTournamentController : CoopMissionController
         messageBroker.Unsubscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
         messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
         messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
-#if DEBUG
-        messageBroker.Unsubscribe<NetworkTournamentCombatFixtureCommand>(Handle_CombatFixtureCommand);
-        combatFixture.Dispose();
-#endif
         pendingLocalDamage.Clear();
         guardedHitWindow.Dispose();
         base.Dispose();
     }
-
-#if DEBUG
-    private void Handle_CombatFixtureCommand(
-        MessagePayload<NetworkTournamentCombatFixtureCommand> payload)
-    {
-        NetworkTournamentCombatFixtureCommand command = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            string result = combatFixture.Apply(
-                command,
-                session,
-                snapshot,
-                latestManifest,
-                coopMissionComponent.AgentRegistry,
-                coopMissionComponent.AgentMovementHandler.Interpolator);
-            if (!string.IsNullOrEmpty(result))
-                Logger.Information("[TournamentFixture] {Result}", result);
-        }, context: nameof(Handle_CombatFixtureCommand));
-    }
-
-    internal string GetCombatFixtureState()
-    {
-        INetworkAgentRegistry agentRegistry = coopMissionComponent.AgentRegistry;
-        var activeManifestAgents = latestManifest?.Agents?
-            .Where(data =>
-                data != null &&
-                agentRegistry.TryGetAgentInfo(data.AgentId, out CoopAgentInfo info) &&
-                info.Agent != null &&
-                info.Agent.IsActive())
-            .ToArray() ?? Array.Empty<TournamentAgentSpawnData>();
-        var humanSlots = new HashSet<string>(
-            snapshot?.Contestants?
-                .Where(contestant => contestant.IsHuman && !contestant.IsReplaced)
-                .Select(contestant => contestant.SlotId) ??
-            Array.Empty<string>());
-        string activeHumans = string.Join(",",
-            activeManifestAgents
-                .Where(data => humanSlots.Contains(data.SlotId))
-                .Select(data => data.ControllerId)
-                .Distinct());
-        string registeredControllers = string.Join(",",
-            agentRegistry.GetControllerIds());
-        int activeAiCount = activeManifestAgents.Count(data => !humanSlots.Contains(data.SlotId));
-
-        return combatFixture.GetState(session, agentRegistry) +
-            $" manifestReady={latestManifest != null} " +
-            $"activeHumans={(activeHumans.Length == 0 ? "none" : activeHumans)} " +
-            $"activeAiCount={activeAiCount} " +
-            $"registeredControllers={(registeredControllers.Length == 0 ? "none" : registeredControllers)}";
-    }
-#endif
 }
