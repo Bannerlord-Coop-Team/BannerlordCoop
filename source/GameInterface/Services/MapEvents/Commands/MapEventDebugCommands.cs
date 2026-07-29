@@ -850,8 +850,8 @@ public class MapEventDebugCommands
         }
 
         fixture.PartialRoutIssued = true;
-        network.SendAll(new NetworkRouteBattleEnemies(mapEventId, enemiesToLeaveFighting: 1));
-        return $"Ordered all but one fixture enemy to retreat: mapEvent={mapEventId}.";
+        network.SendAll(new NetworkRouteBattleEnemies(mapEventId, enemiesToLeaveFighting: 20));
+        return $"Ordered fixture enemies to retreat while leaving up to 20 fighting: mapEvent={mapEventId}.";
     }
 
     [CommandLineArgumentFunction("battle_reward_fixture_route_enemies", "coop.debug.mapevent")]
