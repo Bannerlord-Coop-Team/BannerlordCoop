@@ -74,12 +74,15 @@ public class RejectedEncounterFixtureCommands
         if (partyTemplate == null)
             return $"Bandit faction {kindClanId} has no default party template.";
 
-        var playerPosition = new CampaignVec2(
-            new Vec2(settlement.GatePosition.X + 3f, settlement.GatePosition.Y + 1f),
-            isOnLand: true);
-        var hostilePosition = new CampaignVec2(
-            new Vec2(settlement.GatePosition.X + 3.6f, settlement.GatePosition.Y + 1f),
-            isOnLand: true);
+        var hostilePosition = settlement.GatePosition;
+        var playerPosition = NavigationHelper.FindReachablePointAroundPosition(
+            hostilePosition,
+            MobileParty.NavigationType.Default,
+            maxDistance: 3.5f,
+            minDistance: 2.5f,
+            useUniformDistribution: false);
+        if (playerPosition.ToVec2().DistanceSquared(hostilePosition.ToVec2()) < 0.01f)
+            return $"Unable to find a reachable fixture position near {settlement.Name}.";
         var activeFixture = new Fixture
         {
             ControllerId = args[0],
@@ -115,6 +118,13 @@ public class RejectedEncounterFixtureCommands
                 throw new InvalidOperationException("The hostile fixture party did not become active.");
 
             MoveAndHold(activeFixture.HostileParty, hostilePosition);
+            var nearestTownOrVillage = SettlementHelper.FindNearestSettlementToMobileParty(
+                activeFixture.HostileParty,
+                MobileParty.NavigationType.All,
+                candidate => candidate.IsTown || candidate.IsVillage);
+            if (nearestTownOrVillage != settlement)
+                throw new InvalidOperationException($"The hostile fixture party cannot navigate to {settlement.Name}.");
+
             if (!TryGetObjectManager(out var objectManager) ||
                 !objectManager.TryGetId(playerParty.Party, out var playerPartyBaseId) ||
                 !objectManager.TryGetId(activeFixture.HostileParty.Party, out var hostilePartyBaseId))
@@ -280,8 +290,7 @@ public class RejectedEncounterFixtureCommands
         var ready = mobileParty != null &&
                     mobileParty.IsActive &&
                     mapFaction != null &&
-                    conversationCharacter != null &&
-                    nearestTownOrVillage != null;
+                    conversationCharacter != null;
         return $"Fixture party {args[0]}: ready={ready}, resolved=True, active={mobileParty?.IsActive == true}, " +
                $"position={mobileParty?.Position.X:R}|{mobileParty?.Position.Y:R}, memberCount={memberCount}, " +
                $"mapFaction={mapFaction?.StringId ?? "<null>"}, " +
