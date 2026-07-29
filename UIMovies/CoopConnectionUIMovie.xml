@@ -190,7 +190,7 @@
                     </Widget>
 
                     <Widget Id="LobbyListContainer" WidthSizePolicy="Fixed" SuggestedWidth="900"
-                            HeightSizePolicy="Fixed" SuggestedHeight="408">
+                            HeightSizePolicy="Fixed" SuggestedHeight="334">
                       <Children>
                         <ScrollablePanel Id="LobbyScrollablePanel" WidthSizePolicy="StretchToParent"
                                          HeightSizePolicy="StretchToParent" MarginRight="18"
@@ -275,6 +275,28 @@
                         </ScrollbarWidget>
                       </Children>
                     </Widget>
+
+                    <ListPanel Id="LobbyPaginationControls" WidthSizePolicy="Fixed" SuggestedWidth="900"
+                               HeightSizePolicy="Fixed" SuggestedHeight="64" MarginTop="10"
+                               IsVisible="@IsSteamLobbyPaginationVisible"
+                               StackLayout.LayoutMethod="HorizontalLeftToRight">
+                      <Children>
+                        <Standard.Button Id="PreviousLobbyPageButton" WidthSizePolicy="Fixed" SuggestedWidth="180"
+                                         HeightSizePolicy="Fixed" SuggestedHeight="58" VerticalAlignment="Center"
+                                         IsDisabled="@IsPreviousSteamLobbyPageDisabled"
+                                         Command.Click="ActionPreviousSteamLobbyPage"
+                                         Parameter.Text="@PreviousPageButtonText"/>
+                        <TextWidget Id="LobbyPageIndicator" WidthSizePolicy="StretchToParent"
+                                    HeightSizePolicy="StretchToParent" Brush="Clan.TabControl.Text"
+                                    Brush.FontSize="24" Brush.TextHorizontalAlignment="Center"
+                                    Brush.TextVerticalAlignment="Center" Text="@SteamLobbyPageText"/>
+                        <Standard.Button Id="NextLobbyPageButton" WidthSizePolicy="Fixed" SuggestedWidth="180"
+                                         HeightSizePolicy="Fixed" SuggestedHeight="58" VerticalAlignment="Center"
+                                         IsDisabled="@IsNextSteamLobbyPageDisabled"
+                                         Command.Click="ActionNextSteamLobbyPage"
+                                         Parameter.Text="@NextPageButtonText"/>
+                      </Children>
+                    </ListPanel>
                   </Children>
                 </ListPanel>
               </Children>

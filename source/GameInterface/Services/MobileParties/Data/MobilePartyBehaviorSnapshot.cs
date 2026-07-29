@@ -18,6 +18,7 @@ namespace GameInterface.Services.MobileParties.Data;
 public interface IMobilePartyBehaviorSnapshot
 {
     bool TryCreate(MobileParty party, out PartyBehaviorUpdateData data);
+    bool CanApply(MobileParty party, PartyBehaviorUpdateData data);
     bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state);
     bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable);
     bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply);
@@ -82,6 +83,13 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         };
         return true;
     }
+
+    public bool CanApply(MobileParty party, PartyBehaviorUpdateData data) =>
+        party?.Ai != null &&
+        TryResolveInteractable(data, out _) &&
+        TryResolve(data.TargetPartyId, out MobileParty _) &&
+        TryResolve(data.TargetSettlementId, out Settlement _) &&
+        TryResolve(data.MoveTargetPartyId, out MobileParty _);
 
     public bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state)
     {

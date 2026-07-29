@@ -1,6 +1,7 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
@@ -43,15 +44,18 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
+    private readonly IBattleAgentBudget agentBudget;
 
     public CoopFieldBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ICoopBattleBehaviorAttacher behaviorAttacher)
+        ICoopBattleBehaviorAttacher behaviorAttacher,
+        IBattleAgentBudget agentBudget)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
+        this.agentBudget = agentBudget;
     }
 
     public Mission OpenCoopFieldBattle(MissionInitializerRecord rec)
@@ -64,6 +68,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         }
 
         var mission = CreateCoopFieldBattle(rec, mapEventId);
+        if (mission == null) return null;
 
         // Same post-open coop entry the native path drove via BattleMissionEntryPatch: the controller requests
         // the P2P instance and the host handler requests this client's OWN troop reserves, which reach the
@@ -96,8 +101,10 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         {
             // Each client fields only what it OWNS. Registered so the server reserve (requested below via
             // PlayerEnteredBattle) feeds these during scene load; the spawn handler then sizes each side.
-            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager);
-            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager);
+            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager,
+                agentBudget);
+            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager,
+                agentBudget);
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 
@@ -113,7 +120,8 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 spawnLogic,
                 new BattlePowerCalculationLogic(),
                 new BattleSpawnLogic("battle_set"),
-                new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier),
+                new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
+                    PartyBase.MainParty.Side),
                 new CampaignMissionComponent(),
                 new BattleAgentLogic(),
                 new MountAgentLogic(),

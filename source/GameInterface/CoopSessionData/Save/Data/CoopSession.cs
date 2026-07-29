@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players.Data;
@@ -24,6 +25,7 @@ public interface ICoopSession
     AlleyPlayerData AlleyPlayerData { get; }
     InteractionsPlayerData InteractionsPlayerData { get; }
     TradePlayerData TradePlayerData { get; }
+    InventoryPlayerData InventoryPlayerData { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -41,7 +43,8 @@ public class CoopSession : ICoopSession
         new CaravansPlayerData(new(), new()),
         new AlleyPlayerData(new()),
         new InteractionsPlayerData(new(), new(), new(), new()),
-        new TradePlayerData(new()));
+        new TradePlayerData(new()),
+        new InventoryPlayerData(new(), new()));
 
     [ProtoMember(1)]
     public string UniqueGameId { get; }
@@ -59,6 +62,8 @@ public class CoopSession : ICoopSession
     public InteractionsPlayerData InteractionsPlayerData { get; }
     [ProtoMember(8)]
     public TradePlayerData TradePlayerData { get; }
+    [ProtoMember(9)]
+    public InventoryPlayerData InventoryPlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -68,7 +73,8 @@ public class CoopSession : ICoopSession
         CaravansPlayerData caravansPlayerData,
         AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData,
-        TradePlayerData tradePlayerData)
+        TradePlayerData tradePlayerData,
+        InventoryPlayerData inventoryPlayerData)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -78,5 +84,6 @@ public class CoopSession : ICoopSession
         AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
+        InventoryPlayerData = inventoryPlayerData;
     }
 }

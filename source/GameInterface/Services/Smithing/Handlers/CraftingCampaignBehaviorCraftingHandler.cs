@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Services.ItemObjects.Interfaces;
@@ -20,6 +21,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Smithing.Handlers
 {
@@ -32,6 +34,7 @@ namespace GameInterface.Services.Smithing.Handlers
         private readonly IBinaryPackageFactory binaryPackageFactory;
         private readonly IItemObjectInterface itemObjectInterface;
         private readonly ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface;
+        private readonly ISendCoalescer sendCoalescer;
 
         public CraftingCampaignBehaviorCraftingHandler(
             IMessageBroker messageBroker,
@@ -39,7 +42,8 @@ namespace GameInterface.Services.Smithing.Handlers
             INetwork network,
             IBinaryPackageFactory binaryPackageFactory,
             IItemObjectInterface itemObjectInterface,
-            ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface)
+            ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface,
+            ISendCoalescer sendCoalescer = null)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
@@ -47,6 +51,8 @@ namespace GameInterface.Services.Smithing.Handlers
             this.binaryPackageFactory = binaryPackageFactory;
             this.itemObjectInterface = itemObjectInterface;
             this.sessionCraftingPlayerDataInterface = sessionCraftingPlayerDataInterface;
+            this.sendCoalescer = sendCoalescer;
+
             messageBroker.Subscribe<SmeltingDone>(Handle);
             messageBroker.Subscribe<NetworkDoSmelting>(Handle);
             messageBroker.Subscribe<RefinementDone>(Handle);
@@ -211,6 +217,11 @@ namespace GameInterface.Services.Smithing.Handlers
 
                 CampaignEventDispatcher.Instance.OnEquipmentSmeltedByHero(craftingHero, equipmentElement);
 
+                objectManager.TryGetId(itemRoster, out var rosterId);
+                var compactId = Compact(rosterId, typeof(ItemRoster));
+
+                sendCoalescer?.FlushInstance(compactId, network);
+
                 network.SendAll(new NetworkRefreshSmelting()); // Refresh client ViewModels
             });
         }
@@ -287,6 +298,11 @@ namespace GameInterface.Services.Smithing.Handlers
                 network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
 
                 CampaignEventDispatcher.Instance.OnItemsRefined(craftingHero, formula);
+
+                objectManager.TryGetId(itemRoster, out var rosterId);
+                var compactId = Compact(rosterId, typeof(ItemRoster));
+
+                sendCoalescer?.FlushInstance(compactId, network);
 
                 network.SendAll(new NetworkRefreshRefinement(obj.CraftingHeroId)); // Refresh client ViewModels
             });

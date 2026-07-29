@@ -1,4 +1,5 @@
-﻿using GameInterface.Utils;
+﻿using Common;
+using GameInterface.Utils;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -22,6 +23,7 @@ internal class SiegeEnginesContainerShellPatches
     private static void BesiegerCampSetterPostfix(BesiegerCamp __instance)
     {
         InitializeShell(__instance.SiegeEngines, BattleSideEnum.Attacker);
+        DirtyVisualIfGraphComplete(__instance.SiegeEvent);
     }
 
     [HarmonyPatch(typeof(Settlement), nameof(Settlement.SiegeEngines), MethodType.Setter)]
@@ -36,6 +38,16 @@ internal class SiegeEnginesContainerShellPatches
         if (__instance._siegeEngineMissiles == null)
         {
             __instance._siegeEngineMissiles = new MBList<SiegeEngineMissile>();
+        }
+
+        DirtyVisualIfGraphComplete(__instance.SiegeEvent);
+    }
+
+    private static void DirtyVisualIfGraphComplete(SiegeEvent siegeEvent)
+    {
+        if (ModInformation.IsClient && SiegeContainerLookup.IsGraphComplete(siegeEvent))
+        {
+            siegeEvent.BesiegedSettlement.Party?.SetVisualAsDirty();
         }
     }
 

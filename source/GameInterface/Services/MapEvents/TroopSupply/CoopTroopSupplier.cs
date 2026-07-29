@@ -41,21 +41,25 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     // seed -> partyId, rebuilt alongside `parties` in SetReserve, so GetParty/FindPartyId is O(1) instead of
     // scanning every party's entries per agent. Entry seeds are server-unique, so one seed maps to one party.
     private readonly Dictionary<int, string> seedToPartyId = new Dictionary<int, string>();
+    private string playerPartyId;
     private bool populated;
     private int reserveRevision;
     private int numWounded, numKilled, numRouted;
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
     // objects without hitting the service locator each call. Null only in tests that don't exercise that path.
     private readonly IObjectManager objectManager;
-
+    // BR-110: the engine agent budget clamps wave/initial allocation to the mission's render capacity.
+    private readonly IBattleAgentBudget agentBudget;
     public string MapEventId { get; }
     public BattleSideEnum Side { get; }
 
-    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager)
+    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager,
+        IBattleAgentBudget agentBudget)
     {
         MapEventId = mapEventId;
         Side = side;
         this.objectManager = objectManager;
+        this.agentBudget = agentBudget;
     }
 
     /// <summary>
@@ -87,6 +91,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
             parties.Clear();
             seedToPartyId.Clear();
+            playerPartyId = null;
             if (reserve != null)
             {
                 foreach (var party in reserve)
@@ -96,12 +101,20 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                     if (priorSupplied.TryGetValue(party.PartyId, out var local) && local > supplied)
                         supplied = Math.Min(local, entries.Length);
                     priorSupplied.Remove(party.PartyId); // kept — not part of the dropped set
-                    parties.Add(new PartyState
+                    var state = new PartyState
                     {
                         PartyId = party.PartyId,
                         Entries = entries,
                         Supplied = supplied,
-                    });
+                    };
+                    // Allocate this client's own party first. Otherwise an army's AI parties can fill the
+                    // render cap before the local hero is reserved, leaving deployment without a player agent.
+                    if (party.IsReceiverPlayerParty)
+                        parties.Insert(0, state);
+                    else
+                        parties.Add(state);
+                    if (party.IsReceiverPlayerParty)
+                        playerPartyId = party.PartyId;
                     foreach (var entry in entries)
                         seedToPartyId[entry.Seed] = party.PartyId;
                 }
@@ -114,8 +127,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 dropped.Add((prior.Key, prior.Value));
         }
 
-        Logger.Information("[TroopSupply] Supplier {MapEvent} side {Side}: SetReserve {Parties} parties / {Entries} troops ({Dropped} parties dropped)",
-            MapEventId, Side, parties.Count, NumTroopsNotSupplied, dropped.Count);
+        Logger.Information("[TroopSupply] Supplier {MapEvent} side {Side}: SetReserve {Parties} parties / {Entries} troops ({Dropped} parties dropped), receiver party {PlayerParty}",
+            MapEventId, Side, parties.Count, NumTroopsNotSupplied, dropped.Count, PlayerPartyId);
         return dropped;
     }
 
@@ -135,6 +148,9 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     /// <summary>Whether the server's reserve has arrived (counts/identity known and final).</summary>
     public bool IsPopulated { get { lock (gate) { return populated; } } }
+
+    /// <summary>The server-authored reserve id of this client's own party, when it belongs to this side.</summary>
+    public string PlayerPartyId { get { lock (gate) { return playerPartyId; } } }
 
     /// <summary>Monotonic count of authoritative reserve snapshots applied to this supplier.</summary>
     public int ReserveRevision { get { lock (gate) { return reserveRevision; } } }
@@ -261,25 +277,51 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     public IEnumerable<IAgentOriginBase> SupplyTroops(int numberToAllocate)
     {
+        // BR-110: allocate no more troops than the engine has RENDER-SLOT capacity for — a mounted troop needs
+        // two slots (rider + horse). The unallocated remainder stays UNSUPPLIED (wave-eligible), so the native
+        // wave logic re-requests it as casualties free slots; the supplied pointer stays aligned with what can
+        // actually field. A null budget (the service-locator fallback path could not resolve one) means no
+        // clamp, matching the no-mission behaviour. The native drip is additionally re-checked at spawn time by
+        // MissionSpawnCapacityPatch, so this clamp is a pre-filter, not the sole guard.
+        int slotBudget = agentBudget != null
+            ? agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current))
+            : int.MaxValue;
+
         var origins = new List<IAgentOriginBase>();
+        int supplied = 0;
         lock (gate)
         {
-            int remaining = numberToAllocate;
+            bool stop = false;
             foreach (var party in parties)
             {
-                while (remaining > 0 && party.Supplied < party.Entries.Length)
+                while (!stop && supplied < numberToAllocate && party.Supplied < party.Entries.Length)
                 {
                     var origin = CreateOrigin(party.Entries[party.Supplied], party.PartyId);
+                    int slots = SlotsForOrigin(origin);
+                    // Stop rather than skip: the supplied pointer advances sequentially, so a troop that does
+                    // not fit now must remain unsupplied (wave-eligible) instead of being jumped over.
+                    if (slots > slotBudget) { stop = true; break; }
+
                     party.Supplied++;
-                    remaining--;
+                    supplied++;
+                    slotBudget -= slots;
                     if (origin != null) origins.Add(origin);
                 }
-                if (remaining == 0) break;
+                if (stop || supplied >= numberToAllocate) break;
             }
         }
-        Logger.Information("[TroopSupply] {MapEvent} side {Side}: SupplyTroops({Req}) -> {Ret} origins, {Remaining} remaining",
-            MapEventId, Side, numberToAllocate, origins.Count, NumTroopsNotSupplied);
+        Logger.Information("[TroopSupply] {MapEvent} side {Side}: SupplyTroops({Req}) -> {Ret} origins ({Withheld} withheld at the engine agent limit), {Remaining} remaining",
+            MapEventId, Side, numberToAllocate, origins.Count, numberToAllocate - supplied, NumTroopsNotSupplied);
         return origins;
+    }
+
+    // BR-110: render slots one supplied origin will consume when spawned — a mounted troop spawns a rider and a
+    // horse (2), an unmounted troop one (1), a null/unresolvable origin none (0, so it advances the supplied
+    // pointer without charging the budget). Falls back to 1 when no budget is available (the null-budget path).
+    private int SlotsForOrigin(IAgentOriginBase origin)
+    {
+        if (origin == null) return 0;
+        return agentBudget == null ? 1 : agentBudget.SlotsForOrigin(origin);
     }
 
     public IAgentOriginBase SupplyOneTroop()

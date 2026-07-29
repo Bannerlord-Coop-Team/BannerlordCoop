@@ -52,6 +52,14 @@ internal static class SiegeContainerLookup
         if (defender != null) yield return new SiegeEngineSide("defender", defender);
     }
 
+    public static bool IsGraphComplete(SiegeEvent siegeEvent)
+    {
+        var camp = siegeEvent?.BesiegerCamp;
+        if (camp?.LeaderParty == null) return false;
+        if (camp.SiegeEngines?.DeployedRangedSiegeEngines == null) return false;
+        return siegeEvent.BesiegedSettlement?.SiegeEngines?.DeployedRangedSiegeEngines != null;
+    }
+
     public static Settlement FindOwnerSettlement(SiegeEnginesContainer container)
     {
         foreach (var siegeEvent in ActiveSieges())

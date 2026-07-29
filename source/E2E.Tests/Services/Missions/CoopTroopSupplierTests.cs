@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents.TroopSupply;
+﻿using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.TroopSupply;
 using System.Linq;
 using TaleWorlds.Core;
 
@@ -20,8 +21,9 @@ public class CoopTroopSupplierTests
         return entries;
     }
 
-    private static PartyReserve Party(string id, int count, int supplied = 0, int seedBase = 500)
-        => new PartyReserve(id, supplied, Entries(count, seedBase));
+    private static PartyReserve Party(string id, int count, int supplied = 0, int seedBase = 500,
+        bool isReceiverPlayerParty = false)
+        => new PartyReserve(id, supplied, Entries(count, seedBase), isReceiverPlayerParty);
 
     private static int SuppliedFor(CoopTroopSupplier supplier, string partyId)
         => supplier.GetSuppliedByParty().First(p => p.partyId == partyId).supplied;
@@ -29,7 +31,7 @@ public class CoopTroopSupplierTests
     [Fact]
     public void BeforePopulated_ReportsTroopsStillComing_AndSuppliesNone()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
 
         Assert.True(supplier.AnyTroopRemainsToBeSupplied); // not populated -> deployment must wait
         Assert.Empty(supplier.SupplyTroops(5));
@@ -39,7 +41,7 @@ public class CoopTroopSupplierTests
     public void EmptyReserve_MarksPopulated_AndReportsDone()
     {
         // A side this client owns nothing on still gets an (empty) reserve, so deployment completes.
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(Array.Empty<PartyReserve>());
 
         Assert.False(supplier.AnyTroopRemainsToBeSupplied);
@@ -49,7 +51,7 @@ public class CoopTroopSupplierTests
     [Fact]
     public void SetReserve_ThenSupply_AdvancesPerPartyPointer()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { Party("A", 10) });
 
         Assert.Equal(10, supplier.NumTroopsNotSupplied);
@@ -65,7 +67,7 @@ public class CoopTroopSupplierTests
     [Fact]
     public void SupplyingPastEnd_StopsAndReportsExhausted()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { Party("A", 3) });
 
         supplier.SupplyTroops(99);
@@ -79,7 +81,7 @@ public class CoopTroopSupplierTests
     [Fact]
     public void Supply_SpansMultipleParties_InOrder()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { Party("A", 2, seedBase: 100), Party("B", 3, seedBase: 200) });
 
         Assert.Equal(5, supplier.NumTroopsNotSupplied);
@@ -90,12 +92,28 @@ public class CoopTroopSupplierTests
     }
 
     [Fact]
+    public void Supply_PrioritizesLocalPartyBeforeOtherOwnedParties()
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        supplier.SetReserve(new[]
+        {
+            Party("army-member", 3, seedBase: 100),
+            Party("player", 2, seedBase: 200, isReceiverPlayerParty: true),
+        });
+
+        supplier.SupplyTroops(1);
+
+        Assert.Equal(0, SuppliedFor(supplier, "army-member"));
+        Assert.Equal(1, SuppliedFor(supplier, "player"));
+    }
+
+    [Fact]
     public void StaleResend_DoesNotRewind_FurtherAlongPointer()
     {
         // Migration/race: we've already supplied 5, but a resend carries a STALE pointer (3) because our last
         // progress report hasn't reached the server's ledger yet. Re-applying it must NOT rewind to 3 (which
         // would re-spawn troops 4 and 5, already on the field, with duplicate seeds) — the pointer is monotonic.
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { Party("A", 10) });
         supplier.SupplyTroops(5);
         Assert.Equal(5, SuppliedFor(supplier, "A"));
@@ -111,7 +129,7 @@ public class CoopTroopSupplierTests
     {
         // The normal migration resume: a party the server is further along on (or one we hadn't supplied
         // locally) takes the server's higher pointer.
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { Party("A", 10) });
         supplier.SupplyTroops(2);
 
@@ -128,7 +146,7 @@ public class CoopTroopSupplierTests
         // returns, the server re-feeds the holder its CURRENT owned set WITHOUT the returned party, and the
         // supplier must stop holding that party's reserve entirely (otherwise two suppliers would field the
         // same troops). Parties that remain keep their monotonic pointer.
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { Party("returned", 4, seedBase: 100), Party("kept", 3, seedBase: 200) });
         supplier.SupplyTroops(1); // pointer advanced on "returned" before the shrink lands
 
@@ -145,7 +163,7 @@ public class CoopTroopSupplierTests
     public void SetReserve_WithSuppliedPointer_ResumesMidway()
     {
         // Migration: a new owner is handed the full list at the server's pointer and continues from there.
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { new PartyReserve("A", 7, Entries(10)) });
 
         Assert.Equal(3, supplier.NumTroopsNotSupplied);
@@ -158,7 +176,7 @@ public class CoopTroopSupplierTests
     [Fact]
     public void SetReserve_IncrementsRevision_ForEachAuthoritativeSnapshot()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
 
         Assert.Equal(0, supplier.ReserveRevision);
 
@@ -171,7 +189,7 @@ public class CoopTroopSupplierTests
     [Fact]
     public void SupplyOneTroopFromParty_AdvancesOnlyTheSelectedParty()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { Party("A", 3, supplied: 1), Party("B", 4) });
 
         supplier.SupplyOneTroopFromParty("B");
@@ -186,7 +204,7 @@ public class CoopTroopSupplierTests
     [Fact]
     public void SupplyOneTroopFromParty_MissingParty_DoesNotConsumeAnotherParty()
     {
-        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null);
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
         supplier.SetReserve(new[] { Party("A", 3) });
 
         Assert.Null(supplier.SupplyOneTroopFromParty("missing"));

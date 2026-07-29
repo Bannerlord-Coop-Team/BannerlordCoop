@@ -54,11 +54,6 @@ internal class CompanionRolesPatches
         var message = new CompanionFired(Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(__instance, message);
 
-        if (PlayerEncounter.Current != null)
-        {
-            PlayerEncounter.LeaveEncounter = true;
-        }
-
         return false;
     }
 

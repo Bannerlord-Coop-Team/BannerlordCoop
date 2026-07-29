@@ -14,8 +14,8 @@ public class CoopTournamentScreenMovieTests
         _ = XDocument.Parse(movie);
 
         Assert.Contains("Tournament.Round", movie);
-        Assert.Contains("TournamentMatchWidget", movie);
-        Assert.Contains("State=\"@State\"", movie);
+        Assert.Contains("<Tournament.Match DataSource=\"{CurrentMatch}\"", movie);
+        Assert.Contains("Parameter.OnMission=\"true\"", movie);
         Assert.DoesNotContain("TournamentMatchWidget DataSource=\"{CurrentMatch}\" Brush=", movie);
         Assert.Contains("DataSource=\"{CurrentMatch}\"", movie);
         Assert.Contains("IsVisible=\"@IsCurrentMatchActive\"", movie);

@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.Time.Interfaces;
 
@@ -16,15 +17,18 @@ public sealed class JoinCampaignBaselineHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
+    private readonly ITimeControlInterface timeControlInterface;
 
     public JoinCampaignBaselineHandler(
         IMessageBroker messageBroker,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
-        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
+        ITimeControlInterface timeControlInterface)
     {
         this.messageBroker = messageBroker;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
         this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
+        this.timeControlInterface = timeControlInterface;
 
         messageBroker.Subscribe<NetworkJoinCampaignBaseline>(Handle);
     }
@@ -42,7 +46,11 @@ public sealed class JoinCampaignBaselineHandler : IHandler
             bool success = baseline.IsComplete &&
                 mobilePartyBehaviorSnapshot.TryApplyJoinBaseline(
                     baseline.PartyStates,
-                    () => mapTimeTrackerInterface.ApplyCampaignJoinBaseline(baseline.ServerTicks));
+                    () =>
+                    {
+                        timeControlInterface.ClientSetTimeControl(baseline.TimeControlMode);
+                        mapTimeTrackerInterface.ApplyCampaignJoinBaseline(baseline.ServerTicks);
+                    });
 
             messageBroker.Publish(this, new JoinCampaignBaselineApplied(success));
         }, context: nameof(JoinCampaignBaselineHandler));

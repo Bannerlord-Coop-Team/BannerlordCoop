@@ -2,6 +2,7 @@
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventSides.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -68,6 +69,24 @@ public class MapEventLifetimeTests : MapEventTestBase
         {
             Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         }
+    }
+
+    [Fact]
+    public void ClientFinalize_AlreadyFinalizedMapEventDoesNotSendAnotherRequest()
+    {
+        var mapEventCtx = CreateServerMapEvent();
+        var firstClient = Clients.First();
+        firstClient.NetworkSentMessages.Clear();
+
+        firstClient.Call(() =>
+        {
+            Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
+            mapEvent.State = MapEventState.WaitingRemoval;
+            mapEvent.FinalizeEvent();
+        }, MapEventDisabledMethods);
+
+        Assert.Empty(firstClient.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
+        Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
     }
 
     [Fact]

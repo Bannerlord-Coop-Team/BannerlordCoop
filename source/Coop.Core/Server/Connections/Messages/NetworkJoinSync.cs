@@ -18,6 +18,8 @@ public enum JoinSyncSignal
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkJoinSync : IMessage
 {
+    public const int CompletionPacketThreshold = 500;
+
     [ProtoMember(1)]
     public readonly JoinSyncSignal Signal;
 

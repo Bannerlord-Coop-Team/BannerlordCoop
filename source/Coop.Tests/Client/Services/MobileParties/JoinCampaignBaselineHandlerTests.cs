@@ -3,6 +3,8 @@ using Common.Tests.Utils;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.MobileParties.Handlers;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.Time.Interfaces;
 using Moq;
@@ -18,6 +20,7 @@ public class JoinCampaignBaselineHandlerTests
     private readonly Mock<IMapTimeTrackerInterface> mapTimeTracker = new Mock<IMapTimeTrackerInterface>();
     private readonly Mock<IMobilePartyBehaviorSnapshot> mobilePartyBehaviorSnapshot =
         new Mock<IMobilePartyBehaviorSnapshot>();
+    private readonly Mock<ITimeControlInterface> timeControl = new Mock<ITimeControlInterface>();
     private readonly JoinCampaignBaselineHandler handler;
 
     public JoinCampaignBaselineHandlerTests(ITestOutputHelper output)
@@ -26,18 +29,27 @@ public class JoinCampaignBaselineHandlerTests
         handler = new JoinCampaignBaselineHandler(
             messageBroker,
             mapTimeTracker.Object,
-            mobilePartyBehaviorSnapshot.Object);
+            mobilePartyBehaviorSnapshot.Object,
+            timeControl.Object);
     }
 
     [Fact]
     public void CompleteBaseline_AppliesAllPartyStateBeforePublishingSuccess()
     {
         var partyStates = new[] { new MobilePartyJoinState() };
+        bool timeControlApplied = false;
         bool timeApplied = false;
         bool partyStateApplied = false;
+        timeControl
+            .Setup(time => time.ClientSetTimeControl(TimeControlEnum.Play_2x))
+            .Callback(() => timeControlApplied = true);
         mapTimeTracker
             .Setup(tracker => tracker.ApplyCampaignJoinBaseline(123456L))
-            .Callback(() => timeApplied = true);
+            .Callback(() =>
+            {
+                Assert.True(timeControlApplied);
+                timeApplied = true;
+            });
         mobilePartyBehaviorSnapshot
             .Setup(snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()))
             .Callback<MobilePartyJoinState[], Action>((_, beforeApply) =>
@@ -53,8 +65,12 @@ public class JoinCampaignBaselineHandlerTests
             Assert.True(payload.What.Success);
         });
 
-        var applied = Apply(new NetworkJoinCampaignBaseline(123456L, partyStates));
+        var applied = Apply(new NetworkJoinCampaignBaseline(
+            123456L,
+            TimeControlEnum.Play_2x,
+            partyStates));
 
+        timeControl.Verify(time => time.ClientSetTimeControl(TimeControlEnum.Play_2x), Times.Once);
         mapTimeTracker.Verify(tracker => tracker.ApplyCampaignJoinBaseline(123456L), Times.Once);
         mobilePartyBehaviorSnapshot.Verify(
             snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()),
@@ -74,13 +90,20 @@ public class JoinCampaignBaselineHandlerTests
             .Setup(snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()))
             .Returns(false);
 
-        var applied = Apply(new NetworkJoinCampaignBaseline(123456L, partyStates, isComplete));
+        var applied = Apply(new NetworkJoinCampaignBaseline(
+            123456L,
+            TimeControlEnum.Play_1x,
+            partyStates,
+            isComplete));
 
         mobilePartyBehaviorSnapshot.Verify(
             snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()),
             Times.Exactly(expectedApplyAttempts));
         mapTimeTracker.Verify(
             tracker => tracker.ApplyCampaignJoinBaseline(It.IsAny<long>()),
+            Times.Never);
+        timeControl.Verify(
+            time => time.ClientSetTimeControl(It.IsAny<TimeControlEnum>()),
             Times.Never);
         Assert.False(applied.Success);
     }

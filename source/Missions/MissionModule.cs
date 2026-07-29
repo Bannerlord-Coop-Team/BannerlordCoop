@@ -41,6 +41,13 @@ public class MissionModule : Module
             AgentVoicePatchCategory));
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
+        builder.RegisterType<MovementPacketCompressor>()
+            .As<IMovementPacketCompressor>()
+            .InstancePerDependency();
+        builder.RegisterType<CompressedMovementPacketHandler>()
+            .AsSelf()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
         builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
 
         // MissionContext mirrors the server's instance membership and must live for the whole client
@@ -138,11 +145,15 @@ public class MissionModule : Module
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
         builder.RegisterType<AgentFormationAssigner>().As<IAgentFormationAssigner>().InstancePerDependency();
+        builder.RegisterType<PuppetMountStateRepairer>()
+            .As<IPuppetMountStateRepairer>()
+            .InstancePerDependency();
 
         builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
         builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
+        builder.RegisterType<AgentEquipmentApplier>().As<IAgentEquipmentApplier>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentVisualActionAccessor>()
             .As<IAgentVisualActionAccessor>()

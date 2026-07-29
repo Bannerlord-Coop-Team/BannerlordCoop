@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Heroes.Extensions;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -44,7 +45,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
                         playerEncounter.DoCaptureHeroes();
                         break;
                     case PlayerEncounterState.FreeHeroes:
-                        if (!TryReleaseForeignPlayerCompanion(playerEncounter))
+                        if (!TryReleaseForeignPlayerHero(playerEncounter))
                         {
                             playerEncounter.DoFreeOrCapturePrisonerHeroes();
                         }
@@ -62,13 +63,16 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
                         EndPlayerEncounter(playerEncounter);
                         break;
                     default:
+                        // Begin/Wait and any future states are not after-battle work. Yield until the
+                        // next campaign tick instead of spinning forever when no player map event exists.
+                        playerEncounter._stateHandled = true;
                         break;
                 }
             }
         });
     }
 
-    private static bool TryReleaseForeignPlayerCompanion(PlayerEncounter playerEncounter)
+    private static bool TryReleaseForeignPlayerHero(PlayerEncounter playerEncounter)
     {
         if (playerEncounter._capturedAlreadyPrisonerHeroes == null)
         {
@@ -84,18 +88,25 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
             hero.PartyBelongedToAsPrisoner != PartyBase.MainParty &&
             ShouldReleaseWithoutConversation(hero, Clan.PlayerClan));
 
-        var companion = element.Character?.HeroObject;
-        if (companion == null) return false;
+        var hero = element.Character?.HeroObject;
+        if (hero == null) return false;
 
         playerEncounter._capturedAlreadyPrisonerHeroes.Remove(element);
-        EndCaptivityAction.ApplyByReleasedAfterBattle(companion);
+        EndCaptivityAction.ApplyByReleasedAfterBattle(hero);
         return true;
     }
 
-    internal static bool ShouldReleaseWithoutConversation(Hero hero, Clan localPlayerClan) =>
-        hero?.CompanionOf != null &&
-        hero.CompanionOf != localPlayerClan &&
-        hero.CompanionOf.IsPlayerClan();
+    internal static bool ShouldReleaseWithoutConversation(Hero hero, Clan localPlayerClan)
+    {
+        if (hero == null) return false;
+
+        if (hero.Clan != null && hero.Clan != localPlayerClan && hero.IsPlayerHero())
+            return true;
+
+        return hero.CompanionOf != null &&
+               hero.CompanionOf != localPlayerClan &&
+               hero.CompanionOf.IsPlayerClan();
+    }
 
     private void EndPlayerEncounter(PlayerEncounter playerEncounter)
     {

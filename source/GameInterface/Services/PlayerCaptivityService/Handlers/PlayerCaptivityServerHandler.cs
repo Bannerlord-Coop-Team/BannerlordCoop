@@ -15,6 +15,7 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
@@ -54,8 +55,6 @@ namespace GameInterface.Services.PlayerCaptivityService.Handlers;
 /// </summary>
 internal class PlayerCaptivityServerHandler : IHandler
 {
-    private const int PrisonerLiberationRelationReward = 10;
-
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerCaptivityServerHandler>();
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -79,7 +78,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
         messageBroker.Subscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
         messageBroker.Subscribe<NetworkEndCaptivityAttempted>(Handle_NetworkEndCaptivityAttempted);
-        messageBroker.Subscribe<NetworkPrisonerLiberationAttempted>(Handle_NetworkPrisonerLiberationAttempted);
         messageBroker.Subscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -90,7 +88,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         messageBroker.Unsubscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
         messageBroker.Unsubscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
         messageBroker.Unsubscribe<NetworkEndCaptivityAttempted>(Handle_NetworkEndCaptivityAttempted);
-        messageBroker.Unsubscribe<NetworkPrisonerLiberationAttempted>(Handle_NetworkPrisonerLiberationAttempted);
         messageBroker.Unsubscribe<PlayerCaptivityEndedByServer>(Handle_PlayerCaptivityEndedByServer);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
@@ -367,7 +364,7 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         // Out of the battle first, so the capture below is a plain out-of-battle capture.
         playerParty.Party.MapEventSide = null;
-        network.SendAll(new NetworkPartyLeftBattle(surrenderedPartyId));
+        network.SendAll(new NetworkPartyLeftBattle(surrenderedPartyId, false));
 
         TakePrisonerAction.Apply(captorParty, playerHero);
     }
@@ -439,37 +436,6 @@ internal class PlayerCaptivityServerHandler : IHandler
 
             EndCaptivityAction.ApplyInternal(prisoner, data.Detail, facilitator, data.ShowNotification);
         }, context: nameof(Handle_NetworkEndCaptivityAttempted));
-    }
-
-    private void Handle_NetworkPrisonerLiberationAttempted(MessagePayload<NetworkPrisonerLiberationAttempted> payload)
-    {
-        if (ModInformation.IsClient) return;
-
-        string prisonerId = payload.What.PrisonerId;
-
-        GameThread.RunSafe(() =>
-        {
-            if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
-            {
-                Logger.Error("Received {Message} without a registered player peer", nameof(NetworkPrisonerLiberationAttempted));
-                return;
-            }
-
-            string playerHeroId = player.HeroId;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(playerHeroId, out var playerHero)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(prisonerId, out var prisoner)) return;
-            if (!prisoner.IsPrisoner) return;
-
-            PlayerCaptivityLogger.Debug(
-                "Handle_NetworkPrisonerLiberationAttempted (server): player={PlayerHeroId} prisoner={PrisonerId}",
-                playerHero.StringId,
-                prisoner.StringId);
-
-            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(
-                playerHero,
-                prisoner,
-                PrisonerLiberationRelationReward);
-        }, context: nameof(Handle_NetworkPrisonerLiberationAttempted));
     }
 
     /// <summary>
@@ -605,9 +571,35 @@ internal class PlayerCaptivityServerHandler : IHandler
         // PartyBelongedToAsPrisoner via the engine hook; do this regardless of whether the captor is still
         // active, since a captor defeated in battle may already be inactive. If the roster no longer holds
         // the hero, null it directly so the cleared state still auto-syncs to the owning client.
-        if (captorParty != null && captorParty.PrisonRoster.Contains(playerHero.CharacterObject))
+        if (captorParty != null)
         {
-            captorParty.PrisonRoster.RemoveTroop(playerHero.CharacterObject);
+            var prisonRoster = captorParty.PrisonRoster;
+            int prisonerIndex = prisonRoster.FindIndexOfTroop(playerHero.CharacterObject);
+            // Apply the authoritative cleanup without letting the roster patches publish a conditional
+            // mutation. The explicit identity-keyed tombstone below must be sent even when this element
+            // was already absent on the server but remains stale on one or more clients.
+            using (new AllowedThread())
+            {
+                if (prisonerIndex >= 0)
+                {
+                    if (prisonRoster.GetElementWoundedNumber(prisonerIndex) != 0)
+                    {
+                        prisonRoster.SetElementWoundedNumber(prisonerIndex, 0);
+                    }
+                    prisonRoster.SetElementNumber(prisonerIndex, 0);
+                }
+                // Match the roster-wide cleanup every client applies below, including when the target
+                // player element was already absent but another depleted element remains.
+                prisonRoster.RemoveZeroCounts();
+                prisonRoster.InitializeCachedData();
+            }
+
+            // Publish absolute zeroes regardless of authoritative element presence. A normal Party-screen
+            // release can arrive after another server path removed the roster element while the captor client
+            // still has a stale copy; skipping the tombstone in that state reproduces the ghost prisoner.
+            messageBroker.Publish(this, new ElementWoundedNumberSet(prisonRoster, playerHero.CharacterObject, 0));
+            messageBroker.Publish(this, new ElementNumberSet(prisonRoster, playerHero.CharacterObject, 0));
+            messageBroker.Publish(this, new ZeroCountsRemoved(prisonRoster));
         }
         if (playerHero.PartyBelongedToAsPrisoner != null)
         {
@@ -705,7 +697,8 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null) return;
-        if (!objectManager.TryGetIdWithLogging(partyVisual, out string visualId)) return;
+        if (!objectManager.TryGetIdWithLogging(partyVisual, out string partyVisualId)) return;
+        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return;
 
         objectManager.Remove(partyVisual);
 
@@ -714,7 +707,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(visualId));
+        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
     }
 
     private void RecreateVisual(MobileParty party)

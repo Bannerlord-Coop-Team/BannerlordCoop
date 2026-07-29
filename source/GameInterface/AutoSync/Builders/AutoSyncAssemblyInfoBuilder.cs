@@ -37,6 +37,11 @@ namespace GameInterface.AutoSync.Builders
                 {
                     ignoreCheckAccessAssemblies.Add(targetMethod.DeclaringType.Assembly);
                 }
+
+                foreach (var targetMethod in dynamicRegistryItem.CategorizedTargetMethods.SelectMany(item => item.Value))
+                {
+                    ignoreCheckAccessAssemblies.Add(targetMethod.DeclaringType.Assembly);
+                }
             }
 
             var assemblyInfoTemplate = TemplateParser.Parse("AutoAssemblyInfoTemplate", new

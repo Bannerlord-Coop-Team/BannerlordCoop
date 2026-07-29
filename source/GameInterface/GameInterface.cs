@@ -81,6 +81,8 @@ public class GameInterface : IGameInterface
         if (gameStartedPatchesApplied) return;
 
         harmony.PatchCategory(typeof(GameInterface).Assembly, HARMONY_GAME_STARTED_CATEGORY);
+        if (AutoSyncPatcher.Assembly != null)
+            harmony.PatchCategory(AutoSyncPatcher.Assembly, HARMONY_GAME_STARTED_CATEGORY);
         gameStartedPatchesApplied = true;
     }
 

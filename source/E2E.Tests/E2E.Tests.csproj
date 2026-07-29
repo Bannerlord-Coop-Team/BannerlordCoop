@@ -13,6 +13,10 @@
     <Optimize>false</Optimize>
     <DebugType>portable</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <!-- e2e.runsettings pins the testhost's JIT behavior so Harmony detours can't be dropped
+         mid-test; see the comment there. dotnet test picks this up; direct vstest.console runs
+         need /Settings:e2e.runsettings. -->
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)e2e.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,6 +28,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageReference Include="MonoMod.RuntimeDetour" Version="25.2.3" />
     <PackageReference Include="MonoMod.Utils" Version="25.0.8" />
+    <PackageReference Include="protobuf-net" Version="3.2.56" />
     <PackageReference Include="Scriban" Version="7.2.0" />
     <PackageReference Include="Serilog.Sinks.XUnit" Version="3.0.19" />
     <PackageReference Include="System.Reflection.Primitives" Version="4.3.0" />

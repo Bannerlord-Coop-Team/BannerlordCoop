@@ -37,23 +37,20 @@ public class AgentMovementHandler : IAgentMovementHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
-    // Max agents per movement packet. The host has authority over every AI troop, so its batch can be
-    // dozens of agents — one packet for all of them overflows the unreliable MTU ceiling (LiteNetLib
-    // throws TooBigPacketException on oversized non-fragmentable sends). The MTU can stay near its ~1 KB floor
-    // (no negotiation up over P2P), and a mounted/well-equipped agent can run a few hundred bytes, so keep the
-    // chunk small enough that the common case fits one unreliable packet; the send path promotes any chunk that
-    // still overflows to a fragmentable reliable channel.
-    private const int MaxAgentsPerMovementPacket = 4;
+    // Movement is strictly droppable, so keep even mounted snapshots below the 1 KB unreliable ceiling.
+    private const int MaxAgentsPerMovementPacket = 3;
 
-    // Keep the old movement-send ceiling after moving capture onto the game thread. High-FPS clients can tick
-    // faster than the old poller, and sending every frame would raise battle bandwidth.
-    private const float MovementPollingIntervalSeconds = 0.01f;
+    // Forty updates per second keeps locally authoritative agents responsive.
+    private const float MovementPollingIntervalSeconds = 0.025f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IAgentEquipmentApplier equipmentApplier;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
+    private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
 
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
@@ -80,7 +77,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         IPacketManager packetManager,
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        IAgentEquipmentApplier equipmentApplier,
+        IPuppetMountStateRepairer puppetMountStateRepairer)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
 
@@ -89,6 +88,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.messageBroker = messageBroker;
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
+        this.equipmentApplier = equipmentApplier;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
 
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
@@ -97,8 +98,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
 
         this.packetManager.RegisterPacketHandler(this);
+        this.packetManager.RegisterPacketHandler(equipmentApplier);
 
-        _mountMovementApplier = new MountMovementApplier(agentRegistry, _interpolator);
+        _mountMovementApplier = new MountMovementApplier(agentRegistry, _interpolator, puppetMountStateRepairer);
         this.packetManager.RegisterPacketHandler(_mountMovementApplier);
     }
 
@@ -124,6 +126,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         packetManager.RemovePacketHandler(this);
         packetManager.RemovePacketHandler(_mountMovementApplier);
+        packetManager.RemovePacketHandler(equipmentApplier);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -134,32 +137,49 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public PacketType PacketType => PacketType.Movement;
 
-    // Broadcast the movement of every agent the local node currently has authority over: its own party,
-    // plus any party it has assumed control of as host.
+    private sealed class MovementBatch<T>
+    {
+        public readonly string IdentityScopeId;
+        public readonly List<ushort> CompactIds = new List<ushort>();
+        public readonly List<Guid> CanonicalIds = new List<Guid>();
+        public readonly List<T> Data = new List<T>();
+
+        public MovementBatch(string identityScopeId)
+        {
+            IdentityScopeId = identityScopeId;
+        }
+
+        public void Add(CoopAgentInfo info, T data)
+        {
+            if (IdentityScopeId == null)
+                CanonicalIds.Add(info.AgentId);
+            else
+                CompactIds.Add(info.MovementId);
+            Data.Add(data);
+        }
+    }
+
+    // Broadcast every locally authoritative agent.
     public void PollMovement(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
         movementPollElapsed += dt;
         if (movementPollElapsed < MovementPollingIntervalSeconds) return;
-        movementPollElapsed = 0f;
+        movementPollElapsed %= MovementPollingIntervalSeconds;
 
-        // Collect every agent we have authority over, then broadcast them in MTU-safe chunks. One packet
-        // per agent floods the mesh and the receiver's game-thread queue at battle scale (the GameThread
-        // lockup); one packet for ALL of them overflows the unreliable MTU ceiling. The single registry pass
-        // partitions the two movement streams: troops as AgentData, masterless registered horses as
-        // standalone AgentMountData (a ridden horse's pose rides inside its rider's AgentData instead).
-        var ids = new List<Guid>();
-        var data = new List<AgentData>();
-        List<Guid> mountIds = null;
-        List<AgentMountData> mountData = null;
+        var movementGroups = new Dictionary<string, MovementBatch<AgentData>>();
+        var mountGroups = new Dictionary<string, MovementBatch<AgentMountData>>();
+        var equipmentGroups = new Dictionary<string, MovementBatch<AgentEquipmentData>>();
+        MovementBatch<AgentData> legacyMovement = null;
+        MovementBatch<AgentMountData> legacyMountMovement = null;
+        MovementBatch<AgentEquipmentData> legacyEquipment = null;
 
         foreach (var agentInfo in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
         {
             Agent agent = agentInfo.Agent;
             // Skip agents whose native object is already gone (dead/removed but not yet deregistered):
-            // building the snapshot calls into the agent (GetCurrentActionType, etc.), which throws an
-            // AccessViolationException on a freed agent. Mirrors the IsActive() guard on the apply path.
+            // building the snapshot calls into the agent, which can access-violate after native teardown.
             if (agent == null || agent.Mission == null || !agent.IsActive()) continue;
 
             EnsureLocallyDrivenMountController(agent);
@@ -167,43 +187,188 @@ public class AgentMovementHandler : IAgentMovementHandler
 
             if (agent.IsMount)
             {
-                (mountIds ??= new List<Guid>()).Add(agentInfo.AgentId);
-                (mountData ??= new List<AgentMountData>()).Add(new AgentMountData(agent));
+                AddToBatch(
+                    mountGroups,
+                    ref legacyMountMovement,
+                    agentInfo,
+                    new AgentMountData(agent));
             }
             else
             {
-                ids.Add(agentInfo.AgentId);
-                data.Add(new AgentData(agent, GetRegisteredMountId(agent)));
+                GetRegisteredMountIdentity(
+                    agent,
+                    agentInfo.MovementScopeId,
+                    out ushort mountMovementId,
+                    out string mountIdentityScopeId,
+                    out Guid mountAgentId);
+                AddToBatch(
+                    movementGroups,
+                    ref legacyMovement,
+                    agentInfo,
+                    new AgentData(
+                        agent,
+                        mountMovementId,
+                        mountIdentityScopeId,
+                        mountAgentId));
+
+                var equipment = new AgentEquipmentData(agent);
+                if (!lastEquipment.TryGetValue(agentInfo.AgentId, out var previousEquipment))
+                {
+                    lastEquipment[agentInfo.AgentId] = equipment;
+
+                    // Battle spawn/catch-up records already carry the current wield state. Compact ids are
+                    // battle-only, so seeding their cache here avoids immediately resending every agent's
+                    // equipment on the first 40 Hz poll. Legacy Guid registrations still need an initial update.
+                    if (agentInfo.MovementId != 0)
+                        continue;
+                }
+                else if (previousEquipment.Equals(equipment))
+                {
+                    continue;
+                }
+
+                lastEquipment[agentInfo.AgentId] = equipment;
+                AddToBatch(
+                    equipmentGroups,
+                    ref legacyEquipment,
+                    agentInfo,
+                    equipment);
             }
         }
 
-        for (int start = 0; start < ids.Count; start += MaxAgentsPerMovementPacket)
+        SendEquipment(equipmentGroups.Values);
+        SendEquipment(legacyEquipment);
+        SendMovement(movementGroups.Values);
+        SendMovement(legacyMovement);
+        SendMountMovement(mountGroups.Values);
+        SendMountMovement(legacyMountMovement);
+    }
+
+    private static void AddToBatch<T>(
+        Dictionary<string, MovementBatch<T>> compactBatches,
+        ref MovementBatch<T> legacyBatch,
+        CoopAgentInfo agentInfo,
+        T data)
+    {
+        MovementBatch<T> batch;
+        if (agentInfo.MovementId == 0)
         {
-            int count = Math.Min(MaxAgentsPerMovementPacket, ids.Count - start);
-            var idChunk = new Guid[count];
-            var dataChunk = new AgentData[count];
-            ids.CopyTo(start, idChunk, 0, count);
-            data.CopyTo(start, dataChunk, 0, count);
-            client.SendAll(new MovementPacket(idChunk, dataChunk));
+            batch = legacyBatch ??= new MovementBatch<T>(null);
+        }
+        else if (!compactBatches.TryGetValue(agentInfo.MovementScopeId, out batch))
+        {
+            batch = new MovementBatch<T>(agentInfo.MovementScopeId);
+            compactBatches[agentInfo.MovementScopeId] = batch;
         }
 
-        if (mountIds == null) return;
+        batch.Add(agentInfo, data);
+    }
 
-        for (int start = 0; start < mountIds.Count; start += MaxAgentsPerMovementPacket)
+    private void SendEquipment(IEnumerable<MovementBatch<AgentEquipmentData>> batches)
+    {
+        foreach (var batch in batches)
+            SendEquipment(batch);
+    }
+
+    private void SendEquipment(MovementBatch<AgentEquipmentData> batch)
+    {
+        if (batch == null) return;
+
+        const int maxEquipmentPerPacket = 64;
+        for (int start = 0; start < batch.Data.Count; start += maxEquipmentPerPacket)
         {
-            int count = Math.Min(MaxAgentsPerMovementPacket, mountIds.Count - start);
-            var idChunk = new Guid[count];
-            var dataChunk = new AgentMountData[count];
-            mountIds.CopyTo(start, idChunk, 0, count);
-            mountData.CopyTo(start, dataChunk, 0, count);
-            client.SendAll(new MountMovementPacket(idChunk, dataChunk));
+            int count = Math.Min(maxEquipmentPerPacket, batch.Data.Count - start);
+            var equipment = new AgentEquipmentData[count];
+            batch.Data.CopyTo(start, equipment, 0, count);
+
+            if (batch.IdentityScopeId == null)
+            {
+                var ids = new Guid[count];
+                batch.CanonicalIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new AgentEquipmentPacket(ids, equipment));
+            }
+            else
+            {
+                var ids = new ushort[count];
+                batch.CompactIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new AgentEquipmentPacket(
+                    batch.IdentityScopeId, ids, equipment));
+            }
+        }
+    }
+
+    private void SendMovement(IEnumerable<MovementBatch<AgentData>> batches)
+    {
+        foreach (var batch in batches)
+            SendMovement(batch);
+    }
+
+    private void SendMovement(MovementBatch<AgentData> batch)
+    {
+        if (batch == null) return;
+
+        for (int start = 0; start < batch.Data.Count; start += MaxAgentsPerMovementPacket)
+        {
+            int count = Math.Min(MaxAgentsPerMovementPacket, batch.Data.Count - start);
+            var data = new AgentData[count];
+            batch.Data.CopyTo(start, data, 0, count);
+
+            if (batch.IdentityScopeId == null)
+            {
+                var ids = new Guid[count];
+                batch.CanonicalIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new MovementPacket(ids, data));
+            }
+            else
+            {
+                var ids = new ushort[count];
+                batch.CompactIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new MovementPacket(batch.IdentityScopeId, ids, data));
+            }
+        }
+    }
+
+    private void SendMountMovement(IEnumerable<MovementBatch<AgentMountData>> batches)
+    {
+        foreach (var batch in batches)
+            SendMountMovement(batch);
+    }
+
+    private void SendMountMovement(MovementBatch<AgentMountData> batch)
+    {
+        if (batch == null) return;
+
+        for (int start = 0; start < batch.Data.Count; start += MaxAgentsPerMovementPacket)
+        {
+            int count = Math.Min(MaxAgentsPerMovementPacket, batch.Data.Count - start);
+            var data = new AgentMountData[count];
+            batch.Data.CopyTo(start, data, 0, count);
+
+            if (batch.IdentityScopeId == null)
+            {
+                var ids = new Guid[count];
+                batch.CanonicalIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new MountMovementPacket(ids, data));
+            }
+            else
+            {
+                var ids = new ushort[count];
+                batch.CompactIds.CopyTo(start, ids, 0, count);
+                client.SendAll(new MountMovementPacket(
+                    batch.IdentityScopeId, ids, data));
+            }
         }
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
         var movement = (MovementPacket)packet;
-        if (movement.AgentIds == null) return;
+        int idCount = movement.AgentIds?.Length ?? movement.AgentGuids?.Length ?? 0;
+        if (idCount == 0 || movement.Agents == null ||
+            movement.Agents.Length != idCount)
+        {
+            return;
+        }
 
         // Resolve and apply the whole batch in ONE game-thread action. Resolving here keeps this ordered behind
         // earlier game-thread spawn/register work that may have been queued by reliable messages.
@@ -213,11 +378,15 @@ public class AgentMovementHandler : IAgentMovementHandler
 
             using (new AllowedThread())
             {
-                for (int i = 0; i < movement.AgentIds.Length; i++)
+                for (int i = 0; i < idCount; i++)
                 {
-                    var agentId = movement.AgentIds[i];
-                    if (agentRegistry.IsLocallyControlled(agentId)) continue;
-                    if (!agentRegistry.TryGetAgentInfo(agentId, out var agentInfo)) continue;
+                    CoopAgentInfo agentInfo;
+                    bool found = movement.AgentIds != null
+                        ? agentRegistry.TryGetAgentInfo(
+                            movement.IdentityScopeId, movement.AgentIds[i], out agentInfo)
+                        : agentRegistry.TryGetAgentInfo(
+                            movement.AgentGuids[i], out agentInfo);
+                    if (!found) continue;
 
                     Agent agent = agentInfo.Agent;
                     AgentData data = movement.Agents[i];
@@ -234,11 +403,14 @@ public class AgentMovementHandler : IAgentMovementHandler
                     if (agentRegistry.IsLocallyControlled(agent))
                         continue;
 
-                    SyncMountState(agent, data);
+                    SyncMountState(agent, movement.IdentityScopeId, data);
 
                     // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
                     if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
+                    {
                         puppetMount.Controller = AgentControllerType.None;
+                        puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
+                    }
 
                     data.Apply(agent);
 
@@ -272,7 +444,10 @@ public class AgentMovementHandler : IAgentMovementHandler
     // never re-mounts). MountAgent is set directly (controller-independent — puppets have no controller to
     // process a mount/dismount input flag); the movement sync then keeps the rider/horse positioned.
     // AgentData.Apply still syncs the mount's pose while both are mounted.
-    private void SyncMountState(Agent agent, AgentData data)
+    private void SyncMountState(
+        Agent agent,
+        string riderIdentityScopeId,
+        AgentData data)
     {
         bool ownerMounted = data.MountData != null;
 
@@ -290,7 +465,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             // Owner (re)mounted: prefer the exact horse it reports (registered mounts carry their id); fall
             // back to the one the puppet last left for unregistered horses.
-            Agent horse = ResolveRegisteredHorse(data.MountData.MountId);
+            Agent horse = ResolveRegisteredHorse(
+                riderIdentityScopeId, data.MountData);
             if (horse == null) _dismountedHorses.TryGetValue(agent, out horse);
             if (horse != null && horse.IsActive() && horse.RiderAgent == null)
                 agent.MountAgent = horse;
@@ -301,7 +477,8 @@ public class AgentMovementHandler : IAgentMovementHandler
             // Owner switched horses (dismount + different re-mount inside one poll interval): the reported
             // mount id no longer matches the horse the puppet sits on — move it over so damage routed by the
             // horse's id keeps hitting what players actually see.
-            Agent reported = ResolveRegisteredHorse(data.MountData.MountId);
+            Agent reported = ResolveRegisteredHorse(
+                riderIdentityScopeId, data.MountData);
             if (reported != null && !ReferenceEquals(reported, agent.MountAgent)
                 && reported.IsActive() && reported.RiderAgent == null)
             {
@@ -324,6 +501,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         if (mount.Controller != AgentControllerType.AI)
         {
             mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+            puppetMountStateRepairer.PrepareForAiControl(mount);
             mount.Controller = AgentControllerType.AI;
         }
     }
@@ -335,7 +513,10 @@ public class AgentMovementHandler : IAgentMovementHandler
             && !agentRegistry.IsLocallyControlled(mount)) return;
         mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
         if (mount.Controller != AgentControllerType.AI)
+        {
+            puppetMountStateRepairer.PrepareForAiControl(mount);
             mount.Controller = AgentControllerType.AI;
+        }
     }
 
     /// <summary>
@@ -354,20 +535,53 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // The local agent behind a mount's network id; null when the id is empty/unknown or resolves to a
     // non-mount (a stale id after the registry entry was replaced).
-    private Agent ResolveRegisteredHorse(Guid mountId)
+    private Agent ResolveRegisteredHorse(
+        string riderIdentityScopeId,
+        AgentMountData mountData)
     {
-        if (mountId == Guid.Empty) return null;
-        if (!agentRegistry.TryGetAgentInfo(mountId, out var info)) return null;
+        CoopAgentInfo info = null;
+        bool found;
+        if (mountData.MountMovementId != 0)
+        {
+            string identityScopeId =
+                mountData.MountIdentityScopeId ?? riderIdentityScopeId;
+            found = agentRegistry.TryGetAgentInfo(
+                identityScopeId, mountData.MountMovementId, out info);
+        }
+        else
+        {
+            found = mountData.MountAgentId != Guid.Empty &&
+                    agentRegistry.TryGetAgentInfo(mountData.MountAgentId, out info);
+        }
+
+        if (!found) return null;
         return info.Agent != null && info.Agent.IsMount ? info.Agent : null;
     }
 
-    // The registry id of the agent's current mount, or Guid.Empty when on foot / the horse isn't registered.
-    private Guid GetRegisteredMountId(Agent agent)
+    private void GetRegisteredMountIdentity(
+        Agent agent,
+        string riderIdentityScopeId,
+        out ushort movementId,
+        out string identityScopeId,
+        out Guid agentId)
     {
+        movementId = 0;
+        identityScopeId = null;
+        agentId = Guid.Empty;
+
         var mount = agent.MountAgent;
         if (mount != null && agentRegistry.TryGetAgentInfo(mount, out var mountInfo))
-            return mountInfo.AgentId;
-        return Guid.Empty;
+        {
+            if (mountInfo.MovementId == 0)
+            {
+                agentId = mountInfo.AgentId;
+                return;
+            }
+
+            movementId = mountInfo.MovementId;
+            if (mountInfo.MovementScopeId != riderIdentityScopeId)
+                identityScopeId = mountInfo.MovementScopeId;
+        }
     }
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)

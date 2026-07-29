@@ -1,6 +1,8 @@
 ﻿using Common.PacketHandlers;
 using GameInterface.Services.Alleys;
+using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
@@ -63,7 +65,13 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     public readonly TradePlayerData TradePlayerData;
 
     [ProtoMember(14)]
+    public readonly InventoryPlayerData InventoryPlayerData;
+
+    [ProtoMember(15)]
     public readonly AttachmentIdMap AttachmentIdMap;
+
+    [ProtoMember(16)]
+    public readonly ServerOptions ServerOptions;
 
     public GameSaveDataChunkPacket(
         int transferId,
@@ -79,7 +87,9 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
-        AttachmentIdMap attachmentIdMap)
+        InventoryPlayerData inventoryPlayerData,
+        AttachmentIdMap attachmentIdMap,
+        ServerOptions serverOptions)
     {
         TransferId = transferId;
         ChunkIndex = chunkIndex;
@@ -94,6 +104,8 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
+        InventoryPlayerData = inventoryPlayerData;
         AttachmentIdMap = attachmentIdMap;
+        ServerOptions = serverOptions;
     }
 }

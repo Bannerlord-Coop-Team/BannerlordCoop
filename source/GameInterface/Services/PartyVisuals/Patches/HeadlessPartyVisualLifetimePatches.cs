@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.PartyVisuals.Messages;
@@ -60,6 +60,6 @@ internal class HeadlessPartyVisualLifetimePatches
         if (!shells.TryGetValue(partyBase, out var shell)) return;
 
         shells.Remove(partyBase);
-        MessageBroker.Instance.Publish(shell, new PartyVisualDestroyed(shell));
+        MessageBroker.Instance.Publish(shell, new PartyVisualDestroyed(shell, __instance));
     }
 }
