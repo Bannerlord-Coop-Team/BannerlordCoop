@@ -1,6 +1,5 @@
 ﻿using Common.Network.Session;
 using Coop.Steam;
-using System.Globalization;
 using Xunit;
 
 namespace Coop.Tests.Steam
@@ -24,7 +23,7 @@ namespace Coop.Tests.Steam
             {
                 Address = address,
                 Port = port,
-                ServerSteamId = 76561198000000042,
+                ServerSteamId = 90100000000000042,
             };
 
         [Fact]
@@ -52,24 +51,8 @@ namespace Coop.Tests.Steam
             Assert.True(api.LastCreateWasPublic);
             Assert.Equal("public",
                 api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.VisibilityKey));
-            Assert.Equal(
-                LobbyDataCodec.GetDiscoveryPartition(api.NextCreatedLobbyId)
-                    .ToString(CultureInfo.InvariantCulture),
-                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.DiscoveryPartitionKey));
             Assert.Equal(LobbyDataCodec.StandaloneLobbyType,
                 api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.LobbyTypeKey));
-        }
-
-        [Fact]
-        public void PublicAdvertiser_FailedDiscoveryPartitionWriteWithdrawsLobby()
-        {
-            api.FailedLobbyDataKey = LobbyDataCodec.DiscoveryPartitionKey;
-            var publicAdvertiser = new SteamPublicLobbyAdvertiser(api);
-
-            publicAdvertiser.Advertise(StandaloneInfo());
-
-            Assert.False(publicAdvertiser.IsAdvertising);
-            Assert.Contains(api.NextCreatedLobbyId, api.LeftLobbies);
         }
 
         [Fact]

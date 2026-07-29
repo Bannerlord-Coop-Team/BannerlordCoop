@@ -1,32 +1,54 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace Coop.Steam;
 
+internal readonly struct SteamLobbyListQueryResult
+{
+    public ulong LobbyId { get; }
+    public ulong ServerSteamId { get; }
+
+    public SteamLobbyListQueryResult(ulong lobbyId, ulong serverSteamId)
+    {
+        LobbyId = lobbyId;
+        ServerSteamId = serverSteamId;
+    }
+}
+
 internal readonly struct SteamLobbyListQueryRange
 {
-    public static readonly SteamLobbyListQueryRange Unfiltered =
-        new SteamLobbyListQueryRange(1, int.MaxValue, true);
+    // Public game-server and anonymous-game-server Steam ids are all 17 digits, so Steam's
+    // string comparisons preserve their numeric ordering.
+    public const ulong MinimumServerSteamId = 85568392920039424UL;
+    public const ulong MaximumServerSteamId = 94575592174780415UL;
 
-    public int Minimum { get; }
-    public int Maximum { get; }
+    public static readonly SteamLobbyListQueryRange Unfiltered =
+        new SteamLobbyListQueryRange(MinimumServerSteamId, MaximumServerSteamId, true);
+
+    public ulong Minimum { get; }
+    public ulong Maximum { get; }
     public bool IsUnfiltered { get; }
 
-    public SteamLobbyListQueryRange(int minimum, int maximum)
+    public SteamLobbyListQueryRange(ulong minimum, ulong maximum)
         : this(minimum, maximum, false)
     {
     }
 
-    private SteamLobbyListQueryRange(int minimum, int maximum, bool isUnfiltered)
+    private SteamLobbyListQueryRange(ulong minimum, ulong maximum, bool isUnfiltered)
     {
         Minimum = minimum;
         Maximum = maximum;
         IsUnfiltered = isUnfiltered;
     }
 
-    public bool Contains(int value)
+    public bool Contains(ulong value)
     {
         return IsUnfiltered || (value >= Minimum && value <= Maximum);
+    }
+
+    public static bool IsServerSteamId(ulong value)
+    {
+        return value >= MinimumServerSteamId && value <= MaximumServerSteamId;
     }
 }
 
@@ -59,36 +81,40 @@ internal sealed class SteamLobbyListQueryPlan
         return true;
     }
 
-    public void AddResults(SteamLobbyListQueryRange range, IReadOnlyList<ulong> lobbyIds)
+    public void AddResults(
+        SteamLobbyListQueryRange range,
+        IReadOnlyList<SteamLobbyListQueryResult> lobbyList)
     {
-        if (lobbyIds == null) return;
+        if (lobbyList == null) return;
 
-        foreach (var lobbyId in lobbyIds)
+        foreach (var lobby in lobbyList)
         {
-            if (lobbyId != 0 && seenLobbyIds.Add(lobbyId)) results.Add(lobbyId);
+            if (lobby.LobbyId != 0 && seenLobbyIds.Add(lobby.LobbyId)) results.Add(lobby.LobbyId);
         }
 
-        if (lobbyIds.Count < MaxResultsPerQuery) return;
+        if (lobbyList.Count < MaxResultsPerQuery) return;
 
-        if (range.IsUnfiltered)
-        {
-            PushSplitRanges(1, int.MaxValue);
-            return;
-        }
-
-        if (range.Minimum == range.Maximum)
+        var serverSteamIds = lobbyList
+            .Select(lobby => lobby.ServerSteamId)
+            .Where(SteamLobbyListQueryRange.IsServerSteamId)
+            .Where(range.Contains)
+            .Distinct()
+            .OrderBy(serverSteamId => serverSteamId)
+            .ToArray();
+        if (serverSteamIds.Length < 2)
         {
             WasTruncated = true;
             return;
         }
 
-        PushSplitRanges(range.Minimum, range.Maximum);
-    }
-
-    private void PushSplitRanges(int minimum, int maximum)
-    {
-        int midpoint = minimum + ((maximum - minimum) / 2);
-        pendingRanges.Push(new SteamLobbyListQueryRange(midpoint + 1, maximum));
-        pendingRanges.Push(new SteamLobbyListQueryRange(minimum, midpoint));
+        ulong lowerMaximum = serverSteamIds[(serverSteamIds.Length / 2) - 1];
+        ulong minimum = range.IsUnfiltered
+            ? SteamLobbyListQueryRange.MinimumServerSteamId
+            : range.Minimum;
+        ulong maximum = range.IsUnfiltered
+            ? SteamLobbyListQueryRange.MaximumServerSteamId
+            : range.Maximum;
+        pendingRanges.Push(new SteamLobbyListQueryRange(lowerMaximum + 1, maximum));
+        pendingRanges.Push(new SteamLobbyListQueryRange(minimum, lowerMaximum));
     }
 }

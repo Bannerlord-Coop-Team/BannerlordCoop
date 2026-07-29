@@ -3,6 +3,7 @@ using Serilog;
 using Steamworks;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Coop.Steam;
 
@@ -243,13 +244,13 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
 
         if (!activeLobbyListRange.IsUnfiltered)
         {
-            SteamMatchmaking.AddRequestLobbyListNumericalFilter(
-                LobbyDataCodec.DiscoveryPartitionKey,
-                activeLobbyListRange.Minimum,
+            SteamMatchmaking.AddRequestLobbyListStringFilter(
+                LobbyDataCodec.ServerSteamIdKey,
+                activeLobbyListRange.Minimum.ToString(CultureInfo.InvariantCulture),
                 ELobbyComparison.k_ELobbyComparisonEqualToOrGreaterThan);
-            SteamMatchmaking.AddRequestLobbyListNumericalFilter(
-                LobbyDataCodec.DiscoveryPartitionKey,
-                activeLobbyListRange.Maximum,
+            SteamMatchmaking.AddRequestLobbyListStringFilter(
+                LobbyDataCodec.ServerSteamIdKey,
+                activeLobbyListRange.Maximum.ToString(CultureInfo.InvariantCulture),
                 ELobbyComparison.k_ELobbyComparisonEqualToOrLessThan);
         }
 
@@ -350,24 +351,27 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
                 return;
             }
 
-            var lobbyIds = new List<ulong>((int)result.m_nLobbiesMatching);
+            var lobbies = new List<SteamLobbyListQueryResult>((int)result.m_nLobbiesMatching);
             for (uint i = 0; i < result.m_nLobbiesMatching; i++)
             {
                 ulong lobbyId = SteamMatchmaking.GetLobbyByIndex((int)i).m_SteamID;
-                int partition = LobbyDataCodec.GetDiscoveryPartition(lobbyId);
-                if (!activeLobbyListRange.Contains(partition))
+                string serverSteamIdText = SteamMatchmaking.GetLobbyData(
+                    new CSteamID(lobbyId), LobbyDataCodec.ServerSteamIdKey);
+                ulong.TryParse(serverSteamIdText, out ulong serverSteamId);
+                if (!activeLobbyListRange.IsUnfiltered &&
+                    !activeLobbyListRange.Contains(serverSteamId))
                 {
                     Logger.Warning(
-                        "Steam lobby {LobbyId} was outside the requested discovery partition",
+                        "Steam lobby {LobbyId} was outside the requested server Steam id range",
                         lobbyId.ToString());
                     CompleteLobbyListRequest(lobbyListQueryPlan.Results, true);
                     return;
                 }
 
-                lobbyIds.Add(lobbyId);
+                lobbies.Add(new SteamLobbyListQueryResult(lobbyId, serverSteamId));
             }
 
-            lobbyListQueryPlan.AddResults(activeLobbyListRange, lobbyIds);
+            lobbyListQueryPlan.AddResults(activeLobbyListRange, lobbies);
             if (lobbyListQueryPlan.WasTruncated)
             {
                 Logger.Warning(
