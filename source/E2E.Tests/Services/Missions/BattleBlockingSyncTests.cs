@@ -5314,6 +5314,26 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void GuardApply_ForceClearsGuardWhenNativeModeIsAlreadyNone()
+    {
+        RunScenario(null, context =>
+        {
+            Agent puppet = SpawnAgent(
+                context,
+                AgentControllerType.None,
+                out MirrorAgent mirror);
+
+            AgentActionData.ApplyGuardState(
+                puppet,
+                Agent.GuardMode.None,
+                force: true);
+
+            Assert.Equal(Agent.GuardMode.None, mirror.GuardMode);
+            Assert.Equal(1, mirror.ResetGuardCalls);
+        });
+    }
+
     private static NetworkAgentGuardReaction
         CreateGuardReactionMessage(
             Guid attackerId,

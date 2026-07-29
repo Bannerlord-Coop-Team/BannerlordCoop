@@ -489,12 +489,60 @@ public class BattleGuardFixtureEvidenceTests
     }
 
     [Theory]
-    [InlineData(true, false, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, true)]
-    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, false)]
+    [InlineData(true, false, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.Left, false, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.Left, false, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Left, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Right, false, true)]
+    [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, true)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.None, false, false)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Up, false, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.None, true, false)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.Up, true, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Up, true, true)]
+    public void MountedGuardState_CommandsNativeStateOnTransitionOrDrift(
+        bool guarding,
+        bool guardCommandActive,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection guardCommandDirection,
+        Agent.GuardMode observedGuardMode,
+        bool reactionActive,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldCommandMountedGuardState(
+                guarding,
+                guardCommandActive,
+                direction,
+                guardCommandDirection,
+                observedGuardMode,
+                reactionActive));
+    }
+
+    [Theory]
+    [InlineData(Agent.GuardMode.Right, Agent.GuardMode.None, Agent.GuardMode.Right)]
+    [InlineData(Agent.GuardMode.Right, Agent.GuardMode.Up, Agent.GuardMode.Right)]
+    [InlineData(Agent.GuardMode.None, Agent.GuardMode.Right, Agent.GuardMode.Right)]
+    [InlineData(Agent.GuardMode.None, Agent.GuardMode.None, Agent.GuardMode.None)]
+    public void MountedGuardState_PrefersDirectionalAction(
+        Agent.GuardMode actionGuardMode,
+        Agent.GuardMode currentGuardMode,
+        Agent.GuardMode expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.GetMountedGuardObservedMode(
+                actionGuardMode,
+                currentGuardMode));
+    }
+
+    [Theory]
+    [InlineData(true, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, true)]
     [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]
-    [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, true)]
-    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, false)]
-    public void MountedGuardState_CommandsNativeStateOnlyOnTransition(
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, false)]
+    [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, true)]
+    [InlineData(false, false, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, false)]
+    public void MountedGuardCommandTransition_ExcludesHeldNativeDrift(
         bool guarding,
         bool guardCommandActive,
         BattleGuardFixtureDirection direction,
@@ -503,7 +551,7 @@ public class BattleGuardFixtureEvidenceTests
     {
         Assert.Equal(
             expected,
-            BattleGuardFixture.ShouldCommandMountedGuardState(
+            BattleGuardFixture.IsMountedGuardCommandTransition(
                 guarding,
                 guardCommandActive,
                 direction,
@@ -530,33 +578,13 @@ public class BattleGuardFixtureEvidenceTests
     [Theory]
     [InlineData(BattleGuardFixtureMode.Mounted, true)]
     [InlineData(BattleGuardFixtureMode.Foot, false)]
-    public void MountedGuardInput_UsesOneShotNativeCommand(
+    public void MountedGuardInput_UsesNativeGuardCommand(
         BattleGuardFixtureMode mode,
         bool expected)
     {
         Assert.Equal(
             expected,
             BattleGuardFixture.ShouldApplyMountedGuardCommand(mode));
-    }
-
-    [Theory]
-    [InlineData(true, false, false, true)]
-    [InlineData(true, true, false, true)]
-    [InlineData(false, false, true, false)]
-    [InlineData(false, true, false, false)]
-    [InlineData(false, true, true, true)]
-    public void MountedGuardPresentation_ReplaysMovementFlagTransitionOnceAfterAgentTick(
-        bool explicitPresentation,
-        bool postAgentTick,
-        bool transitionPending,
-        bool expected)
-    {
-        Assert.Equal(
-            expected,
-            BattleGuardFixture.ShouldApplyMountedGuardPresentation(
-                explicitPresentation,
-                postAgentTick,
-                transitionPending));
     }
 
     [Theory]
@@ -579,6 +607,30 @@ public class BattleGuardFixtureEvidenceTests
                 guardCommandActive,
                 direction,
                 guardCommandDirection));
+    }
+
+    [Theory]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.Up, true)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.None, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Right, Agent.GuardMode.Right, false)]
+    [InlineData(true, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Right, true)]
+    [InlineData(false, true, BattleGuardFixtureDirection.Right, BattleGuardFixtureDirection.Left, Agent.GuardMode.Up, false)]
+    public void MountedGuardCommand_ResetsDirectionChangesAndActiveDrift(
+        bool guarding,
+        bool guardCommandActive,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection guardCommandDirection,
+        Agent.GuardMode currentGuardMode,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            BattleGuardFixture.ShouldResetMountedGuardCommand(
+                guarding,
+                guardCommandActive,
+                direction,
+                guardCommandDirection,
+                currentGuardMode));
     }
 
     [Theory]

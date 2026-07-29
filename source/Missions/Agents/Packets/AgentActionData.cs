@@ -94,7 +94,8 @@ namespace Missions.Agents.Packets
                 return;
             }
 
-            if (guardMode == Agent.GuardMode.None && IsGuardMode(agent.CurrentGuardMode))
+            if (guardMode == Agent.GuardMode.None &&
+                (force || IsGuardMode(agent.CurrentGuardMode)))
             {
                 agent.ResetGuard();
             }

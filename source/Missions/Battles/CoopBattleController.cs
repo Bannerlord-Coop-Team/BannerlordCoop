@@ -300,10 +300,6 @@ public class CoopBattleController : CoopMissionController
     }
 
 #if DEBUG
-    internal bool IsGuardFixtureDrivingPlayerInput() =>
-        guardFixture.IsDrivingPlayerInput(
-            coopMissionComponent.AgentRegistry);
-
     internal void ApplyGuardFixturePlayerInput() =>
         guardFixture.ApplyPlayerInput(coopMissionComponent.AgentRegistry);
 

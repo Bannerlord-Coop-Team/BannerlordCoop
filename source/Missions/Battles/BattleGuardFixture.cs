@@ -25,7 +25,6 @@ public interface IBattleGuardFixture
         IAgentPositionInterpolator interpolator);
     void ApplyMountedRoute(NetworkBattleGuardFixtureRoute route);
     void ApplyMountedStrike(NetworkBattleGuardFixtureStrike strike);
-    bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry);
     void ApplyPlayerInput(INetworkAgentRegistry agentRegistry);
     void ReapplyPlayerGuardInput(INetworkAgentRegistry agentRegistry);
     void RefreshOwnedMountedStrikeLook(INetworkAgentRegistry agentRegistry);
@@ -331,12 +330,6 @@ public class BattleGuardFixture : IBattleGuardFixture
             DriveGuardInput(agent, guardDriver);
     }
 
-    public bool IsDrivingPlayerInput(INetworkAgentRegistry agentRegistry)
-    {
-        return TryGetDrivenGuardAgent(agentRegistry, out Agent agent) &&
-            ReferenceEquals(agent, Mission.Current?.MainAgent);
-    }
-
     public void ReapplyPlayerGuardInput(
         INetworkAgentRegistry agentRegistry)
     {
@@ -379,9 +372,7 @@ public class BattleGuardFixture : IBattleGuardFixture
         ApplyOwnedMountedStrikeLook(agent, guardDriver);
 
         // Both production action polls must observe the same held fixture presentation.
-        ApplyMountedGuardPresentationAction(
-            agentRegistry,
-            postAgentTick: false);
+        ApplyMountedGuardPresentationAction(agentRegistry);
     }
 
     public void RefreshOwnedMountedStrikeLook(
@@ -412,9 +403,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     public void ApplyPostAgentTickGuardInput(
         INetworkAgentRegistry agentRegistry)
     {
-        ApplyMountedGuardPresentationAction(
-            agentRegistry,
-            postAgentTick: true);
+        ApplyMountedGuardPresentationAction(agentRegistry);
     }
 
     public void SamplePreReplayDisplayedState(
@@ -1341,55 +1330,67 @@ public class BattleGuardFixture : IBattleGuardFixture
         }
         if (guarding)
             flags |= defendFlags;
-        bool mountedGuardDirectionChanged =
-            driver.Mode == BattleGuardFixtureMode.Mounted &&
-            ShouldResetMountedGuardDirection(
+        Agent.GuardMode currentGuardMode = agent.CurrentGuardMode;
+        Agent.GuardMode observedMountedGuardMode =
+            GetMountedGuardObservedMode(
+                AgentActionData.GetGuardModeFromDefendingAction(agent),
+                currentGuardMode);
+        bool reactionActive =
+            driver.Phase == BattleGuardFixturePhase.Attack &&
+            IsReaction(agent, driver.GuardActionIndex);
+        bool mountedGuardCommandTransition =
+            IsMountedGuardCommandTransition(
                 guarding,
                 driver.MountedGuardCommandActive,
                 driver.Direction,
                 driver.MountedGuardCommandDirection);
+        bool mountedGuardNeedsReset =
+            driver.Mode == BattleGuardFixtureMode.Mounted &&
+            ShouldResetMountedGuardCommand(
+                guarding,
+                driver.MountedGuardCommandActive,
+                driver.Direction,
+                driver.MountedGuardCommandDirection,
+                currentGuardMode);
         bool applyExplicitPresentation =
             ShouldApplyExplicitMountedGuardInput(
                 driver.Mode,
                 driver.UseMovementFlagGuardInput);
-        // Seed direction changes once; held movement flags retain the action.
+        Agent.GuardMode mountedGuardMode = guarding
+            ? GetGuardMode(driver.Direction)
+            : Agent.GuardMode.None;
         if (ShouldApplyMountedGuardCommand(driver.Mode) &&
             ShouldCommandMountedGuardState(
                 guarding,
                 driver.MountedGuardCommandActive,
                 driver.Direction,
-                driver.MountedGuardCommandDirection))
+                driver.MountedGuardCommandDirection,
+                observedMountedGuardMode,
+                reactionActive))
         {
-            Agent.GuardMode guardMode = guarding
-                ? GetGuardMode(driver.Direction)
-                : Agent.GuardMode.None;
-            if (mountedGuardDirectionChanged)
+            if (mountedGuardNeedsReset)
             {
                 AgentActionData.ApplyGuardDirectionTransition(
                     agent,
-                    guardMode);
+                    mountedGuardMode);
             }
             else
             {
                 AgentActionData.ApplyGuardState(
                     agent,
-                    guardMode,
-                    force: guarding);
+                    mountedGuardMode,
+                    force: guarding ||
+                        AgentActionData.IsGuardMode(
+                            observedMountedGuardMode));
             }
             driver.MountedGuardCommandActive = guarding;
             driver.MountedGuardCommandDirection = driver.Direction;
-            if (applyExplicitPresentation)
+            if (applyExplicitPresentation &&
+                mountedGuardCommandTransition)
             {
                 driver.MountedPostNativeGuardCommandPending = true;
                 driver.MountedPostNativeDirectionChanged =
-                    mountedGuardDirectionChanged;
-            }
-            else
-            {
-                driver.MountedPresentationActionPending =
-                    ShouldQueueMountedGuardPresentation(
-                        guarding,
-                        driver.Direction);
+                    mountedGuardNeedsReset;
             }
             driver.MountedGuardStateChanges++;
         }
@@ -1515,13 +1516,6 @@ public class BattleGuardFixture : IBattleGuardFixture
         BattleGuardFixtureMode mode) =>
         mode == BattleGuardFixtureMode.Mounted;
 
-    internal static bool ShouldApplyMountedGuardPresentation(
-        bool explicitPresentation,
-        bool postAgentTick,
-        bool transitionPending) =>
-        explicitPresentation ||
-        (postAgentTick && transitionPending);
-
     internal static bool ShouldMaintainMountedGuardPresentation(
         BattleGuardFixtureMode mode,
         BattleGuardFixturePhase phase,
@@ -1549,8 +1543,7 @@ public class BattleGuardFixture : IBattleGuardFixture
     }
 
     private void ApplyMountedGuardPresentationAction(
-        INetworkAgentRegistry agentRegistry,
-        bool postAgentTick)
+        INetworkAgentRegistry agentRegistry)
     {
         GuardDriver driver = guardDriver;
         if (driver == null ||
@@ -1562,20 +1555,10 @@ public class BattleGuardFixture : IBattleGuardFixture
         bool reactionActive =
             driver.Phase == BattleGuardFixturePhase.Attack &&
             IsReaction(agent, driver.GuardActionIndex);
-        bool explicitPresentation =
-            ShouldApplyExplicitMountedGuardInput(
+        if (!ShouldApplyExplicitMountedGuardInput(
                 driver.Mode,
-                driver.UseMovementFlagGuardInput);
-        bool transitionPending =
-            driver.MountedPresentationActionPending;
-        if (!ShouldApplyMountedGuardPresentation(
-                explicitPresentation,
-                postAgentTick,
-                transitionPending))
-        {
-            return;
-        }
-        if (!ShouldMaintainMountedGuardPresentation(
+                driver.UseMovementFlagGuardInput) ||
+            !ShouldMaintainMountedGuardPresentation(
                 driver.Mode,
                 driver.Phase,
                 driver.Direction,
@@ -1589,6 +1572,8 @@ public class BattleGuardFixture : IBattleGuardFixture
         string actionName =
             GetMountedGuardPresentationActionName(driver.Direction);
         ActionIndexCache action = ActionIndexCache.Create(actionName);
+        bool transitionPending =
+            driver.MountedPresentationActionPending;
         bool actionChanged =
             agent.GetCurrentAction(1).Index != action.Index;
 
@@ -2224,6 +2209,34 @@ public class BattleGuardFixture : IBattleGuardFixture
         bool guarding,
         bool guardCommandActive,
         BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection guardCommandDirection,
+        Agent.GuardMode observedGuardMode,
+        bool reactionActive)
+    {
+        return IsMountedGuardCommandTransition(
+            guarding,
+            guardCommandActive,
+            direction,
+            guardCommandDirection) ||
+            (!reactionActive &&
+             (guarding
+                ? observedGuardMode != GetGuardMode(direction)
+                : AgentActionData.IsGuardMode(observedGuardMode)));
+    }
+
+    internal static Agent.GuardMode GetMountedGuardObservedMode(
+        Agent.GuardMode actionGuardMode,
+        Agent.GuardMode currentGuardMode)
+    {
+        return AgentActionData.IsGuardMode(actionGuardMode)
+            ? actionGuardMode
+            : currentGuardMode;
+    }
+
+    internal static bool IsMountedGuardCommandTransition(
+        bool guarding,
+        bool guardCommandActive,
+        BattleGuardFixtureDirection direction,
         BattleGuardFixtureDirection guardCommandDirection)
     {
         return guarding != guardCommandActive ||
@@ -2243,6 +2256,23 @@ public class BattleGuardFixture : IBattleGuardFixture
         return guarding &&
             guardCommandActive &&
             direction != guardCommandDirection;
+    }
+
+    internal static bool ShouldResetMountedGuardCommand(
+        bool guarding,
+        bool guardCommandActive,
+        BattleGuardFixtureDirection direction,
+        BattleGuardFixtureDirection guardCommandDirection,
+        Agent.GuardMode currentGuardMode)
+    {
+        return ShouldResetMountedGuardDirection(
+                guarding,
+                guardCommandActive,
+                direction,
+                guardCommandDirection) ||
+            (guarding &&
+                AgentActionData.IsGuardMode(currentGuardMode) &&
+                currentGuardMode != GetGuardMode(direction));
     }
 
     internal static bool IsRemountStateReconciled(
