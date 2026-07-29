@@ -29,6 +29,7 @@ public class MissionModule : Module
 {
     internal const string MissilePatchCategory = "CoopMissilePatches";
     internal const string ShieldDamagePatchCategory = "CoopShieldDamagePatches";
+    internal const string CombatHitPresentationPatchCategory = "CoopCombatHitPresentationPatches";
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
 
     protected override void Load(ContainerBuilder builder)
@@ -176,6 +177,9 @@ public class MissionModule : Module
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();
         builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerDependency();
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();
+        builder.RegisterType<CombatHitPresentationHandler>()
+            .As<ICombatHitPresentationHandler>()
+            .InstancePerDependency();
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
     }
@@ -188,6 +192,9 @@ public class MissionModule : Module
         yield return new HarmonyPatchCategoryRegistration(
             typeof(ShieldDamagePatch).Assembly,
             ShieldDamagePatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(MeleeHitPresentationPatch).Assembly,
+            CombatHitPresentationPatchCategory);
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AgentVoicePatch).Assembly,
             AgentVoicePatchCategory);

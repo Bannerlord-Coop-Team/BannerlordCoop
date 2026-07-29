@@ -494,11 +494,15 @@ public class BattleDamageRouter : IBattleDamageRouter
         if (Mission.Current == null || victim == null || !victim.IsActive() || victim.Health <= 0)
             return;
 
-        if (damage.AttackerAgentId != Guid.Empty
-            && registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo)
-            && attackerInfo.Agent != null)
+        Agent attacker = null;
+        string attackerControllerId = null;
+        if (damage.AttackerAgentId != Guid.Empty &&
+            registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo) &&
+            attackerInfo.Agent != null)
         {
-            blow.OwnerId = attackerInfo.Agent.Index;
+            attacker = attackerInfo.Agent;
+            attackerControllerId = attackerInfo.CurrentAuthority;
+            blow.OwnerId = attacker.Index;
         }
         else
         {
@@ -506,6 +510,13 @@ public class BattleDamageRouter : IBattleDamageRouter
         }
 
         bool wasMissile = IsMissileDamage(damage);
+        // The victim owner relays blood so a fatal effect stays ordered before its death broadcast.
+        coopMissionComponent.CombatHitPresentationHandler.PresentRoutedMeleeBlood(
+            victim,
+            attacker,
+            in blow,
+            in collisionData,
+            attackerControllerId);
         if (wasMissile)
         {
             blow.WeaponRecord._isMissile = false;

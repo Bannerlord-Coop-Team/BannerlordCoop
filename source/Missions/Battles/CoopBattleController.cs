@@ -321,6 +321,11 @@ public class CoopBattleController : CoopMissionController
             damagedHp,
             hitDistance,
             shotDifficulty);
+        coopMissionComponent.CombatHitPresentationHandler.BroadcastAcceptedMeleeBlood(
+            affectedAgent,
+            affectorAgent,
+            in blow,
+            in collisionData);
         coopMissionComponent.AgentActionHandler.ObserveBlockedHit(
             affectedAgent,
             affectorAgent,

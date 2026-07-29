@@ -145,6 +145,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.WeaponDropHandler.Dispose();
         coopMissionComponent.WeaponPickupHandler.Dispose();
         coopMissionComponent.ShieldDamageHandler.Dispose();
+        coopMissionComponent.CombatHitPresentationHandler.Dispose();
         coopMissionComponent.AgentDeathHandler.Dispose();
 
         OnLeaving();

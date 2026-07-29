@@ -1072,6 +1072,13 @@ public class CoopTournamentController : CoopMissionController
             receivedDamageSequences.TryAccept(
                 session.OwnControllerId,
                 sequence);
+            Blow blow = pending.Blow;
+            AttackCollisionData collisionData = pending.CollisionData;
+            coopMissionComponent.CombatHitPresentationHandler.BroadcastAcceptedMeleeBlood(
+                pending.Victim,
+                pending.Attacker,
+                in blow,
+                in collisionData);
             network.SendAll(message);
             ApplyTournamentDamage(message);
         }
