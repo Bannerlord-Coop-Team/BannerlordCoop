@@ -154,7 +154,7 @@ namespace GameInterface.Services.Inventory.Interfaces
             if (currentSettlementComponent != null && isTrading)
             {
                 // Sets the gold of the other party
-                currentSettlementComponent.Gold += totalAmount;
+                currentSettlementComponent.ChangeGold(totalAmount);
             }
             else if (((currentMobileParty != null) ? currentMobileParty.Party.LeaderHero : null) != null && isTrading)
             {
