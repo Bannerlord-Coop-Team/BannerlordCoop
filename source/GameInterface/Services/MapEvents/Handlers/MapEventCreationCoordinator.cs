@@ -21,6 +21,27 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
+internal readonly struct MapEventCreationResult
+{
+    public MapEventCreationOutcome Outcome { get; }
+    public MapEvent MapEvent { get; }
+
+    private MapEventCreationResult(MapEventCreationOutcome outcome, MapEvent mapEvent)
+    {
+        Outcome = outcome;
+        MapEvent = mapEvent;
+    }
+
+    public static MapEventCreationResult Created(MapEvent mapEvent) =>
+        new MapEventCreationResult(MapEventCreationOutcome.Created, mapEvent);
+
+    public static MapEventCreationResult Rejected() =>
+        new MapEventCreationResult(MapEventCreationOutcome.Rejected, null);
+
+    public static MapEventCreationResult Unresolved() =>
+        new MapEventCreationResult(MapEventCreationOutcome.Unresolved, null);
+}
+
 /// <summary>
 /// Coordinates server-authoritative MapEvent creation and client-side publication.
 /// </summary>
@@ -40,6 +61,9 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly INetworkConfig configuration;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+#if DEBUG
+    private readonly MapEventCreationDebugHook debugHook = new MapEventCreationDebugHook();
+#endif
     private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new ConcurrentDictionary<string, PendingRequest>();
 
     public MapEventCreationCoordinator(
@@ -73,18 +97,21 @@ internal class MapEventCreationCoordinator : IHandler
 
     /// <summary>
     /// [Client] Blocks until the server creates the authoritative MapEvent and its initialization is committed
-    /// on this client. Returns null on timeout.
+    /// on this client. Only a reply marked rejected unwinds the encounter; registry failures and timeouts remain
+    /// unresolved because the authoritative outcome is unknown.
     /// </summary>
-    public MapEvent RequestBlocking(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
+    public MapEventCreationResult RequestBlocking(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
     {
         if (attacker == null || defender == null)
         {
             Logger.Error("Cannot request map event creation with a null attacker or defender party");
-            return null;
+            return MapEventCreationResult.Unresolved();
         }
 
-        if (!objectManager.TryGetIdWithLogging(attacker, out var attackerId)) return null;
-        if (!objectManager.TryGetIdWithLogging(defender, out var defenderId)) return null;
+        if (!objectManager.TryGetIdWithLogging(attacker, out var attackerId))
+            return MapEventCreationResult.Unresolved();
+        if (!objectManager.TryGetIdWithLogging(defender, out var defenderId))
+            return MapEventCreationResult.Unresolved();
 
         var requestId = Guid.NewGuid().ToString();
         var pending = new PendingRequest();
@@ -106,13 +133,20 @@ internal class MapEventCreationCoordinator : IHandler
             if (!GameThread.WaitWhilePumping(() => pending.Completed.IsSet, deadline))
             {
                 Logger.Error("Timed out after {Timeout} waiting for the server to create the map event. RequestId={RequestId}", timeout, requestId);
-                return null;
+                return MapEventCreationResult.Unresolved();
             }
 
-            if (string.IsNullOrEmpty(pending.MapEventId))
+            if (pending.Outcome == MapEventCreationOutcome.Rejected)
             {
                 Logger.Error("Server reported that it could not create a map event. RequestId={RequestId}", requestId);
-                return null;
+                return MapEventCreationResult.Rejected();
+            }
+
+            if (pending.Outcome != MapEventCreationOutcome.Created ||
+                string.IsNullOrEmpty(pending.MapEventId))
+            {
+                Logger.Error("Server could not resolve the authoritative map event. RequestId={RequestId}", requestId);
+                return MapEventCreationResult.Unresolved();
             }
 
             // The reply can wake this request before the queued initialization commit has run.
@@ -127,11 +161,11 @@ internal class MapEventCreationCoordinator : IHandler
                 Logger.Error(
                     "Server created map event {MapEventId} but it was not committed on this client before timeout. RequestId={RequestId}",
                     pending.MapEventId, requestId);
-                return null;
+                return MapEventCreationResult.Unresolved();
             }
 
             Logger.Debug("Resolved server-created map event {MapEventId}. RequestId={RequestId}", pending.MapEventId, requestId);
-            return mapEvent;
+            return MapEventCreationResult.Created(mapEvent);
         }
         finally
         {
@@ -158,7 +192,7 @@ internal class MapEventCreationCoordinator : IHandler
 
         if (!TryResolveRequestParties(request, out var attacker, out var defender))
         {
-            SendCreatedReply(requestingPeer, request, null);
+            SendCreatedReply(requestingPeer, request, MapEventCreationOutcome.Rejected, null);
             return;
         }
 
@@ -167,30 +201,70 @@ internal class MapEventCreationCoordinator : IHandler
             (!ReferenceEquals(attacker.MobileParty, requestingParty) &&
              !ReferenceEquals(defender.MobileParty, requestingParty)))
         {
-            SendCreatedReply(requestingPeer, request, null);
+            SendCreatedReply(requestingPeer, request, MapEventCreationOutcome.Rejected, null);
             return;
         }
 
-        if (TryHandleExistingMapEventRequest(request, attacker, defender, requestingParty, out var existingMapEventId))
+#if DEBUG
+        if (debugHook.TryConsume(request))
         {
-            SendCreatedReply(requestingPeer, request, existingMapEventId);
+            Logger.Warning(
+                "DEBUG rejected map event creation after ownership validation. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.RequestId,
+                request.AttackerId,
+                request.DefenderId);
+            SendCreatedReply(requestingPeer, request, MapEventCreationOutcome.Rejected, null);
+            return;
+        }
+#endif
+
+        if (TryHandleExistingMapEventRequest(
+                request,
+                attacker,
+                defender,
+                requestingParty,
+                out var existingOutcome,
+                out var existingMapEventId))
+        {
+            SendCreatedReply(requestingPeer, request, existingOutcome, existingMapEventId);
             return;
         }
 
         if (!TryConsumeApprovedMapEventStart(request, attacker, defender))
         {
-            SendCreatedReply(requestingPeer, request, null);
+            SendCreatedReply(requestingPeer, request, MapEventCreationOutcome.Rejected, null);
             return;
         }
 
-        SendCreatedReply(requestingPeer, request, CreateMapEvent(request, attacker, defender));
+        var creationResult = CreateMapEvent(request, attacker, defender);
+        SendCreatedReply(requestingPeer, request, creationResult.Outcome, creationResult.MapEventId);
     }
 
-    private void SendCreatedReply(NetPeer requestingPeer, NetworkRequestCreateMapEvent request, string mapEventId)
+    private void SendCreatedReply(
+        NetPeer requestingPeer,
+        NetworkRequestCreateMapEvent request,
+        MapEventCreationOutcome outcome,
+        string mapEventId)
     {
-        Logger.Debug("Server resolved map event {MapEventId} for RequestId={RequestId}. Responding to client.", mapEventId, request.RequestId);
-        network.Send(requestingPeer, new NetworkMapEventCreated(request.RequestId, mapEventId));
+        Logger.Debug(
+            "Server resolved map event request with {Outcome} and {MapEventId}. RequestId={RequestId}",
+            outcome,
+            mapEventId,
+            request.RequestId);
+        network.Send(requestingPeer, new NetworkMapEventCreated(request.RequestId, outcome, mapEventId));
     }
+
+#if DEBUG
+    internal string ArmDebugRejection(string attackerId, string defenderId)
+    {
+        debugHook.Arm(attackerId, defenderId);
+        return debugHook.Describe();
+    }
+
+    internal string GetDebugRejectionState() => debugHook.Describe();
+
+    internal void ClearDebugRejection() => debugHook.Clear();
+#endif
 
     private static bool TryGetRequestingPeer(
         MessagePayload<NetworkRequestCreateMapEvent> payload,
@@ -241,8 +315,10 @@ internal class MapEventCreationCoordinator : IHandler
         PartyBase attacker,
         PartyBase defender,
         MobileParty requestingParty,
+        out MapEventCreationOutcome outcome,
         out string mapEventId)
     {
+        outcome = MapEventCreationOutcome.Rejected;
         mapEventId = null;
         var attackerSide = attacker.MapEventSide;
         var defenderSide = defender.MapEventSide;
@@ -257,7 +333,11 @@ internal class MapEventCreationCoordinator : IHandler
             if (IsActiveFieldBattle(attackerEvent) &&
                 ReferenceEquals(attackerEvent, defenderSide.MapEvent) &&
                 ReferenceEquals(attackerSide.OtherSide, defenderSide))
-                objectManager.TryGetIdWithLogging(attackerEvent, out mapEventId);
+            {
+                outcome = objectManager.TryGetIdWithLogging(attackerEvent, out mapEventId)
+                    ? MapEventCreationOutcome.Created
+                    : MapEventCreationOutcome.Unresolved;
+            }
             return true;
         }
 
@@ -272,7 +352,9 @@ internal class MapEventCreationCoordinator : IHandler
             return true;
 
         joiningParty.MapEventSide = joiningSide;
-        objectManager.TryGetIdWithLogging(mapEvent, out mapEventId);
+        outcome = objectManager.TryGetIdWithLogging(mapEvent, out mapEventId)
+            ? MapEventCreationOutcome.Created
+            : MapEventCreationOutcome.Unresolved;
         return true;
     }
 
@@ -291,7 +373,7 @@ internal class MapEventCreationCoordinator : IHandler
         involved?.MapFaction != null && involved.IsActive &&
         VillageHostileFactionStanceHelper.HasWarStance(involved.MapFaction, joining) == hostile;
 
-    private string CreateMapEvent(
+    private (MapEventCreationOutcome Outcome, string MapEventId) CreateMapEvent(
         NetworkRequestCreateMapEvent request,
         PartyBase attacker,
         PartyBase defender)
@@ -300,7 +382,7 @@ internal class MapEventCreationCoordinator : IHandler
 
         var parties = GetMapEventParties(attacker, defender);
         var mapEvent = MapEventBattleFactory.CreateMapEvent(parties.Attacker, parties.Defender, request.Flags);
-        if (mapEvent == null) return null;
+        if (mapEvent == null) return (MapEventCreationOutcome.Rejected, null);
 
         if (mapEvent.IsVillageHostileAction())
             MapEventHostileActionConsequences.Apply(mapEvent, parties.Attacker, "village hostile action start");
@@ -308,9 +390,10 @@ internal class MapEventCreationCoordinator : IHandler
         if (!objectManager.TryGetIdWithLogging(mapEvent, out mapEventId))
         {
             Logger.Error("Server created a map event but it has no registered id. RequestId={RequestId}", request.RequestId);
+            return (MapEventCreationOutcome.Unresolved, null);
         }
 
-        return mapEventId;
+        return (MapEventCreationOutcome.Created, mapEventId);
     }
 
     private static (PartyBase Attacker, PartyBase Defender) GetMapEventParties(PartyBase attacker, PartyBase defender)
@@ -337,6 +420,7 @@ internal class MapEventCreationCoordinator : IHandler
             return;
         }
 
+        pending.Outcome = message.Outcome;
         pending.MapEventId = message.MapEventId;
         pending.Completed.Set();
     }
@@ -349,6 +433,7 @@ internal class MapEventCreationCoordinator : IHandler
     private sealed class PendingRequest
     {
         public ManualResetEventSlim Completed { get; } = new ManualResetEventSlim(false);
+        public MapEventCreationOutcome Outcome { get; set; } = MapEventCreationOutcome.Unresolved;
         public string MapEventId { get; set; }
     }
 }
