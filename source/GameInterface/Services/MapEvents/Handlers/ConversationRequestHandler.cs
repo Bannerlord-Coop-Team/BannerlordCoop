@@ -44,21 +44,42 @@ internal class ConversationRequestHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ConversationPartyTracker conversationPartyTracker;
+    private readonly IConversationRestartContextTracker restartContextTracker;
     private readonly PlayerPartyInteractionHandler playerPartyInteractionHandler;
     private readonly IPlayerManager playerManager;
+    private readonly object pvpInteractionSync = new object();
 
     private DateTime lastRequestSentUtc = DateTime.MinValue;
+    private string pendingConversationRequestId;
+    private string activeConversationRequestId;
+    private bool hasActiveConversationRequest;
+    private long conversationActivationVersion;
+    private bool isApplyingApprovedRestart;
 
     // [Server] Player-vs-player interactions in progress, keyed by the attacking player's peer -> the defending
     // player's party id. Lets the defender be told when the interaction ends (the attacker has no AI party to hold,
     // so this is the only record of a PvP engagement). The defender's "hold on" popup is driven from these broadcasts.
-    private readonly ConcurrentDictionary<NetPeer, string> pvpDefenderByAttacker = new ConcurrentDictionary<NetPeer, string>();
+    private readonly ConcurrentDictionary<NetPeer, PvpInteraction> pvpDefenderByAttacker =
+        new ConcurrentDictionary<NetPeer, PvpInteraction>();
+
+    private readonly struct PvpInteraction
+    {
+        public readonly string DefenderPartyId;
+        public readonly string RequestId;
+
+        public PvpInteraction(string defenderPartyId, string requestId)
+        {
+            DefenderPartyId = defenderPartyId;
+            RequestId = requestId;
+        }
+    }
 
     public ConversationRequestHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         ConversationPartyTracker conversationPartyTracker,
+        IConversationRestartContextTracker restartContextTracker,
         PlayerPartyInteractionHandler playerPartyInteractionHandler,
         IPlayerManager playerManager)
     {
@@ -66,6 +87,7 @@ internal class ConversationRequestHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         this.conversationPartyTracker = conversationPartyTracker;
+        this.restartContextTracker = restartContextTracker;
         this.playerPartyInteractionHandler = playerPartyInteractionHandler;
         this.playerManager = playerManager;
 
@@ -113,11 +135,19 @@ internal class ConversationRequestHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(request.AttackerParty, out var attackerId)) return;
 
         lastRequestSentUtc = now;
+        var requestId = restartContextTracker.Capture(PlayerEncounter.Current);
+        pendingConversationRequestId = requestId;
 
         Logger.Debug("Requesting conversation from server. AttackerId={AttackerId}, DefenderId={DefenderId}", attackerId, defenderId);
 
         // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkRequestConversation(defenderId, attackerId, request.ForcePlayerOutFromSettlement, request.Source, request.ArmyTalkEncounter));
+        network.SendAll(new NetworkRequestConversation(
+            defenderId,
+            attackerId,
+            request.ForcePlayerOutFromSettlement,
+            request.Source,
+            request.ArmyTalkEncounter,
+            requestId));
     }
 
     private void ProcessServerConversationRequest(ConversationRequested request)
@@ -147,7 +177,8 @@ internal class ConversationRequestHandler : IHandler
                 attackerId,
                 request.ForcePlayerOutFromSettlement,
                 request.Source,
-                false),
+                false,
+                requestId: null),
             serverDetected: true);
     }
 
@@ -231,7 +262,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Information(
                 "[MissionExitGuard] Refused campaign interaction while a party is still leaving its mission. AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
-            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable, request.RequestId));
             return false;
         }
 
@@ -241,7 +272,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting PvP conversation: a player party is inactive. AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
-            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable, request.RequestId));
             return false;
         }
 
@@ -261,7 +292,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting PvP conversation: a player is participating in a siege. AttackerId={AttackerId}, DefenderId={DefenderId}",
                 request.AttackerId, request.DefenderId);
-            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable));
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PlayerUnavailable, request.RequestId));
             return false;
         }
         
@@ -290,7 +321,7 @@ internal class ConversationRequestHandler : IHandler
                 Logger.Debug(
                     "Rejecting PvP conversation: a party is already conversing with another player. AttackerId={AttackerId}, DefenderId={DefenderId}",
                     request.AttackerId, request.DefenderId);
-                network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
+                network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
                 return false;
             }
 
@@ -374,7 +405,7 @@ internal class ConversationRequestHandler : IHandler
             Logger.Debug(
                 "Rejecting shared conversation for a non-hostile party. PartyId={PartyId}",
                 aiPartyId);
-            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
             return;
         }
 
@@ -385,12 +416,13 @@ internal class ConversationRequestHandler : IHandler
                 playerPartyId,
                 aiPartyBase.MobileParty,
                 aiPartyId,
-                serverDetected && request.DefenderId == playerPartyId))
+                serverDetected && request.DefenderId == playerPartyId,
+                request.RequestId))
         {
             Logger.Debug(
                 "Rejecting conversation request: the party or the requester is already engaged. PartyId={PartyId}",
                 aiPartyId);
-            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
+            network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
             return;
         }
 
@@ -407,7 +439,12 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Server] Replies to the requester that the conversation may (re)open.</summary>
     private void SendAllowConversation(NetPeer requestingPeer, NetworkRequestConversation request)
     {
-        network.Send(requestingPeer, new NetworkAllowConversation(request.DefenderId, request.AttackerId, request.ForcePlayerOutFromSettlement, request.Source));
+        network.Send(requestingPeer, new NetworkAllowConversation(
+            request.DefenderId,
+            request.AttackerId,
+            request.ForcePlayerOutFromSettlement,
+            request.Source,
+            request.RequestId));
     }
 
     /// <summary>
@@ -417,17 +454,27 @@ internal class ConversationRequestHandler : IHandler
     /// </summary>
     private void NotifyPvpInteractionStarted(NetPeer requestingPeer, NetworkRequestConversation request, PartyBase attacker)
     {
-        // TryAdd returns false when this attacker already has a recorded interaction; the popup is already up.
-        if (!pvpDefenderByAttacker.TryAdd(requestingPeer, request.DefenderId))
-            return;
+        lock (pvpInteractionSync)
+        {
+            // TryAdd returns false when this attacker already has a recorded interaction; the popup is already up.
+            if (pvpDefenderByAttacker.TryGetValue(requestingPeer, out var currentInteraction))
+            {
+                if (currentInteraction.DefenderPartyId == request.DefenderId)
+                    pvpDefenderByAttacker[requestingPeer] = new PvpInteraction(request.DefenderId, request.RequestId);
+                return;
+            }
 
-        var attackerName = attacker.LeaderHero?.Name?.ToString() ?? attacker.Name?.ToString() ?? "Another player";
+            if (!pvpDefenderByAttacker.TryAdd(
+                    requestingPeer,
+                    new PvpInteraction(request.DefenderId, request.RequestId)))
+                return;
 
-        network.SendAll(new NetworkPlayerInteractionStarted(request.DefenderId, attackerName));
+            // Mark both players before broadcasting so a synchronous end callback cannot reinsert the pair.
+            conversationPartyTracker.BeginPvpConversation(request.AttackerId, request.DefenderId);
 
-        // Mark both players as conversing so no other party can interact with them while the (no-map-event-yet)
-        // conversation is open; the interaction guards consult the tracker. Released in EndPvpInteraction.
-        conversationPartyTracker.BeginPvpConversation(request.AttackerId, request.DefenderId);
+            var attackerName = attacker.LeaderHero?.Name?.ToString() ?? attacker.Name?.ToString() ?? "Another player";
+            network.SendAll(new NetworkPlayerInteractionStarted(request.DefenderId, attackerName));
+        }
     }
 
     /// <summary>[Server] True when <paramref name="partyId"/> is already in a PvP conversation with someone other than
@@ -444,14 +491,26 @@ internal class ConversationRequestHandler : IHandler
     /// involved player party — defender and joiners — is instead closed on finalize via
     /// <see cref="Messages.NetworkClosePvpEncounter"/> (see <see cref="BattleHandler"/>).
     /// </summary>
-    private void EndPvpInteraction(NetPeer attackerPeer)
+    private void EndPvpInteraction(
+        NetPeer attackerPeer,
+        string requestId = null,
+        bool requireRequestIdMatch = false)
     {
         if (attackerPeer == null) return;
 
-        if (pvpDefenderByAttacker.TryRemove(attackerPeer, out var defenderPartyId))
+        lock (pvpInteractionSync)
         {
-            network.SendAll(new NetworkPlayerInteractionEnded(defenderPartyId));
-            conversationPartyTracker.EndPvpConversation(defenderPartyId);
+            if (!pvpDefenderByAttacker.TryGetValue(attackerPeer, out var interaction))
+                return;
+
+            if (requireRequestIdMatch && interaction.RequestId != requestId)
+                return;
+
+            if (!pvpDefenderByAttacker.TryRemove(attackerPeer, out interaction))
+                return;
+
+            conversationPartyTracker.EndPvpConversation(interaction.DefenderPartyId);
+            network.SendAll(new NetworkPlayerInteractionEnded(interaction.DefenderPartyId));
         }
     }
 
@@ -462,55 +521,75 @@ internal class ConversationRequestHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            var observedActivationVersion = conversationActivationVersion;
+
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.DefenderId, out var defender))
             {
-                SendConversationEndedToServer();
+                ClearPendingConversationRequest(message.RequestId);
+                SendConversationEndedToServer(message.RequestId);
                 return;
             }
 
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.AttackerId, out var attacker))
             {
-                SendConversationEndedToServer();
+                ClearPendingConversationRequest(message.RequestId);
+                SendConversationEndedToServer(message.RequestId);
                 return;
             }
 
             try
             {
-                if (PlayerEncounter.Current != null)
-                {
-                    // A duplicate approval for the encounter that is already open (the rate-limited request was retried
-                    // while the first approval was in flight): ignore it. Sending ConversationEnded here would release
-                    // the server-side hold while the conversation is still active.
-                    if (PlayerEncounter.EncounteredParty == defender || PlayerEncounter.EncounteredParty == attacker)
-                    {
-                        Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
-                        return;
-                    }
+                var restartDecision = restartContextTracker.Consume(
+                    message.RequestId,
+                    PlayerEncounter.Current,
+                    defender,
+                    attacker);
 
-                    Logger.Warning("Conversation allowed but PlayerEncounter.Current is not null; cannot restart encounter");
-                    SendConversationEndedToServer();
+                if (restartDecision == ConversationRestartDecision.Duplicate)
+                {
+                    Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
+                    ActivateConversationRequest(message.RequestId, observedActivationVersion);
                     return;
                 }
 
-                using (new AllowedThread())
+                if (restartDecision == ConversationRestartDecision.Stale)
                 {
-                    if (message.Source == ConversationRestartSource.EncounterManager)
+                    Logger.Warning("Ignoring stale conversation approval because the encounter changed after the request");
+                    ClearPendingConversationRequest(message.RequestId);
+                    SendConversationEndedToServer(message.RequestId);
+                    return;
+                }
+
+                isApplyingApprovedRestart = true;
+                try
+                {
+                    using (new AllowedThread())
                     {
-                        EncounterManager.RestartPlayerEncounter(attacker, defender);
-                    }
-                    else
-                    {
-                        // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
-                        PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
+                        if (message.Source == ConversationRestartSource.EncounterManager)
+                        {
+                            EncounterManager.RestartPlayerEncounter(attacker, defender);
+                        }
+                        else
+                        {
+                            // PlayerEncounter.RestartPlayerEncounter(defenderParty, attackerParty, forcePlayerOutFromSettlement)
+                            PlayerEncounter.RestartPlayerEncounter(defender, attacker, message.ForcePlayerOutFromSettlement);
+                        }
                     }
                 }
+                finally
+                {
+                    isApplyingApprovedRestart = false;
+                }
+
+                ActivateConversationRequest(message.RequestId, observedActivationVersion);
             }
             catch (Exception e)
             {
                 // The server engaged and held the AI party before approving; if the restart fails,
                 // release that hold so the party does not stay frozen for other players.
                 Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
-                SendConversationEndedToServer();
+                ClearPendingConversationRequest(message.RequestId);
+                SendConversationEndedToServer(message.RequestId);
             }
         }, context: nameof(Handle_NetworkAllowConversation));
     }
@@ -518,17 +597,35 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Client] This player's encounter finished; tell the server to release the held party.</summary>
     private void Handle_ConversationEnded(MessagePayload<ConversationEnded> payload)
     {
-        SendConversationEndedToServer();
+        if (isApplyingApprovedRestart) return;
+
+        var pendingRequestId = pendingConversationRequestId;
+        var activeRequestId = activeConversationRequestId;
+        var hadActiveConversationRequest = hasActiveConversationRequest;
+
+        pendingConversationRequestId = null;
+        activeConversationRequestId = null;
+        hasActiveConversationRequest = false;
+
+        if (pendingRequestId != null)
+            SendConversationEndedToServer(pendingRequestId);
+
+        if (hadActiveConversationRequest &&
+            (pendingRequestId == null || activeRequestId != pendingRequestId))
+            SendConversationEndedToServer(activeRequestId);
+
+        if (pendingRequestId == null && !hadActiveConversationRequest)
+            SendConversationEndedToServer(null);
     }
 
     /// <summary>
     /// [Client] Tell the server this player's conversation is over (the encounter finished, or an approved one
     /// failed to start), so it releases the held party.
     /// </summary>
-    private void SendConversationEndedToServer()
+    private void SendConversationEndedToServer(string requestId)
     {
         // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkConversationEnded());
+        network.SendAll(new NetworkConversationEnded(requestId));
     }
 
     /// <summary>[Server] A client's encounter finished: release the AI party held for that player, if any.</summary>
@@ -542,8 +639,8 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        ReleaseEngagementOnMainThread(peer);
-        EndPvpInteraction(peer);
+        ReleaseEngagementOnMainThread(peer, payload.What.RequestId, requireRequestIdMatch: true);
+        EndPvpInteraction(peer, payload.What.RequestId, requireRequestIdMatch: true);
     }
 
     /// <summary>[Client] The server denied the request; tell the player why.</summary>
@@ -551,10 +648,39 @@ internal class ConversationRequestHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        Action showMessage = payload.What.Reason == ConversationDeniedReason.PlayerUnavailable
-            ? ConversationPartyHold.ShowPlayerUnavailableMessage
-            : ConversationPartyHold.ShowInteractionBlockedMessage;
-        GameThread.RunSafe(showMessage, context: "Show conversation denied");
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            restartContextTracker.Remove(message.RequestId);
+            ClearPendingConversationRequest(message.RequestId);
+
+            if (message.Reason == ConversationDeniedReason.PlayerUnavailable)
+                ConversationPartyHold.ShowPlayerUnavailableMessage();
+            else
+                ConversationPartyHold.ShowInteractionBlockedMessage();
+        }, context: nameof(Handle_NetworkConversationDenied));
+    }
+
+    private void ActivateConversationRequest(string requestId, long observedActivationVersion)
+    {
+        if (conversationActivationVersion != observedActivationVersion)
+        {
+            Logger.Debug("Ignoring older conversation approval because a newer approval activated while it was waiting");
+            ClearPendingConversationRequest(requestId);
+            SendConversationEndedToServer(requestId);
+            return;
+        }
+
+        activeConversationRequestId = requestId;
+        hasActiveConversationRequest = true;
+        conversationActivationVersion++;
+        ClearPendingConversationRequest(requestId);
+    }
+
+    private void ClearPendingConversationRequest(string requestId)
+    {
+        if (pendingConversationRequestId == requestId)
+            pendingConversationRequestId = null;
     }
 
     /// <summary>[Server] The defender's client reports it is showing the "hold on" popup; record its peer so a
@@ -592,9 +718,16 @@ internal class ConversationRequestHandler : IHandler
     }
 
     /// <summary>[Server] Releases the given player's engagement on the game thread.</summary>
-    private void ReleaseEngagementOnMainThread(NetPeer peer)
+    private void ReleaseEngagementOnMainThread(
+        NetPeer peer,
+        string requestId = null,
+        bool requireRequestIdMatch = false)
     {
         GameThread.Run(() =>
-            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer));
+            ConversationPartyHold.EndEngagement(
+                conversationPartyTracker,
+                peer,
+                requestId,
+                requireRequestIdMatch));
     }
 }

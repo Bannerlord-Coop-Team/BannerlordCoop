@@ -1344,6 +1344,42 @@ public class MapEventDebugCommands
         return "Requested entry into the current battle.";
     }
 
+    [CommandLineArgumentFunction("attack_rendered_encounter", "coop.debug.mapevent")]
+    public static string AttackRenderedEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.attack_rendered_encounter";
+
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext?.GameMenu?.StringId != "encounter")
+            return "The rendered encounter Attack menu is not active.";
+
+        var battle = PlayerEncounter.Battle;
+        if (PlayerEncounter.Current == null || battle == null || MobileParty.MainParty?.MapEvent != battle)
+            return "The rendered encounter does not own the current battle MapEvent.";
+
+        if (!TryGetObjectManager(out var objectManager) || !objectManager.TryGetId(battle, out var mapEventId))
+            return "The current battle MapEvent is not registered.";
+
+        var options = menuContext.GameMenu.MenuOptions.ToList();
+        int attackOptionIndex = options.FindIndex(menuOption => menuOption.IdString == "attack");
+        if (attackOptionIndex < 0 ||
+            !menuContext.GameMenu.GetMenuOptionConditionsHold(
+                Game.Current,
+                menuContext,
+                attackOptionIndex) ||
+            !options[attackOptionIndex].IsEnabled)
+        {
+            return "The rendered encounter Attack option is not available.";
+        }
+
+        menuContext.GameMenu.RunMenuOptionConsequence(menuContext, attackOptionIndex);
+        return $"Invoked the rendered encounter Attack consequence for registered mapEvent={mapEventId}.";
+    }
+
     // coop.debug.mapevent.finish_player_encounter PlayerOne
     /// <summary>
     /// Requests the connected client's encounter close through the existing authoritative leave message.
@@ -1792,6 +1828,8 @@ public class MapEventDebugCommands
         sb.AppendLine($"PlayerEncounter.Current: {(encounter == null ? "<null> (torn down)" : "PRESENT")}");
         if (encounter != null)
         {
+            sb.AppendLine($"\tEncounterSettlement: {PlayerEncounter.EncounterSettlement?.StringId ?? "<null>"}");
+            sb.AppendLine($"\tPlayerSide:       {encounter.PlayerSide}");
             sb.AppendLine($"\tBattle:           {FormatMapEvent(PlayerEncounter.Battle, objectManager)}");
             sb.AppendLine($"\t_mapEvent:        {FormatMapEvent(encounter._mapEvent, objectManager)}");
             sb.AppendLine($"\tEncounteredParty: {FormatPartyBaseWithId(PlayerEncounter.EncounteredParty, objectManager)}");
