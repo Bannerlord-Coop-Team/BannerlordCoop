@@ -1,8 +1,10 @@
 ﻿using Common.Util;
 using GameInterface.Services.Entity;
 using Missions;
+using Missions.Agents.Packets;
 using Moq;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace E2E.Tests.Services.Missions;
@@ -84,6 +86,21 @@ public class NetworkAgentRegistryTests
 
         Assert.True(registry.TryGetAgentInfo(id, out var info));
         Assert.Equal("host", info.CurrentAuthority);
+    }
+
+    [Fact]
+    public void TransferAuthority_ClearsEquipmentStateFromPreviousController()
+    {
+        var (registry, _, id) = RegisterAgent(ownerControllerId: "host", localControllerId: "me");
+        Assert.True(registry.TryGetAgentInfo(id, out var info));
+        info.RecordAuthoritativeEquipment(new AgentEquipmentData(
+            EquipmentIndex.Weapon0,
+            EquipmentIndex.Weapon2,
+            0));
+
+        Assert.True(registry.TryTransferAuthority("me", id));
+
+        Assert.False(info.TryGetAuthoritativeEquipment(out _));
     }
 
     [Fact]

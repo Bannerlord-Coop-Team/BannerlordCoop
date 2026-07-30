@@ -1,29 +1,28 @@
-using Common.Logging;
-using GameInterface.Services.MapEvents;
-using GameInterface.Services.ObjectManager;
+﻿using Common.Logging;
+using Common.Network;
+using Missions.Messages;
 using Serilog;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
-using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
 /// <summary>
-/// Commits a concluded coop battle's <see cref="MissionResult"/> to the campaign map event on mission end.
-/// A live coop battle never sets the map event's <c>BattleState</c> on its own (the encounter doesn't
-/// resolve), so without this the defeated players are left uncaptured with the encounter still open.
+/// Reports a concluded coop battle's <see cref="MissionResult"/> to the campaign server. The server reconciles
+/// every current mission member before it applies the shared map-event result.
 /// </summary>
 public interface IBattleResultCommitter
 {
-    /// <summary>
-    /// Commit this concluded battle's result. Setting <c>MapEvent.BattleState</c> runs the native
-    /// setter, which the coop intercept (<c>MapEventPatches</c>) syncs to the server; there it runs
-    /// <c>OnBattleWon</c> (capturing the defeated players) and the auto-finalize (closing every player's
-    /// encounter). A retreat (unresolved result) commits nothing; an already-resolved state is left untouched.
-    /// This is intentionally not host-gated: the first client to finish the battle and click Done must
-    /// resolve the shared campaign battle for everyone.
-    /// </summary>
-    void CommitResolvedResult();
+    /// <summary>Report a resolved native mission result without waiting for the player to leave.</summary>
+    void ReportResolvedResult(MissionResult result);
+
+    /// <summary>Remember the host's resolved state until this client's deployment is safe to conclude.</summary>
+    void AcceptResolvedState(BattleState battleState);
+
+    /// <summary>Report the remembered state at the current host epoch, if one exists.</summary>
+    void ReportAcceptedResult();
+
+    /// <summary>Get the resolved state for a late joiner's mesh catch-up.</summary>
+    bool TryGetResolvedState(out BattleState battleState);
 }
 
 /// <inheritdoc cref="IBattleResultCommitter"/>
@@ -31,22 +30,21 @@ public class BattleResultCommitter : IBattleResultCommitter
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BattleResultCommitter>();
 
-    private readonly IObjectManager objectManager;
+    private readonly object resolvedStateGate = new object();
+    private readonly IBattleNetwork battleNetwork;
+    private readonly INetwork relayNetwork;
     private readonly IBattleSession session;
-    private readonly IBattleHostRegistry hostRegistry;
+    private BattleState resolvedState;
 
-    public BattleResultCommitter(IObjectManager objectManager, IBattleSession session, IBattleHostRegistry hostRegistry)
+    public BattleResultCommitter(IBattleNetwork battleNetwork, INetwork relayNetwork, IBattleSession session)
     {
-        this.objectManager = objectManager;
+        this.battleNetwork = battleNetwork;
+        this.relayNetwork = relayNetwork;
         this.session = session;
-        this.hostRegistry = hostRegistry;
     }
 
-    public void CommitResolvedResult()
+    public void ReportResolvedResult(MissionResult result)
     {
-        // The Done button can produce the first resolved result on any client.
-        // Retreat stays ignored by the BattleResolved guard below because it does not end the shared encounter.
-        var result = Mission.Current?.MissionResult;
         if (result == null)
         {
             return;
@@ -57,32 +55,52 @@ public class BattleResultCommitter : IBattleResultCommitter
             return;
         }
 
-        if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent))
+        if (!session.HasInstance)
         {
             return;
         }
 
-        if (mapEvent.BattleState != BattleState.None)
-        {
-            return;
-        }
+        AcceptResolvedState(result.BattleState);
+        ReportAcceptedResult();
+    }
 
-        // If the current host is leaving while successors are still assigned, this mission end is a retreat or
-        // host handoff, not the shared battle's Done result. A successor will commit once the battle truly ends.
-        if (session.IsLocalHost &&
-            hostRegistry.TryGet(session.InstanceId, out var assignment) &&
-            assignment.SuccessorControllerIds.Count > 0)
+    public void AcceptResolvedState(BattleState battleState)
+    {
+        if (battleState != BattleState.AttackerVictory && battleState != BattleState.DefenderVictory)
+            return;
+
+        lock (resolvedStateGate)
         {
-            Logger.Information("[BattleSync] Not committing battle result for {Instance}: {Count} successor(s) still in the battle",
+            resolvedState = battleState;
+        }
+    }
+
+    public void ReportAcceptedResult()
+    {
+        if (!session.HasInstance || !TryGetResolvedState(out var battleState))
+            return;
+
+        Logger.Information("[BattleSync] Reporting resolved mission result {State} for instance {Instance}",
+            battleState, session.InstanceId);
+        relayNetwork.SendAll(new NetworkBattleResultReady(session.InstanceId, battleState, session.HostEpoch));
+
+        if (session.IsLocalHost)
+        {
+            battleNetwork.SendAll(new NetworkBattleResultSnapshot(
                 session.InstanceId,
-                assignment.SuccessorControllerIds.Count);
-            return;
+                session.OwnControllerId,
+                session.HostEpoch,
+                battleState));
+        }
+    }
+
+    public bool TryGetResolvedState(out BattleState battleState)
+    {
+        lock (resolvedStateGate)
+        {
+            battleState = resolvedState;
         }
 
-        Logger.Information("[BattleSync] Committing concluded battle result {State} for instance {Instance}; localHost={LocalHost}",
-            result.BattleState,
-            session.InstanceId,
-            session.IsLocalHost);
-        mapEvent.BattleState = result.BattleState;
+        return battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory;
     }
 }

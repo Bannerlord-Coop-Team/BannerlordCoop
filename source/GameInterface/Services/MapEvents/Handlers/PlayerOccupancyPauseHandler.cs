@@ -1,4 +1,5 @@
 using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -6,6 +7,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -20,6 +22,8 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// </summary>
 internal class PlayerOccupancyPauseHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerOccupancyPauseHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
@@ -52,7 +56,28 @@ internal class PlayerOccupancyPauseHandler : IHandler
         if (!AllPlayersOccupied())
             return;
 
+        Logger.Information(
+            "Pausing campaign because every connected player is occupied: triggerParty={TriggerParty} players={@Players}",
+            payload.What.MobileParty?.StringId ?? "<null>",
+            DescribeConnectedPlayers());
+
         timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+    }
+
+    private string[] DescribeConnectedPlayers()
+    {
+        return playerManager.Players
+            .Where(playerManager.IsConnected)
+            .Select(player =>
+            {
+                if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                    return $"{player.ControllerId}:party={player.MobilePartyId},state=unresolved";
+
+                return $"{player.ControllerId}:party={player.MobilePartyId}," +
+                    $"settlement={party.CurrentSettlement?.StringId ?? "none"}," +
+                    $"mapEvent={party.MapEvent?.StringId ?? "none"}";
+            })
+            .ToArray();
     }
 
     // Every player's party is in a map event or a settlement (i.e. none is free on the campaign map). An empty
