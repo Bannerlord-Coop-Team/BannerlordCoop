@@ -98,6 +98,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
         coopMissionComponent.AgentMovementHandler
             .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+        BattleDebugCommands.CaptureMountPoseFrame();
 
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
         coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();

@@ -24,9 +24,31 @@ internal static class BattleDebugCommands
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
     private static readonly Dictionary<Agent, AgentControllerType> CavalryControllers =
         new Dictionary<Agent, AgentControllerType>();
+    private const int MaximumMountPoseSamples = 120;
+    private static readonly List<MountPoseSample> MountPoseSamples =
+        new List<MountPoseSample>();
     private static Mission observedMission;
     private static Camera ladderCamera;
     private static Camera mountCamera;
+    private static Agent capturedMount;
+    private static Guid capturedMountId;
+    private static float mountPoseCaptureStartTime;
+
+    private sealed class MountPoseSample
+    {
+        public float Time { get; set; }
+        public float Speed { get; set; }
+        public int ActionIndex { get; set; }
+        public string ActionName { get; set; }
+        public string AnimationName { get; set; }
+        public float AnimationProgress { get; set; }
+        public float AnimationSpeed { get; set; }
+        public int TurnDirection { get; set; }
+        public float ChannelWeight { get; set; }
+        public float CurrentActionWeight { get; set; }
+        public Vec3 HeadPosition { get; set; }
+        public Vec3 HeadForward { get; set; }
+    }
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
     public static string State(List<string> args)
@@ -176,6 +198,126 @@ internal static class BattleDebugCommands
         return output.ToString().TrimEnd();
     }
 
+    [CommandLineArgumentFunction("capture_mount_pose", "coop.debug.battle")]
+    public static string CaptureMountPose(List<string> args)
+    {
+        if (args.Count != 1 || !Guid.TryParseExact(args[0], "N", out Guid mountId))
+            return "Usage: coop.debug.battle.capture_mount_pose <mountAgentId>";
+
+        var mission = Mission.Current;
+        if (mission == null)
+            return "No active mission";
+        if (!TryGetActiveMount(mountId, out Agent mount))
+            return $"Active mount {mountId:N} was not found";
+
+        MBAgentVisuals visuals = mount.AgentVisuals;
+        Skeleton skeleton = visuals?.GetSkeleton();
+        if (ReferenceEquals(visuals, null)
+            || !visuals.IsValid()
+            || ReferenceEquals(skeleton, null)
+            || !skeleton.IsValid)
+        {
+            return $"Mount {mountId:N} has no active skeleton";
+        }
+
+        ObserveMission(mission);
+        capturedMount = mount;
+        capturedMountId = mountId;
+        mountPoseCaptureStartTime = mission.CurrentTime;
+        MountPoseSamples.Clear();
+        CaptureMountPoseFrame();
+        return $"Capturing rendered horse-head pose for mount {mountId:N}";
+    }
+
+    [CommandLineArgumentFunction("mount_pose_samples", "coop.debug.battle")]
+    public static string MountPoseSamplesState(List<string> args)
+    {
+        if (args.Count != 1 || !Guid.TryParseExact(args[0], "N", out Guid mountId))
+            return "Usage: coop.debug.battle.mount_pose_samples <mountAgentId>";
+        if (capturedMount == null || capturedMountId != mountId)
+            return $"No pose capture is active for mount {mountId:N}";
+
+        var output = new StringBuilder();
+        output.Append("mount=").Append(capturedMountId.ToString("N"))
+            .Append(" samples=").Append(MountPoseSamples.Count)
+            .AppendLine();
+        for (int index = 0; index < MountPoseSamples.Count; index++)
+        {
+            MountPoseSample sample = MountPoseSamples[index];
+            output.Append("sample=").Append(index)
+                .Append(" time=").Append(sample.Time.ToString("0.0000", CultureInfo.InvariantCulture))
+                .Append(" speed=").Append(sample.Speed.ToString("0.000", CultureInfo.InvariantCulture))
+                .Append(" action0=").Append(sample.ActionIndex)
+                .Append(" actionName=").Append(sample.ActionName ?? "none")
+                .Append(" animation=").Append(sample.AnimationName ?? "none")
+                .Append(" animationProgress=").Append(sample.AnimationProgress.ToString("0.0000", CultureInfo.InvariantCulture))
+                .Append(" animationSpeed=").Append(sample.AnimationSpeed.ToString("0.000", CultureInfo.InvariantCulture))
+                .Append(" turnDirection=").Append(sample.TurnDirection)
+                .Append(" channelWeight=").Append(sample.ChannelWeight.ToString("0.0000", CultureInfo.InvariantCulture))
+                .Append(" currentActionWeight=").Append(sample.CurrentActionWeight.ToString("0.0000", CultureInfo.InvariantCulture))
+                .Append(" headPosition=").Append(sample.HeadPosition.X.ToString("0.00000", CultureInfo.InvariantCulture))
+                .Append(',').Append(sample.HeadPosition.Y.ToString("0.00000", CultureInfo.InvariantCulture))
+                .Append(',').Append(sample.HeadPosition.Z.ToString("0.00000", CultureInfo.InvariantCulture))
+                .Append(" headForward=").Append(sample.HeadForward.X.ToString("0.00000", CultureInfo.InvariantCulture))
+                .Append(',').Append(sample.HeadForward.Y.ToString("0.00000", CultureInfo.InvariantCulture))
+                .Append(',').Append(sample.HeadForward.Z.ToString("0.00000", CultureInfo.InvariantCulture))
+                .AppendLine();
+        }
+        return output.ToString().TrimEnd();
+    }
+
+    internal static void CaptureMountPoseFrame()
+    {
+        Agent mount = capturedMount;
+        Mission mission = Mission.Current;
+        if (mount == null || MountPoseSamples.Count >= MaximumMountPoseSamples)
+            return;
+        if (mission == null
+            || !mount.IsActive()
+            || mount.Mission != mission
+            || observedMission != mission)
+        {
+            capturedMount = null;
+            capturedMountId = Guid.Empty;
+            MountPoseSamples.Clear();
+            return;
+        }
+
+        MBAgentVisuals visuals = mount.AgentVisuals;
+        Skeleton skeleton = visuals?.GetSkeleton();
+        if (ReferenceEquals(visuals, null)
+            || !visuals.IsValid()
+            || ReferenceEquals(skeleton, null)
+            || !skeleton.IsValid)
+        {
+            return;
+        }
+
+        AgentMountData.GetRenderedAction0State(
+            mount,
+            out string animationName,
+            out float animationSpeed,
+            out float animationProgress);
+        int actionIndex = mount.GetCurrentAction(0).Index;
+        string actionName = AgentActionData.GetActionNameWithCode(actionIndex);
+        MatrixFrame headFrame = skeleton.GetBoneEntitialFrameWithName("horse_head");
+        MountPoseSamples.Add(new MountPoseSample
+        {
+            Time = mission.CurrentTime - mountPoseCaptureStartTime,
+            Speed = mount.GetRealGlobalVelocity().AsVec2.Length,
+            ActionIndex = actionIndex,
+            ActionName = actionName,
+            AnimationName = animationName,
+            AnimationProgress = animationProgress,
+            AnimationSpeed = animationSpeed,
+            TurnDirection = AgentMountData.GetTurnDirection(actionName, animationName),
+            ChannelWeight = mount.GetActionChannelWeight(0),
+            CurrentActionWeight = mount.GetActionChannelCurrentActionWeight(0),
+            HeadPosition = headFrame.origin,
+            HeadForward = headFrame.rotation.f
+        });
+    }
+
     [CommandLineArgumentFunction("move_cavalry", "coop.debug.battle")]
     public static string MoveCavalry(List<string> args)
     {
@@ -293,10 +435,10 @@ internal static class BattleDebugCommands
                 out float degrees)
             || float.IsNaN(degrees)
             || float.IsInfinity(degrees)
-            || Math.Abs(degrees) < 15f
+            || Math.Abs(degrees) < 1f
             || Math.Abs(degrees) > 180f)
         {
-            return "Usage: coop.debug.battle.turn_cavalry <degrees: -180 to -15 or 15 to 180>";
+            return "Usage: coop.debug.battle.turn_cavalry <degrees: -180 to -1 or 1 to 180>";
         }
 
         var mission = Mission.Current;
@@ -406,9 +548,28 @@ internal static class BattleDebugCommands
 
         EnemyPositions.Clear();
         CavalryControllers.Clear();
+        capturedMount = null;
+        capturedMountId = Guid.Empty;
+        MountPoseSamples.Clear();
         ReleaseLadderCamera();
         ReleaseMountCamera();
         observedMission = mission;
+    }
+
+    private static bool TryGetActiveMount(Guid mountId, out Agent mount)
+    {
+        mount = null;
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry)
+            || !registry.TryGetAgentInfo(mountId, out var info)
+            || info.Agent == null
+            || !info.Agent.IsMount
+            || !info.Agent.IsActive())
+        {
+            return false;
+        }
+
+        mount = info.Agent;
+        return true;
     }
 
     private static bool MatchesAuthority(
