@@ -111,7 +111,11 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             var entriesArray = new TroopReserveEntry[entries.Count];
             for (int i = 0; i < entries.Count; i++) entriesArray[i] = entries[i];
 
-            var reserve = new PartyReserve(partyId, supplied, entriesArray);
+            var reserve = new PartyReserve(
+                partyId,
+                supplied,
+                entriesArray,
+                isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId));
             if ((party.Party?.Side ?? BattleSideEnum.None) == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else
@@ -199,9 +203,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         }
     }
 
-    // The server's MapEventParty._roster is the flattened roster; its descriptors are the authoritative, stable
-    // seeds we hand out (and what the casualty path keys on). An enemy/AI party that was never made
-    // mission-ready can have a null _roster, so flatten it here (server-side Update is allowed).
+    // Hand out the server's current flattened descriptors so every client spawns the same agent identities.
+    // Setup may re-flatten the server roster later, so authoritative applies match by CharacterId instead.
     private List<TroopReserveEntry> FlattenParty(MapEventParty party)
     {
         var entries = new List<TroopReserveEntry>();

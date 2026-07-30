@@ -896,8 +896,11 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
     public void FlushHandshakeFields_RoundTripOverTheWire()
     {
         var reserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
-            "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>(), flushRequested: true));
+            "rt_battle", (int)BattleSideEnum.Attacker,
+            new[] { new PartyReserve("own-party", 0, Array.Empty<TroopReserveEntry>(), isReceiverPlayerParty: true) },
+            flushRequested: true));
         Assert.True(reserve.FlushRequested);
+        Assert.True(Assert.Single(reserve.Parties).IsReceiverPlayerParty);
 
         var legacyReserve = Server.EnsureSerializable(new NetworkBattleTroopReserve(
             "rt_battle", (int)BattleSideEnum.Attacker, Array.Empty<PartyReserve>()));

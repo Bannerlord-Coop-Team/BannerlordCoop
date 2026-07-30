@@ -1,4 +1,4 @@
-using GameInterface.Services.SiegeEvents.Patches;
+﻿using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,7 @@ using FormatterServices = System.Runtime.Serialization.FormatterServices;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
+[Collection(nameof(CampaignCurrentCollection))]
 public sealed class SiegeAftermathPendingTests : IDisposable
 {
     public SiegeAftermathPendingTests()
@@ -145,18 +146,28 @@ public sealed class SiegeAftermathPendingTests : IDisposable
     [Fact]
     public void NarrationContext_IsParticipantScopedAndIndependentOfChoicePrompt()
     {
-        var participantSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
-        var unrelatedSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
-        var siegeEventInterface = new SiegeEventInterface();
+        // Bootstrap tests can leave an uninitialized Campaign.Current behind.
+        var previousCampaign = Campaign.Current;
+        Campaign.Current = null;
+        try
+        {
+            var participantSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
+            var unrelatedSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
+            var siegeEventInterface = new SiegeEventInterface();
 
-        siegeEventInterface.SetLocalAftermathNarrationContext(participantSettlement);
-        siegeEventInterface.SetLocalAftermathNarration(unrelatedSettlement,
-            (int)SiegeAftermathAction.SiegeAftermath.Devastate);
-        Assert.True(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
+            siegeEventInterface.SetLocalAftermathNarrationContext(participantSettlement);
+            siegeEventInterface.SetLocalAftermathNarration(unrelatedSettlement,
+                (int)SiegeAftermathAction.SiegeAftermath.Devastate);
+            Assert.True(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
 
-        siegeEventInterface.SetLocalAftermathNarration(participantSettlement,
-            (int)SiegeAftermathAction.SiegeAftermath.Pillage);
-        Assert.False(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
+            siegeEventInterface.SetLocalAftermathNarration(participantSettlement,
+                (int)SiegeAftermathAction.SiegeAftermath.Pillage);
+            Assert.False(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
     }
 
     private static (Settlement Settlement, SiegeAftermathPatches.PendingAftermath Pending) AddBoundPending()
@@ -230,3 +241,9 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         }
     }
 }
+
+/// <summary>
+/// Serializes tests that temporarily replace the process-wide campaign.
+/// </summary>
+[CollectionDefinition(nameof(CampaignCurrentCollection), DisableParallelization = true)]
+public sealed class CampaignCurrentCollection { }

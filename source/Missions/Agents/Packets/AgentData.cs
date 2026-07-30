@@ -7,11 +7,28 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public struct AgentData
     {
-        // mountId: the mount's registry id (resolved by the caller — this ctor has no registry access), carried
-        // so the receiver can attach the puppet to the exact horse; Guid.Empty when unregistered/unmounted.
+        internal static Agent.MovementControlFlag GetLocomotionMovementFlags(
+            Agent.MovementControlFlag movementFlags)
+        {
+            return movementFlags & Agent.MovementControlFlag.MoveMask;
+        }
+
+        internal static void ApplyLocomotionMovementFlags(
+            Agent agent,
+            Agent.MovementControlFlag movementFlags)
+        {
+            Agent.MovementControlFlag currentFlags =
+                agent.MovementFlags & ~Agent.MovementControlFlag.MoveMask;
+            agent.MovementFlags =
+                currentFlags |
+                GetLocomotionMovementFlags(movementFlags);
+        }
+
         public AgentData(
             Agent agent,
-            System.Guid mountId = default,
+            ushort mountMovementId = 0,
+            string mountIdentityScopeId = null,
+            System.Guid mountAgentId = default,
             float? mountAction0Speed = null,
             int? mountAction0TurnDirection = null,
             int? mountAction0TurnActionIndex = null)
@@ -21,8 +38,8 @@ namespace Missions.Agents.Packets
             LookDirection = agent.LookDirection;
             InputVector = agent.MovementInputVector;
             Speed = agent.GetRealGlobalVelocity().AsVec2.Length;
-
-            AgentEquipment = new AgentEquipmentData(agent);
+            MovementFlag = (uint)GetLocomotionMovementFlags(
+                agent.MovementFlags);
 
             // The rider can be active while its mount is mid-teardown (e.g. right after a battle concludes):
             // reading the mount's native state (MovementInputVector, etc.) then access-violates. Only capture
@@ -33,7 +50,9 @@ namespace Missions.Agents.Packets
             {
                 MountData = new AgentMountData(
                     mount,
-                    mountId,
+                    mountMovementId,
+                    mountIdentityScopeId,
+                    mountAgentId,
                     mountAction0Speed,
                     mountAction0TurnDirection: mountAction0TurnDirection,
                     mountAction0TurnActionIndex: mountAction0TurnActionIndex);
@@ -42,6 +61,11 @@ namespace Missions.Agents.Packets
             {
                 MountData = null;
             }
+        }
+
+        public AgentData(Agent agent, System.Guid mountAgentId)
+            : this(agent, 0, null, mountAgentId)
+        {
         }
 
         public void Apply(Agent agent)
@@ -78,9 +102,9 @@ namespace Missions.Agents.Packets
                     ? InputVector.Normalized() * throttle
                     : new Vec2(0f, throttle);
             }
-
-            // Update equipment
-            AgentEquipment.Apply(agent);
+            ApplyLocomotionMovementFlags(
+                agent,
+                (Agent.MovementControlFlag)MovementFlag);
 
             // NOTE: actions/animations are NOT applied here anymore. They are events, not continuous state, so
             // they are synced separately and on-change by AgentActionHandler (reliable-ordered), not polled with
@@ -101,13 +125,15 @@ namespace Missions.Agents.Packets
         public Vec3 LookDirection { get; }
         [ProtoMember(4)]
         public Vec2 MovementDirection { get; }
-        [ProtoMember(5)]
-        public AgentEquipmentData AgentEquipment { get; }
-        // 6 was ActionData — actions moved to the event-driven AgentActionHandler; tag left unused for wire stability.
+        // 5 was AgentEquipmentData — wield state moved to reliable on-change updates.
+        // 6 was ActionData — actions moved to the event-driven AgentActionHandler.
         [ProtoMember(7)]
         public AgentMountData MountData { get; }
         /// <summary>The owner's real ground speed, m/s — drives the on-foot puppet's locomotion throttle.</summary>
         [ProtoMember(8)]
         public float Speed { get; }
+        /// <summary>The owner's current translation and turn inputs.</summary>
+        [ProtoMember(9)]
+        public uint MovementFlag { get; }
     }
 }

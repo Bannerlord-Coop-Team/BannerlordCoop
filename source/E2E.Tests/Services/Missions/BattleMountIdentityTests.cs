@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using Missions;
+using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Battles;
@@ -284,15 +285,17 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         var riderId = Guid.NewGuid();
         var horseId = Guid.NewGuid();
-        Agent ownerRider = null, ownerHorse = null, puppetHorse = null;
+        Agent ownerRider = null, ownerHorse = null, puppetRider = null, puppetHorse = null;
         CoopBattleController ownerController = null, attackerController = null;
 
         attacker.Call(() =>
         {
             var mock = fixture.CreateMission(attacker);
             attackerController = attacker.Resolve<CoopBattleController>();
-            (_, puppetHorse) = RegisterMountedRider(
+            (puppetRider, puppetHorse) = RegisterMountedRider(
                 mock, attacker.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
+            puppetHorse.AddComponent(new CommonAIComponent(puppetHorse));
+            puppetHorse.CommonAIComponent.OnMountReserved(puppetRider.Index);
         });
 
         owner.Call(() =>
@@ -313,6 +316,24 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         // standing — the horse lives on masterless at its owner and dies only through its own broadcast.
         Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
         Assert.True(puppetHorseMirror.IsActive);
+        Assert.Null(puppetHorseMirror.RiderAgent);
+        Assert.Equal(AgentControllerType.None, puppetHorse.Controller);
+        Assert.NotNull(puppetHorse.CommonAIComponent);
+        Assert.Equal(-1, puppetHorse.CommonAIComponent.ReservedRiderAgentIndex);
+        Assert.Single(puppetHorseMirror.Components.OfType<CommonAIComponent>());
+
+        attacker.Call(() =>
+        {
+            var repairer = attacker.Resolve<IPuppetMountStateRepairer>();
+            repairer.PrepareForAiControl(puppetHorse);
+            puppetHorse.Controller = AgentControllerType.AI;
+            Assert.Single(puppetHorseMirror.Components.OfType<CommonAIComponent>());
+
+            puppetHorse.Controller = AgentControllerType.None;
+            repairer.PreserveRiderlessPuppet(puppetHorse);
+            Assert.NotNull(puppetHorse.CommonAIComponent);
+            Assert.Single(puppetHorseMirror.Components.OfType<CommonAIComponent>());
+        });
 
         // A later hit on the now-masterless puppet horse still routes by the horse's own id.
         attacker.Call(() =>
@@ -326,6 +347,52 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         GC.KeepAlive(ownerController);
         GC.KeepAlive(attackerController);
+    }
+
+    [Fact]
+    public void RiderDeathBeforeFirstMovement_ClearsTheAiHorsesReservation()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var peer = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(peer, "peer");
+
+        var riderId = Guid.NewGuid();
+        var horseId = Guid.NewGuid();
+        Agent puppetHorse = null;
+        CoopBattleController ownerController = null, peerController = null;
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            peerController = peer.Resolve<CoopBattleController>();
+            var (puppetRider, horse) = RegisterMountedRider(
+                mock, peer.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
+            puppetHorse = horse;
+            puppetHorse.Controller = AgentControllerType.AI;
+            puppetHorse.CommonAIComponent.OnMountReserved(puppetRider.Index);
+        });
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            ownerController = owner.Resolve<CoopBattleController>();
+            var (rider, _) = RegisterMountedRider(
+                mock, owner.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.AI);
+            owner.Resolve<IMessageBroker>().Publish(this, new BattleAgentDied(rider, null, wounded: false));
+        });
+
+        Assert.True(AgentMirror.TryGet(puppetHorse, out var horseMirror));
+        Assert.True(horseMirror.IsActive);
+        Assert.Null(horseMirror.RiderAgent);
+        Assert.Equal(AgentControllerType.AI, puppetHorse.Controller);
+        Assert.NotNull(puppetHorse.CommonAIComponent);
+        Assert.Equal(-1, puppetHorse.CommonAIComponent.ReservedRiderAgentIndex);
+        Assert.Single(horseMirror.Components.OfType<CommonAIComponent>());
+
+        GC.KeepAlive(ownerController);
+        GC.KeepAlive(peerController);
     }
 
     /// <summary>A rider-death broadcast dismounts the puppet and leaves the horse standing, even an unregistered
@@ -351,6 +418,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             riderPuppet = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None));
             puppetHorse = mock.SpawnMount(riderPuppet); // NOT registered
             Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", riderId, riderPuppet));
+            Assert.Null(puppetHorse.CommonAIComponent);
         });
 
         owner.Call(() =>
@@ -371,6 +439,10 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         Assert.True(AgentMirror.TryGet(puppetHorse, out var horseMirror));
         Assert.True(horseMirror.IsActive);
         Assert.Null(horseMirror.RiderAgent);
+        Assert.Equal(AgentControllerType.None, puppetHorse.Controller);
+        Assert.NotNull(puppetHorse.CommonAIComponent);
+        Assert.Equal(-1, puppetHorse.CommonAIComponent.ReservedRiderAgentIndex);
+        Assert.Single(horseMirror.Components.OfType<CommonAIComponent>());
 
         GC.KeepAlive(ownerController);
         GC.KeepAlive(peerController);
@@ -415,6 +487,54 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             var record = joiner.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Last().Agents.Single();
             Assert.Equal(riderInfo.AgentId, record.AgentId);
             Assert.Equal(horseInfo.AgentId, record.MountAgentId);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
+    public void JoinerReplay_CarriesTakenMountsSeparateMovementIdentity()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var joiner = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(joiner, "joiner");
+
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var riderId = Guid.NewGuid();
+        var mountId = Guid.NewGuid();
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            mock.SpawnMounted = true;
+            var controller = owner.Resolve<CoopBattleController>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+
+            Assert.True(owner.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            var rider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
+            var mount = rider.MountAgent;
+            Assert.NotNull(mount);
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "rider-origin", "rider-origin:epoch-1",
+                riderId, 21, rider));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "mount-origin", "mount-origin:epoch-4",
+                mountId, 9, mount));
+
+            owner.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("joiner", null));
+
+            var record = joiner.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Last().Agents.Single();
+            Assert.Equal(riderId, record.AgentId);
+            Assert.Equal("rider-origin", record.OriginalOwnerControllerId);
+            Assert.Equal("rider-origin:epoch-1", record.MovementScopeId);
+            Assert.Equal((ushort)21, record.MovementId);
+            Assert.Equal(mountId, record.MountAgentId);
+            Assert.Equal("mount-origin", record.MountOriginalOwnerControllerId);
+            Assert.Equal("mount-origin:epoch-4", record.MountMovementScopeId);
+            Assert.Equal((ushort)9, record.MountMovementId);
 
             GC.KeepAlive(controller);
         });

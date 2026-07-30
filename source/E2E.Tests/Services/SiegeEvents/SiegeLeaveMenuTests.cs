@@ -1,8 +1,10 @@
-using Common.Util;
+﻿using Common.Util;
+using Common.Network;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
 using Helpers;
 using System.Reflection;
@@ -120,6 +122,40 @@ public class SiegeLeaveMenuTests : IDisposable
         {
             AssertBesiegerCamp(client, partyId, expectCamp: false);
         }
+    }
+
+    [Fact]
+    public void NetworkPartyLeftBattle_WithSiegeCleanup_ClearsClientOnlyCamp()
+    {
+        var leavingClient = Clients.First();
+        var (partyId, _) = SetupBesiegingPlayerParty(leavingClient);
+        string partyBaseId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            party._besiegerCamp = null;
+            Assert.True(Server.ObjectManager.TryGetId(party.Party, out partyBaseId));
+        });
+
+        Assert.NotNull(partyBaseId);
+        AssertBesiegerCamp(Server, partyId, expectCamp: false);
+        foreach (var client in Clients)
+        {
+            AssertBesiegerCamp(client, partyId, expectCamp: true);
+        }
+
+        Server.Call(() =>
+        {
+            Server.Resolve<INetwork>().SendAll(new NetworkPartyLeftBattle(partyBaseId, true));
+        }, LeaveRoundTripDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            AssertBesiegerCamp(client, partyId, expectCamp: false);
+        }
+
+        leavingClient.Call(() => Assert.Null(PlayerSiege.PlayerSiegeEvent));
     }
 
     [Fact]

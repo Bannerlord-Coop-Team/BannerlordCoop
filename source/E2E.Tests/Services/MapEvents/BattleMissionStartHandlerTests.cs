@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface;
@@ -80,6 +81,9 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 ContainerProvider.SetContainer(launcherScope);
                 messageBroker.Publish(this, new NetworkStartAttackMission(
                     mapEvent.MapEventId, 1234, default, mapEvent.AttackerPartyId));
+
+                Assert.Equal(0, missionInitializerResolver.CallCount);
+                GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
 
                 Assert.Equal(1, missionInitializerResolver.CallCount);
                 Assert.Same(clientBattle, missionInitializerResolver.Battle);

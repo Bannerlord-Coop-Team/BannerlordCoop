@@ -22,7 +22,9 @@ namespace Missions.Agents.Packets
         // mirroring ApplyMount. Dereferencing .MountAgent here was reading the mount's own (null) mount → NRE.
         public AgentMountData(
             Agent mountAgent,
-            Guid mountId = default,
+            ushort mountMovementId = 0,
+            string mountIdentityScopeId = null,
+            Guid mountAgentId = default,
             float? mountAction0Speed = null,
             bool? mountAction0IsLocomotion = null,
             int? mountAction0TurnDirection = null,
@@ -40,11 +42,14 @@ namespace Missions.Agents.Packets
             MountMovementDirection = mountAgent.GetMovementDirection();
             MountPosition = mountAgent.Position;
             MountSpeed = mountAgent.GetRealGlobalVelocity().AsVec2.Length;
+            MountMovementFlag = (uint)AgentData.GetLocomotionMovementFlags(
+                mountAgent.MovementFlags);
+            MountMovementId = mountMovementId;
+            MountIdentityScopeId = mountIdentityScopeId;
+            MountAgentId = mountAgentId;
             MountAction0Speed = mountAction0Speed ?? GetRenderedAction0Speed(mountAgent);
             MountAction0IsLocomotion = mountAction0IsLocomotion
-                ?? IsLocomotionAction(
-                    MountAction0Index,
-                    renderedAction0Animation);
+                ?? IsLocomotionAction(MountAction0Index, renderedAction0Animation);
             MountAction0TurnDirection = mountAction0TurnDirection
                 ?? GetTurnDirection(MountAction0Index, renderedAction0Animation);
             MountAction0TurnActionIndex = mountAction0TurnActionIndex
@@ -52,7 +57,11 @@ namespace Missions.Agents.Packets
                     MountAction0Index,
                     MountAction0TurnDirection,
                     mountAgent.Monster?.MonsterUsage);
-            MountId = mountId;
+        }
+
+        public AgentMountData(Agent mountAgent, Guid mountAgentId)
+            : this(mountAgent, 0, null, mountAgentId)
+        {
         }
 
         public void ApplyMount(Agent mountAgent)
@@ -61,8 +70,7 @@ namespace Missions.Agents.Packets
             // (fed MountPosition by AgentMovementHandler). Everything below is per-packet mount state/animation.
             mountAgent.SetMovementDirection(MountMovementDirection);
 
-            // Channel 0 is the horse's lower-body movement (stand, turn, or gait). A Controller.None puppet has
-            // no controller to select it, so replicate the owner's rendered movement action explicitly.
+            // A Controller.None puppet cannot select its channel-zero stand, turn, or gait action.
             bool stationaryTurn = MountSpeed <= StationarySpeedThreshold
                 && MountAction0TurnDirection != NoTurn;
             int desiredAction0Index = ResolveAction0Index(
@@ -76,16 +84,19 @@ namespace Missions.Agents.Packets
                 if (mountAgent.GetCurrentAction(0) != ActionIndexCache.act_none)
                     mountAgent.SetActionChannel(0, ActionIndexCache.act_none);
             }
-            else if (mountAgent.GetCurrentAction(0) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(0).Index != desiredAction0Index)
+            else if (mountAgent.GetCurrentAction(0) == ActionIndexCache.act_none
+                || mountAgent.GetCurrentAction(0).Index != desiredAction0Index)
             {
                 string movementActionName = AgentActionData.GetActionNameWithCode(desiredAction0Index);
                 if (movementActionName != null)
+                {
                     mountAgent.SetActionChannel(
                         0,
                         ActionIndexCache.Create(movementActionName),
                         additionalFlags: (AnimFlags)MountAction0Flag,
                         actionSpeed: MountAction0Speed,
                         startProgress: MountAction0Progress);
+                }
             }
             else
             {
@@ -112,6 +123,9 @@ namespace Missions.Agents.Packets
             // Controller.None still lets native horse motion persist between replicated position corrections.
             // Cap that motion to the owner's real speed so a stopped owner also stops its puppet horse.
             mountAgent.SetMaximumSpeedLimit(MountSpeed, isMultiplier: false);
+            AgentData.ApplyLocomotionMovementFlags(
+                mountAgent,
+                (Agent.MovementControlFlag)MountMovementFlag);
         }
 
         internal static float GetRenderedAction0Speed(Agent mountAgent)
@@ -227,22 +241,6 @@ namespace Missions.Agents.Packets
             return actionIndex;
         }
 
-        private static bool IsTurnDirection(string value, string direction)
-        {
-            if (string.IsNullOrEmpty(value)) return false;
-
-            return value.IndexOf($"turn_{direction}", StringComparison.OrdinalIgnoreCase) >= 0
-                || value.IndexOf($"rotate_{direction}", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static bool IsFinite(Vec2 value)
-        {
-            return !float.IsNaN(value.X)
-                && !float.IsInfinity(value.X)
-                && !float.IsNaN(value.Y)
-                && !float.IsInfinity(value.Y);
-        }
-
         internal static string GetStationaryTurnActionName(
             string authoritativeActionName,
             string monsterUsage,
@@ -267,6 +265,22 @@ namespace Missions.Agents.Packets
                 || string.Equals(actionName, "act_horse_turn_left", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(actionName, "act_camel_turn_right", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(actionName, "act_camel_turn_left", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsTurnDirection(string value, string direction)
+        {
+            if (string.IsNullOrEmpty(value)) return false;
+
+            return value.IndexOf($"turn_{direction}", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf($"rotate_{direction}", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsFinite(Vec2 value)
+        {
+            return !float.IsNaN(value.X)
+                && !float.IsInfinity(value.X)
+                && !float.IsNaN(value.Y)
+                && !float.IsInfinity(value.Y);
         }
 
         private static TurnActionClassification ClassifyTurnActionIndex(int actionIndex)
@@ -297,6 +311,11 @@ namespace Missions.Agents.Packets
                     turnDirection)).Index;
         }
 
+        private static bool IsLocomotionActionIndex(int actionIndex)
+        {
+            return IsLocomotionAnimation(AgentActionData.GetActionNameWithCode(actionIndex));
+        }
+
         private readonly struct TurnActionClassification
         {
             public TurnActionClassification(int direction, bool isStationary)
@@ -307,11 +326,6 @@ namespace Missions.Agents.Packets
 
             public int Direction { get; }
             public bool IsStationary { get; }
-        }
-
-        private static bool IsLocomotionActionIndex(int actionIndex)
-        {
-            return IsLocomotionAnimation(AgentActionData.GetActionNameWithCode(actionIndex));
         }
 
         [ProtoMember(1)]
@@ -328,11 +342,9 @@ namespace Missions.Agents.Packets
         public Vec2 MountMovementDirection { get; }
         [ProtoMember(7)]
         public Vec3 MountPosition { get; }
-        /// <summary>The mount's own network id (registry id), or <see cref="Guid.Empty"/> when the horse isn't
-        /// registered. Lets the receiver put the puppet on the EXACT horse the owner rides — including a
-        /// mid-battle switch to a different horse — instead of guessing from the last one it dismounted.</summary>
+        /// <summary>The mount's owner-scoped movement id, or zero when the horse is unregistered.</summary>
         [ProtoMember(8)]
-        public Guid MountId { get; }
+        public ushort MountMovementId { get; }
         [ProtoMember(9)]
         public ulong MountAction0Flag { get; }
         [ProtoMember(10)]
@@ -342,17 +354,24 @@ namespace Missions.Agents.Packets
         /// <summary>The owner's horizontal mount speed, used as the puppet's absolute native speed limit.</summary>
         [ProtoMember(12)]
         public float MountSpeed { get; }
-        /// <summary>The owner's rendered gait playback speed for action channel zero.</summary>
+        /// <summary>Only populated when the mount's original owner differs from the rider's identity scope.</summary>
         [ProtoMember(13)]
+        public string MountIdentityScopeId { get; }
+        [ProtoMember(14)]
+        public Guid MountAgentId { get; }
+        [ProtoMember(15)]
+        public uint MountMovementFlag { get; }
+        /// <summary>The owner's rendered gait playback speed for action channel zero.</summary>
+        [ProtoMember(16)]
         public float MountAction0Speed { get; }
         /// <summary>Whether the owner's rendered channel-zero animation is a locomotion gait.</summary>
-        [ProtoMember(14)]
+        [ProtoMember(17)]
         public bool MountAction0IsLocomotion { get; }
         /// <summary>The owner's rendered stationary turn direction: -1 left, 0 none, 1 right.</summary>
-        [ProtoMember(15)]
+        [ProtoMember(18)]
         public int MountAction0TurnDirection { get; }
         /// <summary>The native movement action for the owner's mount type and stationary turn direction.</summary>
-        [ProtoMember(16)]
+        [ProtoMember(19)]
         public int MountAction0TurnActionIndex { get; }
     }
 }

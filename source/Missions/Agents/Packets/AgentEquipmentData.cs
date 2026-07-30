@@ -1,17 +1,28 @@
 ﻿using ProtoBuf;
+using System;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Packets
 {
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct AgentEquipmentData
+    public readonly struct AgentEquipmentData : IEquatable<AgentEquipmentData>
     {
         public AgentEquipmentData(Agent agent)
         {
             MainHandIndex = (int)agent.GetPrimaryWieldedItemIndex();
             OffHandIndex = (int)agent.GetOffhandWieldedItemIndex();
             MainHandUsageIndex = GetUsageIndex(agent.Equipment, (EquipmentIndex)MainHandIndex);
+        }
+
+        internal AgentEquipmentData(
+            EquipmentIndex mainHandIndex,
+            EquipmentIndex offHandIndex,
+            int mainHandUsageIndex)
+        {
+            MainHandIndex = (int)mainHandIndex;
+            OffHandIndex = (int)offHandIndex;
+            MainHandUsageIndex = mainHandUsageIndex;
         }
 
         public void Apply(Agent agent)
@@ -113,6 +124,28 @@ namespace Missions.Agents.Packets
             return weapon.Item != null && usageIndex >= 0 && usageIndex < weapon.WeaponsCount
                 ? usageIndex
                 : 0;
+        }
+
+        public bool Equals(AgentEquipmentData other)
+        {
+            return MainHandIndex == other.MainHandIndex &&
+                   OffHandIndex == other.OffHandIndex &&
+                   MainHandUsageIndex == other.MainHandUsageIndex;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is AgentEquipmentData other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hashCode = MainHandIndex;
+                hashCode = (hashCode * 397) ^ OffHandIndex;
+                return (hashCode * 397) ^ MainHandUsageIndex;
+            }
         }
 
         [ProtoMember(1)]

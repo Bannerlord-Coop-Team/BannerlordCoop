@@ -2,6 +2,7 @@
 using GameInterface.Services.Alleys;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
@@ -57,9 +58,12 @@ public readonly struct GameSaveDataPacket : IPacket
     public readonly TradePlayerData TradePlayerData;
 
     [ProtoMember(9)]
-    public readonly AttachmentIdMap AttachmentIdMap;
+    public readonly InventoryPlayerData InventoryPlayerData;
 
     [ProtoMember(10)]
+    public readonly AttachmentIdMap AttachmentIdMap;
+
+    [ProtoMember(11)]
     public readonly ServerOptions ServerOptions;
 
     public GameSaveDataPacket(
@@ -71,6 +75,7 @@ public readonly struct GameSaveDataPacket : IPacket
         AlleyPlayerData alleyPlayerData,
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
+        InventoryPlayerData inventoryPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions)
     {
@@ -82,6 +87,7 @@ public readonly struct GameSaveDataPacket : IPacket
         AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
         TradePlayerData = tradePlayerData;
+        InventoryPlayerData = inventoryPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
     }
