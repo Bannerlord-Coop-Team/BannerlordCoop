@@ -125,7 +125,9 @@ internal class SiegeEntryFlowPatches
             PlayerSiege.FinalizePlayerSiege();
         }
 
-        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
+        MessageBroker.Instance.Publish(
+            null,
+            new BreakSiegeAttempted(MobileParty.MainParty, finishLocalMenus: false));
         MobileParty.MainParty.Army = null;
         return false;
     }

@@ -8,6 +8,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -81,9 +82,27 @@ internal class ClientSiegeEntryHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+            if (MobileParty.MainParty == null) return;
+            if (!objectManager.TryGetIdWithLogging(MobileParty.MainParty, out var mainPartyId)) return;
 
-            siegeEventInterface.PromptSiegeEnded(settlement, obj.BesiegerDefeated);
+            var role = ResolveTerminationRole(obj, mainPartyId);
+            siegeEventInterface.PromptSiegeEnded(settlement, obj.BesiegerDefeated, role);
         });
+    }
+
+    internal static SiegeTerminationRole ResolveTerminationRole(
+        NetworkPromptSiegeEnded message,
+        string mainPartyId)
+    {
+        if (message.LeaderPartyId == mainPartyId)
+            return SiegeTerminationRole.AttackerLeader;
+
+        if (message.DefenderPartyIds?.Contains(mainPartyId) == true)
+            return SiegeTerminationRole.Defender;
+
+        return message.AttackerPartyIds?.Contains(mainPartyId) == true
+            ? SiegeTerminationRole.AttackerMember
+            : SiegeTerminationRole.None;
     }
 
     private void HandleDefensePrompt(MessagePayload<NetworkPromptSiegeDefense> payload)
@@ -155,7 +174,7 @@ internal class ClientSiegeEntryHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.Party, out var partyId)) return;
 
-        network.SendAll(new NetworkRequestBreakSiege(partyId));
+        network.SendAll(new NetworkRequestBreakSiege(partyId, obj.FinishLocalMenus));
     }
 
     private void HandleBesiegeApproved(MessagePayload<NetworkBesiegeSettlementApproved> payload)
@@ -198,14 +217,13 @@ internal class ClientSiegeEntryHandler : IHandler
 
     private void HandleBreakApproved(MessagePayload<NetworkBreakSiegeApproved> payload)
     {
-        if (!payload.What.Approved)
+        if (payload.What.Outcome == SiegeBreakOutcome.Rejected)
         {
             Logger.Information("Server rejected the break-siege request; staying at the current menu");
             return;
         }
 
-        if (payload.What.BattleLeaveApplied)
-            return;
+        if (payload.What.BattleLeaveApplied || !payload.What.FinishLocalMenus) return;
 
         GameThread.RunSafe(() =>
         {

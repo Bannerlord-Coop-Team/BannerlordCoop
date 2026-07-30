@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -12,6 +12,9 @@ using HarmonyLib;
 using LiteNetLib;
 using ProtoBuf.Meta;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Environment.Instance;
 
@@ -143,6 +146,7 @@ public abstract class EnvironmentInstance : IDisposable
     {
         private readonly ILifetimeScope previousContainer;
         private readonly bool wasServer;
+        private readonly Action restoreGameStatics;
 
         public StaticScope(EnvironmentInstance instance)
         {
@@ -160,6 +164,18 @@ public abstract class EnvironmentInstance : IDisposable
                     // If no previous container is set, set it to the current container
                     previousContainer = instance.Container;
                 }
+
+                var previousObjectManager = MBObjectManager.Instance;
+                var previousCampaign = Campaign.Current;
+                var previousGame = Game.Current;
+                var previousModule = TaleWorlds.MountAndBlade.Module.CurrentModule;
+                restoreGameStatics = () =>
+                {
+                    MBObjectManager.Instance = previousObjectManager;
+                    Campaign.Current = previousCampaign;
+                    Game.Current = previousGame;
+                    TaleWorlds.MountAndBlade.Module.CurrentModule = previousModule;
+                };
 
                 // Set new static values
                 instance.GameInstance.SetStatics();
@@ -180,6 +196,7 @@ public abstract class EnvironmentInstance : IDisposable
             try
             {
                 // Restore previous static values
+                restoreGameStatics();
                 ModInformation.IsServer = wasServer;
                 GameInterface.ContainerProvider.SetContainer(previousContainer);
                 previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();

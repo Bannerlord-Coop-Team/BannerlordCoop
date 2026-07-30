@@ -72,7 +72,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.True(left.LeaveSiege);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
-        Assert.True(approval.Approved);
+        Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.True(approval.BattleLeaveApplied);
 
         AssertPartyState(Server, partyId, expectMapEvent: false, expectCamp: false);

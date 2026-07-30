@@ -14,6 +14,7 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
@@ -43,18 +44,21 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISiegeEventInterface siegeEventInterface;
     private readonly Dictionary<MobileParty, MapEvent> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.network = network;
+        this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
@@ -100,6 +104,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
                     peer.Id);
                 return;
             }
+
+            LeaveSiegeBeforeParking(party);
 
             if (!party.IsActive)
             {
@@ -161,6 +167,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             deferredMapEventParking.Remove(party);
             if (!party.IsActive || !IsDisconnectedPlayerParty(party)) continue;
 
+            LeaveSiegeBeforeParking(party);
             party.IsActive = false;
             RemoveVisual(party);
             Logger.Information(
@@ -174,6 +181,16 @@ internal class PlayerPartyVisibilityHandler : IHandler
             !playerManager.IsConnected(player) &&
             objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) &&
             ReferenceEquals(playerParty, party));
+
+    private void LeaveSiegeBeforeParking(MobileParty party)
+    {
+        if (party.BesiegerCamp == null) return;
+
+        Logger.Information(
+            "Removing disconnected party {PartyId} from its siege camp before parking",
+            party.StringId);
+        siegeEventInterface.BreakSiegeForPartyOnly(party);
+    }
 
     /// <summary>
     /// Removes the party's map figure and tells every client to do the same, mirroring
