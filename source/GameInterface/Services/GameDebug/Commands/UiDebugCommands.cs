@@ -1,5 +1,7 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using GameInterface.Utils.Commands;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -71,5 +73,25 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
             return "Usage: coop.debug.ui.active_state";
 
         return Game.Current?.GameStateManager?.ActiveState?.GetType().Name ?? "none";
+    }
+
+    [CommandLineArgumentFunction("complete_party_screen", "coop.debug.ui")]
+    public static string CompletePartyScreen(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+            return "Command can only be run on a client.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.complete_party_screen";
+
+        if (Game.Current?.GameStateManager?.ActiveState is not PartyState partyState ||
+            partyState.PartyScreenLogic == null)
+            return "Failed: active state is not a PartyState.";
+
+        var partyScreenMode = partyState.PartyScreenMode;
+        PartyScreenHelper.CloseScreen(isForced: false);
+        if (Game.Current.GameStateManager.ActiveState == partyState)
+            return $"Failed: Party screen Done did not close the {partyScreenMode} state.";
+
+        return $"PARTY_SCREEN_COMPLETED mode={partyScreenMode}.";
     }
 }

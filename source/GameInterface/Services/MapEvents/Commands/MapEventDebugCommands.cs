@@ -121,6 +121,8 @@ public class MapEventDebugCommands
         public string ControllerId;
         public Hero Hero;
         public MobileParty Party;
+        public Hero LeaderHero;
+        public Hero Owner;
         public TroopRosterElement[] MemberRoster;
         public TroopRosterElement[] PrisonRoster;
         public ItemRosterElement[] ItemRoster;
@@ -1111,6 +1113,8 @@ public class MapEventDebugCommands
             ControllerId = controllerId,
             Hero = hero,
             Party = party,
+            LeaderHero = party.LeaderHero,
+            Owner = party.Owner,
             MemberRoster = party.MemberRoster.GetTroopRoster().ToArray(),
             PrisonRoster = party.PrisonRoster.GetTroopRoster().ToArray(),
             ItemRoster = party.ItemRoster.ToArray(),
@@ -1136,6 +1140,7 @@ public class MapEventDebugCommands
             throw new InvalidOperationException($"Player {snapshot.ControllerId} has no culture basic troop.");
 
         snapshot.Party.MemberRoster.AddToCounts(basicTroop, totalTroops - 1);
+        snapshot.Party.ChangePartyLeader(snapshot.LeaderHero);
         snapshot.Hero.HitPoints = snapshot.Hero.MaxHitPoints;
         snapshot.Party.Position = position;
         snapshot.Party.SetMoveModeHold();
@@ -1198,6 +1203,14 @@ public class MapEventDebugCommands
         snapshot.Party.ItemRoster.Clear();
         foreach (var element in snapshot.ItemRoster)
             snapshot.Party.ItemRoster.Add(element);
+
+        snapshot.Party.ChangePartyLeader(snapshot.LeaderHero);
+        if (snapshot.Party.Owner != snapshot.Owner)
+        {
+            if (snapshot.Party.PartyComponent is not LordPartyComponent lordPartyComponent)
+                throw new InvalidOperationException($"Unable to restore party owner for {snapshot.ControllerId}.");
+            lordPartyComponent.ChangePartyOwner(snapshot.Owner);
+        }
 
         snapshot.Hero.HitPoints = snapshot.HitPoints;
         snapshot.Party.RecentEventsMorale = snapshot.RecentEventsMorale;
