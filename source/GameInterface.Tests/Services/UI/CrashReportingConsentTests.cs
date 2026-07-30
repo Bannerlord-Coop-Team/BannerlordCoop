@@ -8,6 +8,17 @@ namespace GameInterface.Tests.Services.UI;
 
 public class CrashReportingConsentTests
 {
+    [Fact]
+    public void PromptText_ExplainsDumpInShareableZip()
+    {
+        Assert.Contains(
+            "shareable ZIP includes a memory dump",
+            CrashReportingConsentCoordinator.PromptText);
+        Assert.Contains(
+            "excludes saves and configuration files",
+            CrashReportingConsentCoordinator.PromptText);
+    }
+
     [Theory]
     [InlineData(true, 1)]
     [InlineData(false, 0)]

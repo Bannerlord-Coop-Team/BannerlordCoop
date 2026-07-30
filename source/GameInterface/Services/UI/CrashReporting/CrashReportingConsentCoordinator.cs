@@ -14,7 +14,7 @@ public class CrashReportingConsentCoordinator
         "Enable Bannerlord's automatic crash-report mode? " +
         "A full report may include process memory, logs, configuration files, and your newest save. " +
         "BannerlordCoop separately keeps local crash diagnostics and never uploads them. " +
-        "Its shareable ZIP excludes the dump, save, and configuration files.";
+        "Its shareable ZIP includes a memory dump when Bannerlord creates one, but excludes saves and configuration files.";
 
     private readonly ICoopOptionsStore optionsStore;
     private readonly Action requestAutoreport;

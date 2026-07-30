@@ -32,8 +32,9 @@ namespace Coop.CrashReporter
             string logsDirectory = Path.Combine(reportDirectory, "logs");
             Directory.CreateDirectory(logsDirectory);
 
+            string copiedDumpPath = Path.Combine(reportDirectory, "dump.dmp");
             bool dumpCopied = dumpPath != null &&
-                              TryCopyDump(dumpPath, Path.Combine(reportDirectory, "dump.dmp"));
+                              TryCopyDump(dumpPath, copiedDumpPath);
             List<string> copiedLogs = CopyLogs(logsDirectory);
 
             string reportPath = Path.Combine(reportDirectory, "report.txt");
@@ -44,6 +45,7 @@ namespace Coop.CrashReporter
                 Path.Combine(reportDirectory, "shareable.zip"),
                 readmePath,
                 reportPath,
+                dumpCopied ? copiedDumpPath : null,
                 copiedLogs);
             return 0;
         }
@@ -266,13 +268,13 @@ namespace Coop.CrashReporter
                 "If you enabled Bannerlord automatic crash reports, Bannerlord may separately submit its own report to TaleWorlds.",
                 "",
                 "Send shareable.zip to the BannerlordCoop team after reviewing it.",
-                "Logs can contain player names, file paths, and server details.",
-                "The ZIP does not contain a memory dump, save, or configuration file.",
+                "Memory dumps and logs can contain player names, file paths, server details, and other process data.",
+                "The ZIP does not contain a save or configuration file.",
             };
             if (dumpCopied)
             {
                 lines.Add("");
-                lines.Add("dump.dmp is kept only in this local folder for advanced debugging.");
+                lines.Add("The ZIP contains dump.dmp for advanced debugging.");
             }
 
             File.WriteAllLines(readmePath, lines, new UTF8Encoding(false));
@@ -282,6 +284,7 @@ namespace Coop.CrashReporter
             string zipPath,
             string readmePath,
             string reportPath,
+            string dumpPath,
             IEnumerable<string> copiedLogs)
         {
             using (var stream = new FileStream(
@@ -293,6 +296,9 @@ namespace Coop.CrashReporter
             {
                 AddFile(archive, readmePath, "README.txt", false);
                 AddFile(archive, reportPath, "report.txt", false);
+                if (dumpPath != null)
+                    AddFile(archive, dumpPath, "dump.dmp", false);
+
                 foreach (string logPath in copiedLogs)
                 {
                     AddFile(
