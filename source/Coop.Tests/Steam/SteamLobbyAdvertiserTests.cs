@@ -23,7 +23,7 @@ namespace Coop.Tests.Steam
             {
                 Address = address,
                 Port = port,
-                ServerSteamId = 76561198000000042,
+                ServerSteamId = 90100000000000042,
             };
 
         [Fact]

@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Serialization;
 using Coop.Core;
 using Coop.Core.Common.Session;
 using Coop.CrashReporting;
@@ -78,6 +79,7 @@ namespace Coop
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
+            ProtoBufSerializer.ConfigureRuntimeModel();
 
             var fullCommandLine = Utilities.GetFullCommandLineString();
             var args = fullCommandLine.Split(' ').ToList();
@@ -226,6 +228,12 @@ namespace Coop
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                 ?.InformationalVersion ?? "unknown";
             Logger.Information("BannerlordCoop build {Build}", informationalVersion);
+            Logger.Information(
+                "[Protobuf] MonoRuntime={MonoRuntime} AutoCompile={AutoCompile} StructFactoryWorkaround={StructFactoryWorkaround} CLRVersion={ClrVersion}",
+                ProtoBufSerializer.IsMonoRuntime,
+                ProtoBufSerializer.AutoCompileEnabled,
+                ProtoBufSerializer.StructFactoryWorkaroundEnabled,
+                Environment.Version);
 
             Logger.Verbose("Coop Mod Module Started");
         }

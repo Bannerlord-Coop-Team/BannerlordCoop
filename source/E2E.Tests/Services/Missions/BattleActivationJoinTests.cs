@@ -1,10 +1,12 @@
-using System;
+﻿using System;
 using System.Linq;
+using Common;
 using Common.Messaging;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using Missions.Battles;
 using Missions.Messages;
+using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -107,5 +109,130 @@ public class BattleActivationJoinTests : MissionTestEnvironment
 
         GC.KeepAlive(hostController);
         GC.KeepAlive(joinerController);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void LateJoiner_ResultSnapshot_ReportsAcrossHandshakeAndDeploymentOrder(
+        bool resultBeforeHandshake,
+        bool deploymentFirst)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "joiner");
+        var host = Clients.First();
+        var joiner = Clients.Skip(1).First();
+
+        CoopBattleController hostController = null;
+        host.Call(() =>
+        {
+            fixture.CreateMission(host);
+            hostController = host.Resolve<CoopBattleController>();
+        });
+        EnterBattle(host, mapEventId);
+
+        var result = new MissionResult(
+            BattleState.AttackerVictory,
+            playerVictory: true,
+            playerDefeated: false,
+            enemyRetreated: false);
+        if (resultBeforeHandshake)
+            host.Call(() => hostController.ResultCommitter.ReportResolvedResult(result));
+
+        CoopBattleController joinerController = null;
+        joiner.Call(() =>
+        {
+            fixture.CreateMission(joiner);
+            joinerController = joiner.Resolve<CoopBattleController>();
+            joinerController.Session.TryBegin(mapEventId);
+            joiner.NetworkSentMessages.Clear();
+
+            joiner.Resolve<IMessageBroker>().Publish(joiner, new NetworkBattleResultSnapshot(
+                mapEventId,
+                "joiner",
+                joinerController.Session.HostEpoch,
+                BattleState.DefenderVictory));
+            joiner.Resolve<IMessageBroker>().Publish(host, new NetworkBattleResultSnapshot(
+                mapEventId,
+                "host",
+                joinerController.Session.HostEpoch - 1,
+                BattleState.DefenderVictory));
+            GameThread.Run(() => { }, blocking: true);
+            Assert.False(joinerController.ResultCommitter.TryGetResolvedState(out _));
+        });
+
+        if (deploymentFirst)
+        {
+            joiner.Call(() => joinerController.OnDeploymentFinished());
+            Assert.Empty(joiner.NetworkSentMessages.GetMessages<NetworkBattleResultReady>());
+        }
+
+        TriggerJoinHandshake(host, "joiner", mapEventId);
+        if (!resultBeforeHandshake)
+            host.Call(() => hostController.ResultCommitter.ReportResolvedResult(result));
+
+        joiner.Call(() => GameThread.Run(() => { }, blocking: true));
+
+        if (!deploymentFirst)
+        {
+            Assert.Empty(joiner.NetworkSentMessages.GetMessages<NetworkBattleResultReady>());
+            joiner.Call(() => joinerController.OnDeploymentFinished());
+        }
+
+        var report = Assert.Single(joiner.NetworkSentMessages.GetMessages<NetworkBattleResultReady>());
+        Assert.Equal(BattleState.AttackerVictory, report.BattleState);
+
+        GC.KeepAlive(hostController);
+        GC.KeepAlive(joinerController);
+    }
+
+    [Fact]
+    public void ResultSnapshot_AheadOfHostAssignment_IsAppliedAfterAssignment()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "joiner");
+        var host = Clients.First();
+        var joiner = Clients.Skip(1).First();
+
+        host.Call(() => fixture.CreateMission(host));
+        EnterBattle(host, mapEventId);
+
+        joiner.Call(() =>
+        {
+            fixture.CreateMission(joiner);
+            var controller = joiner.Resolve<CoopBattleController>();
+            controller.Session.TryBegin(mapEventId);
+            int nextEpoch = controller.Session.HostEpoch + 1;
+            var broker = joiner.Resolve<IMessageBroker>();
+
+            broker.Publish(host, new NetworkBattleResultSnapshot(
+                mapEventId,
+                "host",
+                nextEpoch,
+                BattleState.DefenderVictory));
+            GameThread.Run(() => { }, blocking: true);
+            Assert.False(controller.ResultCommitter.TryGetResolvedState(out _));
+
+            broker.Publish(host, new NetworkBattleResultSnapshot(
+                mapEventId,
+                "host",
+                controller.Session.HostEpoch,
+                BattleState.AttackerVictory));
+            GameThread.Run(() => { }, blocking: true);
+            Assert.True(controller.ResultCommitter.TryGetResolvedState(out var currentState));
+            Assert.Equal(BattleState.AttackerVictory, currentState);
+
+            broker.Publish(host, new NetworkBattleHostAssigned(
+                mapEventId,
+                "host",
+                Array.Empty<string>(),
+                nextEpoch));
+            GameThread.Run(() => { }, blocking: true);
+
+            Assert.True(controller.ResultCommitter.TryGetResolvedState(out var state));
+            Assert.Equal(BattleState.DefenderVictory, state);
+        });
     }
 }

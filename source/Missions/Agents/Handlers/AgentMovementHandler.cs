@@ -422,16 +422,11 @@ public class AgentMovementHandler : IAgentMovementHandler
                         // Keep the mount position only for rare large-gap snaps and drop any stale direct-horse
                         // target from before the puppet mounted.
                         _interpolator.Forget(agent.MountAgent);
-                        _interpolator.SetMountedRiderTarget(
-                            agent,
-                            data.Position,
-                            data.MovementDirection,
-                            data.MountData.MountMovementDirection,
-                            data.MountData.MountPosition);
+                        _interpolator.SetMountedRiderTarget(agent, data);
                     }
                     else
                     {
-                        _interpolator.SetRiderTarget(agent, data.Position, data.MovementDirection);
+                        _interpolator.SetRiderTarget(agent, data);
                     }
                 }
             }
