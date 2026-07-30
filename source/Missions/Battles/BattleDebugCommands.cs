@@ -465,20 +465,7 @@ internal static class BattleDebugCommands
         float cosine = (float)Math.Cos(radians);
         float sine = (float)Math.Sin(radians);
         foreach (Formation formation in formations)
-        {
-            Vec2 direction = formation.Direction;
-            if (direction.LengthSquared <= 0.0001f)
-                direction = Vec2.Forward;
-            else
-                direction.Normalize();
-
-            var turnedDirection = new Vec2(
-                (direction.X * cosine) - (direction.Y * sine),
-                (direction.X * sine) + (direction.Y * cosine));
             formation.SetMovementOrder(MovementOrder.MovementOrderStop);
-            formation.SetFacingOrder(
-                FacingOrder.FacingOrderLookAtDirection(turnedDirection));
-        }
 
         foreach (Agent rider in riders)
         {
