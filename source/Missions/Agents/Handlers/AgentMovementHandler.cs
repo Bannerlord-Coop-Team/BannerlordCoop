@@ -59,6 +59,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // Vanilla can rotate a stopped AI mount's facing without selecting a turn action.
     private readonly Dictionary<Agent, Vec2> _lastMountDirections = new Dictionary<Agent, Vec2>();
+    private readonly Dictionary<Agent, int> _syntheticMountTurns = new Dictionary<Agent, int>();
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
@@ -127,6 +128,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         _interpolator.Clear();
         _lastMountDirections.Clear();
+        _syntheticMountTurns.Clear();
 
         packetManager.RemovePacketHandler(this);
         packetManager.RemovePacketHandler(_mountMovementApplier);
@@ -272,9 +274,21 @@ public class AgentMovementHandler : IAgentMovementHandler
         Vec2 currentDirection = mount.GetMovementDirection();
         if (mount.GetRealGlobalVelocity().AsVec2.Length > AgentMountData.StationarySpeedThreshold)
         {
+            ClearSyntheticMountTurn(mount);
             // Retain the final moving facing for the first stationary snapshot.
             _lastMountDirections[mount] = currentDirection;
             return AgentMountData.NoTurn;
+        }
+
+        ActionIndexCache currentAction = mount.GetCurrentAction(0);
+        int activeTurnDirection = AgentMountData.GetStationaryTurnDirection(
+            currentAction.Index);
+        if (activeTurnDirection != AgentMountData.NoTurn)
+        {
+            ClearSyntheticMountTurn(mount);
+            _lastMountDirections[mount] = currentDirection;
+            turnActionIndex = currentAction.Index;
+            return activeTurnDirection;
         }
 
         if (!_lastMountDirections.TryGetValue(mount, out Vec2 previousDirection))
@@ -284,7 +298,18 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
 
         int turnDirection = AgentMountData.GetTurnDirection(previousDirection, currentDirection);
-        if (turnDirection == AgentMountData.NoTurn) return AgentMountData.NoTurn;
+        if (turnDirection == AgentMountData.NoTurn)
+        {
+            if (!_syntheticMountTurns.TryGetValue(mount, out turnDirection))
+                return AgentMountData.NoTurn;
+
+            turnActionIndex = ActionIndexCache.Create(
+                AgentMountData.GetStationaryTurnActionName(
+                    null,
+                    mount.Monster?.MonsterUsage,
+                    turnDirection)).Index;
+            return turnDirection;
+        }
 
         string desiredActionName = AgentMountData.GetStationaryTurnActionName(
             null,
@@ -292,24 +317,27 @@ public class AgentMovementHandler : IAgentMovementHandler
             turnDirection);
         ActionIndexCache desiredAction = ActionIndexCache.Create(desiredActionName);
         turnActionIndex = desiredAction.Index;
-        if (mount.GetCurrentAction(0).Index == desiredAction.Index)
-        {
-            _lastMountDirections[mount] = currentDirection;
-            return turnDirection;
-        }
+        Agent.MovementControlFlag movementFlags =
+            AgentData.GetLocomotionMovementFlags(mount.MovementFlags);
+        movementFlags = AgentMountData.WithStationaryTurnMovementFlag(
+            movementFlags,
+            turnDirection);
+        AgentData.ApplyLocomotionMovementFlags(mount, movementFlags);
+        _syntheticMountTurns[mount] = turnDirection;
+        _lastMountDirections[mount] = currentDirection;
+        return turnDirection;
+    }
 
-        bool actionStarted = mount.SetActionChannel(
-            0,
-            desiredAction,
-            ignorePriority: true);
-        if (actionStarted)
-        {
-            _lastMountDirections[mount] = currentDirection;
-            return turnDirection;
-        }
+    private void ClearSyntheticMountTurn(Agent mount)
+    {
+        if (!_syntheticMountTurns.TryGetValue(mount, out int turnDirection))
+            return;
 
-        turnActionIndex = ActionIndexCache.act_none.Index;
-        return AgentMountData.NoTurn;
+        Agent.MovementControlFlag movementFlags =
+            AgentData.GetLocomotionMovementFlags(mount.MovementFlags);
+        movementFlags &= ~AgentMountData.GetStationaryTurnMovementFlag(turnDirection);
+        AgentData.ApplyLocomotionMovementFlags(mount, movementFlags);
+        _syntheticMountTurns.Remove(mount);
     }
 
     private static void AddToBatch<T>(
