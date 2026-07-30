@@ -439,7 +439,7 @@ public class ServerBattleCompletionHandler : IHandler
     {
         Logger.Information("All {Count} mission member(s) reconciled {State} for battle {Instance}; concluding at host epoch {Epoch}",
             memberCount, concludedState, instanceId, hostEpoch);
-        messageBroker.Publish(this, new NetworkChangeBattleState(instanceId, concludedState, hostEpoch));
+        messageBroker.Publish(this, new AuthoritativeBattleConclusionRequested(instanceId, concludedState, hostEpoch));
     }
 
     private void ConcludeAbandonedBattle(
