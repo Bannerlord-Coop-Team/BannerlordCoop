@@ -19,7 +19,10 @@ public interface IMobilePartyBehaviorSnapshot
 {
     bool TryCreate(MobileParty party, out PartyBehaviorUpdateData data);
     bool CanApply(MobileParty party, PartyBehaviorUpdateData data);
-    bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state);
+    bool TryCreateJoinState(
+        MobileParty party,
+        out MobilePartyJoinState state,
+        out string failure);
     bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable);
     bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply);
 }
@@ -29,24 +32,51 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorSnapshot>();
 
     private readonly IObjectManager objectManager;
+    private string lastJoinBaselineFailure;
+
+    internal string LastJoinBaselineFailure => lastJoinBaselineFailure;
 
     public MobilePartyBehaviorSnapshot(IObjectManager objectManager) => this.objectManager = objectManager;
 
     public bool TryCreate(
         MobileParty party,
-        out PartyBehaviorUpdateData data)
+        out PartyBehaviorUpdateData data) =>
+        TryCreate(party, out data, out _);
+
+    private bool TryCreate(
+        MobileParty party,
+        out PartyBehaviorUpdateData data,
+        out string failure)
     {
         data = default;
-        if (party?.Ai == null)
-            return false;
-        if (!TryGetCompactId(party, out string partyId) ||
-            !TryGetInteractableReference(
-                party.Ai.AiBehaviorInteractable,
-                out string interactablePointId,
-                out bool isInteractableAnchor) ||
-            !TryGetCompactId(party.TargetParty, out string targetPartyId) ||
-            !TryGetCompactId(party.TargetSettlement, out string targetSettlementId))
-            return false;
+        failure = null;
+        if (party == null)
+            return FailCreation("party is null", out failure);
+        if (party.Ai == null)
+            return FailCreation("party AI is unavailable", out failure);
+        if (!TryGetCompactId(party, out string partyId))
+            return FailCreation("party is not registered", out failure);
+        if (!TryGetInteractableReference(
+            party.Ai.AiBehaviorInteractable,
+            out string interactablePointId,
+            out bool isInteractableAnchor))
+        {
+            return FailCreation(
+                $"AI interactable '{party.Ai.AiBehaviorInteractable?.GetType().Name}' is not registered",
+                out failure);
+        }
+        if (!TryGetCompactId(party.TargetParty, out string targetPartyId))
+        {
+            return FailCreation(
+                $"target party '{party.TargetParty?.StringId}' is not registered",
+                out failure);
+        }
+        if (!TryGetCompactId(party.TargetSettlement, out string targetSettlementId))
+        {
+            return FailCreation(
+                $"target settlement '{party.TargetSettlement?.StringId}' is not registered",
+                out failure);
+        }
 
         MoveModeType partyMoveMode = party.PartyMoveMode;
         CampaignVec2 moveTargetPoint = party.MoveTargetPoint;
@@ -91,10 +121,13 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         TryResolve(data.TargetSettlementId, out Settlement _) &&
         TryResolve(data.MoveTargetPartyId, out MobileParty _);
 
-    public bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state)
+    public bool TryCreateJoinState(
+        MobileParty party,
+        out MobilePartyJoinState state,
+        out string failure)
     {
         state = default;
-        if (!TryCreate(party, out PartyBehaviorUpdateData behavior))
+        if (!TryCreate(party, out PartyBehaviorUpdateData behavior, out failure))
             return false;
 
         state = new MobilePartyJoinState
@@ -109,7 +142,14 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             StartTransitionNextFrameToExitFromPort = party.StartTransitionNextFrameToExitFromPort,
             ForceAiNoPathMode = party.ForceAiNoPathMode,
         };
+        failure = null;
         return true;
+    }
+
+    private static bool FailCreation(string reason, out string failure)
+    {
+        failure = reason;
+        return false;
     }
 
     public bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable)
@@ -125,13 +165,23 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 
     public bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply)
     {
-        if (states == null || beforeApply == null) return false;
+        if (states == null)
+            return RejectJoinBaseline("the baseline party-state array is null");
+        if (beforeApply == null)
+            return RejectJoinBaseline("the before-apply callback is null");
 
         var objectManager = Campaign.Current?.CampaignObjectManager;
         var parties = objectManager?.MobileParties;
         var settlements = objectManager?.Settlements;
-        if (parties == null || settlements == null || states.Length != parties.Count)
-            return false;
+        if (parties == null)
+            return RejectJoinBaseline("the client campaign mobile-party collection is unavailable");
+        if (settlements == null)
+            return RejectJoinBaseline("the client campaign settlement collection is unavailable");
+        if (states.Length != parties.Count)
+        {
+            return RejectJoinBaseline(
+                $"party count mismatch (baseline={states.Length}, client={parties.Count})");
+        }
 
         var liveParties = new HashSet<MobileParty>(parties);
         var liveSettlements = new HashSet<Settlement>(settlements);
@@ -141,17 +191,43 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         for (int i = 0; i < states.Length; i++)
         {
             PartyBehaviorUpdateData behavior = states[i].Behavior;
-            if (string.IsNullOrEmpty(behavior.MobilePartyId) ||
-                !this.objectManager.TryGetObjectWithLogging(behavior.MobilePartyId, out MobileParty party) ||
-                !liveParties.Contains(party) ||
-                !seenParties.Add(party) ||
-                !TryPrepare(party, behavior, liveParties, liveSettlements, out resolved[i]))
+            if (string.IsNullOrEmpty(behavior.MobilePartyId))
+                return RejectJoinBaseline($"state {i} has no mobile-party id");
+            if (!this.objectManager.TryGetObjectWithLogging(
+                behavior.MobilePartyId,
+                out MobileParty party))
             {
-                return false;
+                return RejectJoinBaseline(
+                    $"state {i} references missing mobile party '{behavior.MobilePartyId}'");
+            }
+            if (!liveParties.Contains(party))
+            {
+                return RejectJoinBaseline(
+                    $"state {i} party '{behavior.MobilePartyId}' is not in the client campaign collection");
+            }
+            if (!seenParties.Add(party))
+                return RejectJoinBaseline($"state {i} duplicates party '{behavior.MobilePartyId}'");
+            if (!TryPrepare(
+                party,
+                behavior,
+                liveParties,
+                liveSettlements,
+                out resolved[i]))
+            {
+                return RejectJoinBaseline(
+                    $"state {i} party '{behavior.MobilePartyId}' failed dependency validation " +
+                    $"(interactable='{behavior.InteractablePointId}', " +
+                    $"targetParty='{behavior.TargetPartyId}', " +
+                    $"targetSettlement='{behavior.TargetSettlementId}', " +
+                    $"moveTargetParty='{behavior.MoveTargetPartyId}')");
             }
         }
 
-        if (seenParties.Count != liveParties.Count) return false;
+        if (seenParties.Count != liveParties.Count)
+        {
+            return RejectJoinBaseline(
+                $"party coverage mismatch (baseline={seenParties.Count}, client={liveParties.Count})");
+        }
 
         try
         {
@@ -165,13 +241,27 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
                 }
             }
 
+            lastJoinBaselineFailure = null;
             return true;
         }
         catch (Exception ex)
         {
+            lastJoinBaselineFailure = $"application threw {ex.GetType().Name}: {ex.Message}";
             Logger.Error(ex, "Failed to apply a complete mobile-party join baseline");
             return false;
         }
+    }
+
+    private bool RejectJoinBaseline(string failure)
+    {
+        if (string.Equals(lastJoinBaselineFailure, failure, StringComparison.Ordinal))
+            return false;
+
+        lastJoinBaselineFailure = failure;
+        Logger.Warning(
+            "Could not apply mobile-party join baseline: {Failure}. Identical retries will not be logged",
+            failure);
+        return false;
     }
 
     private bool TryPrepare(
