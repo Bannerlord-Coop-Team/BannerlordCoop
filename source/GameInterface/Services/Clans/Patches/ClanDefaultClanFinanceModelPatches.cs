@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Interfaces;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Patches;
@@ -38,6 +39,20 @@ internal class DefaultClanFinanceModelPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(DefaultClanFinanceModel.CalculateClanExpensesInternal))]
+    [HarmonyPrefix]
+    public static bool CalculateClanExpensesInternalPrefix(DefaultClanFinanceModel __instance, Clan clan, ref ExplainedNumber goldChange, bool applyWithdrawals = false, bool includeDetails = false)
+    {
+        // Calculate for non-player clans normally
+        if (clan == null || !clan.IsPlayerClan()) return true;
+
+        ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
+
+        financeModelInterface.CalculateClanExpensesForPlayerClan(__instance, clan, ref goldChange, applyWithdrawals, includeDetails);
+
+        return false;
+    }
+
     [ThreadStatic]
     private static float initialRecentEventsMorale;
 
@@ -56,6 +71,17 @@ internal class DefaultClanFinanceModelPatches
         {
             MessageBroker.Instance.Publish(__instance, new NotifyMoraleLossDueToFunds(mobileParty, mobileParty.RecentEventsMorale - initialRecentEventsMorale));
         }
+    }
+
+    [HarmonyPatch(nameof(DefaultClanFinanceModel.AddPartyExpense))]
+    [HarmonyPrefix]
+    public static bool AddPartyExpensePrefix(DefaultClanFinanceModel __instance, ref int __result, MobileParty party, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals)
+    {
+        ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
+
+        __result = financeModelInterface.AddPartyExpense(__instance, party, clan, goldChange, applyWithdrawals);
+
+        return false;
     }
 
     [HarmonyPatch(nameof(DefaultClanFinanceModel.CalculateClanGoldChange))]

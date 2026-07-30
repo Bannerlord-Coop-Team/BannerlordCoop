@@ -164,6 +164,42 @@ internal class PartyCommands
         return $"Restored {party.StringId} to {party.Position.X:R},{party.Position.Y:R} in Hold mode.";
     }
 
+    [CommandLineArgumentFunction("move_to_settlement", "coop.debug.mobileparty")]
+    public static string MoveToSettlementCommand(List<string> strings)
+    {
+        if (!ModInformation.IsServer)
+            return "Command can only be run on the server.";
+
+        if (strings.Count != 2)
+            return "Usage: coop.debug.mobileparty.move_to_settlement <partyId> <settlementId>";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found";
+
+        if (!party.IsPlayerParty())
+            return $"Party {party.StringId} is not a player party.";
+
+        var settlement = Settlement.Find(strings[1]);
+        if (settlement == null)
+            return $"Settlement with id {strings[1]} not found";
+
+        if (!party.IsActive)
+            return $"Party {party.StringId} is not active.";
+
+        if (party.CurrentSettlement != null)
+            return $"Party {party.StringId} is already in {party.CurrentSettlement.StringId}.";
+
+        var navigationType = party.IsCurrentlyAtSea
+            ? MobileParty.NavigationType.Naval
+            : MobileParty.NavigationType.Default;
+        party.SetMoveGoToSettlement(settlement, navigationType, isTargetingThePort: false);
+
+        return $"Ordered {party.StringId} to {settlement.StringId}.";
+    }
+
     /// <summary>
     /// View character ids in a hero's party by full name or hero id.
     /// </summary>

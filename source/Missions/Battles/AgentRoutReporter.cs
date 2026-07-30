@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
 using Serilog;
 using System;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -16,6 +17,8 @@ namespace Missions.Battles;
 /// </summary>
 public interface IAgentRoutReporter : IDisposable
 {
+    /// <summary>[Game thread] Broadcast that a locally authoritative agent began fleeing.</summary>
+    void OnAgentFleeing(Agent agent);
 }
 
 /// <inheritdoc cref="IAgentRoutReporter"/>
@@ -48,6 +51,16 @@ public class AgentRoutReporter : IAgentRoutReporter
     public void Dispose()
     {
         messageBroker.Unsubscribe<BattleAgentRouted>(Handle_BattleAgentRouted);
+    }
+
+    public void OnAgentFleeing(Agent agent)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(agent, out var info)) return;
+        if (info.CurrentAuthority != session.OwnControllerId) return;
+
+        Logger.Information("[BattleSync] Broadcasting fleeing state of agent {AgentId} to the battle mesh", info.AgentId);
+        network.SendAll(new NetworkBattleAgentFleeing(info.AgentId));
     }
 
     private void Handle_BattleAgentRouted(MessagePayload<BattleAgentRouted> payload)

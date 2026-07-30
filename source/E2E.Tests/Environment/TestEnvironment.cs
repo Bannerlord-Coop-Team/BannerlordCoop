@@ -111,6 +111,9 @@ public class TestEnvironment
         builder.RegisterType<MockAgentVisualActionAccessor>()
             .As<IAgentVisualActionAccessor>()
             .InstancePerDependency();
+        builder.RegisterType<MockGuardReactionActionResolver>()
+            .As<IGuardReactionActionResolver>()
+            .InstancePerDependency();
 
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();

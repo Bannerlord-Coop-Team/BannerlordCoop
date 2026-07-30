@@ -47,8 +47,18 @@ public class NetworkSiegeMachineState : IEvent
     /// </summary>
     [ProtoMember(11)]
     public readonly int HostEpoch;
-
-    public NetworkSiegeMachineState(int machineId, float hitPoints, int destructionState, int gateState, int ladderState, float moveDistance, bool hasArrived, int weaponState, float aimDirection, float aimReleaseAngle, int hostEpoch = 0)
+    public NetworkSiegeMachineState(
+        int machineId,
+        float hitPoints,
+        int destructionState,
+        int gateState,
+        int ladderState,
+        float moveDistance,
+        bool hasArrived,
+        int weaponState,
+        float aimDirection,
+        float aimReleaseAngle,
+        int hostEpoch = 0)
     {
         MachineId = machineId;
         HitPoints = hitPoints;

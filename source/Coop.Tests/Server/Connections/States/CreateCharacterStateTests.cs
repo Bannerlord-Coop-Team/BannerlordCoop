@@ -94,10 +94,11 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             SetupUnpackedHero();
             var currentState = connectionLogic.SetState<CreateCharacterState>();
+            byte[] heroData = { 1, 2, 3 };
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+                playerPeer, new NetworkTransferNewHero("MyId", heroData));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert — every other connected peer is told a new player hero was created, and the broadcast Player
@@ -106,6 +107,9 @@ namespace Coop.Tests.Server.Connections.States
             var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(differentPeer));
             var created = Assert.IsType<NetworkNewPlayerHeroCreated>(message);
             Assert.Equal(TestCharacterObjectId, created.Player.CharacterObjectId);
+            Assert.Equal(heroData, created.HeroData);
+            serverComponent.Container.Resolve<Mock<IHeroInterface>>()
+                .Verify(x => x.ServerUnpackHero(heroData), Times.Once);
             Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
