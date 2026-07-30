@@ -42,7 +42,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // Forty updates per second keeps locally authoritative agents responsive.
     private const float MovementPollingIntervalSeconds = 0.025f;
-    private const int SyntheticMountTurnStablePollLimit = 12;
+    private const int SyntheticMountTurnStablePollLimit = 80;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -66,11 +66,13 @@ public class AgentMovementHandler : IAgentMovementHandler
     private sealed class SyntheticMountTurnState
     {
         public readonly int Direction;
+        public readonly Agent Rider;
         public int StablePolls;
 
-        public SyntheticMountTurnState(int direction)
+        public SyntheticMountTurnState(int direction, Agent rider)
         {
             Direction = direction;
+            Rider = rider;
         }
     }
 
@@ -318,6 +320,12 @@ public class AgentMovementHandler : IAgentMovementHandler
                     out SyntheticMountTurnState syntheticTurn))
                 return AgentMountData.NoTurn;
 
+            if (!ReferenceEquals(syntheticTurn.Rider, mount.RiderAgent))
+            {
+                SetSyntheticMountTurn(mount, syntheticTurn.Direction);
+                syntheticTurn = _syntheticMountTurns[mount];
+            }
+
             syntheticTurn.StablePolls++;
             if (syntheticTurn.StablePolls >= SyntheticMountTurnStablePollLimit)
             {
@@ -326,6 +334,9 @@ public class AgentMovementHandler : IAgentMovementHandler
                 return AgentMountData.NoTurn;
             }
 
+            // AI can rewrite movement control between polls, so keep driving the turn until it selects an action.
+            ApplySyntheticTurnFlag(mount, syntheticTurn.Direction);
+            ApplySyntheticTurnFlag(syntheticTurn.Rider, syntheticTurn.Direction);
             turnDirection = syntheticTurn.Direction;
             turnActionIndex = ActionIndexCache.Create(
                 AgentMountData.GetStationaryTurnActionName(
@@ -341,15 +352,38 @@ public class AgentMovementHandler : IAgentMovementHandler
             turnDirection);
         ActionIndexCache desiredAction = ActionIndexCache.Create(desiredActionName);
         turnActionIndex = desiredAction.Index;
+        SetSyntheticMountTurn(mount, turnDirection);
+        _lastMountDirections[mount] = currentDirection;
+        return turnDirection;
+    }
+
+    private void SetSyntheticMountTurn(Agent mount, int turnDirection)
+    {
+        Agent rider = mount.RiderAgent;
+        if (_syntheticMountTurns.TryGetValue(
+                mount,
+                out SyntheticMountTurnState previousTurn))
+        {
+            if (!ReferenceEquals(previousTurn.Rider, rider))
+                ClearSyntheticMountTurn(mount);
+        }
+
+        ApplySyntheticTurnFlag(mount, turnDirection);
+        ApplySyntheticTurnFlag(rider, turnDirection);
+        _syntheticMountTurns[mount] =
+            new SyntheticMountTurnState(turnDirection, rider);
+    }
+
+    private static void ApplySyntheticTurnFlag(Agent agent, int turnDirection)
+    {
+        if (agent == null || !agent.IsActive()) return;
+
         Agent.MovementControlFlag movementFlags =
-            AgentData.GetLocomotionMovementFlags(mount.MovementFlags);
+            AgentData.GetLocomotionMovementFlags(agent.MovementFlags);
         movementFlags = AgentMountData.WithStationaryTurnMovementFlag(
             movementFlags,
             turnDirection);
-        AgentData.ApplyLocomotionMovementFlags(mount, movementFlags);
-        _syntheticMountTurns[mount] = new SyntheticMountTurnState(turnDirection);
-        _lastMountDirections[mount] = currentDirection;
-        return turnDirection;
+        AgentData.ApplyLocomotionMovementFlags(agent, movementFlags);
     }
 
     private void ClearSyntheticMountTurn(Agent mount)
@@ -359,12 +393,22 @@ public class AgentMovementHandler : IAgentMovementHandler
                 out SyntheticMountTurnState syntheticTurn))
             return;
 
-        Agent.MovementControlFlag movementFlags =
-            AgentData.GetLocomotionMovementFlags(mount.MovementFlags);
-        movementFlags &= ~AgentMountData.GetStationaryTurnMovementFlag(
-            syntheticTurn.Direction);
-        AgentData.ApplyLocomotionMovementFlags(mount, movementFlags);
+        ClearSyntheticTurnFlag(mount, syntheticTurn.Direction);
+        ClearSyntheticTurnFlag(syntheticTurn.Rider, syntheticTurn.Direction);
         _syntheticMountTurns.Remove(mount);
+    }
+
+    private static void ClearSyntheticTurnFlag(
+        Agent agent,
+        int turnDirection)
+    {
+        if (agent == null || !agent.IsActive()) return;
+
+        Agent.MovementControlFlag movementFlags =
+            AgentData.GetLocomotionMovementFlags(agent.MovementFlags);
+        movementFlags &= ~AgentMountData.GetStationaryTurnMovementFlag(
+            turnDirection);
+        AgentData.ApplyLocomotionMovementFlags(agent, movementFlags);
     }
 
     private static void AddToBatch<T>(
