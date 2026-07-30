@@ -6,12 +6,15 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Services.MapEvents;
+using E2E.Tests.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using Helpers;
 using System.Reflection;
@@ -306,6 +309,79 @@ public class SiegeDisconnectTests : MapEventTestBase
         var prompt = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPromptSiegeEnded>());
         Assert.Equal(leaderPartyId, prompt.LeaderPartyId);
         Assert.Equal(new[] { leaderPartyId, memberPartyId }, prompt.AttackerPartyIds);
+        Assert.Equal(new[] { defenderPartyId }, prompt.DefenderPartyIds);
+        Assert.True(prompt.InterruptedActiveAssault);
+    }
+
+    [Fact]
+    public void SiegeLeaderRemovedDuringActiveAssault_SnapshotsMapEventParticipants()
+    {
+        var (_, leaderPartyId) = CreatePlayerHeroParty("AssaultLeader");
+        var (_, memberPartyId) = CreatePlayerHeroParty("AssaultMember");
+        var (_, defenderPartyId) = CreatePlayerHeroParty("AssaultDefender");
+        var siege = SetupSiege(leaderPartyId);
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siege.SiegeEventId, out var siegeEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leaderPartyId, out var leader));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(memberPartyId, out var member));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderPartyId, out var defender));
+
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+            mapEvent.MapEventSettlement = siegeEvent.BesiegedSettlement;
+
+            var defenderSide = new MapEventSide(
+                mapEvent,
+                BattleSideEnum.Defender,
+                siegeEvent.BesiegedSettlement.Party);
+            var attackerSide = new MapEventSide(
+                mapEvent,
+                BattleSideEnum.Attacker,
+                leader.Party);
+            mapEvent._sides[(int)BattleSideEnum.Defender] = defenderSide;
+            mapEvent._sides[(int)BattleSideEnum.Attacker] = attackerSide;
+            MessageBroker.Instance.Publish(
+                mapEvent,
+                new MapEventSideAssigned(mapEvent, defenderSide, BattleSideEnum.Defender));
+            MessageBroker.Instance.Publish(
+                mapEvent,
+                new MapEventSideAssigned(mapEvent, attackerSide, BattleSideEnum.Attacker));
+
+            leader.Party.MapEventSide = attackerSide;
+            member.Party.MapEventSide = attackerSide;
+            defender._currentSettlement = siegeEvent.BesiegedSettlement;
+            siegeEvent.BesiegedSettlement._partiesCache.Add(defender);
+            defender.Party.MapEventSide = defenderSide;
+            siegeEvent.BesiegedSettlement.Party.MapEventSide = defenderSide;
+            Assert.True(mapEvent.IsSiegeAssault);
+            Assert.False(mapEvent.HasWinner);
+
+            Assert.Single(siegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType());
+            siegeEvent.BesiegerCamp._besiegerParties.Clear();
+            leader._besiegerCamp = null;
+
+            var prefix = AccessTools.Method(
+                typeof(SiegePreparationPromptPatches),
+                "FinalizeSiegeEventPrefix");
+            var finalizer = AccessTools.Method(
+                typeof(SiegePreparationPromptPatches),
+                "FinalizeSiegeEventFinalizer");
+            var prefixArguments = new object[] { siegeEvent, null };
+            prefix.Invoke(null, prefixArguments);
+            var finalizerArguments = new[] { siegeEvent, prefixArguments[1], null };
+            Assert.Null(finalizer.Invoke(null, finalizerArguments));
+        }, disabledMethods);
+
+        var prompt = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPromptSiegeEnded>());
+        Assert.Equal(leaderPartyId, prompt.LeaderPartyId);
+        Assert.Equal(
+            new[] { leaderPartyId, memberPartyId }.OrderBy(id => id),
+            prompt.AttackerPartyIds.OrderBy(id => id));
         Assert.Equal(new[] { defenderPartyId }, prompt.DefenderPartyIds);
         Assert.True(prompt.InterruptedActiveAssault);
     }

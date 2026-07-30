@@ -85,11 +85,27 @@ internal class SiegePreparationPromptPatches
         }
 
         var camp = __instance.BesiegerCamp;
+        var leaderParty = camp?.LeaderParty;
+        var attackerParties = GetMobileParties(camp?.GetInvolvedPartiesForEventType());
+        var defenderParties = GetDefenderParties(settlement);
+        if (interruptedActiveAssault)
+        {
+            leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty ?? leaderParty;
+            attackerParties = attackerParties
+                .Concat(GetMapEventParties(mapEvent.AttackerSide))
+                .Distinct()
+                .ToArray();
+            defenderParties = defenderParties
+                .Concat(GetMapEventParties(mapEvent.DefenderSide))
+                .Distinct()
+                .ToArray();
+        }
+
         __state = new SiegeTerminationState(
             settlement,
-            camp?.LeaderParty,
-            GetMobileParties(camp?.GetInvolvedPartiesForEventType()),
-            GetDefenderParties(settlement),
+            leaderParty,
+            attackerParties,
+            defenderParties,
             interruptedActiveAssault);
     }
 
@@ -189,6 +205,9 @@ internal class SiegePreparationPromptPatches
             .Distinct()
             .ToArray()
             ?? Array.Empty<MobileParty>();
+
+    private static MobileParty[] GetMapEventParties(MapEventSide side)
+        => GetMobileParties(side?.Parties.Select(party => party?.Party));
 
     private static MobileParty[] GetDefenderParties(Settlement settlement)
         => GetMobileParties(settlement.GetInvolvedPartiesForEventType())
