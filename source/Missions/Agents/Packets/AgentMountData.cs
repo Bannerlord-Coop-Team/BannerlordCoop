@@ -27,6 +27,8 @@ namespace Missions.Agents.Packets
             MountMovementDirection = mountAgent.GetMovementDirection();
             MountPosition = mountAgent.Position;
             MountSpeed = mountAgent.GetRealGlobalVelocity().AsVec2.Length;
+            MountMovementFlag = (uint)AgentData.GetLocomotionMovementFlags(
+                mountAgent.MovementFlags);
             MountMovementId = mountMovementId;
             MountIdentityScopeId = mountIdentityScopeId;
             MountAgentId = mountAgentId;
@@ -73,6 +75,9 @@ namespace Missions.Agents.Packets
             // Controller.None still lets native horse motion persist between replicated position corrections.
             // Cap that motion to the owner's real speed so a stopped owner also stops its puppet horse.
             mountAgent.SetMaximumSpeedLimit(MountSpeed, isMultiplier: false);
+            AgentData.ApplyLocomotionMovementFlags(
+                mountAgent,
+                (Agent.MovementControlFlag)MountMovementFlag);
         }
 
         [ProtoMember(1)]
@@ -106,5 +111,7 @@ namespace Missions.Agents.Packets
         public string MountIdentityScopeId { get; }
         [ProtoMember(14)]
         public Guid MountAgentId { get; }
+        [ProtoMember(15)]
+        public uint MountMovementFlag { get; }
     }
 }

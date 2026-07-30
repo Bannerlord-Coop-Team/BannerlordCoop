@@ -25,6 +25,7 @@ namespace GameInterface.Services.Workshops.Handlers
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
         private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
+        private readonly IWorkshopRepairer workshopRepairer;
 
         private WorkshopPlayerData workshopPlayerData;
 
@@ -32,12 +33,14 @@ namespace GameInterface.Services.Workshops.Handlers
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
-            ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+            ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
+            IWorkshopRepairer workshopRepairer)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
             this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
+            this.workshopRepairer = workshopRepairer;
             messageBroker.Subscribe<InitializeClientWorkshopData>(Handle);
             messageBroker.Subscribe<PlayerHeroChanged>(Handle);
             messageBroker.Subscribe<NetworkInitializeServerWorkshopDataKeys>(Handle);
@@ -64,13 +67,46 @@ namespace GameInterface.Services.Workshops.Handlers
             WorkshopsCampaignBehavior workshopsCampaignBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
 
             workshopsCampaignBehavior._warehouseRosterPerSettlement = GetWarehouseRosterPerSettlement(playerHeroId, playerHero);
+            workshopRepairer.RepairClientWorkshopData(workshopsCampaignBehavior, playerHero);
 
             network.SendAll(new NetworkInitializeServerWorkshopDataKeys(playerHeroId));
         }
 
         private void Handle(MessagePayload<NetworkInitializeServerWorkshopDataKeys> obj)
         {
-            sessionWorkshopPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            string playerHeroId = obj.What.PlayerHeroId;
+            sessionWorkshopPlayerDataInterface.AddPlayerKeys(playerHeroId);
+
+            if (!objectManager.TryGetObjectWithLogging(playerHeroId, out Hero playerHero)) return;
+
+            workshopRepairer.RepairServerWorkshopData(playerHero, playerHeroId);
+        }
+
+        internal static IEnumerable<Workshop> GetWorkshopsOwnedBy(Hero playerHero)
+        {
+            // Hero._ownedWorkshops and Workshop._owner can diverge in coop (only the list is
+            // synced mid-session), and the Clan screen lists workshops by Workshop.Owner, so
+            // cover both sources.
+            var ownedWorkshops = new List<Workshop>();
+            if (playerHero.OwnedWorkshops != null)
+            {
+                ownedWorkshops.AddRange(playerHero.OwnedWorkshops);
+            }
+
+            foreach (Town town in Town.AllTowns)
+            {
+                if (town?.Workshops == null) continue;
+
+                foreach (Workshop workshop in town.Workshops)
+                {
+                    if (workshop?.Owner == playerHero && !ownedWorkshops.Contains(workshop))
+                    {
+                        ownedWorkshops.Add(workshop);
+                    }
+                }
+            }
+
+            return ownedWorkshops;
         }
 
         private KeyValuePair<Settlement, ItemRoster>[] GetWarehouseRosterPerSettlement(string playerHeroId, Hero playerHero)
@@ -107,7 +143,7 @@ namespace GameInterface.Services.Workshops.Handlers
                     }
                 }
 
-                AddMissingOwnedWorkshopRosters(warehouseRosterPerSettlement, playerHero.OwnedWorkshops);
+                AddMissingOwnedWorkshopRosters(warehouseRosterPerSettlement, GetWorkshopsOwnedBy(playerHero));
             }, blocking: true);
 
             return CreateWarehouseRosterSlots(warehouseRosterPerSettlement, maxWorkshopCount);

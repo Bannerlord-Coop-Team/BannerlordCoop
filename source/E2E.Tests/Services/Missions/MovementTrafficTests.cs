@@ -261,6 +261,12 @@ public class MovementTrafficTests : MissionTestEnvironment
             Assert.Equal(movement.IdentityScopeId, roundTripped.IdentityScopeId);
             Assert.Equal(movement.AgentIds, roundTripped.AgentIds);
             Assert.Equal(movement.Agents.Length, roundTripped.Agents.Length);
+            Assert.All(
+                roundTripped.Agents,
+                agent => Assert.Equal(
+                    (uint)(Agent.MovementControlFlag.Forward |
+                        Agent.MovementControlFlag.TurnLeft),
+                    agent.MovementFlag));
             Assert.True(wire.Length <= LiteNetP2PClient.SafeSinglePacketBytes);
         });
     }
@@ -391,6 +397,10 @@ public class MovementTrafficTests : MissionTestEnvironment
         mirror.InputVector = new Vec2(0.75f, -0.5f);
         mirror.LookDirection = new Vec3(-0.25f, 0.5f, 0.75f);
         mirror.MovementDirection = new Vec2(-0.75f, 0.5f);
+        mirror.MovementFlags =
+            Agent.MovementControlFlag.Forward |
+            Agent.MovementControlFlag.TurnLeft |
+            Agent.MovementControlFlag.DefendUp;
         mirror.RealGlobalVelocity = new Vec3(123.25f, -456.5f, 789.75f);
         mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon3;
         mirror.OffhandWieldedItemIndex = EquipmentIndex.Weapon2;
