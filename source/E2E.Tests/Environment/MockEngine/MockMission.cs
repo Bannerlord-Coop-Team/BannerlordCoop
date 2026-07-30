@@ -21,6 +21,8 @@ public sealed class MockMission
 
     public Agent MainAgent { get; set; }
     public bool EndMissionCalled { get; set; }
+    public int AgentFleeingCalls { get; set; }
+    public Agent LastFleeingAgent { get; set; }
     public bool DeploymentInProgress { get; set; }
     public DeploymentMissionController DeploymentController { get; }
         = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();

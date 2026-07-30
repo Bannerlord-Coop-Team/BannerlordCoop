@@ -10,14 +10,17 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// Peer-side rout application for a coop battle: when an owner reports one of its agents routed out
-/// (<see cref="NetworkBattleAgentRouted"/>), despawn our puppet of it and deregister. Without this the
-/// puppet stays alive here and the local live-agent depletion count never reaches zero.
+/// Mirrors an authoritative agent's fleeing transition, then despawns and deregisters it when the owner
+/// reports that it has fully routed out. The early transition keeps vanilla battle-end logic consistent;
+/// the later removal keeps the local live-agent count consistent.
 /// </summary>
 public interface IPuppetRoutApplier : IDisposable
 {
+    /// <summary>[Game thread] Apply the fleeing state carried by a spawn catch-up record.</summary>
+    void ApplyFleeing(Agent agent);
+
     /// <summary>
-    /// [Game thread] Apply routs that arrived before their deployment-buffered puppets registered.
+    /// [Game thread] Apply fleeing and routed messages that arrived before their puppets registered.
     /// </summary>
     void DrainPendingRouts();
 }
@@ -30,6 +33,7 @@ public class PuppetRoutApplier : IPuppetRoutApplier
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly HashSet<Guid> pendingFleeing = new HashSet<Guid>();
     private readonly HashSet<Guid> pendingRouts = new HashSet<Guid>();
 
     public PuppetRoutApplier(
@@ -41,13 +45,28 @@ public class PuppetRoutApplier : IPuppetRoutApplier
         this.coopMissionComponent = coopMissionComponent;
         this.casualties = casualties;
 
+        messageBroker.Subscribe<NetworkBattleAgentFleeing>(Handle_NetworkBattleAgentFleeing);
         messageBroker.Subscribe<NetworkBattleAgentRouted>(Handle_NetworkBattleAgentRouted);
     }
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<NetworkBattleAgentFleeing>(Handle_NetworkBattleAgentFleeing);
         messageBroker.Unsubscribe<NetworkBattleAgentRouted>(Handle_NetworkBattleAgentRouted);
+        pendingFleeing.Clear();
         pendingRouts.Clear();
+    }
+
+    private void Handle_NetworkBattleAgentFleeing(MessagePayload<NetworkBattleAgentFleeing> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!TryApplyFleeing(payload.What.AgentId))
+            {
+                pendingFleeing.Add(payload.What.AgentId);
+                Logger.Information("[BattleSync] Deferring fleeing state of {AgentId} until its puppet registers", payload.What.AgentId);
+            }
+        });
     }
 
     private void Handle_NetworkBattleAgentRouted(MessagePayload<NetworkBattleAgentRouted> payload)
@@ -64,6 +83,16 @@ public class PuppetRoutApplier : IPuppetRoutApplier
 
     public void DrainPendingRouts()
     {
+        if (pendingFleeing.Count > 0)
+        {
+            var fleeingAgentIds = new List<Guid>(pendingFleeing);
+            foreach (var agentId in fleeingAgentIds)
+            {
+                if (TryApplyFleeing(agentId))
+                    pendingFleeing.Remove(agentId);
+            }
+        }
+
         if (pendingRouts.Count == 0) return;
 
         var agentIds = new List<Guid>(pendingRouts);
@@ -72,6 +101,27 @@ public class PuppetRoutApplier : IPuppetRoutApplier
             if (TryApplyRout(agentId))
                 pendingRouts.Remove(agentId);
         }
+    }
+
+    private bool TryApplyFleeing(Guid agentId)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(agentId, out var info)) return false;
+        if (Mission.Current == null) return false;
+
+        ApplyFleeing(info.Agent);
+        return true;
+    }
+
+    public void ApplyFleeing(Agent agent)
+    {
+        Mission mission = Mission.Current;
+        if (mission == null || agent == null || !agent.IsActive() || agent.IsRunningAway) return;
+
+        // Remote puppets have no AI morale component, so the native callback that sets this flag never runs.
+        // Notify every mission behavior after mirroring the authoritative transition.
+        agent.IsRunningAway = true;
+        mission.OnAgentFleeing(agent);
     }
 
     private bool TryApplyRout(Guid agentId)

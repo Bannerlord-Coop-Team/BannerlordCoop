@@ -483,11 +483,20 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
     private void ConvertPuppetToHostAi(Agent agent, bool wakeAi)
     {
+        agent.Controller = AgentControllerType.AI;
+
+        // A fleeing puppet already left its formation when the authoritative transition was mirrored. Keep it
+        // routed during migration instead of assigning it to a formation and charging it back into combat.
+        if (agent.IsRunningAway)
+        {
+            if (wakeAi)
+                agent.Retreat(Mission.Current.GetClosestFleePositionForAgent(agent));
+            return;
+        }
+
         // Fall back to the troop-class default only if the puppet has no formation yet.
         var formation = agent.Formation ?? formationAssigner.Assign(agent);
         formation?.SetControlledByAI(true);
-
-        agent.Controller = AgentControllerType.AI;
 
         // In a live battle, wake the AI the same way the NPC-release path does. Without this an adopted agent
         // is AI-controlled but not alarmed and holds stale enemy caches, so it ignores its formation's Charge

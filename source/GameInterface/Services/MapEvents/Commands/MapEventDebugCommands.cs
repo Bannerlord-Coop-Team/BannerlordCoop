@@ -5,6 +5,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -103,10 +104,16 @@ public class MapEventDebugCommands
         public BattleRewardPlayerSnapshot Initiator;
         public BattleRewardPlayerSnapshot LateJoiner;
         public MobileParty BanditParty;
+        public MobileParty ReinforcementParty;
+        public CharacterObject BanditTroop;
+        public CampaignVec2 FixturePosition;
         public MapEvent MapEvent;
         public MapEventParty InitiatorMapEventParty;
         public MapEventParty LateJoinerMapEventParty;
         public bool LateJoinerAdded;
+        public bool ReinforcementAdded;
+        public bool PartialRoutIssued;
+        public bool EnemiesRouted;
     }
 
     private sealed class BattleRewardPlayerSnapshot
@@ -764,6 +771,7 @@ public class MapEventDebugCommands
         {
             Initiator = initiator,
             LateJoiner = lateJoiner,
+            BanditTroop = banditTroop,
         };
         battleRewardFixture = fixture;
 
@@ -772,7 +780,8 @@ public class MapEventDebugCommands
             var fixturePosition = new CampaignVec2(
                 new Vec2(danustica.GatePosition.X - 1.5f, danustica.GatePosition.Y),
                 isOnLand: true);
-            PrepareBattleRewardPlayer(initiator, totalTroops: 18, fixturePosition);
+            fixture.FixturePosition = fixturePosition;
+            PrepareBattleRewardPlayer(initiator, totalTroops: 60, fixturePosition);
             PrepareBattleRewardPlayer(
                 lateJoiner,
                 totalTroops: 20,
@@ -835,6 +844,47 @@ public class MapEventDebugCommands
         }
     }
 
+    [CommandLineArgumentFunction("battle_reward_fixture_reinforce", "coop.debug.mapevent")]
+    public static string ReinforceBattleRewardFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.battle_reward_fixture_reinforce";
+
+        var fixture = battleRewardFixture;
+        if (fixture == null)
+            return "No battle reward fixture is active.";
+        if (fixture.MapEvent.IsFinalized)
+            return "The fixture battle is already finalized.";
+        if (fixture.ReinforcementAdded)
+            return "The fixture reinforcement was already added.";
+
+        var banditSide = fixture.BanditParty?.Party?.MapEventSide;
+        var banditComponent = fixture.BanditParty?.PartyComponent as BanditPartyComponent;
+        if (banditSide == null || banditComponent == null || fixture.BanditTroop == null)
+            return "The fixture bandit side is no longer available.";
+
+        fixture.ReinforcementParty = BanditPartyComponent.CreateBanditParty(
+            $"debug_2423_reward_reinforcement_{Guid.NewGuid():N}",
+            fixture.BanditParty.ActualClan,
+            banditComponent.Hideout,
+            isBossParty: false,
+            pt: null,
+            new CampaignVec2(
+                new Vec2(fixture.FixturePosition.X - 0.6f, fixture.FixturePosition.Y),
+                isOnLand: true));
+        fixture.ReinforcementParty.MemberRoster.AddToCounts(fixture.BanditTroop, 12);
+        fixture.ReinforcementParty.SetMoveModeHold();
+        fixture.ReinforcementParty.Party.MapEventSide = banditSide;
+        fixture.ReinforcementAdded = true;
+
+        return $"Battle reward fixture reinforced: party={fixture.ReinforcementParty.StringId}, " +
+               $"troops={fixture.ReinforcementParty.MemberRoster.TotalManCount}, " +
+               $"enemyParties={banditSide.Parties.Count}.";
+    }
+
     // coop.debug.mapevent.battle_reward_fixture_join
     /// <summary>Adds the second player to the active #2308 battle and opens its encounter.</summary>
     [CommandLineArgumentFunction("battle_reward_fixture_join", "coop.debug.mapevent")]
@@ -890,6 +940,68 @@ public class MapEventDebugCommands
                $"controller={fixture.LateJoiner.ControllerId}, party={fixture.LateJoiner.Party.StringId}.";
     }
 
+    [CommandLineArgumentFunction("battle_reward_fixture_begin_rout", "coop.debug.mapevent")]
+    public static string BeginBattleRewardFixtureRout(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.battle_reward_fixture_begin_rout";
+
+        var fixture = battleRewardFixture;
+        if (fixture == null)
+            return "No battle reward fixture is active.";
+        if (fixture.MapEvent.IsFinalized)
+            return "The fixture battle is already finalized.";
+        if (!fixture.LateJoinerAdded)
+            return "Add the late joiner before routing the fixture enemies.";
+        if (!fixture.ReinforcementAdded)
+            return "Add the fixture reinforcement before routing enemies.";
+        if (fixture.PartialRoutIssued)
+            return "The fixture partial rout was already issued.";
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetId(fixture.MapEvent, out string mapEventId) ||
+            !ContainerProvider.TryResolve<INetwork>(out var network))
+        {
+            return "Unable to resolve the fixture battle network state.";
+        }
+
+        fixture.PartialRoutIssued = true;
+        network.SendAll(new NetworkRouteBattleEnemies(mapEventId, enemiesToLeaveFighting: 20));
+        return $"Ordered fixture enemies to retreat while leaving up to 20 fighting: mapEvent={mapEventId}.";
+    }
+
+    [CommandLineArgumentFunction("battle_reward_fixture_route_enemies", "coop.debug.mapevent")]
+    public static string RouteBattleRewardFixtureEnemies(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.battle_reward_fixture_route_enemies";
+
+        var fixture = battleRewardFixture;
+        if (fixture == null)
+            return "No battle reward fixture is active.";
+        if (fixture.MapEvent.IsFinalized)
+            return "The fixture battle is already finalized.";
+        if (!fixture.PartialRoutIssued)
+            return "Begin the fixture rout before routing the final enemy.";
+        if (fixture.EnemiesRouted)
+            return "The fixture enemies were already ordered to retreat.";
+        if (!TryGetObjectManager(out var objectManager) ||
+            !objectManager.TryGetId(fixture.MapEvent, out string mapEventId) ||
+            !ContainerProvider.TryResolve<INetwork>(out var network))
+        {
+            return "Unable to resolve the fixture battle network state.";
+        }
+
+        fixture.EnemiesRouted = true;
+        network.SendAll(new NetworkRouteBattleEnemies(mapEventId, enemiesToLeaveFighting: 0));
+        return $"Ordered the battle authority to route fixture enemies: mapEvent={mapEventId}.";
+    }
+
     // coop.debug.mapevent.battle_reward_fixture_state
     /// <summary>Reports contributions and roster reward deltas for the active #2308 fixture.</summary>
     [CommandLineArgumentFunction("battle_reward_fixture_state", "coop.debug.mapevent")]
@@ -911,6 +1023,8 @@ public class MapEventDebugCommands
 
         return $"Battle reward fixture state: mapEvent={mapEventId ?? "unregistered"}, " +
                $"finalized={fixture.MapEvent.IsFinalized}, lateJoinerAdded={fixture.LateJoinerAdded}, " +
+               $"reinforcementAdded={fixture.ReinforcementAdded}, partialRoutIssued={fixture.PartialRoutIssued}, " +
+               $"enemiesRouted={fixture.EnemiesRouted}, " +
                FormatBattleRewardPlayerState("initiator", fixture.Initiator, fixture.InitiatorMapEventParty) + ", " +
                FormatBattleRewardPlayerState("lateJoiner", fixture.LateJoiner, fixture.LateJoinerMapEventParty) + ".";
     }
@@ -1056,6 +1170,8 @@ public class MapEventDebugCommands
 
             if (fixture.BanditParty?.IsActive == true && fixture.BanditParty.MapEvent == null)
                 DestroyPartyAction.Apply(null, fixture.BanditParty);
+            if (fixture.ReinforcementParty?.IsActive == true && fixture.ReinforcementParty.MapEvent == null)
+                DestroyPartyAction.Apply(null, fixture.ReinforcementParty);
 
             if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
                 throw new InvalidOperationException("Unable to resolve the mobile-party behavior snapshot service.");
