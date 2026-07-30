@@ -15,10 +15,13 @@ internal class NetworkStartSettlementEncounter : ICommand
     public string SettlementId;
     [ProtoMember(2)]
     public string PartyId;
+    [ProtoMember(3)]
+    public string InteractionId;
 
     public NetworkStartSettlementEncounter(NetworkRequestStartSettlementEncounter payload)
     {
         SettlementId = payload.SettlementId;
         PartyId = payload.PartyId;
+        InteractionId = payload.InteractionId;
     }
 }

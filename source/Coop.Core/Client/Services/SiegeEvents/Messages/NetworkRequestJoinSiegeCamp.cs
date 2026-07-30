@@ -13,10 +13,16 @@ public record NetworkRequestJoinSiegeCamp : ICommand
     public string PartyId { get; }
     [ProtoMember(2)]
     public string SettlementId { get; }
+    [ProtoMember(3)]
+    public string InteractionId { get; }
 
-    public NetworkRequestJoinSiegeCamp(string partyId, string settlementId)
+    public NetworkRequestJoinSiegeCamp(
+        string partyId,
+        string settlementId,
+        string interactionId)
     {
         PartyId = partyId;
         SettlementId = settlementId;
+        InteractionId = interactionId;
     }
 }

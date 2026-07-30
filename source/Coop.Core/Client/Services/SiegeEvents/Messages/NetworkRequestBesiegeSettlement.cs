@@ -13,10 +13,16 @@ public record NetworkRequestBesiegeSettlement : ICommand
     public string PartyId { get; }
     [ProtoMember(2)]
     public string SettlementId { get; }
+    [ProtoMember(3)]
+    public string InteractionId { get; }
 
-    public NetworkRequestBesiegeSettlement(string partyId, string settlementId)
+    public NetworkRequestBesiegeSettlement(
+        string partyId,
+        string settlementId,
+        string interactionId)
     {
         PartyId = partyId;
         SettlementId = settlementId;
+        InteractionId = interactionId;
     }
 }

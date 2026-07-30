@@ -15,11 +15,16 @@ internal readonly struct NetworkRequestStartSettlementEncounter : ICommand
     [ProtoMember(2)]
     public readonly string SettlementId;
 
+    [ProtoMember(3)]
+    public readonly string InteractionId;
+
     public NetworkRequestStartSettlementEncounter(
         string partyId,
-        string settlementId)
+        string settlementId,
+        string interactionId)
     {
         PartyId = partyId;
         SettlementId = settlementId;
+        InteractionId = interactionId;
     }
 }

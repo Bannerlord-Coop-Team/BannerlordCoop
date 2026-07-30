@@ -12,8 +12,11 @@ using GameInterface;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Validation;
 using Moq;
 using Serilog;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -103,15 +106,37 @@ public class TestEnvironment
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
 
         RegisterMock<ISettlementInterface>(builder);
+        var siegeEntryValidator = RegisterMock<ISiegeEntryValidator>(builder);
+        var mapState = new SiegeEntryCanonicalState(SiegeEntryDisposition.Map, null);
+        siegeEntryValidator
+            .Setup(validator => validator.ValidateSettlementInteraction(
+                It.IsAny<MobileParty>(),
+                It.IsAny<Settlement>()))
+            .Returns(SiegeEntryValidationResult.Valid(mapState));
+        siegeEntryValidator
+            .Setup(validator => validator.ValidateEntry(
+                It.IsAny<MobileParty>(),
+                It.IsAny<Settlement>(),
+                It.IsAny<SiegeEntryAction>()))
+            .Returns(SiegeEntryValidationResult.Valid(mapState));
+        siegeEntryValidator
+            .Setup(validator => validator.ValidateReloadedBesieger(
+                It.IsAny<MobileParty>()))
+            .Returns(SiegeEntryValidationResult.Valid(mapState));
+        siegeEntryValidator
+            .Setup(validator => validator.GetCanonicalState(
+                It.IsAny<MobileParty>()))
+            .Returns(mapState);
 
         return builder;
     }
 
-    private void RegisterMock<T>(ContainerBuilder builder) where T : class
+    private Mock<T> RegisterMock<T>(ContainerBuilder builder) where T : class
     {
         var mock = new Mock<T>();
         builder.RegisterInstance(mock).AsSelf().SingleInstance();
         builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
+        return mock;
     }
 
     public void RegisterObjectInNetwork<T>(T obj, string? stringId = null)

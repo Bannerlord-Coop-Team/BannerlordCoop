@@ -11,7 +11,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.SiegeEvents.Interfaces;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
@@ -135,21 +134,6 @@ internal class HeroInterface : IHeroInterface
         finally
         {
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
-        }
-
-        if (playerParty.CurrentSettlement != null || playerParty.BesiegerCamp != null)
-        {
-            // Queued so it runs after the campaign state is entered; the headless server's save
-            // carries no player encounter, menu, or player-siege state for this hero. Covers both
-            // a party reloaded inside a settlement and one besieging a settlement, which would
-            // otherwise sit at the siege camp with no menu (soft lock).
-            GameThread.RunSafe(() =>
-            {
-                if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
-                {
-                    siegeEventInterface.RestoreReloadedPlayer();
-                }
-            });
         }
 
         // Recapture if previously captured

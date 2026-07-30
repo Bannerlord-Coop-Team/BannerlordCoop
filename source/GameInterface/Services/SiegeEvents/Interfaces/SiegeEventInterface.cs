@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Util;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
+using GameInterface.Services.SiegeEvents.Validation;
 using Serilog;
 using System;
 using System.Linq;
@@ -15,6 +16,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEvents.Interfaces;
@@ -52,6 +54,18 @@ public interface ISiegeEventInterface : IGameAbstraction
     /// Removes a party from its besieger camp; the siege ends when the last besieger leaves. Server side.
     /// </summary>
     void BreakSiege(MobileParty party);
+
+    /// <summary>
+    /// Removes only this party from its besieger camp without applying vanilla's attached-party cascade.
+    /// Server side.
+    /// </summary>
+    /// <returns>Whether the stale-link repair path was required instead of the vanilla setter.</returns>
+    bool BreakSiegeForPartyOnly(MobileParty party);
+
+    /// <summary>
+    /// Directly clears a besieger-camp link after the server identified a malformed siege graph.
+    /// </summary>
+    void ClearStaleBesiegerCamp(MobileParty party);
 
     /// <summary>
     /// Runs the player-local part of starting a siege: close the encounter and open the siege menus.
@@ -103,12 +117,16 @@ public interface ISiegeEventInterface : IGameAbstraction
     void PromptSiegeDefenderVictory(Settlement settlement);
 
     /// <summary>
-    /// [Game thread] Rebuilds the local state the transferred host save doesn't carry for a
-    /// reloaded player: the encounter (and siege menus) when its party is inside a settlement,
-    /// or the player siege and its preparation menu when the party is besieging one — without
-    /// which a rejoining besieger soft-locks at the camp with no menu.
+    /// Applies the canonical local menu and player-siege state returned by authoritative entry or
+    /// reconnect validation.
     /// </summary>
-    void RestoreReloadedPlayer();
+    void ReconcileSiegeEntry(SiegeEntryDisposition disposition, Settlement settlement);
+
+    /// <summary>
+    /// Recomputes and applies the reloaded local party's final siege disposition after campaign
+    /// catch-up has completed.
+    /// </summary>
+    void ReconcileReloadedSiegeEntry();
 
     /// <summary>
     /// Establishes the besieging player's encounter for a starting wall assault by adopting the replicated
@@ -155,10 +173,23 @@ public interface ISiegeEventInterface : IGameAbstraction
 internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeEventInterface>();
-    private bool reloadRestorePending;
-    private bool reloadRestoreSubscribed;
+    private readonly ISiegeEntryValidator siegeEntryValidator;
+    private bool siegeEntryReconciliationPending;
+    private bool siegeEntryReconciliationSubscribed;
     private Settlement localAftermathChoiceSettlement;
     private Settlement localAftermathNarrationSettlement;
+
+    public SiegeEventInterface(ISiegeEntryValidator siegeEntryValidator)
+    {
+        if (siegeEntryValidator == null)
+            throw new ArgumentNullException(nameof(siegeEntryValidator));
+
+        this.siegeEntryValidator = siegeEntryValidator;
+    }
+
+    internal SiegeEventInterface() : this(new SiegeEntryValidator())
+    {
+    }
 
     public void StartSiegeEvent(MobileParty besiegerParty, Settlement settlement)
     {
@@ -190,6 +221,65 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     public void BreakSiege(MobileParty party)
     {
         party.BesiegerCamp = null;
+    }
+
+    public bool BreakSiegeForPartyOnly(MobileParty party)
+    {
+        var camp = party?.BesiegerCamp;
+        if (camp == null) return false;
+
+        if (!CanApplyVanillaSiegeLeave(party, camp))
+        {
+            ClearStaleBesiegerCamp(party);
+            return true;
+        }
+
+        var attachedParties = party._attachedParties;
+        party._attachedParties = new MBList<MobileParty>();
+        try
+        {
+            party.BesiegerCamp = null;
+        }
+        finally
+        {
+            party._attachedParties = attachedParties;
+        }
+
+        return false;
+    }
+
+    public void ClearStaleBesiegerCamp(MobileParty party)
+    {
+        var camp = party?.BesiegerCamp;
+        if (camp == null) return;
+
+        if (party.IsMainParty && party.Anchor != null)
+        {
+            party.Anchor.IsDisabled = false;
+        }
+        party.EventPositionAdder = Vec2.Zero;
+        camp._besiegerParties?.Remove(party);
+        party._besiegerCamp = null;
+        party._besiegerCampResetStarted = false;
+        party.Party?.SetVisualAsDirty();
+        Logger.Warning(
+            "Cleared a structurally stale besieger-camp link for party {Party}",
+            party.StringId);
+    }
+
+    private static bool CanApplyVanillaSiegeLeave(
+        MobileParty party,
+        BesiegerCamp camp)
+    {
+        var siegeEvent = camp.SiegeEvent;
+        var settlement = siegeEvent?.BesiegedSettlement;
+        return siegeEvent != null &&
+            settlement != null &&
+            siegeEvent.BesiegerCamp == camp &&
+            settlement.SiegeEvent == siegeEvent &&
+            camp._besiegerParties != null &&
+            camp._besiegerParties.Contains(party) &&
+            party._attachedParties != null;
     }
 
     public void StartLocalPlayerSiegePreparation()
@@ -267,34 +357,89 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
             .ToArray();
     }
 
-    public void RestoreReloadedPlayer()
+    public void ReconcileReloadedSiegeEntry()
     {
-        // The queued restore can land before the map state is active. GameThread.RunSafe executes inline
-        // when called from the game thread, so using it as a retry recurses immediately. Arm one campaign-
-        // tick listener instead; campaign ticks resume only after the map state becomes active.
         if (!(GameStateManager.Current?.ActiveState is TaleWorlds.CampaignSystem.GameState.MapState))
         {
-            reloadRestorePending = true;
-            if (!reloadRestoreSubscribed)
+            siegeEntryReconciliationPending = true;
+            if (!siegeEntryReconciliationSubscribed)
             {
-                reloadRestoreSubscribed = true;
-                CampaignEvents.TickEvent.AddNonSerializedListener(this, RetryReloadedPlayerRestore);
+                siegeEntryReconciliationSubscribed = true;
+                CampaignEvents.TickEvent.AddNonSerializedListener(this, RetrySiegeEntryReconciliation);
             }
             return;
         }
 
-        ClearReloadedPlayerRestoreRetry();
-
-        // Vanilla's generic-state menu ranks the besieger camp above settlement presence
-        // (DefaultEncounterGameMenuModel.GetGenericStateMenu); the siege entry/join flows also
-        // leave the settlement first, so the two states are mutually exclusive in practice.
-        if (MobileParty.MainParty?.BesiegerCamp != null)
+        ClearSiegeEntryReconciliationRetry();
+        var validation = siegeEntryValidator.ValidateReloadedBesieger(MobileParty.MainParty);
+        if (!validation.IsValid && MobileParty.MainParty?.BesiegerCamp != null)
         {
+            using (new AllowedThread())
+            {
+                BreakSiegeForPartyOnly(MobileParty.MainParty);
+            }
+        }
+
+        var canonicalState = validation.IsValid
+            ? validation.CanonicalState
+            : new SiegeEntryCanonicalState(SiegeEntryDisposition.Map, null);
+        ReconcileSiegeEntry(canonicalState.Disposition, canonicalState.Settlement);
+    }
+
+    public void ReconcileSiegeEntry(SiegeEntryDisposition disposition, Settlement settlement)
+    {
+        if (disposition == SiegeEntryDisposition.Besieger)
+        {
+            if (MobileParty.MainParty?.BesiegerCamp?.SiegeEvent?.BesiegedSettlement != settlement)
+                return;
+
+            if (PlayerSiege.PlayerSiegeEvent != null &&
+                PlayerSiege.BesiegedSettlement != settlement)
+            {
+                using (new AllowedThread())
+                {
+                    PlayerSiege.FinalizePlayerSiege();
+                }
+            }
+
             RestoreReloadedPlayerBesieging();
             return;
         }
 
-        RestoreReloadedPlayerInSettlement();
+        using (new AllowedThread())
+        {
+            if (PlayerSiege.PlayerSiegeEvent != null)
+                PlayerSiege.FinalizePlayerSiege();
+        }
+
+        if (disposition == SiegeEntryDisposition.Settlement)
+        {
+            if (MobileParty.MainParty?.CurrentSettlement == settlement)
+                RestoreReloadedPlayerInSettlement();
+            return;
+        }
+
+        if (disposition == SiegeEntryDisposition.MapEvent)
+            return;
+
+        using (new AllowedThread())
+        {
+            if (PlayerEncounter.Current != null && MobileParty.MainParty?.MapEvent == null)
+            {
+                PlayerEncounter.Finish();
+                return;
+            }
+
+            var currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
+            if (currentMenu == "town_outside" ||
+                currentMenu == "castle_outside" ||
+                currentMenu == "join_siege_event" ||
+                currentMenu == "menu_siege_strategies" ||
+                currentMenu == "encounter_interrupted_siege_preparations")
+            {
+                GameMenu.ExitToLast();
+            }
+        }
     }
 
     private void RestoreReloadedPlayerBesieging()
@@ -314,15 +459,13 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
         if (party.MapEvent != null)
         {
-            // A wall assault is still live: adopt the replicated event as the player encounter
-            // (it seats the encounter menus) instead of parking on the preparation menu.
-            if (party.MapEvent.IsSiegeAssault && settlement.Party.MapEvent == party.MapEvent)
+            if (party.MapEvent.MapEventSettlement != settlement)
             {
-                PromptSiegeAssault(party, settlement);
+                Logger.Warning("Skipped the reloaded besieger's encounter at {Settlement}: the map event belongs to another settlement", settlement.StringId);
             }
             else
             {
-                Logger.Warning("Skipped the reloaded besieger's siege menu at {Settlement}: the party is in an unexpected map event", settlement.StringId);
+                RestoreReloadedPlayerSiegeEncounter();
             }
             return;
         }
@@ -338,6 +481,26 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
             {
                 GameMenu.SwitchToMenu("menu_siege_strategies");
             }
+        }
+    }
+
+    private static void RestoreReloadedPlayerSiegeEncounter()
+    {
+        // Vanilla serializes PlayerEncounter alongside MainParty.MapEvent. The client switches into
+        // the server's hero without that player-local object, so rebuild it through InitAux, which
+        // adopts MainParty.MapEvent for every siege battle type without creating a second event.
+        if (PlayerEncounter.Current?._mapEvent == MobileParty.MainParty.MapEvent)
+            return;
+
+        using (new AllowedThread())
+        {
+            if (PlayerEncounter.Current != null)
+            {
+                PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+            }
+
+            PlayerEncounter.Start();
+            PlayerEncounter.Init();
         }
     }
 
@@ -681,27 +844,26 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         return localAftermathNarrationSettlement == settlement;
     }
 
-    private void RetryReloadedPlayerRestore(float dt)
+    private void RetrySiegeEntryReconciliation(float dt)
     {
-        if (!reloadRestorePending) return;
+        if (!siegeEntryReconciliationPending) return;
         if (!(GameStateManager.Current?.ActiveState is TaleWorlds.CampaignSystem.GameState.MapState)) return;
 
-        ClearReloadedPlayerRestoreRetry();
-        RestoreReloadedPlayer();
+        ReconcileReloadedSiegeEntry();
     }
 
-    private void ClearReloadedPlayerRestoreRetry()
+    private void ClearSiegeEntryReconciliationRetry()
     {
-        reloadRestorePending = false;
-        if (!reloadRestoreSubscribed) return;
+        siegeEntryReconciliationPending = false;
+        if (!siegeEntryReconciliationSubscribed) return;
 
-        reloadRestoreSubscribed = false;
+        siegeEntryReconciliationSubscribed = false;
         CampaignEvents.TickEvent.ClearListeners(this);
     }
 
     public void Dispose()
     {
-        ClearReloadedPlayerRestoreRetry();
+        ClearSiegeEntryReconciliationRetry();
         SiegeCaptureMenuHoldPatch.Release(localAftermathChoiceSettlement);
         localAftermathChoiceSettlement = null;
         localAftermathNarrationSettlement = null;

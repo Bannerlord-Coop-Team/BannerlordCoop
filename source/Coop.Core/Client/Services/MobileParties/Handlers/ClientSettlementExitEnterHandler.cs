@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using Coop.Core.Common.Services.SiegeEvents;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MapEvents;
@@ -23,6 +24,7 @@ public class ClientSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
+    private readonly ISiegeInteractionGrantStore siegeInteractionGrantStore;
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
     private string pendingLeavePartyId;
@@ -31,12 +33,14 @@ public class ClientSettlementExitEnterHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        ISettlementInterface settlementInterface)
+        ISettlementInterface settlementInterface,
+        ISiegeInteractionGrantStore siegeInteractionGrantStore)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
+        this.siegeInteractionGrantStore = siegeInteractionGrantStore;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkSettlementEncounterLeaveResult>(Handle);
@@ -69,7 +73,11 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (pendingStart != null)
             return;
 
-        var request = new NetworkRequestStartSettlementEncounter(partyId, settlementId);
+        siegeInteractionGrantStore.ClearLocal(partyId);
+        var request = new NetworkRequestStartSettlementEncounter(
+            partyId,
+            settlementId,
+            siegeInteractionGrantStore.CreateInteractionId());
         pendingStart = new PendingStart(
             request,
             pendingLeavePartyId == null ? PendingStartState.Sent : PendingStartState.Queued);
@@ -97,27 +105,38 @@ public class ClientSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<NetworkStartSettlementEncounter> obj)
     {
         var payload = obj.What;
-        GameThread.RunSafe(() => HandleStartApproved(payload.PartyId, payload.SettlementId));
+        GameThread.RunSafe(() => HandleStartApproved(
+            payload.PartyId,
+            payload.SettlementId,
+            payload.InteractionId));
     }
 
-    private void HandleStartApproved(string partyId, string settlementId)
+    private void HandleStartApproved(
+        string partyId,
+        string settlementId,
+        string interactionId)
     {
-        if (!IsPendingStart(partyId, settlementId, PendingStartState.Sent))
+        if (!IsPendingStart(partyId, settlementId, interactionId, PendingStartState.Sent))
             return;
 
         pendingStart.State = PendingStartState.Approved;
         if (pendingLeavePartyId != null)
             return;
 
+        var start = pendingStart;
         pendingStart = null;
-        ApplySettlementEncounter(partyId, settlementId);
+        ApplySettlementEncounter(start.Request);
     }
 
-    private void ApplySettlementEncounter(string partyId, string settlementId)
+    private void ApplySettlementEncounter(NetworkRequestStartSettlementEncounter request)
     {
-        if (!objectManager.TryGetObjectWithLogging(partyId, out MobileParty party)) return;
-        if (!objectManager.TryGetObjectWithLogging(settlementId, out Settlement settlement)) return;
+        if (!objectManager.TryGetObjectWithLogging(request.PartyId, out MobileParty party)) return;
+        if (!objectManager.TryGetObjectWithLogging(request.SettlementId, out Settlement settlement)) return;
 
+        siegeInteractionGrantStore.RecordLocal(
+            request.InteractionId,
+            request.PartyId,
+            request.SettlementId);
         using (new AllowedThread())
         {
             settlementInterface.StartSettlementEncounter(party, settlement);
@@ -132,18 +151,27 @@ public class ClientSettlementExitEnterHandler : IHandler
         var payload = obj.What;
         GameThread.RunSafe(() =>
         {
-            if (!IsPendingStart(payload.PartyId, payload.SettlementId, PendingStartState.Sent))
+            if (!IsPendingStart(
+                    payload.PartyId,
+                    payload.SettlementId,
+                    payload.InteractionId,
+                    PendingStartState.Sent))
                 return;
 
             pendingStart = null;
         });
     }
 
-    private bool IsPendingStart(string partyId, string settlementId, PendingStartState state) =>
+    private bool IsPendingStart(
+        string partyId,
+        string settlementId,
+        string interactionId,
+        PendingStartState state) =>
         pendingStart != null &&
         pendingStart.State == state &&
         pendingStart.Request.PartyId == partyId &&
-        pendingStart.Request.SettlementId == settlementId;
+        pendingStart.Request.SettlementId == settlementId &&
+        pendingStart.Request.InteractionId == interactionId;
 
     private static bool ShouldShowRaidOccupiedMenu(MobileParty party, Settlement settlement)
     {
@@ -188,7 +216,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         }
 
         pendingStart = null;
-        ApplySettlementEncounter(start.Request.PartyId, start.Request.SettlementId);
+        ApplySettlementEncounter(start.Request);
     }
 
     private void HandleAppliedLeave(string partyId)
@@ -203,15 +231,19 @@ public class ClientSettlementExitEnterHandler : IHandler
             pendingStart = null;
         }
 
-        if (!IsMainParty(partyId))
-            return;
-
-        if (!resolvesPendingLeave)
-            pendingStart = null;
-
-        using (new AllowedThread())
+        bool isMainParty = IsMainParty(partyId);
+        if (isMainParty)
         {
-            settlementInterface.EndSettlementEncounter();
+            using (new AllowedThread())
+            {
+                settlementInterface.EndSettlementEncounter();
+            }
+        }
+
+        siegeInteractionGrantStore.ClearLocal(partyId);
+        if (!resolvesPendingLeave && isMainParty)
+        {
+            pendingStart = null;
         }
     }
 
@@ -250,6 +282,8 @@ public class ClientSettlementExitEnterHandler : IHandler
             {
                 settlementInterface.PartyLeaveSettlement(party);
             }
+
+            siegeInteractionGrantStore.ClearLocal(payload.PartyId);
         });
     }
 
