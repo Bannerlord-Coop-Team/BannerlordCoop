@@ -242,21 +242,21 @@ internal class ServerSiegeEntryHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var party)) return;
 
+            if (party.MapEvent?.IsSiegeAssault == true &&
+                party.Party.Side == BattleSideEnum.Attacker)
+            {
+                messageBroker.Publish(
+                    party,
+                    new PlayerLeaveBattleAttempted(party.Party, obj.FinishLocalMenus));
+                network.Send(peer, new NetworkBreakSiegeApproved(
+                    SiegeBreakOutcome.Applied,
+                    obj.FinishLocalMenus,
+                    battleLeaveApplied: true));
+                return;
+            }
+
             if (party.BesiegerCamp == null)
             {
-                if (party.MapEvent?.IsSiegeAssault == true &&
-                    party.Party.Side == BattleSideEnum.Attacker)
-                {
-                    messageBroker.Publish(
-                        party,
-                        new PlayerLeaveBattleAttempted(party.Party, obj.FinishLocalMenus));
-                    network.Send(peer, new NetworkBreakSiegeApproved(
-                        SiegeBreakOutcome.Applied,
-                        obj.FinishLocalMenus,
-                        battleLeaveApplied: true));
-                    return;
-                }
-
                 Logger.Information("Party {PartyId} already left its siege camp", obj.PartyId);
                 network.Send(peer, new NetworkBreakSiegeApproved(
                     SiegeBreakOutcome.AlreadyLeft,

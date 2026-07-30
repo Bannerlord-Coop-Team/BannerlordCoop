@@ -38,15 +38,19 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
     };
 
-    [Fact]
-    public void ActiveSiegeAttacker_WithoutServerCamp_CanLeave()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ActiveSiegeAttacker_WithOrWithoutServerCamp_CanLeave(bool serverHasCamp)
     {
         var mapEvent = CreateServerMapEvent();
         var partyId = JoinNewServerPartyToSide(mapEvent.MapEventId, BattleSideEnum.Attacker);
         SetMapEventType(mapEvent.MapEventId, MapEvent.BattleTypes.Siege);
         var leavingClient = Clients.First();
         SetMainParty(leavingClient, partyId);
-        SetClientOnlyCamp(leavingClient, partyId);
+        var siegeEventId = SetClientOnlyCamp(leavingClient, partyId);
+        if (serverHasCamp)
+            SetCamp(Server, partyId, siegeEventId);
         string? partyBaseId = null;
         Server.Call(() =>
         {
@@ -55,7 +59,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         });
 
         Assert.NotNull(partyBaseId);
-        AssertPartyState(Server, partyId, expectMapEvent: true, expectCamp: false);
+        AssertPartyState(Server, partyId, expectMapEvent: true, expectCamp: serverHasCamp);
         AssertPartyState(leavingClient, partyId, expectMapEvent: true, expectCamp: true);
         Server.NetworkSentMessages.Clear();
 
@@ -225,16 +229,20 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     private string SetClientOnlyCamp(EnvironmentInstance client, string partyId)
     {
         var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(SiegeCreationDisabledMethods);
+        SetCamp(client, partyId, siegeEventId);
+        return siegeEventId;
+    }
 
-        client.Call(() =>
+    private static void SetCamp(EnvironmentInstance instance, string partyId, string siegeEventId)
+    {
+        instance.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.NotNull(siegeEvent.BesiegerCamp);
 
             party._besiegerCamp = siegeEvent.BesiegerCamp;
         });
-        return siegeEventId;
     }
 
     private static void SetMainParty(EnvironmentInstance instance, string partyId)

@@ -26,8 +26,8 @@ public record NetworkBreakSiegeApproved : IEvent
     public bool FinishLocalMenus { get; }
 
     /// <summary>
-    /// True when the party was no longer in a camp because an active siege assault owned the leave.
-    /// Its replicated battle-leave path performs the client cleanup.
+    /// True when an active siege assault owns the leave.
+    /// Its replicated battle-leave path removes both battle and camp state and performs the client cleanup.
     /// </summary>
     [ProtoMember(3)]
     public bool BattleLeaveApplied { get; }
