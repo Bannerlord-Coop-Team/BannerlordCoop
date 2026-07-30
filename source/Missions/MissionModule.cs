@@ -44,6 +44,9 @@ public class MissionModule : Module
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
             .InstancePerDependency();
+        builder.RegisterType<MovementBatchSender>()
+            .As<IMovementBatchSender>()
+            .InstancePerDependency();
         builder.RegisterType<CompressedMovementPacketHandler>()
             .AsSelf()
             .InstancePerLifetimeScope()
