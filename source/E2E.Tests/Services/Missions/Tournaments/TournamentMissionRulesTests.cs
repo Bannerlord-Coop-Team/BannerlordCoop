@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
@@ -344,5 +344,52 @@ public class TournamentMissionRulesTests
             typeof(SandboxHighlightsController),
             typeof(CoopTournamentController)
         }, CoopTournamentLauncher.BehaviorOrder);
+    }
+
+    [Fact]
+    public void TournamentFightController_ForwardsBlockedHitToSharedGuardReactionRecorder()
+    {
+        var controller =
+            ObjectHelper.SkipConstructor<
+                CoopTournamentFightMissionController>();
+        bool recorded = false;
+        bool recordedBlocked = false;
+        bool recordedMissile = true;
+        CombatCollisionResult recordedCollision = default;
+        controller.SetGuardReactionRecorder(
+            (
+                Agent affectedAgent,
+                Agent affectorAgent,
+                bool isBlocked,
+                in Blow recordedBlow,
+                in AttackCollisionData recordedCollisionData) =>
+            {
+                recorded = true;
+                recordedBlocked = isBlocked;
+                recordedMissile = recordedBlow.IsMissile;
+                recordedCollision =
+                    recordedCollisionData.CollisionResult;
+            });
+        var blow = new Blow();
+        var collisionData = new AttackCollisionData();
+
+        controller.OnScoreHit(
+            null,
+            null,
+            null,
+            true,
+            false,
+            in blow,
+            in collisionData,
+            0f,
+            0f,
+            0f);
+
+        Assert.True(recorded);
+        Assert.True(recordedBlocked);
+        Assert.False(recordedMissile);
+        Assert.Equal(
+            collisionData.CollisionResult,
+            recordedCollision);
     }
 }

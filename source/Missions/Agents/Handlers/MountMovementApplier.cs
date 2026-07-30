@@ -99,7 +99,7 @@ public class MountMovementApplier : IPacketHandler
                     puppetMountStateRepairer.PreserveRiderlessPuppet(horse);
 
                     data.ApplyMount(horse);
-                    interpolator.SetMountTarget(horse, data.MountPosition, data.MountMovementDirection);
+                    interpolator.SetMountTarget(horse, data);
                 }
             }
         });

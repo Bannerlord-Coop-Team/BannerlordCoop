@@ -13,6 +13,7 @@ public interface ICoopMissionComponent
     IWeaponDropHandler WeaponDropHandler { get; }
     IWeaponPickupHandler WeaponPickupHandler { get; }
     IShieldDamageHandler ShieldDamageHandler { get; }
+    ICombatHitPresentationHandler CombatHitPresentationHandler { get; }
     //IAgentDamageHandler AgentDamageHandler { get; }
     IAgentDeathHandler AgentDeathHandler { get; }
     //INetworkMissileRegistry NetworkMissileRegistry { get; }
@@ -33,6 +34,8 @@ public class CoopMissionComponent : ICoopMissionComponent
 
     public IShieldDamageHandler ShieldDamageHandler { get; }
 
+    public ICombatHitPresentationHandler CombatHitPresentationHandler { get; }
+
     //public IAgentDamageHandler AgentDamageHandler { get; }
 
     public IAgentDeathHandler AgentDeathHandler { get; }
@@ -49,6 +52,7 @@ public class CoopMissionComponent : ICoopMissionComponent
         IWeaponDropHandler weaponDropHandler,
         IWeaponPickupHandler weaponPickupHandler,
         IShieldDamageHandler shieldDamageHandler,
+        ICombatHitPresentationHandler combatHitPresentationHandler,
         //IAgentDamageHandler agentDamageHandler,
         IAgentDeathHandler agentDeathHandler
         //INetworkMissileRegistry networkMissileRegistry
@@ -62,6 +66,7 @@ public class CoopMissionComponent : ICoopMissionComponent
         WeaponDropHandler = weaponDropHandler;
         WeaponPickupHandler = weaponPickupHandler;
         ShieldDamageHandler = shieldDamageHandler;
+        CombatHitPresentationHandler = combatHitPresentationHandler;
         //AgentDamageHandler = agentDamageHandler;
         AgentDeathHandler = agentDeathHandler;
         //NetworkMissileRegistry = networkMissileRegistry;
