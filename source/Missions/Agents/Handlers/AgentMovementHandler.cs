@@ -268,7 +268,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     private int EnsureStationaryMountTurnAnimation(Agent mount, out int turnActionIndex)
     {
-        turnActionIndex = ActionIndexCache.act_none.Index;
+        turnActionIndex = AgentMountData.NoActionIndex;
         if (mount == null || !mount.IsActive()) return AgentMountData.NoTurn;
 
         Vec2 currentDirection = mount.GetMovementDirection();

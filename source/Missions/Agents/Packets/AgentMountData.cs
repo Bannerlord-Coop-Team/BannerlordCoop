@@ -14,6 +14,7 @@ namespace Missions.Agents.Packets
         internal const int TurnLeft = -1;
         internal const int NoTurn = 0;
         internal const int TurnRight = 1;
+        internal const int NoActionIndex = -1;
         private static readonly ConcurrentDictionary<int, bool> locomotionActionCache =
             new ConcurrentDictionary<int, bool>();
         private static readonly ConcurrentDictionary<int, TurnActionClassification> turnActionCache =
@@ -102,7 +103,7 @@ namespace Missions.Agents.Packets
                 && !syntheticStationaryTurn
                 && currentAction0.Index == desiredAction0Index
                 && (ulong)mountAgent.GetCurrentAnimationFlag(0) != MountAction0Flag;
-            if (desiredAction0Index == ActionIndexCache.act_none.Index)
+            if (desiredAction0Index == NoActionIndex)
             {
                 if (currentAction0 != ActionIndexCache.act_none)
                     mountAgent.SetActionChannel(0, ActionIndexCache.act_none);
@@ -295,9 +296,9 @@ namespace Missions.Agents.Packets
         {
             if (speed <= StationarySpeedThreshold && turnDirection != NoTurn)
                 return turnActionIndex;
-            if (actionIndex == ActionIndexCache.act_none.Index
+            if (actionIndex == NoActionIndex
                 || (speed <= StationarySpeedThreshold && isLocomotion))
-                return ActionIndexCache.act_none.Index;
+                return NoActionIndex;
 
             return actionIndex;
         }
@@ -358,7 +359,7 @@ namespace Missions.Agents.Packets
             string monsterUsage)
         {
             if (turnDirection == NoTurn)
-                return ActionIndexCache.act_none.Index;
+                return NoActionIndex;
             TurnActionClassification actionTurn = turnActionCache.GetOrAdd(
                 actionIndex,
                 ClassifyTurnActionIndex);

@@ -500,7 +500,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     public void ResolveAction0Index_ClearsTheGaitAfterAStationaryTurnSettles()
     {
         Assert.Equal(
-            ActionIndexCache.act_none.Index,
+            AgentMountData.NoActionIndex,
             AgentMountData.ResolveAction0Index(
                 actionIndex: 101,
                 speed: 0f,
