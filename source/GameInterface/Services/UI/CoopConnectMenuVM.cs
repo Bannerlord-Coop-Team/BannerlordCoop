@@ -46,6 +46,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string DiscordButtonText => "Discord";
     public string PatreonButtonText => "Patreon";
     public string DonateButtonText => "Donate";
+    public string CreditsButtonText => "Credits";
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
     public string SteamLobbiesHeaderText => $"Hosted Steam Servers ({filteredSteamLobbyCount})";
@@ -346,6 +347,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     // Opens a popup listing the individual donation platforms above a close button.
     public void ActionDonate() => CommunityLinks.ShowDonatePopup();
+
+    // Opens a popup listing contributor, community, and supporter names.
+    public void ActionCredits() => CommunityLinks.ShowCreditsPopup();
 
     public void Dispose()
     {
