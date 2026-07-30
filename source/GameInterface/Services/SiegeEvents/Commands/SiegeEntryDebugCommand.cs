@@ -74,8 +74,19 @@ internal class SiegeEntryDebugCommand
             settlement.OwnerClan?.Leader == null)
             return $"{settlement.Name} must be an owned fortification.";
 
+        if (playerParty.IsDisorganized)
+            playerParty.SetDisorganized(false);
+
         if (!IsClean(playerParty))
-            return $"{playerParty.Name} must be active, organized, unattached, and outside settlements, sieges, armies, and map events.";
+        {
+            return $"{playerParty.Name} must be active, organized, unattached, and outside settlements, sieges, armies, and map events: " +
+                $"active={playerParty.IsActive}|disorganized={playerParty.IsDisorganized}|" +
+                $"attached={playerParty.AttachedTo?.StringId ?? "none"}|" +
+                $"army={playerParty.Army?.LeaderParty?.StringId ?? "none"}|" +
+                $"mapEvent={(playerParty.MapEvent == null ? "none" : playerParty.MapEvent.EventType.ToString())}|" +
+                $"settlement={playerParty.CurrentSettlement?.StringId ?? "none"}|" +
+                $"besiegerCamp={playerParty.BesiegerCamp?.SiegeEvent?.BesiegedSettlement?.StringId ?? "none"}";
+        }
 
         if (settlement.SiegeEvent != null)
             return $"{settlement.Name} is already under siege.";
