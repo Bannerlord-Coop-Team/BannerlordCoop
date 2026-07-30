@@ -505,10 +505,17 @@ internal static class BattleDebugCommands
             Agent mount = rider.MountAgent;
             if (mount != null)
             {
+                Vec2 mountDirection = mount.GetMovementDirection();
+                var turnedMountDirection = new Vec2(
+                    (mountDirection.X * cosine) - (mountDirection.Y * sine),
+                    (mountDirection.X * sine) + (mountDirection.Y * cosine));
+                float mountTargetDirection = (float)Math.Atan2(
+                    turnedMountDirection.Y,
+                    turnedMountDirection.X);
                 WorldPosition mountTargetPosition = mount.GetWorldPosition();
                 mount.SetScriptedPositionAndDirection(
                     ref mountTargetPosition,
-                    targetDirection,
+                    mountTargetDirection,
                     addHumanLikeDelay: false,
                     Agent.AIScriptedFrameFlags.NoAttack |
                         Agent.AIScriptedFrameFlags.ConsiderRotation);
