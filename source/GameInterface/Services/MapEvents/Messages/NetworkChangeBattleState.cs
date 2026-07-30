@@ -26,3 +26,18 @@ public readonly struct NetworkChangeBattleState : ICommand
         HostEpoch = hostEpoch;
     }
 }
+
+/// <summary>[Local] Reports whether a received battle-state change reached the authoritative map event.</summary>
+public readonly struct BattleStateChangeProcessed : IEvent
+{
+    public readonly string MapEventId;
+    public readonly BattleState BattleState;
+    public readonly bool Applied;
+
+    public BattleStateChangeProcessed(string mapEventId, BattleState battleState, bool applied)
+    {
+        MapEventId = mapEventId;
+        BattleState = battleState;
+        Applied = applied;
+    }
+}

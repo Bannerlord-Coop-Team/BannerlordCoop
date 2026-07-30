@@ -1,4 +1,5 @@
-using Common.Logging;
+﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using Serilog;
 using System;
@@ -14,16 +15,26 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
     // Autofac-provided factory: CoopBattleController is registered InstancePerDependency, so each call
     // builds a fresh controller that lives and is disposed with its mission.
     private readonly Func<CoopBattleController> controllerFactory;
+    private readonly IMessageBroker messageBroker;
 
-    public CoopBattleBehaviorAttacher(Func<CoopBattleController> controllerFactory)
+    public CoopBattleBehaviorAttacher(
+        Func<CoopBattleController> controllerFactory,
+        IMessageBroker messageBroker)
     {
         this.controllerFactory = controllerFactory;
+        this.messageBroker = messageBroker;
     }
 
     public void Attach(Mission mission)
     {
         var controller = controllerFactory();
         mission.AddMissionBehavior(controller);
-        Logger.Information("[BattleSync] Attached {Behavior} to mission '{Scene}'", controller.GetType().Name, mission.SceneName);
+        mission.AddMissionBehavior(new BattleResultReadyLogic(
+            controller.ResultCommitter,
+            controller.SiegeEngineStateReporter,
+            messageBroker,
+            controller.Session,
+            controller.Deployment));
+        Logger.Information("[BattleSync] Attached coop battle behaviors to mission '{Scene}'", mission.SceneName);
     }
 }

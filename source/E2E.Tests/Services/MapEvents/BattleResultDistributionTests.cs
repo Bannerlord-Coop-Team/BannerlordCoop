@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common.Logging;
@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -28,8 +29,8 @@ namespace E2E.Tests.Services.MapEvents;
 /// <summary>
 /// Section 9 (Battle Results) distribution rules: the authoritative final result is attributed to the correct
 /// participating party (BR-081) and reaches every participating player (BR-082). The result is packed keyed by the
-/// stable <see cref="MapEventParty"/> coop id (<see cref="MapEventResultsInterface"/>), broadcast to all clients
-/// (<c>NetworkCommitMapEventResults</c>), and each client's <c>MapEventResultsHandler</c> stages ONLY its own
+/// stable <see cref="MapEventParty"/> coop id (<see cref="MapEventResultsInterface"/>), sent to each participant
+/// with that receiver's authoritative party id, and each client's <c>MapEventResultsHandler</c> stages ONLY its own
 /// party's loot onto its <see cref="PlayerEncounter"/> — so loot never cross-attributes between two winners on the
 /// same side. Actual loot <em>content</em> production needs the live <c>BattleRewardModel</c> (GameModels), so
 /// these tests feed the per-party loot payload directly to exercise the keying/attribution/delivery path headless.
@@ -103,16 +104,27 @@ public class BattleResultDistributionTests : MapEventTestBase
 
         var client = Clients.First();
         SetMainPartyInBattle(client, ctx.AttackerPartyId);
-        SetMockPlayerEncounter(client);
+        SetMockPlayerEncounter(client, mapEventId: ctx.MapEventId);
+
+        string playerMapEventPartyId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            playerMapEventPartyId = ResolveMapEventPartyId(mapEvent.AttackerSide, ctx.AttackerPartyId);
+        }, MapEventDisabledMethods);
 
         var wireMessage = Server.EnsureSerializable(new NetworkCommitMapEventResults(
             ctx.MapEventId,
             BattleSideEnum.Defender,
+            BattleSideEnum.Attacker,
+            playerMapEventPartyId,
             new NetworkPlayerLootData(new(), new(), new())));
 
         Assert.Null(wireMessage.PlayerLootData.LootedItems);
         Assert.Null(wireMessage.PlayerLootData.LootedMembers);
         Assert.Null(wireMessage.PlayerLootData.LootedPrisoners);
+        Assert.Equal(playerMapEventPartyId, wireMessage.PlayerMapEventPartyId);
+        Assert.Equal(BattleSideEnum.Attacker, wireMessage.PlayerSide);
 
         var unpackErrors = new List<string>();
         void CaptureUnpackError(string message)
@@ -136,10 +148,10 @@ public class BattleResultDistributionTests : MapEventTestBase
     }
 
     /// <summary>
-    /// BR-081 (end-to-end): two allied player parties win the same battle. The authoritative result is broadcast
+    /// BR-081 (end-to-end): two allied player parties win the same battle. The authoritative result is sent
     /// with distinct prisoners per party; each winner's <see cref="PlayerEncounter"/> must receive ONLY its own
-    /// party's prisoners. This is the apply-side attribution filter (<c>MapEventResultsHandler</c> matches
-    /// <c>MapEventParty.Party == PartyBase.MainParty</c>) that keeps one winner's loot off another winner.
+    /// party's prisoners. The receiver-specific server-authored <see cref="MapEventParty"/> id keeps one winner's
+    /// loot off another winner without reconstructing identity from <see cref="PartyBase.MainParty"/>.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-081")]
@@ -147,13 +159,13 @@ public class BattleResultDistributionTests : MapEventTestBase
     {
         var (ctx, player2PartyId) = SetupTwoAlliedPlayersOnAttackerSide();
 
-        // Distinct prisoners for each winner — the loot content the broadcast carries.
+        // Distinct prisoners for each winner — the loot content the result messages carry.
         var troopForP1 = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var troopForP2 = TestEnvironment.CreateRegisteredObject<CharacterObject>();
 
         // Each winner sits in its own post-battle encounter to receive its loot.
-        SetMockPlayerEncounter(Clients.First());
-        SetMockPlayerEncounter(Clients.Last());
+        SetMockPlayerEncounter(Clients.First(), mapEventId: ctx.MapEventId);
+        SetMockPlayerEncounter(Clients.Last(), mapEventId: ctx.MapEventId);
 
         Server.Call(() =>
         {
@@ -174,9 +186,24 @@ public class BattleResultDistributionTests : MapEventTestBase
                 new Dictionary<string, TroopRosterData>(),
                 lootedPrisoners);
 
-            // The authoritative server broadcasts the per-party result to every client.
-            Server.Resolve<INetwork>().SendAll(
-                new NetworkCommitMapEventResults(ctx.MapEventId, BattleSideEnum.Attacker, payload));
+            // The authoritative server addresses each result with the receiver's stable map-event party id.
+            var network = Server.Resolve<INetwork>();
+            network.Send(
+                Clients.First().NetPeer,
+                new NetworkCommitMapEventResults(
+                    ctx.MapEventId,
+                    BattleSideEnum.Attacker,
+                    BattleSideEnum.Attacker,
+                    mep1Id,
+                    payload));
+            network.Send(
+                Clients.Last().NetPeer,
+                new NetworkCommitMapEventResults(
+                    ctx.MapEventId,
+                    BattleSideEnum.Attacker,
+                    BattleSideEnum.Attacker,
+                    mep2Id,
+                    payload));
         }, MapEventDisabledMethods);
 
         // Player 1's encounter received only player 1's prisoner; player 2's received only player 2's.
@@ -184,40 +211,166 @@ public class BattleResultDistributionTests : MapEventTestBase
         AssertEncounterPrisoners(Clients.Last(), ownTroopId: troopForP2, foreignTroopId: troopForP1);
     }
 
+    [Fact]
+    [Trait("Requirement", "BR-081")]
+    public void CommittedResults_UseServerAddressedPartyAndSide_WhenClientMapEventOmitsParty()
+    {
+        var (ctx, player2PartyId) = SetupTwoAlliedPlayersOnAttackerSide();
+        var troopForP1 = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var troopForP2 = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        SetMockPlayerEncounter(Clients.First(), mapEventId: ctx.MapEventId);
+        SetMockPlayerEncounter(Clients.Last(), mapEventId: ctx.MapEventId);
+
+        // Reproduce a late-join replica mismatch: MainParty points at another PartyBase in the same map event,
+        // while the player registry still identifies the authoritative party that owns this client's rewards.
+        SetMainPartyInBattle(Clients.First(), ctx.DefenderPartyId);
+        SetMainPartyInBattle(Clients.Last(), ctx.DefenderPartyId);
+
+        string mep1Id = null;
+        string mep2Id = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+
+            mep1Id = ResolveMapEventPartyId(mapEvent.AttackerSide, ctx.AttackerPartyId);
+            mep2Id = ResolveMapEventPartyId(mapEvent.AttackerSide, player2PartyId);
+        }, MapEventDisabledMethods);
+
+        // Late-join clients can retain the authoritative MapEventParty id without that same object appearing in
+        // their partial MapEvent side. Result attribution must use the server-addressed id and side directly.
+        RemoveMapEventPartyFromClientSide(Clients.First(), ctx.MapEventId, mep1Id);
+        RemoveMapEventPartyFromClientSide(Clients.Last(), ctx.MapEventId, mep2Id);
+
+        Server.Call(() =>
+        {
+            var payload = new NetworkPlayerLootData(
+                new Dictionary<string, ItemRosterElement[]>(),
+                new Dictionary<string, TroopRosterData>(),
+                new Dictionary<string, TroopRosterData>
+                {
+                    { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP1, 1, 0, 0) }) },
+                    { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP2, 1, 0, 0) }) },
+                });
+
+            var network = Server.Resolve<INetwork>();
+            network.Send(
+                Clients.First().NetPeer,
+                new NetworkCommitMapEventResults(
+                    ctx.MapEventId,
+                    BattleSideEnum.Attacker,
+                    BattleSideEnum.Attacker,
+                    mep1Id,
+                    payload));
+            network.Send(
+                Clients.Last().NetPeer,
+                new NetworkCommitMapEventResults(
+                    ctx.MapEventId,
+                    BattleSideEnum.Attacker,
+                    BattleSideEnum.Attacker,
+                    mep2Id,
+                    payload));
+        }, MapEventDisabledMethods);
+
+        AssertEncounterPrisoners(Clients.First(), ownTroopId: troopForP1, foreignTroopId: troopForP2);
+        AssertEncounterPrisoners(Clients.Last(), ownTroopId: troopForP2, foreignTroopId: troopForP1);
+        AssertPlayerEncounterState(Clients.First(), PlayerEncounterState.CaptureHeroes);
+        AssertPlayerEncounterState(Clients.Last(), PlayerEncounterState.CaptureHeroes);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-081")]
+    public void CommittedResults_DoNotStageAnUnrelatedCurrentEncounter()
+    {
+        var ctx = CreateServerMapEvent();
+        var unrelated = CreateServerMapEvent();
+        var client = Clients.First();
+        RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), ctx.AttackerPartyId);
+        SetMainPartyInBattle(client, ctx.AttackerPartyId);
+        SetMockPlayerEncounter(client, mapEventId: unrelated.MapEventId);
+
+        var troop = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            var playerMapEventPartyId = ResolveMapEventPartyId(mapEvent.AttackerSide, ctx.AttackerPartyId);
+            var payload = new NetworkPlayerLootData(
+                new Dictionary<string, ItemRosterElement[]>(),
+                new Dictionary<string, TroopRosterData>(),
+                new Dictionary<string, TroopRosterData>
+                {
+                    {
+                        playerMapEventPartyId,
+                        new TroopRosterData(new[] { new TroopRosterElementData(troop, 1, 0, 0) })
+                    },
+                });
+
+            Server.Resolve<INetwork>().Send(
+                client.NetPeer,
+                new NetworkCommitMapEventResults(
+                    ctx.MapEventId,
+                    BattleSideEnum.Attacker,
+                    BattleSideEnum.Attacker,
+                    playerMapEventPartyId,
+                    payload));
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(unrelated.MapEventId, out var unrelatedMapEvent));
+            Assert.Same(unrelatedMapEvent, PlayerEncounter.Battle);
+            Assert.Equal(0, PlayerEncounter.Current.RosterToReceiveLootPrisoners.TotalManCount);
+            Assert.NotEqual(PlayerEncounterState.CaptureHeroes, PlayerEncounter.Current.EncounterState);
+        });
+    }
+
     /// <summary>
     /// BR-082: every participating player receives the authoritative final result. The battle concludes as an
-    /// allied player victory (a client commits the victory <see cref="BattleState"/>, the server applies it and
-    /// broadcasts <c>NetworkCommitMapEventResults</c>). Both allies must receive the broadcast carrying the
-    /// server's authoritative winning side — including the ally that never saw the local <see cref="BattleState"/>
-    /// change — and both stage their encounter for the results pass. Loot <em>content</em> needs live GameModels;
-    /// here we assert delivery + the authoritative winning side + result staging, which are drivable headless.
+    /// allied player victory after one client commits the <see cref="BattleState"/>. Both allies must receive
+    /// the server's authoritative winning side and their own player side, including the ally that never saw the
+    /// local state change, and both stage their encounter for the results pass. Loot <em>content</em> needs live
+    /// GameModels; here we assert delivery, receiver attribution, and result staging, which are drivable headless.
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-082")]
-    public void ConcludedPlayerVictory_BroadcastsAuthoritativeResult_ToEveryParticipatingAlly()
+    public void ConcludedPlayerVictory_SendsAuthoritativeResult_ToEveryParticipatingAlly()
     {
-        var (ctx, _) = SetupTwoAlliedPlayersOnAttackerSide();
+        var (ctx, player2PartyId) = SetupTwoAlliedPlayersOnAttackerSide();
 
-        SetMockPlayerEncounter(Clients.First());
-        SetMockPlayerEncounter(Clients.Last());
+        SetMockPlayerEncounter(Clients.First(), mapEventId: ctx.MapEventId);
+        SetMockPlayerEncounter(Clients.Last(), mapEventId: ctx.MapEventId);
 
-        // Every participating client watches for the authoritative result broadcast.
+        string player1MapEventPartyId = null, player2MapEventPartyId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            player1MapEventPartyId = ResolveMapEventPartyId(mapEvent.AttackerSide, ctx.AttackerPartyId);
+            player2MapEventPartyId = ResolveMapEventPartyId(mapEvent.AttackerSide, player2PartyId);
+        }, MapEventDisabledMethods);
+
+        // Every participating client watches for its authoritative result.
         BattleSideEnum? winningSideOnClient1 = null, winningSideOnClient2 = null;
+        BattleSideEnum? playerSideOnClient1 = null, playerSideOnClient2 = null;
+        string receivingPartyOnClient1 = null, receivingPartyOnClient2 = null;
         int commitsOnClient1 = 0, commitsOnClient2 = 0;
         Clients.First().Resolve<IMessageBroker>().Subscribe<NetworkCommitMapEventResults>(p =>
         {
             commitsOnClient1++;
             winningSideOnClient1 = p.What.WinningSide;
+            playerSideOnClient1 = p.What.PlayerSide;
+            receivingPartyOnClient1 = p.What.PlayerMapEventPartyId;
         });
         Clients.Last().Resolve<IMessageBroker>().Subscribe<NetworkCommitMapEventResults>(p =>
         {
             commitsOnClient2++;
             winningSideOnClient2 = p.What.WinningSide;
+            playerSideOnClient2 = p.What.PlayerSide;
+            receivingPartyOnClient2 = p.What.PlayerMapEventPartyId;
         });
 
         // Conclude the battle: the allied attackers win. One client commits the victory BattleState, the server
-        // applies it (OnBattleWon) and broadcasts the results. The world-dependent loot/capture steps need a live
-        // campaign, so disable them — the test asserts only broadcast delivery, not loot content.
+        // applies it (OnBattleWon) and sends the results. The world-dependent loot/capture steps need a live
+        // campaign, so disable them — the test asserts only result delivery, not loot content.
         var client1 = Clients.First();
         client1.Call(() =>
         {
@@ -225,12 +378,16 @@ public class BattleResultDistributionTests : MapEventTestBase
             mapEvent.BattleState = BattleState.AttackerVictory;
         }, ConcludeVictoryDisabledMethods());
 
-        // Both allied winners received the broadcast exactly once, carrying the server's authoritative winning
+        // Both allied winners received a result exactly once, carrying the server's authoritative winning
         // side — even the ally that never set the BattleState locally.
         Assert.Equal(1, commitsOnClient1);
         Assert.Equal(1, commitsOnClient2);
         Assert.Equal(BattleSideEnum.Attacker, winningSideOnClient1);
         Assert.Equal(BattleSideEnum.Attacker, winningSideOnClient2);
+        Assert.Equal(BattleSideEnum.Attacker, playerSideOnClient1);
+        Assert.Equal(BattleSideEnum.Attacker, playerSideOnClient2);
+        Assert.Equal(player1MapEventPartyId, receivingPartyOnClient1);
+        Assert.Equal(player2MapEventPartyId, receivingPartyOnClient2);
 
         // ...and each staged its own encounter for the battle-results pass.
         AssertPlayerEncounterState(Clients.First(), PlayerEncounterState.CaptureHeroes);
@@ -285,6 +442,8 @@ public class BattleResultDistributionTests : MapEventTestBase
 
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), ctx.AttackerPartyId);
         RegisterAsPlayerParty("2", TestEnvironment.CreateRegisteredObject<Hero>(), player2PartyId);
+        Server.Resolve<IPlayerManager>().SetPeer("1", Clients.First().NetPeer);
+        Server.Resolve<IPlayerManager>().SetPeer("2", Clients.Last().NetPeer);
 
         SetMainPartyInBattle(Clients.First(), ctx.AttackerPartyId);
         SetMainPartyInBattle(Clients.Last(), player2PartyId);
@@ -322,6 +481,26 @@ public class BattleResultDistributionTests : MapEventTestBase
 
         Assert.Fail($"No MapEventParty on the side wraps mobile party {mobilePartyId}");
         return null;
+    }
+
+    private void RemoveMapEventPartyFromClientSide(
+        EnvironmentInstance client,
+        string mapEventId,
+        string mapEventPartyId)
+    {
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(mapEventPartyId, out var mapEventParty));
+
+            var side = mapEvent.AttackerSide.Parties.Contains(mapEventParty)
+                ? mapEvent.AttackerSide
+                : mapEvent.DefenderSide;
+            Assert.Contains(mapEventParty, side.Parties);
+            side._battleParties.Remove(mapEventParty);
+            Assert.DoesNotContain(mapEventParty, side.Parties);
+            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(mapEventPartyId, out _));
+        }, MapEventDisabledMethods);
     }
 
     private static TroopRoster BuildRoster(CharacterObject character, int count)

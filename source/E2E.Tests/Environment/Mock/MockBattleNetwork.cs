@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Tests.Utils;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Extensions;
 using LiteNetLib;
@@ -42,6 +43,7 @@ public class MockBattleNetwork : IBattleNetwork
     private readonly MeshNetworkRouter router;
 
     public NetPeer NetPeer { get; } = NetPeerExtensions.CreatePeer();
+    public MessageCollection NetworkSentMessages { get; } = new MessageCollection();
     public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
     public List<DirectPacketSend> DirectPacketSends { get; } = new();
     public List<SerializedPacketSend> SerializedPacketSends { get; } = new();
@@ -56,9 +58,23 @@ public class MockBattleNetwork : IBattleNetwork
     public void Stop() { }
     public void ConnectToInstance(string instanceId) { }
 
-    public void SendAll(IMessage message) => router.SendAll(this, message);
-    public void Send(string controllerId, IMessage message) => router.Send(this, controllerId, message);
-    public void SendAllBut(string controllerId, IMessage message) => router.SendAllBut(this, controllerId, message);
+    public void SendAll(IMessage message)
+    {
+        NetworkSentMessages.Add(message);
+        router.SendAll(this, message);
+    }
+
+    public void Send(string controllerId, IMessage message)
+    {
+        NetworkSentMessages.Add(message);
+        router.Send(this, controllerId, message);
+    }
+
+    public void SendAllBut(string controllerId, IMessage message)
+    {
+        NetworkSentMessages.Add(message);
+        router.SendAllBut(this, controllerId, message);
+    }
 
     // Packet broadcasts are captured for sender-path assertions; packet-level mesh routing isn't exercised.
     public void SendAll(IPacket packet) => NetworkSentPackets.Add(packet);
