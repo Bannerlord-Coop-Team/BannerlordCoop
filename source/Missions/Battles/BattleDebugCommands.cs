@@ -21,6 +21,8 @@ namespace Missions.Battles;
 /// <summary>Reports state needed to verify co-op battle synchronization.</summary>
 internal static class BattleDebugCommands
 {
+    private const float StationaryTurnSpeedLimit = 0.01f;
+
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
     private static readonly Dictionary<Agent, AgentControllerType> CavalryControllers =
         new Dictionary<Agent, AgentControllerType>();
@@ -319,8 +321,8 @@ internal static class BattleDebugCommands
         foreach (Agent rider in riders)
         {
             RestoreCavalryController(rider);
-            rider.SetMaximumSpeedLimit(0f, isMultiplier: false);
-            rider.MountAgent?.SetMaximumSpeedLimit(0f, isMultiplier: false);
+            rider.SetMaximumSpeedLimit(StationaryTurnSpeedLimit, isMultiplier: false);
+            rider.MountAgent?.SetMaximumSpeedLimit(StationaryTurnSpeedLimit, isMultiplier: false);
             rider.SetIsAIPaused(false);
             rider.MountAgent?.SetIsAIPaused(false);
         }
