@@ -121,9 +121,10 @@ internal static class BattleDebugCommands
             Agent mount = info.Agent;
             float speed = mount.GetRealGlobalVelocity().AsVec2.Length;
             bool stationary = speed <= AgentMountData.StationarySpeedThreshold;
-            var skeleton = mount.AgentVisuals?.GetSkeleton();
-            string animationName = skeleton?.GetAnimationAtChannel(0);
-            float animationSpeed = skeleton?.GetAnimationSpeedAtChannel(0) ?? 0f;
+            AgentMountData.GetRenderedAction0State(
+                mount,
+                out string animationName,
+                out float animationSpeed);
             int actionIndex = mount.GetCurrentAction(0).Index;
             string actionName = AgentActionData.GetActionNameWithCode(actionIndex);
             int turnDirection = AgentMountData.GetTurnDirection(actionName, animationName);

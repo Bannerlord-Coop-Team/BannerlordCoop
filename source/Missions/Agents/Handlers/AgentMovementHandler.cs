@@ -200,7 +200,6 @@ public class AgentMovementHandler : IAgentMovementHandler
                     agentInfo,
                     new AgentMountData(
                         agent,
-                        mountAction0Speed: AgentMountData.GetRenderedAction0Speed(agent),
                         mountAction0TurnDirection: turnDirection == AgentMountData.NoTurn
                             ? (int?)null
                             : turnDirection,
@@ -220,9 +219,6 @@ public class AgentMovementHandler : IAgentMovementHandler
                 int turnDirection = EnsureStationaryMountTurnAnimation(
                     mount,
                     out int turnActionIndex);
-                float? mountAction0Speed = mount != null && mount.IsActive()
-                    ? AgentMountData.GetRenderedAction0Speed(mount)
-                    : null;
                 AddToBatch(
                     movementGroups,
                     ref legacyMovement,
@@ -232,7 +228,6 @@ public class AgentMovementHandler : IAgentMovementHandler
                         mountMovementId,
                         mountIdentityScopeId,
                         mountAgentId,
-                        mountAction0Speed,
                         turnDirection == AgentMountData.NoTurn ? (int?)null : turnDirection,
                         turnDirection == AgentMountData.NoTurn ? (int?)null : turnActionIndex));
 

@@ -1,6 +1,7 @@
 ﻿using ProtoBuf;
 using System;
 using System.Collections.Concurrent;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -34,7 +35,10 @@ namespace Missions.Agents.Packets
             MountAction0Flag = (ulong)mountAgent.GetCurrentAnimationFlag(0);
             MountAction0Progress = mountAgent.GetCurrentActionProgress(0);
             MountAction0Index = mountAgent.GetCurrentAction(0).Index;
-            string renderedAction0Animation = GetRenderedAction0Animation(mountAgent);
+            GetRenderedAction0State(
+                mountAgent,
+                out string renderedAction0Animation,
+                out float renderedAction0Speed);
             MountAction1Flag = (ulong)mountAgent.GetCurrentAnimationFlag(1);
             MountAction1Progress = mountAgent.GetCurrentActionProgress(1);
             MountAction1Index = mountAgent.GetCurrentAction(1).Index;
@@ -47,7 +51,7 @@ namespace Missions.Agents.Packets
             MountMovementId = mountMovementId;
             MountIdentityScopeId = mountIdentityScopeId;
             MountAgentId = mountAgentId;
-            MountAction0Speed = mountAction0Speed ?? GetRenderedAction0Speed(mountAgent);
+            MountAction0Speed = mountAction0Speed ?? renderedAction0Speed;
             MountAction0IsLocomotion = mountAction0IsLocomotion
                 ?? IsLocomotionAction(MountAction0Index, renderedAction0Animation);
             MountAction0TurnDirection = mountAction0TurnDirection
@@ -128,36 +132,39 @@ namespace Missions.Agents.Packets
                 (Agent.MovementControlFlag)MountMovementFlag);
         }
 
-        internal static float GetRenderedAction0Speed(Agent mountAgent)
+        internal static void GetRenderedAction0State(
+            Agent mountAgent,
+            out string animationName,
+            out float animationSpeed)
         {
-            if (mountAgent == null) return 0f;
+            animationName = null;
+            animationSpeed = mountAgent == null ? 0f : 1f;
+            if (mountAgent == null) return;
 
-            TaleWorlds.Engine.Skeleton skeleton;
+            Skeleton skeleton = null;
             try
             {
-                skeleton = mountAgent.AgentVisuals?.GetSkeleton();
+                MBAgentVisuals visuals = mountAgent.AgentVisuals;
+                if (ReferenceEquals(visuals, null) || !visuals.IsValid()) return;
+
+                skeleton = visuals.GetSkeleton();
+                if (ReferenceEquals(skeleton, null)) return;
+
+                animationName = skeleton.GetAnimationAtChannel(0);
+                float renderedSpeed = skeleton.GetAnimationSpeedAtChannel(0);
+                animationSpeed = float.IsNaN(renderedSpeed) || float.IsInfinity(renderedSpeed)
+                    ? 1f
+                    : Math.Max(0f, renderedSpeed);
             }
             catch (NullReferenceException)
             {
-                return 1f;
+                animationName = null;
+                animationSpeed = 1f;
             }
-            if (skeleton == null) return 1f;
-
-            float animationSpeed = skeleton.GetAnimationSpeedAtChannel(0);
-            return float.IsNaN(animationSpeed) || float.IsInfinity(animationSpeed)
-                ? 1f
-                : Math.Max(0f, animationSpeed);
-        }
-
-        private static string GetRenderedAction0Animation(Agent mountAgent)
-        {
-            try
+            finally
             {
-                return mountAgent?.AgentVisuals?.GetSkeleton()?.GetAnimationAtChannel(0);
-            }
-            catch (NullReferenceException)
-            {
-                return null;
+                if (!ReferenceEquals(skeleton, null))
+                    skeleton.ManualInvalidate();
             }
         }
 

@@ -29,7 +29,6 @@ namespace Missions.Agents.Packets
             ushort mountMovementId = 0,
             string mountIdentityScopeId = null,
             System.Guid mountAgentId = default,
-            float? mountAction0Speed = null,
             int? mountAction0TurnDirection = null,
             int? mountAction0TurnActionIndex = null)
         {
@@ -53,7 +52,6 @@ namespace Missions.Agents.Packets
                     mountMovementId,
                     mountIdentityScopeId,
                     mountAgentId,
-                    mountAction0Speed,
                     mountAction0TurnDirection: mountAction0TurnDirection,
                     mountAction0TurnActionIndex: mountAction0TurnActionIndex);
             }
