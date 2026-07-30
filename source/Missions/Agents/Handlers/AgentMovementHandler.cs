@@ -49,6 +49,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IAgentEquipmentApplier equipmentApplier;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
 
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
@@ -77,7 +78,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
-        IAgentEquipmentApplier equipmentApplier)
+        IAgentEquipmentApplier equipmentApplier,
+        IPuppetMountStateRepairer puppetMountStateRepairer)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
 
@@ -87,6 +89,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.equipmentApplier = equipmentApplier;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
 
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
@@ -97,7 +100,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.packetManager.RegisterPacketHandler(this);
         this.packetManager.RegisterPacketHandler(equipmentApplier);
 
-        _mountMovementApplier = new MountMovementApplier(agentRegistry, _interpolator);
+        _mountMovementApplier = new MountMovementApplier(agentRegistry, _interpolator, puppetMountStateRepairer);
         this.packetManager.RegisterPacketHandler(_mountMovementApplier);
     }
 
@@ -404,7 +407,10 @@ public class AgentMovementHandler : IAgentMovementHandler
 
                     // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
                     if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
+                    {
                         puppetMount.Controller = AgentControllerType.None;
+                        puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
+                    }
 
                     data.Apply(agent);
 
@@ -416,16 +422,11 @@ public class AgentMovementHandler : IAgentMovementHandler
                         // Keep the mount position only for rare large-gap snaps and drop any stale direct-horse
                         // target from before the puppet mounted.
                         _interpolator.Forget(agent.MountAgent);
-                        _interpolator.SetMountedRiderTarget(
-                            agent,
-                            data.Position,
-                            data.MovementDirection,
-                            data.MountData.MountMovementDirection,
-                            data.MountData.MountPosition);
+                        _interpolator.SetMountedRiderTarget(agent, data);
                     }
                     else
                     {
-                        _interpolator.SetRiderTarget(agent, data.Position, data.MovementDirection);
+                        _interpolator.SetRiderTarget(agent, data);
                     }
                 }
             }
@@ -495,6 +496,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         if (mount.Controller != AgentControllerType.AI)
         {
             mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+            puppetMountStateRepairer.PrepareForAiControl(mount);
             mount.Controller = AgentControllerType.AI;
         }
     }
@@ -506,7 +508,10 @@ public class AgentMovementHandler : IAgentMovementHandler
             && !agentRegistry.IsLocallyControlled(mount)) return;
         mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
         if (mount.Controller != AgentControllerType.AI)
+        {
+            puppetMountStateRepairer.PrepareForAiControl(mount);
             mount.Controller = AgentControllerType.AI;
+        }
     }
 
     /// <summary>

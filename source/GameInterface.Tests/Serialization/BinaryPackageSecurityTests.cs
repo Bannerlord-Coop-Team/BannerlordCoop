@@ -26,6 +26,65 @@ public class BinaryPackageSecurityTests
     }
 
     [Fact]
+    public void CompressedPackage_RoundTripsAndReducesSize()
+    {
+        string value = new string('x', 1024 * 1024);
+        var package = new PrimitiveBinaryPackage(value);
+
+        byte[] uncompressed = BinaryPackageSerializer.Serialize(package);
+        byte[] compressed = BinaryPackageSerializer.SerializeCompressed(package);
+        var unpacked = BinaryPackageSerializer
+            .DeserializeCompressed<PrimitiveBinaryPackage>(compressed)
+            .Unpack(null);
+
+        Assert.True(compressed.Length < uncompressed.Length);
+        Assert.Equal(value, unpacked);
+    }
+
+    [Fact]
+    public void DeserializeCompressed_InvalidHeader_IsRejected()
+    {
+        Assert.Throws<SerializationException>(() =>
+            BinaryPackageSerializer.DeserializeCompressed<PrimitiveBinaryPackage>(new byte[9]));
+    }
+
+    [Fact]
+    public void DeserializeCompressed_DeclaredSizeOverLimit_IsRejectedBeforeDecompression()
+    {
+        byte[] data = BinaryPackageSerializer.SerializeCompressed(new PrimitiveBinaryPackage("text"));
+
+        WriteInt32(data, 4, BinaryPackageSerializer.MaxPayloadBytes + 1);
+
+        Assert.Throws<SerializationException>(() =>
+            BinaryPackageSerializer.DeserializeCompressed<PrimitiveBinaryPackage>(data));
+    }
+
+    [Fact]
+    public void DeserializeCompressed_ExpandedSizeMismatch_IsRejected()
+    {
+        byte[] data = BinaryPackageSerializer.SerializeCompressed(
+            new PrimitiveBinaryPackage(new string('x', 1024)));
+
+        WriteInt32(data, 4, 1);
+
+        Assert.Throws<SerializationException>(() =>
+            BinaryPackageSerializer.DeserializeCompressed<PrimitiveBinaryPackage>(data));
+    }
+
+    [Fact]
+    public void DeserializeCompressed_DeclaredSizeLongerThanPayload_IsRejected()
+    {
+        var package = new PrimitiveBinaryPackage(new string('x', 1024));
+        byte[] uncompressed = BinaryPackageSerializer.Serialize(package);
+        byte[] data = BinaryPackageSerializer.SerializeCompressed(package);
+
+        WriteInt32(data, 4, uncompressed.Length + 1);
+
+        Assert.Throws<SerializationException>(() =>
+            BinaryPackageSerializer.DeserializeCompressed<PrimitiveBinaryPackage>(data));
+    }
+
+    [Fact]
     public void PrimitivePackage_TamperedValue_IsRejected()
     {
         var package = new PrimitiveBinaryPackage(1);
@@ -99,5 +158,13 @@ public class BinaryPackageSecurityTests
     private enum TestEnum
     {
         Value,
+    }
+
+    private static void WriteInt32(byte[] data, int offset, int value)
+    {
+        data[offset] = (byte)value;
+        data[offset + 1] = (byte)(value >> 8);
+        data[offset + 2] = (byte)(value >> 16);
+        data[offset + 3] = (byte)(value >> 24);
     }
 }

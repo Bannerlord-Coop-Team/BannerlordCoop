@@ -22,6 +22,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -453,6 +454,16 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
 
             if (clan != Clan.PlayerClan) return;
+
+            // Also show notification if companion leaves because of a quest.
+            // Used for transferring companions between players as there is no vanilla detail for this.
+            // This way is safe because the extra message displayed when quests are supported won't be out of place.
+            if (obj.What.Detail == RemoveCompanionAction.RemoveCompanionDetail.AfterQuest)
+            {
+                TextObject textObject2 = new TextObject("{=4zdyeTGn}{COMPANION.NAME} left your clan.", null);
+                textObject2.SetCharacterProperties("COMPANION", hero.CharacterObject, false);
+                MBInformationManager.AddQuickInformation(textObject2, 0, null, null, "event:/ui/notification/relation");
+            }
 
             notificationsBehavior.OnCompanionRemoved(hero, obj.What.Detail);
         });

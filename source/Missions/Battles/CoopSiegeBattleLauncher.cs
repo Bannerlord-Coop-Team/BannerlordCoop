@@ -62,11 +62,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             return null;
         }
 
-        var playerPartyId = CoopFieldBattleLauncher.GetLocalPlayerPartyId(mapEvent, objectManager);
-        if (playerPartyId == null)
-            Logger.Error("[BattleSync] Local player party is not resolvable; opening the siege battle so its mission lifecycle can reject it safely");
-
-        var mission = CreateCoopSiegeBattle(rec, mapEventId, playerPartyId,
+        var mission = CreateCoopSiegeBattle(rec, mapEventId,
             wallHitPointRatios, attackerWeapons, defenderWeapons);
         if (mission == null) return null;
 
@@ -78,7 +74,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     }
 
     private Mission CreateCoopSiegeBattle(MissionInitializerRecord rec, string mapEventId,
-        string playerPartyId, float[] wallHitPointRatios,
+        float[] wallHitPointRatios,
         List<MissionSiegeWeapon> attackerWeapons, List<MissionSiegeWeapon> defenderWeapons)
     {
         bool hasAnySiegeTower = attackerWeapons.Exists(weapon => weapon.Type == DefaultSiegeEngineTypes.SiegeTower);
@@ -94,8 +90,10 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
 
         var mission = MissionState.OpenNew("SiegeMissionWithDeployment", rec, (InitializeMissionBehaviorsDelegate)delegate
         {
-            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager, agentBudget);
-            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager, agentBudget);
+            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager,
+                agentBudget);
+            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager,
+                agentBudget);
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 
@@ -134,7 +132,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             }
 
             behaviors.Add(new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
-                PartyBase.MainParty.Side, playerPartyId));
+                PartyBase.MainParty.Side));
             behaviors.Add(spawnLogic);
             behaviors.Add(new BattlePowerCalculationLogic());
             behaviors.Add(new BattleObserverMissionLogic());

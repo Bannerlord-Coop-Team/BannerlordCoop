@@ -1,4 +1,4 @@
-using GameInterface.Services.Tournaments.Data;
+﻿using GameInterface.Services.Tournaments.Data;
 using Missions.Tournaments;
 using Missions.Tournaments.Messages;
 using TaleWorlds.Core;
@@ -177,7 +177,11 @@ public class TournamentManifestAuthorityTests
             new TournamentAgentRuntimeData[]
             {
                 null,
-                new TournamentAgentRuntimeData(agentId, 72f, new[] { weapon })
+                new TournamentAgentRuntimeData(
+                    agentId,
+                    72f,
+                    new[] { weapon },
+                    currentEquipment: null)
             },
             new TournamentWorldItemRuntimeData[]
             {
@@ -207,7 +211,11 @@ public class TournamentManifestAuthorityTests
     public void RuntimeContracts_NormalizeNullCollectionsForProtobufSkipConstructorSafety()
     {
         Guid agentId = Guid.NewGuid();
-        var agent = new TournamentAgentRuntimeData(agentId, 10f, null);
+        var agent = new TournamentAgentRuntimeData(
+            agentId,
+            10f,
+            null,
+            currentEquipment: null);
         var runtime = new NetworkTournamentRuntimeState(
             "session",
             "match",

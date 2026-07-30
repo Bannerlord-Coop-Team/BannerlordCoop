@@ -59,7 +59,6 @@ internal class PlayerCaptivityClientHandler : IHandler
         messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Subscribe<EndPlayerCaptivityAttempted>(Handle_EndPlayerCaptivityAttempted);
         messageBroker.Subscribe<EndCaptivityAttempted>(Handle_EndCaptivityAttempted);
-        messageBroker.Subscribe<PrisonerLiberationAttempted>(Handle_PrisonerLiberationAttempted);
         messageBroker.Subscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
         messageBroker.Subscribe<NetworkPlayerCaptivityReleasePositionSet>(Handle_NetworkPlayerCaptivityReleasePositionSet);
     }
@@ -70,7 +69,6 @@ internal class PlayerCaptivityClientHandler : IHandler
         messageBroker.Unsubscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Unsubscribe<EndPlayerCaptivityAttempted>(Handle_EndPlayerCaptivityAttempted);
         messageBroker.Unsubscribe<EndCaptivityAttempted>(Handle_EndCaptivityAttempted);
-        messageBroker.Unsubscribe<PrisonerLiberationAttempted>(Handle_PrisonerLiberationAttempted);
         messageBroker.Unsubscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
         messageBroker.Unsubscribe<NetworkPlayerCaptivityReleasePositionSet>(Handle_NetworkPlayerCaptivityReleasePositionSet);
     }
@@ -209,15 +207,6 @@ internal class PlayerCaptivityClientHandler : IHandler
 
         PlayerEncounter.Current?._capturedAlreadyPrisonerHeroes?
             .RemoveAll(element => element.Character?.HeroObject == data.Prisoner);
-    }
-
-    private void Handle_PrisonerLiberationAttempted(MessagePayload<PrisonerLiberationAttempted> payload)
-    {
-        if (ModInformation.IsServer) return;
-
-        if (!objectManager.TryGetIdWithLogging(payload.What.Prisoner, out string prisonerId)) return;
-
-        network.SendAll(new NetworkPrisonerLiberationAttempted(prisonerId));
     }
 
     /// <summary>

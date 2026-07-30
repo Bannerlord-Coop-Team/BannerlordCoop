@@ -172,7 +172,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                 mountOriginalOwnerControllerId:
                     mountInfo?.OriginalOwner ?? info.OriginalOwner,
                 mountMovementScopeId:
-                    mountInfo?.MovementScopeId ?? info.MovementScopeId));
+                    mountInfo?.MovementScopeId ?? info.MovementScopeId,
+                isRunningAway: agent.IsRunningAway));
         }
         return records;
     }
@@ -314,7 +315,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             currentEquipment: new AgentEquipmentData(agent),
             movementScopeId: movementScopeId,
             mountOriginalOwnerControllerId: owner,
-            mountMovementScopeId: movementScopeId);
+            mountMovementScopeId: movementScopeId,
+            isRunningAway: agent.IsRunningAway);
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
         messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));
