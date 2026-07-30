@@ -50,7 +50,7 @@ internal class PartyCommands
     /// dereferences a null PartyBelongedTo.
     /// </summary>
     private static List<Hero> FindHeroesWithParty(string name)
-        => Hero.AllAliveHeroes.Where(h => h.Name.ToString() == name && h.PartyBelongedTo != null).ToList();
+        => Hero.AllAliveHeroes.Where(h => h != null && h.Name.ToString() == name && h.PartyBelongedTo != null).ToList();
 
     /// <summary>
     /// Finds a single alive hero with a party, for the cheats that target one party (the companion-preserve
@@ -174,7 +174,7 @@ internal class PartyCommands
 
         var nameOrId = string.Join(" ", strings);
         var heroById = Hero.AllAliveHeroes.FirstOrDefault(
-            hero => hero.StringId == nameOrId && hero.PartyBelongedTo != null);
+            hero => hero != null && hero.StringId == nameOrId && hero.PartyBelongedTo != null);
         var heroes = heroById == null
             ? FindHeroesWithParty(nameOrId)
             : new List<Hero> { heroById };
