@@ -214,6 +214,8 @@ internal static class BattleDebugCommands
 
         foreach (Agent rider in riders)
         {
+            rider.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+            rider.MountAgent?.SetMaximumSpeedLimit(-1f, isMultiplier: false);
             rider.SetIsAIPaused(false);
             rider.MountAgent?.SetIsAIPaused(false);
         }
@@ -264,10 +266,12 @@ internal static class BattleDebugCommands
             formation.SetMovementOrder(MovementOrder.MovementOrderStop);
         foreach (Agent rider in riders)
         {
+            rider.SetMaximumSpeedLimit(0f, isMultiplier: false);
             rider.MovementInputVector = Vec2.Zero;
             rider.SetIsAIPaused(true);
             if (rider.MountAgent != null)
             {
+                rider.MountAgent.SetMaximumSpeedLimit(0f, isMultiplier: false);
                 rider.MountAgent.MovementInputVector = Vec2.Zero;
                 rider.MountAgent.SetIsAIPaused(true);
             }
@@ -315,6 +319,8 @@ internal static class BattleDebugCommands
 
         foreach (Agent rider in riders)
         {
+            rider.SetMaximumSpeedLimit(0f, isMultiplier: false);
+            rider.MountAgent?.SetMaximumSpeedLimit(0f, isMultiplier: false);
             rider.SetIsAIPaused(false);
             rider.MountAgent?.SetIsAIPaused(false);
         }
