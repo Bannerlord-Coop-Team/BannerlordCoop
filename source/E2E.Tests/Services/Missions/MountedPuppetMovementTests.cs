@@ -77,6 +77,118 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void MovementPacket_ReplaysRemoteSyntheticMountTurnAfterNativeTick()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var riderId = Guid.NewGuid();
+            var horseId = Guid.NewGuid();
+
+            Agent puppetRider = SpawnRider(mock);
+            Agent puppetHorse = mock.SpawnMount(puppetRider);
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            puppetHorseMirror.HasVisualSkeleton = true;
+            Assert.True(registry.TryRegisterAgent("owner", riderId, puppetRider));
+            Assert.True(registry.TryRegisterAgent("owner", horseId, puppetHorse));
+
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceHorseMirror.RealGlobalVelocity = Vec3.Zero;
+            sourceHorseMirror.Action0Index = 101;
+
+            const int turnActionIndex = 902;
+            AgentData turnData = CreateMountedData(
+                riderPosition: Vec3.Zero,
+                riderDirection: Vec2.Forward,
+                ownerSpeed: 0f,
+                mountData: new AgentMountData(
+                    sourceHorse,
+                    mountAgentId: horseId,
+                    mountAction0TurnDirection: AgentMountData.TurnRight,
+                    mountAction0TurnActionIndex: turnActionIndex,
+                    mountAction0TurnProgress: 0.25f));
+            Assert.Equal(
+                0.25f,
+                turnData.MountData.MountAction0Progress,
+                precision: 3);
+            Assert.True(
+                turnData.MountData.MountSpeed
+                    <= AgentMountData.StationarySpeedThreshold);
+            Assert.Equal(
+                AgentMountData.TurnRight,
+                turnData.MountData.MountAction0TurnDirection);
+            Assert.Equal(
+                turnActionIndex,
+                turnData.MountData.MountAction0TurnActionIndex);
+
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(
+                    new[] { riderId },
+                    new[] { turnData }));
+            Assert.True(puppetRider.HasMount);
+            Assert.Same(puppetHorse, puppetRider.MountAgent);
+            Assert.Equal(1, puppetHorseMirror.SetActionChannelCalls);
+            puppetHorseMirror.SkeletonAction0Index =
+                ActionIndexCache.act_none.Index;
+
+            component.AgentMovementHandler
+                .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
+            Assert.Equal(
+                turnActionIndex,
+                puppetHorseMirror.SkeletonAction0Index);
+            Assert.Equal(
+                0.25f,
+                puppetHorseMirror.RawVisualAction0Progress,
+                precision: 3);
+            Assert.Equal(
+                -0.2f,
+                puppetHorseMirror.LastAgentVisualActionBlendPeriodOverride);
+
+            AgentData settledData = CreateMountedData(
+                riderPosition: Vec3.Zero,
+                riderDirection: Vec2.Forward,
+                ownerSpeed: 0f,
+                mountData: new AgentMountData(sourceHorse, horseId));
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(
+                    new[] { riderId },
+                    new[] { settledData }));
+            puppetHorseMirror.SkeletonAction0Index =
+                ActionIndexCache.act_none.Index;
+            int installsBeforeGrace =
+                puppetHorseMirror.InstallAgentVisualActionCalls;
+
+            component.AgentMovementHandler
+                .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+            component.AgentMovementHandler
+                .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+            component.AgentMovementHandler
+                .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+            int installsAfterGrace =
+                puppetHorseMirror.InstallAgentVisualActionCalls;
+            puppetHorseMirror.SkeletonAction0Index =
+                ActionIndexCache.act_none.Index;
+            component.AgentMovementHandler
+                .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
+            Assert.True(installsAfterGrace > installsBeforeGrace);
+            Assert.Equal(
+                installsAfterGrace,
+                puppetHorseMirror.InstallAgentVisualActionCalls);
+        });
+    }
+
+    [Fact]
     public void ApplyMount_CapsAStationaryPuppetAtZeroUsingHorizontalSpeed()
     {
         using var fixture = new MissionEngineFixture();

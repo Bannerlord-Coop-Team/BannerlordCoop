@@ -46,6 +46,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     // Forty updates per second keeps locally authoritative agents responsive.
     private const float MovementPollingIntervalSeconds = 0.025f;
     private const int SyntheticMountTurnPollLimit = 80;
+    private const int RemoteSyntheticMountTurnClearGraceFrames = 3;
     private const float UseActionBlendPeriod = -0.2f;
 
     private readonly IPacketManager packetManager;
@@ -67,6 +68,10 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly Dictionary<Agent, Vec2> _lastMountDirections = new Dictionary<Agent, Vec2>();
     private readonly Dictionary<Agent, SyntheticMountTurnState> _syntheticMountTurns =
         new Dictionary<Agent, SyntheticMountTurnState>();
+    private readonly Dictionary<Agent, RemoteSyntheticMountTurnState> _remoteSyntheticMountTurns =
+        new Dictionary<Agent, RemoteSyntheticMountTurnState>();
+    private readonly List<Agent> _completedRemoteSyntheticMountTurns =
+        new List<Agent>();
 
     private sealed class SyntheticMountTurnState
     {
@@ -87,6 +92,25 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         public float Progress =>
             Math.Min(0.99f, (float)ElapsedPolls / SyntheticMountTurnPollLimit);
+    }
+
+    private sealed class RemoteSyntheticMountTurnState
+    {
+        public readonly int Direction;
+        public readonly int ActionIndex;
+        public float Progress;
+        public int FramesSinceUpdate;
+        public bool ClearRequested;
+
+        public RemoteSyntheticMountTurnState(
+            int direction,
+            int actionIndex,
+            float progress)
+        {
+            Direction = direction;
+            ActionIndex = actionIndex;
+            Progress = progress;
+        }
     }
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
@@ -159,6 +183,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         _interpolator.Clear();
         _lastMountDirections.Clear();
         _syntheticMountTurns.Clear();
+        _remoteSyntheticMountTurns.Clear();
+        _completedRemoteSyntheticMountTurns.Clear();
 
         packetManager.RemovePacketHandler(this);
         packetManager.RemovePacketHandler(_mountMovementApplier);
@@ -322,6 +348,82 @@ public class AgentMovementHandler : IAgentMovementHandler
                 syntheticTurn.Progress,
                 UseActionBlendPeriod);
         }
+
+        _completedRemoteSyntheticMountTurns.Clear();
+        foreach (var pair in _remoteSyntheticMountTurns)
+        {
+            Agent mount = pair.Key;
+            RemoteSyntheticMountTurnState syntheticTurn = pair.Value;
+            if (mount == null
+                || mount.Mission == null
+                || !mount.IsActive())
+            {
+                _completedRemoteSyntheticMountTurns.Add(mount);
+                continue;
+            }
+
+            visualActionAccessor.TrySetAction(
+                mount,
+                0,
+                new ActionIndexCache(syntheticTurn.ActionIndex),
+                syntheticTurn.Progress,
+                UseActionBlendPeriod);
+            syntheticTurn.FramesSinceUpdate++;
+            if (syntheticTurn.ClearRequested
+                && syntheticTurn.FramesSinceUpdate
+                    >= RemoteSyntheticMountTurnClearGraceFrames)
+            {
+                _completedRemoteSyntheticMountTurns.Add(mount);
+            }
+        }
+
+        foreach (Agent mount in _completedRemoteSyntheticMountTurns)
+            _remoteSyntheticMountTurns.Remove(mount);
+    }
+
+    private void UpdateRemoteSyntheticMountTurn(
+        Agent mount,
+        AgentMountData mountData)
+    {
+        if (mount == null) return;
+
+        bool syntheticTurn =
+            mountData != null
+            && mountData.MountSpeed <= AgentMountData.StationarySpeedThreshold
+            && mountData.MountAction0TurnDirection != AgentMountData.NoTurn
+            && mountData.MountAction0TurnActionIndex
+                != AgentMountData.NoActionIndex;
+        if (!syntheticTurn)
+        {
+            if (_remoteSyntheticMountTurns.TryGetValue(
+                    mount,
+                    out RemoteSyntheticMountTurnState completedTurn))
+            {
+                completedTurn.ClearRequested = true;
+            }
+            return;
+        }
+
+        if (!_remoteSyntheticMountTurns.TryGetValue(
+                mount,
+                out RemoteSyntheticMountTurnState activeTurn)
+            || activeTurn.Direction
+                != mountData.MountAction0TurnDirection
+            || activeTurn.ActionIndex
+                != mountData.MountAction0TurnActionIndex)
+        {
+            _remoteSyntheticMountTurns[mount] =
+                new RemoteSyntheticMountTurnState(
+                    mountData.MountAction0TurnDirection,
+                    mountData.MountAction0TurnActionIndex,
+                    mountData.MountAction0Progress);
+            return;
+        }
+
+        if (mountData.MountAction0Progress > activeTurn.Progress)
+            activeTurn.Progress = mountData.MountAction0Progress;
+        activeTurn.FramesSinceUpdate = 0;
+        activeTurn.ClearRequested = false;
     }
 
     private int EnsureStationaryMountTurnAnimation(
@@ -627,7 +729,15 @@ public class AgentMovementHandler : IAgentMovementHandler
                     if (agentRegistry.IsLocallyControlled(agent))
                         continue;
 
+                    Agent previousMount = agent.MountAgent;
                     SyncMountState(agent, movement.IdentityScopeId, data);
+                    if (previousMount != null
+                        && !ReferenceEquals(previousMount, agent.MountAgent))
+                    {
+                        UpdateRemoteSyntheticMountTurn(
+                            previousMount,
+                            null);
+                    }
 
                     // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
                     if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
@@ -637,6 +747,13 @@ public class AgentMovementHandler : IAgentMovementHandler
                     }
 
                     data.Apply(agent);
+                    if (data.MountData != null
+                        && agent.MountAgent is Agent remoteMount)
+                    {
+                        UpdateRemoteSyntheticMountTurn(
+                            remoteMount,
+                            data.MountData);
+                    }
 
                     // Position is reconciled per-frame by the interpolator (smoother than a per-packet
                     // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
