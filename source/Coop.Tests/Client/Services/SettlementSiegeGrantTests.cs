@@ -4,6 +4,7 @@ using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Handlers;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Common.Services.SiegeEvents;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -11,6 +12,7 @@ using GameInterface.Services.Settlements.Interfaces;
 using Moq;
 using System;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 
 namespace Coop.Tests.Client.Services;
@@ -18,6 +20,126 @@ namespace Coop.Tests.Client.Services;
 [Collection(nameof(ModInformationRoleCollection))]
 public class SettlementSiegeGrantTests
 {
+    [Fact]
+    public void RejectedSettlementRequest_PreservesTheExistingGrant()
+    {
+        var messageBroker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var objectManager = new Mock<IObjectManager>();
+        var grantStore = new SiegeInteractionGrantStore();
+        const string partyId = "party";
+        const string settlementId = "settlement";
+        const string interactionId = "existing-interaction";
+        string resolvedPartyId = partyId;
+        string resolvedSettlementId = settlementId;
+        objectManager
+            .Setup(manager => manager.TryGetIdWithLogging(
+                party,
+                out resolvedPartyId))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetIdWithLogging(
+                settlement,
+                out resolvedSettlementId))
+            .Returns(true);
+        grantStore.RecordLocal(interactionId, partyId, settlementId);
+
+        using var handler = new ClientSettlementExitEnterHandler(
+            messageBroker,
+            network,
+            objectManager.Object,
+            Mock.Of<ISettlementInterface>(),
+            grantStore);
+
+        messageBroker.Publish(
+            this,
+            new StartSettlementEncounterAttempted(party, settlement));
+        var replacement = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkRequestStartSettlementEncounter>(
+                peer));
+        messageBroker.Publish(
+            this,
+            new NetworkSettlementEncounterRejected(replacement));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.True(
+            grantStore.TryConsumeLocal(
+                partyId,
+                settlementId,
+                out var preservedInteractionId));
+        Assert.Equal(interactionId, preservedInteractionId);
+    }
+
+    [Fact]
+    public void ApprovedSettlementRequest_ReplacesTheExistingGrant()
+    {
+        var messageBroker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var objectManager = new Mock<IObjectManager>();
+        var grantStore = new SiegeInteractionGrantStore();
+        const string partyId = "party";
+        const string settlementId = "settlement";
+        string resolvedPartyId = partyId;
+        string resolvedSettlementId = settlementId;
+        MobileParty resolvedParty = party;
+        Settlement resolvedSettlement = settlement;
+        objectManager
+            .Setup(manager => manager.TryGetIdWithLogging(
+                party,
+                out resolvedPartyId))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetIdWithLogging(
+                settlement,
+                out resolvedSettlementId))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(
+                partyId,
+                out resolvedParty))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(
+                settlementId,
+                out resolvedSettlement))
+            .Returns(true);
+        grantStore.RecordLocal(
+            "existing-interaction",
+            partyId,
+            settlementId);
+
+        using var handler = new ClientSettlementExitEnterHandler(
+            messageBroker,
+            network,
+            objectManager.Object,
+            Mock.Of<ISettlementInterface>(),
+            grantStore);
+
+        messageBroker.Publish(
+            this,
+            new StartSettlementEncounterAttempted(party, settlement));
+        var replacement = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkRequestStartSettlementEncounter>(
+                peer));
+        messageBroker.Publish(
+            this,
+            new NetworkStartSettlementEncounter(replacement));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.True(
+            grantStore.TryConsumeLocal(
+                partyId,
+                settlementId,
+                out var replacementInteractionId));
+        Assert.Equal(replacement.InteractionId, replacementInteractionId);
+    }
+
     [Fact]
     public void ReplicatedPartyLeave_ClearsOwningGrantAfterTheLeaveApplies()
     {

@@ -113,11 +113,11 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void BesiegeRequest_AfterPartyTargetsAnotherSettlement_IsRejected()
+    public void BesiegeRequest_AfterRejectedInteractionRefresh_UsesTheOriginalGrant()
     {
         var client = Clients.First();
         var context = CreateEntryContext(client, "PlayerOne");
-        RequestSettlementInteraction(client, context);
+        var originalInteractionId = RequestSettlementInteraction(client, context);
         var otherSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
         Server.Call(() =>
@@ -140,9 +140,38 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             }
         });
         Server.NetworkSentMessages.Clear();
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(
+                context.SettlementId,
+                out var settlement));
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new StartSettlementEncounterAttempted(party, settlement));
+        }, SettlementEncounterDisabledMethods);
+
+        var replacementInteraction = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.NotEqual(originalInteractionId, replacementInteraction.InteractionId);
+        var replacementRejection = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterRejected>());
+        Assert.Equal(
+            replacementInteraction.InteractionId,
+            replacementRejection.InteractionId);
+
+        Server.NetworkSentMessages.Clear();
+        client.NetworkSentMessages.Clear();
 
         SendBesiegeAttempt(client, context);
 
+        var request = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBesiegeSettlement>());
+        Assert.Equal(originalInteractionId, request.InteractionId);
         var result = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSiegeEntryResult>());
         Assert.Equal(SiegeEntryOutcome.Rejected, result.Outcome);

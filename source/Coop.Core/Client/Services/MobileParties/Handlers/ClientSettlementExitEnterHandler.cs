@@ -73,7 +73,6 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (pendingStart != null)
             return;
 
-        siegeInteractionGrantStore.ClearLocal(partyId);
         var request = new NetworkRequestStartSettlementEncounter(
             partyId,
             settlementId,

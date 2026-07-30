@@ -10,6 +10,7 @@ using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Validation;
 using Moq;
@@ -23,6 +24,177 @@ namespace Coop.Tests.Server.Services.MobileParties;
 [Collection(nameof(ModInformationRoleCollection))]
 public class SettlementSiegeGrantInvalidationTests
 {
+    [Fact]
+    public void RejectedSettlementRequest_PreservesTheExistingGrant()
+    {
+        var messageBroker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        var validator = new Mock<ISiegeEntryValidator>();
+        var grantStore = new SiegeInteractionGrantStore();
+        const string partyId = "party";
+        const string settlementId = "settlement";
+        const string interactionId = "existing-interaction";
+        var player = new Player("controller", "hero", partyId, "clan", "character");
+        Player resolvedPlayer = player;
+        MobileParty resolvedParty = party;
+        Settlement resolvedSettlement = settlement;
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out resolvedPlayer))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(
+                partyId,
+                out resolvedParty))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(
+                settlementId,
+                out resolvedSettlement))
+            .Returns(true);
+        validator
+            .Setup(service => service.ValidateSettlementInteraction(
+                party,
+                settlement))
+            .Returns(SiegeEntryValidationResult.Rejected(
+                SiegeEntryDenialReason.MovementTargetMismatch,
+                new SiegeEntryCanonicalState(
+                    SiegeEntryDisposition.Map,
+                    null)));
+        grantStore.Grant(
+            peer,
+            interactionId,
+            partyId,
+            settlementId,
+            presentedCamp: null);
+
+        using var handler = new ServerSettlementExitEnterHandler(
+            messageBroker,
+            network,
+            objectManager.Object,
+            Mock.Of<ISettlementInterface>(),
+            Mock.Of<IKingdomCreationSettlementTracker>(),
+            playerManager.Object,
+            grantStore,
+            validator.Object);
+
+        messageBroker.Publish(
+            peer,
+            new NetworkRequestStartSettlementEncounter(
+                partyId,
+                settlementId,
+                "replacement-interaction"));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.False(
+            grantStore.TryConsume(
+                peer,
+                "replacement-interaction",
+                partyId,
+                settlementId,
+                presentedCamp: null));
+        Assert.True(
+            grantStore.TryConsume(
+                peer,
+                interactionId,
+                partyId,
+                settlementId,
+                presentedCamp: null));
+        Assert.Single(
+            network.GetPeerMessagesFromType<NetworkSettlementEncounterRejected>(
+                peer));
+    }
+
+    [Fact]
+    public void ApprovedSettlementRequest_ReplacesTheExistingGrant()
+    {
+        var messageBroker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        party._currentSettlement = settlement;
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        var validator = new Mock<ISiegeEntryValidator>();
+        var grantStore = new SiegeInteractionGrantStore();
+        const string partyId = "party";
+        const string settlementId = "settlement";
+        const string interactionId = "existing-interaction";
+        const string replacementInteractionId = "replacement-interaction";
+        var player = new Player("controller", "hero", partyId, "clan", "character");
+        Player resolvedPlayer = player;
+        MobileParty resolvedParty = party;
+        Settlement resolvedSettlement = settlement;
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out resolvedPlayer))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(
+                partyId,
+                out resolvedParty))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(
+                settlementId,
+                out resolvedSettlement))
+            .Returns(true);
+        validator
+            .Setup(service => service.ValidateSettlementInteraction(
+                party,
+                settlement))
+            .Returns(SiegeEntryValidationResult.Valid(
+                new SiegeEntryCanonicalState(
+                    SiegeEntryDisposition.Settlement,
+                    settlement)));
+        grantStore.Grant(
+            peer,
+            interactionId,
+            partyId,
+            settlementId,
+            presentedCamp: null);
+
+        using var handler = new ServerSettlementExitEnterHandler(
+            messageBroker,
+            network,
+            objectManager.Object,
+            Mock.Of<ISettlementInterface>(),
+            Mock.Of<IKingdomCreationSettlementTracker>(),
+            playerManager.Object,
+            grantStore,
+            validator.Object);
+
+        messageBroker.Publish(
+            peer,
+            new NetworkRequestStartSettlementEncounter(
+                partyId,
+                settlementId,
+                replacementInteractionId));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.False(
+            grantStore.TryConsume(
+                peer,
+                interactionId,
+                partyId,
+                settlementId,
+                presentedCamp: null));
+        Assert.True(
+            grantStore.TryConsume(
+                peer,
+                replacementInteractionId,
+                partyId,
+                settlementId,
+                presentedCamp: null));
+        Assert.Single(
+            network.GetPeerMessagesFromType<NetworkStartSettlementEncounter>(
+                peer));
+    }
+
     [Fact]
     public void EndSettlementRequest_WhenLeaveThrowsBeforeMutation_SuppressesTheLeave()
     {

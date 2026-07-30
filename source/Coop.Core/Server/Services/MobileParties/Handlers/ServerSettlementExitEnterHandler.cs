@@ -79,7 +79,6 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            siegeInteractionGrantStore.Revoke(peer);
             if (!playerManager.TryGetPlayer(peer, out var player) ||
                 player.MobilePartyId != payload.PartyId)
             {
