@@ -436,15 +436,26 @@ public class AgentMovementHandler : IAgentMovementHandler
         if (mount == null || !mount.IsActive()) return AgentMountData.NoTurn;
 
         Vec2 currentDirection = mount.GetMovementDirection();
+        bool hasPreviousDirection = _lastMountDirections.TryGetValue(
+            mount,
+            out Vec2 previousDirection);
+        ActionIndexCache currentAction = mount.GetCurrentAction(0);
         if (mount.GetRealGlobalVelocity().AsVec2.Length > AgentMountData.StationarySpeedThreshold)
         {
             ClearSyntheticMountTurn(mount);
-            // Retain the final moving facing for the first stationary snapshot.
-            _lastMountDirections[mount] = currentDirection;
+            bool drivenLocomotion =
+                mount.MovementInputVector.LengthSquared > 0.0001f
+                || AgentMountData.IsLocomotionAction(
+                    currentAction.Index,
+                    null);
+            if (!hasPreviousDirection || drivenLocomotion)
+            {
+                // Retain the final moving facing for the first stationary snapshot.
+                _lastMountDirections[mount] = currentDirection;
+            }
             return AgentMountData.NoTurn;
         }
 
-        ActionIndexCache currentAction = mount.GetCurrentAction(0);
         int activeTurnDirection = AgentMountData.GetStationaryTurnDirection(
             currentAction.Index);
         if (activeTurnDirection != AgentMountData.NoTurn)
@@ -494,7 +505,7 @@ public class AgentMovementHandler : IAgentMovementHandler
             return activeSyntheticTurn.Direction;
         }
 
-        if (!_lastMountDirections.TryGetValue(mount, out Vec2 previousDirection))
+        if (!hasPreviousDirection)
         {
             _lastMountDirections[mount] = currentDirection;
             return AgentMountData.NoTurn;
