@@ -456,6 +456,10 @@ internal static class BattleDebugCommands
         mountCamera.FillParametersFrom(missionScreen.CombatCamera);
 
         Agent mount = info.Agent;
+        MBAgentVisuals visuals = mount.AgentVisuals;
+        if (ReferenceEquals(visuals, null) || !visuals.IsValid())
+            return $"Mount {mountId:N} has no active visuals";
+
         Vec2 direction = mount.GetMovementDirection();
         if (direction.LengthSquared <= 0.0001f)
             direction = Vec2.Forward;
@@ -464,7 +468,7 @@ internal static class BattleDebugCommands
 
         var forward = new Vec3(direction.X, direction.Y, 0f);
         var side = new Vec3(-direction.Y, direction.X, 0f);
-        var target = mount.Position + (Vec3.Up * 1.4f);
+        var target = visuals.GetGlobalFrame().origin + (Vec3.Up * 1.4f);
         var position = target - (forward * 11f) + (side * 4f) + (Vec3.Up * 4f);
         mountCamera.LookAt(position, target, Vec3.Up);
         missionScreen.CustomCamera = mountCamera;
