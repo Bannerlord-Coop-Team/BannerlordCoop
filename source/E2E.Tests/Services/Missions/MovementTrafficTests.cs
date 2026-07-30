@@ -229,7 +229,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 registry,
                 peer.Resolve<IControllerIdProvider>(),
                 peer.Resolve<IAgentEquipmentApplier>(),
-                compressor,
+                new MovementBatchSender(network, compressor),
                 peer.Resolve<IPuppetMountStateRepairer>());
             network.MaxUnreliablePayloadBytes = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
                 serializer,

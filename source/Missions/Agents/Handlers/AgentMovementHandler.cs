@@ -9,7 +9,6 @@ using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Packets;
 using Missions.Messages;
-using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -47,7 +46,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IAgentEquipmentApplier equipmentApplier;
-    private readonly MovementBatchSender movementBatchSender;
+    private readonly IMovementBatchSender movementBatchSender;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
 
@@ -78,7 +77,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IAgentEquipmentApplier equipmentApplier,
-        IMovementPacketCompressor movementPacketCompressor,
+        IMovementBatchSender movementBatchSender,
         IPuppetMountStateRepairer puppetMountStateRepairer)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
@@ -89,7 +88,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.equipmentApplier = equipmentApplier;
-        this.movementBatchSender = new MovementBatchSender(client, movementPacketCompressor);
+        this.movementBatchSender = movementBatchSender;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
 
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind

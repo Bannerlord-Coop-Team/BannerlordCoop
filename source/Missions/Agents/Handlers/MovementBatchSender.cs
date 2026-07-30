@@ -8,7 +8,18 @@ using System.Collections.Generic;
 
 namespace Missions.Agents.Handlers;
 
-internal sealed class MovementBatch<T>
+public interface IMovementBatchSender
+{
+    void Send<T>(
+        IEnumerable<MovementBatch<T>> scopedBatches,
+        MovementBatch<T> legacyBatch,
+        int maxPayloadBytes,
+        Func<string, ushort[], Guid[], T[], IPacket> createPacket);
+
+    void Clear();
+}
+
+public sealed class MovementBatch<T>
 {
     public string IdentityScopeId { get; }
     public List<ushort> CompactIds { get; } = new List<ushort>();
@@ -30,7 +41,7 @@ internal sealed class MovementBatch<T>
 }
 
 /// <summary>Selects and sends the largest movement batches that fit the unreliable route budget.</summary>
-internal sealed class MovementBatchSender
+public sealed class MovementBatchSender : IMovementBatchSender
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MovementBatchSender>();
     private const int InitialBatchSize = 3;
