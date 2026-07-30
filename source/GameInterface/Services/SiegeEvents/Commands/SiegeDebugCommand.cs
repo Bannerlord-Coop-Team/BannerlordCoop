@@ -397,6 +397,20 @@ public class SiegeDebugCommand
             return "Encounter menu behavior is unavailable";
         }
 
+        var entryArgs = new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, null);
+        if (!behavior.break_in_to_help_defender_side_on_condition(entryArgs) ||
+            !entryArgs.IsEnabled)
+        {
+            return "The rendered break-in entry is disabled";
+        }
+
+        var confirmationArgs = new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, null);
+        if (!behavior.break_in_menu_accept_on_condition(confirmationArgs) ||
+            !confirmationArgs.IsEnabled)
+        {
+            return "The rendered break-in confirmation is disabled";
+        }
+
         behavior.game_menu_join_siege_event_on_defender_side_on_consequence(null);
         behavior.break_in_menu_accept_on_consequence(null);
         return "Accepted the rendered break-in prompt and opened its debrief";
