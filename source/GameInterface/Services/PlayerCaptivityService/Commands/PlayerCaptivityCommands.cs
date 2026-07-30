@@ -771,6 +771,7 @@ Reports captivity and registered party state without mutating it.";
             output.AppendLine($"HeroMemberCount: {registeredParty.MemberRoster.GetTroopCount(hero.CharacterObject)}");
             output.AppendLine($"PartyMemberCount: {registeredParty.MemberRoster.TotalManCount}");
             output.AppendLine($"PartyPrisonerCount: {registeredParty.PrisonRoster.TotalManCount}");
+            output.AppendLine($"PartyItemCount: {registeredParty.ItemRoster.Sum(element => element.Amount)}");
             output.AppendLine($"PartyPosition: {registeredParty.Position.X:R},{registeredParty.Position.Y:R}");
             output.AppendLine($"PartyIsOnLand: {registeredParty.Position.IsOnLand}");
             output.AppendLine($"PartyMoveMode: {registeredParty.PartyMoveMode}");
