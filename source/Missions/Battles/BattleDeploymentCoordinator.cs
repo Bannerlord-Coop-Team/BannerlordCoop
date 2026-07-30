@@ -237,8 +237,9 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     //    (reserves still inside CoopBattleMissionSpawnHandler's hold). This is transient; disarming here (as the
     //    original one-shot did) would leave the AFK player never auto-finished once setup completes, so we ask
     //    again on the next tick.
-    //  - Finished (permanent disarm): the native FinishDeployment ran; its fan-out re-enters
-    //    OnLocalDeploymentFinished, so the announce/activation/reveal follow exactly as a manual finish.
+    //  - Finished (permanent disarm): the native FinishDeployment was queued for the next game-loop pump;
+    //    its fan-out re-enters OnLocalDeploymentFinished, so the announce/activation/reveal follow exactly
+    //    as a manual finish.
     private static DeploymentAutoFinishResult FinishNativeDeployment()
     {
         var mission = Mission.Current;
@@ -263,8 +264,18 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
             return DeploymentAutoFinishResult.Unavailable;
         }
 
-        Logger.Information("[BattleSync] Auto-finishing the local deployment via the native DeploymentHandler.FinishDeployment");
-        deploymentHandler.FinishDeployment();
+        Logger.Information("[BattleSync] Queuing native DeploymentHandler.FinishDeployment outside the mission behavior tick");
+        GameThread.EnqueueSafe(() =>
+        {
+            if (!ReferenceEquals(Mission.Current, mission)) return;
+
+            var currentController = mission.GetMissionBehavior<DeploymentMissionController>();
+            var currentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+            if (currentController?.TeamSetupOver != true || currentHandler == null) return;
+
+            Logger.Information("[BattleSync] Auto-finishing the local deployment via the native DeploymentHandler.FinishDeployment");
+            currentHandler.FinishDeployment();
+        }, "deferred battle deployment auto-finish");
         return DeploymentAutoFinishResult.Finished;
     }
 

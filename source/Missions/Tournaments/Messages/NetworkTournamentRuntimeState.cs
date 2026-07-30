@@ -1,5 +1,6 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Tournaments.Data;
+using Missions.Agents.Packets;
 using ProtoBuf;
 using System;
 using TaleWorlds.Library;
@@ -36,15 +37,20 @@ public sealed class TournamentAgentRuntimeData
     [ProtoMember(1)] public readonly Guid AgentId;
     [ProtoMember(2)] public readonly float Health;
     [ProtoMember(3)] public readonly TournamentMissionWeaponData[] Equipment;
+    [ProtoMember(4)] public readonly AgentEquipmentData CurrentEquipment;
+    [ProtoMember(5)] public readonly bool HasCurrentEquipment;
 
     public TournamentAgentRuntimeData(
         Guid agentId,
         float health,
-        TournamentMissionWeaponData[] equipment)
+        TournamentMissionWeaponData[] equipment,
+        AgentEquipmentData? currentEquipment)
     {
         AgentId = agentId;
         Health = health;
         Equipment = equipment ?? Array.Empty<TournamentMissionWeaponData>();
+        CurrentEquipment = currentEquipment.GetValueOrDefault();
+        HasCurrentEquipment = currentEquipment.HasValue;
     }
 }
 
