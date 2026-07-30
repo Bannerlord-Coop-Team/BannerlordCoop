@@ -53,7 +53,8 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress)
+        float progress,
+        float blendPeriodOverride)
     {
         if (!AgentMirror.TryGet(agent, out MirrorAgent mirror)
             || !mirror.HasVisualSkeleton)
@@ -64,14 +65,22 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         if (channel == 0)
         {
             if (mirror.SkeletonAction0Index != action.Index)
+            {
                 mirror.InstallAgentVisualActionCalls++;
+                mirror.LastAgentVisualActionBlendPeriodOverride =
+                    blendPeriodOverride;
+            }
             mirror.SkeletonAction0Index = action.Index;
             mirror.RawVisualAction0Progress = progress;
         }
         else
         {
             if (mirror.SkeletonAction1Index != action.Index)
+            {
                 mirror.InstallAgentVisualActionCalls++;
+                mirror.LastAgentVisualActionBlendPeriodOverride =
+                    blendPeriodOverride;
+            }
             mirror.SkeletonAction1Index = action.Index;
             mirror.RawVisualAction1Progress = progress;
         }

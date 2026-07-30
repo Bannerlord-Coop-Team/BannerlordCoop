@@ -19,7 +19,8 @@ public interface IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress);
+        float progress,
+        float blendPeriodOverride);
 }
 
 public class AgentVisualActionAccessor : IAgentVisualActionAccessor
@@ -87,7 +88,8 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress)
+        float progress,
+        float blendPeriodOverride)
     {
         Skeleton skeleton = null;
         try
@@ -113,7 +115,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
                     action.Index,
                     channelParameter:
                         Math.Max(0f, Math.Min(1f, progress)),
-                    blendPeriodOverride: 0f,
+                    blendPeriodOverride: blendPeriodOverride,
                     forceFaceMorphRestart: false);
             }
 

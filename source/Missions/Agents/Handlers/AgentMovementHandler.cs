@@ -46,6 +46,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     // Forty updates per second keeps locally authoritative agents responsive.
     private const float MovementPollingIntervalSeconds = 0.025f;
     private const int SyntheticMountTurnPollLimit = 80;
+    private const float UseActionBlendPeriod = -0.2f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -318,7 +319,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                 mount,
                 0,
                 new ActionIndexCache(syntheticTurn.ActionIndex),
-                syntheticTurn.Progress);
+                syntheticTurn.Progress,
+                UseActionBlendPeriod);
         }
     }
 

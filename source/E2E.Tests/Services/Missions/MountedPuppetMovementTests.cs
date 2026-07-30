@@ -581,6 +581,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 horseMirror.SkeletonAction0Index);
             Assert.Equal(0f, horseMirror.RawVisualAction0Progress);
             Assert.Equal(1, horseMirror.InstallAgentVisualActionCalls);
+            Assert.Equal(
+                -0.2f,
+                horseMirror.LastAgentVisualActionBlendPeriodOverride);
 
             network.NetworkSentPackets.Packets.Clear();
             for (int i = 0; i < 20; i++)

@@ -102,6 +102,7 @@ public sealed class MirrorAgent
     public int AdvanceExistingRawVisualActionCalls { get; set; }
     public int InstallRawVisualActionCalls { get; set; }
     public int InstallAgentVisualActionCalls { get; set; }
+    public float LastAgentVisualActionBlendPeriodOverride { get; set; }
     public Agent.MovementControlFlag DefendMovementFlag { get; set; }
     public int SetWeaponGuardCalls { get; set; }
     public Agent.UsageDirection LastSetWeaponGuardDirection { get; set; } =
