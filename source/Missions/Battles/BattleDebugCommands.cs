@@ -502,6 +502,17 @@ internal static class BattleDebugCommands
                 addHumanLikeDelay: false,
                 Agent.AIScriptedFrameFlags.NoAttack |
                     Agent.AIScriptedFrameFlags.ConsiderRotation);
+            Agent mount = rider.MountAgent;
+            if (mount != null)
+            {
+                WorldPosition mountTargetPosition = mount.GetWorldPosition();
+                mount.SetScriptedPositionAndDirection(
+                    ref mountTargetPosition,
+                    targetDirection,
+                    addHumanLikeDelay: false,
+                    Agent.AIScriptedFrameFlags.NoAttack |
+                        Agent.AIScriptedFrameFlags.ConsiderRotation);
+            }
         }
 
         return $"Turned {formations.Length} battle-host cavalry formations {degrees:0.0} degrees in place";
