@@ -165,7 +165,9 @@ internal class TimeControlInterface : ITimeControlInterface
             return;
         }
 
-        var currentMode = GetTimeControl();
+        var currentMode = Campaign.Current == null
+            ? "<unavailable>"
+            : GetTimeControl().ToString();
         var requestedMode = timeMode;
         timeMode = LimitTimeControl(timeMode);
 
