@@ -1366,7 +1366,13 @@ public class MapEventDebugCommands
             return "Unable to resolve Network";
         }
 
-        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+        if (!TryGetPlayerParty(
+                args[0],
+                requireReady: true,
+                out var objectManager,
+                out var playerParty,
+                out var error,
+                allowActiveMapEvent: true))
         {
             return error;
         }
@@ -1516,7 +1522,8 @@ public class MapEventDebugCommands
         bool requireReady,
         out IObjectManager objectManager,
         out MobileParty playerParty,
-        out string error)
+        out string error,
+        bool allowActiveMapEvent = false)
     {
         objectManager = null;
         playerParty = null;
@@ -1552,7 +1559,7 @@ public class MapEventDebugCommands
             return false;
         }
 
-        if (requireReady && playerParty.MapEvent != null)
+        if (requireReady && !allowActiveMapEvent && playerParty.MapEvent != null)
         {
             error = $"Player {controllerId} is already in a map event.";
             return false;
