@@ -5,6 +5,7 @@ using Autofac.Core.Resolving.Pipeline;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
+using GameInterface.Configuration;
 using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
@@ -46,6 +47,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
+        // mod-config.json: one lazy read per session container (see IModConfig).
+        builder.RegisterType<ModConfig>().As<IModConfig>().InstancePerLifetimeScope();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
