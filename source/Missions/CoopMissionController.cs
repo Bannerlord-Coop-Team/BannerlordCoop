@@ -99,6 +99,10 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // Diff again here so peers receive that exact action instead of retaining the earlier pose.
         coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick();
 
+        // A 30 FPS battle needs a second game-thread sample to reach the 60 Hz player target. Consume only
+        // accrued budget here, after the native agent tick can produce a newer movement frame.
+        coopMissionComponent.AgentMovementHandler.PollPlayerMovement();
+
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
         coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
     }

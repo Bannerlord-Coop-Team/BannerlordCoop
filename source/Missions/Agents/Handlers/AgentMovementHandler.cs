@@ -25,6 +25,12 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     /// </summary>
     void PollMovement(float dt);
 
+    /// <summary>
+    /// [Game thread] Consume a second field-battle player sample after the native agent tick when the
+    /// 60 Hz budget has another snapshot due.
+    /// </summary>
+    void PollPlayerMovement();
+
     /// <summary>Per-frame position smoother for received puppets; ticked by CoopMissionController.OnMissionTick.</summary>
     IAgentPositionInterpolator Interpolator { get; }
 
@@ -282,7 +288,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         if (_disposed || mission == null) return;
 
         trafficElapsedSeconds += Math.Max(0f, dt);
-        playerMovementPollElapsed += dt;
+        playerMovementPollElapsed = Math.Min(
+            playerMovementPollElapsed + Math.Max(0f, dt),
+            PlayerMovementPollingIntervalSeconds * 2f);
         movementPollElapsed += dt;
         bool pollPlayer = mission.IsFieldBattle &&
                           playerMovementPollElapsed >= PlayerMovementPollingIntervalSeconds;
@@ -291,9 +299,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         if (pollPlayer)
         {
-            playerPolls++;
-            playerMovementPollElapsed %= PlayerMovementPollingIntervalSeconds;
-            SendPlayerMovement(mission.MainAgent);
+            PollPlayerMovement();
         }
 
         if (!pollNormal) return;
@@ -378,6 +384,22 @@ public class AgentMovementHandler : IAgentMovementHandler
         SendMovement(legacyMovement);
         SendMountMovement(mountGroups.Values);
         SendMountMovement(legacyMountMovement);
+    }
+
+    public void PollPlayerMovement()
+    {
+        Mission mission = Mission.Current;
+        if (_disposed ||
+            mission == null ||
+            !mission.IsFieldBattle ||
+            playerMovementPollElapsed < PlayerMovementPollingIntervalSeconds)
+        {
+            return;
+        }
+
+        playerPolls++;
+        playerMovementPollElapsed -= PlayerMovementPollingIntervalSeconds;
+        SendPlayerMovement(mission.MainAgent);
     }
 
     private void SendPlayerMovement(Agent player)

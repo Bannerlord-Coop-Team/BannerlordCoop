@@ -116,21 +116,69 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             network.NetworkSentPackets.Packets.Clear();
             component.AgentMovementHandler.PollMovement(0.05f);
+            component.AgentMovementHandler.PollPlayerMovement();
             MovementPacket[] sharedTick = network.NetworkSentPackets
                 .GetPackets<MovementPacket>()
                 .ToArray();
             Assert.True(sharedTick[0].IsPlayerMovement);
             Assert.Contains(sharedTick.Skip(1), packet =>
                 !packet.IsPlayerMovement && packet.AgentIds.SequenceEqual(new ushort[] { 1 }));
+            Assert.True(sharedTick[sharedTick.Length - 1].IsPlayerMovement);
 
             MovementTrafficSnapshot traffic =
                 component.AgentMovementHandler.GetTrafficSnapshot();
             Assert.Equal(MovementTrafficSnapshot.PlayerTargetHz, 60);
             Assert.Equal(MovementTrafficSnapshot.NormalTargetHz, 40);
-            Assert.Equal(3, traffic.PlayerPolls);
+            Assert.Equal(4, traffic.PlayerPolls);
             Assert.Equal(2, traffic.NormalPolls);
-            Assert.Equal(3, traffic.PlayerPacketsSent);
+            Assert.Equal(4, traffic.PlayerPacketsSent);
             Assert.Equal(2, traffic.NormalPacketsSent);
+        });
+    }
+
+    [Fact]
+    public void PollPlayerMovement_UsesTwoGameThreadSamplesAtThirtyFps()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            mock.Shell.MissionTeamAIType = Mission.MissionTeamAITypeEnum.FieldBattle;
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+
+            Agent ai = SpawnRider(mock);
+            Agent player = SpawnRider(mock);
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, ai));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 2, player));
+            Assert.True(AgentMirror.TryGet(player, out var playerMirror));
+            mock.MainAgent = player;
+
+            component.AgentMovementHandler.PollMovement(1f / 30f);
+            playerMirror.Position = new Vec3(10f, 20f, 30f);
+            component.AgentMovementHandler.PollPlayerMovement();
+
+            MovementPacket[] packets = network.NetworkSentPackets
+                .GetPackets<MovementPacket>()
+                .ToArray();
+            MovementPacket[] playerPackets = packets
+                .Where(packet => packet.IsPlayerMovement)
+                .ToArray();
+            Assert.Equal(2, playerPackets.Length);
+            Assert.NotEqual(
+                playerPackets[0].Agents[0].Position,
+                playerPackets[1].Agents[0].Position);
+            Assert.Contains(packets, packet => !packet.IsPlayerMovement);
+
+            MovementTrafficSnapshot traffic =
+                component.AgentMovementHandler.GetTrafficSnapshot();
+            Assert.Equal(2, traffic.PlayerPolls);
+            Assert.Equal(1, traffic.NormalPolls);
+            Assert.Equal(2, traffic.PlayerPacketsSent);
         });
     }
 
