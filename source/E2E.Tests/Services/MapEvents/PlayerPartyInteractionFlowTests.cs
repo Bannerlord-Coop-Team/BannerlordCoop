@@ -1199,6 +1199,16 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         RequestInteraction(client1, initiatorPartyId, responderPartyId);
         var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+
+        foreach (var client in Clients)
+        {
+            client.Call(() => client.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkClosePvpEncounter(
+                    new[] { initiatorPartyId, responderPartyId },
+                    mapEventId: "previous-map-event")));
+        }
+
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
 

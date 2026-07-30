@@ -61,7 +61,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly HashSet<string> openedConversationSessionIds = new HashSet<string>();
     private readonly HashSet<string> endedInteractionSessionIds = new HashSet<string>();
     private readonly HashSet<string> hostileEncounterSessionIds = new HashSet<string>();
-    private readonly HashSet<string> closedHostileEncounterPartyIds = new HashSet<string>();
+    private readonly Dictionary<string, string> closedHostileEncounterMapEventIds = new Dictionary<string, string>();
     private bool presentationTickRegistered;
 
     public PlayerPartyInteractionHandler(
@@ -185,8 +185,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (!TryGetControlledSessionParty(message, out var myPartyId, out _)) return;
 
-            closedHostileEncounterPartyIds.Remove(message.InitiatorPartyId);
-            closedHostileEncounterPartyIds.Remove(message.ResponderPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.InitiatorPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.ResponderPartyId);
 
             network.SendAll(new NetworkPlayerPartyInteractionShown(message.SessionId, myPartyId));
         }, context: "Confirm player-party interaction party");
@@ -348,7 +348,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         GameThread.RunSafe(() =>
         {
             foreach (var partyId in payload.What.PartyIds ?? Array.Empty<string>())
-                closedHostileEncounterPartyIds.Add(partyId);
+                closedHostileEncounterMapEventIds[partyId] = payload.What.MapEventId;
         }, context: "Record closed player-party hostile encounter");
     }
 
@@ -967,10 +967,11 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (IsHostileEncounterClosed(message))
         {
             CloseLocalPlayerPartyEncounter(localSide == BattleSideEnum.Attacker ? attacker.MobileParty : defender.MobileParty);
-            closedHostileEncounterPartyIds.Remove(message.AttackerPartyId);
-            closedHostileEncounterPartyIds.Remove(message.DefenderPartyId);
+            ForgetClosedHostileEncounters(message);
             return;
         }
+
+        ForgetClosedHostileEncounters(message);
 
         if (IsCurrentLocalInteractionSession(message.SessionId))
             hostileEncounterSessionIds.Add(message.SessionId);
@@ -979,8 +980,18 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
 
     private bool IsHostileEncounterClosed(NetworkPlayerPartyHostileEncounterStarted message)
-        => closedHostileEncounterPartyIds.Contains(message.AttackerPartyId) ||
-           closedHostileEncounterPartyIds.Contains(message.DefenderPartyId);
+        => IsHostileEncounterClosed(message.AttackerPartyId, message.MapEventId) ||
+           IsHostileEncounterClosed(message.DefenderPartyId, message.MapEventId);
+
+    private bool IsHostileEncounterClosed(string partyId, string mapEventId) =>
+        closedHostileEncounterMapEventIds.TryGetValue(partyId, out var closedMapEventId) &&
+        (closedMapEventId == null || closedMapEventId == mapEventId);
+
+    private void ForgetClosedHostileEncounters(NetworkPlayerPartyHostileEncounterStarted message)
+    {
+        closedHostileEncounterMapEventIds.Remove(message.AttackerPartyId);
+        closedHostileEncounterMapEventIds.Remove(message.DefenderPartyId);
+    }
 
     private bool TryResolveHostileEncounter(
         NetworkPlayerPartyHostileEncounterStarted message,
