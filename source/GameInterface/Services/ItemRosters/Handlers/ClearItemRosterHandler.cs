@@ -7,10 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.ItemRosters.Handlers
 {
@@ -22,15 +19,15 @@ namespace GameInterface.Services.ItemRosters.Handlers
         private static readonly ILogger Logger = LogManager.GetLogger<ClearItemRosterHandler>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
-        private readonly IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider;
+        private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
 
         public ClearItemRosterHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
-            IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider) {
+            IPartyScreenRosterRefresher partyScreenRosterRefresher) {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            this.partyScreenRosterBaselineProvider = partyScreenRosterBaselineProvider;
+            this.partyScreenRosterRefresher = partyScreenRosterRefresher;
 
             messageBroker.Subscribe<ClearItemRoster>(Handle);
         }
@@ -45,10 +42,10 @@ namespace GameInterface.Services.ItemRosters.Handlers
                 {
                     if (!objectManager.TryGetObjectWithLogging<ItemRoster>(data.ItemRosterId, out var itemRoster)) return;
 
-                    var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
-                    var baseline = partyScreenRosterBaselineProvider.GetBaselineRoster(logic, itemRoster);
-                    ItemRosterPatch.ClearOverride(itemRoster);
-                    if (baseline != null) ItemRosterPatch.ClearOverride(baseline);
+                    if (!partyScreenRosterRefresher.TryApply(itemRoster, ItemRosterPatch.ClearOverride))
+                    {
+                        ItemRosterPatch.ClearOverride(itemRoster);
+                    }
                 }
                 catch (Exception e)
                 {

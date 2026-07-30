@@ -110,5 +110,7 @@ public class TroopRosterDeltaHandlerRefreshTests
         }
 
         public bool TryRemoveZeroCounts(TroopRoster authoritativeRoster) => false;
+
+        public bool TryApply(ItemRoster authoritativeRoster, Action<ItemRoster> applyAuthoritative) => false;
     }
 }

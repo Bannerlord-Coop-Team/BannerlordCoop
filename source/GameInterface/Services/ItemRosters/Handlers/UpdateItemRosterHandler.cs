@@ -7,8 +7,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
@@ -22,16 +20,16 @@ internal class UpdateItemRosterHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<UpdateItemRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
-    private readonly IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider;
+    private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
 
     public UpdateItemRosterHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        IPartyScreenRosterBaselineProvider partyScreenRosterBaselineProvider)
+        IPartyScreenRosterRefresher partyScreenRosterRefresher)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
-        this.partyScreenRosterBaselineProvider = partyScreenRosterBaselineProvider;
+        this.partyScreenRosterRefresher = partyScreenRosterRefresher;
 
         messageBroker.Subscribe<UpdateItemRoster>(Handle);
     }
@@ -67,13 +65,12 @@ internal class UpdateItemRosterHandler : IHandler
                     return;
                 }
 
-                var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
-                var baseline = partyScreenRosterBaselineProvider.GetBaselineRoster(logic, itemRoster);
                 var element = new EquipmentElement(item, modifier);
-                ItemRosterPatch.AddToCountsOverride(itemRoster, element, msg.Amount);
-                if (baseline != null)
+                if (!partyScreenRosterRefresher.TryApply(
+                    itemRoster,
+                    roster => ItemRosterPatch.AddToCountsOverride(roster, element, msg.Amount)))
                 {
-                    ItemRosterPatch.AddToCountsOverride(baseline, element, msg.Amount);
+                    ItemRosterPatch.AddToCountsOverride(itemRoster, element, msg.Amount);
                 }
             }
             catch (Exception e)

@@ -36,7 +36,8 @@ internal class PartyScreenRosterBaselineProvider : IPartyScreenRosterBaselinePro
     public ItemRoster GetBaselineRoster(PartyScreenLogic logic, ItemRoster roster)
     {
         if (logic == null || roster == null) return null;
-        return ReferenceEquals(roster, logic.CurrentData.RightItemRoster)
+        return ReferenceEquals(roster, logic.CurrentData.RightItemRoster) ||
+            ReferenceEquals(roster, logic.RightOwnerParty?.ItemRoster)
             ? logic._initialData.RightItemRoster
             : null;
     }
