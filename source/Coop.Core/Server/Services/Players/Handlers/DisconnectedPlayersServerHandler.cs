@@ -1,9 +1,11 @@
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Players;
+using Serilog;
 using System.Linq;
 
 namespace Coop.Core.Server.Services.Players.Handlers;
@@ -13,6 +15,8 @@ namespace Coop.Core.Server.Services.Players.Handlers;
 /// </summary>
 internal sealed class DisconnectedPlayersServerHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<DisconnectedPlayersServerHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
@@ -39,6 +43,7 @@ internal sealed class DisconnectedPlayersServerHandler : IHandler
         var connectedPlayers = playerManager.Players.Where(playerManager.IsConnected).Count();
         if (connectedPlayers == 0)
         {
+            Logger.Information("Pausing campaign because no players are connected");
             timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
         }
     }

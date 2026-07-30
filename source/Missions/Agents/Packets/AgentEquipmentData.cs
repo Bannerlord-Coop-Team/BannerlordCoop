@@ -15,6 +15,16 @@ namespace Missions.Agents.Packets
             MainHandUsageIndex = GetUsageIndex(agent.Equipment, (EquipmentIndex)MainHandIndex);
         }
 
+        internal AgentEquipmentData(
+            EquipmentIndex mainHandIndex,
+            EquipmentIndex offHandIndex,
+            int mainHandUsageIndex)
+        {
+            MainHandIndex = (int)mainHandIndex;
+            OffHandIndex = (int)offHandIndex;
+            MainHandUsageIndex = mainHandUsageIndex;
+        }
+
         public void Apply(Agent agent)
         {
             // Bannerlord's wield-change callback always reads every weapon slot. During mission teardown and the

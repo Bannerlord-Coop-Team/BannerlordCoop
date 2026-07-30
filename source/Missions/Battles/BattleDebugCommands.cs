@@ -73,12 +73,16 @@ internal static class BattleDebugCommands
 
         bool deploymentReady = mission.GetMissionBehavior<DeploymentMissionController>()?.TeamSetupOver == true;
         int activeAgents = mission.Agents.Count(agent => agent.IsActive());
+        int enemyFleeing = enemies.Count(agent => agent.IsRunningAway);
+        var result = mission.MissionResult;
 
         return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
             $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
             $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
-            $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyMovedSinceLast={moved}";
+            $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyFleeing={enemyFleeing} " +
+            $"enemyMovedSinceLast={moved} resultState={result?.BattleState.ToString() ?? "None"} " +
+            $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
     }
 
     [CommandLineArgumentFunction("ladder_state", "coop.debug.battle")]
