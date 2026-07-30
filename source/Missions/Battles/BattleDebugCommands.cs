@@ -482,26 +482,12 @@ internal static class BattleDebugCommands
 
         foreach (Agent rider in riders)
         {
-            RestoreCavalryController(rider);
-            rider.SetMaximumSpeedLimit(-1f, isMultiplier: false);
-            rider.MountAgent?.SetMaximumSpeedLimit(-1f, isMultiplier: false);
-            rider.SetIsAIPaused(false);
-            rider.MountAgent?.SetIsAIPaused(false);
-
             Vec2 riderDirection = rider.GetMovementDirection();
             var turnedRiderDirection = new Vec2(
                 (riderDirection.X * cosine) - (riderDirection.Y * sine),
                 (riderDirection.X * sine) + (riderDirection.Y * cosine));
-            float targetDirection = (float)Math.Atan2(
-                turnedRiderDirection.Y,
-                turnedRiderDirection.X);
-            WorldPosition targetPosition = rider.GetWorldPosition();
-            rider.SetScriptedPositionAndDirection(
-                ref targetPosition,
-                targetDirection,
-                addHumanLikeDelay: false,
-                Agent.AIScriptedFrameFlags.NoAttack |
-                    Agent.AIScriptedFrameFlags.ConsiderRotation);
+            rider.SetMovementDirection(in turnedRiderDirection);
+
             Agent mount = rider.MountAgent;
             if (mount != null)
             {
@@ -509,16 +495,7 @@ internal static class BattleDebugCommands
                 var turnedMountDirection = new Vec2(
                     (mountDirection.X * cosine) - (mountDirection.Y * sine),
                     (mountDirection.X * sine) + (mountDirection.Y * cosine));
-                float mountTargetDirection = (float)Math.Atan2(
-                    turnedMountDirection.Y,
-                    turnedMountDirection.X);
-                WorldPosition mountTargetPosition = mount.GetWorldPosition();
-                mount.SetScriptedPositionAndDirection(
-                    ref mountTargetPosition,
-                    mountTargetDirection,
-                    addHumanLikeDelay: false,
-                    Agent.AIScriptedFrameFlags.NoAttack |
-                        Agent.AIScriptedFrameFlags.ConsiderRotation);
+                mount.SetMovementDirection(in turnedMountDirection);
             }
         }
 
