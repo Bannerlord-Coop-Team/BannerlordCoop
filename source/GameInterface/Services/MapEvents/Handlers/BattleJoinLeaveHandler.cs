@@ -181,6 +181,11 @@ internal class BattleJoinLeaveHandler : IHandler
                     if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
                         MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
 
+                    // The original mode broadcast predates this join. Replay it after the party add so the joining
+                    // client applies membership first and rebuilds its encounter menu with the authoritative mode.
+                    if (requestingPeer != null && ServerBattleModeArbiter.TryGetMode(data.MapEventId, out var mode))
+                        network.Send(requestingPeer, new NetworkBattleModeSet(data.MapEventId, (int)mode));
+
                     // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
                     // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
                     // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
