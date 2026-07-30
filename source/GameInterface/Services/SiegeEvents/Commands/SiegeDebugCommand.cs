@@ -20,7 +20,6 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
@@ -320,128 +319,6 @@ public class SiegeDebugCommand
         var settlementName = party.CurrentSettlement.Name;
         PlayerLeaveSettlementPatch.RequestLeave();
         return $"Requested that the local player party leave {settlementName}";
-    }
-
-    [CommandLineArgumentFunction("open_settlement_encounter", "coop.debug.siege")]
-    public static string OpenSettlementEncounter(List<string> args)
-    {
-        if (ModInformation.IsServer)
-        {
-            return "This command can only be used by a client";
-        }
-
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.siege.open_settlement_encounter <settlementId>";
-        }
-
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
-            || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
-        {
-            return $"Settlement with id {args[0]} not found";
-        }
-
-        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
-        return $"Opened the settlement encounter at {settlement.Name}";
-    }
-
-    [CommandLineArgumentFunction("sally_out", "coop.debug.siege")]
-    public static string SallyOut(List<string> args)
-    {
-        if (ModInformation.IsServer)
-        {
-            return "This command can only be used by a client";
-        }
-
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.siege.sally_out";
-        }
-
-        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "menu_siege_strategies")
-        {
-            return "The rendered siege strategies menu is not active";
-        }
-
-        var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
-        if (behavior == null)
-        {
-            return "Encounter menu behavior is unavailable";
-        }
-
-        behavior.menu_sally_out_land_on_consequence(null);
-        return "Invoked the rendered siege menu's sally-out consequence";
-    }
-
-    [CommandLineArgumentFunction("begin_break_in", "coop.debug.siege")]
-    public static string BeginBreakIn(List<string> args)
-    {
-        if (ModInformation.IsServer)
-        {
-            return "This command can only be used by a client";
-        }
-
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.siege.begin_break_in";
-        }
-
-        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "join_siege_event")
-        {
-            return "The rendered join-siege menu is not active";
-        }
-
-        var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
-        if (behavior == null)
-        {
-            return "Encounter menu behavior is unavailable";
-        }
-
-        var entryArgs = new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, null);
-        if (!behavior.break_in_to_help_defender_side_on_condition(entryArgs) ||
-            !entryArgs.IsEnabled)
-        {
-            return "The rendered break-in entry is disabled";
-        }
-
-        var confirmationArgs = new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, null);
-        if (!behavior.break_in_menu_accept_on_condition(confirmationArgs) ||
-            !confirmationArgs.IsEnabled)
-        {
-            return "The rendered break-in confirmation is disabled";
-        }
-
-        behavior.game_menu_join_siege_event_on_defender_side_on_consequence(null);
-        behavior.break_in_menu_accept_on_consequence(null);
-        return "Accepted the rendered break-in prompt and opened its debrief";
-    }
-
-    [CommandLineArgumentFunction("continue_break_in", "coop.debug.siege")]
-    public static string ContinueBreakIn(List<string> args)
-    {
-        if (ModInformation.IsServer)
-        {
-            return "This command can only be used by a client";
-        }
-
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.siege.continue_break_in";
-        }
-
-        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "break_in_debrief_menu")
-        {
-            return "The rendered break-in debrief is not active";
-        }
-
-        var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
-        if (behavior == null)
-        {
-            return "Encounter menu behavior is unavailable";
-        }
-
-        behavior.break_in_debrief_continue_on_consequence(null);
-        return "Invoked the rendered break-in debrief's Continue consequence";
     }
 
     // coop.debug.siege.start
