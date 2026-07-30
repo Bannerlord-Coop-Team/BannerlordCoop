@@ -7,6 +7,23 @@ namespace Missions.Agents.Packets
     [ProtoContract(SkipConstructor = true)]
     public struct AgentData
     {
+        internal static Agent.MovementControlFlag GetLocomotionMovementFlags(
+            Agent.MovementControlFlag movementFlags)
+        {
+            return movementFlags & Agent.MovementControlFlag.MoveMask;
+        }
+
+        internal static void ApplyLocomotionMovementFlags(
+            Agent agent,
+            Agent.MovementControlFlag movementFlags)
+        {
+            Agent.MovementControlFlag currentFlags =
+                agent.MovementFlags & ~Agent.MovementControlFlag.MoveMask;
+            agent.MovementFlags =
+                currentFlags |
+                GetLocomotionMovementFlags(movementFlags);
+        }
+
         public AgentData(
             Agent agent,
             ushort mountMovementId = 0,
@@ -18,6 +35,8 @@ namespace Missions.Agents.Packets
             LookDirection = agent.LookDirection;
             InputVector = agent.MovementInputVector;
             Speed = agent.GetRealGlobalVelocity().AsVec2.Length;
+            MovementFlag = (uint)GetLocomotionMovementFlags(
+                agent.MovementFlags);
 
             // The rider can be active while its mount is mid-teardown (e.g. right after a battle concludes):
             // reading the mount's native state (MovementInputVector, etc.) then access-violates. Only capture
@@ -74,6 +93,9 @@ namespace Missions.Agents.Packets
                     ? InputVector.Normalized() * throttle
                     : new Vec2(0f, throttle);
             }
+            ApplyLocomotionMovementFlags(
+                agent,
+                (Agent.MovementControlFlag)MovementFlag);
 
             // NOTE: actions/animations are NOT applied here anymore. They are events, not continuous state, so
             // they are synced separately and on-change by AgentActionHandler (reliable-ordered), not polled with
@@ -101,5 +123,8 @@ namespace Missions.Agents.Packets
         /// <summary>The owner's real ground speed, m/s — drives the on-foot puppet's locomotion throttle.</summary>
         [ProtoMember(8)]
         public float Speed { get; }
+        /// <summary>The owner's current translation and turn inputs.</summary>
+        [ProtoMember(9)]
+        public uint MovementFlag { get; }
     }
 }

@@ -54,11 +54,18 @@ public sealed class MirrorAgent
     public Vec2 MovementDirection { get; set; }
     public Vec2 InputVector { get; set; }
     public Agent.MovementControlFlag MovementFlags { get; set; }
+    public int SetMovementFlagsCalls { get; set; }
+    public int NativeStateWriteSequence { get; set; }
+    public int LastMovementFlagsWriteSequence { get; set; }
+    public int LastWeaponGuardWriteSequence { get; set; }
+    public bool ClearLocomotionFlagsOnContinuousStateWrite { get; set; }
     public Agent.EventControlFlag EventControlFlags { get; set; }
     public bool CrouchMode { get; set; }
     public Agent.GuardMode GuardMode { get; set; } = Agent.GuardMode.None;
     public Agent.ActionCodeType Action0CodeType { get; set; } = Agent.ActionCodeType.Idle;
     public Agent.ActionCodeType Action1CodeType { get; set; } = Agent.ActionCodeType.Idle;
+    public Agent.ActionStage Action0Stage { get; set; } = Agent.ActionStage.None;
+    public Agent.ActionStage Action1Stage { get; set; } = Agent.ActionStage.None;
     public Agent.UsageDirection Action0Direction { get; set; } = Agent.UsageDirection.None;
     public Agent.UsageDirection Action1Direction { get; set; } = Agent.UsageDirection.None;
     public int Action0Index { get; set; } = -1;
@@ -67,20 +74,76 @@ public sealed class MirrorAgent
     public float Action1Progress { get; set; }
     public AnimFlags Action0Flags { get; set; }
     public AnimFlags Action1Flags { get; set; }
+    public int SetCurrentActionProgressCalls { get; set; }
     public int SetActionChannelCalls { get; set; }
+    public List<int> SetActionChannelIndices { get; } = new();
+    public List<string> ActionAndGuardCallOrder { get; } = new();
+    public bool SetActionChannelResult { get; set; } = true;
+    public int AcceptedSetActionChannelDeferralsRemaining { get; set; }
+    public bool RejectSetActionChannelWithoutIgnorePriority { get; set; }
     public int LastSetActionChannel { get; set; } = -1;
+    public bool LastSetActionIgnorePriority { get; set; }
+    public AnimFlags LastSetActionFlags { get; set; }
     public float LastSetActionBlendInPeriod { get; set; }
+    public float LastSetActionStartProgress { get; set; }
+    public bool LastSetActionForceFaceMorphRestart { get; set; }
     public bool HasVisualSkeleton { get; set; }
     public int SkeletonAction0Index { get; set; } = -1;
     public int SkeletonAction1Index { get; set; } = -1;
+    public Dictionary<int, int> ActionAnimationIndices { get; } = new();
+    public Dictionary<int, float> AnimationDurations { get; } = new();
     public int RawVisualAction0Index { get; set; } = -1;
     public int RawVisualAction1Index { get; set; } = -1;
     public float RawVisualAction0Progress { get; set; }
     public float RawVisualAction1Progress { get; set; }
     public int AdvanceRawVisualActionCalls { get; set; }
+    public int AdvanceExistingRawVisualActionCalls { get; set; }
+    public int InstallRawVisualActionCalls { get; set; }
+    public int InstallAgentVisualActionCalls { get; set; }
     public Agent.MovementControlFlag DefendMovementFlag { get; set; }
     public int SetWeaponGuardCalls { get; set; }
+    public Agent.UsageDirection LastSetWeaponGuardDirection { get; set; } =
+        Agent.UsageDirection.None;
+    public bool SetWeaponGuardOverwritesDefendFlags { get; set; }
     public int ResetGuardCalls { get; set; }
+    public bool RetainedNativeActionArmed { get; set; }
+    public int RetainedNativeActionChannel { get; set; } = -1;
+    public int RetainedNativeActionIndex { get; set; } = -1;
+    public Agent.ActionCodeType RetainedNativeActionType { get; set; } =
+        Agent.ActionCodeType.Idle;
+    public Agent.UsageDirection RetainedNativeActionDirection { get; set; } =
+        Agent.UsageDirection.None;
+    public int RetainedNativeActionResumeCalls { get; set; }
+
+    public void ClearRetainedNativeAction(int channel)
+    {
+        if (RetainedNativeActionChannel != channel)
+            return;
+
+        RetainedNativeActionArmed = false;
+    }
+
+    public bool ResumeRetainedNativeAction()
+    {
+        if (!RetainedNativeActionArmed)
+            return false;
+
+        RetainedNativeActionResumeCalls++;
+        if (RetainedNativeActionChannel == 0)
+        {
+            Action0Index = RetainedNativeActionIndex;
+            Action0CodeType = RetainedNativeActionType;
+            Action0Direction = RetainedNativeActionDirection;
+        }
+        else
+        {
+            Action1Index = RetainedNativeActionIndex;
+            Action1CodeType = RetainedNativeActionType;
+            Action1Direction = RetainedNativeActionDirection;
+        }
+
+        return true;
+    }
 }
 
 /// <summary>

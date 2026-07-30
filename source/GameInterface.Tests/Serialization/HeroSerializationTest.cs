@@ -86,15 +86,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+            byte[] bytes = BinaryPackageSerializer.SerializeCompressed(package);
 
             Assert.NotEmpty(bytes);
 
-            object obj = BinaryPackageSerializer.Deserialize(bytes);
-
-            Assert.IsType<HeroBinaryPackage>(obj);
-
-            HeroBinaryPackage returnedPackage = (HeroBinaryPackage)obj;
+            HeroBinaryPackage returnedPackage =
+                BinaryPackageSerializer.DeserializeCompressed<HeroBinaryPackage>(bytes);
 
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             Hero newHero = returnedPackage.Unpack<Hero>(deserializeFactory);

@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Tournaments.Data;
@@ -80,7 +80,8 @@ public class TournamentPacketOrderingTests : MissionTestEnvironment
                     new TournamentAgentRuntimeData(
                         agentId,
                         55,
-                        Array.Empty<TournamentMissionWeaponData>())
+                        Array.Empty<TournamentMissionWeaponData>(),
+                        currentEquipment: null)
                 },
                 Array.Empty<TournamentWorldItemRuntimeData>());
 
