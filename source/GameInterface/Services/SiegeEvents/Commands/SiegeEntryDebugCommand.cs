@@ -252,7 +252,11 @@ internal class SiegeEntryDebugCommand
             return $"Settlement with id {args[1]} not found.";
         }
 
-        StageAtSettlement(fixture.PlayerParty, settlement);
+        fixture.PlayerParty.SetMoveGoToSettlement(
+            settlement,
+            MobileParty.NavigationType.Default,
+            isTargetingThePort: false);
+
         return $"token={fixture.Token}|playerParty={fixture.PlayerParty.StringId}|" +
             $"targetSettlement={settlement.StringId}|requestedSettlement={fixture.Settlement.StringId}";
     }
