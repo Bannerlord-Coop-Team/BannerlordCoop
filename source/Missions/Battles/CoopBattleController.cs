@@ -93,6 +93,7 @@ public class CoopBattleController : CoopMissionController
         IMissionContext missionContext,
         IHostEpochPolicy hostEpochPolicy,
         IBattleAgentBudget agentBudget,
+        IGuardedHitWindow guardedHitWindow,
         IPuppetMountStateRepairer puppetMountStateRepairer)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
@@ -112,7 +113,12 @@ public class CoopBattleController : CoopMissionController
             casualties,
             puppetMountStateRepairer);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
-        damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
+        damageRouter = new BattleDamageRouter(
+            network,
+            messageBroker,
+            coopMissionComponent,
+            session,
+            guardedHitWindow);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
@@ -298,6 +304,42 @@ public class CoopBattleController : CoopMissionController
         base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
 
         deathReporter.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+    }
+
+    public override void OnScoreHit(
+        Agent affectedAgent,
+        Agent affectorAgent,
+        WeaponComponentData attackerWeapon,
+        bool isBlocked,
+        bool isSiegeEngineHit,
+        in Blow blow,
+        in AttackCollisionData collisionData,
+        float damagedHp,
+        float hitDistance,
+        float shotDifficulty)
+    {
+        base.OnScoreHit(
+            affectedAgent,
+            affectorAgent,
+            attackerWeapon,
+            isBlocked,
+            isSiegeEngineHit,
+            in blow,
+            in collisionData,
+            damagedHp,
+            hitDistance,
+            shotDifficulty);
+        coopMissionComponent.CombatHitPresentationHandler.BroadcastAcceptedMeleeBlood(
+            affectedAgent,
+            affectorAgent,
+            in blow,
+            in collisionData);
+        coopMissionComponent.AgentActionHandler.ObserveBlockedHit(
+            affectedAgent,
+            affectorAgent,
+            isBlocked,
+            in blow,
+            in collisionData);
     }
 
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the
