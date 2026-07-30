@@ -31,6 +31,54 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     /// <summary>Receive side for masterless-horse movement (<see cref="MountMovementPacket"/>); the send side
     /// is this handler's movement tick. Exposed so the packet flow is reachable in tests.</summary>
     IPacketHandler MountMovementApplier { get; }
+
+    /// <summary>Returns read-only movement traffic counters for live-test diagnostics.</summary>
+    MovementTrafficSnapshot GetTrafficSnapshot();
+
+    /// <summary>Resets only the read-only movement traffic counters.</summary>
+    void ResetTrafficDiagnostics();
+}
+
+/// <summary>Read-only movement cadence and player-first apply counters for live testing.</summary>
+public readonly struct MovementTrafficSnapshot
+{
+    public const int PlayerTargetHz = 60;
+    public const int NormalTargetHz = 40;
+
+    public float ElapsedSeconds { get; }
+    public int PlayerPolls { get; }
+    public int NormalPolls { get; }
+    public int PlayerPacketsSent { get; }
+    public int NormalPacketsSent { get; }
+    public int PlayerPacketsApplied { get; }
+    public int NormalPacketsApplied { get; }
+    public int MixedSegments { get; }
+    public int PlayerFirstSegments { get; }
+    public int OrderViolations { get; }
+
+    public MovementTrafficSnapshot(
+        float elapsedSeconds,
+        int playerPolls,
+        int normalPolls,
+        int playerPacketsSent,
+        int normalPacketsSent,
+        int playerPacketsApplied,
+        int normalPacketsApplied,
+        int mixedSegments,
+        int playerFirstSegments,
+        int orderViolations)
+    {
+        ElapsedSeconds = elapsedSeconds;
+        PlayerPolls = playerPolls;
+        NormalPolls = normalPolls;
+        PlayerPacketsSent = playerPacketsSent;
+        NormalPacketsSent = normalPacketsSent;
+        PlayerPacketsApplied = playerPacketsApplied;
+        NormalPacketsApplied = normalPacketsApplied;
+        MixedSegments = mixedSegments;
+        PlayerFirstSegments = playerFirstSegments;
+        OrderViolations = orderViolations;
+    }
 }
 
 public class AgentMovementHandler : IAgentMovementHandler
@@ -78,6 +126,16 @@ public class AgentMovementHandler : IAgentMovementHandler
     private bool _disposed;
     private float playerMovementPollElapsed = PlayerMovementPollingIntervalSeconds;
     private float movementPollElapsed = MovementPollingIntervalSeconds;
+    private float trafficElapsedSeconds;
+    private int playerPolls;
+    private int normalPolls;
+    private int playerPacketsSent;
+    private int normalPacketsSent;
+    private int playerPacketsApplied;
+    private int normalPacketsApplied;
+    private int mixedSegments;
+    private int playerFirstSegments;
+    private int orderViolations;
 
     public AgentMovementHandler(
         IBattleNetwork client,
@@ -223,6 +281,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         Mission mission = Mission.Current;
         if (_disposed || mission == null) return;
 
+        trafficElapsedSeconds += Math.Max(0f, dt);
         playerMovementPollElapsed += dt;
         movementPollElapsed += dt;
         bool pollPlayer = mission.IsFieldBattle &&
@@ -232,11 +291,13 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         if (pollPlayer)
         {
+            playerPolls++;
             playerMovementPollElapsed %= PlayerMovementPollingIntervalSeconds;
             SendPlayerMovement(mission.MainAgent);
         }
 
         if (!pollNormal) return;
+        normalPolls++;
         movementPollElapsed %= MovementPollingIntervalSeconds;
 
         var movementGroups = new Dictionary<string, MovementBatch<AgentData>>();
@@ -358,6 +419,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                 data,
                 isPlayerMovement: true));
         }
+        playerPacketsSent++;
     }
 
     private static void AddToBatch<T>(
@@ -441,6 +503,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                 batch.CompactIds.CopyTo(start, ids, 0, count);
                 client.SendAll(new MovementPacket(batch.IdentityScopeId, ids, data));
             }
+            normalPacketsSent++;
         }
     }
 
@@ -521,6 +584,7 @@ public class AgentMovementHandler : IAgentMovementHandler
             if (ReferenceEquals(tailMovementInbox, inbox))
                 tailMovementInbox = null;
         }
+        RecordAppliedSegment(movements);
         foreach (MovementPacket movement in movements)
         {
             if (_disposed) break;
@@ -529,6 +593,67 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         if (_disposed)
             inbox.Clear();
+    }
+
+    private void RecordAppliedSegment(MovementPacket[] movements)
+    {
+        bool hasPlayer = false;
+        bool hasNormal = false;
+        bool normalSeen = false;
+        bool violation = false;
+
+        foreach (MovementPacket movement in movements)
+        {
+            if (movement.IsPlayerMovement)
+            {
+                playerPacketsApplied++;
+                hasPlayer = true;
+                if (normalSeen) violation = true;
+            }
+            else
+            {
+                normalPacketsApplied++;
+                hasNormal = true;
+                normalSeen = true;
+            }
+        }
+
+        if (!hasPlayer || !hasNormal) return;
+
+        mixedSegments++;
+        if (violation)
+            orderViolations++;
+        else
+            playerFirstSegments++;
+    }
+
+    public MovementTrafficSnapshot GetTrafficSnapshot()
+    {
+        return new MovementTrafficSnapshot(
+            trafficElapsedSeconds,
+            playerPolls,
+            normalPolls,
+            playerPacketsSent,
+            normalPacketsSent,
+            playerPacketsApplied,
+            normalPacketsApplied,
+            mixedSegments,
+            playerFirstSegments,
+            orderViolations);
+    }
+
+    public void ResetTrafficDiagnostics()
+    {
+        trafficElapsedSeconds = 0f;
+        playerPolls = 0;
+        normalPolls = 0;
+        playerPacketsSent = 0;
+        normalPacketsSent = 0;
+        playerPacketsApplied = 0;
+        normalPacketsApplied = 0;
+        mixedSegments = 0;
+        playerFirstSegments = 0;
+        orderViolations = 0;
     }
 
     private void ApplyMovement(MovementPacket movement)

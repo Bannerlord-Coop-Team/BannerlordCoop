@@ -1,8 +1,10 @@
 ﻿using Common;
 using GameInterface;
 using GameInterface.Services.MapEvents;
+using Missions.Agents.Handlers;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem.Party;
@@ -84,6 +86,52 @@ internal static class BattleDebugCommands
             $"enemyMovedSinceLast={moved} resultState={result?.BattleState.ToString() ?? "None"} " +
             $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
     }
+
+    [CommandLineArgumentFunction("movement_traffic", "coop.debug.battle")]
+    public static string MovementTraffic(List<string> args)
+    {
+        if (args.Count > 1 ||
+            (args.Count == 1 && !string.Equals(
+                args[0], "reset", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Usage: coop.debug.battle.movement_traffic [reset]";
+        }
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        if (mission == null || controller == null)
+        {
+            return "No active coop battle mission";
+        }
+
+        if (args.Count == 1)
+        {
+            controller.AgentMovementHandler.ResetTrafficDiagnostics();
+            return "movementTrafficReset=True";
+        }
+
+        MovementTrafficSnapshot traffic =
+            controller.AgentMovementHandler.GetTrafficSnapshot();
+        float playerHz = traffic.ElapsedSeconds > 0f
+            ? traffic.PlayerPolls / traffic.ElapsedSeconds
+            : 0f;
+        float normalHz = traffic.ElapsedSeconds > 0f
+            ? traffic.NormalPolls / traffic.ElapsedSeconds
+            : 0f;
+
+        return
+            $"fieldBattle={mission.IsFieldBattle} elapsedSeconds={Format(traffic.ElapsedSeconds)} " +
+            $"playerTargetHz={MovementTrafficSnapshot.PlayerTargetHz} normalTargetHz={MovementTrafficSnapshot.NormalTargetHz} " +
+            $"playerPolls={traffic.PlayerPolls} normalPolls={traffic.NormalPolls} " +
+            $"playerPollHz={Format(playerHz)} normalPollHz={Format(normalHz)} " +
+            $"playerPacketsSent={traffic.PlayerPacketsSent} normalPacketsSent={traffic.NormalPacketsSent} " +
+            $"playerPacketsApplied={traffic.PlayerPacketsApplied} normalPacketsApplied={traffic.NormalPacketsApplied} " +
+            $"mixedSegments={traffic.MixedSegments} playerFirstSegments={traffic.PlayerFirstSegments} " +
+            $"orderViolations={traffic.OrderViolations}";
+    }
+
+    private static string Format(float value) =>
+        value.ToString("0.000", CultureInfo.InvariantCulture);
 
     [CommandLineArgumentFunction("ladder_state", "coop.debug.battle")]
     public static string LadderState(List<string> args)

@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Messages;
 using Serilog;
@@ -28,6 +29,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     protected readonly IMessageBroker messageBroker;
     protected readonly IObjectManager objectManager;
     protected readonly ICoopMissionComponent coopMissionComponent;
+    internal IAgentMovementHandler AgentMovementHandler =>
+        coopMissionComponent.AgentMovementHandler;
 
     protected CoopMissionController(
         IBattleNetwork network,

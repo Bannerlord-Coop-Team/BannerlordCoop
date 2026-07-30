@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Common;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -121,6 +122,50 @@ public class MovementTrafficTests : MissionTestEnvironment
             Assert.True(sharedTick[0].IsPlayerMovement);
             Assert.Contains(sharedTick.Skip(1), packet =>
                 !packet.IsPlayerMovement && packet.AgentIds.SequenceEqual(new ushort[] { 1 }));
+
+            MovementTrafficSnapshot traffic =
+                component.AgentMovementHandler.GetTrafficSnapshot();
+            Assert.Equal(MovementTrafficSnapshot.PlayerTargetHz, 60);
+            Assert.Equal(MovementTrafficSnapshot.NormalTargetHz, 40);
+            Assert.Equal(3, traffic.PlayerPolls);
+            Assert.Equal(2, traffic.NormalPolls);
+            Assert.Equal(3, traffic.PlayerPacketsSent);
+            Assert.Equal(2, traffic.NormalPacketsSent);
+        });
+    }
+
+    [Fact]
+    public void MovementTrafficDiagnostics_RecordsPlayerFirstMixedSegments()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            fixture.CreateMission(peer);
+            var component = peer.Resolve<ICoopMissionComponent>();
+            component.AgentMovementHandler.ResetTrafficDiagnostics();
+
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(
+                    new[] { Guid.NewGuid() },
+                    new AgentData[1]));
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(
+                    new[] { Guid.NewGuid() },
+                    new AgentData[1],
+                    isPlayerMovement: true));
+            GameThread.Instance.Update(TimeSpan.Zero);
+
+            MovementTrafficSnapshot traffic =
+                component.AgentMovementHandler.GetTrafficSnapshot();
+            Assert.Equal(1, traffic.PlayerPacketsApplied);
+            Assert.Equal(1, traffic.NormalPacketsApplied);
+            Assert.Equal(1, traffic.MixedSegments);
+            Assert.Equal(1, traffic.PlayerFirstSegments);
+            Assert.Equal(0, traffic.OrderViolations);
         });
     }
 
