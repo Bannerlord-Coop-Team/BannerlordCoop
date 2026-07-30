@@ -286,6 +286,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 "MapEvent_Created_0000",
                 "76561198000000042",
                 LiteNetP2PClient.SafeSinglePacketBytes);
+            var riderMirrors = new List<MirrorAgent>();
 
             for (int i = 0; i < 18; i++)
             {
@@ -295,6 +296,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
                 PopulateIncompressibleMovementState(riderMirror, i + 1);
                 PopulateIncompressibleMovementState(mountMirror, i + 101);
+                riderMirrors.Add(riderMirror);
                 Assert.True(registry.TryRegisterAgent(
                     "peer", Guid.NewGuid(), (ushort)((i * 2) + 1), rider));
                 Assert.True(registry.TryRegisterAgent(
@@ -305,6 +307,8 @@ public class MovementTrafficTests : MissionTestEnvironment
             network.NetworkSentPackets.Packets.Clear();
             network.SerializedPacketSends.Clear();
             compressor.Reset();
+            foreach (MirrorAgent mirror in riderMirrors)
+                mirror.Position += new Vec3(1f, 0f, 0f);
 
             handler.PollMovement(0.025f);
 

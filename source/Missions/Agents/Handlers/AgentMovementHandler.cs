@@ -157,28 +157,6 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public PacketType PacketType => PacketType.Movement;
 
-    private sealed class MovementBatch<T>
-    {
-        public readonly string IdentityScopeId;
-        public readonly List<ushort> CompactIds = new List<ushort>();
-        public readonly List<Guid> CanonicalIds = new List<Guid>();
-        public readonly List<T> Data = new List<T>();
-
-        public MovementBatch(string identityScopeId)
-        {
-            IdentityScopeId = identityScopeId;
-        }
-
-        public void Add(CoopAgentInfo info, T data)
-        {
-            if (IdentityScopeId == null)
-                CanonicalIds.Add(info.AgentId);
-            else
-                CompactIds.Add(info.MovementId);
-            Data.Add(data);
-        }
-    }
-
     // Broadcast every locally authoritative agent using delta thresholding.
     public void PollMovement(float dt)
     {
