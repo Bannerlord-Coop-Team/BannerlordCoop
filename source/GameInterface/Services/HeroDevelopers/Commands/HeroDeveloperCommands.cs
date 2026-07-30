@@ -43,7 +43,8 @@ internal class HeroDeveloperCommands
             }
         }
 
-        return stringBuilder.ToString();
+        if (stringBuilder.Length > 0) return stringBuilder.ToString();
+        else return $"Unable to find hero with name or id of {strings[0]}";
     }
 
     /// <summary>
@@ -72,7 +73,8 @@ internal class HeroDeveloperCommands
             }
         }
 
-        return stringBuilder.ToString();
+        if (stringBuilder.Length > 0) return stringBuilder.ToString();
+        else return $"Unable to find hero with name or id of {strings[0]}";
     }
 
     /// <summary>
@@ -101,7 +103,8 @@ internal class HeroDeveloperCommands
             }
         }
 
-        return stringBuilder.ToString();
+        if (stringBuilder.Length > 0) return stringBuilder.ToString();
+        else return $"Unable to find hero with name or id of {strings[0]}";
     }
 
     private static SkillObject GetSkillByName(string skillName)
