@@ -204,6 +204,9 @@ internal class ClientSiegeEntryHandler : IHandler
             return;
         }
 
+        if (payload.What.BattleLeaveApplied)
+            return;
+
         GameThread.RunSafe(() =>
         {
             using (new AllowedThread())

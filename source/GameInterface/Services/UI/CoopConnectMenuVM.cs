@@ -36,6 +36,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     private bool disposed;
     private int lobbyRequestGeneration;
     private int filteredSteamLobbyCount;
+    private long filteredSteamLobbyPlayerCount;
     private int steamLobbyPageIndex;
 
     public string JoinButtonText => "Join";
@@ -48,7 +49,9 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string DonateButtonText => "Donate";
     public string MovieTextHeader => "Join Co-op Sandbox";
     public string CommunityText => "Join the Community";
-    public string SteamLobbiesHeaderText => $"Hosted Steam Servers ({filteredSteamLobbyCount})";
+    public string SteamLobbiesHeaderText =>
+        $"Hosted Steam Servers ({filteredSteamLobbyCount} servers; " +
+        $"{filteredSteamLobbyPlayerCount} players)";
     public string SteamLobbyPageText => $"Page {CurrentSteamLobbyPage} of {SteamLobbyPageCount}";
     public int CurrentSteamLobbyPage => filteredSteamLobbyCount == 0 ? 0 : steamLobbyPageIndex + 1;
     public int SteamLobbyPageCount => filteredSteamLobbyCount == 0
@@ -422,6 +425,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             .ToList();
 
         filteredSteamLobbyCount = filteredLobbies.Count;
+        filteredSteamLobbyPlayerCount = filteredLobbies.Sum(
+            lobby => (long)lobby.ConnectedPlayers);
         if (resetPage)
         {
             steamLobbyPageIndex = 0;
@@ -458,6 +463,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     private void ClearSteamLobbyDisplay()
     {
         filteredSteamLobbyCount = 0;
+        filteredSteamLobbyPlayerCount = 0;
         steamLobbyPageIndex = 0;
         SteamLobbies.Clear();
         NotifySteamLobbyDisplayChanged();

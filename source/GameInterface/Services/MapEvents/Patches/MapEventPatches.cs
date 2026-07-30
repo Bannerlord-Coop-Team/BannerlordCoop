@@ -124,13 +124,11 @@ internal class MapEventPatches
             return true;
         }
 
-        // A mission peer's local conclusion is not authoritative: its mission can diverge from the
-        // battle host's (e.g. commit before the host fielded anything) and read an empty enemy side
-        // as a victory, which would drive the server to finalize and capture while the host still
-        // fights. Only the battle host relays a mission victory; the local set still runs so the
-        // peer's own mission winds down, and the real result arrives through the sync.
+        // Coop mission victories use NetworkBattleResultReady so the server can wait for every member and
+        // accepted joiner. The local set still runs so this mission winds down; the server applies the result
+        // only after the completion barrier publishes the authoritative state change.
         if ((value == BattleState.AttackerVictory || value == BattleState.DefenderVictory)
-            && BattleConclusionGate.IsInCoopBattleMission && !BattleConclusionGate.IsLocalBattleHost)
+            && BattleConclusionGate.IsInCoopBattleMission)
         {
             return true;
         }

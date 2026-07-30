@@ -173,7 +173,10 @@ internal class BattleMissionStartHandler : IHandler
                 if (isNewMissionClaim)
                 {
                     operation = "remove wounded non-initiating players";
-                    if (!RemoveWoundedNonInitiatorParties(mapEvent, payload.What.AttackerPartyId))
+                    if (!RemoveWoundedNonInitiatorParties(
+                            payload.What.MapEventId,
+                            mapEvent,
+                            payload.What.AttackerPartyId))
                     {
                         ServerBattleModeArbiter.Release(payload.What.MapEventId);
                         network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
@@ -186,6 +189,9 @@ internal class BattleMissionStartHandler : IHandler
                 {
                     side.MakeReadyForMission(null);
                 }
+
+                operation = "reserve mission participants";
+                ReserveMissionParticipants(payload.What.MapEventId, mapEvent);
 
                 // Reply first so the requesting client's blocked consequence unblocks before the mission-open
                 // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
@@ -233,6 +239,22 @@ internal class BattleMissionStartHandler : IHandler
         }, context: nameof(Handle_NetworkBattleStartRequest));
     }
 
+    private void ReserveMissionParticipants(string mapEventId, MapEvent mapEvent)
+    {
+        foreach (var player in playerManager.Players)
+        {
+            if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
+                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
+                !ReferenceEquals(party.Party.MapEvent, mapEvent))
+            {
+                continue;
+            }
+
+            messageBroker.Publish(peer,
+                new BattleJoinAccepted(mapEventId, player.ControllerId, Guid.NewGuid()));
+        }
+    }
+
     internal AtmosphereInfo GetOrCreateAtmosphereSnapshot(string mapEventId, Func<AtmosphereInfo> create)
     {
         return mapEventAtmospheres.GetOrAdd(mapEventId, _ => create());
@@ -273,7 +295,10 @@ internal class BattleMissionStartHandler : IHandler
         MapEventHostileActionConsequences.Apply(mapEvent, attackerMobileParty.Party, "attack");
     }
 
-    private bool RemoveWoundedNonInitiatorParties(MapEvent mapEvent, string initiatingPartyId)
+    private bool RemoveWoundedNonInitiatorParties(
+        string mapEventId,
+        MapEvent mapEvent,
+        string initiatingPartyId)
     {
         foreach (var player in playerManager.Players)
         {
@@ -285,15 +310,29 @@ internal class BattleMissionStartHandler : IHandler
                 !objectManager.TryGetId(mobileParty.Party, out var partyId))
                 continue;
 
+            bool leaveSiege = mapEvent.IsSiegeAssault && mobileParty.Party.Side == BattleSideEnum.Attacker;
             mobileParty.Party.MapEventSide = null;
+            messageBroker.Publish(this, new BattleJoinCancelled(mapEventId, player.ControllerId));
 
             if (mapEvent.IsFinalized)
                 return false;
 
-            network.SendAll(new NetworkPartyLeftBattle(partyId));
+            // Preserve the client's PlayerSiege reference until its explicit cleanup runs.
+            network.SendAll(new NetworkPartyLeftBattle(partyId, leaveSiege));
+
+            if (leaveSiege && mobileParty.BesiegerCamp != null)
+                mobileParty.BesiegerCamp = null;
         }
 
         return true;
+    }
+
+    internal bool RemoveWoundedNonInitiatorParties(MapEvent mapEvent, string initiatingPartyId)
+    {
+        if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId))
+            return false;
+
+        return RemoveWoundedNonInitiatorParties(mapEventId, mapEvent, initiatingPartyId);
     }
 
     private int RollTerrainSeed()

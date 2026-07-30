@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using GameInterface.Services.Entity;
+using Missions.Agents.Packets;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -373,6 +374,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             }
 
             agentInfo.CurrentAuthority = controllerId;
+            agentInfo.ClearAuthoritativeEquipment();
 
             if (!ControllerAgentMap.TryGetValue(controllerId, out var newAgents))
             {
@@ -389,12 +391,33 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
 public class CoopAgentInfo
 {
+    private AgentEquipmentData authoritativeEquipment;
+    private bool hasAuthoritativeEquipment;
+
     public Agent Agent { get; }
     public Guid AgentId { get; }
     public ushort MovementId { get; }
     public string OriginalOwner { get; }
     public string MovementScopeId { get; }
     public string CurrentAuthority { get; internal set; }
+
+    internal void RecordAuthoritativeEquipment(AgentEquipmentData equipment)
+    {
+        authoritativeEquipment = equipment;
+        hasAuthoritativeEquipment = true;
+    }
+
+    internal bool TryGetAuthoritativeEquipment(out AgentEquipmentData equipment)
+    {
+        equipment = authoritativeEquipment;
+        return hasAuthoritativeEquipment;
+    }
+
+    internal void ClearAuthoritativeEquipment()
+    {
+        authoritativeEquipment = default;
+        hasAuthoritativeEquipment = false;
+    }
 
     internal CoopAgentInfo(
         string currentAuthority,
