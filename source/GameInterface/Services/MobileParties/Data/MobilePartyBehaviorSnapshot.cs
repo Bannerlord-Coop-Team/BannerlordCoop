@@ -20,6 +20,7 @@ public interface IMobilePartyBehaviorSnapshot
     bool TryCreate(MobileParty party, out PartyBehaviorUpdateData data);
     bool CanApply(MobileParty party, PartyBehaviorUpdateData data);
     bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state);
+    bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state, out string failureReason);
     bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable);
     bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply);
 }
@@ -34,19 +35,43 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 
     public bool TryCreate(
         MobileParty party,
-        out PartyBehaviorUpdateData data)
+        out PartyBehaviorUpdateData data) => TryCreate(party, out data, out _);
+
+    private bool TryCreate(
+        MobileParty party,
+        out PartyBehaviorUpdateData data,
+        out string failureReason)
     {
         data = default;
+        failureReason = null;
         if (party?.Ai == null)
+        {
+            failureReason = party == null ? "party is null" : "party.Ai is null";
             return false;
-        if (!TryGetCompactId(party, out string partyId) ||
-            !TryGetInteractableReference(
+        }
+        if (!TryGetCompactId(party, out string partyId))
+        {
+            failureReason = "the party itself is not registered with the object manager";
+            return false;
+        }
+        if (!TryGetInteractableReference(
                 party.Ai.AiBehaviorInteractable,
                 out string interactablePointId,
-                out bool isInteractableAnchor) ||
-            !TryGetCompactId(party.TargetParty, out string targetPartyId) ||
-            !TryGetCompactId(party.TargetSettlement, out string targetSettlementId))
+                out bool isInteractableAnchor))
+        {
+            failureReason = DescribeStaleInteractable(party.Ai.AiBehaviorInteractable);
             return false;
+        }
+        if (!TryGetCompactId(party.TargetParty, out string targetPartyId))
+        {
+            failureReason = DescribeStaleParty("TargetParty", party.TargetParty);
+            return false;
+        }
+        if (!TryGetCompactId(party.TargetSettlement, out string targetSettlementId))
+        {
+            failureReason = $"TargetSettlement \"{party.TargetSettlement?.StringId}\" is not registered with the object manager";
+            return false;
+        }
 
         MoveModeType partyMoveMode = party.PartyMoveMode;
         CampaignVec2 moveTargetPoint = party.MoveTargetPoint;
@@ -91,11 +116,27 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         TryResolve(data.TargetSettlementId, out Settlement _) &&
         TryResolve(data.MoveTargetPartyId, out MobileParty _);
 
-    public bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state)
+    public bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state) =>
+        TryCreateJoinState(party, out state, out _);
+
+    public bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state, out string failureReason)
     {
         state = default;
-        if (!TryCreate(party, out PartyBehaviorUpdateData behavior))
-            return false;
+        if (!TryCreate(party, out PartyBehaviorUpdateData behavior, out failureReason))
+        {
+            // A party can hold AI references to objects that no longer exist in the
+            // campaign — typically a destroyed party whose PartyBase was persisted
+            // into the save as an AI target (#2489: a deserter party kept a dead
+            // party as its AiBehaviorInteractable). One such party would otherwise
+            // block the join baseline — and therefore every join — forever. The
+            // server is authoritative over AI here, so drop the stale references
+            // the same way the AI would after its next rethink and capture again.
+            if (!TryHealStaleReferences(party, failureReason) ||
+                !TryCreate(party, out behavior, out failureReason))
+            {
+                return false;
+            }
+        }
 
         state = new MobilePartyJoinState
         {
@@ -318,6 +359,91 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             return TryGetCompactId(anchor.Owner, out id);
         id = null;
         return interactable == null;
+    }
+
+    /// <summary>
+    /// Server-side repair for a party whose AI references cannot be resolved to
+    /// synced ids (the referenced object is gone from the campaign). Clears only
+    /// the stale members — targets first, then the behaviors that depended on
+    /// them, mirroring <see cref="ApplyBehavior"/>'s ordering — and leaves the
+    /// party holding position until the server AI's next rethink re-tasks it.
+    /// Returns true when something was repaired so the capture can be retried.
+    /// </summary>
+    private bool TryHealStaleReferences(MobileParty party, string failureReason)
+    {
+        if (party?.Ai == null)
+            return false;
+
+        var healed = new List<string>();
+
+        if (!TryGetCompactId(party.TargetParty, out _))
+        {
+            party.TargetParty = null;
+            if (party.DefaultBehavior == AiBehavior.EngageParty ||
+                party.DefaultBehavior == AiBehavior.EscortParty)
+            {
+                party.DefaultBehavior = AiBehavior.Hold;
+            }
+            healed.Add(nameof(party.TargetParty));
+        }
+
+        if (!TryGetCompactId(party.TargetSettlement, out _))
+        {
+            party.SetTargetSettlement(null, false);
+            if (party.DefaultBehavior == AiBehavior.GoToSettlement ||
+                party.DefaultBehavior == AiBehavior.RaidSettlement ||
+                party.DefaultBehavior == AiBehavior.BesiegeSettlement ||
+                party.DefaultBehavior == AiBehavior.DefendSettlement)
+            {
+                party.DefaultBehavior = AiBehavior.Hold;
+            }
+            healed.Add(nameof(party.TargetSettlement));
+        }
+
+        if (!TryGetInteractableReference(party.Ai.AiBehaviorInteractable, out _, out _))
+        {
+            party.SetShortTermBehavior(AiBehavior.Hold, null);
+            healed.Add(nameof(party.Ai.AiBehaviorInteractable));
+        }
+
+        if (healed.Count == 0)
+            return false;
+
+        Logger.Warning(
+            "Cleared stale AI references ({Members}) on party {Party} so it can join-sync; original failure: {Reason}",
+            string.Join(", ", healed), party.StringId, failureReason);
+        return true;
+    }
+
+    /// <summary>
+    /// Failure detail for the join-baseline path: identifies which reference on a
+    /// party could not be resolved to a synced id and whether the referenced object
+    /// is still part of the live campaign, so a single log line localizes the bug.
+    /// </summary>
+    private static string DescribeStaleParty(string member, MobileParty target)
+    {
+        if (target == null) return $"{member} is null but was reported unresolvable";
+        bool inCampaign = Campaign.Current?.CampaignObjectManager?.MobileParties?.Contains(target) ?? false;
+        return $"{member} \"{target.StringId}\" is not registered with the object manager " +
+            $"(IsActive={target.IsActive}, inCampaignList={inCampaign}, mapEvent={target.MapEvent != null}, " +
+            $"type={target.PartyComponent?.GetType().Name ?? "<none>"})";
+    }
+
+    private static string DescribeStaleInteractable(IInteractablePoint interactable)
+    {
+        if (interactable is AnchorPoint anchor)
+        {
+            return anchor.Owner == null
+                ? "AiBehaviorInteractable is an AnchorPoint with a null Owner"
+                : DescribeStaleParty("AiBehaviorInteractable(anchor.Owner)", anchor.Owner);
+        }
+        if (interactable is PartyBase partyBase)
+        {
+            if (partyBase.MobileParty != null)
+                return DescribeStaleParty("AiBehaviorInteractable(PartyBase.MobileParty)", partyBase.MobileParty);
+            return $"AiBehaviorInteractable PartyBase (settlement \"{partyBase.Settlement?.StringId ?? "<null>"}\") is not registered with the object manager";
+        }
+        return $"AiBehaviorInteractable of type {interactable?.GetType().Name ?? "<null>"} could not be referenced";
     }
 
     private bool TryGetCompactId<T>(T instance, out string id)
