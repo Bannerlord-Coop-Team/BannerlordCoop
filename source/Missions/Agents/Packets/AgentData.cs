@@ -17,11 +17,14 @@ namespace Missions.Agents.Packets
             Agent agent,
             Agent.MovementControlFlag movementFlags)
         {
+            Agent.MovementControlFlag currentMovementFlags = agent.MovementFlags;
             Agent.MovementControlFlag currentFlags =
-                agent.MovementFlags & ~Agent.MovementControlFlag.MoveMask;
-            agent.MovementFlags =
+                currentMovementFlags & ~Agent.MovementControlFlag.MoveMask;
+            Agent.MovementControlFlag desiredMovementFlags =
                 currentFlags |
                 GetLocomotionMovementFlags(movementFlags);
+            if (currentMovementFlags != desiredMovementFlags)
+                agent.MovementFlags = desiredMovementFlags;
         }
 
         public AgentData(
