@@ -22,6 +22,8 @@ namespace Missions.Battles;
 internal static class BattleDebugCommands
 {
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
+    private static readonly Dictionary<Agent, AgentControllerType> CavalryControllers =
+        new Dictionary<Agent, AgentControllerType>();
     private static Mission observedMission;
     private static Camera ladderCamera;
 
@@ -41,12 +43,7 @@ internal static class BattleDebugCommands
             return "No active coop battle mission";
         }
 
-        if (observedMission != mission)
-        {
-            EnemyPositions.Clear();
-            ReleaseLadderCamera();
-            observedMission = mission;
-        }
+        ObserveMission(mission);
 
         var enemies = new List<Agent>();
         int enemyParties = 0;
@@ -214,6 +211,7 @@ internal static class BattleDebugCommands
 
         foreach (Agent rider in riders)
         {
+            RestoreCavalryController(rider);
             rider.SetMaximumSpeedLimit(-1f, isMultiplier: false);
             rider.MountAgent?.SetMaximumSpeedLimit(-1f, isMultiplier: false);
             rider.SetIsAIPaused(false);
@@ -266,6 +264,7 @@ internal static class BattleDebugCommands
             formation.SetMovementOrder(MovementOrder.MovementOrderStop);
         foreach (Agent rider in riders)
         {
+            FreezeCavalryController(rider);
             rider.SetMaximumSpeedLimit(0f, isMultiplier: false);
             rider.MovementInputVector = Vec2.Zero;
             rider.SetIsAIPaused(true);
@@ -319,6 +318,7 @@ internal static class BattleDebugCommands
 
         foreach (Agent rider in riders)
         {
+            RestoreCavalryController(rider);
             rider.SetMaximumSpeedLimit(0f, isMultiplier: false);
             rider.MountAgent?.SetMaximumSpeedLimit(0f, isMultiplier: false);
             rider.SetIsAIPaused(false);
@@ -347,11 +347,28 @@ internal static class BattleDebugCommands
         return $"Turned {formations.Length} battle-host cavalry formations {degrees:0.0} degrees in place";
     }
 
+    private static void FreezeCavalryController(Agent rider)
+    {
+        if (!CavalryControllers.ContainsKey(rider))
+            CavalryControllers.Add(rider, rider.Controller);
+        rider.Controller = AgentControllerType.None;
+    }
+
+    private static void RestoreCavalryController(Agent rider)
+    {
+        if (!CavalryControllers.TryGetValue(rider, out AgentControllerType controller))
+            return;
+
+        rider.Controller = controller;
+        CavalryControllers.Remove(rider);
+    }
+
     private static Agent[] GetBattleHostCavalryRiders(
         Mission mission,
         CoopBattleController controller,
         INetworkAgentRegistry registry)
     {
+        ObserveMission(mission);
         return registry.GetAgents(controller.Session.OwnControllerId)
             .Where(info => info.OriginalOwner == controller.Session.OwnControllerId)
             .Select(info => info.Agent)
@@ -362,6 +379,17 @@ internal static class BattleDebugCommands
                 && agent.Team == mission.PlayerTeam
                 && agent.Formation != null)
             .ToArray();
+    }
+
+    private static void ObserveMission(Mission mission)
+    {
+        if (observedMission == mission)
+            return;
+
+        EnemyPositions.Clear();
+        CavalryControllers.Clear();
+        ReleaseLadderCamera();
+        observedMission = mission;
     }
 
     private static bool MatchesAuthority(
