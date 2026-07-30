@@ -45,17 +45,20 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly ICoopDeploymentPlanBuilder deploymentPlanBuilder;
 
     public CoopFieldBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        ICoopDeploymentPlanBuilder deploymentPlanBuilder)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
+        this.deploymentPlanBuilder = deploymentPlanBuilder;
     }
 
     public Mission OpenCoopFieldBattle(MissionInitializerRecord rec)
@@ -154,7 +157,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 // Battle), spawn both sides frozen during SetupTeams, hold Mission.AllowAiTicking off, and start
                 // the spawners + un-pause AI only on Start Battle (FinishDeployment). This replaces the coop
                 // force-spawn shortcut (CoopBattleController.EnsureSidesSpawning), now removed.
-                new CoopBattleDeploymentMissionController(isPlayerAttacker),
+                new CoopBattleDeploymentMissionController(isPlayerAttacker, deploymentPlanBuilder),
                 new BattleDeploymentHandler(isPlayerAttacker),
             };
 

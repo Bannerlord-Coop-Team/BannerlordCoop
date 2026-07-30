@@ -39,17 +39,20 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly ICoopDeploymentPlanBuilder deploymentPlanBuilder;
 
     public CoopSiegeBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        ICoopDeploymentPlanBuilder deploymentPlanBuilder)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
+        this.deploymentPlanBuilder = deploymentPlanBuilder;
     }
 
     public Mission OpenCoopSiegeBattle(MissionInitializerRecord rec, float[] wallHitPointRatios,
@@ -152,7 +155,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
             behaviors.Add(new EquipmentControllerLeaveLogic());
             behaviors.Add(new MissionSiegeEnginesLogic(defenderWeapons, attackerWeapons));
             behaviors.Add(new SiegeDeploymentHandler(isPlayerAttacker));
-            behaviors.Add(new CoopSiegeDeploymentMissionController(isPlayerAttacker));
+            behaviors.Add(new CoopSiegeDeploymentMissionController(isPlayerAttacker, deploymentPlanBuilder));
 
             return behaviors.ToArray();
         }, true, true);

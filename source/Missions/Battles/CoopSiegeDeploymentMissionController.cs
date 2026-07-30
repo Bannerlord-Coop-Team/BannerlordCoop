@@ -1,23 +1,29 @@
-﻿using GameInterface.Services.MapEvents;
+﻿using System;
+using GameInterface.Services.MapEvents;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
 /// <summary>
-/// Coop <see cref="SiegeDeploymentMissionController"/> with the same sizing gate as
-/// <see cref="CoopBattleDeploymentMissionController"/>: the native one-time team/command setup runs on
-/// the first tick regardless of troops, but in coop a late reserve would run it against empty teams.
-/// Everything siege-specific (deployment points, AI weapon deployment, ladder disabling,
-/// reinforcement re-enable) is inherited.
+/// Coop siege deployment waits for troop sizing and host election. Its side setup mirrors vanilla so foreign
+/// teams receive real deployment plans before the spawn gate reruns; keep that sequence aligned with
+/// <see cref="SiegeDeploymentMissionController"/>.
 /// </summary>
 public class CoopSiegeDeploymentMissionController : SiegeDeploymentMissionController
 {
+    private readonly ICoopDeploymentPlanBuilder deploymentPlanBuilder;
     private CoopBattleMissionSpawnHandler _spawnHandler;
 
-    public CoopSiegeDeploymentMissionController(bool isPlayerAttacker)
+    public CoopSiegeDeploymentMissionController(
+        bool isPlayerAttacker,
+        ICoopDeploymentPlanBuilder deploymentPlanBuilder)
         : base(isPlayerAttacker)
     {
+        if (deploymentPlanBuilder == null) throw new ArgumentNullException(nameof(deploymentPlanBuilder));
+
+        this.deploymentPlanBuilder = deploymentPlanBuilder;
     }
 
     public override void OnBehaviorInitialize()
@@ -54,6 +60,59 @@ public class CoopSiegeDeploymentMissionController : SiegeDeploymentMissionContro
         }
 
         base.OnMissionTick(dt);
+    }
+
+    public override void OnSetupTeamsOfSide(BattleSideEnum battleSide)
+    {
+        foreach (var sideTeam in base.Mission.Teams)
+        {
+            if (sideTeam.Side == battleSide &&
+                sideTeam.GeneralAgent != null &&
+                sideTeam.GeneralAgent != base.Mission.InitialPlayerAgent)
+            {
+                sideTeam.GeneralAgent.SetDetachableFromFormation(value: false);
+            }
+        }
+
+        Team team = battleSide == BattleSideEnum.Attacker
+            ? base.Mission.AttackerTeam
+            : base.Mission.DefenderTeam;
+        if (team == base.Mission.PlayerTeam)
+        {
+            _siegeDeploymentHandler.RemoveUnavailableDeploymentPoints(battleSide);
+            _siegeDeploymentHandler.UnHideDeploymentPoints(battleSide);
+            _siegeDeploymentHandler.DeployAllSiegeWeaponsOfPlayer();
+        }
+        else
+        {
+            _siegeDeploymentHandler.DeployAllSiegeWeaponsOfAi();
+        }
+
+        MissionAgentSpawnLogic.SetSpawnTroops(battleSide, spawnTroops: true, enforceSpawning: true);
+        deploymentPlanBuilder.EnsurePlans(base.Mission, MissionAgentSpawnLogic, battleSide);
+        MissionAgentSpawnLogic.SetSpawnTroops(battleSide, spawnTroops: true, enforceSpawning: true);
+
+        if (battleSide == PlayerSide && base.Mission.InitialPlayerAgent == null)
+        {
+            throw new InvalidOperationException(
+                $"Player-side siege deployment completed without spawning the initial player agent ({PlayerSide}).");
+        }
+
+        foreach (WeakGameEntity entity in base.Mission.GetActiveEntitiesWithScriptComponentOfType<SiegeWeapon>())
+        {
+            SiegeWeapon siegeWeapon = entity.GetFirstScriptOfType<SiegeWeapon>();
+            if (siegeWeapon != null && siegeWeapon.GetSide() == battleSide)
+                siegeWeapon.TickAuxForInit();
+        }
+
+        SetupAgentAIStatesForSide(battleSide);
+        if (team == base.Mission.PlayerTeam)
+        {
+            foreach (var formation in team.FormationsIncludingEmpty)
+                formation.SetControlledByAI(isControlledByAI: true);
+        }
+
+        MissionAgentSpawnLogic.OnSideDeploymentOver(team.Side);
     }
 
     private const float AuthorityWaitDeadline = 15f;

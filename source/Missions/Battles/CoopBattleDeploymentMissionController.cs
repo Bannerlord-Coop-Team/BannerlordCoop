@@ -1,3 +1,5 @@
+﻿using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -12,11 +14,17 @@ namespace Missions.Battles;
 /// </summary>
 public class CoopBattleDeploymentMissionController : BattleDeploymentMissionController
 {
+    private readonly ICoopDeploymentPlanBuilder deploymentPlanBuilder;
     private CoopBattleMissionSpawnHandler _spawnHandler;
 
-    public CoopBattleDeploymentMissionController(bool isPlayerAttacker)
+    public CoopBattleDeploymentMissionController(
+        bool isPlayerAttacker,
+        ICoopDeploymentPlanBuilder deploymentPlanBuilder)
         : base(isPlayerAttacker)
     {
+        if (deploymentPlanBuilder == null) throw new ArgumentNullException(nameof(deploymentPlanBuilder));
+
+        this.deploymentPlanBuilder = deploymentPlanBuilder;
     }
 
     public override void OnBehaviorInitialize()
@@ -35,4 +43,27 @@ public class CoopBattleDeploymentMissionController : BattleDeploymentMissionCont
 
         base.OnMissionTick(dt);
     }
+
+    public override void OnSetupTeamsOfSide(BattleSideEnum battleSide)
+    {
+        // The first check reserves this client's troops and builds plans for teams with locally supplied origins.
+        // Foreign teams have no local origins, but OnTeamDeployed still expects their real plan to exist.
+        MissionAgentSpawnLogic.SetSpawnTroops(battleSide, spawnTroops: true, enforceSpawning: true);
+
+        deploymentPlanBuilder.EnsurePlans(base.Mission, MissionAgentSpawnLogic, battleSide);
+
+        // Plan creation happened after the first check's spawn gate, so rerun it before announcing deployment.
+        // This is what turns the already-reserved local origins into agents and sets Mission.InitialPlayerAgent.
+        MissionAgentSpawnLogic.SetSpawnTroops(battleSide, spawnTroops: true, enforceSpawning: true);
+
+        if (battleSide == PlayerSide && base.Mission.InitialPlayerAgent == null)
+        {
+            throw new InvalidOperationException(
+                $"Player-side deployment completed without spawning the initial player agent ({PlayerSide}).");
+        }
+
+        SetupAgentAIStatesForSide(battleSide);
+        MissionAgentSpawnLogic.OnSideDeploymentOver(battleSide);
+    }
+
 }
