@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands;
@@ -73,6 +74,15 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
             return "Usage: coop.debug.ui.active_state";
 
         return Game.Current?.GameStateManager?.ActiveState?.GetType().Name ?? "none";
+    }
+
+    [CommandLineArgumentFunction("loading_window_state", "coop.debug.ui")]
+    public static string LoadingWindowState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.loading_window_state";
+
+        return $"Loading window: {(LoadingWindow.IsLoadingWindowActive ? "ACTIVE" : "INACTIVE")}.";
     }
 
     [CommandLineArgumentFunction("saving_overlay_state", "coop.debug.ui")]
