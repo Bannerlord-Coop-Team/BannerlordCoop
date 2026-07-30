@@ -14,9 +14,9 @@ internal static class CreditsRoster
     /// </summary>
     public static readonly IReadOnlyList<string> Contributors = new[]
     {
-        "garrettluskey",
+        "Joke (Garrett)",
         "ShoT-UPfps",
-        "EgardA",
+        "EgardA (Hasted)",
         "jordanbrymora",
         "araex",
         "MaxDorob",
@@ -48,7 +48,6 @@ internal static class CreditsRoster
         "GitEiko",
         "AndreasOhmer",
         "Magenstor",
-        "code-factor",
         "Cytraen",
         "ac-jurd",
         "jacksonamartin",
