@@ -279,7 +279,7 @@ internal class PartyCommands
             character,
             1,
             element.Number == element.WoundedNumber ? 1 : 0,
-            logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left].Count);
+            -1);
         if (!logic.ValidateCommand(command)) return "The Party screen rejected the transfer.";
 
         logic.AddCommand(command);
