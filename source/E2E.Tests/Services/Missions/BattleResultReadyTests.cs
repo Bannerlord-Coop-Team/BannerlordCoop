@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using Missions.Battles;
 using Missions.Messages;
 using System;
 using System.Collections.Generic;
@@ -156,6 +157,31 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
         AssertMapEventPresent(mapEventId);
         SendResult(clients[1], mapEventId, BattleState.AttackerVictory);
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void ResolvedHostLeavesBeforeAcceptedJoinerEnters_FinalizesBattle()
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
+        var host = Clients.First();
+        RegisterPeer(host, "host");
+        EnterBattleWithMembership(host, "host", mapEventId);
+        var reservationId = Guid.NewGuid();
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            host.NetPeer,
+            new BattleJoinAccepted(mapEventId, "joining-player", reservationId)));
+        SendResult(host, mapEventId, BattleState.AttackerVictory);
+        AssertMapEventPresent(mapEventId);
+
+        Server.Call(
+            () => Server.SimulateMessage(
+                host.NetPeer,
+                new NetworkMissionLeft("host", mapEventId)),
+            VictoryConclusionDisabledMethods());
+
         AssertMapEventRemoved(mapEventId);
     }
 
@@ -324,16 +350,17 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
     [Fact]
     [Trait("Requirement", "BR-005")]
-    public void SuccessorMustReportAgainAfterBecomingHost()
+    public void SuccessorReceivesResolvedStateAfterBecomingHost()
     {
         var (mapEventId, _) = SetupCoopBattle("host", "successor");
         var clients = Clients.ToArray();
         RegisterPeer(clients[0], "host");
         RegisterPeer(clients[1], "successor");
+        var successorController = clients[1].Resolve<CoopBattleController>();
         EnterBattleWithMembership(clients[0], "host", mapEventId);
         EnterBattleWithMembership(clients[1], "successor", mapEventId);
 
-        SendResult(clients[1], mapEventId, BattleState.DefenderVictory);
+        SendResult(clients[0], mapEventId, BattleState.DefenderVictory);
         AssertMapEventPresent(mapEventId);
 
         Server.Call(
@@ -343,7 +370,12 @@ public class BattleResultReadyTests : MissionTestEnvironment
             VictoryConclusionDisabledMethods());
 
         AssertMapEventPresent(mapEventId);
-        SendResult(clients[1], mapEventId, BattleState.DefenderVictory);
+        clients[1].Call(() =>
+        {
+            Assert.True(successorController.ResultCommitter.TryGetResolvedState(out var state));
+            Assert.Equal(BattleState.DefenderVictory, state);
+            successorController.ResultCommitter.ReportAcceptedResult();
+        }, VictoryConclusionDisabledMethods());
         AssertMapEventRemoved(mapEventId);
     }
 

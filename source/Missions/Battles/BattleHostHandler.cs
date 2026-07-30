@@ -19,6 +19,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace Missions.Battles;
 
@@ -78,6 +79,7 @@ internal class BattleHostHandler : IHandler
         public readonly HashSet<string> HostOwnedOfflineControllers = new HashSet<string>();
         public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
         public HostEndpoint HostEndpoint;
+        public BattleState ResolvedState;
     }
 
     private sealed class HostEndpoint
@@ -139,6 +141,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Subscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -152,6 +155,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Unsubscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -305,6 +309,23 @@ internal class BattleHostHandler : IHandler
 
             SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides);
         });
+    }
+
+    private void Handle_BattleResolvedStateRecorded(MessagePayload<BattleResolvedStateRecorded> payload)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        var result = payload.What;
+        if (result.BattleState != BattleState.AttackerVictory &&
+            result.BattleState != BattleState.DefenderVictory)
+        {
+            return;
+        }
+
+        GetOrCreateRuntimeState(result.MapEventId).ResolvedState = result.BattleState;
+        if (hostRegistry.TryGet(result.MapEventId, out var assignment))
+            BroadcastResolvedState(result.MapEventId, assignment, result.BattleState);
     }
 
     /// <summary>[Server] Send the requester every reserve it owns, one message per side. With
@@ -967,6 +988,25 @@ internal class BattleHostHandler : IHandler
     {
         hostRegistry.Set(mapEventId, assignment);
         network.SendAll(ToMessage(mapEventId, assignment));
+        if (battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) &&
+            (runtimeState.ResolvedState == BattleState.AttackerVictory ||
+             runtimeState.ResolvedState == BattleState.DefenderVictory))
+        {
+            BroadcastResolvedState(mapEventId, assignment, runtimeState.ResolvedState);
+        }
+
         messageBroker.Publish(this, new BattleHostAssignmentChanged(mapEventId));
+    }
+
+    private void BroadcastResolvedState(
+        string mapEventId,
+        BattleHostAssignment assignment,
+        BattleState battleState)
+    {
+        network.SendAll(new NetworkBattleResultSnapshot(
+            mapEventId,
+            assignment.HostControllerId,
+            assignment.Epoch,
+            battleState));
     }
 }

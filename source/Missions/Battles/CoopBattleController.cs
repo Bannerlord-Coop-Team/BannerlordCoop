@@ -74,6 +74,7 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
+    private int lastResultSnapshotEpochReported;
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
@@ -415,7 +416,7 @@ public class CoopBattleController : CoopMissionController
 
     private void TryAcceptResultSnapshot(NetworkBattleResultSnapshot snapshot)
     {
-        if (snapshot.InstanceId != Session.InstanceId || Session.IsLocalHost)
+        if (snapshot.InstanceId != Session.InstanceId)
             return;
 
         if (snapshot.HostEpoch > Session.HostEpoch)
@@ -438,8 +439,11 @@ public class CoopBattleController : CoopMissionController
 
         ClearAppliedPendingResultSnapshot();
         ResultCommitter.AcceptResolvedState(snapshot.BattleState);
-        if (Deployment.IsCommitted)
+        if (Deployment.IsCommitted && lastResultSnapshotEpochReported != snapshot.HostEpoch)
+        {
             ResultCommitter.ReportAcceptedResult();
+            lastResultSnapshotEpochReported = snapshot.HostEpoch;
+        }
     }
 
     private void ClearAppliedPendingResultSnapshot()

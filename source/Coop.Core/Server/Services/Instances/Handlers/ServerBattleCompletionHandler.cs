@@ -110,8 +110,14 @@ public class ServerBattleCompletionHandler : IHandler
                 return;
 
             bool canConclude = !HasPendingJoiners(instanceId);
+            bool isCurrentHostResult =
+                currentMembers.Contains(controllerId) &&
+                controllerId == assignment.HostControllerId &&
+                result.HostEpoch == assignment.Epoch &&
+                (result.BattleState == BattleState.AttackerVictory ||
+                 result.BattleState == BattleState.DefenderVictory);
 
-            if (!completionTracker.TryRecordResult(
+            bool concluded = completionTracker.TryRecordResult(
                     instanceId,
                     controllerId,
                     result.BattleState,
@@ -120,10 +126,13 @@ public class ServerBattleCompletionHandler : IHandler
                     assignment.HostControllerId,
                     assignment.Epoch,
                     out var concludedState,
-                    canConclude))
-            {
+                    canConclude);
+
+            if (isCurrentHostResult)
+                messageBroker.Publish(this, new BattleResolvedStateRecorded(instanceId, result.BattleState));
+
+            if (!concluded)
                 return;
-            }
 
             if (!missionManager.TryBeginActiveInstanceConclusion(instanceId, currentMembers))
                 return;
@@ -164,21 +173,21 @@ public class ServerBattleCompletionHandler : IHandler
     {
         lock (pendingJoinersGate)
         {
-            bool hasPendingJoiners = HasPendingJoiners(instanceId);
             if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
             {
-                if (!hasPendingJoiners && completionTracker.TryConcludeAbandoned(
+                if (completionTracker.TryConcludeAbandoned(
                         instanceId,
                         out var abandonedState,
                         out var abandonedEpoch,
                         out var abandonedMemberCount))
                 {
-                    QueueAbandonedConclusion(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
+                    ConcludeAbandonedBattle(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
                 }
 
                 return;
             }
 
+            bool hasPendingJoiners = HasPendingJoiners(instanceId);
             if (!hostRegistry.TryGet(instanceId, out var assignment))
                 return;
 
@@ -433,20 +442,17 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Publish(this, new NetworkChangeBattleState(instanceId, concludedState, hostEpoch));
     }
 
-    private void QueueAbandonedConclusion(
+    private void ConcludeAbandonedBattle(
         string instanceId,
         int memberCount,
         BattleState concludedState,
         int hostEpoch)
     {
-        RunSerialized(() =>
-        {
-            if (!missionManager.TryBeginEmptyInstanceConclusion(instanceId))
-                return;
+        if (!missionManager.TryBeginEmptyInstanceConclusion(instanceId))
+            return;
 
-            hostRegistry.Remove(instanceId);
-            PublishConclusion(instanceId, memberCount, concludedState, hostEpoch);
-        });
+        hostRegistry.Remove(instanceId);
+        PublishConclusion(instanceId, memberCount, concludedState, hostEpoch);
     }
 
     // Keep membership signals, host changes, and result decisions on one FIFO queue.
