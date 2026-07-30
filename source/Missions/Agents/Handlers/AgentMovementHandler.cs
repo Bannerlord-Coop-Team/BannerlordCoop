@@ -37,9 +37,6 @@ public class AgentMovementHandler : IAgentMovementHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
-    // Movement is strictly droppable, so keep even mounted snapshots below the 1 KB unreliable ceiling.
-    private const int MaxAgentsPerMovementPacket = 3;
-
     // Forty updates per second keeps locally authoritative agents responsive.
     private const float MovementPollingIntervalSeconds = 0.025f;
 
@@ -49,6 +46,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IAgentEquipmentApplier equipmentApplier;
+    private readonly IMovementBatchSender movementBatchSender;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
 
@@ -79,6 +77,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IAgentEquipmentApplier equipmentApplier,
+        IMovementBatchSender movementBatchSender,
         IPuppetMountStateRepairer puppetMountStateRepairer)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
@@ -89,6 +88,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.equipmentApplier = equipmentApplier;
+        this.movementBatchSender = movementBatchSender;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
 
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
@@ -123,6 +123,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         _interpolator.Clear();
+        movementBatchSender.Clear();
 
         packetManager.RemovePacketHandler(this);
         packetManager.RemovePacketHandler(_mountMovementApplier);
@@ -136,28 +137,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     }
 
     public PacketType PacketType => PacketType.Movement;
-
-    private sealed class MovementBatch<T>
-    {
-        public readonly string IdentityScopeId;
-        public readonly List<ushort> CompactIds = new List<ushort>();
-        public readonly List<Guid> CanonicalIds = new List<Guid>();
-        public readonly List<T> Data = new List<T>();
-
-        public MovementBatch(string identityScopeId)
-        {
-            IdentityScopeId = identityScopeId;
-        }
-
-        public void Add(CoopAgentInfo info, T data)
-        {
-            if (IdentityScopeId == null)
-                CanonicalIds.Add(info.AgentId);
-            else
-                CompactIds.Add(info.MovementId);
-            Data.Add(data);
-        }
-    }
 
     // Broadcast every locally authoritative agent.
     public void PollMovement(float dt)
@@ -238,10 +217,17 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         SendEquipment(equipmentGroups.Values);
         SendEquipment(legacyEquipment);
-        SendMovement(movementGroups.Values);
-        SendMovement(legacyMovement);
-        SendMountMovement(mountGroups.Values);
-        SendMountMovement(legacyMountMovement);
+        int maxPayloadBytes = client.GetMaxUnreliablePayloadBytes();
+        movementBatchSender.Send(
+            movementGroups.Values,
+            legacyMovement,
+            maxPayloadBytes,
+            CreateMovementPacket);
+        movementBatchSender.Send(
+            mountGroups.Values,
+            legacyMountMovement,
+            maxPayloadBytes,
+            CreateMountMovementPacket);
     }
 
     private static void AddToBatch<T>(
@@ -297,67 +283,26 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
-    private void SendMovement(IEnumerable<MovementBatch<AgentData>> batches)
+    private static IPacket CreateMovementPacket(
+        string identityScopeId,
+        ushort[] compactIds,
+        Guid[] canonicalIds,
+        AgentData[] data)
     {
-        foreach (var batch in batches)
-            SendMovement(batch);
+        return identityScopeId == null
+            ? new MovementPacket(canonicalIds, data)
+            : new MovementPacket(identityScopeId, compactIds, data);
     }
 
-    private void SendMovement(MovementBatch<AgentData> batch)
+    private static IPacket CreateMountMovementPacket(
+        string identityScopeId,
+        ushort[] compactIds,
+        Guid[] canonicalIds,
+        AgentMountData[] data)
     {
-        if (batch == null) return;
-
-        for (int start = 0; start < batch.Data.Count; start += MaxAgentsPerMovementPacket)
-        {
-            int count = Math.Min(MaxAgentsPerMovementPacket, batch.Data.Count - start);
-            var data = new AgentData[count];
-            batch.Data.CopyTo(start, data, 0, count);
-
-            if (batch.IdentityScopeId == null)
-            {
-                var ids = new Guid[count];
-                batch.CanonicalIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new MovementPacket(ids, data));
-            }
-            else
-            {
-                var ids = new ushort[count];
-                batch.CompactIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new MovementPacket(batch.IdentityScopeId, ids, data));
-            }
-        }
-    }
-
-    private void SendMountMovement(IEnumerable<MovementBatch<AgentMountData>> batches)
-    {
-        foreach (var batch in batches)
-            SendMountMovement(batch);
-    }
-
-    private void SendMountMovement(MovementBatch<AgentMountData> batch)
-    {
-        if (batch == null) return;
-
-        for (int start = 0; start < batch.Data.Count; start += MaxAgentsPerMovementPacket)
-        {
-            int count = Math.Min(MaxAgentsPerMovementPacket, batch.Data.Count - start);
-            var data = new AgentMountData[count];
-            batch.Data.CopyTo(start, data, 0, count);
-
-            if (batch.IdentityScopeId == null)
-            {
-                var ids = new Guid[count];
-                batch.CanonicalIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new MountMovementPacket(ids, data));
-            }
-            else
-            {
-                var ids = new ushort[count];
-                batch.CompactIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new MountMovementPacket(
-                    batch.IdentityScopeId, ids, data));
-            }
-        }
+        return identityScopeId == null
+            ? new MountMovementPacket(canonicalIds, data)
+            : new MountMovementPacket(identityScopeId, compactIds, data);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -403,7 +348,10 @@ public class AgentMovementHandler : IAgentMovementHandler
                     if (agentRegistry.IsLocallyControlled(agent))
                         continue;
 
-                    SyncMountState(agent, movement.IdentityScopeId, data);
+                    SyncMountState(
+                        agent,
+                        movement.IdentityScopeId ?? agentInfo.MovementScopeId,
+                        data);
 
                     // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
                     if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)

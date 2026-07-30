@@ -890,6 +890,42 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void GuidMovementPacket_UsesTheRegisteredRiderScopeToResolveACompactMount()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            const string movementScopeId = "owner-movement-scope";
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            Guid riderId = Guid.NewGuid();
+            Guid horseId = Guid.NewGuid();
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount();
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, riderId, 1, rider));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, horseId, 2, horse));
+
+            AgentData data = CreateAgentData(
+                riderPosition: Vec3.Zero,
+                riderDirection: Vec2.Forward,
+                ownerSpeed: 0f,
+                mountData: new AgentMountData(horse, 2));
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(new[] { riderId }, new[] { data }));
+
+            Assert.Same(horse, rider.MountAgent);
+        });
+    }
+
+    [Fact]
     public void MovementPolling_RestoresAiOnlyWhenTheLocalHorseIsLocallyDriven()
     {
         using var fixture = new MissionEngineFixture();
