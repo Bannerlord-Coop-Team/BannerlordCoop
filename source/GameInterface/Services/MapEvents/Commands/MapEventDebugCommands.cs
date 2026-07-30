@@ -1366,7 +1366,7 @@ public class MapEventDebugCommands
             return "Unable to resolve Network";
         }
 
-        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+        if (!TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var playerParty, out var error))
         {
             return error;
         }
