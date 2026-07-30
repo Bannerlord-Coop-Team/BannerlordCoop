@@ -1,4 +1,7 @@
-﻿using Coop.Core.Server.Services.Stances.Messages;
+﻿using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Client.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.Stances.Messages;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -25,6 +28,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobilePartyAIs.Patches;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Stances.Messages;
@@ -1889,23 +1893,145 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void BreakInContinuation_ApprovedWhileSiegeLeaderPending_OpensSiegeEncounter()
+    public void BreakInContinuation_ServerEntryPrecedesApprovalAndOpensPendingSiegeEncounter()
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
         var siege = CreateSyncedSiege();
         var pendingMapEventId = TestEnvironment.CreateRegisteredObject<MapEvent>(MapEventDisabledMethods);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
 
         var capturedEncounter = PrepareClientSiegeEncounter(
             client,
             playerPartyId,
-            siege.SettlementId);
+            siege.SettlementId,
+            enterSettlement: false);
+        client.NetworkSentMessages.Clear();
+        Server.NetworkSentMessages.Clear();
+
+        var captureRequestDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var breakInRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        Assert.Equal(playerMobilePartyId, breakInRequest.PartyId);
+        Assert.Equal(siege.SettlementId, breakInRequest.SettlementId);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+        foreach (var syncedClient in Clients)
+            AssertPartyOutsideSettlement(syncedClient, playerMobilePartyId);
+        LocationEncounter? stagedLocationEncounter = null;
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(
+                siege.SettlementId,
+                out var settlement));
+            stagedLocationEncounter = PlayerEncounter.LocationEncounter;
+            Assert.NotNull(stagedLocationEncounter);
+            Assert.Same(settlement, stagedLocationEncounter!.Settlement);
+        });
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkBreakInContinuationApproved(
+                "stale-break-in-request",
+                siege.SettlementId,
+                approved: true));
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        AssertPartyOutsideSettlement(client, playerMobilePartyId);
+        client.Call(() => Assert.Same(stagedLocationEncounter, PlayerEncounter.LocationEncounter));
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkBreakInContinuationApproved(
+                breakInRequest.RequestId,
+                siege.SettlementId,
+                approved: false));
+        client.Call(() => Assert.Null(PlayerEncounter.LocationEncounter));
+
+        client.NetworkSentMessages.Clear();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var firstRequestId = breakInRequest.RequestId;
+        breakInRequest = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        Assert.NotEqual(firstRequestId, breakInRequest.RequestId);
+        client.Call(() =>
+        {
+            stagedLocationEncounter = PlayerEncounter.LocationEncounter;
+            Assert.NotNull(stagedLocationEncounter);
+        });
+
+        Server.Call(
+            () =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    playerMobilePartyId,
+                    out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                    siege.SettlementId,
+                    out var settlement));
+                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(
+                    siege.LeaderPartyId,
+                    out var siegeLeaderParty));
+
+                VillageHostileFactionStanceHelper.ApplyWarStance(
+                    siegeLeaderParty.MapFaction,
+                    playerParty.MapFaction);
+                Assert.True(playerParty.IsActive);
+                Assert.Null(playerParty.CurrentSettlement);
+                Assert.Null(playerParty.BesiegerCamp);
+                Assert.Null(playerParty.Party.MapEventSide);
+                Assert.NotNull(settlement.SiegeEvent);
+                Assert.True(settlement.SiegeEvent.CanPartyJoinSide(
+                    playerParty.Party,
+                    BattleSideEnum.Defender));
+
+                Server.SimulateMessage(client.NetPeer, breakInRequest);
+            },
+            MapEventDisabledMethods.Append(GetDirectNetworkRoutingMethod()));
+
+        var settlementEntry = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
+        Assert.Equal(
+            ObjectManager.Compact(playerMobilePartyId, typeof(MobileParty)),
+            settlementEntry.PartyId);
+        Assert.Equal(
+            ObjectManager.Compact(siege.SettlementId, typeof(Settlement)),
+            settlementEntry.SettlementId);
+        var breakInApproval = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkBreakInContinuationApproved>());
+        Assert.Equal(breakInRequest.RequestId, breakInApproval.RequestId);
+        Assert.True(breakInApproval.Approved);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        AssertPartyEnteredSettlement(Server, playerMobilePartyId, siege.SettlementId);
+        foreach (var syncedClient in Clients)
+            AssertPartyEnteredSettlement(syncedClient, playerMobilePartyId, siege.SettlementId);
+        client.Call(() =>
+        {
+            Assert.Same(capturedEncounter, PlayerEncounter.Current);
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(
+                siege.SettlementId,
+                out var settlement));
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.NotNull(Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>());
+        });
+
         client.NetworkSentMessages.Clear();
 
-        var captureDisabledMethods = MapEventDisabledMethods
+        var captureContinuationDisabledMethods = MapEventDisabledMethods
             .Append(GetNetworkRoutingMethod())
             .Append(AccessTools.Method(typeof(PlayerSiege), nameof(PlayerSiege.StartSiegePreparation)))
             .ToList();
-        client.Call(InvokeBreakInContinuation, captureDisabledMethods);
+        client.Call(
+            () => client.SimulateMessage(Server.NetPeer, breakInApproval),
+            captureContinuationDisabledMethods);
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
         Assert.Equal(siege.LeaderPartyId, request.AttackerId);
@@ -1928,6 +2054,72 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             capturedEncounter,
             siege.SettlementId,
             siege.LeaderPartyId);
+    }
+
+    [Fact]
+    public void BreakInContinuation_ApprovedAfterEncounterChanges_PreservesEnteredLocation()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        client.NetworkSentMessages.Clear();
+
+        var captureRequestDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        var request = Assert.Single(
+            client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        LocationEncounter? stagedLocationEncounter = null;
+        client.Call(() =>
+        {
+            stagedLocationEncounter = PlayerEncounter.LocationEncounter;
+            Assert.NotNull(stagedLocationEncounter);
+        });
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkPartyEnterSettlement(
+                ObjectManager.Compact(siege.SettlementId, typeof(Settlement)),
+                ObjectManager.Compact(playerMobilePartyId, typeof(MobileParty))));
+        AssertPartyEnteredSettlement(client, playerMobilePartyId, siege.SettlementId);
+
+        PlayerEncounter? changedEncounter = null;
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(
+                siege.SettlementId,
+                out var settlement));
+            changedEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            changedEncounter.EncounterSettlementAux = settlement;
+            Campaign.Current.PlayerEncounter = changedEncounter;
+        });
+
+        client.SimulateMessage(
+            Server.NetPeer,
+            new NetworkBreakInContinuationApproved(
+                request.RequestId,
+                request.SettlementId,
+                approved: true));
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        AssertPartyEnteredSettlement(client, playerMobilePartyId, siege.SettlementId);
+        client.Call(() =>
+        {
+            Assert.Same(changedEncounter, PlayerEncounter.Current);
+            Assert.Same(stagedLocationEncounter, PlayerEncounter.LocationEncounter);
+        });
     }
 
     [Fact]
@@ -2743,7 +2935,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     private PlayerEncounter PrepareClientSiegeEncounter(
         EnvironmentInstance client,
         string playerPartyId,
-        string settlementId)
+        string settlementId,
+        bool enterSettlement = true)
     {
         SetMainParty(client, playerPartyId);
         EnableHeadlessEncounterFinish(client);
@@ -2757,21 +2950,127 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
             using (new AllowedThread())
             {
-                playerParty.MobileParty._currentSettlement = settlement;
+                if (enterSettlement)
+                    playerParty.MobileParty._currentSettlement = settlement;
+                else
+                    playerParty.MobileParty._currentSettlement = null;
                 Hero.MainHero._partyBelongedTo = playerParty.MobileParty;
+            }
+
+            if (Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>() == null)
+            {
+                Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
+                    new CampaignBehaviorBase[] { new EncounterGameMenuBehavior() }));
             }
 
             encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter.EncounterSettlementAux = settlement;
             Campaign.Current.PlayerEncounter = encounter;
 
-            Assert.Same(settlement, Settlement.CurrentSettlement);
-            Assert.Same(settlement, Hero.MainHero.CurrentSettlement);
-            Assert.Same(settlement.SiegeEvent, PlayerSiege.PlayerSiegeEvent);
+            if (enterSettlement)
+            {
+                Assert.Same(settlement, Settlement.CurrentSettlement);
+                Assert.Same(settlement, Hero.MainHero.CurrentSettlement);
+                Assert.Same(settlement.SiegeEvent, PlayerSiege.PlayerSiegeEvent);
+            }
+            else
+            {
+                Assert.Null(playerParty.MobileParty.CurrentSettlement);
+                Assert.Null(Hero.MainHero.CurrentSettlement);
+                Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            }
         }, MapEventDisabledMethods);
 
         Assert.NotNull(encounter);
         return encounter!;
+    }
+
+    private void PrepareBreakInDefenderEligibility(
+        string playerPartyId,
+        string settlementId,
+        string siegeLeaderPartyId)
+    {
+        var defenderClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var attackerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(siegeLeaderPartyId, out var siegeLeaderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(defenderClanId, out var defenderClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(attackerClanId, out var attackerClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Town>(townId, out var town));
+            Assert.NotNull(playerParty.MobileParty);
+            Assert.NotNull(siegeLeaderParty.MobileParty);
+
+            playerParty.LeaderHero.Clan = defenderClan;
+            playerParty.MobileParty.ActualClan = defenderClan;
+            siegeLeaderParty.LeaderHero.Clan = attackerClan;
+            siegeLeaderParty.MobileParty.ActualClan = attackerClan;
+            SetupFief(settlement, town, playerParty);
+            VillageHostileFactionStanceHelper.ApplyWarStance(
+                siegeLeaderParty.MapFaction,
+                playerParty.MapFaction);
+
+            Assert.True(settlement.SiegeEvent.CanPartyJoinSide(
+                playerParty,
+                BattleSideEnum.Defender));
+        }, MapEventDisabledMethods);
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(
+                    playerPartyId,
+                    out var playerParty));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(
+                    settlementId,
+                    out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Town>(
+                    townId,
+                    out var town));
+                Assert.NotNull(playerParty.MobileParty);
+                using (new AllowedThread())
+                {
+                    settlement.Town = town;
+                    settlement.SetSettlementComponent(town);
+                    playerParty.MobileParty._currentSettlement = null;
+                }
+            });
+        }
+    }
+
+    private static void AssertPartyOutsideSettlement(
+        EnvironmentInstance instance,
+        string playerMobilePartyId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(
+                playerMobilePartyId,
+                out var playerParty));
+            Assert.Null(playerParty.CurrentSettlement);
+        });
+    }
+
+    private static void AssertPartyEnteredSettlement(
+        EnvironmentInstance instance,
+        string playerMobilePartyId,
+        string settlementId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(
+                playerMobilePartyId,
+                out var playerParty));
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(
+                settlementId,
+                out var settlement));
+            Assert.Same(settlement, playerParty.CurrentSettlement);
+        });
     }
 
     private void MarkPartyPending(

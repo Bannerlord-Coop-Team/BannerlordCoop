@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
@@ -8,7 +9,10 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Helpers;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -24,6 +28,42 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch]
 internal class SiegeEntryFlowPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegeEntryFlowPatches>();
+
+    [ThreadStatic]
+    private static int approvedBreakInContinuationDepth;
+
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "break_in_debrief_continue_on_consequence")]
+    [HarmonyPrefix]
+    private static bool BreakInContinuationPrefix()
+    {
+        if (ModInformation.IsServer || approvedBreakInContinuationDepth > 0) return true;
+
+        var party = MobileParty.MainParty;
+        var settlement = PlayerEncounter.EncounterSettlement;
+        if (party == null || settlement == null)
+        {
+            Logger.Error("Suppressing break-in continuation because the local party or encounter settlement is unavailable");
+            return false;
+        }
+
+        MessageBroker.Instance.Publish(null, new BreakInContinuationAttempted(party, settlement));
+        return false;
+    }
+
+    internal static void RunApprovedBreakInContinuation(Action continuation)
+    {
+        approvedBreakInContinuationDepth++;
+        try
+        {
+            continuation();
+        }
+        finally
+        {
+            approvedBreakInContinuationDepth--;
+        }
+    }
+
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_town_town_besiege_on_consequence))]
     [HarmonyPrefix]
     private static bool BesiegeConsequencePrefix()
