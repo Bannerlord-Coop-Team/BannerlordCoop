@@ -267,22 +267,14 @@ internal class PartyCommands
             return "No active party screen.";
 
         var logic = partyState.PartyScreenLogic;
-        var source = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right];
-        int index = source.FindIndexOfTroop(character);
-        if (index < 0) return $"{strings[0]} is not in the right member roster.";
+        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+        if (partyVm == null) return "No active Party screen view model.";
 
-        var element = source.GetElementCopyAtIndex(index);
-        var command = new PartyScreenLogic.PartyCommand();
-        command.FillForTransferTroop(
-            PartyScreenLogic.PartyRosterSide.Right,
-            PartyScreenLogic.TroopType.Member,
-            character,
-            1,
-            element.Number == element.WoundedNumber ? 1 : 0,
-            -1);
-        if (!logic.ValidateCommand(command)) return "The Party screen rejected the transfer.";
+        var row = partyVm.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
+        if (row == null) return $"{strings[0]} is not in the right member roster.";
 
-        logic.AddCommand(command);
+        partyVm.OnTransferTroop(row, -1, 1, row.Side);
+        partyVm.ExecuteRemoveZeroCounts();
         return $"PARTY_SCREEN_EDIT_STAGED pending={logic.IsThereAnyChanges()}";
     }
 
