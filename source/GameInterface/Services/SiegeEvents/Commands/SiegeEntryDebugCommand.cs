@@ -276,17 +276,13 @@ internal class SiegeEntryDebugCommand
         if (fixture.PlayerParty.ActualClan == null)
             return $"{fixture.PlayerParty.Name} has no clan.";
 
-        fixture.OwnerWarCaptured = true;
-        if (!fixture.BesiegerPlayerWasAtWar)
-            DeclareWarAction.ApplyByDefault(fixture.BesiegerFaction, fixture.PlayerFaction);
-
         // Change only the authoritative backing field so the temporary stale-client fixture does not alter fief caches.
         fixture.Settlement.Town._ownerClan = fixture.PlayerParty.ActualClan;
         fixture.OwnerOverridden = true;
 
         return $"token={fixture.Token}|settlement={fixture.Settlement.StringId}|" +
             $"ownerClan={fixture.PlayerParty.ActualClan.StringId}|" +
-            $"ownerSiegeWarAdded={!fixture.BesiegerPlayerWasAtWar}";
+            "ownerSiegeWarAdded=False";
     }
 
     [CommandLineArgumentFunction("entry_fixture_force_stale_reconnect", "coop.debug.siege")]
@@ -364,7 +360,6 @@ internal class SiegeEntryDebugCommand
 
         fixture.Settlement.Town._ownerClan = fixture.OriginalOwnerClan;
         fixture.OwnerOverridden = false;
-        RestoreOwnerWar(fixture);
         return $"Restored {fixture.Settlement.StringId} owner to {fixture.OriginalOwnerClan?.StringId ?? "none"}.";
     }
 
@@ -741,7 +736,6 @@ internal class SiegeEntryDebugCommand
                 fixture.Settlement.Town._ownerClan = fixture.OriginalOwnerClan;
                 fixture.OwnerOverridden = false;
             }
-            RestoreOwnerWar(fixture);
 
             if (fixture.PlayerParty.BesiegerCamp != null)
                 siegeEventInterface.BreakSiege(fixture.PlayerParty);
@@ -837,18 +831,6 @@ internal class SiegeEntryDebugCommand
             DeclareWarAction.ApplyByDefault(first, second);
         else
             MakePeaceAction.Apply(first, second);
-    }
-
-    private static void RestoreOwnerWar(SiegeEntryFixture fixture)
-    {
-        if (!fixture.OwnerWarCaptured)
-            return;
-
-        RestoreWar(
-            fixture.BesiegerFaction,
-            fixture.PlayerFaction,
-            fixture.BesiegerPlayerWasAtWar);
-        fixture.OwnerWarCaptured = false;
     }
 
     private sealed class StanceLinkSnapshot
@@ -1067,7 +1049,6 @@ internal class SiegeEntryDebugCommand
         public int OriginalOwnerLeaderRelation { get; }
         public bool OwnerOverridden { get; set; }
         public bool StaleReconnectForced { get; set; }
-        public bool OwnerWarCaptured { get; set; }
         public bool TimePolicyAdded { get; set; }
 
         public SiegeEntryFixture(
