@@ -4,9 +4,11 @@ using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
@@ -23,6 +25,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -296,13 +299,15 @@ public class SiegeDisconnectTests : MapEventTestBase
                     besiegerDefeated: false,
                     leader,
                     new[] { leader, member },
-                    new[] { defender }));
+                    new[] { defender },
+                    interruptedActiveAssault: true));
         });
 
         var prompt = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPromptSiegeEnded>());
         Assert.Equal(leaderPartyId, prompt.LeaderPartyId);
         Assert.Equal(new[] { leaderPartyId, memberPartyId }, prompt.AttackerPartyIds);
         Assert.Equal(new[] { defenderPartyId }, prompt.DefenderPartyIds);
+        Assert.True(prompt.InterruptedActiveAssault);
     }
 
     [Fact]
@@ -324,6 +329,7 @@ public class SiegeDisconnectTests : MapEventTestBase
         Assert.Equal(leaderPartyId, prompt.LeaderPartyId);
         Assert.Equal(new[] { leaderPartyId, memberPartyId }, prompt.AttackerPartyIds);
         Assert.Empty(prompt.DefenderPartyIds);
+        Assert.False(prompt.InterruptedActiveAssault);
 
         foreach (var instance in Clients.Append(Server))
         {
@@ -411,6 +417,98 @@ public class SiegeDisconnectTests : MapEventTestBase
             Assert.Empty(menuCalls.SwitchesFor(client));
         else
             Assert.Equal(new[] { expectedMenu }, menuCalls.SwitchesFor(client));
+    }
+
+    [Fact]
+    public void InterruptedActiveAssaultPrompt_EndsMissionThenFinishesEncounterOnce()
+    {
+        var client = Clients.First();
+        var (_, mainPartyId) = CreatePlayerHeroParty("InterruptedAssaultClient");
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        ConfigureTerminationClient(
+            client,
+            mainPartyId,
+            mainPartyId,
+            settlementId,
+            SiegeTerminationRole.AttackerLeader);
+        SetMockPlayerEncounter(client);
+
+        MockMission mission = null;
+        using var menuCalls = new GameMenuCallCounter();
+        using (var fixture = new MissionEngineFixture())
+        {
+            client.Call(() =>
+            {
+                mission = fixture.CreateMission(client);
+                MobileParty.MainParty.Party._mapEventSide = ObjectHelper.SkipConstructor<MapEventSide>();
+            });
+
+            client.SimulateMessage(
+                this,
+                new NetworkPromptSiegeEnded(
+                    settlementId,
+                    besiegerDefeated: false,
+                    mainPartyId,
+                    new[] { mainPartyId },
+                    Array.Empty<string>(),
+                    interruptedActiveAssault: true));
+
+            client.Call(() =>
+            {
+                Assert.True(mission.EndMissionCalled);
+                Assert.NotNull(PlayerEncounter.Current);
+
+                client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+                Assert.NotNull(PlayerEncounter.Current);
+            });
+        }
+
+        client.Call(() =>
+        {
+            client.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(MobileParty.MainParty.Party.MapEventSide);
+        });
+
+        Assert.Equal(1, menuCalls.ExitCountFor(client));
+        Assert.Equal(1, menuCalls.DeactivationCountFor(client));
+
+        client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()));
+        Assert.Equal(1, menuCalls.ExitCountFor(client));
+        Assert.Equal(1, menuCalls.DeactivationCountFor(client));
+    }
+
+    [Fact]
+    public void InterruptedActiveAssaultPrompt_ForNonparticipantPreservesMission()
+    {
+        var client = Clients.First();
+        var (_, mainPartyId) = CreatePlayerHeroParty("UnrelatedMissionClient");
+        var leaderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        ConfigureTerminationClient(
+            client,
+            mainPartyId,
+            leaderPartyId,
+            settlementId,
+            SiegeTerminationRole.None);
+
+        using var fixture = new MissionEngineFixture();
+        MockMission mission = null;
+        client.Call(() => mission = fixture.CreateMission(client));
+
+        client.SimulateMessage(
+            this,
+            new NetworkPromptSiegeEnded(
+                settlementId,
+                besiegerDefeated: false,
+                leaderPartyId,
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                interruptedActiveAssault: true));
+
+        client.Call(() => Assert.False(mission.EndMissionCalled));
     }
 
     private SiegeContext SetupSiege(params string[] attackerPartyIds)

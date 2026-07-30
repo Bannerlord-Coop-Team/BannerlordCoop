@@ -68,6 +68,22 @@ public class SiegeTerminationRoleTests
         Assert.Equal(SiegeTerminationRole.None, result);
     }
 
+    [Fact]
+    public void InterruptedActiveAssault_ProtobufPreservesFlagAndParticipants()
+    {
+        var message = RoundTrip(new NetworkPromptSiegeEnded(
+            "town_ES1",
+            besiegerDefeated: false,
+            "leader",
+            new[] { "leader", "member" },
+            new[] { "defender" },
+            interruptedActiveAssault: true));
+
+        Assert.True(message.InterruptedActiveAssault);
+        Assert.Equal(new[] { "leader", "member" }, message.AttackerPartyIds);
+        Assert.Equal(new[] { "defender" }, message.DefenderPartyIds);
+    }
+
     [Theory]
     [InlineData(SiegeBreakOutcome.Applied)]
     [InlineData(SiegeBreakOutcome.AlreadyLeft)]

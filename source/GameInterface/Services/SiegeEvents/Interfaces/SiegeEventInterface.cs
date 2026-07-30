@@ -121,9 +121,23 @@ public interface ISiegeEventInterface : IGameAbstraction
     void PromptSiegePreparation(MobileParty attackerParty, Settlement settlement);
 
     /// <summary>
-    /// Frees this player from the siege-preparation menus when the siege dissolved without a battle.
+    /// Frees this player from siege menus when the siege ended without a completed battle.
     /// </summary>
-    void PromptSiegeEnded(Settlement settlement, bool besiegerDefeated, SiegeTerminationRole role);
+    void PromptSiegeEnded(
+        Settlement settlement,
+        bool besiegerDefeated,
+        SiegeTerminationRole role,
+        bool interruptedActiveAssault = false);
+
+    /// <summary>
+    /// Whether a rendered mission still owns the screen while an interrupted assault is unwinding.
+    /// </summary>
+    bool IsCampaignMissionActive { get; }
+
+    /// <summary>
+    /// Requests that the rendered mission end before interrupted-assault encounter cleanup continues.
+    /// </summary>
+    void EndCampaignMission();
 
     /// <summary>
     /// Seat a winning inside defender on the siege-defeated menu after the assault, which the replicated
@@ -188,6 +202,17 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     private bool reloadRestoreSubscribed;
     private Settlement localAftermathChoiceSettlement;
     private Settlement localAftermathNarrationSettlement;
+
+    public bool IsCampaignMissionActive =>
+        TaleWorlds.MountAndBlade.MissionState.Current != null ||
+        TaleWorlds.MountAndBlade.Mission.Current != null;
+
+    public void EndCampaignMission()
+    {
+        var mission = TaleWorlds.MountAndBlade.Mission.Current ??
+            TaleWorlds.MountAndBlade.MissionState.Current?.CurrentMission;
+        mission?.EndMission();
+    }
 
     public void StartSiegeEvent(MobileParty besiegerParty, Settlement settlement)
     {
@@ -492,7 +517,11 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         }
     }
 
-    public void PromptSiegeEnded(Settlement settlement, bool besiegerDefeated, SiegeTerminationRole role)
+    public void PromptSiegeEnded(
+        Settlement settlement,
+        bool besiegerDefeated,
+        SiegeTerminationRole role,
+        bool interruptedActiveAssault = false)
     {
         if (role == SiegeTerminationRole.None || MobileParty.MainParty == null) return;
 
@@ -500,31 +529,87 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
         using (new AllowedThread())
         {
-            DeactivateLocalPlayerSiege(settlement);
+            if (interruptedActiveAssault)
+            {
+                FinishInterruptedActiveAssault(settlement);
+            }
+            else
+            {
+                DeactivateLocalPlayerSiege(settlement);
+            }
 
             if (role == SiegeTerminationRole.Defender)
             {
-                if (MobileParty.MainParty.CurrentSettlement != settlement || !IsSiegePreparationMenu(currentMenu))
+                if (MobileParty.MainParty.CurrentSettlement != settlement ||
+                    (!interruptedActiveAssault && !IsSiegePreparationMenu(currentMenu)))
                     return;
 
-                GameMenu.SwitchToMenu(besiegerDefeated ? "siege_attacker_defeated" : "siege_attacker_left");
+                SwitchOrActivateMenu(besiegerDefeated ? "siege_attacker_defeated" : "siege_attacker_left");
                 return;
             }
 
             if (MobileParty.MainParty.BesiegerCamp != null)
                 MobileParty.MainParty.BesiegerCamp = null;
 
-            if (!IsSiegePreparationMenu(currentMenu)) return;
+            if (!interruptedActiveAssault && !IsSiegePreparationMenu(currentMenu)) return;
 
             if (role == SiegeTerminationRole.AttackerMember &&
                 MobileParty.MainParty.Army != null &&
                 MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty)
             {
-                GameMenu.SwitchToMenu("army_wait");
+                SwitchOrActivateMenu("army_wait");
                 return;
             }
 
+            if (!interruptedActiveAssault)
+                GameMenu.ExitToLast();
+        }
+    }
+
+    private static void FinishInterruptedActiveAssault(Settlement settlement)
+    {
+        var party = MobileParty.MainParty;
+        if (party?.Party?._mapEventSide != null)
+            party.Party._mapEventSide = null;
+
+        if (PlayerEncounter.Current != null)
+        {
+            PlayerEncounter.LeaveEncounter = true;
+            try
+            {
+                PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to finish the interrupted siege encounter at {Settlement}", settlement?.StringId);
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = null;
+            }
+        }
+        else
+        {
             GameMenu.ExitToLast();
+            if (Campaign.Current.CurrentMenuContext == null)
+                Campaign.Current.MapStateData.GameMenuId = null;
+        }
+
+        if (party?.BesiegerCamp != null)
+            party.BesiegerCamp = null;
+
+        DeactivateLocalPlayerSiege(settlement);
+    }
+
+    private static void SwitchOrActivateMenu(string menuId)
+    {
+        if (Campaign.Current.CurrentMenuContext == null)
+        {
+            GameMenu.ActivateGameMenu(menuId);
+        }
+        else
+        {
+            GameMenu.SwitchToMenu(menuId);
         }
     }
 

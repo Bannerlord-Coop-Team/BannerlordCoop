@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -32,18 +33,21 @@ internal class SiegePreparationPromptPatches
         public MobileParty LeaderParty { get; }
         public MobileParty[] AttackerParties { get; }
         public MobileParty[] DefenderParties { get; }
+        public bool InterruptedActiveAssault { get; }
 
         public SiegeTerminationState(
             Settlement settlement,
             MobileParty leaderParty,
             MobileParty[] attackerParties,
-            MobileParty[] defenderParties)
+            MobileParty[] defenderParties,
+            bool interruptedActiveAssault)
         {
             ShouldPublish = true;
             Settlement = settlement;
             LeaderParty = leaderParty;
             AttackerParties = attackerParties;
             DefenderParties = defenderParties;
+            InterruptedActiveAssault = interruptedActiveAssault;
         }
 
         public SiegeTerminationState()
@@ -72,7 +76,9 @@ internal class SiegePreparationPromptPatches
         if (!FinalizingSieges.Add(__instance)) return;
 
         var settlement = __instance.BesiegedSettlement;
-        if (settlement?.Party == null || settlement.Party.MapEvent != null)
+        var mapEvent = settlement?.Party?.MapEvent;
+        bool interruptedActiveAssault = IsInterruptedActiveAssault(mapEvent);
+        if (settlement?.Party == null || (mapEvent != null && !interruptedActiveAssault))
         {
             __state = new SiegeTerminationState();
             return;
@@ -83,7 +89,8 @@ internal class SiegePreparationPromptPatches
             settlement,
             camp?.LeaderParty,
             GetMobileParties(camp?.GetInvolvedPartiesForEventType()),
-            GetDefenderParties(settlement));
+            GetDefenderParties(settlement),
+            interruptedActiveAssault);
     }
 
     // Vanilla assumes a local player exists while selecting its player-only end menu. Skip that
@@ -164,11 +171,16 @@ internal class SiegePreparationPromptPatches
                 __instance._isBesiegerDefeated,
                 __state.LeaderParty,
                 __state.AttackerParties,
-                __state.DefenderParties));
+                __state.DefenderParties,
+                __state.InterruptedActiveAssault));
         }
 
         return __exception;
     }
+
+    internal static bool IsInterruptedActiveAssault(MapEvent mapEvent)
+        => mapEvent?.IsSiegeAssault == true &&
+           !mapEvent.HasWinner;
 
     private static MobileParty[] GetMobileParties(System.Collections.Generic.IEnumerable<PartyBase> parties)
         => parties?

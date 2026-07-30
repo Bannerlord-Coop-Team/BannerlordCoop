@@ -120,7 +120,8 @@ internal class ServerSiegeEntryHandler : IHandler
             obj.BesiegerDefeated,
             leaderPartyId,
             GetPlayerPartyIds(obj.AttackerParties),
-            GetPlayerPartyIds(obj.DefenderParties)));
+            GetPlayerPartyIds(obj.DefenderParties),
+            obj.InterruptedActiveAssault));
     }
 
     private string[] GetPlayerPartyIds(IEnumerable<MobileParty> parties)

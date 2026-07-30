@@ -6,8 +6,8 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.SiegeEvents.Messages;
 
 /// <summary>
-/// A siege dissolved on the server without an assault battle. Participants are captured before
-/// vanilla destroys the siege graph so clients can unwind the matching local siege UI.
+/// A siege dissolved on the server without a completed assault battle. Participants are captured
+/// before vanilla destroys the siege graph so clients can unwind the matching local siege UI.
 /// </summary>
 public readonly struct SiegeEndedWithoutBattle : IEvent
 {
@@ -16,18 +16,21 @@ public readonly struct SiegeEndedWithoutBattle : IEvent
     public readonly MobileParty LeaderParty;
     public readonly MobileParty[] AttackerParties;
     public readonly MobileParty[] DefenderParties;
+    public readonly bool InterruptedActiveAssault;
 
     public SiegeEndedWithoutBattle(
         Settlement settlement,
         bool besiegerDefeated,
         MobileParty leaderParty,
         MobileParty[] attackerParties,
-        MobileParty[] defenderParties)
+        MobileParty[] defenderParties,
+        bool interruptedActiveAssault = false)
     {
         Settlement = settlement;
         BesiegerDefeated = besiegerDefeated;
         LeaderParty = leaderParty;
         AttackerParties = attackerParties ?? Array.Empty<MobileParty>();
         DefenderParties = defenderParties ?? Array.Empty<MobileParty>();
+        InterruptedActiveAssault = interruptedActiveAssault;
     }
 }

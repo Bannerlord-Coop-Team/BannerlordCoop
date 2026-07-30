@@ -6,6 +6,7 @@ using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using System.Linq;
@@ -26,6 +27,25 @@ internal class ClientSiegeEntryHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private PendingInterruptedAssault pendingInterruptedAssault;
+
+    // Game-thread only: prompts and CampaignTick continuations both run through the campaign queue.
+    private sealed class PendingInterruptedAssault
+    {
+        public Settlement Settlement { get; }
+        public bool BesiegerDefeated { get; }
+        public SiegeTerminationRole Role { get; }
+
+        public PendingInterruptedAssault(
+            Settlement settlement,
+            bool besiegerDefeated,
+            SiegeTerminationRole role)
+        {
+            Settlement = settlement;
+            BesiegerDefeated = besiegerDefeated;
+            Role = role;
+        }
+    }
 
     public ClientSiegeEntryHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface)
     {
@@ -45,6 +65,7 @@ internal class ClientSiegeEntryHandler : IHandler
         messageBroker.Subscribe<AssaultSiegeAttempted>(HandleAssaultAttempt);
         messageBroker.Subscribe<NetworkPromptSiegeAssault>(HandleAssaultPrompt);
         messageBroker.Subscribe<NetworkSnapSiegeCampPartyPosition>(HandleCampPositionSnap);
+        messageBroker.Subscribe<CampaignTick>(HandleCampaignTick);
     }
 
     private void HandleCampPositionSnap(MessagePayload<NetworkSnapSiegeCampPartyPosition> payload)
@@ -86,8 +107,53 @@ internal class ClientSiegeEntryHandler : IHandler
             if (!objectManager.TryGetIdWithLogging(MobileParty.MainParty, out var mainPartyId)) return;
 
             var role = ResolveTerminationRole(obj, mainPartyId);
-            siegeEventInterface.PromptSiegeEnded(settlement, obj.BesiegerDefeated, role);
+            if (obj.InterruptedActiveAssault && role != SiegeTerminationRole.None)
+            {
+                pendingInterruptedAssault = new PendingInterruptedAssault(
+                    settlement,
+                    obj.BesiegerDefeated,
+                    role);
+
+                if (siegeEventInterface.IsCampaignMissionActive)
+                {
+                    siegeEventInterface.EndCampaignMission();
+                    return;
+                }
+
+                FinishPendingInterruptedAssault();
+                return;
+            }
+
+            siegeEventInterface.PromptSiegeEnded(
+                settlement,
+                obj.BesiegerDefeated,
+                role,
+                interruptedActiveAssault: false);
         });
+    }
+
+    private void HandleCampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        if (pendingInterruptedAssault == null ||
+            siegeEventInterface.IsCampaignMissionActive)
+            return;
+
+        GameThread.RunSafe(
+            FinishPendingInterruptedAssault,
+            context: nameof(FinishPendingInterruptedAssault));
+    }
+
+    private void FinishPendingInterruptedAssault()
+    {
+        var pending = pendingInterruptedAssault;
+        if (pending == null) return;
+
+        siegeEventInterface.PromptSiegeEnded(
+            pending.Settlement,
+            pending.BesiegerDefeated,
+            pending.Role,
+            interruptedActiveAssault: true);
+        pendingInterruptedAssault = null;
     }
 
     internal static SiegeTerminationRole ResolveTerminationRole(
@@ -248,5 +314,7 @@ internal class ClientSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<AssaultSiegeAttempted>(HandleAssaultAttempt);
         messageBroker.Unsubscribe<NetworkPromptSiegeAssault>(HandleAssaultPrompt);
         messageBroker.Unsubscribe<NetworkSnapSiegeCampPartyPosition>(HandleCampPositionSnap);
+        messageBroker.Unsubscribe<CampaignTick>(HandleCampaignTick);
+        pendingInterruptedAssault = null;
     }
 }
