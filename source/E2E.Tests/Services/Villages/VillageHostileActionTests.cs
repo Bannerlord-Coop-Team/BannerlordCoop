@@ -1890,6 +1890,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
         Assert.Equal(woundedPartyId, left.PartyId);
+        Assert.False(left.LeaveSiege);
 
         AssertHostileActionJoinerLeft(Server, hostileAction.MapEventId, hostileAction.AttackerPartyId, woundedPartyId!);
         foreach (var syncedClient in Clients)
@@ -2180,6 +2181,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
         Assert.Equal(joinerPartyId, left.PartyId);
+        Assert.False(left.LeaveSiege);
 
         AssertHostileActionJoinerLeft(Server, hostileAction.MapEventId, hostileAction.AttackerPartyId, joinerPartyId);
         foreach (var leftClient in Clients)
