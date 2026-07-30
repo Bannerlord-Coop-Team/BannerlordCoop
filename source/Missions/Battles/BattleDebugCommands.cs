@@ -212,6 +212,7 @@ internal static class BattleDebugCommands
         foreach (Agent rider in riders)
         {
             RestoreCavalryController(rider);
+            rider.SetScriptedFlags(Agent.AIScriptedFrameFlags.None);
             rider.SetMaximumSpeedLimit(-1f, isMultiplier: false);
             rider.MountAgent?.SetMaximumSpeedLimit(-1f, isMultiplier: false);
             rider.SetIsAIPaused(false);
@@ -337,29 +338,26 @@ internal static class BattleDebugCommands
 
         foreach (Agent rider in riders)
         {
-            FreezeCavalryController(rider);
-            rider.SetMaximumSpeedLimit(0f, isMultiplier: false);
-            rider.MovementInputVector = Vec2.Zero;
-            rider.SetIsAIPaused(true);
+            RestoreCavalryController(rider);
+            rider.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+            rider.MountAgent?.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+            rider.SetIsAIPaused(false);
+            rider.MountAgent?.SetIsAIPaused(false);
 
             Vec2 riderDirection = rider.GetMovementDirection();
             var turnedRiderDirection = new Vec2(
                 (riderDirection.X * cosine) - (riderDirection.Y * sine),
                 (riderDirection.X * sine) + (riderDirection.Y * cosine));
-            rider.SetMovementDirection(turnedRiderDirection);
-
-            Agent mount = rider.MountAgent;
-            if (mount == null)
-                continue;
-
-            mount.SetMaximumSpeedLimit(0f, isMultiplier: false);
-            mount.MovementInputVector = Vec2.Zero;
-            mount.SetIsAIPaused(true);
-            Vec2 mountDirection = mount.GetMovementDirection();
-            var turnedMountDirection = new Vec2(
-                (mountDirection.X * cosine) - (mountDirection.Y * sine),
-                (mountDirection.X * sine) + (mountDirection.Y * cosine));
-            mount.SetMovementDirection(turnedMountDirection);
+            float targetDirection = (float)Math.Atan2(
+                turnedRiderDirection.Y,
+                turnedRiderDirection.X);
+            WorldPosition targetPosition = rider.GetWorldPosition();
+            rider.SetScriptedPositionAndDirection(
+                ref targetPosition,
+                targetDirection,
+                addHumanLikeDelay: false,
+                Agent.AIScriptedFrameFlags.NoAttack |
+                    Agent.AIScriptedFrameFlags.ConsiderRotation);
         }
 
         return $"Turned {formations.Length} battle-host cavalry formations {degrees:0.0} degrees in place";
