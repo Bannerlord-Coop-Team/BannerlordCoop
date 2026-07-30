@@ -21,8 +21,6 @@ namespace Missions.Battles;
 /// <summary>Reports state needed to verify co-op battle synchronization.</summary>
 internal static class BattleDebugCommands
 {
-    private const float StationaryTurnSpeedLimit = 0.01f;
-
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
     private static readonly Dictionary<Agent, AgentControllerType> CavalryControllers =
         new Dictionary<Agent, AgentControllerType>();
@@ -318,15 +316,6 @@ internal static class BattleDebugCommands
         if (formations.Length == 0)
             return "The battle host has no active cavalry formations";
 
-        foreach (Agent rider in riders)
-        {
-            RestoreCavalryController(rider);
-            rider.SetMaximumSpeedLimit(StationaryTurnSpeedLimit, isMultiplier: false);
-            rider.MountAgent?.SetMaximumSpeedLimit(StationaryTurnSpeedLimit, isMultiplier: false);
-            rider.SetIsAIPaused(false);
-            rider.MountAgent?.SetIsAIPaused(false);
-        }
-
         float radians = degrees * ((float)Math.PI / 180f);
         float cosine = (float)Math.Cos(radians);
         float sine = (float)Math.Sin(radians);
@@ -344,6 +333,33 @@ internal static class BattleDebugCommands
             formation.SetMovementOrder(MovementOrder.MovementOrderStop);
             formation.SetFacingOrder(
                 FacingOrder.FacingOrderLookAtDirection(turnedDirection));
+        }
+
+        foreach (Agent rider in riders)
+        {
+            FreezeCavalryController(rider);
+            rider.SetMaximumSpeedLimit(0f, isMultiplier: false);
+            rider.MovementInputVector = Vec2.Zero;
+            rider.SetIsAIPaused(true);
+
+            Vec2 riderDirection = rider.GetMovementDirection();
+            var turnedRiderDirection = new Vec2(
+                (riderDirection.X * cosine) - (riderDirection.Y * sine),
+                (riderDirection.X * sine) + (riderDirection.Y * cosine));
+            rider.SetMovementDirection(turnedRiderDirection);
+
+            Agent mount = rider.MountAgent;
+            if (mount == null)
+                continue;
+
+            mount.SetMaximumSpeedLimit(0f, isMultiplier: false);
+            mount.MovementInputVector = Vec2.Zero;
+            mount.SetIsAIPaused(true);
+            Vec2 mountDirection = mount.GetMovementDirection();
+            var turnedMountDirection = new Vec2(
+                (mountDirection.X * cosine) - (mountDirection.Y * sine),
+                (mountDirection.X * sine) + (mountDirection.Y * cosine));
+            mount.SetMovementDirection(turnedMountDirection);
         }
 
         return $"Turned {formations.Length} battle-host cavalry formations {degrees:0.0} degrees in place";
