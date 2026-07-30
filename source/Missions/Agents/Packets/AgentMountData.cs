@@ -30,7 +30,8 @@ namespace Missions.Agents.Packets
             float? mountAction0Speed = null,
             bool? mountAction0IsLocomotion = null,
             int? mountAction0TurnDirection = null,
-            int? mountAction0TurnActionIndex = null)
+            int? mountAction0TurnActionIndex = null,
+            float? mountAction0TurnProgress = null)
         {
             MountInputVector = mountAgent.MovementInputVector;
             MountAction0Index = mountAgent.GetCurrentAction(0).Index;
@@ -43,7 +44,7 @@ namespace Missions.Agents.Packets
                 ? 0UL
                 : (ulong)mountAgent.GetCurrentAnimationFlag(0);
             MountAction0Progress = syntheticStationaryTurn
-                ? 0f
+                ? mountAction0TurnProgress ?? 0f
                 : mountAgent.GetCurrentActionProgress(0);
             GetRenderedAction0State(
                 mountAgent,
@@ -125,6 +126,14 @@ namespace Missions.Agents.Packets
                 mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
                 mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
             }
+            else if (MountAction0Progress
+                > mountAgent.GetCurrentActionProgress(0))
+            {
+                mountAgent.SetCurrentActionProgress(
+                    0,
+                    MountAction0Progress);
+                mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
+            }
 
             //Currently not doing anything afaik
             if (mountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(1).Index != MountAction1Index)
@@ -163,8 +172,24 @@ namespace Missions.Agents.Packets
             out string animationName,
             out float animationSpeed)
         {
+            GetRenderedAction0State(
+                mountAgent,
+                out animationName,
+                out animationSpeed,
+                out _);
+        }
+
+        internal static void GetRenderedAction0State(
+            Agent mountAgent,
+            out string animationName,
+            out float animationSpeed,
+            out float animationProgress)
+        {
             animationName = null;
             animationSpeed = mountAgent == null ? 0f : 1f;
+            animationProgress = mountAgent == null
+                ? 0f
+                : mountAgent.GetCurrentActionProgress(0);
             if (mountAgent == null) return;
 
             Skeleton skeleton = null;
@@ -181,6 +206,15 @@ namespace Missions.Agents.Packets
                 animationSpeed = float.IsNaN(renderedSpeed) || float.IsInfinity(renderedSpeed)
                     ? 1f
                     : Math.Max(0f, renderedSpeed);
+                float renderedProgress =
+                    skeleton.GetAnimationParameterAtChannel(0);
+                if (!float.IsNaN(renderedProgress)
+                    && !float.IsInfinity(renderedProgress))
+                {
+                    animationProgress = Math.Max(
+                        0f,
+                        Math.Min(1f, renderedProgress));
+                }
             }
             catch (NullReferenceException)
             {

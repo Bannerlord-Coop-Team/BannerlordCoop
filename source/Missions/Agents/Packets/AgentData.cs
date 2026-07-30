@@ -33,7 +33,8 @@ namespace Missions.Agents.Packets
             string mountIdentityScopeId = null,
             System.Guid mountAgentId = default,
             int? mountAction0TurnDirection = null,
-            int? mountAction0TurnActionIndex = null)
+            int? mountAction0TurnActionIndex = null,
+            float? mountAction0TurnProgress = null)
         {
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
@@ -56,7 +57,8 @@ namespace Missions.Agents.Packets
                     mountIdentityScopeId,
                     mountAgentId,
                     mountAction0TurnDirection: mountAction0TurnDirection,
-                    mountAction0TurnActionIndex: mountAction0TurnActionIndex);
+                    mountAction0TurnActionIndex: mountAction0TurnActionIndex,
+                    mountAction0TurnProgress: mountAction0TurnProgress);
             }
             else
             {

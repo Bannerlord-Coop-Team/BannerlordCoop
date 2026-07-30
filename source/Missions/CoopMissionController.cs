@@ -96,6 +96,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // Diff again here so peers receive that exact action instead of retaining the earlier pose.
         coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick();
 
+        coopMissionComponent.AgentMovementHandler
+            .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
         coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
     }

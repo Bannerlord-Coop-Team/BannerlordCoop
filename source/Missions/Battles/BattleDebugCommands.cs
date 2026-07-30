@@ -121,7 +121,8 @@ internal static class BattleDebugCommands
             AgentMountData.GetRenderedAction0State(
                 mount,
                 out string animationName,
-                out float animationSpeed);
+                out float animationSpeed,
+                out float animationProgress);
             int actionIndex = mount.GetCurrentAction(0).Index;
             string actionName = AgentActionData.GetActionNameWithCode(actionIndex);
             int turnDirection = AgentMountData.GetTurnDirection(actionName, animationName);
@@ -156,7 +157,7 @@ internal static class BattleDebugCommands
                 .Append(',').Append(mount.GetMovementDirection().Y.ToString("0.000", CultureInfo.InvariantCulture))
                 .Append(" action0=").Append(actionIndex)
                 .Append(" actionName=").Append(actionName ?? "none")
-                .Append(" actionProgress=").Append(mount.GetCurrentActionProgress(0).ToString("0.000", CultureInfo.InvariantCulture))
+                .Append(" actionProgress=").Append(animationProgress.ToString("0.000", CultureInfo.InvariantCulture))
                 .Append(" animation=").Append(animationName ?? "none")
                 .Append(" animationSpeed=").Append(animationSpeed.ToString("0.000", CultureInfo.InvariantCulture))
                 .Append(" locomotion=").Append(locomotionAction)
