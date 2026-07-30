@@ -26,6 +26,7 @@ internal static class BattleDebugCommands
         new Dictionary<Agent, AgentControllerType>();
     private static Mission observedMission;
     private static Camera ladderCamera;
+    private static Camera mountCamera;
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
     public static string State(List<string> args)
@@ -406,6 +407,7 @@ internal static class BattleDebugCommands
         EnemyPositions.Clear();
         CavalryControllers.Clear();
         ReleaseLadderCamera();
+        ReleaseMountCamera();
         observedMission = mission;
     }
 
@@ -424,6 +426,75 @@ internal static class BattleDebugCommands
                 && info.Agent.RiderAgent.Team?.Side == playerTeam?.Side;
         if (filter == "local") return session.IsOwn(info.CurrentAuthority);
         return info.CurrentAuthority == filter;
+    }
+
+    [CommandLineArgumentFunction("focus_mount", "coop.debug.battle")]
+    public static string FocusMount(List<string> args)
+    {
+        if (args.Count != 1 || !Guid.TryParseExact(args[0], "N", out Guid mountId))
+            return "Usage: coop.debug.battle.focus_mount <mountAgentId>";
+
+        var mission = Mission.Current;
+        if (mission == null)
+            return "No active mission";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "Network agent registry is unavailable";
+        if (!registry.TryGetAgentInfo(mountId, out var info)
+            || info.Agent == null
+            || !info.Agent.IsMount
+            || !info.Agent.IsActive())
+        {
+            return $"Active mount {mountId:N} was not found";
+        }
+
+        if (!(ScreenManager.TopScreen is MissionScreen missionScreen) || missionScreen.CombatCamera == null)
+            return "The mission screen is not active";
+
+        ReleaseLadderCamera();
+        ReleaseMountCamera();
+        mountCamera = Camera.CreateCamera();
+        mountCamera.FillParametersFrom(missionScreen.CombatCamera);
+
+        Agent mount = info.Agent;
+        Vec2 direction = mount.GetMovementDirection();
+        if (direction.LengthSquared <= 0.0001f)
+            direction = Vec2.Forward;
+        else
+            direction.Normalize();
+
+        var forward = new Vec3(direction.X, direction.Y, 0f);
+        var side = new Vec3(-direction.Y, direction.X, 0f);
+        var target = mount.Position + (Vec3.Up * 1.4f);
+        var position = target - (forward * 11f) + (side * 4f) + (Vec3.Up * 4f);
+        mountCamera.LookAt(position, target, Vec3.Up);
+        missionScreen.CustomCamera = mountCamera;
+
+        return $"Focused the mission camera on mount {mountId:N}";
+    }
+
+    [CommandLineArgumentFunction("release_mount_camera", "coop.debug.battle")]
+    public static string ReleaseMountCameraCommand(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.release_mount_camera";
+
+        bool released = ReleaseMountCamera();
+        return released ? "Released the mount camera" : "No mount camera was active";
+    }
+
+    private static bool ReleaseMountCamera()
+    {
+        if (mountCamera == null) return false;
+
+        if (ScreenManager.TopScreen is MissionScreen missionScreen
+            && missionScreen.CustomCamera == mountCamera)
+        {
+            missionScreen.CustomCamera = null;
+        }
+
+        mountCamera.ReleaseCamera();
+        mountCamera = null;
+        return true;
     }
 
     [CommandLineArgumentFunction("ladder_state", "coop.debug.battle")]
@@ -518,6 +589,7 @@ internal static class BattleDebugCommands
             return "The mission screen is not active";
         }
 
+        ReleaseMountCamera();
         ReleaseLadderCamera();
         ladderCamera = Camera.CreateCamera();
         ladderCamera.FillParametersFrom(missionScreen.CombatCamera);
