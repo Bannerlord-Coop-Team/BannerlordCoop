@@ -62,6 +62,11 @@ public interface IPlayerManager
     /// Checks whether the given player has a connected peer.
     /// </summary>
     bool IsConnected(Player player);
+
+    /// <summary>
+    /// Checks whether the given mobileParty's owner is disconnected.
+    /// </summary>
+    bool IsOwnerOfPartyDisconnected(MobileParty party);
 }
 
 /// <inheritdoc cref="IPlayerManager"/>
@@ -192,6 +197,12 @@ public class PlayerManager : IPlayerManager
         return peerToPlayer.Any(kvp =>
          kvp.Value == player && kvp.Key.ConnectionState == ConnectionState.Connected);
     }
+
+    public bool IsOwnerOfPartyDisconnected(MobileParty party) =>
+        Players.Any(player =>
+            !IsConnected(player) &&
+            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) &&
+            ReferenceEquals(playerParty, party));
 }
 
 public class ControlledObjectInfo

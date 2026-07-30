@@ -4,6 +4,7 @@ using GameInterface.Services.Clans.Interfaces;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using System;
@@ -90,6 +91,12 @@ internal class DefaultClanFinanceModelPatches
     {
         // Calculate gold change for AI led clans normally
         if (clan.Leader == null || !clan.Leader.IsPlayerHero()) return true;
+
+        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
+
+        // Don't tick gold change for disconnected players
+        var clanLeaderParty = clan.Leader.PartyBelongedTo;
+        if (clanLeaderParty != null && playerManager.IsOwnerOfPartyDisconnected(clanLeaderParty)) return false;
 
         var clanLeaderMapEvent = clan.Leader.PartyBelongedTo?.MapEvent;
 
