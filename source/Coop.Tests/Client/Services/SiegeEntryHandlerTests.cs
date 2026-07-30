@@ -232,5 +232,4 @@ public class SiegeEntryHandlerTests
             .Last();
         Assert.Equal(retryInteractionId, retryRequest.InteractionId);
     }
-
 }
