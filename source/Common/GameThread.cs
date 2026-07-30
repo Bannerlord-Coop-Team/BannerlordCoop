@@ -22,6 +22,7 @@ public class GameThread : IUpdateable
         new Queue<(Action, EventWaitHandle, string, CancellationToken)>();
 
     private readonly object m_QueueLock = new object();
+    private object m_QueueTailCoalescingToken;
     private static readonly AsyncLocal<CancellationToken> m_AmbientCancellation =
         new AsyncLocal<CancellationToken>();
     private int m_GameLoopThreadId;
@@ -103,6 +104,7 @@ public class GameThread : IUpdateable
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
+            m_QueueTailCoalescingToken = null;
         }
 
         if (!Instrument)
@@ -249,6 +251,7 @@ public class GameThread : IUpdateable
             lock (Instance.m_QueueLock)
             {
                 Instance.m_Queue.Enqueue((action, ewh, resolved, cancellation));
+                Instance.m_QueueTailCoalescingToken = null;
             }
 
             if (ewh == null) return;
@@ -310,6 +313,60 @@ public class GameThread : IUpdateable
         lock (Instance.m_QueueLock)
         {
             Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label, cancellation));
+            Instance.m_QueueTailCoalescingToken = null;
+        }
+    }
+
+    /// <summary>
+    /// Queues a deferred action and marks it as the current coalescible queue tail. A later caller can
+    /// join work to this exact FIFO slot only while no other game-thread action has been queued after it.
+    /// </summary>
+    public static void EnqueueSafeCoalescible(Action action, object coalescingToken,
+        string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
+    {
+        if (coalescingToken == null)
+            throw new ArgumentNullException(nameof(coalescingToken));
+
+        CancellationToken cancellation = m_AmbientCancellation.Value;
+        if (cancellation.IsCancellationRequested) return;
+
+        string label = context ?? BuildLabel(callerFile, callerMember);
+        lock (Instance.m_QueueLock)
+        {
+            Instance.m_Queue.Enqueue((
+                WrapSafe(action, context),
+                null,
+                label,
+                cancellation));
+            Instance.m_QueueTailCoalescingToken = coalescingToken;
+        }
+    }
+
+    /// <summary>
+    /// Applies an update to a coalescible action only while it remains the exact queue tail.
+    /// The update must only mutate that action's bounded batch.
+    /// </summary>
+    public static bool TryCoalesceWithQueuedTail(object coalescingToken, Action update)
+    {
+        if (coalescingToken == null)
+            throw new ArgumentNullException(nameof(coalescingToken));
+        if (update == null)
+            throw new ArgumentNullException(nameof(update));
+        if (m_AmbientCancellation.Value.IsCancellationRequested) return false;
+
+        lock (Instance.m_QueueLock)
+        {
+            if (!ReferenceEquals(
+                    Instance.m_QueueTailCoalescingToken,
+                    coalescingToken))
+            {
+                return false;
+            }
+
+            update();
+            return true;
         }
     }
 

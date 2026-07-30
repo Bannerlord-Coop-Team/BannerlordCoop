@@ -8,6 +8,7 @@ using E2E.Tests.Environment.MockEngine;
 using LiteNetLib;
 using Missions;
 using Missions.Agents;
+using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Services.Network;
 using TaleWorlds.Core;
@@ -68,6 +69,124 @@ public class MovementTrafficTests : MissionTestEnvironment
                 .GetPackets<MovementPacket>()
                 .Sum(packet => packet.AgentIds.Length));
         });
+    }
+
+    [Fact]
+    public void PollMovement_PrioritizesFieldBattlePlayerAtSixtyHertz()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            mock.Shell.MissionTeamAIType = Mission.MissionTeamAITypeEnum.FieldBattle;
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+
+            Agent ai = SpawnRider(mock);
+            Agent player = SpawnRider(mock);
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, ai));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 2, player));
+            mock.MainAgent = player;
+
+            component.AgentMovementHandler.PollMovement(0f);
+            MovementPacket[] initial = network.NetworkSentPackets
+                .GetPackets<MovementPacket>()
+                .ToArray();
+            Assert.True(initial[0].IsPlayerMovement);
+            Assert.Equal(new ushort[] { 2 }, initial[0].AgentIds);
+            Assert.All(initial.Skip(1), packet => Assert.False(packet.IsPlayerMovement));
+            Assert.DoesNotContain(
+                initial.Skip(1).SelectMany(packet => packet.AgentIds),
+                id => id == 2);
+
+            network.NetworkSentPackets.Packets.Clear();
+            component.AgentMovementHandler.PollMovement(0.016f);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            component.AgentMovementHandler.PollMovement(0.001f);
+            MovementPacket playerRefresh = Assert.Single(
+                network.NetworkSentPackets.GetPackets<MovementPacket>());
+            Assert.True(playerRefresh.IsPlayerMovement);
+            Assert.Equal(new ushort[] { 2 }, playerRefresh.AgentIds);
+
+            network.NetworkSentPackets.Packets.Clear();
+            component.AgentMovementHandler.PollMovement(0.05f);
+            MovementPacket[] sharedTick = network.NetworkSentPackets
+                .GetPackets<MovementPacket>()
+                .ToArray();
+            Assert.True(sharedTick[0].IsPlayerMovement);
+            Assert.Contains(sharedTick.Skip(1), packet =>
+                !packet.IsPlayerMovement && packet.AgentIds.SequenceEqual(new ushort[] { 1 }));
+        });
+    }
+
+    [Fact]
+    public void PollMovement_KeepsNonFieldPlayerOnNormalCadence()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+
+            Agent player = SpawnRider(mock);
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, player));
+            mock.MainAgent = player;
+
+            component.AgentMovementHandler.PollMovement(0f);
+            Assert.False(Assert.Single(
+                network.NetworkSentPackets.GetPackets<MovementPacket>())
+                .IsPlayerMovement);
+
+            network.NetworkSentPackets.Packets.Clear();
+            component.AgentMovementHandler.PollMovement(0.01f);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            component.AgentMovementHandler.PollMovement(0.016f);
+            Assert.False(Assert.Single(
+                network.NetworkSentPackets.GetPackets<MovementPacket>())
+                .IsPlayerMovement);
+        });
+    }
+
+    [Fact]
+    public void MovementInbox_DequeuesPlayerPacketsBeforePendingNormalPackets()
+    {
+        var inbox = new AgentMovementHandler.MovementInbox();
+        var firstNormal = new MovementPacket(
+            new[] { Guid.NewGuid() },
+            new AgentData[1]);
+        var player = new MovementPacket(
+            new[] { Guid.NewGuid() },
+            new AgentData[1],
+            isPlayerMovement: true);
+        var secondNormal = new MovementPacket(
+            new[] { Guid.NewGuid() },
+            new AgentData[1]);
+
+        inbox.Enqueue(firstNormal);
+        inbox.Enqueue(player);
+        inbox.Enqueue(secondNormal);
+
+        MovementPacket[] packets = inbox.TakeSnapshot();
+
+        Assert.Equal(3, packets.Length);
+        MovementPacket first = packets[0];
+        Assert.True(first.IsPlayerMovement);
+        MovementPacket second = packets[1];
+        Assert.Equal(firstNormal.AgentGuids, second.AgentGuids);
+        MovementPacket third = packets[2];
+        Assert.Equal(secondNormal.AgentGuids, third.AgentGuids);
+        Assert.Empty(inbox.TakeSnapshot());
     }
 
     [Fact]
@@ -194,7 +313,8 @@ public class MovementTrafficTests : MissionTestEnvironment
             var movement = new MovementPacket(
                 "76561198000000042",
                 new ushort[] { 1, 2, 3 },
-                agents);
+                agents,
+                isPlayerMovement: true);
 
             byte[] original = serializer.Serialize(movement);
             byte[] wire = compressor.Serialize(movement);
@@ -217,6 +337,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                     (uint)(Agent.MovementControlFlag.Forward |
                         Agent.MovementControlFlag.TurnLeft),
                     agent.MovementFlag));
+            Assert.True(roundTripped.IsPlayerMovement);
             Assert.True(wire.Length <= LiteNetP2PClient.SafeSinglePacketBytes);
         });
     }

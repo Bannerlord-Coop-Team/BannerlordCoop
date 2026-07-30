@@ -24,21 +24,32 @@ namespace Missions.Agents.Packets
         public AgentData[] Agents { get; }
         [ProtoMember(4)]
         public Guid[] AgentGuids { get; }
+        [ProtoMember(5)]
+        public bool IsPlayerMovement { get; }
 
-        public MovementPacket(string identityScopeId, ushort[] agentIds, AgentData[] agents)
+        public MovementPacket(
+            string identityScopeId,
+            ushort[] agentIds,
+            AgentData[] agents,
+            bool isPlayerMovement = false)
         {
             IdentityScopeId = identityScopeId;
             AgentIds = agentIds;
             Agents = agents;
             AgentGuids = null;
+            IsPlayerMovement = isPlayerMovement;
         }
 
-        public MovementPacket(Guid[] agentGuids, AgentData[] agents)
+        public MovementPacket(
+            Guid[] agentGuids,
+            AgentData[] agents,
+            bool isPlayerMovement = false)
         {
             IdentityScopeId = null;
             AgentIds = null;
             AgentGuids = agentGuids;
             Agents = agents;
+            IsPlayerMovement = isPlayerMovement;
         }
     }
 }

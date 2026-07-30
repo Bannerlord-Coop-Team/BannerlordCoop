@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
+using Common;
 using Common.PacketHandlers;
 using Common.Serialization;
 using E2E.Tests.Environment.MockEngine;
@@ -57,9 +59,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 mountData: new AgentMountData(sourceHorse, horseId),
                 riderLookDirection: new Vec3(-1f, 0f, 0f));
 
-            component.AgentMovementHandler.HandlePacket(
+            ReceivePackets(() => component.AgentMovementHandler.HandlePacket(
                 null,
-                new MovementPacket(new[] { riderId }, new[] { data }));
+                new MovementPacket(new[] { riderId }, new[] { data })));
 
             Assert.Equal(AgentControllerType.None, puppetHorseMirror.Controller);
             Assert.Equal(5f, puppetHorseMirror.MaximumSpeedLimit);
@@ -564,9 +566,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 ownerSpeed: 2f,
                 mountData: new AgentMountData(sourceHorse, horseId));
 
-            component.AgentMovementHandler.HandlePacket(
+            ReceivePackets(() => component.AgentMovementHandler.HandlePacket(
                 null,
-                new MovementPacket(new[] { riderId }, new[] { data }));
+                new MovementPacket(new[] { riderId }, new[] { data })));
 
             Assert.Equal(AgentControllerType.AI, horseMirror.Controller);
             Assert.Equal(-1f, horseMirror.MaximumSpeedLimit);
@@ -793,9 +795,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 riderDirection: Vec2.Forward,
                 ownerSpeed: 0f,
                 mountData: null);
-            component.AgentMovementHandler.HandlePacket(
+            ReceivePackets(() => component.AgentMovementHandler.HandlePacket(
                 null,
-                new MovementPacket(new[] { riderId }, new[] { data }));
+                new MovementPacket(new[] { riderId }, new[] { data })));
 
             Assert.Null(rider.MountAgent);
             Assert.Null(horse.RiderAgent);
@@ -831,9 +833,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 riderDirection: Vec2.Forward,
                 ownerSpeed: 0f,
                 mountData: null);
-            component.AgentMovementHandler.HandlePacket(
+            ReceivePackets(() => component.AgentMovementHandler.HandlePacket(
                 null,
-                new MovementPacket(new[] { riderId }, new[] { data }));
+                new MovementPacket(new[] { riderId }, new[] { data })));
 
             Assert.Null(rider.MountAgent);
             Assert.Null(horse.RiderAgent);
@@ -876,9 +878,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 riderDirection: new Vec2(1f, 0f),
                 ownerSpeed: 0f,
                 mountData: new AgentMountData(newHorse, newHorseId));
-            component.AgentMovementHandler.HandlePacket(
+            ReceivePackets(() => component.AgentMovementHandler.HandlePacket(
                 null,
-                new MovementPacket(new[] { riderId }, new[] { data }));
+                new MovementPacket(new[] { riderId }, new[] { data })));
 
             Assert.Same(newHorse, rider.MountAgent);
             Assert.Null(oldHorse.RiderAgent);
@@ -992,11 +994,14 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 mountData: mountData);
             var riderPacket = new MovementPacket(new[] { riderId }, new[] { riderData });
 
-            if (!masterlessPacketArrivesLast)
-                component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, mountPacket);
-            component.AgentMovementHandler.HandlePacket(null, riderPacket);
-            if (masterlessPacketArrivesLast)
-                component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, mountPacket);
+            ReceivePackets(() =>
+            {
+                if (!masterlessPacketArrivesLast)
+                    component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, mountPacket);
+                component.AgentMovementHandler.HandlePacket(null, riderPacket);
+                if (masterlessPacketArrivesLast)
+                    component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, mountPacket);
+            });
 
             Assert.Same(horse, rider.MountAgent);
             component.AgentMovementHandler.Interpolator.Tick(1f / 60f);
@@ -1089,6 +1094,12 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         return mock.SpawnAgent(
             new AgentBuildData(Game.Current.PlayerTroop)
                 .Controller(AgentControllerType.None));
+    }
+
+    private static void ReceivePackets(Action receive)
+    {
+        Task.Run(receive).GetAwaiter().GetResult();
+        GameThread.Instance.Update(TimeSpan.Zero);
     }
 
     private static AgentData CreateMountedData(
