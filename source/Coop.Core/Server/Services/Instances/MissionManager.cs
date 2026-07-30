@@ -267,6 +267,17 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
+    public bool IsInstanceOccupied(string instanceId)
+    {
+        if (instanceId == null)
+            return false;
+
+        lock (gate)
+        {
+            return byInstanceId.TryGetValue(instanceId, out var instance) && instance.Controllers.Count > 0;
+        }
+    }
+
     // Drop the instance record once its last member is gone (BR-017: destroying the battle instance includes
     // the membership/relay record — previously it leaked per battle). Any stale NAT-punch endpoints go with
     // it; a later (re-)engagement of the same instance id re-punches and recreates the record from scratch,

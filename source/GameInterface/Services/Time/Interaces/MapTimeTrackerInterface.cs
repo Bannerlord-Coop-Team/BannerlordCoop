@@ -34,6 +34,24 @@ public interface IMapTimeTrackerInterface : IGameAbstraction
     void ApplyClientSimulationTime(Campaign campaign, float realDt);
 
     /// <summary>
+    /// Clears prior campaign samples and holds heartbeats until a join baseline arrives.
+    /// </summary>
+    void ResetForCampaignJoin();
+
+    /// <summary>
+    /// Applies a join baseline directly on the game thread and resumes heartbeat pacing.
+    /// </summary>
+    void ApplyCampaignJoinBaseline(long serverTicks);
+
+    /// <summary>
+    /// Evaluates post-baseline heartbeats until local campaign time is current.
+    /// </summary>
+    /// <param name="baselineRefreshRequired">
+    /// True when the party and time baseline is too stale and must be requested again.
+    /// </param>
+    bool TryCompleteCampaignJoinCatchUp(out bool baselineRefreshRequired);
+
+    /// <summary>
     /// Advances the campaign time forward by the given number of ticks.
     /// Intended for debugging the time-sync correction from the server/host.
     /// </summary>
@@ -68,6 +86,7 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
     private static ILogger Logger => LogManager.GetLogger<MapTimeTrackerInterface>();
 
     internal const float MaximumClientLeadSeconds = 0.35f;
+    internal const float MaximumJoinBaselineDelaySeconds = 2f;
     internal const float HeartbeatTimeoutSeconds = 1.25f;
     private const float MaximumCompensatedOneWayLatencySeconds = 0.25f;
     private const float ResumeClientLeadRatio = 0.75f;
@@ -98,6 +117,11 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
     private float candidatePacingStateSeconds;
     private CampaignTimePacingState loggedPacingState = CampaignTimePacingState.Normal;
     private CampaignTimePacingState candidatePacingState = CampaignTimePacingState.Normal;
+    private bool waitingForJoinBaseline;
+    private bool joinCatchUpActive;
+    private bool hasPostJoinBaselineHeartbeat;
+    private bool joinBaselineRequiresRefresh;
+    private bool skipNextServerRateEstimate;
 
     public bool TryGetCurrentTicks(out long ticks)
     {
@@ -114,6 +138,8 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 
     public void SyncCampaignTime(long serverTicks, float oneWayLatencySeconds)
     {
+        if (Volatile.Read(ref waitingForJoinBaseline)) return;
+
         // The game thread only needs the newest sample; queued historical samples add artificial latency.
         Volatile.Write(ref latestServerTimeSample, new ServerTimeSample(serverTicks, oneWayLatencySeconds));
         QueueLatestServerTime();
@@ -131,6 +157,12 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         ServerTimeSample appliedSample = null;
         try
         {
+            if (Volatile.Read(ref waitingForJoinBaseline))
+            {
+                Volatile.Write(ref latestServerTimeSample, null);
+                return;
+            }
+
             do
             {
                 appliedSample = Volatile.Read(ref latestServerTimeSample);
@@ -195,11 +227,131 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
         }, context: nameof(MapTimeTrackerInterface));
     }
 
+    public void ResetForCampaignJoin()
+    {
+        Volatile.Write(ref waitingForJoinBaseline, true);
+        Volatile.Write(ref latestServerTimeSample, null);
+        hasServerTime = false;
+        hasPendingHardSync = false;
+        hasEstimatedServerRate = false;
+        isPausedForServer = false;
+        skipNextHeartbeatAgeIncrement = false;
+        joinCatchUpActive = false;
+        hasPostJoinBaselineHeartbeat = false;
+        joinBaselineRequiresRefresh = false;
+        skipNextServerRateEstimate = false;
+        previousServerTicks = 0L;
+        lastServerProgressTicks = 0L;
+        pendingServerTicks = 0L;
+        pendingServerOneWayLatencySeconds = 0f;
+        localTicksPerSecond = 0d;
+        serverTicksPerSecond = 0d;
+        correctionTicksPerSecond = 0d;
+        correctionAccumulator = 0d;
+        secondsSinceHeartbeat = 0f;
+        secondsSinceServerSample = 0f;
+        ResetPacingDiagnostics();
+    }
+
+    public void ApplyCampaignJoinBaseline(long serverTicks)
+    {
+        var campaign = Campaign.Current;
+        var tracker = campaign?.MapTimeTracker;
+        if (tracker == null)
+        {
+            throw new InvalidOperationException("Cannot apply a join baseline without a loaded campaign");
+        }
+
+        ResetForCampaignJoin();
+        LogHardSync(tracker._numTicks, serverTicks);
+        tracker._numTicks = serverTicks;
+        tracker._deltaTimeInTicks = 0L;
+        campaign._dt = 0f;
+
+        CompleteCampaignJoinBaseline(serverTicks);
+    }
+
+    internal void CompleteCampaignJoinBaseline(long serverTicks)
+    {
+        hasServerTime = true;
+        previousServerTicks = serverTicks;
+        pendingServerTicks = serverTicks;
+        skipNextHeartbeatAgeIncrement = true;
+        joinCatchUpActive = true;
+        hasPostJoinBaselineHeartbeat = false;
+        joinBaselineRequiresRefresh = false;
+        skipNextServerRateEstimate = true;
+        Volatile.Write(ref waitingForJoinBaseline, false);
+    }
+
+    public bool TryCompleteCampaignJoinCatchUp(out bool baselineRefreshRequired)
+    {
+        baselineRefreshRequired = false;
+        var tracker = Campaign.Current?.MapTimeTracker;
+        if (tracker == null) return false;
+
+        return TryCompleteCampaignJoinCatchUp(
+            tracker._numTicks,
+            tracker._deltaTimeInTicks,
+            out baselineRefreshRequired);
+    }
+
+    internal bool TryCompleteCampaignJoinCatchUp(
+        long localTicks,
+        long localDeltaTicks,
+        out bool baselineRefreshRequired)
+    {
+        baselineRefreshRequired = false;
+        if (!joinCatchUpActive || !hasPostJoinBaselineHeartbeat) return false;
+        if (joinBaselineRequiresRefresh)
+        {
+            joinCatchUpActive = false;
+            baselineRefreshRequired = true;
+            return true;
+        }
+        if (hasPendingHardSync) return false;
+
+        double projectedServerTicksPerSecond = hasEstimatedServerRate
+            ? serverTicksPerSecond
+            : localTicksPerSecond;
+        double projectedServerTicks = pendingServerTicks + (projectedServerTicksPerSecond *
+            (secondsSinceServerSample + pendingServerOneWayLatencySeconds));
+        double maximumOffsetTicks = Math.Max(
+            Math.Abs(localDeltaTicks),
+            Math.Abs(localTicksPerSecond) * MaximumClientLeadSeconds);
+        double offsetTicks = Math.Abs(localTicks - projectedServerTicks);
+        if (offsetTicks <= maximumOffsetTicks)
+        {
+            joinCatchUpActive = false;
+            return true;
+        }
+
+        if (localDeltaTicks <= 0L && lastServerProgressTicks == 0L)
+        {
+            joinCatchUpActive = false;
+            baselineRefreshRequired = true;
+            return true;
+        }
+
+        double maximumBaselineDelayTicks = Math.Max(
+            maximumOffsetTicks,
+            Math.Abs(localTicksPerSecond) *
+                (MaximumJoinBaselineDelaySeconds + pendingServerOneWayLatencySeconds));
+        if (offsetTicks <= maximumBaselineDelayTicks) return false;
+
+        joinCatchUpActive = false;
+        baselineRefreshRequired = true;
+        return true;
+    }
+
     internal bool BeginCorrection(
         long serverTicks,
         long maxServerProgressTicks,
         float oneWayLatencySeconds = 0f)
     {
+        // Sequenced heartbeats can overtake the reliable baseline. Never let an older sample rewind it.
+        if (joinCatchUpActive && serverTicks < previousServerTicks) return false;
+
         float elapsedSincePreviousHeartbeat = secondsSinceServerSample;
         secondsSinceHeartbeat = 0f;
         secondsSinceServerSample = 0f;
@@ -211,17 +363,25 @@ internal class MapTimeTrackerInterface : IMapTimeTrackerInterface
 
         lastServerProgressTicks = isDiscontinuity ? 0L : serverTicks - previousServerTicks;
         hasServerTime = true;
-        if (isDiscontinuity == false && elapsedSincePreviousHeartbeat > 0f)
+        if (joinCatchUpActive)
+        {
+            hasPostJoinBaselineHeartbeat = true;
+            joinBaselineRequiresRefresh = joinBaselineRequiresRefresh || isDiscontinuity;
+        }
+        if (isDiscontinuity == false &&
+            elapsedSincePreviousHeartbeat > 0f &&
+            !skipNextServerRateEstimate)
         {
             UpdateEstimatedServerRate(lastServerProgressTicks, elapsedSincePreviousHeartbeat);
         }
+        skipNextServerRateEstimate = false;
 
         previousServerTicks = serverTicks;
         pendingServerTicks = serverTicks;
         pendingServerOneWayLatencySeconds = Math.Max(
             0f,
             Math.Min(oneWayLatencySeconds, MaximumCompensatedOneWayLatencySeconds));
-        hasPendingHardSync = hasPendingHardSync || isDiscontinuity;
+        hasPendingHardSync = hasPendingHardSync || (isDiscontinuity && !joinCatchUpActive);
 
         if (hasPendingHardSync)
         {

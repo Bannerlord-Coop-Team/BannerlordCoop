@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -43,6 +44,7 @@ public sealed class MirrorAgent
     /// <summary>The rider currently on this (mount) agent; kept in step with the rider's
     /// <see cref="MountAgent"/> by the <c>set_MountAgent</c> shim.</summary>
     public Agent RiderAgent { get; set; }
+    public List<AgentComponent> Components { get; } = new List<AgentComponent>();
     /// <summary>The mission this agent was spawned into (its mock's shell) — read by the movement apply path's
     /// <c>agent.Mission != Mission.Current</c> staleness guard.</summary>
     public Mission Mission { get; set; }

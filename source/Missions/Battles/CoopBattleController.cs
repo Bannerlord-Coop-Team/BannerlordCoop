@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
+using Missions.Agents;
 using Missions.Data;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -91,7 +92,8 @@ public class CoopBattleController : CoopMissionController
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
         IHostEpochPolicy hostEpochPolicy,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        IPuppetMountStateRepairer puppetMountStateRepairer)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -104,7 +106,11 @@ public class CoopBattleController : CoopMissionController
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
         puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget);
-        puppetDeathApplier = new PuppetDeathApplier(messageBroker, coopMissionComponent, casualties);
+        puppetDeathApplier = new PuppetDeathApplier(
+            messageBroker,
+            coopMissionComponent,
+            casualties,
+            puppetMountStateRepairer);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         damageRouter = new BattleDamageRouter(network, messageBroker, coopMissionComponent, session);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);

@@ -15,8 +15,10 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -225,8 +227,13 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
                 var mapEvent = party.MapEvent;
+                bool leaveSiege = IsAttackingSiegeAssault(party);
                 ApplyAuthoritativeLeave(party);
-                network.SendAll(new NetworkPartyLeftBattle(partyId));
+                // Preserve the client's PlayerSiege reference until its explicit cleanup runs.
+                network.SendAll(new NetworkPartyLeftBattle(partyId, leaveSiege));
+
+                if (leaveSiege && party.MobileParty?.BesiegerCamp != null)
+                    party.MobileParty.BesiegerCamp = null;
 
                 if (mapEvent != null &&
                     objectManager.TryGetId(mapEvent, out var mapEventId) &&
@@ -244,15 +251,15 @@ internal class BattleJoinLeaveHandler : IHandler
     /// <summary>[Client] Apply a joiner's removal from its map event side.</summary>
     private void Handle_NetworkPartyLeftBattle(MessagePayload<NetworkPartyLeftBattle> payload)
     {
-        var partyId = payload.What.PartyId;
+        var message = payload.What;
 
         GameThread.RunSafe(
             () =>
             {
                 if (Campaign.Current == null) return;
-                if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
+                if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.PartyId, out var party)) return;
 
-                ApplyNetworkLeave(party);
+                ApplyNetworkLeave(party, message.LeaveSiege);
             },
             context: nameof(Handle_NetworkPartyLeftBattle));
     }
@@ -303,17 +310,38 @@ internal class BattleJoinLeaveHandler : IHandler
         return true;
     }
 
-    // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
-    // PlayerEncounter.Finish is safe here: with MapEventSide already cleared, LeaveBattle no longer finalizes.
-    private static void ApplyNetworkLeave(PartyBase party)
+    private static bool IsAttackingSiegeAssault(PartyBase party)
+    {
+        return party.MapEvent?.IsSiegeAssault == true && party.Side == BattleSideEnum.Attacker;
+    }
+
+    // Apply the received removal under AllowedThread and unwind this client's local siege/encounter state.
+    private static void ApplyNetworkLeave(PartyBase party, bool leaveSiege)
     {
         using (new AllowedThread())
         {
+            bool isMainParty = party == PartyBase.MainParty;
+            var mobileParty = party.MobileParty;
+
+            if (leaveSiege && isMainParty && PlayerSiege.PlayerSiegeEvent != null)
+                PlayerSiege.FinalizePlayerSiege();
+
             if (party.MapEventSide != null)
                 party.MapEventSide = null;
 
-            if (party == PartyBase.MainParty && PlayerEncounter.Current != null)
-                PlayerEncounter.Finish(false);
+            if (leaveSiege && mobileParty?.BesiegerCamp != null)
+                mobileParty.BesiegerCamp = null;
+
+            if (isMainParty)
+            {
+                if (PlayerEncounter.Current != null)
+                    PlayerEncounter.Finish(false);
+                else if (leaveSiege)
+                    GameMenu.ExitToLast();
+            }
+
+            if (leaveSiege && isMainParty)
+                mobileParty?.SetMoveModeHold();
         }
     }
 }

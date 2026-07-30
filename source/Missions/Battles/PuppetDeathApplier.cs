@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MapEvents;
+using Missions.Agents;
 using Missions.Messages;
 using Serilog;
 using System;
@@ -33,17 +34,20 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Dictionary<Guid, NetworkBattleAgentDied> pendingDeaths =
         new Dictionary<Guid, NetworkBattleAgentDied>();
 
     public PuppetDeathApplier(
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
-        ICasualtyAttributionMap casualties)
+        ICasualtyAttributionMap casualties,
+        IPuppetMountStateRepairer puppetMountStateRepairer)
     {
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.casualties = casualties;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
 
         messageBroker.Subscribe<NetworkBattleAgentDied>(Handle_NetworkBattleAgentDied);
     }
@@ -90,6 +94,9 @@ public class PuppetDeathApplier : IPuppetDeathApplier
         Logger.Information("[DeathDiag] Killing puppet {AgentId}: agentPresent={Present}, health={Health}", death.AgentId, agent != null, agent?.Health ?? -1f);
         if (agent != null && agent.Health > 0)
         {
+            Agent mount = agent.MountAgent;
+            LogMountState("before", agent, mount);
+
             Agent affectorAgent = null;
             if (death.AffectorAgentId != Guid.Empty
                 && registry.TryGetAgentInfo(death.AffectorAgentId, out var affectorInfo))
@@ -116,6 +123,9 @@ public class PuppetDeathApplier : IPuppetDeathApplier
                         agent.RegisterBlow(blow, default);
                     }
                 });
+
+            puppetMountStateRepairer.RepairAfterRiderDeath(mount);
+            LogMountState("after", agent, mount);
         }
 
         // Deregister after the game-thread kill. Removing on the poll thread before the queued apply would
@@ -123,6 +133,32 @@ public class PuppetDeathApplier : IPuppetDeathApplier
         registry.RemoveAgent(death.AgentId);
         casualties.Forget(death.AgentId);
         return true;
+    }
+
+    private static void LogMountState(string phase, Agent rider, Agent mount)
+    {
+        if (mount == null) return;
+
+        CommonAIComponent commonAi = mount.CommonAIComponent;
+        int reservedRiderIndex = commonAi?.ReservedRiderAgentIndex ?? -1;
+        Agent reservedRider = reservedRiderIndex >= 0
+            ? Mission.Current.FindAgentWithIndex(reservedRiderIndex)
+            : null;
+
+        Logger.Information(
+            "[DeathDiag] Mounted puppet death {Phase}: riderIndex={RiderIndex}, mountIndex={MountIndex}, " +
+            "mountRiderIndex={MountRiderIndex}, mountActive={MountActive}, hasCommonAi={HasCommonAi}, " +
+            "reservedRiderIndex={ReservedRiderIndex}, reservedRiderPresent={ReservedRiderPresent}, " +
+            "reservedRiderActive={ReservedRiderActive}",
+            phase,
+            rider.Index,
+            mount.Index,
+            mount.RiderAgent?.Index ?? -1,
+            mount.IsActive(),
+            commonAi != null,
+            reservedRiderIndex,
+            reservedRider != null,
+            reservedRider?.IsActive() ?? false);
     }
 
     private static Blow CreateReplicatedBlow(NetworkBattleAgentDied message, int ownerId)

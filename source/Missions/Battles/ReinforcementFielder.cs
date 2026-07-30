@@ -51,6 +51,7 @@ public class ReinforcementFielder : IReinforcementFielder
     // [Host] Map-event party ids we have already fielded as mid-battle reinforcements, so a repeated involved-
     // parties broadcast for the same party doesn't double-spawn it.
     private readonly HashSet<string> reinforcedParties = new HashSet<string>();
+    private readonly HashSet<string> pendingReinforcementParties = new HashSet<string>();
 
     /// <summary>A reinforcement party's troops still waiting for engine agent capacity (BR-110): fielding
     /// stops at the render limit and <see cref="Tick"/> spawns the remainder as removals free slots.</summary>
@@ -145,17 +146,22 @@ public class ReinforcementFielder : IReinforcementFielder
 
     public void Tick()
     {
-        if (!session.IsLocalHost || !deployment.IsCommitted || Mission.Current == null) return;
+        if (!session.IsLocalHost || Mission.Current == null) return;
 
         try
         {
+            if (deployment.IsActivated)
+                FieldPendingReinforcementParties();
+
+            if (!deployment.IsCommitted) return;
+
             TryQueueMigrationReserves();
             FieldMigrationReserves();
             FieldPendingReinforcements();
         }
         catch (Exception e)
         {
-            Logger.Error(e, "[BattleSync] Failed to field migration reserves");
+            Logger.Error(e, "[BattleSync] Failed to field battle reserves");
         }
     }
 
@@ -509,43 +515,55 @@ public class ReinforcementFielder : IReinforcementFielder
         }
     }
 
-    // [Host] A party was added to the live battle. If it is a new AI party we field — not a player's own party,
-    // and not one of the initial parties the troop supplier already spawns — field it now by spawning its troops
-    // at the side's default reinforcement frame. Gated on the battle being activated so the INITIAL involved-
-    // parties broadcast (pre-activation) is ignored: those parties spawn through the supplier, not here.
+    // [Host] Preserve involved-party messages until the mission is activated. World and battle messages use
+    // different channels, so a party can arrive first and must not be lost while deployment is still frozen.
     private void Handle_ReinforcementPartiesAdded(MessagePayload<NetworkAddInvolvedParties> payload)
     {
         if (!session.IsLocalHost) return;
-        if (!deployment.IsActivated) return;
+        if (payload.What.MapEventId != session.InstanceId) return;
 
         var partyIds = payload.What.MapEventPartyIds;
         if (partyIds == null || partyIds.Length == 0) return;
 
         GameThread.RunSafe(() =>
         {
-            if (Mission.Current == null) return;
-
             foreach (var partyId in partyIds)
-            {
-                if (reinforcedParties.Contains(partyId)) continue;      // already fielded
-                if (IsSupplierParty(partyId)) continue;                 // an initial party — the supplier spawns it
-                if (!objectManager.TryGetObject<MapEventParty>(partyId, out var mapEventParty)) continue;
+                if (!string.IsNullOrEmpty(partyId) && !reinforcedParties.Contains(partyId))
+                    pendingReinforcementParties.Add(partyId);
 
-                var party = mapEventParty?.Party;
-                if (party == null) continue;
-
-                // The broadcast is server -> all clients (every battle), so only field this battle's parties.
-                var mapEvent = party.MapEventSide?.MapEvent;
-                if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId) || mapEventId != session.InstanceId)
-                    continue;
-
-                // A player's own party is fielded by that player (Phase E), not us — we only field AI parties.
-                if (party.LeaderHero?.IsPlayerHero() == true) continue;
-
-                reinforcedParties.Add(partyId);
-                SpawnReinforcementParty(party, partyId);
-            }
+            if (deployment.IsActivated && Mission.Current != null)
+                FieldPendingReinforcementParties();
         });
+    }
+
+    private void FieldPendingReinforcementParties()
+    {
+        if (pendingReinforcementParties.Count == 0) return;
+
+        foreach (var partyId in new List<string>(pendingReinforcementParties))
+        {
+            if (reinforcedParties.Contains(partyId) || IsSupplierParty(partyId))
+            {
+                pendingReinforcementParties.Remove(partyId);
+                continue;
+            }
+
+            // Registration is applied on the game thread too. Retain an unresolved id for a later tick.
+            if (!objectManager.TryGetObject<MapEventParty>(partyId, out var mapEventParty)) continue;
+
+            var party = mapEventParty?.Party;
+            var mapEvent = party?.MapEventSide?.MapEvent;
+            if (party == null || mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId)
+                || mapEventId != session.InstanceId || party.LeaderHero?.IsPlayerHero() == true)
+            {
+                pendingReinforcementParties.Remove(partyId);
+                continue;
+            }
+
+            pendingReinforcementParties.Remove(partyId);
+            reinforcedParties.Add(partyId);
+            SpawnReinforcementParty(party, partyId);
+        }
     }
 
     // Whether a party is one of the initial reserves the troop supplier already provides, so the native spawn

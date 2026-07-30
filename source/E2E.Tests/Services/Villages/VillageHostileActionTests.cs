@@ -26,11 +26,13 @@ using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
+using Missions.Messages;
 using Moq;
 using System.Net;
 using System.Threading;
@@ -1139,6 +1141,73 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void ActiveSlowRaid_WithOpposingPlayerInDeployment_ServerUpdateIsBlockedUntilMissionExit()
+    {
+        var client = Clients.First();
+        RegisterPeer(client, "PlayerOne");
+        var (playerHeroId, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var aiRaiderMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var aiRaiderTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var target = CreateVillageTarget();
+        MapEvent? mapEvent = null;
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiRaiderMobilePartyId, out var aiRaiderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(aiRaiderTroopId, out var aiRaiderTroop));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+
+            using (new AllowedThread())
+            {
+                playerParty.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
+                playerHero.PartyBelongedTo = playerParty;
+                aiRaiderParty.MemberRoster.AddToCounts(aiRaiderTroop, 1);
+            }
+
+            mapEvent = CreateHostileActionMapEvent(aiRaiderParty.Party, settlement.Party, VillageHostileAction.Raid);
+            Assert.True(mapEvent.IsActiveSlowVillageRaid());
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+            Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventId);
+        var playerPartyId = GetPartyBaseId(playerMobilePartyId);
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestJoinBattle(
+            mapEventId!,
+            playerPartyId,
+            BattleSideEnum.Defender)), MapEventDisabledMethods);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var playerParty));
+            Assert.Null(playerParty.MapEvent);
+            Assert.True(mapEvent!.IsActiveSlowVillageRaid());
+        }, MapEventDisabledMethods);
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+            Guid.NewGuid().ToString(),
+            (int)BattleStartMode.Mission,
+            mapEventId!,
+            playerMobilePartyId)), MapEventDisabledMethods);
+
+        Assert.Equal(mapEventId, Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single().MapEventId);
+
+        Server.SimulateMessage(client.NetPeer, new NetworkMissionEntered("PlayerOne", mapEventId!));
+
+        Server.Call(() => Assert.False(InvokeMapEventUpdatePrefix(mapEvent!)), MapEventDisabledMethods);
+
+        Server.SimulateMessage(client.NetPeer, new NetworkMissionLeft("PlayerOne", mapEventId!));
+
+        Server.Call(() => Assert.True(InvokeMapEventUpdatePrefix(mapEvent!)), MapEventDisabledMethods);
+        ServerBattleModeArbiter.Release(mapEventId!);
+    }
+
+    [Fact]
     public void SlowRaidMapEvent_WithDefenderTroopsAfterLootingPhase_ServerUpdateIsBlocked()
     {
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
@@ -1382,6 +1451,9 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
+
+        // Simulate atleast one connected player so that unPause policy in ITimeControl for no connected players is not triggered
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "PlayerOne");
 
         Server.Call(() => Server.Resolve<ITimeControlInterface>().ServerSetTimeControl(TimeControlEnum.Play_2x));
         Server.NetworkSentMessages.Clear();
@@ -1855,6 +1927,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
         Assert.Equal(woundedPartyId, left.PartyId);
+        Assert.False(left.LeaveSiege);
         Assert.True(cancelled.HasValue);
         Assert.Equal(hostileAction.MapEventId, cancelled.Value.InstanceId);
         Assert.Equal("PlayerTwo", cancelled.Value.ControllerId);
@@ -2148,6 +2221,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var left = Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Single();
         Assert.Equal(joinerPartyId, left.PartyId);
+        Assert.False(left.LeaveSiege);
 
         AssertHostileActionJoinerLeft(Server, hostileAction.MapEventId, hostileAction.AttackerPartyId, joinerPartyId);
         foreach (var leftClient in Clients)

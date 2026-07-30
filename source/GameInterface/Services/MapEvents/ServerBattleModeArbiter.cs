@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -51,6 +51,17 @@ internal static class ServerBattleModeArbiter
         lock (lockObj)
         {
             return modes.ContainsKey(mapEventId);
+        }
+    }
+
+    /// <summary>True while the event has been accepted for live-mission resolution.</summary>
+    public static bool IsMissionClaimed(string mapEventId)
+    {
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            return modes.TryGetValue(mapEventId, out var mode) && mode == Mode.Mission;
         }
     }
 

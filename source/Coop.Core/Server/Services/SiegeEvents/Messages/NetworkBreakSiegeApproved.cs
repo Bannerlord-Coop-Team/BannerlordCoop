@@ -11,9 +11,12 @@ public record NetworkBreakSiegeApproved : IEvent
 {
     [ProtoMember(1)]
     public bool Approved { get; }
+    [ProtoMember(2)]
+    public bool BattleLeaveApplied { get; }
 
-    public NetworkBreakSiegeApproved(bool approved)
+    public NetworkBreakSiegeApproved(bool approved, bool battleLeaveApplied)
     {
         Approved = approved;
+        BattleLeaveApplied = battleLeaveApplied;
     }
 }

@@ -73,16 +73,19 @@ internal sealed class ConversationPartyTracker : IHandler
             pvpIsEmpty = true;
         }
 
-        // The campaign can outlive this co-op session (the container is disposed on leaving the mode while the
-        // game stays loaded), and MobilePartyAi._isDisabled is a saveable field that vanilla never re-enables on
-        // its own - so any party still held here must be released now or it stays frozen forever.
-        GameThread.RunSafe(() =>
+        if (leftovers.Count > 0)
         {
-            foreach (var leftover in leftovers)
-                ConversationPartyHold.ReleaseParty(ObjectManager, leftover.Key, leftover.Value);
-        },
-            blocking: true,
-            context: nameof(ConversationPartyTracker));
+            // The campaign can outlive this co-op session (the container is disposed on leaving the mode while the
+            // game stays loaded), and MobilePartyAi._isDisabled is a saveable field that vanilla never re-enables on
+            // its own - so any party still held here must be released now or it stays frozen forever.
+            GameThread.RunSafe(() =>
+            {
+                foreach (var leftover in leftovers)
+                    ConversationPartyHold.ReleaseParty(ObjectManager, leftover.Key, leftover.Value);
+            },
+                blocking: true,
+                context: nameof(ConversationPartyTracker));
+        }
 
         if (Instance == this) Instance = null;
     }
@@ -98,14 +101,18 @@ internal sealed class ConversationPartyTracker : IHandler
 
         public readonly string PartyId;
 
+        /// <summary>Whether the engaging player's party was the defender when the encounter opened.</summary>
+        public readonly bool EngagerIsDefender;
+
         /// <summary>Whether the party's AI was already disabled before the hold, so release preserves that state.</summary>
         public readonly bool WasAiDisabled;
 
-        public Engagement(object engagerKey, string engagerPartyId, string partyId, bool wasAiDisabled)
+        public Engagement(object engagerKey, string engagerPartyId, string partyId, bool engagerIsDefender, bool wasAiDisabled)
         {
             EngagerKey = engagerKey;
             EngagerPartyId = engagerPartyId;
             PartyId = partyId;
+            EngagerIsDefender = engagerIsDefender;
             WasAiDisabled = wasAiDisabled;
         }
     }
@@ -114,20 +121,54 @@ internal sealed class ConversationPartyTracker : IHandler
     /// Begins or refreshes an engagement. A player cannot replace a live engagement with a different target, and
     /// every player sharing a target preserves the AI state recorded by its first engagement.
     /// </summary>
-    public bool TryBeginEngagement(object engagerKey, string engagerPartyId, string partyId, bool wasAiDisabled)
+    public bool TryBeginEngagement(
+        object engagerKey,
+        string engagerPartyId,
+        string partyId,
+        bool wasAiDisabled,
+        bool engagerIsDefender = false)
     {
         if (engagerKey == null || partyId == null) return false;
 
         lock (stateLock)
         {
             if (disposed) return false;
-            if (engagements.TryGetValue(engagerKey, out var current)) return current.PartyId == partyId;
+            if (engagements.TryGetValue(engagerKey, out var current))
+            {
+                if (current.PartyId != partyId) return false;
+
+                engagements[engagerKey] = new Engagement(
+                    engagerKey,
+                    engagerPartyId,
+                    partyId,
+                    current.EngagerIsDefender || engagerIsDefender,
+                    current.WasAiDisabled);
+                return true;
+            }
+
             var existing = engagements.Values.FirstOrDefault(x => x.PartyId == partyId);
             if (existing.PartyId != null) wasAiDisabled = existing.WasAiDisabled;
 
-            engagements.Add(engagerKey, new Engagement(engagerKey, engagerPartyId, partyId, wasAiDisabled));
+            engagements.Add(engagerKey, new Engagement(
+                engagerKey,
+                engagerPartyId,
+                partyId,
+                engagerIsDefender,
+                wasAiDisabled));
             isEmpty = false;
             return true;
+        }
+    }
+
+    /// <summary>Gets the engagement owned by the given player, if any.</summary>
+    public bool TryGetEngagement(object engagerKey, out Engagement engagement)
+    {
+        engagement = default;
+        if (engagerKey == null) return false;
+
+        lock (stateLock)
+        {
+            return engagements.TryGetValue(engagerKey, out engagement);
         }
     }
 

@@ -36,6 +36,7 @@ internal class BattleModeEncounterOptionsPatch
     private static readonly TextObject MissionUnderwayTooltip = new("{=!}A battle is already underway.");
     private static readonly TextObject SimulationUnderwayTooltip = new("{=!}A battle simulation is already underway.");
     private static readonly TextObject EncounterUnavailableTooltip = new("{=!}The battle encounter is no longer available.");
+    private static readonly TextObject LowMoraleTooltip = new("{=xnRtINwH}Your men lack the courage to continue the battle without you. (Low Morale)");
 
     // Live-mission launch options, greyed while a simulation runs (launch_mission is the shared catch-all every
     // mission path funnels through). Trailing comment = in-game label.
@@ -94,6 +95,9 @@ internal class BattleModeEncounterOptionsPatch
             return;
         }
 
+        if (SimulationStartConditions.Contains(name))
+            EnableAlliedSimulationForIncapacitatedPlayer(__0, __result);
+
         // Already unavailable — nothing to do.
         if (__result == false) return;
 
@@ -115,11 +119,53 @@ internal class BattleModeEncounterOptionsPatch
         }
     }
 
+    /// <summary>Native uses the empty main party's morale to disable "Leave it to the others" even when healthy
+    /// allied parties can resolve the field battle. Restore that option without changing any other native gate.</summary>
+    private static void EnableAlliedSimulationForIncapacitatedPlayer(MenuCallbackArgs args, bool isShown)
+    {
+        if (!isShown || args.IsEnabled) return;
+        if (args.Tooltip?.HasSameValue(LowMoraleTooltip) != true) return;
+        if (Hero.MainHero?.IsWounded != true) return;
+        if (PartyBase.MainParty.NumberOfHealthyMembers != 0) return;
+
+        var mapEvent = GetPlayerEncounterBattle() ?? MobileParty.MainParty?.MapEvent;
+        if (mapEvent == null || !mapEvent.IsFieldBattle || mapEvent.IsNavalMapEvent || mapEvent.MapEventSettlement != null)
+            return;
+
+        if (!HasHealthyAlliedParty(MobileParty.MainParty.MapEventSide)) return;
+        if (IsEnemyTemporarilyProtected()) return;
+
+        args.IsEnabled = true;
+        args.Tooltip = TooltipHelper.GetSendTroopsPowerContextTooltipForMapEvent();
+    }
+
+    private static bool HasHealthyAlliedParty(MapEventSide side)
+    {
+        if (side == null) return false;
+
+        foreach (var party in side.Parties)
+        {
+            if (party.Party != PartyBase.MainParty && party.Party.NumberOfHealthyMembers > 0)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsEnemyTemporarilyProtected()
+    {
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.Army != null && mainParty.Army.LeaderParty != mainParty) return false;
+        if (PlayerEncounter.PlayerIsDefender) return false;
+
+        return PlayerEncounter.EncounteredParty?.MapFaction?.NotAttackableByPlayerUntilTime.IsFuture == true;
+    }
+
     /// <summary>
     /// An incapacitated defender — wounded main hero, no healthy member left in its own party, on a battle side it
-    /// cannot walk away from — must always be able to surrender: it cannot attack (wound), cannot send troops
-    /// (nothing healthy of its own to send, and the wrong-mode gate above), and cannot afford the get-away troop
-    /// sacrifice. Native only shows surrender when the WHOLE side has no healthy member left
+    /// cannot walk away from — must always be able to surrender: it cannot attack (wound), may have no allied party
+    /// available to simulate, and cannot afford the get-away troop sacrifice. Native only shows surrender when the
+    /// WHOLE side has no healthy member left
     /// (<c>DefenderSide.TroopCount == own NumberOfHealthyMembers</c>) or when morale is broken, but a client's view
     /// of its side can still count parties whose casualties or departure have not synced yet, which hides the
     /// option and soft-locks the player. Conversely, while ANY player resolves the event (live mission or

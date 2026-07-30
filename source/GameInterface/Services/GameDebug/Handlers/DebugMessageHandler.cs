@@ -4,7 +4,10 @@ using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using Serilog;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.GameDebug.Handlers;
 
@@ -14,12 +17,48 @@ namespace GameInterface.Services.GameDebug.Handlers;
 internal class DebugMessageHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<DebugMessageHandler>();
+    private static readonly TimeSpan PopupHostReadyTimeout = TimeSpan.FromSeconds(30);
+    private const string InitialScreenTypeName =
+        "TaleWorlds.MountAndBlade.GauntletUI.GauntletInitialScreen";
 
     private readonly IMessageBroker messageBroker;
+    private readonly Action<Action> enqueue;
+    private readonly Func<bool> isPopupHostReady;
+    private readonly Func<DateTime> utcNow;
+    private readonly Action<string> showPopup;
 
     public DebugMessageHandler(IMessageBroker messageBroker)
+        : this(
+            messageBroker,
+            action => GameThread.EnqueueSafe(action, context: nameof(DebugMessageHandler)),
+            IsPopupHostReady,
+            () => DateTime.UtcNow,
+            ShowPopup)
+    {
+    }
+
+    internal DebugMessageHandler(IMessageBroker messageBroker, Action<string> showPopup)
+        : this(
+            messageBroker,
+            action => GameThread.EnqueueSafe(action, context: nameof(DebugMessageHandler)),
+            () => true,
+            () => DateTime.UtcNow,
+            showPopup)
+    {
+    }
+
+    internal DebugMessageHandler(
+        IMessageBroker messageBroker,
+        Action<Action> enqueue,
+        Func<bool> isPopupHostReady,
+        Func<DateTime> utcNow,
+        Action<string> showPopup)
     {
         this.messageBroker = messageBroker;
+        this.enqueue = enqueue;
+        this.isPopupHostReady = isPopupHostReady;
+        this.utcNow = utcNow;
+        this.showPopup = showPopup;
 
         messageBroker.Subscribe<SendInformationMessage>(Handle);
         messageBroker.Subscribe<SendPopupMessage>(Handle);
@@ -52,25 +91,53 @@ internal class DebugMessageHandler : IHandler
     private void Handle(MessagePayload<SendPopupMessage> payload)
     {
         var text = payload.What.Text;
-        // ShowInquiry pushes a screen/layer, which is only safe on the main thread. No campaign
-        // guard: these popups also fire outside a loaded campaign (e.g. "Server has been stopped").
-        GameThread.Run(() =>
+        EnqueuePopup(text, utcNow().Add(PopupHostReadyTimeout));
+    }
+
+    private void EnqueuePopup(string text, DateTime deadlineUtc)
+    {
+        // InitialState.OnActivate precedes completion of GauntletInitialScreen.OnInitialize, so
+        // wait for the real screen to avoid later transition work dismissing the popup. Use
+        // elapsed time because uncapped/no-focus transitions can drain hundreds of frames before
+        // readiness; the deadline also prevents a headless context retaining the closure forever.
+        enqueue(() =>
         {
-            try
+            if (utcNow() < deadlineUtc && !isPopupHostReady())
             {
-                var inquiry = new InquiryData("Notice", text,
-                    isAffirmativeOptionShown: true,
-                    affirmativeText: "Ok",
-                    affirmativeAction: null,
-                    isNegativeOptionShown: false,
-                    negativeText: string.Empty,
-                    negativeAction: null);
-                InformationManager.ShowInquiry(inquiry);
+                EnqueuePopup(text, deadlineUtc);
+                return;
             }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to show popup message");
-            }
+
+            showPopup(text);
         });
+    }
+
+    private static bool IsPopupHostReady()
+    {
+        if (GameStateManager.Current?.ActiveState is not InitialState) return true;
+
+        return string.Equals(
+            ScreenManager.TopScreen?.GetType().FullName,
+            InitialScreenTypeName,
+            StringComparison.Ordinal);
+    }
+
+    private static void ShowPopup(string text)
+    {
+        try
+        {
+            var inquiry = new InquiryData("Notice", text,
+                isAffirmativeOptionShown: true,
+                affirmativeText: "Ok",
+                affirmativeAction: null,
+                isNegativeOptionShown: false,
+                negativeText: string.Empty,
+                negativeAction: null);
+            InformationManager.ShowInquiry(inquiry);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to show popup message");
+        }
     }
 }

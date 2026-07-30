@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Logging;
 using Common.Messaging;
@@ -81,6 +81,26 @@ internal class PartyCommands
     }
 
     /// <summary>
+    /// Reports an exact party position and movement mode for cross-client live-test comparisons.
+    /// </summary>
+    [CommandLineArgumentFunction("position", "coop.debug.mobileparty")]
+    public static string PositionCommand(List<string> strings)
+    {
+        if (strings.Count != 1)
+            return "Usage: coop.debug.mobileparty.position <partyId>";
+
+        MobileParty party = Campaign.Current?.CampaignObjectManager.Find<MobileParty>(strings[0]);
+        if (party == null) return $"Party with id {strings[0]} not found";
+
+        CampaignVec2 position = party.Position;
+        return
+            $"party={party.StringId}|" +
+            $"x={position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
+            $"y={position.Y.ToString("R", CultureInfo.InvariantCulture)}|" +
+            $"isOnLand={position.IsOnLand}|moveMode={party.PartyMoveMode}";
+    }
+
+    /// <summary>
     /// Issues a local player-party point movement order so automated live tests can verify that a restored
     /// party accepts client control and sends the normal behavior update to the server.
     /// </summary>
@@ -138,6 +158,42 @@ internal class PartyCommands
                 resetMovementToHold: true));
 
         return $"Restored {party.StringId} to {party.Position.X:R},{party.Position.Y:R} in Hold mode.";
+    }
+
+    [CommandLineArgumentFunction("move_to_settlement", "coop.debug.mobileparty")]
+    public static string MoveToSettlementCommand(List<string> strings)
+    {
+        if (!ModInformation.IsServer)
+            return "Command can only be run on the server.";
+
+        if (strings.Count != 2)
+            return "Usage: coop.debug.mobileparty.move_to_settlement <partyId> <settlementId>";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found";
+
+        if (!party.IsPlayerParty())
+            return $"Party {party.StringId} is not a player party.";
+
+        var settlement = Settlement.Find(strings[1]);
+        if (settlement == null)
+            return $"Settlement with id {strings[1]} not found";
+
+        if (!party.IsActive)
+            return $"Party {party.StringId} is not active.";
+
+        if (party.CurrentSettlement != null)
+            return $"Party {party.StringId} is already in {party.CurrentSettlement.StringId}.";
+
+        var navigationType = party.IsCurrentlyAtSea
+            ? MobileParty.NavigationType.Naval
+            : MobileParty.NavigationType.Default;
+        party.SetMoveGoToSettlement(settlement, navigationType, isTargetingThePort: false);
+
+        return $"Ordered {party.StringId} to {settlement.StringId}.";
     }
 
     /// <summary>

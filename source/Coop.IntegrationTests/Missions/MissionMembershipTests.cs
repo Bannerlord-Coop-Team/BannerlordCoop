@@ -3,6 +3,7 @@ using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Missions;
 using Missions.Messages;
 using Missions.Services.Network;
 
@@ -72,6 +73,9 @@ public class MissionMembershipTests
         Join(members[0]);
         Join(members[1]);
 
+        var membershipRegistry = TestEnvironment.Server.Resolve<IMissionMembershipRegistry>();
+        Assert.True(membershipRegistry.IsInstanceOccupied(InstanceId));
+
         Leave(members[1]);
 
         var firstDeparture = Assert.Single(departures);
@@ -88,6 +92,7 @@ public class MissionMembershipTests
         Assert.Equal(InstanceId, lastDeparture.InstanceId);
         Assert.True(lastDeparture.WasRetreat);
         Assert.True(lastDeparture.IsInstanceEmpty);
+        Assert.False(membershipRegistry.IsInstanceOccupied(InstanceId));
     }
 
     private record Member(EnvironmentInstance Instance, string ControllerId);
