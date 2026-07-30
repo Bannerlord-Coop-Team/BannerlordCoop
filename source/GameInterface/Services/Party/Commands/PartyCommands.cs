@@ -50,7 +50,7 @@ internal class PartyCommands
     /// dereferences a null PartyBelongedTo.
     /// </summary>
     private static List<Hero> FindHeroesWithParty(string name)
-        => Hero.AllAliveHeroes.Where(h => h != null && h.Name.ToString() == name && h.PartyBelongedTo != null).ToList();
+        => Hero.AllAliveHeroes.Where(h => h != null && h.Name?.ToString() == name && h.PartyBelongedTo != null).ToList();
 
     /// <summary>
     /// Finds a single alive hero with a party, for the cheats that target one party (the companion-preserve
@@ -173,8 +173,13 @@ internal class PartyCommands
         if (strings.Count == 0) return "Hero name argument required.";
 
         var nameOrId = string.Join(" ", strings);
-        var heroById = Hero.AllAliveHeroes.FirstOrDefault(
-            hero => hero != null && hero.StringId == nameOrId && hero.PartyBelongedTo != null);
+        var mainHero = Hero.MainHero;
+        var heroById = mainHero != null &&
+                       mainHero.StringId == nameOrId &&
+                       mainHero.PartyBelongedTo != null
+            ? mainHero
+            : Hero.AllAliveHeroes.FirstOrDefault(
+                hero => hero != null && hero.StringId == nameOrId && hero.PartyBelongedTo != null);
         var heroes = heroById == null
             ? FindHeroesWithParty(nameOrId)
             : new List<Hero> { heroById };
@@ -184,31 +189,34 @@ internal class PartyCommands
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in heroes)
         {
-            stringBuilder.AppendLine("##" + hero.Name.ToString() + "  (hero id: " + hero.StringId + ")");
+            var party = hero.PartyBelongedTo;
+            if (party == null) continue;
+
+            stringBuilder.AppendLine("##" + (hero.Name?.ToString() ?? "<unnamed>") + "  (hero id: " + hero.StringId + ")");
             stringBuilder.AppendLine("Member roster:");
-            foreach (var rosterElement in hero.PartyBelongedTo.MemberRoster.data)
-            {
-                stringBuilder.AppendLine(
-                    rosterElement.Character?.StringId +
-                    ": number=" + rosterElement.Number +
-                    " wounded=" + rosterElement.WoundedNumber +
-                    " xp=" + rosterElement.Xp +
-                    " hero=" + (rosterElement.Character?.IsHero == true));
-            }
+            AppendRoster(stringBuilder, party.MemberRoster);
 
             stringBuilder.AppendLine("Prisoner roster:");
-            foreach (var rosterElement in hero.PartyBelongedTo.PrisonRoster.data)
-            {
-                stringBuilder.AppendLine(
-                    rosterElement.Character?.StringId +
-                    ": number=" + rosterElement.Number +
-                    " wounded=" + rosterElement.WoundedNumber +
-                    " xp=" + rosterElement.Xp +
-                    " hero=" + (rosterElement.Character?.IsHero == true));
-            }
+            AppendRoster(stringBuilder, party.PrisonRoster);
         }
 
         return stringBuilder.ToString();
+    }
+
+    private static void AppendRoster(StringBuilder stringBuilder, TroopRoster roster)
+    {
+        if (roster == null) return;
+
+        for (int index = 0; index < roster.Count; index++)
+        {
+            var rosterElement = roster.GetElementCopyAtIndex(index);
+            stringBuilder.AppendLine(
+                rosterElement.Character?.StringId +
+                ": number=" + rosterElement.Number +
+                " wounded=" + rosterElement.WoundedNumber +
+                " xp=" + rosterElement.Xp +
+                " hero=" + (rosterElement.Character?.IsHero == true));
+        }
     }
 
     /// <summary>
