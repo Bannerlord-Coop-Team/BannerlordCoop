@@ -609,7 +609,7 @@ internal static class BattleDebugCommands
 
         var forward = new Vec3(direction.X, direction.Y, 0f);
         var side = new Vec3(-direction.Y, direction.X, 0f);
-        var target = mount.Position + (Vec3.Up * 1.4f);
+        var target = mount.VisualPosition + (Vec3.Up * 1.4f);
         var position = target - (forward * 11f) + (side * 4f) + (Vec3.Up * 4f);
         mountCamera.LookAt(position, target, Vec3.Up);
         focusedMount = mount;
@@ -635,7 +635,7 @@ internal static class BattleDebugCommands
         }
 
         Vec3 renderedPosition = missionScreen.CombatCamera.Position;
-        Vec3 expectedTarget = focusedMount.Position + (Vec3.Up * 1.4f);
+        Vec3 expectedTarget = focusedMount.VisualPosition + (Vec3.Up * 1.4f);
         Vec3 targetDirection = expectedTarget - renderedPosition;
         float directionDot = -1f;
         if (targetDirection.LengthSquared > 0.0001f)
