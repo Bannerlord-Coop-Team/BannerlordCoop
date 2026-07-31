@@ -9,7 +9,6 @@ using GameInterface.Services.Barters.Patches;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.MapEvents;
-using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -22,13 +21,12 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Barters.Handlers;
 
-internal sealed class LordBarterHandler : IHandler
+internal sealed partial class LordBarterHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LordBarterHandler>();
     private static readonly TimeSpan AuthorizationLifetime = TimeSpan.FromMinutes(15);
@@ -177,8 +175,28 @@ internal sealed class LordBarterHandler : IHandler
                 Reject(peer, request, playerHero.Gold, reason);
                 return;
             }
-            var manager = BarterManager.Instance;
-            var offerValue = manager.GetOfferValueForFaction(barter, targetHero.Clan);
+
+            var isSafePassage = (LordBarterKind)request.Kind == LordBarterKind.SafePassage;
+            IReadOnlyList<MobileParty> safePassageOpponents = Array.Empty<MobileParty>();
+            float offerValue;
+            if (isSafePassage)
+            {
+                var safePassageOffer = EvaluateSafePassageOffer(
+                    barter,
+                    playerHero,
+                    playerParty.MobileParty,
+                targetHero,
+                targetParty.MobileParty);
+                safePassageOpponents = safePassageOffer.OpponentParties;
+                offerValue = safePassageOffer.OfferValue;
+            }
+            else
+            {
+                offerValue = BarterManager.Instance.GetOfferValueForFaction(
+                    barter,
+                    targetHero.Clan);
+            }
+
             if (offerValue < -0.01f)
             {
                 Reject(peer, request, playerHero.Gold, "The lord will not accept this offer.");
@@ -197,9 +215,11 @@ internal sealed class LordBarterHandler : IHandler
                 }
             }
 
-            var isSafePassage = (LordBarterKind)request.Kind == LordBarterKind.SafePassage;
             if (isSafePassage)
-                ApplySafePassage(targetParty?.MobileParty, playerParty?.MobileParty);
+                ApplySafePassage(
+                    targetParty?.MobileParty,
+                    playerParty?.MobileParty,
+                    safePassageOpponents);
 
             CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offered);
             ApplyOverpayRelationBonus(playerHero, targetHero, offerValue);
@@ -537,42 +557,6 @@ internal sealed class LordBarterHandler : IHandler
 
     private bool MatchesPrisoner(Hero prisoner, PeaceBarterTerm term) => prisoner?.CharacterObject != null && objectManager.TryGetId(prisoner.CharacterObject, out var id) && id == term.ObjectId;
 
-    internal static void ApplySafePassage(MobileParty targetParty, MobileParty playerParty)
-    {
-        if (targetParty == null || playerParty == null) return;
-        var attackProtectionEnds = CampaignTime.HoursFromNow(32f);
-        var factionProtectionEnds = CampaignTime.DaysFromNow(5f);
-        var protectedParties = new HashSet<MobileParty>();
-        if (PlayerEncounter.Current != null)
-        {
-            var playerSideParties = new List<MobileParty>();
-            var opponentSideParties = new List<MobileParty>();
-            PlayerEncounter.Current.FindAllNpcPartiesWhoWillJoinEvent(
-                playerSideParties,
-                opponentSideParties);
-            foreach (var party in opponentSideParties)
-            {
-                if (party != null)
-                    protectedParties.Add(party);
-            }
-        }
-        protectedParties.Add(targetParty);
-        foreach (var party in protectedParties)
-        {
-            DefaultMobilePartyAIModelPatches.PreventAttacksUntil(
-                party,
-                playerParty,
-                attackProtectionEnds);
-            party.SetMoveModeHold();
-            party.IgnoreForHours(32f);
-            party.Ai.SetInitiative(0f, 0.8f, 8f);
-        }
-        DefaultMobilePartyAIModelPatches.PreventFactionAttacksUntil(
-            playerParty,
-            targetParty.MapFaction,
-            factionProtectionEnds);
-    }
-
     internal static void ApplyOverpayRelationBonus(Hero playerHero, Hero otherHero, float overpayAmount)
     {
         var campaign = Campaign.Current;
@@ -601,7 +585,6 @@ internal sealed class LordBarterHandler : IHandler
     {
         Logger.Warning("Rejected lord barter with {TargetHeroId}: {Reason}", request.TargetHeroId, reason);
         var result = new NetworkLordBarterResult(request.ContextId, false, gold, reason, request.RequestId);
-        completedResults[peer] = result;
         SendResult(peer, result);
     }
 

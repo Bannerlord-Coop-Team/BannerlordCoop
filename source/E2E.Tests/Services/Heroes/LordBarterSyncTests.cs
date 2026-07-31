@@ -8,9 +8,11 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -20,14 +22,16 @@ namespace E2E.Tests.Services.Heroes;
 public class LordBarterSyncTests : MapEventTestBase
 {
     private static int observedBarterAcceptedDispatches;
-    private static List<MobileParty>? safePassageOpponentParties;
+    private static IFaction? safePassagePlayerFaction;
+    private static IFaction? safePassageTargetFaction;
+    private static IFaction? safePassageNearbyFaction;
 
     public LordBarterSyncTests(ITestOutputHelper output) : base(output)
     {
     }
 
     [Fact]
-    public void GenericLordBarter_DuplicateRequest_AppliesPaymentOnceAndReplaysAcceptance()
+    public void GenericLordBarter_RejectedRetryAndDuplicate_AppliesPaymentOnce()
     {
         const int initialPlayerGold = 1_000_000;
         const int initialTargetGold = 50;
@@ -74,6 +78,22 @@ public class LordBarterSyncTests : MapEventTestBase
                 PeaceConversationContext.MapParty,
                 target.PartyId,
                 LordBarterKind.Generic)));
+            var rejectedRequest = new NetworkRequestLordBarter(
+                target.HeroId,
+                PeaceConversationContext.MapParty,
+                target.PartyId,
+                LordBarterKind.Generic,
+                new[]
+                {
+                    new PeaceBarterTerm(
+                        PeaceBarterTermType.Gold,
+                        player.HeroId,
+                        null,
+                        null,
+                        true,
+                        initialPlayerGold + 1),
+                },
+                requestId);
             var request = new NetworkRequestLordBarter(
                 target.HeroId,
                 PeaceConversationContext.MapParty,
@@ -91,13 +111,16 @@ public class LordBarterSyncTests : MapEventTestBase
                 },
                 requestId);
 
+            client.Call(() => client.Resolve<INetwork>().SendAll(rejectedRequest));
             client.Call(() => client.Resolve<INetwork>().SendAll(request));
             client.Call(() => client.Resolve<INetwork>().SendAll(request));
             TestEnvironment.FlushCoalescer();
 
             var results = Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>().ToList();
-            Assert.Equal(2, results.Count);
-            Assert.All(results, result =>
+            Assert.Equal(3, results.Count);
+            Assert.False(results[0].Accepted);
+            Assert.Equal(requestId, results[0].RequestId);
+            Assert.All(results.Skip(1), result =>
             {
                 Assert.True(result.Accepted, result.Reason);
                 Assert.Equal(requestId, result.RequestId);
@@ -149,40 +172,160 @@ public class LordBarterSyncTests : MapEventTestBase
     }
 
     [Fact]
-    public void SafePassage_ProtectsEveryEncounterOpponent()
+    public void SafePassage_WithoutPlayerEncounter_IsAccepted()
     {
+        const int initialPlayerGold = 1_000_000;
+        const int offeredGold = 900_000;
+        var client = Clients.First();
         var player = CreatePartyWithRegisteredLeader();
         var target = CreatePartyWithRegisteredLeader();
-        var nearbyOpponent = CreatePartyWithRegisteredLeader();
-        var harmony = new Harmony($"e2e.lord-safe-passage.{Guid.NewGuid():N}");
+        var requestId = Guid.NewGuid().ToString("N");
 
+        RegisterPlayer(client, player.HeroId, player.MobilePartyId);
         SetMainHero(player.HeroId);
-        SetMockPlayerEncounter(Server, target.MobilePartyId);
         try
         {
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
-                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
+
+                new GoldBarterBehavior().RegisterEvents();
+                playerHero.Gold = initialPlayerGold;
+                VillageHostileFactionStanceHelper.ApplyWarStance(
+                    playerHero.MapFaction,
+                    targetHero.MapFaction);
+                Assert.Null(PlayerEncounter.Current);
+                Assert.True(FactionManager.IsAtWarAgainstFaction(
+                    playerHero.MapFaction,
+                    targetHero.MapFaction));
+                Assert.True(ConversationPartyHold.TryEngage(
+                    Server.Resolve<ConversationPartyTracker>(),
+                    client.NetPeer,
+                    player.PartyId,
+                    targetParty,
+                    target.PartyId,
+                    engagerIsDefender: true));
+                Assert.True(Server.Resolve<ConversationPartyTracker>()
+                    .TryGetEngagement(client.NetPeer, out var engagement));
+                Assert.True(engagement.EngagerIsDefender);
+            });
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+                requestId,
+                target.HeroId,
+                PeaceConversationContext.MapParty,
+                target.PartyId,
+                LordBarterKind.SafePassage)));
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+                target.HeroId,
+                PeaceConversationContext.MapParty,
+                target.PartyId,
+                LordBarterKind.SafePassage,
+                new[]
+                {
+                    new PeaceBarterTerm(
+                        PeaceBarterTermType.Gold,
+                        player.HeroId,
+                        null,
+                        null,
+                        true,
+                        offeredGold),
+                },
+                requestId)));
+
+            var result = Assert.Single(
+                Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+            Assert.True(result.Accepted, result.Reason);
+            Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
+            Server.Call(() =>
+            {
+                Assert.Null(PlayerEncounter.Current);
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    player.MobilePartyId,
+                    out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    target.MobilePartyId,
+                    out var targetParty));
+                var protectedAttackers = DefaultMobilePartyAIModelPatches
+                    .GetPersistedAttackProtections()
+                    .Where(protection => protection.TargetParty == playerParty)
+                    .Select(protection => protection.AttackerParty)
+                    .ToList();
+                Assert.Contains(targetParty, protectedAttackers);
+            });
+        }
+        finally
+        {
+            Server.Call(DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections);
+        }
+    }
+
+    [Fact]
+    public void SafePassage_ProtectsEveryResolvedOpponentWithoutPlayerEncounter()
+    {
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+        var nearbyOpponent = CreatePartyWithRegisteredLeader();
+        var playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var targetClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var nearbyOpponentClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var harmony = new Harmony($"e2e.lord-safe-passage-parties.{Guid.NewGuid():N}");
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    player.MobilePartyId,
+                    out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    target.MobilePartyId,
+                    out var targetParty));
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
                     nearbyOpponent.MobilePartyId,
                     out var nearbyOpponentParty));
-                safePassageOpponentParties = new List<MobileParty>
-                {
-                    targetParty,
-                    nearbyOpponentParty,
-                };
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(
+                    playerClanId,
+                    out var playerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(
+                    targetClanId,
+                    out var targetClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(
+                    nearbyOpponentClanId,
+                    out var nearbyOpponentClan));
+
+                playerParty._actualClan = playerClan;
+                targetParty._actualClan = targetClan;
+                nearbyOpponentParty._actualClan = nearbyOpponentClan;
+                Assert.NotSame(playerParty.MapFaction, targetParty.MapFaction);
+                Assert.NotSame(playerParty.MapFaction, nearbyOpponentParty.MapFaction);
+                Assert.NotSame(targetParty.MapFaction, nearbyOpponentParty.MapFaction);
+                safePassagePlayerFaction = playerParty.MapFaction;
+                safePassageTargetFaction = targetParty.MapFaction;
+                safePassageNearbyFaction = nearbyOpponentParty.MapFaction;
                 harmony.Patch(
                     AccessTools.Method(
-                        Campaign.Current.Models.EncounterModel.GetType(),
-                        "FindNonAttachedNpcPartiesWhoWillJoinPlayerEncounter"),
+                        typeof(FactionManager),
+                        nameof(FactionManager.IsAtWarAgainstFaction)),
                     prefix: new HarmonyMethod(
                         typeof(LordBarterSyncTests),
-                        nameof(SupplySafePassageOpponentParties)));
+                        nameof(SupplySafePassageWarState)));
+                Assert.Null(PlayerEncounter.Current);
+                Assert.Null(nearbyOpponentParty.AttachedTo);
+                Assert.DoesNotContain(nearbyOpponentParty, targetParty.AttachedParties);
 
-                using (new BarterPlayerContext(playerHero, playerParty))
-                    LordBarterHandler.ApplySafePassage(targetParty, playerParty);
+                var safePassageParties = SafePassagePartyResolver.ResolveFromCandidates(
+                    playerParty,
+                    targetParty,
+                    new[] { targetParty, nearbyOpponentParty });
+                Assert.Contains(nearbyOpponentParty, safePassageParties.OpponentSide);
+                LordBarterHandler.ApplySafePassage(
+                    targetParty,
+                    playerParty,
+                    safePassageParties.OpponentSide);
 
                 var protectedAttackers = DefaultMobilePartyAIModelPatches
                     .GetPersistedAttackProtections()
@@ -196,7 +339,9 @@ public class LordBarterSyncTests : MapEventTestBase
         finally
         {
             harmony.UnpatchAll(harmony.Id);
-            safePassageOpponentParties = null;
+            safePassagePlayerFaction = null;
+            safePassageTargetFaction = null;
+            safePassageNearbyFaction = null;
             Server.Call(DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections);
         }
     }
@@ -311,12 +456,33 @@ public class LordBarterSyncTests : MapEventTestBase
     private static void ObserveBarterAcceptedDispatch()
         => observedBarterAcceptedDispatches++;
 
-    private static bool SupplySafePassageOpponentParties(
-        List<MobileParty> partiesToJoinPlayerSide,
-        List<MobileParty> partiesToJoinEnemySide)
+    private static bool SupplySafePassageWarState(
+        IFaction faction1,
+        IFaction faction2,
+        ref bool __result)
     {
-        if (safePassageOpponentParties != null)
-            partiesToJoinEnemySide.AddRange(safePassageOpponentParties);
-        return false;
+        var playerFaction = safePassagePlayerFaction;
+        var targetFaction = safePassageTargetFaction;
+        var nearbyFaction = safePassageNearbyFaction;
+        if (playerFaction == null || targetFaction == null || nearbyFaction == null)
+            return true;
+
+        if ((faction1 == playerFaction &&
+             (faction2 == targetFaction || faction2 == nearbyFaction)) ||
+            (faction2 == playerFaction &&
+             (faction1 == targetFaction || faction1 == nearbyFaction)))
+        {
+            __result = true;
+            return false;
+        }
+
+        if ((faction1 == targetFaction && faction2 == nearbyFaction) ||
+            (faction1 == nearbyFaction && faction2 == targetFaction))
+        {
+            __result = false;
+            return false;
+        }
+
+        return true;
     }
 }

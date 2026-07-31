@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -138,6 +139,7 @@ internal static class LordBarterPatch
                 barter.OtherParty == MobileParty.ConversationParty?.Party)
             {
                 var siegeEvent = barter.OtherParty?.SiegeEvent;
+                var mainParty = MobileParty.MainParty;
                 using (new AllowedThread())
                 {
                     var faction = barter.OtherParty.MapFaction;
@@ -150,6 +152,12 @@ internal static class LordBarterPatch
                 {
                     using (new AllowedThread())
                     {
+                        if (siegeEvent.BesiegedSettlement.MapFaction == Hero.MainHero.MapFaction)
+                        {
+                            GainKingdomInfluenceAction.ApplyForSiegeSafePassageBarter(
+                                mainParty,
+                                -10f);
+                        }
                         Campaign.Current.GameMenuManager.SetNextMenu("menu_siege_safe_passage_accepted");
                         PlayerSiege.FinalizePlayerSiege();
                     }
@@ -157,6 +165,12 @@ internal static class LordBarterPatch
                 else
                 {
                     PlayerEncounter.LeaveEncounter = true;
+                    if (mainParty.SiegeEvent != null &&
+                        mainParty.SiegeEvent.BesiegerCamp
+                            .HasInvolvedPartyForEventType(PartyBase.MainParty))
+                    {
+                        mainParty.BesiegerCamp = null;
+                    }
                 }
             }
         }
