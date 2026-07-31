@@ -3,11 +3,9 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -19,7 +17,6 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehaviorWeaponNameHandler>();
 
     private readonly IMessageBroker messageBroker;
-    private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface;
 
@@ -27,12 +24,10 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
 
     public CraftingCampaignBehaviorWeaponNameHandler(
         IMessageBroker messageBroker,
-        IObjectManager objectManager,
         INetwork network,
         ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
-        this.objectManager = objectManager;
         this.network = network;
         this.craftingCampaignBehaviorInterface = craftingCampaignBehaviorInterface;
 

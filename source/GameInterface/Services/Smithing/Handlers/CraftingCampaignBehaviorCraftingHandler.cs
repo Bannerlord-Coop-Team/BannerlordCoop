@@ -137,6 +137,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            // Get required objects using interface & objectManager
             craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
@@ -166,9 +167,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(data.CraftingHero, out var craftingHeroId)) return;
         if (!objectManager.TryGetIdWithLogging(data.WeaponDesign.Template, out var craftingTemplateId)) return;
         if (!objectManager.TryGetIdWithLogging(data.PlayerHero, out var playerHeroId)) return;
-
-        // Need to add to object manager early for completing town orders
-        //objectManager.AddExisting(obj.NextCraftedItemId, obj.CraftedItemObject);
 
         string itemModifierGroupId = null;
         if (data.CraftingLogic.CurrentItemModifierGroup != null && !objectManager.TryGetIdWithLogging(data.CraftingLogic.CurrentItemModifierGroup, out itemModifierGroupId)) return;
@@ -233,7 +231,8 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 data.WeaponName,
                 nextCraftedItemId);
 
-            network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
+            // Update stamina on clients
+            network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
 
             // Create weapon on all clients
             NetworkCreateCraftedWeaponInternalClients message = new(data, nextCraftedItemId);
@@ -275,7 +274,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 var craftedItemObject = craftingCampaignBehaviorInterface.CreateAndRegisterCraftedItem(weaponDesign, data.Name, culture, itemModifierGroup, nextCraftedItemId);
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !data.IsFreeMode);
 
-                // Only run on associated client
+                // Only run on crafting client
                 if (GameStateManager.Current.ActiveState is CraftingState currentState && playerHero == Hero.MainHero)
                 {
                     currentState.CraftingLogic._craftedItemObject = craftedItemObject;
@@ -287,7 +286,9 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
                     if (!objectManager.TryGetIdWithLogging(craftedItemObject, out var craftedItemId)) return;
 
-                    if (data.IsFreeMode) // Add to item rosters after the item has finished being created on clients
+                    // Add to item rosters after the item has finished being created on clients
+                    // Won't resolve on clients when running AddToCounts otherwise
+                    if (data.IsFreeMode) 
                     {
                         var message = new NetworkAddCraftedItemToRoster(craftedItemId, data.PlayerHeroId, data.WeaponModifierId);
                         network.SendAll(message);

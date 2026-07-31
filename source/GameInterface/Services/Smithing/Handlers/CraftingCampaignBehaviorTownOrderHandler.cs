@@ -224,8 +224,6 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
 
             // Replace TaleWorlds implementation
-
-            // Manage hero gold with dynamic sync
             int amount = craftingBehavior.CalculateOrderPriceDifference(craftingOrder, craftedItem);
             GiveGoldAction.ApplyBetweenCharacters(null, mainHero, amount, false);
 
@@ -239,26 +237,21 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
             {
                 if (craftingOrder.IsLordOrder)
                 {
-                    // Manage Hero.BattleEquipment with dynamic sync
                     craftingBehavior.ChangeCraftedOrderWithTheNoblesWeaponIfItIsBetter(craftedItem, craftingOrder);
                     if (orderOwner.PartyBelongedTo != null)
                     {
-                        // Manage party roster with dynamic sync
                         craftingBehavior.GiveTroopToNobleAtWeaponTier((int)craftedItem.Tier, orderOwner);
                     }
                     if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.SteelMaker3))
                     {
-                        // Manage hero relations with dynamic sync
                         ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.SteelMaker3.SecondaryBonus, true);
                     }
                 }
                 else
                 {
-                    // Manage Hero.Power with dynamic sync
                     orderOwner.AddPower((float)(craftedItem.Tier + 1));
                     if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.ExperiencedSmith))
                     {
-                        // Manage hero relations with dynamic sync
                         ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.ExperiencedSmith.SecondaryBonus, true);
                     }
                 }

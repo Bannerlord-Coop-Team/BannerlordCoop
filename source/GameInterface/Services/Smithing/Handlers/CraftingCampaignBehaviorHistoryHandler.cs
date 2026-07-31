@@ -37,7 +37,7 @@ internal class CraftingCampaignBehaviorHistoryHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<UpdateCraftedItemHistory>(Handle_UpdateCraftedItemHistory);
-        messageBroker.Subscribe<NetworkUpdateCraftedItemHistory>(Handle_NetworkUpdateCraftedItemHistory);
+        messageBroker.Unsubscribe<NetworkUpdateCraftedItemHistory>(Handle_NetworkUpdateCraftedItemHistory);
     }
 
     private void Handle_UpdateCraftedItemHistory(MessagePayload<UpdateCraftedItemHistory> obj)
@@ -56,6 +56,7 @@ internal class CraftingCampaignBehaviorHistoryHandler : IHandler
 
     private void Handle_NetworkUpdateCraftedItemHistory(MessagePayload<NetworkUpdateCraftedItemHistory> obj)
     {
+        // Save crafting history on server in CoopSession
         sessionCraftingPlayerDataInterface.UpdateCraftingHistory(
             obj.What.PlayerHeroId,
             obj.What.CraftedItemHistoryIds);

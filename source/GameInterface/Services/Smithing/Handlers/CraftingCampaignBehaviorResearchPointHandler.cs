@@ -38,10 +38,10 @@ internal class CraftingCampaignBehaviorResearchPointHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<UpdateResearchPoints>(Handle_UpdateResearchPoints);
-        messageBroker.Subscribe<NetworkUpdateResearchPoints>(Handle_NetworkUpdateResearchPoints);
+        messageBroker.Unsubscribe<NetworkUpdateResearchPoints>(Handle_NetworkUpdateResearchPoints);
 
         messageBroker.Unsubscribe<OpenCraftingPart>(Handle_OpenCraftingPart);
-        messageBroker.Subscribe<NetworkOpenCraftingPart>(Handle_NetworkOpenCraftingPart);
+        messageBroker.Unsubscribe<NetworkOpenCraftingPart>(Handle_NetworkOpenCraftingPart);
     }
 
     private void Handle_UpdateResearchPoints(MessagePayload<UpdateResearchPoints> obj)
@@ -54,6 +54,7 @@ internal class CraftingCampaignBehaviorResearchPointHandler : IHandler
 
     private void Handle_NetworkUpdateResearchPoints(MessagePayload<NetworkUpdateResearchPoints> obj)
     {
+        // Save crafting piece xp on server in CoopSession
         sessionCraftingPlayerDataInterface.SetCraftingPieceXp(
             obj.What.PlayerHeroId,
             obj.What.CraftingTemplateId,
@@ -71,6 +72,7 @@ internal class CraftingCampaignBehaviorResearchPointHandler : IHandler
 
     private void Handle_NetworkOpenCraftingPart(MessagePayload<NetworkOpenCraftingPart> obj)
     {
+        // Save unlocked piece on server in CoopSession
         sessionCraftingPlayerDataInterface.UnlockCraftingPiece(
             obj.What.PlayerHeroId,
             obj.What.CraftingTemplateId,
