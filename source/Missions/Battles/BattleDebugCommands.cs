@@ -30,6 +30,8 @@ internal static class BattleDebugCommands
     private static Mission observedMission;
     private static Camera ladderCamera;
     private static Camera mountCamera;
+    private static Agent focusedMount;
+    private static Guid focusedMountId;
     private static Agent capturedMount;
     private static Guid capturedMountId;
     private static float mountPoseCaptureStartTime;
@@ -599,10 +601,6 @@ internal static class BattleDebugCommands
         mountCamera.FillParametersFrom(missionScreen.CombatCamera);
 
         Agent mount = info.Agent;
-        MBAgentVisuals visuals = mount.AgentVisuals;
-        if (ReferenceEquals(visuals, null) || !visuals.IsValid())
-            return $"Mount {mountId:N} has no active visuals";
-
         Vec2 direction = mount.GetMovementDirection();
         if (direction.LengthSquared <= 0.0001f)
             direction = Vec2.Forward;
@@ -611,12 +609,54 @@ internal static class BattleDebugCommands
 
         var forward = new Vec3(direction.X, direction.Y, 0f);
         var side = new Vec3(-direction.Y, direction.X, 0f);
-        var target = visuals.GetGlobalFrame().origin + (Vec3.Up * 1.4f);
+        var target = mount.Position + (Vec3.Up * 1.4f);
         var position = target - (forward * 11f) + (side * 4f) + (Vec3.Up * 4f);
         mountCamera.LookAt(position, target, Vec3.Up);
+        focusedMount = mount;
+        focusedMountId = mountId;
         missionScreen.CustomCamera = mountCamera;
 
         return $"Focused the mission camera on mount {mountId:N}";
+    }
+
+    [CommandLineArgumentFunction("mount_camera_state", "coop.debug.battle")]
+    public static string MountCameraState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.mount_camera_state";
+
+        if (mountCamera == null
+            || focusedMount == null
+            || !focusedMount.IsActive()
+            || !(ScreenManager.TopScreen is MissionScreen missionScreen)
+            || missionScreen.CombatCamera == null)
+        {
+            return "active=False";
+        }
+
+        Vec3 renderedPosition = missionScreen.CombatCamera.Position;
+        Vec3 expectedTarget = focusedMount.Position + (Vec3.Up * 1.4f);
+        Vec3 targetDirection = expectedTarget - renderedPosition;
+        float directionDot = -1f;
+        if (targetDirection.LengthSquared > 0.0001f)
+        {
+            targetDirection.Normalize();
+            Vec3 renderedDirection = missionScreen.CombatCamera.Direction;
+            directionDot =
+                (renderedDirection.X * targetDirection.X)
+                + (renderedDirection.Y * targetDirection.Y)
+                + (renderedDirection.Z * targetDirection.Z);
+        }
+
+        float positionDelta = (renderedPosition - mountCamera.Position).Length;
+        bool active = ReferenceEquals(missionScreen.CustomCamera, mountCamera);
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "active={0} mount={1:N} positionDelta={2:F3} directionDot={3:F3}",
+            active,
+            focusedMountId,
+            positionDelta,
+            directionDot);
     }
 
     [CommandLineArgumentFunction("release_mount_camera", "coop.debug.battle")]
@@ -641,6 +681,8 @@ internal static class BattleDebugCommands
 
         mountCamera.ReleaseCamera();
         mountCamera = null;
+        focusedMount = null;
+        focusedMountId = Guid.Empty;
         return true;
     }
 
