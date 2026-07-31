@@ -4,6 +4,7 @@ using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Kingdoms;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Settlements.Interfaces;
@@ -320,6 +321,11 @@ namespace Coop.IntegrationTests.MobileParties
             Assert.Equal(
                 1,
                 TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkSettlementEncounterRejected>());
+            var informationMessage = Assert.Single(
+                TestEnvironment.Server.NetworkSentMessages.GetMessages<SendInformationMessage>());
+            Assert.Equal(
+                "Unable to enter the settlement: your party is already in a map event.",
+                informationMessage.Text);
             Assert.Equal(0, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkPartyEnterSettlement>());
         }
 
@@ -346,6 +352,11 @@ namespace Coop.IntegrationTests.MobileParties
             Assert.Equal(
                 1,
                 TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkSettlementEncounterRejected>());
+            var informationMessage = Assert.Single(
+                TestEnvironment.Server.NetworkSentMessages.GetMessages<SendInformationMessage>());
+            Assert.Equal(
+                "Unable to enter the settlement: your party is already inside another settlement.",
+                informationMessage.Text);
             Assert.Equal(0, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkPartyEnterSettlement>());
         }
 

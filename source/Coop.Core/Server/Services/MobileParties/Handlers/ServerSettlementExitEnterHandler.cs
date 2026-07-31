@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -66,12 +67,12 @@ public class ServerSettlementExitEnterHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty))
             {
-                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                RejectSettlementEncounter(peer, payload, "your party is no longer available");
                 return;
             }
             if (!objectManager.TryGetObjectWithLogging(payload.SettlementId, out Settlement settlement))
             {
-                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                RejectSettlementEncounter(peer, payload, "the settlement is no longer available");
                 return;
             }
 
@@ -80,7 +81,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                 Logger.Warning(
                     "Rejecting settlement entry for party {PartyId} because it is already in a map event",
                     payload.PartyId);
-                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                RejectSettlementEncounter(peer, payload, "your party is already in a map event");
                 return;
             }
 
@@ -98,7 +99,10 @@ public class ServerSettlementExitEnterHandler : IHandler
                         objectManager.TryGetId(mobileParty.CurrentSettlement, out var currentSettlementId)
                             ? currentSettlementId
                             : mobileParty.CurrentSettlement.StringId);
-                    network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                    RejectSettlementEncounter(
+                        peer,
+                        payload,
+                        "your party is already inside another settlement");
                 }
                 return;
             }
@@ -120,7 +124,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                         "Rejecting settlement entry for party {PartyId} because it is too far from settlement {SettlementId}",
                         payload.PartyId,
                         payload.SettlementId);
-                    network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                    RejectSettlementEncounter(peer, payload, "your party is too far from the settlement");
                     return;
                 }
             }
@@ -136,6 +140,17 @@ public class ServerSettlementExitEnterHandler : IHandler
 
             settlementInterface.PartyEnterSettlement(mobileParty, settlement);
         }, context: nameof(NetworkRequestStartSettlementEncounter));
+    }
+
+    private void RejectSettlementEncounter(
+        NetPeer peer,
+        NetworkRequestStartSettlementEncounter payload,
+        string reason)
+    {
+        network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+        network.Send(
+            peer,
+            new SendInformationMessage($"Unable to enter the settlement: {reason}."));
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)

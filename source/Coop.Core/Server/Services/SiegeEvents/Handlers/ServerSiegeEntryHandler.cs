@@ -5,6 +5,7 @@ using Common.Network;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.BesiegerCamps.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -203,14 +204,18 @@ internal class ServerSiegeEntryHandler : IHandler
         if (!playerManager.TryGetPlayer(peer, out var player) ||
             player.MobilePartyId != partyId)
         {
-            RejectEntry(peer, partyId, settlementId, action, "the peer does not control the party");
+            RejectEntry(peer, partyId, settlementId, action, "your party is not controlled by you");
             return;
         }
 
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party) ||
             !objectManager.TryGetObjectWithLogging<Settlement>(settlementId, out var settlement))
         {
-            SendEntryResult(peer, settlementId, action, approved: false);
+            SendEntryRejection(
+                peer,
+                settlementId,
+                action,
+                "your party or the settlement is no longer available");
             return;
         }
 
@@ -244,7 +249,11 @@ internal class ServerSiegeEntryHandler : IHandler
                 action,
                 partyId,
                 settlementId);
-            SendEntryResult(peer, settlementId, action, approved: false);
+            SendEntryRejection(
+                peer,
+                settlementId,
+                action,
+                "the server could not apply the request");
             return;
         }
 
@@ -260,31 +269,31 @@ internal class ServerSiegeEntryHandler : IHandler
         rejectionReason = null;
 
         if (!party.IsActive || party.Party == null)
-            rejectionReason = "the party is inactive";
+            rejectionReason = "your party is inactive";
         else if (settlement.Party == null || !settlement.IsFortification)
             rejectionReason = "the target is not a fortification";
         else if (party.MapEvent != null)
-            rejectionReason = "the party is already in a map event";
+            rejectionReason = "your party is already in a map event";
         else if (party.CurrentSettlement != null && party.CurrentSettlement != settlement)
-            rejectionReason = "the party is inside another settlement";
+            rejectionReason = "your party is inside another settlement";
         else if (party.BesiegerCamp != null)
-            rejectionReason = "the party is already in another siege camp";
+            rejectionReason = "your party is already in another siege camp";
         else if (!IsWithinInteractionDistance(party, settlement))
-            rejectionReason = "the party is too far from the settlement";
+            rejectionReason = "your party is too far from the settlement";
         else if ((party.ActualClan != null && party.ActualClan == settlement.OwnerClan) ||
             (party.MapFaction != null && party.MapFaction == settlement.MapFaction))
-            rejectionReason = "the party belongs to the defending faction";
+            rejectionReason = "your party belongs to the defending faction";
         else if (party.MapFaction == null ||
             settlement.MapFaction == null ||
             !FactionManager.IsAtWarAgainstFaction(party.MapFaction, settlement.MapFaction))
-            rejectionReason = "the party is not at war with the settlement";
+            rejectionReason = "your party is not at war with the settlement";
         else if (action == SiegeEntryAction.Besiege &&
             (settlement.SiegeEvent != null || party.Party.NumberOfHealthyMembers <= 0))
-            rejectionReason = "the party cannot begin this siege";
+            rejectionReason = "your party cannot begin this siege";
         else if (action == SiegeEntryAction.Join &&
             (settlement.SiegeEvent == null ||
             !settlement.SiegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Attacker)))
-            rejectionReason = "the party cannot join the attacking side";
+            rejectionReason = "your party cannot join the attacking side";
 
         return rejectionReason == null;
     }
@@ -322,7 +331,23 @@ internal class ServerSiegeEntryHandler : IHandler
             partyId,
             settlementId,
             reason);
+        SendEntryRejection(peer, settlementId, action, reason);
+    }
+
+    private void SendEntryRejection(
+        NetPeer peer,
+        string settlementId,
+        SiegeEntryAction action,
+        string reason)
+    {
         SendEntryResult(peer, settlementId, action, approved: false);
+
+        var actionText = action == SiegeEntryAction.Besiege
+            ? "begin the siege"
+            : "join the siege";
+        network.Send(
+            peer,
+            new SendInformationMessage($"Unable to {actionText}: {reason}."));
     }
 
     private void SendEntryResult(

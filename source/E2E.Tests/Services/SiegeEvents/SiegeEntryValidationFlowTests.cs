@@ -9,6 +9,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
@@ -73,6 +74,9 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterRejected>());
+        AssertInformationMessage(
+            client,
+            "Unable to enter the settlement: your party is too far from the settlement.");
         Assert.Empty(
             Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
         Assert.Empty(
@@ -86,9 +90,13 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Assert.True(party.Position.Distance(farPosition) < 0.001f);
         });
 
+        client.InternalMessages.Clear();
         SendBesiegeRequest(client, context);
 
         Assert.False(GetBesiegeApproval().Approved);
+        AssertInformationMessage(
+            client,
+            "Unable to begin the siege: your party is too far from the settlement.");
         AssertNoSiege(context);
     }
 
@@ -112,6 +120,9 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         SendBesiegeRequest(client, context);
 
         Assert.False(GetBesiegeApproval().Approved);
+        AssertInformationMessage(
+            client,
+            "Unable to begin the siege: your party is too far from the settlement.");
         AssertNoSiege(context);
     }
 
@@ -138,6 +149,9 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         SendBesiegeRequest(client, context);
 
         Assert.False(GetBesiegeApproval().Approved);
+        AssertInformationMessage(
+            client,
+            "Unable to begin the siege: your party belongs to the defending faction.");
         AssertNoSiege(context);
     }
 
@@ -209,6 +223,9 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         SendJoinRequest(client, context);
 
         Assert.False(GetJoinApproval().Approved);
+        AssertInformationMessage(
+            client,
+            "Unable to join the siege: your party is too far from the settlement.");
         AssertNotJoined(context);
     }
 
@@ -235,6 +252,9 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         SendJoinRequest(client, context);
 
         Assert.False(GetJoinApproval().Approved);
+        AssertInformationMessage(
+            client,
+            "Unable to join the siege: your party belongs to the defending faction.");
         AssertNotJoined(context);
     }
 
@@ -286,6 +306,8 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         Server.NetworkSentMessages.Clear();
         client.NetworkSentMessages.Clear();
+        foreach (var connectedClient in Clients)
+            connectedClient.InternalMessages.Clear();
         return new EntryContext(partyId, settlementId, townId);
     }
 
@@ -345,6 +367,18 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     private NetworkJoinSiegeCampApproved GetJoinApproval() =>
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkJoinSiegeCampApproved>());
+
+    private void AssertInformationMessage(
+        EnvironmentInstance client,
+        string expectedText)
+    {
+        var message = Assert.Single(
+            client.InternalMessages.GetMessages<SendInformationMessage>());
+        Assert.Equal(expectedText, message.Text);
+
+        foreach (var otherClient in Clients.Where(otherClient => otherClient != client))
+            Assert.Empty(otherClient.InternalMessages.GetMessages<SendInformationMessage>());
+    }
 
     private void AssertNoSiege(EntryContext context)
     {
