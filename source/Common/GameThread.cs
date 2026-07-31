@@ -22,7 +22,6 @@ public class GameThread : IUpdateable
         new Queue<(Action, EventWaitHandle, string, CancellationToken)>();
 
     private readonly object m_QueueLock = new object();
-    private object m_QueueTailBatch;
     private static readonly AsyncLocal<CancellationToken> m_AmbientCancellation =
         new AsyncLocal<CancellationToken>();
     private int m_GameLoopThreadId;
@@ -64,7 +63,7 @@ public class GameThread : IUpdateable
     /// call site needs to change. Off by default; toggle it at runtime on the process you want to
     /// profile (typically the client) with the <c>coop.debug.gamethread.instrument</c> console command.
     /// </summary>
-    public static bool Instrument { get; private set; }
+    public static bool Instrument = false;
 
     /// <summary>How often the drain summary is written to the log.</summary>
     private static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(1);
@@ -81,8 +80,6 @@ public class GameThread : IUpdateable
     private long m_WorstFrameTicks;
     private int m_WorstFrameActions;
     private int m_WorstBacklog;
-    private int m_WindowBatchItems;
-    private int m_WindowBatchRuns;
 
     private static double ToMs(long ticks) => 1000.0 * ticks / Stopwatch.Frequency;
 
@@ -106,7 +103,6 @@ public class GameThread : IUpdateable
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
-            m_QueueTailBatch = null;
         }
 
         if (!Instrument)
@@ -181,8 +177,7 @@ public class GameThread : IUpdateable
             Logger.Information(
                 "[GameThread] {Frames} frames | {Actions} actions ({Rate:0}/s) | drain {Drain:0.0}ms " +
                 "({PerFrame:0.00}ms/frame) | worst frame {Worst:0.0}ms/{WorstActions} actions | " +
-                "max backlog {Backlog} | batching {BatchItems} items -> {BatchRuns} runs " +
-                "({AvoidedRuns} avoided, {BatchReduction:0.0}% reduction, {ItemsPerBatch:0.0}/run) | top: {Top}",
+                "max backlog {Backlog} | top: {Top}",
                 m_WindowFrames,
                 m_WindowActions,
                 m_WindowActions / seconds,
@@ -191,30 +186,9 @@ public class GameThread : IUpdateable
                 ToMs(m_WorstFrameTicks),
                 m_WorstFrameActions,
                 m_WorstBacklog,
-                m_WindowBatchItems,
-                m_WindowBatchRuns,
-                Math.Max(0, m_WindowBatchItems - m_WindowBatchRuns),
-                m_WindowBatchItems == 0
-                    ? 0
-                    : 100.0 * (m_WindowBatchItems - m_WindowBatchRuns) / m_WindowBatchItems,
-                m_WindowBatchRuns == 0
-                    ? 0
-                    : (double)m_WindowBatchItems / m_WindowBatchRuns,
                 top);
         }
 
-        ResetInstrumentationWindow();
-    }
-
-    /// <summary>Changes instrumentation state and starts a fresh measurement window.</summary>
-    public static void SetInstrumentation(bool enabled)
-    {
-        Instrument = enabled;
-        Instance.ResetInstrumentationWindow();
-    }
-
-    private void ResetInstrumentationWindow()
-    {
         m_PerLabel.Clear();
         m_WindowFrames = 0;
         m_WindowActions = 0;
@@ -222,8 +196,6 @@ public class GameThread : IUpdateable
         m_WorstFrameTicks = 0;
         m_WorstFrameActions = 0;
         m_WorstBacklog = 0;
-        m_WindowBatchItems = 0;
-        m_WindowBatchRuns = 0;
         m_ReportTimer.Restart();
     }
 
@@ -276,7 +248,7 @@ public class GameThread : IUpdateable
             string resolved = label ?? BuildLabel(callerFile, callerMember);
             lock (Instance.m_QueueLock)
             {
-                Instance.EnqueueLocked((action, ewh, resolved, cancellation));
+                Instance.m_Queue.Enqueue((action, ewh, resolved, cancellation));
             }
 
             if (ewh == null) return;
@@ -337,60 +309,7 @@ public class GameThread : IUpdateable
         string label = context ?? BuildLabel(callerFile, callerMember);
         lock (Instance.m_QueueLock)
         {
-            Instance.EnqueueLocked((WrapSafe(action, context), null, label, cancellation));
-        }
-    }
-
-    /// <summary>
-    /// Runs one item on the game thread. Adjacent calls using the same action instance and cancellation
-    /// scope share one queue entry while every item is still applied in FIFO order. Any other queued
-    /// action starts a new batch. Canceling <paramref name="lifetime"/> discards its pending items.
-    /// </summary>
-    public static void RunSafeBatched<T>(
-        T item,
-        Action<T> action,
-        CancellationToken lifetime = default,
-        string context = null,
-        [CallerFilePath] string callerFile = null,
-        [CallerMemberName] string callerMember = null)
-    {
-        if (action == null)
-            throw new ArgumentNullException(nameof(action));
-
-        CancellationToken cancellation = m_AmbientCancellation.Value;
-        if (cancellation.IsCancellationRequested ||
-            lifetime.IsCancellationRequested) return;
-
-        if (Instance.IsGameThread)
-        {
-            InvokeSafe(action, item, context);
-            return;
-        }
-
-        lock (Instance.m_QueueLock)
-        {
-            if (cancellation.IsCancellationRequested ||
-                lifetime.IsCancellationRequested) return;
-
-            if (Instance.m_QueueTailBatch is QueuedBatch<T> batch &&
-                batch.TryAdd(action, cancellation, lifetime, item))
-            {
-                return;
-            }
-
-            if (cancellation.IsCancellationRequested ||
-                lifetime.IsCancellationRequested) return;
-
-            string label = context ?? BuildLabel(callerFile, callerMember);
-            batch = new QueuedBatch<T>(
-                action,
-                cancellation,
-                lifetime,
-                context,
-                item);
-            Instance.EnqueueLocked(
-                (batch.Run, null, label, cancellation),
-                batch);
+            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label, cancellation));
         }
     }
 
@@ -461,35 +380,6 @@ public class GameThread : IUpdateable
             Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
         }
     };
-
-    internal static void InvokeSafe<T>(Action<T> action, T item, string context)
-    {
-        try
-        {
-            action(item);
-        }
-        catch (Exception e)
-        {
-            Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
-        }
-    }
-
-    internal static void RecordBatchRun(int itemCount)
-    {
-        if (!Instrument) return;
-
-        Instance.m_WindowBatchItems += itemCount;
-        Instance.m_WindowBatchRuns++;
-    }
-
-    private void EnqueueLocked(
-        (Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task,
-        object tailBatch = null)
-    {
-        m_Queue.Enqueue(task);
-        // An ordinary queue entry is a FIFO barrier between adjacent batches.
-        m_QueueTailBatch = tailBatch;
-    }
 
     public void MarkGameThread()
     {

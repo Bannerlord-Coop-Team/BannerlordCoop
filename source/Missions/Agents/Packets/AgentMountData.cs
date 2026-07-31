@@ -1,4 +1,7 @@
 ﻿using ProtoBuf;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using System;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -51,10 +54,28 @@ namespace Missions.Agents.Packets
             {
                 string gaitActionName = AgentActionData.GetActionNameWithCode(MountAction0Index);
                 if (gaitActionName != null)
+                {
+#if DEBUG
+                    MissionActionDiagnostics.RecordMountActionCommand(
+                        MountAgentId,
+                        mountAgent,
+                        channel: 0,
+                        MountAction0Index,
+                        MountAction0Progress,
+                        (AnimFlags)MountAction0Flag);
+#endif
                     mountAgent.SetActionChannel(0, ActionIndexCache.Create(gaitActionName), additionalFlags: (AnimFlags)MountAction0Flag, startProgress: MountAction0Progress);
+                }
             }
             else
             {
+#if DEBUG
+                MissionActionDiagnostics.RecordMountProgressReplay(
+                    MountAgentId,
+                    mountAgent,
+                    channel: 0,
+                    MountAction0Progress);
+#endif
                 mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
             }
 
@@ -63,10 +84,28 @@ namespace Missions.Agents.Packets
             {
                 string mActionName2 = AgentActionData.GetActionNameWithCode(MountAction1Index);
                 if (mActionName2 != null)
+                {
+#if DEBUG
+                    MissionActionDiagnostics.RecordMountActionCommand(
+                        MountAgentId,
+                        mountAgent,
+                        channel: 1,
+                        MountAction1Index,
+                        MountAction1Progress,
+                        (AnimFlags)MountAction1Flag);
+#endif
                     mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (AnimFlags)MountAction1Flag, startProgress: MountAction1Progress);
+                }
             }
             else
             {
+#if DEBUG
+                MissionActionDiagnostics.RecordMountProgressReplay(
+                    MountAgentId,
+                    mountAgent,
+                    channel: 1,
+                    MountAction1Progress);
+#endif
                 mountAgent.SetCurrentActionProgress(1, MountAction1Progress);
             }
             mountAgent.LookDirection = MountLookDirection;

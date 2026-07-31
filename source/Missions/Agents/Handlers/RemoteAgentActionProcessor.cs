@@ -3,6 +3,9 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Packets;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using Missions.Messages;
 using Missions.Services.Network;
 using System;
@@ -16,6 +19,7 @@ namespace Missions.Agents.Handlers;
 public interface IRemoteAgentActionProcessor : IDisposable
 {
     int GetOutgoingBattleHostEpoch();
+    void ClearLocalAgentStates();
     void ClearForLocalAgent(Guid agentId, Agent agent);
     void ApplyRemoteGuardStates();
     void RefreshRemoteGuardStatesAfterMovement();
@@ -233,6 +237,15 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         return assignment.Epoch;
     }
 
+    public void ClearLocalAgentStates()
+    {
+        foreach (CoopAgentInfo info in agentRegistry.GetAgents(
+            controllerIdProvider.ControllerId))
+        {
+            ClearForLocalAgent(info.AgentId, info.Agent);
+        }
+    }
+
     public void ClearForLocalAgent(Guid agentId, Agent agent)
     {
         if (!_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
@@ -325,6 +338,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     continue;
                 }
 
+#if DEBUG
+                MissionActionDiagnostics.RecordRetainedGuardReplay(
+                    phase == RemoteGuardTickPhase.BeforeNativeTick
+                        ? "before-native"
+                        : phase == RemoteGuardTickPhase.AfterMovement
+                            ? "after-movement"
+                            : "after-native");
+#endif
                 if (guardState.MountedGuardRearm
                     != MountedGuardRearmPhase.None)
                 {
@@ -711,6 +732,12 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 action.Data,
                 guardActionChannel,
                 previousGuard);
+#if DEBUG
+        using (MissionActionDiagnostics.MeasureRemoteApply(
+                   agentId,
+                   action.Sequence))
+#endif
+        {
         action.Data.Apply(
             agent,
             agentVisualActionAccessor,
@@ -721,6 +748,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     == MountedGuardRearmPhase.NeutralInput
                 || mountedGuardRearm
                     == MountedGuardRearmPhase.NeutralInputObserved);
+        }
         bool retainsGuard = action.Data.DefendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(action.Data.GuardMode)
             || (hasMountedGuardPresentation
@@ -993,6 +1021,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             || nativeGuardStateMissing;
         if (shouldApplyGuardCommand)
         {
+#if DEBUG
+            MissionActionDiagnostics.RecordGuardCommand(
+                guardModeChanged);
+#endif
             bool forceGuardCommand =
                 mountChanged
                 || reacquiringGuard
@@ -1090,6 +1122,25 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
 
         // Only clear the action this retained guard owns; leave reactions and attacks alone.
+#if DEBUG
+        if (MissionActionDiagnostics.AnimationTraceEnabled)
+        {
+            Guid diagnosticAgentId =
+                agentRegistry.TryGetAgentInfo(
+                    agent,
+                    out CoopAgentInfo diagnosticInfo)
+                    ? diagnosticInfo.AgentId
+                    : Guid.Empty;
+            MissionActionDiagnostics.RecordExternalActionCommand(
+                diagnosticAgentId,
+                agent,
+                channel,
+                ActionIndexCache.act_none.Index,
+                startProgress: 0f,
+                AnimFlags.anf_restart,
+                "retained-guard-release");
+        }
+#endif
         agent.SetActionChannel(
             channel,
             ActionIndexCache.act_none,

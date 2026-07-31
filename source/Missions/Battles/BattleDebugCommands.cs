@@ -1,6 +1,9 @@
 ﻿using Common;
 using GameInterface;
 using GameInterface.Services.MapEvents;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +25,74 @@ internal static class BattleDebugCommands
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
     private static Mission observedMission;
     private static Camera ladderCamera;
+
+#if DEBUG
+    [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
+    public static string ActionPerformance(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.battle.action_performance " +
+                   "<start|snapshot|stop|status>";
+        }
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "start":
+                MissionActionDiagnostics.StartPerformance();
+                return "Action performance instrumentation is ON.";
+            case "snapshot":
+                return "ACTION_PERFORMANCE " +
+                       MissionActionDiagnostics.SnapshotPerformance(
+                           stop: false);
+            case "stop":
+                return "ACTION_PERFORMANCE " +
+                       MissionActionDiagnostics.SnapshotPerformance(
+                           stop: true);
+            case "status":
+                return "Action performance instrumentation is " +
+                       (MissionActionDiagnostics.PerformanceEnabled
+                           ? "ON."
+                           : "OFF.");
+            default:
+                return "Usage: coop.debug.battle.action_performance " +
+                       "<start|snapshot|stop|status>";
+        }
+    }
+
+    [CommandLineArgumentFunction("animation_trace", "coop.debug.battle")]
+    public static string AnimationTrace(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.battle.animation_trace " +
+                   "<start|snapshot|stop|status>";
+        }
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "start":
+                MissionActionDiagnostics.StartAnimationTrace();
+                return "Battle animation trace is ON.";
+            case "snapshot":
+                return "BATTLE_ANIMATION_TRACE " +
+                       MissionActionDiagnostics.SnapshotAnimationTrace(
+                           stop: false);
+            case "stop":
+                return "BATTLE_ANIMATION_TRACE " +
+                       MissionActionDiagnostics.SnapshotAnimationTrace(
+                           stop: true);
+            case "status":
+                return "Battle animation trace is " +
+                       (MissionActionDiagnostics.AnimationTraceEnabled
+                           ? "ON."
+                           : "OFF.");
+            default:
+                return "Usage: coop.debug.battle.animation_trace " +
+                       "<start|snapshot|stop|status>";
+        }
+    }
+#endif
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
     public static string State(List<string> args)

@@ -1,7 +1,5 @@
-﻿using System;
+using System;
 using System.Linq;
-using System.Threading;
-using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
@@ -178,62 +176,6 @@ public class MovementTrafficTests : MissionTestEnvironment
             Assert.Equal(movementIds.Count, sentAgents.Length);
             Assert.Equal(sentAgents.Length, sentAgents.Distinct().Count());
             Assert.All(movementIds, id => Assert.Contains(id, sentAgents));
-        });
-    }
-
-    [Fact]
-    public void HandlePacket_CoalescesAdjacentReceivesWithoutDroppingUpdates()
-    {
-        using var fixture = new MissionEngineFixture();
-        var peer = Clients.First();
-        SetControllerId(peer, "peer");
-
-        peer.Call(() =>
-        {
-            var mock = fixture.CreateMission(peer);
-            var registry = peer.Resolve<INetworkAgentRegistry>();
-            var component = peer.Resolve<ICoopMissionComponent>();
-            Guid puppetId = Guid.NewGuid();
-            Agent puppet = SpawnRider(mock);
-            Agent source = SpawnRider(mock);
-            Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
-            Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
-            Assert.True(registry.TryRegisterAgent("owner", puppetId, puppet));
-
-            GameThread.Instance.Update(TimeSpan.Zero);
-            int initialMovementFlagCalls = puppetMirror.SetMovementFlagsCalls;
-            const int packetCount = 134;
-            var packets = new MovementPacket[packetCount];
-            for (int i = 0; i < packets.Length; i++)
-            {
-                sourceMirror.MovementFlags = i % 2 == 0
-                    ? Agent.MovementControlFlag.Forward
-                    : Agent.MovementControlFlag.Backward;
-                sourceMirror.MovementDirection = new Vec2(i, -i);
-                packets[i] = new MovementPacket(
-                    new[] { puppetId },
-                    new[] { new AgentData(source) });
-            }
-
-            RunOffGameThread(() =>
-            {
-                foreach (MovementPacket packet in packets)
-                    component.AgentMovementHandler.HandlePacket(null, packet);
-            });
-
-            Assert.Equal(1, GameThread.Instance.QueueLength);
-            GameThread.Instance.Update(TimeSpan.Zero);
-
-            Assert.Equal(
-                packets.Length,
-                puppetMirror.SetMovementFlagsCalls - initialMovementFlagCalls);
-            Assert.Equal(
-                Agent.MovementControlFlag.Backward,
-                puppetMirror.MovementFlags & Agent.MovementControlFlag.MoveMask);
-            int finalPacketIndex = packetCount - 1;
-            Assert.Equal(
-                new Vec2(finalPacketIndex, -finalPacketIndex),
-                puppetMirror.MovementDirection);
         });
     }
 
@@ -937,27 +879,6 @@ public class MovementTrafficTests : MissionTestEnvironment
         for (int i = 0; i < characters.Length; i++)
             characters[i] = (char)('!' + (Next(ref state) % 94));
         return new string(characters);
-    }
-
-    private static void RunOffGameThread(Action action)
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception e)
-            {
-                failure = e;
-            }
-        });
-        thread.Start();
-        thread.Join();
-
-        if (failure != null)
-            throw failure;
     }
 
     private sealed class CountingMovementPacketCompressor : IMovementPacketCompressor

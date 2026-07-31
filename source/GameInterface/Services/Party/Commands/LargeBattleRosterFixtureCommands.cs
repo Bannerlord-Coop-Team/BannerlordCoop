@@ -38,24 +38,42 @@ internal static class LargeBattleRosterFixtureCommands
     {
         if (!ModInformation.IsServer)
             return "Run this command on the server.";
-        if (args.Count != 3 ||
-            !int.TryParse(args[2], out var addedPerParty) ||
-            addedPerParty < 1 ||
-            addedPerParty > 500)
+        if (args.Count != 3
+            || !int.TryParse(args[2], out int addedPerParty)
+            || addedPerParty < 1
+            || addedPerParty > 500)
+        {
             return "Usage: coop.debug.mobileparty.large_battle_roster_begin " +
                    "<firstPartyId> <secondPartyId> <troopsPerParty:1-500>";
+        }
         if (fixture != null)
             return "A large-battle roster fixture is already pending restoration.";
-        if (!TryGetObjectManager(out var objectManager))
+        if (!TryGetObjectManager(out IObjectManager objectManager))
             return "Unable to resolve ObjectManager.";
-        if (!TryResolveParty(objectManager, args[0], out var firstParty, out var firstError))
+        if (!TryResolveParty(
+                objectManager,
+                args[0],
+                out MobileParty firstParty,
+                out string firstError))
+        {
             return firstError;
-        if (!TryResolveParty(objectManager, args[1], out var secondParty, out var secondError))
+        }
+        if (!TryResolveParty(
+                objectManager,
+                args[1],
+                out MobileParty secondParty,
+                out string secondError))
+        {
             return secondError;
+        }
         if (firstParty == secondParty)
             return "The fixture requires two distinct parties.";
-        if (!objectManager.TryGetObject(FixtureTroopId, out CharacterObject fixtureTroop))
+        if (!objectManager.TryGetObject(
+                FixtureTroopId,
+                out CharacterObject fixtureTroop))
+        {
             return $"Unable to resolve fixture troop {FixtureTroopId}.";
+        }
 
         var activeFixture = new LargeBattleRosterFixture
         {
@@ -64,8 +82,12 @@ internal static class LargeBattleRosterFixtureCommands
         };
         fixture = activeFixture;
 
-        firstParty.MemberRoster.AddToCounts(fixtureTroop, addedPerParty);
-        secondParty.MemberRoster.AddToCounts(fixtureTroop, addedPerParty);
+        firstParty.MemberRoster.AddToCounts(
+            fixtureTroop,
+            addedPerParty);
+        secondParty.MemberRoster.AddToCounts(
+            fixtureTroop,
+            addedPerParty);
 
         return
             $"LARGE_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} addedPerParty={addedPerParty}\n" +
@@ -76,16 +98,33 @@ internal static class LargeBattleRosterFixtureCommands
     public static string Status(List<string> args)
     {
         if (args.Count != 2)
+        {
             return "Usage: coop.debug.mobileparty.large_battle_roster_status " +
                    "<firstPartyId> <secondPartyId>";
-        if (!TryGetObjectManager(out var objectManager))
+        }
+        if (!TryGetObjectManager(out IObjectManager objectManager))
             return "Unable to resolve ObjectManager.";
-        if (!TryResolveParty(objectManager, args[0], out var firstParty, out var firstError))
+        if (!TryResolveParty(
+                objectManager,
+                args[0],
+                out MobileParty firstParty,
+                out string firstError))
+        {
             return firstError;
-        if (!TryResolveParty(objectManager, args[1], out var secondParty, out var secondError))
+        }
+        if (!TryResolveParty(
+                objectManager,
+                args[1],
+                out MobileParty secondParty,
+                out string secondError))
+        {
             return secondError;
+        }
 
-        return FormatState(fixture == null ? "none" : "active", firstParty, secondParty);
+        return FormatState(
+            fixture == null ? "none" : "active",
+            firstParty,
+            secondParty);
     }
 
     [CommandLineArgumentFunction("large_battle_roster_restore", "coop.debug.mobileparty")]
@@ -98,14 +137,16 @@ internal static class LargeBattleRosterFixtureCommands
         if (fixture == null)
             return "No large-battle roster fixture is pending restoration.";
 
-        var activeFixture = fixture;
+        LargeBattleRosterFixture activeFixture = fixture;
         Restore(activeFixture.FirstParty);
         Restore(activeFixture.SecondParty);
 
-        string firstFingerprint = Fingerprint(activeFixture.FirstParty.Party.MemberRoster);
-        string secondFingerprint = Fingerprint(activeFixture.SecondParty.Party.MemberRoster);
-        if (firstFingerprint != activeFixture.FirstParty.Fingerprint ||
-            secondFingerprint != activeFixture.SecondParty.Fingerprint)
+        string firstFingerprint = Fingerprint(
+            activeFixture.FirstParty.Party.MemberRoster);
+        string secondFingerprint = Fingerprint(
+            activeFixture.SecondParty.Party.MemberRoster);
+        if (firstFingerprint != activeFixture.FirstParty.Fingerprint
+            || secondFingerprint != activeFixture.SecondParty.Fingerprint)
         {
             return "Large-battle roster restoration did not reproduce the original fingerprints.\n" +
                    FormatState(
@@ -123,10 +164,13 @@ internal static class LargeBattleRosterFixtureCommands
                 activeFixture.SecondParty.Party);
     }
 
-    private static bool TryGetObjectManager(out IObjectManager objectManager)
+    private static bool TryGetObjectManager(
+        out IObjectManager objectManager)
     {
         objectManager = null;
-        if (!ContainerProvider.TryGetContainer(out var container)) return false;
+        if (!ContainerProvider.TryGetContainer(
+                out ILifetimeScope container))
+            return false;
 
         return container.TryResolve(out objectManager);
     }
@@ -137,8 +181,8 @@ internal static class LargeBattleRosterFixtureCommands
         out MobileParty party,
         out string error)
     {
-        if (objectManager.TryGetObject(id, out party) ||
-            CommandHelpers.TryGetMobileParty(id, out party, out _))
+        if (objectManager.TryGetObject(id, out party)
+            || CommandHelpers.TryGetMobileParty(id, out party, out _))
         {
             error = null;
             return true;
@@ -148,12 +192,15 @@ internal static class LargeBattleRosterFixtureCommands
         return false;
     }
 
-    private static PartySnapshot Capture(MobileParty party) => new PartySnapshot
+    private static PartySnapshot Capture(MobileParty party)
     {
-        Party = party,
-        MemberRoster = CopyRoster(party.MemberRoster),
-        Fingerprint = Fingerprint(party.MemberRoster),
-    };
+        return new PartySnapshot
+        {
+            Party = party,
+            MemberRoster = CopyRoster(party.MemberRoster),
+            Fingerprint = Fingerprint(party.MemberRoster),
+        };
+    }
 
     private static TroopRosterElement[] CopyRoster(TroopRoster roster)
     {
@@ -166,10 +213,11 @@ internal static class LargeBattleRosterFixtureCommands
 
     private static void Restore(PartySnapshot snapshot)
     {
-        var roster = snapshot.Party.MemberRoster;
+        TroopRoster roster = snapshot.Party.MemberRoster;
         for (int index = roster.Count - 1; index >= 0; index--)
         {
-            TroopRosterElement element = roster.GetElementCopyAtIndex(index);
+            TroopRosterElement element =
+                roster.GetElementCopyAtIndex(index);
             roster.AddToCountsAtIndex(
                 index,
                 -element.Number,
@@ -197,20 +245,24 @@ internal static class LargeBattleRosterFixtureCommands
         MobileParty secondParty)
     {
         var output = new StringBuilder();
-        output.AppendLine($"LARGE_BATTLE_ROSTER_FIXTURE state={state}");
+        output.AppendLine(
+            $"LARGE_BATTLE_ROSTER_FIXTURE state={state}");
         AppendPartyState(output, firstParty);
         AppendPartyState(output, secondParty);
         return output.ToString().TrimEnd();
     }
 
-    private static void AppendPartyState(StringBuilder output, MobileParty party)
+    private static void AppendPartyState(
+        StringBuilder output,
+        MobileParty party)
     {
         TroopRoster roster = party.MemberRoster;
         int total = 0;
         int wounded = 0;
         for (int index = 0; index < roster.Count; index++)
         {
-            TroopRosterElement element = roster.GetElementCopyAtIndex(index);
+            TroopRosterElement element =
+                roster.GetElementCopyAtIndex(index);
             total += element.Number;
             wounded += element.WoundedNumber;
         }
@@ -228,7 +280,9 @@ internal static class LargeBattleRosterFixtureCommands
             elements.Add(roster.GetElementCopyAtIndex(index));
 
         foreach (TroopRosterElement element in elements
-                     .OrderBy(value => value.Character.StringId, StringComparer.Ordinal))
+                     .OrderBy(
+                         value => value.Character.StringId,
+                         StringComparer.Ordinal))
         {
             content.Append(element.Character.StringId);
             content.Append('|');
@@ -242,7 +296,8 @@ internal static class LargeBattleRosterFixtureCommands
 
         using (SHA256 sha256 = SHA256.Create())
         {
-            byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(content.ToString()));
+            byte[] hash = sha256.ComputeHash(
+                Encoding.UTF8.GetBytes(content.ToString()));
             var result = new StringBuilder(hash.Length * 2);
             foreach (byte value in hash)
                 result.Append(value.ToString("x2"));

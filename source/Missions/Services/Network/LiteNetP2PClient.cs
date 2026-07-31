@@ -9,6 +9,10 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Services.Entity;
 using LiteNetLib;
+#if DEBUG
+using Missions.Agents.Packets;
+using Missions.Diagnostics;
+#endif
 using Missions.Messages;
 using Serilog;
 using System;
@@ -798,7 +802,18 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             if (!mappedPeerControllers.ContainsKey(peer)) return;
         }
 
+#if DEBUG
+        byte[] serializedPacket = reader.GetRemainingBytes();
+        var packet = serializer.Deserialize<IPacket>(serializedPacket);
+        if (packet is AgentActionPacket actionPacket)
+        {
+            MissionActionDiagnostics.RecordActionPacketReceived(
+                actionPacket,
+                serializedPacket.Length);
+        }
+#else
         var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
+#endif
         packetManager.HandleReceive(peer, packet);
     }
 }
