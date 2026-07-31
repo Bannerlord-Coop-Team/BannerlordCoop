@@ -74,6 +74,7 @@ internal sealed class QueuedBatch<T>
                 items.Clear();
             }
 
+            GameThread.RecordBatchRun(snapshot.Length);
             foreach (T item in snapshot)
             {
                 if (cancellation.IsCancellationRequested ||

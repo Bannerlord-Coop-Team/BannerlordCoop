@@ -27,15 +27,15 @@ public class GameThreadDebugCommand
             case "on":
             case "true":
             case "1":
-                GameThread.Instrument = true;
+                GameThread.SetInstrumentation(true);
                 break;
             case "off":
             case "false":
             case "0":
-                GameThread.Instrument = false;
+                GameThread.SetInstrumentation(false);
                 break;
             case "toggle":
-                GameThread.Instrument = !GameThread.Instrument;
+                GameThread.SetInstrumentation(!GameThread.Instrument);
                 break;
             case "status":
                 break;
@@ -44,7 +44,7 @@ public class GameThreadDebugCommand
         }
 
         return $"GameThread drain instrumentation is {(GameThread.Instrument ? "ON" : "OFF")}. " +
-               "When ON, a per-second [GameThread] summary (drain ms, worst frame, backlog, top handlers) is written to the log.";
+               "When ON, a per-second [GameThread] summary (drain ms, worst frame, backlog, batching, top handlers) is written to the log.";
     }
 
     [CommandLineArgumentFunction("stall", "coop.debug.gamethread")]

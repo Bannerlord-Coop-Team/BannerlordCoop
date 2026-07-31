@@ -64,7 +64,7 @@ public class GameThread : IUpdateable
     /// call site needs to change. Off by default; toggle it at runtime on the process you want to
     /// profile (typically the client) with the <c>coop.debug.gamethread.instrument</c> console command.
     /// </summary>
-    public static bool Instrument = false;
+    public static bool Instrument { get; private set; }
 
     /// <summary>How often the drain summary is written to the log.</summary>
     private static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(1);
@@ -81,6 +81,8 @@ public class GameThread : IUpdateable
     private long m_WorstFrameTicks;
     private int m_WorstFrameActions;
     private int m_WorstBacklog;
+    private int m_WindowBatchItems;
+    private int m_WindowBatchRuns;
 
     private static double ToMs(long ticks) => 1000.0 * ticks / Stopwatch.Frequency;
 
@@ -179,7 +181,8 @@ public class GameThread : IUpdateable
             Logger.Information(
                 "[GameThread] {Frames} frames | {Actions} actions ({Rate:0}/s) | drain {Drain:0.0}ms " +
                 "({PerFrame:0.00}ms/frame) | worst frame {Worst:0.0}ms/{WorstActions} actions | " +
-                "max backlog {Backlog} | top: {Top}",
+                "max backlog {Backlog} | batching {BatchItems} items -> {BatchRuns} runs " +
+                "({AvoidedRuns} avoided, {BatchReduction:0.0}% reduction, {ItemsPerBatch:0.0}/run) | top: {Top}",
                 m_WindowFrames,
                 m_WindowActions,
                 m_WindowActions / seconds,
@@ -188,9 +191,30 @@ public class GameThread : IUpdateable
                 ToMs(m_WorstFrameTicks),
                 m_WorstFrameActions,
                 m_WorstBacklog,
+                m_WindowBatchItems,
+                m_WindowBatchRuns,
+                Math.Max(0, m_WindowBatchItems - m_WindowBatchRuns),
+                m_WindowBatchItems == 0
+                    ? 0
+                    : 100.0 * (m_WindowBatchItems - m_WindowBatchRuns) / m_WindowBatchItems,
+                m_WindowBatchRuns == 0
+                    ? 0
+                    : (double)m_WindowBatchItems / m_WindowBatchRuns,
                 top);
         }
 
+        ResetInstrumentationWindow();
+    }
+
+    /// <summary>Changes instrumentation state and starts a fresh measurement window.</summary>
+    public static void SetInstrumentation(bool enabled)
+    {
+        Instrument = enabled;
+        Instance.ResetInstrumentationWindow();
+    }
+
+    private void ResetInstrumentationWindow()
+    {
         m_PerLabel.Clear();
         m_WindowFrames = 0;
         m_WindowActions = 0;
@@ -198,6 +222,8 @@ public class GameThread : IUpdateable
         m_WorstFrameTicks = 0;
         m_WorstFrameActions = 0;
         m_WorstBacklog = 0;
+        m_WindowBatchItems = 0;
+        m_WindowBatchRuns = 0;
         m_ReportTimer.Restart();
     }
 
@@ -446,6 +472,14 @@ public class GameThread : IUpdateable
         {
             Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
         }
+    }
+
+    internal static void RecordBatchRun(int itemCount)
+    {
+        if (!Instrument) return;
+
+        Instance.m_WindowBatchItems += itemCount;
+        Instance.m_WindowBatchRuns++;
     }
 
     private void EnqueueLocked(
