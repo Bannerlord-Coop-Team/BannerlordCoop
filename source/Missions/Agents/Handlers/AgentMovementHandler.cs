@@ -252,7 +252,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                 int turnDirection = EnsureStationaryMountTurnAnimation(
                     agent,
                     out int turnActionIndex,
-                    out float turnProgress);
+                    out float turnProgress,
+                    out bool syntheticTurn);
                 AddToBatch(
                     mountGroups,
                     ref legacyMountMovement,
@@ -267,7 +268,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                             : turnActionIndex,
                         mountAction0TurnProgress: turnDirection == AgentMountData.NoTurn
                             ? (float?)null
-                            : turnProgress));
+                            : turnProgress,
+                        mountAction0IsSyntheticTurn: syntheticTurn));
             }
             else
             {
@@ -281,7 +283,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                 int turnDirection = EnsureStationaryMountTurnAnimation(
                     mount,
                     out int turnActionIndex,
-                    out float turnProgress);
+                    out float turnProgress,
+                    out bool syntheticTurn);
                 AddToBatch(
                     movementGroups,
                     ref legacyMovement,
@@ -293,7 +296,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                         mountAgentId,
                         turnDirection == AgentMountData.NoTurn ? (int?)null : turnDirection,
                         turnDirection == AgentMountData.NoTurn ? (int?)null : turnActionIndex,
-                        turnDirection == AgentMountData.NoTurn ? (float?)null : turnProgress));
+                        turnDirection == AgentMountData.NoTurn ? (float?)null : turnProgress,
+                        mountAction0IsSyntheticTurn: syntheticTurn));
 
                 var equipment = new AgentEquipmentData(agent);
                 if (!lastEquipment.TryGetValue(agentInfo.AgentId, out var previousEquipment))
@@ -429,10 +433,12 @@ public class AgentMovementHandler : IAgentMovementHandler
     private int EnsureStationaryMountTurnAnimation(
         Agent mount,
         out int turnActionIndex,
-        out float turnProgress)
+        out float turnProgress,
+        out bool syntheticTurn)
     {
         turnActionIndex = AgentMountData.NoActionIndex;
         turnProgress = 0f;
+        syntheticTurn = false;
         if (mount == null || !mount.IsActive()) return AgentMountData.NoTurn;
 
         Vec2 currentDirection = mount.GetMovementDirection();
@@ -458,19 +464,20 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         int activeTurnDirection = AgentMountData.GetStationaryTurnDirection(
             currentAction.Index);
-        if (activeTurnDirection != AgentMountData.NoTurn)
-        {
-            ClearSyntheticMountTurn(mount);
-            _lastMountDirections[mount] = currentDirection;
-            turnActionIndex = currentAction.Index;
-            turnProgress = mount.GetCurrentActionProgress(0);
-            return activeTurnDirection;
-        }
-
         if (_syntheticMountTurns.TryGetValue(
                 mount,
                 out SyntheticMountTurnState activeSyntheticTurn))
         {
+            if (activeTurnDirection != AgentMountData.NoTurn
+                && currentAction.Index != activeSyntheticTurn.ActionIndex)
+            {
+                ClearSyntheticMountTurn(mount);
+                _lastMountDirections[mount] = currentDirection;
+                turnActionIndex = currentAction.Index;
+                turnProgress = mount.GetCurrentActionProgress(0);
+                return activeTurnDirection;
+            }
+
             if (!ReferenceEquals(
                     activeSyntheticTurn.Rider,
                     mount.RiderAgent))
@@ -502,7 +509,16 @@ public class AgentMovementHandler : IAgentMovementHandler
                 activeSyntheticTurn.Direction);
             turnActionIndex = activeSyntheticTurn.ActionIndex;
             turnProgress = activeSyntheticTurn.Progress;
+            syntheticTurn = true;
             return activeSyntheticTurn.Direction;
+        }
+
+        if (activeTurnDirection != AgentMountData.NoTurn)
+        {
+            _lastMountDirections[mount] = currentDirection;
+            turnActionIndex = currentAction.Index;
+            turnProgress = mount.GetCurrentActionProgress(0);
+            return activeTurnDirection;
         }
 
         if (!hasPreviousDirection)
@@ -526,6 +542,7 @@ public class AgentMovementHandler : IAgentMovementHandler
             turnDirection,
             desiredAction.Index);
         _lastMountDirections[mount] = currentDirection;
+        syntheticTurn = true;
         return turnDirection;
     }
 

@@ -34,7 +34,8 @@ namespace Missions.Agents.Packets
             System.Guid mountAgentId = default,
             int? mountAction0TurnDirection = null,
             int? mountAction0TurnActionIndex = null,
-            float? mountAction0TurnProgress = null)
+            float? mountAction0TurnProgress = null,
+            bool? mountAction0IsSyntheticTurn = null)
         {
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
@@ -58,7 +59,8 @@ namespace Missions.Agents.Packets
                     mountAgentId,
                     mountAction0TurnDirection: mountAction0TurnDirection,
                     mountAction0TurnActionIndex: mountAction0TurnActionIndex,
-                    mountAction0TurnProgress: mountAction0TurnProgress);
+                    mountAction0TurnProgress: mountAction0TurnProgress,
+                    mountAction0IsSyntheticTurn: mountAction0IsSyntheticTurn);
             }
             else
             {

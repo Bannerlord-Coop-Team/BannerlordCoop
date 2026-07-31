@@ -31,15 +31,18 @@ namespace Missions.Agents.Packets
             bool? mountAction0IsLocomotion = null,
             int? mountAction0TurnDirection = null,
             int? mountAction0TurnActionIndex = null,
-            float? mountAction0TurnProgress = null)
+            float? mountAction0TurnProgress = null,
+            bool? mountAction0IsSyntheticTurn = null)
         {
             MountInputVector = mountAgent.MovementInputVector;
             MountAction0Index = mountAgent.GetCurrentAction(0).Index;
             bool syntheticStationaryTurn =
-                mountAction0TurnDirection.HasValue
-                && mountAction0TurnDirection.Value != NoTurn
-                && mountAction0TurnActionIndex.HasValue
-                && MountAction0Index != mountAction0TurnActionIndex.Value;
+                mountAction0IsSyntheticTurn
+                ?? (mountAction0TurnDirection.HasValue
+                    && mountAction0TurnDirection.Value != NoTurn
+                    && mountAction0TurnActionIndex.HasValue
+                    && MountAction0Index != mountAction0TurnActionIndex.Value);
+            MountAction0IsSyntheticTurn = syntheticStationaryTurn;
             MountAction0Flag = syntheticStationaryTurn
                 ? 0UL
                 : (ulong)mountAgent.GetCurrentAnimationFlag(0);
@@ -98,7 +101,7 @@ namespace Missions.Agents.Packets
                 MountAction0TurnDirection,
                 MountAction0TurnActionIndex);
             bool syntheticStationaryTurn = stationaryTurn
-                && MountAction0Index != desiredAction0Index;
+                && MountAction0IsSyntheticTurn;
             ActionIndexCache currentAction0 = mountAgent.GetCurrentAction(0);
             bool nativeTurnFlagsChanged = stationaryTurn
                 && !syntheticStationaryTurn
@@ -469,5 +472,8 @@ namespace Missions.Agents.Packets
         /// <summary>The native movement action for the owner's mount type and stationary turn direction.</summary>
         [ProtoMember(19)]
         public int MountAction0TurnActionIndex { get; }
+        /// <summary>Whether channel zero is being driven through the bounded synthetic turn timeline.</summary>
+        [ProtoMember(20)]
+        public bool MountAction0IsSyntheticTurn { get; }
     }
 }

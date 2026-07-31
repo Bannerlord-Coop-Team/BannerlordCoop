@@ -670,6 +670,128 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_KeepsTheSyntheticTurnWhenNativeRealizesTheMatchingAction()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var riderId = Guid.NewGuid();
+            var horseId = Guid.NewGuid();
+
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount(rider);
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            horseMirror.HasVisualSkeleton = true;
+            horseMirror.SkeletonAction0Index = 101;
+            horseMirror.MovementDirection = Vec2.Forward;
+            horseMirror.RealGlobalVelocity = new Vec3(1f, 0f, 0f);
+            horseMirror.Action0Index = 101;
+            Assert.True(registry.TryRegisterAgent("peer", riderId, rider));
+            Assert.True(registry.TryRegisterAgent("peer", horseId, horse));
+
+            component.AgentMovementHandler.PollMovement(0f);
+            horseMirror.MovementDirection = new Vec2(-1f, 0f);
+            horseMirror.RealGlobalVelocity = Vec3.Zero;
+            component.AgentMovementHandler.PollMovement(0.025f);
+            component.AgentMovementHandler
+                .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
+            int turnActionIndex =
+                ActionIndexCache.Create("act_horse_turn_left").Index;
+            horseMirror.Action0Index = turnActionIndex;
+            network.NetworkSentPackets.Packets.Clear();
+
+            component.AgentMovementHandler.PollMovement(0.025f);
+            component.AgentMovementHandler
+                .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
+            AgentMountData realizedMount = Assert.Single(
+                    network.NetworkSentPackets.GetPackets<MovementPacket>())
+                .Agents
+                .Single()
+                .MountData;
+            Assert.Equal(
+                AgentMountData.TurnLeft,
+                realizedMount.MountAction0TurnDirection);
+            Assert.Equal(turnActionIndex, realizedMount.MountAction0TurnActionIndex);
+            Assert.Equal(0.0125f, realizedMount.MountAction0Progress, precision: 4);
+            Assert.Equal(
+                Agent.MovementControlFlag.TurnLeft,
+                horseMirror.MovementFlags);
+            Assert.Equal(turnActionIndex, horseMirror.SkeletonAction0Index);
+            Assert.Equal(0.0125f, horseMirror.RawVisualAction0Progress, precision: 4);
+            Assert.Equal(1, horseMirror.InstallAgentVisualActionCalls);
+
+            horseMirror.Action0Index = -1;
+            network.NetworkSentPackets.Packets.Clear();
+            component.AgentMovementHandler.PollMovement(0.025f);
+            component.AgentMovementHandler
+                .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
+            AgentMountData replayedMount = Assert.Single(
+                    network.NetworkSentPackets.GetPackets<MovementPacket>())
+                .Agents
+                .Single()
+                .MountData;
+            Assert.Equal(
+                AgentMountData.TurnLeft,
+                replayedMount.MountAction0TurnDirection);
+            Assert.Equal(0.025f, replayedMount.MountAction0Progress, precision: 4);
+            Assert.Equal(turnActionIndex, horseMirror.SkeletonAction0Index);
+            Assert.Equal(0.025f, horseMirror.RawVisualAction0Progress, precision: 4);
+            Assert.Equal(1, horseMirror.InstallAgentVisualActionCalls);
+
+            const int wireTurnActionIndex = 902;
+            horseMirror.Action0Index = wireTurnActionIndex;
+            puppetHorseMirror.Action0Index = 101;
+            AgentMountData receivedRealizedMount =
+                ProtoBuf.Serializer.DeepClone(
+                    new AgentMountData(
+                        horse,
+                        mountAction0TurnDirection: AgentMountData.TurnLeft,
+                        mountAction0TurnActionIndex: wireTurnActionIndex,
+                        mountAction0TurnProgress: 0.0125f,
+                        mountAction0IsSyntheticTurn: true));
+            Assert.True(receivedRealizedMount.MountAction0IsSyntheticTurn);
+            Assert.Equal(
+                0.0125f,
+                receivedRealizedMount.MountAction0Progress,
+                precision: 4);
+            receivedRealizedMount.ApplyMount(puppetHorse);
+            Assert.Equal(1, puppetHorseMirror.SetActionChannelCalls);
+            Assert.Equal(wireTurnActionIndex, puppetHorseMirror.Action0Index);
+            puppetHorseMirror.Action0Progress = 0.0125f;
+            puppetHorseMirror.Action0Flags = AnimFlags.anf_cyclic;
+
+            AgentMountData receivedReplayedMount =
+                ProtoBuf.Serializer.DeepClone(
+                    new AgentMountData(
+                        horse,
+                        mountAction0TurnDirection: AgentMountData.TurnLeft,
+                        mountAction0TurnActionIndex: wireTurnActionIndex,
+                        mountAction0TurnProgress: 0.025f,
+                        mountAction0IsSyntheticTurn: true));
+            Assert.True(receivedReplayedMount.MountAction0IsSyntheticTurn);
+            Assert.Equal(
+                0.025f,
+                receivedReplayedMount.MountAction0Progress,
+                precision: 4);
+            receivedReplayedMount.ApplyMount(puppetHorse);
+            Assert.Equal(1, puppetHorseMirror.SetActionChannelCalls);
+            Assert.Equal(0.025f, puppetHorseMirror.Action0Progress, precision: 4);
+        });
+    }
+
+    [Fact]
     public void PollMovement_DrivesARiddenStationaryTurnForAFullStableWindow()
     {
         using var fixture = new MissionEngineFixture();
