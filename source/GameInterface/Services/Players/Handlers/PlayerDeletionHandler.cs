@@ -2,7 +2,6 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Messages;
 using LiteNetLib;
@@ -127,10 +126,10 @@ internal class PlayerDeletionHandler : IHandler
 
         playerManager.RemovePlayer(player);
 
-        // The other clients drop their player registration and mark the hero dead off this
-        // message. It must go out BEFORE the destroy below replicates: DestroyPartyActionPatch
-        // blocks destroys of registered player parties on every peer, and both messages ride the
-        // same ordered stream.
+        // The other clients drop their player registration off this message. It must go out
+        // BEFORE the kill/destroy below replicate: DestroyPartyActionPatch blocks destroys of
+        // registered player parties on every peer, and all these messages ride the same ordered
+        // stream.
         network.SendAllBut(peer, new NetworkPlayerRemoved(player.ControllerId, player.HeroId));
 
         // Kick the requester before applying the world changes so the resulting broadcasts skip
@@ -139,11 +138,12 @@ internal class PlayerDeletionHandler : IHandler
         // no longer include it.
         peer.Disconnect();
 
-        // Patches stay live for both actions: the kill is server-only (clan cascades broadcast
-        // via their own patched actions; the state flip itself is applied on clients by the
-        // removal broadcast above), and the party destroy's prefix broadcasts the destruction to
-        // the remaining clients. Kill first so the hero leaves the party through the native death
-        // flow, then destroy whatever party is left, mirroring vanilla's defeat teardown order.
+        // Patches stay live for both actions so the server-side apply is what replicates: the
+        // kill is server-only and its state flip broadcasts through the hero field sync (clan
+        // cascades via their own patched actions), and the party destroy's prefix broadcasts the
+        // destruction to the remaining clients. Kill first so the hero leaves the party through
+        // the native death flow, then destroy whatever party is left, mirroring vanilla's defeat
+        // teardown order.
         if (hero != null && hero.IsAlive)
         {
             // (showNotification: false, isForced: true) — forced skips the can-die model checks,
@@ -159,10 +159,10 @@ internal class PlayerDeletionHandler : IHandler
 
     /// <summary>
     /// Client: the server deleted a player — drop it from the local registry so the follow-up
-    /// party destroy replication applies, and mark its hero dead locally. The local death is
-    /// needed because the server's kill flips the hero state through
-    /// <see cref="Hero.ChangeState(Hero.CharacterStates)"/>, a direct field store no hero sync
-    /// replicates (the death day and death mark replicate on their own).
+    /// kill/destroy replication applies. The world-side changes themselves arrive through the
+    /// normal sync flows (the hero state via the hero field sync, the party via the destroy
+    /// broadcast); this message only carries the session-level registration, which no game-state
+    /// sync can.
     /// </summary>
     private void Handle_NetworkPlayerRemoved(MessagePayload<NetworkPlayerRemoved> payload)
     {
@@ -171,26 +171,15 @@ internal class PlayerDeletionHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (playerManager.TryGetPlayer(data.ControllerId, out var player))
-            {
-                playerManager.RemovePlayer(player);
-                Logger.Information("Player {ControllerId} (hero {HeroId}) was deleted by the server",
-                    data.ControllerId, data.HeroId);
-            }
-            else
+            if (!playerManager.TryGetPlayer(data.ControllerId, out var player))
             {
                 Logger.Debug("Deleted player {ControllerId} was not registered on this client", data.ControllerId);
+                return;
             }
 
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var hero) && hero.IsAlive)
-            {
-                // ChangeState runs the native bookkeeping (clan + campaign object manager lists);
-                // the kill's cascades happened on the server and replicate via their own syncs.
-                using (new AllowedThread())
-                {
-                    hero.ChangeState(Hero.CharacterStates.Dead);
-                }
-            }
+            playerManager.RemovePlayer(player);
+            Logger.Information("Player {ControllerId} (hero {HeroId}) was deleted by the server",
+                data.ControllerId, data.HeroId);
         }, context: nameof(PlayerDeletionHandler));
     }
 
