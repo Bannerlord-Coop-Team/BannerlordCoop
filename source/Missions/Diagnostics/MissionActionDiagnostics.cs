@@ -42,7 +42,7 @@ internal static class MissionActionDiagnostics
     private const int PreNative = 0;
     private const int PostNative = 1;
     private const int MovementChannel = 2;
-    private const int TraceAgentsPerMovementClass = 8;
+    private const int TraceAgentsPerMovementClass = 32;
     private const int MaximumTimelineEvents = 20000;
     private const int MaximumRewindSamples = 64;
     private const float ProgressTolerance = 0.02f;
