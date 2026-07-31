@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using Missions.Battles;
 using Missions.Messages;
 using Serilog;
 using System; 
@@ -43,6 +44,17 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
     }
 
+    public override void OnPreMissionTick(float dt)
+    {
+        base.OnPreMissionTick(dt);
+
+        // Agent ticking follows OnMissionTick and can replace the retained look before the next collision window.
+        // Restore the owner frame before its guard so native collision reads one coherent input.
+        coopMissionComponent.AgentMovementHandler.Interpolator
+            .ReplayLookDirections();
+        coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
+    }
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
@@ -58,12 +70,15 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // override it, so this runs for both battle and location missions.
         coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
 
+        // Continuous movement setters can replace defend input after the mission boundary. Restore the held
+        // flags without restarting the guard command so native animation keeps its own timeline.
+        coopMissionComponent.AgentActionHandler.RefreshRemoteGuardStatesAfterMovement();
+
         // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action
         // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
         // polled with movement.
         coopMissionComponent.AgentActionHandler.PollActions();
 
-        coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
         coopMissionComponent.AgentVoiceHandler.PollVoices();
         coopMissionComponent.MissileHandler.DrainPendingShots();
     }
@@ -72,8 +87,17 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         base.OnPreDisplayMissionTick(dt);
 
-        // This runs after the previous native agent tick and immediately before the display snapshot.
-        coopMissionComponent.AgentActionHandler.ReassertRemoteDefendStates(dt);
+        // Native Agent processing can rewrite a puppet's look after OnMissionTick replayed it.
+        // Restore only that display input here; movement setters can consume the active guard flags.
+        coopMissionComponent.AgentMovementHandler.Interpolator
+            .ReplayLookDirections();
+
+        // The prior native Agent tick can realize an action after OnMissionTick sampled its input.
+        // Diff again here so peers receive that exact action instead of retaining the earlier pose.
+        coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick();
+
+        // Keep short remote guard reactions visible for this frame without driving held guard actions.
+        coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
     }
 
     public virtual void Dispose()
@@ -121,6 +145,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.WeaponDropHandler.Dispose();
         coopMissionComponent.WeaponPickupHandler.Dispose();
         coopMissionComponent.ShieldDamageHandler.Dispose();
+        coopMissionComponent.CombatHitPresentationHandler.Dispose();
         coopMissionComponent.AgentDeathHandler.Dispose();
 
         OnLeaving();

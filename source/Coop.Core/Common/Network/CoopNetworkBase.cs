@@ -48,7 +48,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
         netManager = new NetManager(this)
         {
-            DisconnectTimeout = (int)configuration.ConnectionTimeout.TotalMilliseconds,
+            DisconnectTimeout = (int)configuration.DisconnectTimeout.TotalMilliseconds,
             // Two reliable lanes: 0 for the world-change stream, BulkChannel for large transfers.
             // Each channel has its own (small, fixed) reliable window, so a multi-MB transfer
             // saturating its own lane cannot head-of-line block world sync or be counted against

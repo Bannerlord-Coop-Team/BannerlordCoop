@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Network.Session;
 using System;
 using System.Threading;
@@ -67,8 +67,12 @@ public class SteamPublicLobbyAdvertiser : SteamLobbyAdvertiser
     }
 
     protected override bool ApplyAdditionalLobbyData(ulong targetLobbyId)
-        => lobbyApi.SetLobbyData(
-            targetLobbyId, LobbyDataCodec.VisibilityKey, LobbyDataCodec.EncodeVisibility(visibility));
+    {
+        return lobbyApi.SetLobbyData(
+            targetLobbyId,
+            LobbyDataCodec.VisibilityKey,
+            LobbyDataCodec.EncodeVisibility(visibility));
+    }
 
     protected override void OnLobbyUnavailable(SessionJoinInfo info)
     {

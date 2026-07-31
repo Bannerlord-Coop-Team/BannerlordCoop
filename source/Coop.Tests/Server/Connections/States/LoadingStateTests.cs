@@ -10,6 +10,7 @@ using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.MobileParties.Data;
 using LiteNetLib;
 using Moq;
@@ -132,7 +133,10 @@ namespace Coop.Tests.Server.Connections.States
                 .Setup(sender => sender.Send(playerPeer))
                 .Callback(() => serverComponent.TestNetwork.SendImmediate(
                     playerPeer,
-                    new NetworkJoinCampaignBaseline(123L, Array.Empty<MobilePartyJoinState>())));
+                    new NetworkJoinCampaignBaseline(
+                        123L,
+                        TimeControlEnum.Play_1x,
+                        Array.Empty<MobilePartyJoinState>())));
             StartReplay(state);
             var beforeAck = serverComponent.TestNetwork.GetPeerMessages(playerPeer).ToArray();
             Assert.Equal(
@@ -230,23 +234,32 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void FinalCatchUpPending_StartsWithFinalBaselineAndEndsWithCampaignEntry()
+        public void JoinCatchUpPending_StartsAfterReplayAndEndsWithCampaignEntry()
         {
             var state = connectionLogic.SetState<LoadingState>();
-            Assert.False(state.IsFinalCatchUpPending);
+            Assert.False(state.IsJoinCatchUpPending);
 
-            StartBaseline(state);
-            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
-            Assert.False(state.IsFinalCatchUpPending);
+            CampaignEntered(state);
+            Assert.False(state.IsJoinCatchUpPending);
+            DrainGameThread();
+            Assert.True(state.IsJoinCatchUpPending);
+
+            Signal(state, JoinSyncSignal.ReplayApplied);
+            Assert.True(state.IsJoinCatchUpPending);
+            DrainGameThread();
+
+            Signal(state, JoinSyncSignal.BaselineRequested);
+            Assert.True(state.IsJoinCatchUpPending);
+            DrainGameThread();
 
             SendAndDrain(state, JoinSyncSignal.BaselineApplied);
-            Assert.True(state.IsFinalCatchUpPending);
+            Assert.True(state.IsJoinCatchUpPending);
 
             SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
-            Assert.True(state.IsFinalCatchUpPending);
+            Assert.True(state.IsJoinCatchUpPending);
 
             SendAndDrain(state, JoinSyncSignal.CatchUpApplied);
-            Assert.False(state.IsFinalCatchUpPending);
+            Assert.False(state.IsJoinCatchUpPending);
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
 

@@ -57,7 +57,8 @@ internal class SaveGameHandler : IHandler
             current?.CaravansPlayerData ?? empty.CaravansPlayerData,
             current?.AlleyPlayerData ?? empty.AlleyPlayerData,
             current?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
-            current?.TradePlayerData ?? empty.TradePlayerData);
+            current?.TradePlayerData ?? empty.TradePlayerData,
+            current?.InventoryPlayerData ?? empty.InventoryPlayerData);
 
         coopSessionProvider.CoopSession = session;
 
@@ -78,7 +79,8 @@ internal class SaveGameHandler : IHandler
             loaded?.CaravansPlayerData ?? empty.CaravansPlayerData,
             loaded?.AlleyPlayerData ?? empty.AlleyPlayerData,
             loaded?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
-            loaded?.TradePlayerData ?? empty.TradePlayerData);
+            loaded?.TradePlayerData ?? empty.TradePlayerData,
+            loaded?.InventoryPlayerData ?? empty.InventoryPlayerData);
 
         coopSessionProvider.CoopSession = savedSession;
     }

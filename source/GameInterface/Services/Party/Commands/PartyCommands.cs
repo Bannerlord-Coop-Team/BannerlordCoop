@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Logging;
 using Common.Messaging;
@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using SandBox.GauntletUI;
 using Serilog;
 using System.Collections.Generic;
 using System.Globalization;
@@ -15,10 +16,13 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Party.Commands;
@@ -46,7 +50,7 @@ internal class PartyCommands
     /// dereferences a null PartyBelongedTo.
     /// </summary>
     private static List<Hero> FindHeroesWithParty(string name)
-        => Hero.AllAliveHeroes.Where(h => h.Name.ToString() == name && h.PartyBelongedTo != null).ToList();
+        => Hero.AllAliveHeroes.Where(h => h != null && h.Name?.ToString() == name && h.PartyBelongedTo != null).ToList();
 
     /// <summary>
     /// Finds a single alive hero with a party, for the cheats that target one party (the companion-preserve
@@ -160,36 +164,196 @@ internal class PartyCommands
         return $"Restored {party.StringId} to {party.Position.X:R},{party.Position.Y:R} in Hold mode.";
     }
 
+    [CommandLineArgumentFunction("move_to_settlement", "coop.debug.mobileparty")]
+    public static string MoveToSettlementCommand(List<string> strings)
+    {
+        if (!ModInformation.IsServer)
+            return "Command can only be run on the server.";
+
+        if (strings.Count != 2)
+            return "Usage: coop.debug.mobileparty.move_to_settlement <partyId> <settlementId>";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found";
+
+        if (!party.IsPlayerParty())
+            return $"Party {party.StringId} is not a player party.";
+
+        var settlement = Settlement.Find(strings[1]);
+        if (settlement == null)
+            return $"Settlement with id {strings[1]} not found";
+
+        if (!party.IsActive)
+            return $"Party {party.StringId} is not active.";
+
+        if (party.CurrentSettlement != null)
+            return $"Party {party.StringId} is already in {party.CurrentSettlement.StringId}.";
+
+        var navigationType = party.IsCurrentlyAtSea
+            ? MobileParty.NavigationType.Naval
+            : MobileParty.NavigationType.Default;
+        party.SetMoveGoToSettlement(settlement, navigationType, isTargetingThePort: false);
+
+        return $"Ordered {party.StringId} to {settlement.StringId}.";
+    }
+
     /// <summary>
-    /// View character ids in a hero's party
+    /// View character ids in a hero's party by full name or hero id.
     /// </summary>
     [CommandLineArgumentFunction("characterids", "coop.debug.mobileparty")]
     public static string ViewItemIdsCommand(List<string> strings)
     {
         if (strings.Count == 0) return "Hero name argument required.";
 
-        var name = string.Join(" ", strings);
-        var heroes = FindHeroesWithParty(name);
-        if (heroes.Count == 0) return "No hero named \"" + name + "\" with a party found.";
+        var nameOrId = string.Join(" ", strings);
+        var mainHero = Hero.MainHero;
+        var heroById = mainHero != null &&
+                       mainHero.StringId == nameOrId &&
+                       mainHero.PartyBelongedTo != null
+            ? mainHero
+            : Hero.AllAliveHeroes.FirstOrDefault(
+                hero => hero != null && hero.StringId == nameOrId && hero.PartyBelongedTo != null);
+        var heroes = heroById == null
+            ? FindHeroesWithParty(nameOrId)
+            : new List<Hero> { heroById };
+        if (heroes.Count == 0)
+            return "No hero named or identified by \"" + nameOrId + "\" with a party found.";
 
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in heroes)
         {
-            stringBuilder.AppendLine("##" + hero.Name.ToString() + "  (hero id: " + hero.StringId + ")");
+            var party = hero.PartyBelongedTo;
+            if (party == null) continue;
+
+            stringBuilder.AppendLine("##" + (hero.Name?.ToString() ?? "<unnamed>") + "  (hero id: " + hero.StringId + ")");
             stringBuilder.AppendLine("Member roster:");
-            foreach (var rosterElement in hero.PartyBelongedTo.MemberRoster.data)
-            {
-                stringBuilder.AppendLine(rosterElement.Character?.StringId + ": " + rosterElement.Number + " " + rosterElement.Xp);
-            }
+            AppendRoster(stringBuilder, party.MemberRoster);
 
             stringBuilder.AppendLine("Prisoner roster:");
-            foreach (var rosterElement in hero.PartyBelongedTo.PrisonRoster.data)
-            {
-                stringBuilder.AppendLine(rosterElement.Character?.StringId + ": " + rosterElement.Number + " " + rosterElement.Xp);
-            }
+            AppendRoster(stringBuilder, party.PrisonRoster);
         }
 
         return stringBuilder.ToString();
+    }
+
+    private static void AppendRoster(StringBuilder stringBuilder, TroopRoster roster)
+    {
+        if (roster == null) return;
+
+        for (int index = 0; index < roster.Count; index++)
+        {
+            var rosterElement = roster.GetElementCopyAtIndex(index);
+            stringBuilder.AppendLine(
+                rosterElement.Character?.StringId +
+                ": number=" + rosterElement.Number +
+                " wounded=" + rosterElement.WoundedNumber +
+                " xp=" + rosterElement.Xp +
+                " hero=" + (rosterElement.Character?.IsHero == true));
+        }
+    }
+
+    /// <summary>
+    /// Sets one member-roster troop's wounded count for live synchronization tests.
+    /// </summary>
+    [CommandLineArgumentFunction("set_troop_wounded", "coop.debug.mobileparty")]
+    public static string SetTroopWoundedCommand(List<string> strings)
+    {
+        if (!ModInformation.IsServer) return "Command can only be run on the server.";
+        if (strings.Count != 3)
+            return "Usage: coop.debug.mobileparty.set_troop_wounded <party id> <character id> <wounded count>";
+
+        if (!int.TryParse(strings[2], out var woundedCount))
+            return "Please enter an integer for wounded count.";
+
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found.";
+        if (!objectManager.TryGetObject(strings[1], out CharacterObject character))
+            return $"Character with id {strings[1]} not found.";
+
+        var roster = party.MemberRoster;
+        var index = roster.FindIndexOfTroop(character);
+        if (index < 0)
+            return $"{strings[1]} is not in {party.Name}'s member roster.";
+
+        var element = roster.GetElementCopyAtIndex(index);
+        if (woundedCount < 0 || woundedCount > element.Number)
+            return $"Wounded count must be between 0 and {element.Number}.";
+
+        roster.SetElementWoundedNumber(index, woundedCount);
+        return $"Set {strings[1]} oldWounded={element.WoundedNumber} newWounded={woundedCount}.";
+    }
+
+    /// <summary>
+    /// Creates a real pending Party-screen transfer for live synchronization tests.
+    /// </summary>
+    [CommandLineArgumentFunction("stage_party_screen_transfer", "coop.debug.mobileparty")]
+    public static string StagePartyScreenTransferCommand(List<string> strings)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (strings.Count != 1)
+            return "Usage: coop.debug.mobileparty.stage_party_screen_transfer <character id>";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
+            return $"Character with id {strings[0]} not found.";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
+            return "No active party screen.";
+
+        var logic = partyState.PartyScreenLogic;
+        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+        if (partyVm == null) return "No active Party screen view model.";
+
+        var row = partyVm.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
+        if (row == null) return $"{strings[0]} is not in the right member roster.";
+
+        partyVm.OnTransferTroop(row, -1, 1, row.Side);
+        partyVm.ExecuteRemoveZeroCounts();
+        return $"PARTY_SCREEN_EDIT_STAGED pending={logic.IsThereAnyChanges()}";
+    }
+
+    /// <summary>
+    /// Reports the visible roster, Done baseline, and rendered VM state for one open Party-screen row.
+    /// </summary>
+    [CommandLineArgumentFunction("party_screen_troop_state", "coop.debug.mobileparty")]
+    public static string PartyScreenTroopStateCommand(List<string> strings)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (strings.Count != 1)
+            return "Usage: coop.debug.mobileparty.party_screen_troop_state <character id>";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
+            return $"Character with id {strings[0]} not found.";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
+            return "No active party screen.";
+
+        var logic = partyState.PartyScreenLogic;
+        var visible = GetRosterElement(logic.MemberRosters[1], character);
+        var baseline = GetRosterElement(logic._initialData.RightMemberRoster, character);
+        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+        var row = partyVm?.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
+        var rendered = row == null
+            ? (number: -1, wounded: -1)
+            : (number: row.Troop.Number, wounded: row.Troop.WoundedNumber);
+
+        return $"PARTY_SCREEN_TROOP_STATE character={strings[0]} " +
+               $"visibleNumber={visible.number} visibleWounded={visible.wounded} " +
+               $"baselineNumber={baseline.number} baselineWounded={baseline.wounded} " +
+               $"vmNumber={rendered.number} vmWounded={rendered.wounded} " +
+               $"pending={logic.IsThereAnyChanges()}";
+    }
+
+    private static (int number, int wounded) GetRosterElement(
+        TroopRoster roster,
+        CharacterObject character)
+    {
+        var index = roster.FindIndexOfTroop(character);
+        if (index < 0) return default;
+
+        var element = roster.GetElementCopyAtIndex(index);
+        return (element.Number, element.WoundedNumber);
     }
 
     /// <summary>

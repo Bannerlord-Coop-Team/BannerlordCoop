@@ -1,6 +1,10 @@
 ﻿using Common;
+using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.Players;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -32,6 +36,18 @@ internal class FoodConsumptionBehaviorPatches
     [HarmonyPrefix]
     public static bool DailyTickPartyPrefix(FoodConsumptionBehavior __instance, MobileParty party)
     {
+        if (party == null || !party.IsPlayerParty()) return true;
+
+        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
+
+        // Don't tick food change for disconnected players
+        if (playerManager.IsOwnerOfPartyDisconnected(party)) return false;
+
+        // Use AI join window to determine if a player party should consume food and breed animals.
+        // This way players only have food change at most once during a map event.
+        if (party.MapEvent != null
+            && !InteractionPatches.IsWithinAiJoinWindow(party.MapEvent)) return false;
+
         if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
 
         // Custom implementation to move check for starving player parties into daily tick from OnTick

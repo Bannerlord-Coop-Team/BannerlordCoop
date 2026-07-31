@@ -52,4 +52,77 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
         Assert.False(agentMirror.IsActive);
         Assert.False(agentMirror.WasKilled);
     }
+
+    [Fact]
+    public void FleeingBeforeRegistration_AppliesWhenPendingRoutsDrain()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        var agentId = Guid.NewGuid();
+        Agent peerAgent = null!;
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var broker = peer.Resolve<IMessageBroker>();
+            using var applier = new PuppetRoutApplier(
+                broker,
+                peer.Resolve<ICoopMissionComponent>(),
+                new CasualtyAttributionMap());
+
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId));
+            applier.DrainPendingRouts();
+
+            peerAgent = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            peerAgent.Formation = mock.DefenderTeam.GetFormation(FormationClass.Infantry).Shell;
+            Assert.True(registry.TryRegisterAgent("owner", agentId, peerAgent));
+
+            applier.DrainPendingRouts();
+
+            Assert.True(peerAgent.IsRunningAway);
+            Assert.Equal(1, mock.AgentFleeingCalls);
+            Assert.Same(peerAgent, mock.LastFleeingAgent);
+            Assert.True(AgentMirror.TryGet(peerAgent, out var agentMirror));
+            Assert.Equal(1, agentMirror.OnFleeingCalls);
+            Assert.Null(agentMirror.Formation);
+            Assert.True(registry.TryGetAgentInfo(agentId, out _));
+        });
+
+        Assert.True(AgentMirror.TryGet(peerAgent, out var agentMirror));
+        Assert.True(agentMirror.IsActive);
+        Assert.False(agentMirror.WasKilled);
+    }
+
+    [Fact]
+    public void OnAgentFleeing_BroadcastsOnlyForLocallyAuthoritativeAgent()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var observer = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(observer, "observer");
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            var controller = owner.Resolve<CoopBattleController>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+
+            var ownedAgent = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), ownedAgent));
+            controller.OnAgentFleeing(ownedAgent);
+
+            var remoteAgent = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("remote", Guid.NewGuid(), remoteAgent));
+            controller.OnAgentFleeing(remoteAgent);
+        });
+
+        Assert.Equal(1, observer.InternalMessages.GetMessageCount<NetworkBattleAgentFleeing>());
+    }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using SandBox.Tournaments.MissionLogics;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -14,11 +14,19 @@ public delegate void TournamentHitProgressionRecorder(
     in AttackCollisionData collisionData,
     float shotDifficulty);
 
+public delegate void TournamentGuardReactionRecorder(
+    Agent affectedAgent,
+    Agent affectorAgent,
+    bool isBlocked,
+    in Blow blow,
+    in AttackCollisionData collisionData);
+
 /// <summary>Native fight rules with result authority handled by the coop tournament controller.</summary>
 public class CoopTournamentFightMissionController : TournamentFightMissionController
 {
     private Func<bool> shouldProcessAgentRemoval = () => true;
     private TournamentHitProgressionRecorder hitProgressionRecorder;
+    private TournamentGuardReactionRecorder guardReactionRecorder;
 
     public CoopTournamentFightMissionController(CultureObject culture)
         : base(culture)
@@ -33,6 +41,12 @@ public class CoopTournamentFightMissionController : TournamentFightMissionContro
     public void SetHitProgressionRecorder(TournamentHitProgressionRecorder recorder)
     {
         hitProgressionRecorder = recorder;
+    }
+
+    public void SetGuardReactionRecorder(
+        TournamentGuardReactionRecorder recorder)
+    {
+        guardReactionRecorder = recorder;
     }
 
     public override void OnAgentRemoved(
@@ -59,6 +73,12 @@ public class CoopTournamentFightMissionController : TournamentFightMissionContro
     {
         if (affectorAgent?.IsMount == true && affectorAgent.RiderAgent != null)
             affectorAgent = affectorAgent.RiderAgent;
+        guardReactionRecorder?.Invoke(
+            affectedAgent,
+            affectorAgent,
+            isBlocked,
+            in blow,
+            in collisionData);
         hitProgressionRecorder?.Invoke(
             affectedAgent,
             affectorAgent,
