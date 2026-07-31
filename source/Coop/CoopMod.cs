@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Serialization;
 using Coop.Core;
 using Coop.Core.Common.Session;
+using Coop.CrashReporting;
 using Coop.Lib.NoHarmony;
 #if DEBUG
 using Coop.LiveTesting;
@@ -11,13 +13,18 @@ using GameInterface;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CrashReporting;
 using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -42,8 +49,13 @@ namespace Coop
 
         private static ILogger Logger;
 
-#if DEBUG
         private string activeLogFilePath;
+        private string informationalVersion = "unknown";
+        private CrashReportingConsentCoordinator crashReportingConsent;
+        private bool automaticCrashReportsRequested;
+        private DateTime nextWatchdogRetryUtc;
+
+#if DEBUG
         private LiveTestControlServer liveTestControlServer;
 #endif
 
@@ -67,6 +79,7 @@ namespace Coop
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
+            ProtoBufSerializer.ConfigureRuntimeModel();
 
             var fullCommandLine = Utilities.GetFullCommandLineString();
             var args = fullCommandLine.Split(' ').ToList();
@@ -94,6 +107,7 @@ namespace Coop
             ManagedServerConfig.Visibility = serverVisibility;
 
             SetupLogging();
+            InitializeCrashReporting();
 
             if (ManagedServerConfig.IsManagedServer)
             {
@@ -180,9 +194,7 @@ namespace Coop
             if (!TryClaimExclusive(filePath))
                 filePath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
 
-#if DEBUG
             activeLogFilePath = System.IO.Path.GetFullPath(filePath);
-#endif
 
             PruneProcessSuffixedLogs(filePostfix);
 
@@ -212,12 +224,119 @@ namespace Coop
 
             Logger = LogManager.GetLogger<CoopMod>();
 
-            var informationalVersion = typeof(ModInformation).Assembly
+            informationalVersion = typeof(ModInformation).Assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                 ?.InformationalVersion ?? "unknown";
             Logger.Information("BannerlordCoop build {Build}", informationalVersion);
+            Logger.Information(
+                "[Protobuf] MonoRuntime={MonoRuntime} AutoCompile={AutoCompile} StructFactoryWorkaround={StructFactoryWorkaround} CLRVersion={ClrVersion}",
+                ProtoBufSerializer.IsMonoRuntime,
+                ProtoBufSerializer.AutoCompileEnabled,
+                ProtoBufSerializer.StructFactoryWorkaroundEnabled,
+                Environment.Version);
 
             Logger.Verbose("Coop Mod Module Started");
+        }
+
+        private void InitializeCrashReporting()
+        {
+            var role = isServer ? "server" : "client";
+            CrashDiagnostics.Initialize(informationalVersion, role);
+            CrashDiagnostics.SetPhase("module-initialized");
+
+            crashReportingConsent = new CrashReportingConsentCoordinator(
+                new CoopOptionsStore(),
+                () =>
+                {
+                    automaticCrashReportsRequested = true;
+                    TryApplyAutomaticCrashReports();
+                },
+                exception => Logger.Warning(exception, "Crash reporting preference could not be saved"));
+            crashReportingConsent.ApplyStoredDecision();
+            TryStartCrashReporter(role);
+        }
+
+        private void TryStartCrashReporter(string role)
+        {
+            try
+            {
+                string moduleDirectory = System.IO.Path.GetDirectoryName(
+                    Assembly.GetExecutingAssembly().Location);
+                string reporterPath = System.IO.Path.Combine(
+                    moduleDirectory,
+                    "Coop.CrashReporter.exe");
+                if (!File.Exists(reporterPath))
+                {
+                    Logger.Warning("Crash reporter was not found at {Path}", reporterPath);
+                    return;
+                }
+
+                using (Process currentProcess = Process.GetCurrentProcess())
+                {
+                    string readyEventName =
+                        "Local\\CoopCrashReporterReady_" +
+                        currentProcess.Id.ToString(CultureInfo.InvariantCulture) +
+                        "_" +
+                        Guid.NewGuid().ToString("N");
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = reporterPath,
+                        Arguments = string.Format(
+                            CultureInfo.InvariantCulture,
+                            "{0} {1}",
+                            currentProcess.Id,
+                            currentProcess.StartTime.ToUniversalTime().Ticks),
+                        WorkingDirectory = moduleDirectory,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                    };
+                    startInfo.EnvironmentVariables["COOP_CRASH_LOG"] = activeLogFilePath;
+                    startInfo.EnvironmentVariables["COOP_CRASH_ROLE"] = role;
+                    startInfo.EnvironmentVariables["COOP_CRASH_BUILD"] = informationalVersion;
+                    startInfo.EnvironmentVariables["COOP_CRASH_READY"] = readyEventName;
+
+                    using (var ready = new EventWaitHandle(
+                        false,
+                        EventResetMode.AutoReset,
+                        readyEventName))
+                    {
+                        Process reporterProcess = Process.Start(startInfo);
+                        if (reporterProcess == null ||
+                            !ready.WaitOne(TimeSpan.FromSeconds(2)))
+                        {
+                            Logger.Warning("Crash reporter did not confirm that it was ready");
+                        }
+
+                        reporterProcess?.Dispose();
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Warning(exception, "Crash reporter could not be started");
+            }
+        }
+
+        private void TryApplyAutomaticCrashReports()
+        {
+            if (!automaticCrashReportsRequested) return;
+            if (DateTime.UtcNow < nextWatchdogRetryUtc) return;
+
+            nextWatchdogRetryUtc = DateTime.UtcNow.AddSeconds(1);
+            try
+            {
+                if (!Watchdog.Attached()) return;
+
+                Utilities.SetWatchdogAutoreport(true);
+                automaticCrashReportsRequested = false;
+                Logger.Information("Bannerlord automatic crash reports enabled by saved user consent");
+            }
+            catch (Exception exception)
+            {
+                nextWatchdogRetryUtc = DateTime.UtcNow.AddSeconds(30);
+                Logger.Warning(exception, "Bannerlord automatic crash reports could not be enabled");
+            }
         }
 
         /// <summary>
@@ -274,7 +393,7 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
-            Coop = new CoopartiveMultiplayerExperience(isServer);
+            Coop = new CoopartiveMultiplayerExperience(isServer, CrashDiagnostics.SetPhase);
 
             Updateables.Add(GameThread.Instance);
 
@@ -349,6 +468,7 @@ namespace Coop
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
         {
             base.OnGameStart(game, gameStarterObject);
+            CrashDiagnostics.SetPhase("campaign-running");
 
             if (ContainerProvider.TryResolve<IGameInterface>(out var gameInterface))
                 gameInterface.PatchGameStarted();
@@ -363,11 +483,13 @@ namespace Coop
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
+            CrashDiagnostics.SetPhase("main-menu");
             InformationManager.DisplayMessage(new InformationMessage(ClientServerModeMessage));
         }
 
         public override void OnGameEnd(Game game)
         {
+            CrashDiagnostics.SetPhase("ending-game");
             base.OnGameEnd(game);
 
             if (Coop.Running)
@@ -378,6 +500,7 @@ namespace Coop
 
         protected override void OnSubModuleUnloaded()
         {
+            CrashDiagnostics.SetPhase("module-unloading");
 #if DEBUG
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
@@ -401,8 +524,12 @@ namespace Coop
                 m_IsFirstTick = false;
             }
 
+            var isAtMainMenu = GameStateManager.Current?.ActiveState is InitialState;
+            TryApplyAutomaticCrashReports();
+            TryShowCrashReportingConsent(isAtMainMenu);
+
             // Boot Steam services once the main menu is up, so a +connect_lobby launch resolves while joining is possible.
-            if (!steamBootAttempted && GameStateManager.Current?.ActiveState is InitialState)
+            if (!steamBootAttempted && isAtMainMenu)
             {
                 steamBootAttempted = true;
                 var steamPump = SteamIntegrationBoot.TryStartWithCallbackPump(
@@ -419,6 +546,19 @@ namespace Coop
 #if DEBUG
             TryAutoConnect();
 #endif
+        }
+
+        private void TryShowCrashReportingConsent(bool isAtMainMenu)
+        {
+            if (crashReportingConsent == null || isServer || isAutoConnect ||
+                ManagedServerConfig.IsManagedServer)
+            {
+                return;
+            }
+
+            crashReportingConsent.TryShowPrompt(
+                isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
+                inquiry => InformationManager.ShowInquiry(inquiry));
         }
 
         private bool _managedAutoStarted = false;
@@ -483,6 +623,7 @@ namespace Coop
 
         internal static void JoinWindow()
         {
+            CrashDiagnostics.SetPhase("join-menu");
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
         }
 

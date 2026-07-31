@@ -1,10 +1,11 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -28,8 +29,9 @@ namespace GameInterface.Services.MobileParties.Handlers;
 /// <summary>
 /// Dedicated recovery flow behind coop.debug.mobileparty.unstuck. The client forwards
 /// <see cref="PlayerUnstuckRequested"/> to the server as <see cref="NetworkRequestPlayerUnstuck"/>;
-/// the server force-applies every applicable exit (captivity, army, siege camp, settlement) with
-/// each step guarded independently, so one broken exit flow cannot block the others; the
+/// the server force-applies every applicable exit (captivity, map event, army, siege camp,
+/// settlement) with each step guarded independently, so one broken exit flow cannot block the
+/// others; the
 /// <see cref="NetworkPlayerUnstuckResult"/> reply then lets the requesting client clear the
 /// local-only encounter and menu state the server cannot see. Intentionally separate from the
 /// normal exit request flows — those carry gating state that may be exactly what is stuck.
@@ -161,12 +163,20 @@ internal class PlayerUnstuckHandler : IHandler
 
         if (party.Party?.MapEvent != null)
         {
-            actions.Add("Warning: the party is in a map event; battle state was not touched (retreat from the battle instead).");
+            TryStep(actions, "map event removal", () =>
+            {
+                // Reuse the normal authoritative leave flow so the removal and client cleanup are broadcast.
+                messageBroker.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
+                if (party.Party.MapEvent != null)
+                    throw new InvalidOperationException("The battle leave flow did not remove the party from its map event.");
+
+                return "Removed the party from its map event.";
+            });
         }
 
         if (actions.Count == 0)
         {
-            actions.Add("No server-side stuck state found (captivity, army, siege camp, settlement).");
+            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement).");
         }
 
         network.SendAll(new NetworkPlayerUnstuckResult(partyId, actions.ToArray()));

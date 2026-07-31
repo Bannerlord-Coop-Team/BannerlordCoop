@@ -55,10 +55,15 @@
     <!-- Evaluate after Build so DLLs created by a clean build are included. -->
     <ItemGroup>
       <DeployDllFiles Include="$(TargetDir)**\*.dll" />
+      <DeployExecutableFiles Include="$(TargetDir)Coop.CrashReporter.exe"
+                             Condition="Exists('$(TargetDir)Coop.CrashReporter.exe')" />
     </ItemGroup>
 
-    <!-- DLLs -->
+    <!-- Module DLLs and the out-of-process crash reporter -->
     <Copy SourceFiles="@(DeployDllFiles)"
+          DestinationFolder="$(ModBinDir)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DeployExecutableFiles)"
           DestinationFolder="$(ModBinDir)"
           SkipUnchangedFiles="true" />
 

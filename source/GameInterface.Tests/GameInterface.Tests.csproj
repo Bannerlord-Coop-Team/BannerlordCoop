@@ -33,6 +33,15 @@
     <None Remove="Services\Parties\**" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The real shipped mod-config template, so the seeding tests exercise the
+         file operators actually receive. ModConfig walks up from its assembly to
+         find it, and in this build that assembly's own output dir is the hit. -->
+    <Content Include="..\..\deploy\mod-config.default.json">
+      <Link>mod-config.default.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Autofac" Version="8.2.0" />
     <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>

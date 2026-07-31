@@ -48,6 +48,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly IPuppetRoutApplier puppetRoutApplier;
 
     // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
     // agents without that identity later break team ownership and scoreboard attribution.
@@ -66,7 +67,8 @@ public class PuppetSpawner : IPuppetSpawner
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        IPuppetRoutApplier puppetRoutApplier = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -77,6 +79,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
         this.agentBudget = agentBudget;
+        this.puppetRoutApplier = puppetRoutApplier;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -245,6 +248,8 @@ public class PuppetSpawner : IPuppetSpawner
             data.AgentId,
             data.MovementId,
             agent);
+        if (data.IsRunningAway)
+            puppetRoutApplier?.ApplyFleeing(agent);
         if (data.HasCurrentEquipment)
             data.CurrentEquipment.Apply(agent);
 

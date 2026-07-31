@@ -19,57 +19,44 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
         int visualAction = channel == 0
             ? mirror.SkeletonAction0Index
             : mirror.SkeletonAction1Index;
-        if (visualAction == action.Index) return true;
-        if (visualAction != ActionIndexCache.act_none.Index) return false;
-
         int rawVisualAction = channel == 0
             ? mirror.RawVisualAction0Index
             : mirror.RawVisualAction1Index;
-        return rawVisualAction == action.Index;
+        if (visualAction == action.Index)
+            return true;
+        if (visualAction != ActionIndexCache.act_none.Index) return false;
+
+        return rawVisualAction == GetAnimationIndex(mirror, action.Index);
     }
 
-    public void AdvanceActionIfAvailable(
+    public bool HasVisibleAction(
         Agent agent,
-        int channel,
-        in ActionIndexCache action,
-        float progress)
+        int channel)
     {
         if (!AgentMirror.TryGet(agent, out MirrorAgent mirror)
             || !mirror.HasVisualSkeleton)
         {
-            return;
+            return false;
         }
 
         int visualAction = channel == 0
             ? mirror.SkeletonAction0Index
             : mirror.SkeletonAction1Index;
-        if (visualAction != ActionIndexCache.act_none.Index
-            && visualAction != action.Index)
-        {
-            return;
-        }
-
         int rawVisualAction = channel == 0
             ? mirror.RawVisualAction0Index
             : mirror.RawVisualAction1Index;
-        if (visualAction == ActionIndexCache.act_none.Index
-            && rawVisualAction >= 0
-            && rawVisualAction != action.Index)
-        {
-            return;
-        }
+        return visualAction != ActionIndexCache.act_none.Index
+            || rawVisualAction >= 0;
+    }
 
-        if (channel == 0)
-        {
-            mirror.RawVisualAction0Index = action.Index;
-            mirror.RawVisualAction0Progress = progress;
-        }
-        else
-        {
-            mirror.RawVisualAction1Index = action.Index;
-            mirror.RawVisualAction1Progress = progress;
-        }
-
-        mirror.AdvanceRawVisualActionCalls++;
+    private static int GetAnimationIndex(
+        MirrorAgent mirror,
+        int actionIndex)
+    {
+        return mirror.ActionAnimationIndices.TryGetValue(
+            actionIndex,
+            out int animationIndex)
+            ? animationIndex
+            : actionIndex;
     }
 }

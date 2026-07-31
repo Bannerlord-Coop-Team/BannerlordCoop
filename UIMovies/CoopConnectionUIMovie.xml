@@ -309,7 +309,7 @@
                          VerticalAlignment="Bottom" MarginBottom="44" Command.Click="ActionCancel"/>
 
         <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="256" HeightSizePolicy="Fixed" SuggestedHeight="64"
-                    VerticalAlignment="Bottom" HorizontalAlignment="Right" PositionYOffset="-170" PositionXOffset="-6"
+                    VerticalAlignment="Bottom" HorizontalAlignment="Right" PositionYOffset="-220" PositionXOffset="-6"
                     Brush="ScoreboardPanels_2" Text="@CommunityText"/>
 
         <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
@@ -336,6 +336,15 @@
           <Children>
             <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
                              Command.Click="ActionDonate" Parameter.Text="@DonateButtonText" PositionXOffset="-20"/>
+          </Children>
+        </ListPanel>
+
+        <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="160"
+                   StackLayout.LayoutMethod="HorizontalLeftToRight">
+          <Children>
+            <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                             Command.Click="ActionCredits" Parameter.Text="@CreditsButtonText" PositionXOffset="-20"/>
           </Children>
         </ListPanel>
       </Children>
