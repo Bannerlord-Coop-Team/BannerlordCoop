@@ -225,6 +225,9 @@
 	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 		    <_Parameter1>Missions</_Parameter1>
 	    </AssemblyAttribute>
+	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+		    <_Parameter1>GameInterface.Tests</_Parameter1>
+	    </AssemblyAttribute>
     </ItemGroup>
 	<ItemGroup>
 		<EmbeddedResource Include="AutoSync\Templates\**\*.txt" />
