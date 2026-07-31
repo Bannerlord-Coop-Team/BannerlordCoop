@@ -42,6 +42,7 @@ internal static class MissionActionDiagnostics
     private const int PreNative = 0;
     private const int PostNative = 1;
     private const int MovementChannel = 2;
+    private const int TraceAgentsPerMovementClass = 8;
     private const int MaximumTimelineEvents = 20000;
     private const float ProgressTolerance = 0.02f;
 
@@ -55,6 +56,8 @@ internal static class MissionActionDiagnostics
         new Dictionary<TraceKey, TraceTrack>();
     private static readonly List<TraceEvent> Timeline =
         new List<TraceEvent>();
+    private static readonly HashSet<Guid> TraceAgentIds =
+        new HashSet<Guid>();
 
     [ThreadStatic]
     private static PollSample currentPoll;
@@ -71,6 +74,7 @@ internal static class MissionActionDiagnostics
     private static long receivedBytes;
 
     private static bool animationTraceEnabled;
+    private static bool traceAgentsSelected;
     private static long traceStartedAt;
     private static int traceGeneration;
     private static long outboundUpdates;
@@ -318,6 +322,8 @@ internal static class MissionActionDiagnostics
         animationTraceEnabled = false;
         Tracks.Clear();
         Timeline.Clear();
+        TraceAgentIds.Clear();
+        traceAgentsSelected = false;
         traceGeneration = 0;
         outboundUpdates = 0;
         remoteApplies = 0;
@@ -514,6 +520,7 @@ internal static class MissionActionDiagnostics
     {
         if (!animationTraceEnabled || Mission.Current == null) return;
 
+        SelectTraceAgents(registry);
         int generation = ++traceGeneration;
         long now = Stopwatch.GetTimestamp();
         foreach (string controllerId in registry.GetControllerIds())
@@ -525,7 +532,8 @@ internal static class MissionActionDiagnostics
                     || agent.Mission != Mission.Current
                     || !agent.IsActive()
                     || !agent.IsHuman
-                    || agent.IsMount)
+                    || agent.IsMount
+                    || !TraceAgentIds.Contains(info.AgentId))
                 {
                     continue;
                 }
@@ -546,6 +554,36 @@ internal static class MissionActionDiagnostics
         {
             FinishTrack(key, now);
         }
+    }
+
+    private static void SelectTraceAgents(INetworkAgentRegistry registry)
+    {
+        if (traceAgentsSelected) return;
+
+        // Keep the pipe payload bounded while sampling the same combatants on every peer.
+        CoopAgentInfo[] candidates = registry.GetControllerIds()
+            .SelectMany(controllerId => registry.GetAgents(controllerId))
+            .Where(info =>
+                info.Agent != null
+                && info.Agent.Mission == Mission.Current
+                && info.Agent.IsActive()
+                && info.Agent.IsHuman
+                && !info.Agent.IsMount)
+            .GroupBy(info => info.AgentId)
+            .Select(group => group.First())
+            .ToArray();
+        foreach (CoopAgentInfo info in candidates
+                     .Where(value => value.Agent.HasMount)
+                     .OrderBy(value => value.AgentId)
+                     .Take(TraceAgentsPerMovementClass)
+                     .Concat(candidates
+                         .Where(value => !value.Agent.HasMount)
+                         .OrderBy(value => value.AgentId)
+                         .Take(TraceAgentsPerMovementClass)))
+        {
+            TraceAgentIds.Add(info.AgentId);
+        }
+        traceAgentsSelected = true;
     }
 
     private static void SampleAction(
@@ -697,6 +735,10 @@ internal static class MissionActionDiagnostics
         {
             enabled = animationTraceEnabled,
             wallMilliseconds = ToMilliseconds(now - traceStartedAt),
+            tracedAgentIds = TraceAgentIds
+                .OrderBy(agentId => agentId)
+                .Select(agentId => agentId.ToString("D"))
+                .ToArray(),
             counters = new
             {
                 outboundUpdates,
@@ -756,6 +798,8 @@ internal static class MissionActionDiagnostics
         bool sameAction,
         double durationMilliseconds = 0d)
     {
+        if (agentId != Guid.Empty
+            && !TraceAgentIds.Contains(agentId)) return;
         if (Timeline.Count >= MaximumTimelineEvents) return;
         Timeline.Add(new TraceEvent
         {
