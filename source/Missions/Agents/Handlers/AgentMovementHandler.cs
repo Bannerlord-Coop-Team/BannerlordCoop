@@ -40,6 +40,11 @@ public class AgentMovementHandler : IAgentMovementHandler
     // Forty updates per second keeps locally authoritative agents responsive.
     private const float MovementPollingIntervalSeconds = 0.025f;
 
+    private const float PositionDeltaThresholdSq = 0.0001f;
+    private const float DirectionDeltaThresholdSq = 0.0001f;
+    private const float SpeedDeltaThreshold = 0.01f;
+    private const float ForcedSyncIntervalSeconds = 0.25f;
+
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
     private readonly IMessageBroker messageBroker;
@@ -54,6 +59,16 @@ public class AgentMovementHandler : IAgentMovementHandler
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
     // (this handler is transient), so it can't leak across missions.
     private readonly Dictionary<Agent, Agent> _dismountedHorses = new Dictionary<Agent, Agent>();
+
+    private sealed class LastSentMovementState
+    {
+        public AgentData AgentData;
+        public AgentMountData MountData;
+        public bool IsMount;
+        public float LastSentTime;
+    }
+    private readonly Dictionary<Guid, LastSentMovementState> _lastSentMovement = new Dictionary<Guid, LastSentMovementState>();
+    private float totalSimulationTime = 0f;
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
@@ -123,6 +138,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         _interpolator.Clear();
+
+        _dismountedHorses.Clear();
+        _lastSentMovement.Clear();
+        
         movementBatchSender.Clear();
 
         packetManager.RemovePacketHandler(this);
@@ -138,11 +157,12 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public PacketType PacketType => PacketType.Movement;
 
-    // Broadcast every locally authoritative agent.
+    // Broadcast every locally authoritative agent using delta thresholding.
     public void PollMovement(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
+        totalSimulationTime += dt;
         movementPollElapsed += dt;
         if (movementPollElapsed < MovementPollingIntervalSeconds) return;
         movementPollElapsed %= MovementPollingIntervalSeconds;
@@ -153,6 +173,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         MovementBatch<AgentData> legacyMovement = null;
         MovementBatch<AgentMountData> legacyMountMovement = null;
         MovementBatch<AgentEquipmentData> legacyEquipment = null;
+        var broadcastAgentIds = new HashSet<Guid>();
 
         foreach (var agentInfo in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
         {
@@ -163,14 +184,20 @@ public class AgentMovementHandler : IAgentMovementHandler
 
             EnsureLocallyDrivenMountController(agent);
             if (!ShouldBroadcastMovement(agent)) continue;
+            broadcastAgentIds.Add(agentInfo.AgentId);
 
             if (agent.IsMount)
             {
-                AddToBatch(
-                    mountGroups,
-                    ref legacyMountMovement,
-                    agentInfo,
-                    new AgentMountData(agent));
+                var mountData = new AgentMountData(agent);
+
+                if (ShouldSendMovement(agentInfo.AgentId, mountData))
+                {
+                    AddToBatch(
+                        mountGroups,
+                        ref legacyMountMovement,
+                        agentInfo,
+                        mountData);
+                }
             }
             else
             {
@@ -180,15 +207,21 @@ public class AgentMovementHandler : IAgentMovementHandler
                     out ushort mountMovementId,
                     out string mountIdentityScopeId,
                     out Guid mountAgentId);
-                AddToBatch(
-                    movementGroups,
-                    ref legacyMovement,
-                    agentInfo,
-                    new AgentData(
-                        agent,
-                        mountMovementId,
-                        mountIdentityScopeId,
-                        mountAgentId));
+
+                var agentData = new AgentData(
+                    agent,
+                    mountMovementId,
+                    mountIdentityScopeId,
+                    mountAgentId);
+
+                if (ShouldSendMovement(agentInfo.AgentId, agentData))
+                {
+                    AddToBatch(
+                        movementGroups,
+                        ref legacyMovement,
+                        agentInfo,
+                        agentData);
+                }
 
                 var equipment = new AgentEquipmentData(agent);
                 if (!lastEquipment.TryGetValue(agentInfo.AgentId, out var previousEquipment))
@@ -215,6 +248,7 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
         }
 
+        RemoveStaleLocalState(broadcastAgentIds);
         SendEquipment(equipmentGroups.Values);
         SendEquipment(legacyEquipment);
         int maxPayloadBytes = client.GetMaxUnreliablePayloadBytes();
@@ -228,6 +262,112 @@ public class AgentMovementHandler : IAgentMovementHandler
             legacyMountMovement,
             maxPayloadBytes,
             CreateMountMovementPacket);
+    }
+
+    private bool ShouldSendMovement(Guid agentId, AgentData current)
+    {
+        if (!_lastSentMovement.TryGetValue(agentId, out var lastState))
+        {
+            _lastSentMovement[agentId] = new LastSentMovementState
+            {
+                AgentData = current,
+                LastSentTime = totalSimulationTime
+            };
+            return true;
+        }
+
+        if (lastState.IsMount ||
+            HasMovementChanged(lastState.AgentData, current) ||
+            IsHeartbeatDue(lastState))
+        {
+            lastState.AgentData = current;
+            lastState.MountData = null;
+            lastState.IsMount = false;
+            lastState.LastSentTime = totalSimulationTime;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool ShouldSendMovement(Guid agentId, AgentMountData current)
+    {
+        if (!_lastSentMovement.TryGetValue(agentId, out var lastState))
+        {
+            _lastSentMovement[agentId] = new LastSentMovementState
+            {
+                MountData = current,
+                IsMount = true,
+                LastSentTime = totalSimulationTime
+            };
+            return true;
+        }
+
+        if (!lastState.IsMount ||
+            HasMountMovementChanged(lastState.MountData, current) ||
+            IsHeartbeatDue(lastState))
+        {
+            lastState.AgentData = default;
+            lastState.MountData = current;
+            lastState.IsMount = true;
+            lastState.LastSentTime = totalSimulationTime;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsHeartbeatDue(LastSentMovementState state)
+    {
+        return totalSimulationTime - state.LastSentTime >= ForcedSyncIntervalSeconds;
+    }
+
+    private static bool HasMovementChanged(AgentData previous, AgentData current)
+    {
+        return (current.Position - previous.Position).LengthSquared > PositionDeltaThresholdSq ||
+               (current.MovementDirection - previous.MovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               (current.InputVector - previous.InputVector).LengthSquared > DirectionDeltaThresholdSq ||
+               (current.LookDirection - previous.LookDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               Math.Abs(current.Speed - previous.Speed) > SpeedDeltaThreshold ||
+               HasMountMovementChanged(previous.MountData, current.MountData);
+    }
+
+    private static bool HasMountMovementChanged(AgentMountData previous, AgentMountData current)
+    {
+        if (previous == null || current == null)
+            return previous != current;
+
+        return (current.MountPosition - previous.MountPosition).LengthSquared > PositionDeltaThresholdSq ||
+               (current.MountMovementDirection - previous.MountMovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               (current.MountInputVector - previous.MountInputVector).LengthSquared > DirectionDeltaThresholdSq ||
+               (current.MountLookDirection - previous.MountLookDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               Math.Abs(current.MountSpeed - previous.MountSpeed) > SpeedDeltaThreshold ||
+               current.MountAction0Index != previous.MountAction0Index ||
+               current.MountAction0Flag != previous.MountAction0Flag ||
+               current.MountAction1Index != previous.MountAction1Index ||
+               current.MountAction1Flag != previous.MountAction1Flag ||
+               current.MountMovementId != previous.MountMovementId ||
+               current.MountAgentId != previous.MountAgentId ||
+               !string.Equals(
+                   current.MountIdentityScopeId,
+                   previous.MountIdentityScopeId,
+                   StringComparison.Ordinal);
+    }
+
+    private void RemoveStaleLocalState(HashSet<Guid> broadcastAgentIds)
+    {
+        var staleAgentIds = new List<Guid>();
+        foreach (Guid agentId in _lastSentMovement.Keys)
+        {
+            if (!broadcastAgentIds.Contains(agentId))
+                staleAgentIds.Add(agentId);
+        }
+
+        foreach (Guid agentId in staleAgentIds)
+        {
+            _lastSentMovement.Remove(agentId);
+            lastEquipment.Remove(agentId);
+        }
     }
 
     private static void AddToBatch<T>(
@@ -426,7 +566,10 @@ public class AgentMovementHandler : IAgentMovementHandler
                 && reported.IsActive() && reported.RiderAgent == null)
             {
                 Agent previous = agent.MountAgent;
-                _interpolator.Forget(previous);
+                if (previous != null)
+                {
+                    _interpolator.Forget(previous);
+                }
                 agent.MountAgent = reported;
                 RestoreLocallyControlledMount(previous);
             }
@@ -497,7 +640,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                     agentRegistry.TryGetAgentInfo(mountData.MountAgentId, out info);
         }
 
-        if (!found) return null;
+        if (!found || info == null) return null;
         return info.Agent != null && info.Agent.IsMount ? info.Agent : null;
     }
 

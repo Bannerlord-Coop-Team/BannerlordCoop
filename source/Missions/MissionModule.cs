@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;

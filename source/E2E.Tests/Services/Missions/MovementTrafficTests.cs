@@ -35,7 +35,7 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PollMovement_UsesFortyHertzCadenceAndWireSizedBatches()
+    public void PollMovement_UsesFortyHertzCadenceAndSkipsUnchangedAgents()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -47,10 +47,16 @@ public class MovementTrafficTests : MissionTestEnvironment
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var mirrors = new List<MirrorAgent>();
 
             for (int i = 0; i < 4; i++)
+            {
+                Agent agent = SpawnRider(mock);
+                Assert.True(AgentMirror.TryGet(agent, out var mirror));
+                mirrors.Add(mirror);
                 Assert.True(registry.TryRegisterAgent(
-                    "peer", Guid.NewGuid(), (ushort)(i + 1), SpawnRider(mock)));
+                    "peer", Guid.NewGuid(), (ushort)(i + 1), agent));
+            }
 
             component.AgentMovementHandler.PollMovement(0f);
             Assert.Equal(new[] { 4 }, network.NetworkSentPackets
@@ -58,6 +64,9 @@ public class MovementTrafficTests : MissionTestEnvironment
                 .Select(packet => packet.AgentIds.Length));
 
             network.NetworkSentPackets.Packets.Clear();
+            foreach (MirrorAgent mirror in mirrors)
+                mirror.Position = new Vec3(1f, 0f, 0f);
+
             component.AgentMovementHandler.PollMovement(0.024f);
             Assert.Empty(network.NetworkSentPackets.GetPackets<MovementPacket>());
 
@@ -67,11 +76,52 @@ public class MovementTrafficTests : MissionTestEnvironment
                 .Select(packet => packet.AgentIds.Length));
 
             network.NetworkSentPackets.Packets.Clear();
-            for (int i = 0; i < 6; i++)
-                component.AgentMovementHandler.PollMovement(1f / 60f);
-            Assert.Equal(16, network.NetworkSentPackets
-                .GetPackets<MovementPacket>()
-                .Sum(packet => packet.AgentIds.Length));
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<MovementPacket>());
+        });
+    }
+
+    [Fact]
+    public void PollMovement_SendsNonPositionalChangesAndHeartbeat()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent agent = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, agent));
+
+            component.AgentMovementHandler.PollMovement(0f);
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            network.NetworkSentPackets.Packets.Clear();
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            mirror.LookDirection = new Vec3(0f, 1f, 0f);
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            network.NetworkSentPackets.Packets.Clear();
+            mirror.RealGlobalVelocity = new Vec3(1f, 0f, 0f);
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            network.NetworkSentPackets.Packets.Clear();
+            mirror.RealGlobalVelocity = Vec3.Zero;
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            network.NetworkSentPackets.Packets.Clear();
+            component.AgentMovementHandler.PollMovement(1f);
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
         });
     }
 
@@ -236,6 +286,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 "MapEvent_Created_0000",
                 "76561198000000042",
                 LiteNetP2PClient.SafeSinglePacketBytes);
+            var riderMirrors = new List<MirrorAgent>();
 
             for (int i = 0; i < 18; i++)
             {
@@ -245,6 +296,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
                 PopulateIncompressibleMovementState(riderMirror, i + 1);
                 PopulateIncompressibleMovementState(mountMirror, i + 101);
+                riderMirrors.Add(riderMirror);
                 Assert.True(registry.TryRegisterAgent(
                     "peer", Guid.NewGuid(), (ushort)((i * 2) + 1), rider));
                 Assert.True(registry.TryRegisterAgent(
@@ -255,6 +307,8 @@ public class MovementTrafficTests : MissionTestEnvironment
             network.NetworkSentPackets.Packets.Clear();
             network.SerializedPacketSends.Clear();
             compressor.Reset();
+            foreach (MirrorAgent mirror in riderMirrors)
+                mirror.Position += new Vec3(1f, 0f, 0f);
 
             handler.PollMovement(0.025f);
 
