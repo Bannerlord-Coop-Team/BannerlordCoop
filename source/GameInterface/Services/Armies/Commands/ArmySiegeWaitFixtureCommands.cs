@@ -425,6 +425,7 @@ public class ArmySiegeWaitFixtureCommands
         var leader = activeFixture.LeaderParty;
         leader.Position = settlement.GatePosition;
         leader.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
+        PublishBehavior(leader, leader.IsCurrentlyAtSea);
         try
         {
             activeFixture.SiegeEvent = Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, leader);
