@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Network;
 using Common.Network.Coalescing;
@@ -67,10 +67,13 @@ public class E2ETestEnvironment : IDisposable
 
         SetupAutoSync();
 
-        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        Server.Call(() =>
         {
-            Server.ObjectManager.AddExisting(settlement.StringId, settlement);
-        }
+            foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+            {
+                Server.ObjectManager.AddExisting(settlement.StringId, settlement);
+            }
+        });
     }
 
     /// <summary>
