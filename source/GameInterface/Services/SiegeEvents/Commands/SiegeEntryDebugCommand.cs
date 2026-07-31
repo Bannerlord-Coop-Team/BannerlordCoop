@@ -256,11 +256,12 @@ internal class SiegeEntryDebugCommand
             return $"Settlement with id {args[1]} not found.";
         }
 
-        StageAtSettlement(fixture.PlayerParty, settlement);
+        StageOutsideSettlement(fixture.PlayerParty, settlement);
         fixture.PhysicalSettlementId = settlement.StringId;
 
         return $"token={fixture.Token}|playerParty={fixture.PlayerParty.StringId}|" +
-            $"targetSettlement={settlement.StringId}|physicalSettlement={settlement.StringId}|" +
+            $"targetSettlement={fixture.PlayerParty.TargetSettlement?.StringId ?? "none"}|" +
+            $"physicalSettlement={settlement.StringId}|" +
             $"requestedSettlement={fixture.Settlement.StringId}";
     }
 
@@ -630,6 +631,22 @@ internal class SiegeEntryDebugCommand
                 resetMovementToHold: false));
     }
 
+    private static void StageOutsideSettlement(MobileParty party, Settlement settlement)
+    {
+        if (party.CurrentSettlement != null)
+            LeaveSettlementAction.ApplyForParty(party);
+
+        party.Position = settlement.GatePosition;
+        party.SetMoveModeHold();
+        MessageBroker.Instance.Publish(
+            typeof(SiegeEntryDebugCommand),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: false,
+                resetMovementToHold: false));
+    }
+
     private static string FormatFixtureBaseline(SiegeEntryFixture fixture) =>
         $"token={fixture.Token}|controller={fixture.ControllerId}|" +
         $"playerParty={fixture.PlayerBehavior.MobilePartyId}|aiBesieger={fixture.AiBehavior.MobilePartyId}|" +
@@ -802,6 +819,9 @@ internal class SiegeEntryDebugCommand
 
             if (fixture.Settlement.SiegeEvent?.BesiegerCamp?.LeaderParty == fixture.AiBesieger)
                 siegeEventInterface.BreakSiege(fixture.AiBesieger);
+
+            if (fixture.PlayerParty.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(fixture.PlayerParty);
 
             RestoreBehavior(fixture.PlayerParty, fixture.PlayerBehavior, behaviorSnapshot);
             RestoreBehavior(fixture.AiBesieger, fixture.AiBehavior, behaviorSnapshot);
