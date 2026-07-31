@@ -74,7 +74,7 @@ internal class SiegeEntryDebugCommand
             settlement.OwnerClan?.Leader == null)
             return $"{settlement.Name} must be an owned fortification.";
 
-        if (!IsClean(playerParty))
+        if (!IsClean(playerParty, allowDisorganized: true))
         {
             return $"{playerParty.Name} must be active, organized, unattached, and outside settlements, sieges, armies, and map events: " +
                 $"active={playerParty.IsActive}|disorganized={playerParty.IsDisorganized}|" +
@@ -84,6 +84,8 @@ internal class SiegeEntryDebugCommand
                 $"settlement={playerParty.CurrentSettlement?.StringId ?? "none"}|" +
                 $"besiegerCamp={playerParty.BesiegerCamp?.SiegeEvent?.BesiegedSettlement?.StringId ?? "none"}";
         }
+
+        bool playerWasDisorganized = playerParty.IsDisorganized;
 
         if (settlement.SiegeEvent != null)
             return $"{settlement.Name} is already under siege.";
@@ -159,6 +161,7 @@ internal class SiegeEntryDebugCommand
             besiegerPlayerStance,
             settlementThreatSnapshots,
             timeControl.GetTimeControl(),
+            playerWasDisorganized,
             CharacterRelationManager.GetHeroRelation(
                 settlement.OwnerClan.Leader,
                 aiBesieger.LeaderHero));
@@ -166,6 +169,10 @@ internal class SiegeEntryDebugCommand
         try
         {
             activeFixture = fixture;
+            playerParty.SetDisorganized(false);
+            if (playerParty.IsDisorganized)
+                throw new InvalidOperationException($"Unable to organize {playerParty.Name} for the fixture.");
+
             timeControl.AddUnpausePolicy(TimeUnpausePolicy);
             fixture.TimePolicyAdded = true;
             timeControl.ServerSetTimeControl(TimeControlEnum.Pause);
@@ -598,9 +605,9 @@ internal class SiegeEntryDebugCommand
             : error;
     }
 
-    private static bool IsClean(MobileParty party) =>
+    private static bool IsClean(MobileParty party, bool allowDisorganized = false) =>
         party?.IsActive == true &&
-        !party.IsDisorganized &&
+        (allowDisorganized || !party.IsDisorganized) &&
         party.AttachedTo == null &&
         party.Army == null &&
         party.MapEvent == null &&
@@ -631,7 +638,11 @@ internal class SiegeEntryDebugCommand
         $"aiWar={fixture.BesiegerWasAtWar}|ownerSiegeWar={fixture.BesiegerPlayerWasAtWar}|" +
         $"ownerRelation={fixture.OriginalOwnerLeaderRelation}|" +
         $"timeMode={fixture.OriginalTimeControl}|" +
-        FormatPartyState("player", fixture.PlayerBehavior, null) + "|" +
+        FormatPartyState(
+            "player",
+            fixture.PlayerBehavior,
+            null,
+            fixture.PlayerWasDisorganized) + "|" +
         FormatPartyState("ai", fixture.AiBehavior, null) + "|" +
         "siegeActive=False|fixtureActive=False|" +
         $"playerDiplomacy={fixture.PlayerSettlementStance.OriginalFingerprint}|" +
@@ -714,12 +725,13 @@ internal class SiegeEntryDebugCommand
     private static string FormatPartyState(
         string prefix,
         PartyBehaviorUpdateData behavior,
-        MobileParty party)
+        MobileParty party,
+        bool? recordedDisorganized = null)
     {
         string besiegerCamp = party?.BesiegerCamp?.SiegeEvent?.BesiegedSettlement?.StringId ?? "none";
         string mapEvent = party?.MapEvent?.EventType.ToString() ?? "none";
         string currentSettlement = party?.CurrentSettlement?.StringId ?? "none";
-        bool isDisorganized = party?.IsDisorganized ?? false;
+        bool isDisorganized = recordedDisorganized ?? party?.IsDisorganized ?? false;
         return $"{prefix}Position={FormatPosition(behavior.PartyPosition)}|" +
             $"{prefix}AtSea={behavior.IsCurrentlyAtSea}|" +
             $"{prefix}Behavior={FormatBehavior(behavior)}|" +
@@ -793,7 +805,7 @@ internal class SiegeEntryDebugCommand
 
             RestoreBehavior(fixture.PlayerParty, fixture.PlayerBehavior, behaviorSnapshot);
             RestoreBehavior(fixture.AiBesieger, fixture.AiBehavior, behaviorSnapshot);
-            fixture.PlayerParty.SetDisorganized(false);
+            fixture.PlayerParty.SetDisorganized(fixture.PlayerWasDisorganized);
             fixture.AiBesieger.SetDisorganized(false);
             CharacterRelationManager.SetHeroRelation(
                 fixture.OriginalOwnerClan.Leader,
@@ -1091,6 +1103,7 @@ internal class SiegeEntryDebugCommand
         public StanceLinkSnapshot BesiegerPlayerStance { get; }
         public SettlementThreatSnapshot[] SettlementThreatSnapshots { get; }
         public TimeControlEnum OriginalTimeControl { get; }
+        public bool PlayerWasDisorganized { get; }
         public bool PlayerWasAtWar => PlayerSettlementStance.WasAtWar;
         public bool BesiegerWasAtWar => BesiegerSettlementStance.WasAtWar;
         public bool BesiegerPlayerWasAtWar => BesiegerPlayerStance.WasAtWar;
@@ -1119,6 +1132,7 @@ internal class SiegeEntryDebugCommand
             StanceLinkSnapshot besiegerPlayerStance,
             SettlementThreatSnapshot[] settlementThreatSnapshots,
             TimeControlEnum originalTimeControl,
+            bool playerWasDisorganized,
             int originalOwnerLeaderRelation)
         {
             Token = token;
@@ -1139,6 +1153,7 @@ internal class SiegeEntryDebugCommand
             BesiegerPlayerStance = besiegerPlayerStance;
             SettlementThreatSnapshots = settlementThreatSnapshots;
             OriginalTimeControl = originalTimeControl;
+            PlayerWasDisorganized = playerWasDisorganized;
             OriginalOwnerLeaderRelation = originalOwnerLeaderRelation;
             PhysicalSettlementId = settlementId;
         }
