@@ -452,7 +452,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var broker = Server.Resolve<IMessageBroker>();
-            broker.Subscribe<NetworkChangeBattleState>(_ => publishedConclusions++);
+            broker.Subscribe<AuthoritativeBattleConclusionRequested>(_ => publishedConclusions++);
             Server.Resolve<ServerBattleCompletionHandler>().ConclusionRetryDelay = TimeSpan.Zero;
 
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
