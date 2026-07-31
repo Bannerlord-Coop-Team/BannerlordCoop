@@ -59,10 +59,6 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
         {
             behavior.CheckAnimalBreeding(mobileParty);
             bool doesPartyConsumeFood = Campaign.Current.Models.MobilePartyFoodConsumptionModel.DoesPartyConsumeFood(mobileParty);
-            if (RepairNonConsumingPartyFoodState(mobileParty, doesPartyConsumeFood))
-            {
-                mobileParty.Party.OnConsumedFood();
-            }
 
             if (doesPartyConsumeFood)
             {
@@ -70,15 +66,6 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
                 behavior.PartyConsumeFood(mobileParty, mobileParty.IsPlayerParty() && mobileParty.Party.IsStarving);
             }
         });
-    }
-
-    internal static bool RepairNonConsumingPartyFoodState(MobileParty mobileParty, bool doesPartyConsumeFood)
-    {
-        if (!mobileParty.IsActive || doesPartyConsumeFood || mobileParty.Party.RemainingFoodPercentage >= 0) return false;
-
-        // Repair food debt persisted by the old predicate for parties vanilla excludes from consumption.
-        mobileParty.Party.RemainingFoodPercentage = 0;
-        return true;
     }
 
     public void PartyConsumeFood(FoodConsumptionBehavior behavior, MobileParty mobileParty, bool starvingCheck = false)
