@@ -317,18 +317,18 @@ internal class ServerSiegeEntryHandler : IHandler
                 if (party.MapEvent?.IsSiegeAssault == true && party.Party.Side == BattleSideEnum.Attacker)
                 {
                     messageBroker.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
-                    network.Send(peer, new NetworkBreakSiegeApproved(true, true));
+                    network.Send(peer, new NetworkBreakSiegeApproved(true, true, obj.FinishLocalMenus));
                     return;
                 }
 
                 Logger.Error("Party {PartyId} tried to leave a siege camp it is not in", obj.PartyId);
-                network.Send(peer, new NetworkBreakSiegeApproved(false, false));
+                network.Send(peer, new NetworkBreakSiegeApproved(false, false, obj.FinishLocalMenus));
                 return;
             }
 
             siegeEventInterface.BreakSiege(party);
 
-            network.Send(peer, new NetworkBreakSiegeApproved(true, false));
+            network.Send(peer, new NetworkBreakSiegeApproved(true, false, obj.FinishLocalMenus));
         });
     }
 

@@ -49,6 +49,7 @@ internal class ConversationRequestHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly object pvpInteractionSync = new object();
 
+    // Client request state is game-thread-only; patch publishers run there and receive handlers use GameThread.RunSafe.
     private DateTime lastRequestSentUtc = DateTime.MinValue;
     private string pendingConversationRequestId;
     private string activeConversationRequestId;
@@ -607,6 +608,7 @@ internal class ConversationRequestHandler : IHandler
         activeConversationRequestId = null;
         hasActiveConversationRequest = false;
 
+        // Release every request id the server may still hold; null only covers legacy or server-detected engagements.
         if (pendingRequestId != null)
             SendConversationEndedToServer(pendingRequestId);
 

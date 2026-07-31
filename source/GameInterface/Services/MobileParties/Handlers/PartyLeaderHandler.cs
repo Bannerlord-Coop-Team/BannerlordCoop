@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -7,7 +7,9 @@ using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -69,6 +71,12 @@ internal class PartyLeaderHandler : IHandler
             {
                 mobileParty.ChangePartyLeader(newLeader);
             }
+
+            var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+            if (ReferenceEquals(logic?.RightOwnerParty?.MobileParty, mobileParty))
+                logic._initialData.RightPartyLeaderHero = newLeader;
+            if (ReferenceEquals(logic?.LeftOwnerParty?.MobileParty, mobileParty))
+                logic._initialData.LeftPartyLeaderHero = newLeader;
 
             // The leader drives the party's map figure; refresh and rebuild it so the change is reflected visually.
             if (mobileParty.Party == null) return;

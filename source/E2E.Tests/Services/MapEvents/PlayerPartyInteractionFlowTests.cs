@@ -1,4 +1,5 @@
 ﻿using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Client.Services.SiegeEvents.Handlers;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
@@ -1555,7 +1556,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 new NetworkConversationDenied(
                     ConversationDeniedReason.PartyEngaged,
                     firstRequest.RequestId)));
-        Common.GameThread.Instance.MarkGameThread();
+        using var gameThreadMark = new GameThreadMarkScope();
 
         Assert.Equal(firstRequest.RequestId, GetPendingConversationRequestId(client));
 
@@ -1646,7 +1647,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     forcePlayerOutFromSettlement: false,
                     ConversationRestartSource.EncounterManager,
                     secondRequestId)));
-        Common.GameThread.Instance.MarkGameThread();
+        using var gameThreadMark = new GameThreadMarkScope();
         Assert.True(Common.GameThread.Instance.QueueLength > 0);
 
         var getEncounterMenu = AccessTools.Method(
@@ -2054,6 +2055,39 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             capturedEncounter,
             siege.SettlementId,
             siege.LeaderPartyId);
+    }
+
+    [Fact]
+    public void BreakInContinuation_HandlerDisposedBeforeApproval_RestoresLocationEncounter()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        client.NetworkSentMessages.Clear();
+        LocationEncounter? previousLocationEncounter = null;
+        client.Call(() => previousLocationEncounter = PlayerEncounter.LocationEncounter);
+
+        var captureRequestDisabledMethods = MapEventDisabledMethods
+            .Append(GetNetworkRoutingMethod())
+            .ToList();
+        client.Call(InvokeBreakInContinuation, captureRequestDisabledMethods);
+
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        client.Call(() =>
+        {
+            Assert.NotSame(previousLocationEncounter, PlayerEncounter.LocationEncounter);
+            client.Resolve<ClientSiegeEntryHandler>().Dispose();
+            Assert.Same(previousLocationEncounter, PlayerEncounter.LocationEncounter);
+        });
     }
 
     [Fact]
@@ -3151,6 +3185,19 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             requestId = (string?)field.GetValue(handler);
         });
         return requestId;
+    }
+
+    private sealed class GameThreadMarkScope : IDisposable
+    {
+        public GameThreadMarkScope()
+        {
+            Common.GameThread.Instance.MarkGameThread();
+        }
+
+        public void Dispose()
+        {
+            Common.GameThread.Instance.UnmarkGameThread();
+        }
     }
 
     private static bool ForceImmediateBattleEncounterMenu(
