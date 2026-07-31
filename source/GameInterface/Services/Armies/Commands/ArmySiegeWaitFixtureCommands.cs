@@ -122,7 +122,10 @@ public class ArmySiegeWaitFixtureCommands
 
         var leader = FindEligibleLeader(playerParty, settlement);
         if (leader == null)
-            return "No same-faction AI lord outside an army is available to lead the hostile Garontor siege.";
+        {
+            return "No same-faction AI lord outside an army is available to lead the hostile Garontor siege. " +
+                DescribeLeaderCandidates(playerParty, settlement);
+        }
         if (settlement.OwnerClan?.Leader == null)
             return "Garontor Castle does not have an owner hero whose relation can be restored.";
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
@@ -202,7 +205,10 @@ public class ArmySiegeWaitFixtureCommands
 
         var leader = FindEligibleLeader(playerParty, settlement);
         if (leader == null)
-            return "No same-faction AI lord outside an army is available to lead the hostile Garontor siege.";
+        {
+            return "No same-faction AI lord outside an army is available to lead the hostile Garontor siege. " +
+                DescribeLeaderCandidates(playerParty, settlement);
+        }
 
         var settlementOwnerHero = settlement.OwnerClan?.Leader;
         if (settlementOwnerHero == null)
@@ -252,6 +258,10 @@ public class ArmySiegeWaitFixtureCommands
                 playerParty.SetDisorganized(false);
             if (playerParty.IsDisorganized)
                 throw new InvalidOperationException("Unable to clear the joining player's transient disorganized state.");
+            if (activeFixture.LeaderDisorganized)
+                leader.SetDisorganized(false);
+            if (leader.IsDisorganized)
+                throw new InvalidOperationException("Unable to clear the AI leader's transient disorganized state.");
 
             timeControl.AddUnpausePolicy(TimeUnpausePolicy);
             activeFixture.TimePolicyAdded = true;
@@ -877,11 +887,37 @@ public class ArmySiegeWaitFixtureCommands
             .Where(candidate => candidate.IsActive && !candidate.IsPlayerParty() && candidate.Army == null &&
                 candidate.AttachedTo == null && candidate.MapEvent == null &&
                 candidate.BesiegerCamp == null && candidate.CurrentSettlement == null &&
-                candidate.LeaderHero != null && !candidate.IsDisorganized &&
+                candidate.LeaderHero != null &&
                 HasSameMapFaction(playerParty, candidate) && candidate.MapFaction is Kingdom &&
                 candidate.MapFaction.IsAtWarWith(settlement.MapFaction))
             .OrderByDescending(candidate => candidate.Party.CalculateCurrentStrength())
             .FirstOrDefault();
+
+    private static string DescribeLeaderCandidates(MobileParty playerParty, Settlement settlement)
+    {
+        var lords = MobileParty.AllLordParties
+            .Where(candidate => candidate.IsActive && !candidate.IsPlayerParty() && candidate.LeaderHero != null)
+            .ToArray();
+        var sameFactionLords = lords
+            .Where(candidate => HasSameMapFaction(playerParty, candidate))
+            .OrderByDescending(candidate => candidate.Party.CalculateCurrentStrength())
+            .ToArray();
+        var hostileKingdomLords = lords.Count(candidate =>
+            candidate.MapFaction is Kingdom &&
+            candidate.MapFaction.IsAtWarWith(settlement.MapFaction));
+        var states = sameFactionLords
+            .Take(12)
+            .Select(candidate =>
+                $"{candidate.StringId}[army={candidate.Army != null},attached={candidate.AttachedTo != null}," +
+                $"mapEvent={candidate.MapEvent != null},camp={candidate.BesiegerCamp != null}," +
+                $"settlement={candidate.CurrentSettlement?.StringId ?? "none"}," +
+                $"disorganized={candidate.IsDisorganized}]");
+
+        return $"playerFaction={playerParty.MapFaction?.StringId ?? "none"}, " +
+            $"playerFactionIsKingdom={playerParty.MapFaction is Kingdom}, " +
+            $"sameFactionLords={sameFactionLords.Length}, hostileKingdomLords={hostileKingdomLords}, " +
+            $"sameFactionStates={string.Join(";", states)}.";
+    }
 
     private static bool IsFixturePartyReady(MobileParty party) =>
         party?.IsActive == true &&
