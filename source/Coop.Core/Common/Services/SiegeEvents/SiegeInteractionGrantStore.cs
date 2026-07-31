@@ -30,8 +30,8 @@ public interface ISiegeInteractionGrantStore
 internal sealed class SiegeInteractionGrantStore : ISiegeInteractionGrantStore
 {
     private readonly object sync = new object();
-    private readonly Dictionary<NetPeer, SiegeInteractionGrant> remoteGrants =
-        new Dictionary<NetPeer, SiegeInteractionGrant>();
+    private readonly Dictionary<NetPeer, SiegeInteractionGrantWindow> remoteGrants =
+        new Dictionary<NetPeer, SiegeInteractionGrantWindow>();
     private SiegeInteractionGrant localGrant;
 
     public string CreateInteractionId() => Guid.NewGuid().ToString("N");
@@ -48,11 +48,18 @@ internal sealed class SiegeInteractionGrantStore : ISiegeInteractionGrantStore
 
         lock (sync)
         {
-            remoteGrants[peer] = new SiegeInteractionGrant(
+            var grant = new SiegeInteractionGrant(
                 interactionId,
                 partyId,
                 settlementId,
                 presentedCamp);
+            if (remoteGrants.TryGetValue(peer, out var window))
+            {
+                window.Grant(grant);
+                return;
+            }
+
+            remoteGrants[peer] = new SiegeInteractionGrantWindow(grant);
         }
     }
 
@@ -66,8 +73,8 @@ internal sealed class SiegeInteractionGrantStore : ISiegeInteractionGrantStore
         lock (sync)
         {
             if (peer == null ||
-                !remoteGrants.TryGetValue(peer, out var grant) ||
-                !grant.Matches(
+                !remoteGrants.TryGetValue(peer, out var window) ||
+                !window.TryConsume(
                     interactionId,
                     partyId,
                     settlementId,
@@ -76,7 +83,9 @@ internal sealed class SiegeInteractionGrantStore : ISiegeInteractionGrantStore
                 return false;
             }
 
-            remoteGrants.Remove(peer);
+            if (window.IsEmpty)
+                remoteGrants.Remove(peer);
+
             return true;
         }
     }
@@ -100,10 +109,11 @@ internal sealed class SiegeInteractionGrantStore : ISiegeInteractionGrantStore
         lock (sync)
         {
             var peers = new List<NetPeer>();
-            foreach (var grant in remoteGrants)
+            foreach (var window in remoteGrants)
             {
-                if (grant.Value.PartyId == partyId)
-                    peers.Add(grant.Key);
+                window.Value.RevokeParty(partyId);
+                if (window.Value.IsEmpty)
+                    peers.Add(window.Key);
             }
 
             foreach (var peer in peers)
@@ -145,6 +155,71 @@ internal sealed class SiegeInteractionGrantStore : ISiegeInteractionGrantStore
         {
             if (localGrant?.PartyId == partyId)
                 localGrant = null;
+        }
+    }
+
+    private sealed class SiegeInteractionGrantWindow
+    {
+        private SiegeInteractionGrant newest;
+        private SiegeInteractionGrant previous;
+
+        public bool IsEmpty => newest == null && previous == null;
+
+        public SiegeInteractionGrantWindow(SiegeInteractionGrant grant)
+        {
+            newest = grant;
+        }
+
+        public void Grant(SiegeInteractionGrant grant)
+        {
+            // The client may use the previous approval while this replacement waits on its game thread.
+            previous = newest;
+            newest = grant;
+        }
+
+        public bool TryConsume(
+            string interactionId,
+            string partyId,
+            string settlementId,
+            BesiegerCamp presentedCamp)
+        {
+            if (newest?.Matches(
+                    interactionId,
+                    partyId,
+                    settlementId,
+                    presentedCamp) == true)
+            {
+                newest = null;
+                previous = null;
+                return true;
+            }
+
+            if (previous?.Matches(
+                    interactionId,
+                    partyId,
+                    settlementId,
+                    presentedCamp) != true)
+            {
+                return false;
+            }
+
+            previous = null;
+            return true;
+        }
+
+        public void RevokeParty(string partyId)
+        {
+            if (newest?.PartyId == partyId)
+                newest = null;
+
+            if (previous?.PartyId == partyId)
+                previous = null;
+
+            if (newest == null && previous != null)
+            {
+                newest = previous;
+                previous = null;
+            }
         }
     }
 

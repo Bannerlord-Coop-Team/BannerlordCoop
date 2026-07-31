@@ -110,7 +110,7 @@ public class SettlementSiegeGrantInvalidationTests
     }
 
     [Fact]
-    public void ApprovedSettlementRequest_ReplacesTheExistingGrant()
+    public void ApprovedSettlementRequest_KeepsExistingGrantDuringReplacementHandoff()
     {
         var messageBroker = new TestMessageBroker();
         var network = new TestNetwork();
@@ -176,7 +176,7 @@ public class SettlementSiegeGrantInvalidationTests
                 replacementInteractionId));
         GameThread.Run(() => { }, blocking: true);
 
-        Assert.False(
+        Assert.True(
             grantStore.TryConsume(
                 peer,
                 interactionId,
@@ -193,6 +193,89 @@ public class SettlementSiegeGrantInvalidationTests
         Assert.Single(
             network.GetPeerMessagesFromType<NetworkStartSettlementEncounter>(
                 peer));
+    }
+
+    [Fact]
+    public void ConsumingNewestGrant_ClearsPreviousGrant()
+    {
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var grantStore = new SiegeInteractionGrantStore();
+        grantStore.Grant(
+            peer,
+            "previous",
+            "party",
+            "settlement",
+            presentedCamp: null);
+        grantStore.Grant(
+            peer,
+            "newest",
+            "party",
+            "settlement",
+            presentedCamp: null);
+
+        Assert.True(
+            grantStore.TryConsume(
+                peer,
+                "newest",
+                "party",
+                "settlement",
+                presentedCamp: null));
+        Assert.False(
+            grantStore.TryConsume(
+                peer,
+                "previous",
+                "party",
+                "settlement",
+                presentedCamp: null));
+    }
+
+    [Fact]
+    public void ThirdGrant_EvictsOldestGrant()
+    {
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var grantStore = new SiegeInteractionGrantStore();
+        grantStore.Grant(
+            peer,
+            "oldest",
+            "party",
+            "settlement",
+            presentedCamp: null);
+        grantStore.Grant(
+            peer,
+            "previous",
+            "party",
+            "settlement",
+            presentedCamp: null);
+        grantStore.Grant(
+            peer,
+            "newest",
+            "party",
+            "settlement",
+            presentedCamp: null);
+
+        Assert.False(
+            grantStore.TryConsume(
+                peer,
+                "oldest",
+                "party",
+                "settlement",
+                presentedCamp: null));
+        Assert.True(
+            grantStore.TryConsume(
+                peer,
+                "previous",
+                "party",
+                "settlement",
+                presentedCamp: null));
+        Assert.True(
+            grantStore.TryConsume(
+                peer,
+                "newest",
+                "party",
+                "settlement",
+                presentedCamp: null));
     }
 
     [Fact]

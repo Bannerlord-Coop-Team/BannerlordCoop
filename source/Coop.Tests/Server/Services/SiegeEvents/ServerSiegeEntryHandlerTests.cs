@@ -24,6 +24,97 @@ namespace Coop.Tests.Server.Services.SiegeEvents;
 public class ServerSiegeEntryHandlerTests
 {
     [Fact]
+    public void JoinRequest_WithPreviousGrant_UsesEntryValidator()
+    {
+        var messageBroker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        var siegeEventInterface = new Mock<ISiegeEventInterface>();
+        var validator = new Mock<ISiegeEntryValidator>();
+        var grantStore = new SiegeInteractionGrantStore();
+        const string partyId = "party";
+        const string settlementId = "settlement";
+        const string previousInteractionId = "previous-interaction";
+        const string newestInteractionId = "newest-interaction";
+        var player = new Player("controller", "hero", partyId, "clan", "character");
+        Player resolvedPlayer = player;
+        MobileParty resolvedParty = party;
+        Settlement resolvedSettlement = settlement;
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out resolvedPlayer))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(
+                partyId,
+                out resolvedParty))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(
+                settlementId,
+                out resolvedSettlement))
+            .Returns(true);
+        validator
+            .Setup(service => service.ValidateEntry(
+                party,
+                settlement,
+                SiegeEntryAction.Join))
+            .Returns(SiegeEntryValidationResult.Rejected(
+                SiegeEntryDenialReason.DefenderDisposition,
+                new SiegeEntryCanonicalState(
+                    SiegeEntryDisposition.Settlement,
+                    settlement)));
+        grantStore.Grant(
+            peer,
+            previousInteractionId,
+            partyId,
+            settlementId,
+            presentedCamp: null);
+        grantStore.Grant(
+            peer,
+            newestInteractionId,
+            partyId,
+            settlementId,
+            presentedCamp: null);
+
+        using var handler = new ServerSiegeEntryHandler(
+            messageBroker,
+            network,
+            objectManager.Object,
+            playerManager.Object,
+            siegeEventInterface.Object,
+            grantStore,
+            validator.Object);
+
+        messageBroker.Publish(
+            peer,
+            new NetworkRequestJoinSiegeCamp(
+                partyId,
+                settlementId,
+                previousInteractionId));
+        GameThread.Run(() => { }, blocking: true);
+
+        var result = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkSiegeEntryResult>(peer));
+        Assert.Equal(SiegeEntryDenialReason.DefenderDisposition, result.Reason);
+        Assert.True(
+            grantStore.TryConsume(
+                peer,
+                newestInteractionId,
+                partyId,
+                settlementId,
+                presentedCamp: null));
+        siegeEventInterface.Verify(
+            service => service.JoinSiegeCamp(
+                It.IsAny<MobileParty>(),
+                It.IsAny<Settlement>()),
+            Times.Never);
+    }
+
+    [Fact]
     public void BesiegeRequest_WhenAuthoritativeActionThrows_SendsTerminalResult()
     {
         var messageBroker = new TestMessageBroker();
