@@ -54,6 +54,16 @@ public interface IPlayerManager
     void ClearPeer(NetPeer peer);
 
     /// <summary>
+    /// Deletes a player's registration entirely: the Player entry, every peer link, and the
+    /// controlled-object markers on its hero/party/clan. The game objects themselves are
+    /// untouched. Used when a player's character is deleted; afterwards a rejoin with the same
+    /// controller id goes through character creation again.
+    /// </summary>
+    /// <param name="player">The player to delete from the registry</param>
+    /// <returns>true if the player was registered and is now removed</returns>
+    bool RemovePlayer(Player player);
+
+    /// <summary>
     /// Resolves the Player currently controlled by a connected peer.
     /// </summary>
     bool TryGetPlayer(NetPeer peer, out Player player);
@@ -190,6 +200,47 @@ public class PlayerManager : IPlayerManager
             if (controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) &&
                 ReferenceEquals(currentPeer, peer))
                 controllerToPeer.Remove(player.ControllerId);
+        }
+    }
+
+    /// <inheritdoc cref="IPlayerManager.RemovePlayer(Player)"/>
+    public bool RemovePlayer(Player player)
+    {
+        if (player == null || !_players.Remove(player)) return false;
+
+        lock (peerSync)
+        {
+            controllerToPeer.Remove(player.ControllerId);
+
+            // A rejoin adds a fresh peer link without clearing the old one, so sweep every peer
+            // still mapped to this player, not just the current one.
+            foreach (var stalePeer in peerToPlayer
+                         .Where(kvp => ReferenceEquals(kvp.Value, player))
+                         .Select(kvp => kvp.Key).ToArray())
+            {
+                peerToPlayer.TryRemove(stalePeer, out _);
+            }
+        }
+
+        RemovePlayerObject<MobileParty>(player.MobilePartyId);
+        RemovePlayerObject<Hero>(player.HeroId);
+        RemovePlayerObject<Clan>(player.ClanId);
+
+        return true;
+    }
+
+    private void RemovePlayerObject<T>(string networkId)
+    {
+        if (string.IsNullOrEmpty(networkId)) return;
+
+        // The object may already be gone (e.g. a destroyed party); nothing to unmark then.
+        if (!objectManager.TryGetObject<T>(networkId, out var obj)) return;
+
+        PlayerObjects.Remove(obj);
+
+        if (obj is MobileParty mobileParty)
+        {
+            InvalidatePlayerPartySpeedCache(mobileParty);
         }
     }
 
