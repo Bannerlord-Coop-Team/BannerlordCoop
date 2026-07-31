@@ -5,7 +5,6 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Players;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -93,6 +92,7 @@ internal class FoodConsumptionBehaviorPatches
     {
         if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
 
+        // Custom implementation to handle IsMainParty -> IsPlayerParty replacements and client notifications
         foodConsumptionBehaviorInterface.PartyConsumeFood(__instance, mobileParty, starvingCheck);
 
         return false;
@@ -104,6 +104,7 @@ internal class FoodConsumptionBehaviorPatches
     {
         if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
 
+        // Custom implementation to handle IsMainParty -> IsPlayerParty replacement and client notification
         foodConsumptionBehaviorInterface.CheckAnimalBreeding(__instance, party);
 
         return false;
