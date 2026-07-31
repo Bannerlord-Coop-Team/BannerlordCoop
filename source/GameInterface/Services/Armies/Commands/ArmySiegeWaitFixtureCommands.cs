@@ -370,6 +370,14 @@ public class ArmySiegeWaitFixtureCommands
             MoveAndHold(playerParty, new CampaignVec2(
                 new TaleWorlds.Library.Vec2(settlement.GatePosition.X + 3f, settlement.GatePosition.Y + 1f),
                 isOnLand: true));
+            activeFixture.Army.AiBehaviorObject = settlement;
+            if (activeFixture.Army.AiBehaviorObject != settlement ||
+                activeFixture.Army.LeaderParty != leader ||
+                leader.Army != activeFixture.Army)
+            {
+                throw new InvalidOperationException(
+                    "Unable to target the staged army at Garontor Castle.");
+            }
             return $"Army siege-wait fixture staged: settlement={settlement.Name} ({settlement.StringId}), " +
                    $"leader={leader.StringId}, leaderPartyId={activeFixture.LeaderPartyId}, " +
                    $"armyLeader={activeFixture.Army.LeaderParty.StringId}, joiningPlayer={playerParty.StringId}, " +
@@ -603,6 +611,10 @@ public class ArmySiegeWaitFixtureCommands
             activeFixture.LeaderParty == leader;
         var playerClan = player.LeaderHero?.Clan ?? player.ActualClan;
         var leaderKingdom = leader.MapFaction as Kingdom;
+        var leaderArmy = leader.Army;
+        var armyTargetSettlement = leaderArmy?.AiBehaviorObject is Settlement targetSettlement
+            ? targetSettlement.StringId
+            : "none";
         var relationRestored = matchesFixture
             ? (CharacterRelationManager.GetHeroRelation(activeFixture.SettlementOwnerHero, activeFixture.LeaderHero) ==
                 activeFixture.OwnerLeaderRelation).ToString()
@@ -721,6 +733,8 @@ public class ArmySiegeWaitFixtureCommands
             : "unknown";
         return $"Fixture: settlement={settlement.StringId}, siege={settlement.SiegeEvent != null}, " +
                $"leader={DescribeParty(leader)}, player={DescribeParty(player)}, " +
+               $"armyLeader={leaderArmy?.LeaderParty?.StringId ?? "none"}, " +
+               $"armyTargetSettlement={armyTargetSettlement}, " +
                $"playerClan={playerClan?.StringId ?? "none"}, " +
                $"playerClanKingdom={playerClan?.Kingdom?.StringId ?? "none"}, " +
                $"playerMapFaction={player?.MapFaction?.StringId ?? "none"}, " +
