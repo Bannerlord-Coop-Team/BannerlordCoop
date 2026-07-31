@@ -38,6 +38,7 @@ internal class MapEventHandler : IHandler
 
         messageBroker.Subscribe<MapEventBattleStateChangeAttempted>(Handle_MapEventBattleStateChangeAttempted);
         messageBroker.Subscribe<NetworkChangeBattleState>(Handle_NetworkChangeBattleState);
+        messageBroker.Subscribe<AuthoritativeBattleConclusionRequested>(Handle_AuthoritativeBattleConclusionRequested);
 
         messageBroker.Subscribe<MapEventSurrenderAttempted>(Handle_MapEventSurrenderAttempted);
         messageBroker.Subscribe<NetworkMapEventSurrender>(Handle_NetworkMapEventSurrender);
@@ -48,6 +49,7 @@ internal class MapEventHandler : IHandler
 
         messageBroker.Unsubscribe<MapEventBattleStateChangeAttempted>(Handle_MapEventBattleStateChangeAttempted);
         messageBroker.Unsubscribe<NetworkChangeBattleState>(Handle_NetworkChangeBattleState);
+        messageBroker.Unsubscribe<AuthoritativeBattleConclusionRequested>(Handle_AuthoritativeBattleConclusionRequested);
 
         messageBroker.Unsubscribe<MapEventSurrenderAttempted>(Handle_MapEventSurrenderAttempted);
         messageBroker.Unsubscribe<NetworkMapEventSurrender>(Handle_NetworkMapEventSurrender);
@@ -72,6 +74,35 @@ internal class MapEventHandler : IHandler
 
     private void Handle_NetworkChangeBattleState(MessagePayload<NetworkChangeBattleState> payload)
     {
+        ApplyBattleStateChange(
+            payload.What.MapEventId,
+            payload.What.BattleState,
+            payload.What.HostEpoch,
+            payload.Who as NetPeer,
+            false);
+    }
+
+    private void Handle_AuthoritativeBattleConclusionRequested(
+        MessagePayload<AuthoritativeBattleConclusionRequested> payload)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        ApplyBattleStateChange(
+            payload.What.MapEventId,
+            payload.What.BattleState,
+            payload.What.HostEpoch,
+            null,
+            true);
+    }
+
+    private void ApplyBattleStateChange(
+        string mapEventId,
+        BattleState battleState,
+        int hostEpoch,
+        NetPeer sender,
+        bool isAuthoritativeServerConclusion)
+    {
         // Do NOT wrap in AllowedThread. Setting BattleState to a victory state runs the native setter ->
         // OnBattleWon -> CalculateAndCommitMapEventResults -> CaptureDefeatedPartyMembers, which is the
         // server-authoritative capture path. Under AllowedThread CallOriginalPolicy.IsOriginalAllowed() is
@@ -80,9 +111,6 @@ internal class MapEventHandler : IHandler
         // the client gets no capture UI and the player party is never parked. The server's BattleState
         // setter does not re-broadcast (MapEventPatches.Prefix_BattleState returns without publishing on the
         // server), so no AllowedThread is needed to prevent an echo.
-        var mapEventId = payload.What.MapEventId;
-        var battleState = payload.What.BattleState;
-        var sender = payload.Who as NetPeer;
         GameThread.Run(() =>
         {
             bool applied = false;
@@ -108,29 +136,44 @@ internal class MapEventHandler : IHandler
                     return;
                 }
 
-            // Only the elected battle host's conclusion is authoritative: a non-host's local mission can
-            // conclude a victory the shared battle never reached (its enemies arrive as another client's
-            // puppets). Applying it would run the full capture/finalize on a battle still being fought.
+                // Only the elected battle host's conclusion is authoritative: a non-host's local mission can
+                // conclude a victory the shared battle never reached (its enemies arrive as another client's
+                // puppets). Applying it would run the full capture/finalize on a battle still being fought.
                 if ((battleState == BattleState.AttackerVictory || battleState == BattleState.DefenderVictory)
                     && hostRegistry.TryGet(mapEventId, out var hostAssignment))
                 {
-                    if (sender != null
-                        && playerManager.TryGetPlayer(sender, out var sendingPlayer)
-                        && sendingPlayer.ControllerId != hostAssignment.HostControllerId)
+                    if (!isAuthoritativeServerConclusion)
                     {
-                        Logger.Information("Refused battle state {BattleState} for {MapEventId} from non-host {ControllerId}",
-                            battleState, mapEventId, sendingPlayer.ControllerId);
-                        return;
+                        if (sender == null)
+                        {
+                            Logger.Information("Refused battle state {BattleState} for {MapEventId}: sender was not a network peer (expected host {HostControllerId})",
+                                battleState, mapEventId, hostAssignment.HostControllerId);
+                            return;
+                        }
+
+                        if (!playerManager.TryGetPlayer(sender, out var sendingPlayer))
+                        {
+                            Logger.Information("Refused battle state {BattleState} for {MapEventId}: sender was not a registered player (expected host {HostControllerId})",
+                                battleState, mapEventId, hostAssignment.HostControllerId);
+                            return;
+                        }
+
+                        if (sendingPlayer.ControllerId != hostAssignment.HostControllerId)
+                        {
+                            Logger.Information("Refused battle state {BattleState} for {MapEventId} from non-host {ControllerId}",
+                                battleState, mapEventId, sendingPlayer.ControllerId);
+                            return;
+                        }
                     }
 
-                // BR-102: even the correct sender may hold stale authority — a report stamped with the epoch
-                // of an earlier hosting stint (in flight across a migration, or from a former host that has
-                // since been re-promoted) must not conclude the battle. Only a report stamped with the
-                // CURRENT assignment's epoch is honored.
-                    if (payload.What.HostEpoch != hostAssignment.Epoch)
+                    // BR-102: even the correct sender may hold stale authority — a report stamped with the epoch
+                    // of an earlier hosting stint (in flight across a migration, or from a former host that has
+                    // since been re-promoted) must not conclude the battle. Only a report stamped with the
+                    // CURRENT assignment's epoch is honored.
+                    if (hostEpoch != hostAssignment.Epoch)
                     {
                         Logger.Information("Refused battle state {BattleState} for {MapEventId}: stale host epoch {Stale} (current {Current})",
-                            battleState, mapEventId, payload.What.HostEpoch, hostAssignment.Epoch);
+                            battleState, mapEventId, hostEpoch, hostAssignment.Epoch);
                         return;
                     }
                 }

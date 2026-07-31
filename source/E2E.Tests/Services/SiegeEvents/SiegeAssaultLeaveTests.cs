@@ -61,7 +61,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
         leavingClient.Call(() =>
         {
-            leavingClient.Resolve<INetwork>().SendAll(new NetworkRequestBreakSiege(partyId));
+            leavingClient.Resolve<INetwork>().SendAll(new NetworkRequestBreakSiege(partyId, finishLocalMenus: true));
         }, MapEventDisabledMethods
             .Concat(SiegeCreationDisabledMethods)
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
