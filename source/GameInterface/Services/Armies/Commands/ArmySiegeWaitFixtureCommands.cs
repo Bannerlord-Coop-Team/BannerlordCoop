@@ -5,6 +5,7 @@ using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -49,6 +50,18 @@ public class ArmySiegeWaitFixtureCommands
         public Settlement.SiegeState CurrentSiegeState;
     }
 
+    private sealed class ClanMembershipSnapshot
+    {
+        public Clan Clan;
+        public Kingdom Kingdom;
+        public IFaction MapFaction;
+        public bool IsUnderMercenaryService;
+        public int FiefCount;
+        public Kingdom[] CollectionKingdoms;
+        public MBList<Clan> FixtureKingdomClanList;
+        public Clan[] FixtureKingdomClans;
+    }
+
     private sealed class Fixture
     {
         public string ControllerId;
@@ -58,6 +71,9 @@ public class ArmySiegeWaitFixtureCommands
         public MobileParty LeaderParty;
         public string PlayerPartyId;
         public string LeaderPartyId;
+        public ClanMembershipSnapshot PlayerClanMembership;
+        public Kingdom FixtureKingdom;
+        public int FixtureKingdomClanCount;
         public Army Army;
         public SiegeEvent SiegeEvent;
         public BesiegerCamp BesiegerCamp;
@@ -88,6 +104,9 @@ public class ArmySiegeWaitFixtureCommands
     {
         public Settlement Settlement;
         public MobileParty LeaderParty;
+        public ClanMembershipSnapshot PlayerClanMembership;
+        public Kingdom FixtureKingdom;
+        public int FixtureKingdomClanCount;
         public bool LeaderRethinkAtNextHourlyTick;
         public SettlementSnapshot[] SettlementSnapshots;
     }
@@ -113,6 +132,8 @@ public class ArmySiegeWaitFixtureCommands
         if (!TryGetConnectedPlayerParty(args[0], out var playerParty, out var error) ||
             !TryGetConnectedPlayerParty(args[1], out _, out error))
             return error;
+        if (!TryGetFixturePlayerClan(playerParty, out var playerClan, out error))
+            return error;
 
         var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == "castle_EW1");
         if (settlement == null)
@@ -120,12 +141,15 @@ public class ArmySiegeWaitFixtureCommands
         if (settlement.SiegeEvent != null)
             return "Garontor Castle is already under siege.";
 
-        var leader = FindEligibleLeader(playerParty, settlement);
+        var leader = FindEligibleLeader(playerClan, settlement);
         if (leader == null)
         {
-            return "No same-faction AI lord outside an army is available to lead the hostile Garontor siege. " +
-                DescribeLeaderCandidates(playerParty, settlement);
+            return "No hostile AI kingdom lord outside an army is available to lead the Garontor siege. " +
+                DescribeLeaderCandidates(playerClan, settlement);
         }
+        var fixtureKingdom = (Kingdom)leader.MapFaction;
+        if (!TryValidateMembershipFixture(playerClan, fixtureKingdom, out error))
+            return error;
         if (settlement.OwnerClan?.Leader == null)
             return "Garontor Castle does not have an owner hero whose relation can be restored.";
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
@@ -138,6 +162,8 @@ public class ArmySiegeWaitFixtureCommands
         return $"Army siege-wait fixture preflight: ready={IsFixturePartyReady(playerParty)}, " +
             $"recoverable={IsFixturePartyRecoverable(playerParty)}, settlement={settlement.StringId}, " +
             $"joiningPartyId={playerPartyId}, leaderPartyId={leaderPartyId}, " +
+            $"playerClanId={playerClan.StringId}, originalKingdomId={playerClan.Kingdom?.StringId ?? "none"}, " +
+            $"leaderKingdomId={fixtureKingdom.StringId}, leaderKingdomClanCount={fixtureKingdom.Clans.Count}, " +
             $"player={DescribeParty(playerParty)}, leader={DescribeParty(leader)}.";
     }
 
@@ -146,14 +172,25 @@ public class ArmySiegeWaitFixtureCommands
     {
         if (ModInformation.IsServer)
             return "Run this command on a client.";
-        if (args.Count != 1)
-            return "Usage: coop.debug.army.siege_wait_fixture_snapshot_client <leaderPartyId>";
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.army.siege_wait_fixture_snapshot_client " +
+                "<joiningPartyId> <leaderPartyId>";
+        }
         if (clientStateFixture != null)
             return "A client army siege-wait fixture snapshot is already active.";
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return "Unable to resolve ObjectManager.";
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(args[0], out var leader))
-            return $"Unable to resolve AI leader party {args[0]}.";
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(args[0], out var playerParty))
+            return $"Unable to resolve joining party {args[0]}.";
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(args[1], out var leader))
+            return $"Unable to resolve AI leader party {args[1]}.";
+        if (!TryGetFixturePlayerClan(playerParty, out var playerClan, out var error))
+            return error;
+        if (!(leader.MapFaction is Kingdom fixtureKingdom))
+            return "The AI leader does not belong to a kingdom.";
+        if (!TryValidateMembershipFixture(playerClan, fixtureKingdom, out error))
+            return error;
 
         var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == "castle_EW1");
         if (settlement == null)
@@ -166,12 +203,17 @@ public class ArmySiegeWaitFixtureCommands
         {
             Settlement = settlement,
             LeaderParty = leader,
+            PlayerClanMembership = CaptureClanMembership(playerClan, fixtureKingdom),
+            FixtureKingdom = fixtureKingdom,
+            FixtureKingdomClanCount = fixtureKingdom.Clans.Count,
             LeaderRethinkAtNextHourlyTick = leader.Ai.RethinkAtNextHourlyTick,
             SettlementSnapshots = settlementSnapshots,
         };
         lastRestoredClientStateFixture = null;
 
         return $"Client army siege-wait fixture snapshot captured: leader={leader.StringId}, " +
+               $"playerClan={playerClan.StringId}, leaderKingdom={fixtureKingdom.StringId}, " +
+               $"leaderKingdomClanCount={fixtureKingdom.Clans.Count}, " +
                $"leaderRethinkAtNextHourlyTick={leader.Ai.RethinkAtNextHourlyTick}, " +
                $"settlementSnapshots={settlementSnapshots.Length}.";
     }
@@ -182,14 +224,19 @@ public class ArmySiegeWaitFixtureCommands
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
-        if (args.Count != 2)
-            return "Usage: coop.debug.army.siege_wait_fixture_stage <controllerId> <observerControllerId>";
+        if (args.Count != 3)
+        {
+            return "Usage: coop.debug.army.siege_wait_fixture_stage " +
+                "<controllerId> <observerControllerId> <leaderPartyId>";
+        }
 
         if (fixture != null)
             return "An army siege-wait fixture is already active.";
 
         if (!TryGetConnectedPlayerParty(args[0], out var playerParty, out var error) ||
             !TryGetConnectedPlayerParty(args[1], out _, out error))
+            return error;
+        if (!TryGetFixturePlayerClan(playerParty, out var playerClan, out error))
             return error;
 
         if (playerParty.CurrentSettlement != null || playerParty.Army != null ||
@@ -203,12 +250,14 @@ public class ArmySiegeWaitFixtureCommands
         if (settlement.SiegeEvent != null)
             return "Garontor Castle is already under siege.";
 
-        var leader = FindEligibleLeader(playerParty, settlement);
-        if (leader == null)
-        {
-            return "No same-faction AI lord outside an army is available to lead the hostile Garontor siege. " +
-                DescribeLeaderCandidates(playerParty, settlement);
-        }
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(args[2], out var leader))
+            return $"Unable to resolve AI leader party {args[2]}.";
+        if (!IsEligibleLeader(leader, playerClan, settlement, out var fixtureKingdom))
+            return $"AI leader party {args[2]} no longer qualifies for the Garontor fixture.";
+        if (!TryValidateMembershipFixture(playerClan, fixtureKingdom, out error))
+            return error;
 
         var settlementOwnerHero = settlement.OwnerClan?.Leader;
         if (settlementOwnerHero == null)
@@ -218,14 +267,16 @@ public class ArmySiegeWaitFixtureCommands
             !behaviorSnapshot.TryCreate(playerParty, out var playerBehavior) ||
             !behaviorSnapshot.TryCreate(leader, out var leaderBehavior))
             return "Unable to capture the player or AI leader movement state.";
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId) ||
+        if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId) ||
             !objectManager.TryGetIdWithLogging(leader, out var leaderPartyId))
             return "Unable to capture the registered player or AI leader party ids.";
         if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControl))
             return "Unable to resolve authoritative time control.";
+        if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+            return "Unable to resolve kingdom membership state.";
 
         var settlementSnapshots = CaptureSettlementStates(leader, settlement);
+        var playerClanMembership = CaptureClanMembership(playerClan, fixtureKingdom);
 
         var activeFixture = new Fixture
         {
@@ -236,6 +287,9 @@ public class ArmySiegeWaitFixtureCommands
             LeaderParty = leader,
             PlayerPartyId = playerPartyId,
             LeaderPartyId = leaderPartyId,
+            PlayerClanMembership = playerClanMembership,
+            FixtureKingdom = fixtureKingdom,
+            FixtureKingdomClanCount = fixtureKingdom.Clans.Count,
             SettlementOwnerHero = settlementOwnerHero,
             LeaderHero = leader.LeaderHero,
             OwnerLeaderRelation = CharacterRelationManager.GetHeroRelation(settlementOwnerHero, leader.LeaderHero),
@@ -269,9 +323,23 @@ public class ArmySiegeWaitFixtureCommands
             if (timeControl.GetTimeControl() != TimeControlEnum.Pause)
                 throw new InvalidOperationException("Unable to pause authoritative campaign time.");
 
+            kingdomMembershipState.MoveClanToKingdom(
+                playerClanMembership.Kingdom,
+                fixtureKingdom,
+                playerClan,
+                publishCollectionChanges: true);
+            if (!IsClanMembershipStaged(
+                    playerClanMembership,
+                    fixtureKingdom,
+                    activeFixture.FixtureKingdomClanCount))
+            {
+                throw new InvalidOperationException(
+                    "Unable to join the player clan to the AI leader's kingdom.");
+            }
+
             try
             {
-                ((Kingdom)leader.MapFaction).CreateArmy(leader.LeaderHero, settlement, Army.ArmyTypes.Besieger);
+                fixtureKingdom.CreateArmy(leader.LeaderHero, settlement, Army.ArmyTypes.Besieger);
             }
             finally
             {
@@ -303,6 +371,9 @@ public class ArmySiegeWaitFixtureCommands
                    $"armyLeader={activeFixture.Army.LeaderParty.StringId}, joiningPlayer={playerParty.StringId}, " +
                    $"joiningPartyId={activeFixture.PlayerPartyId}, playerAtSea={playerBehavior.IsCurrentlyAtSea}, " +
                    $"leaderAtSea={leaderBehavior.IsCurrentlyAtSea}, " +
+                   $"playerClan={playerClan.StringId}, originalKingdom={playerClanMembership.Kingdom?.StringId ?? "none"}, " +
+                   $"leaderKingdom={fixtureKingdom.StringId}, " +
+                   $"leaderKingdomOriginalClanCount={activeFixture.FixtureKingdomClanCount}, " +
                    $"playerDisorganized={activeFixture.PlayerDisorganized}, " +
                    $"playerDisorganizedUntilTicks={activeFixture.PlayerDisorganizedUntilTime.NumTicks}, " +
                    $"leaderDisorganized={activeFixture.LeaderDisorganized}, " +
@@ -391,7 +462,11 @@ public class ArmySiegeWaitFixtureCommands
         if (activeClientStateFixture != null &&
             (activeClientStateFixture.Settlement.SiegeEvent != null ||
              activeClientStateFixture.LeaderParty.Army != null ||
-             activeClientStateFixture.LeaderParty.BesiegerCamp != null))
+             activeClientStateFixture.LeaderParty.BesiegerCamp != null ||
+             !IsClanMembershipRestored(
+                 activeClientStateFixture.PlayerClanMembership,
+                 activeClientStateFixture.FixtureKingdom,
+                 activeClientStateFixture.FixtureKingdomClanCount)))
         {
             return "Client army siege-wait fixture restore is waiting for replicated teardown.";
         }
@@ -420,9 +495,14 @@ public class ArmySiegeWaitFixtureCommands
             if (activeClientStateFixture != null &&
                 (!AreSettlementStatesRestored(activeClientStateFixture.SettlementSnapshots) ||
                  activeClientStateFixture.LeaderParty.Ai.RethinkAtNextHourlyTick !=
-                    activeClientStateFixture.LeaderRethinkAtNextHourlyTick))
+                    activeClientStateFixture.LeaderRethinkAtNextHourlyTick ||
+                 !IsClanMembershipRestored(
+                     activeClientStateFixture.PlayerClanMembership,
+                     activeClientStateFixture.FixtureKingdom,
+                     activeClientStateFixture.FixtureKingdomClanCount)))
             {
-                throw new InvalidOperationException("Unable to restore the client-local siege-side or party AI state.");
+                throw new InvalidOperationException(
+                    "Unable to verify the replicated membership, siege-side, or party AI state.");
             }
 
             lastRestoredClientFixture = activeClientFixture;
@@ -433,7 +513,8 @@ public class ArmySiegeWaitFixtureCommands
                    $"leader={activeClientStateFixture?.LeaderParty.StringId ?? activeClientFixture.LeaderHero.StringId}, " +
                    $"meetingState={activeClientFixture != null}, " +
                    $"settlementState={activeClientStateFixture != null}, " +
-                   $"leaderRethinkState={activeClientStateFixture != null}.";
+                   $"leaderRethinkState={activeClientStateFixture != null}, " +
+                   $"clientMembershipRestored={activeClientStateFixture != null}.";
         }
         catch (Exception exception)
         {
@@ -461,6 +542,8 @@ public class ArmySiegeWaitFixtureCommands
         var matchesFixture = activeFixture != null &&
             activeFixture.PlayerParty == player &&
             activeFixture.LeaderParty == leader;
+        var playerClan = player.LeaderHero?.Clan ?? player.ActualClan;
+        var leaderKingdom = leader.MapFaction as Kingdom;
         var relationRestored = matchesFixture
             ? (CharacterRelationManager.GetHeroRelation(activeFixture.SettlementOwnerHero, activeFixture.LeaderHero) ==
                 activeFixture.OwnerLeaderRelation).ToString()
@@ -496,6 +579,13 @@ public class ArmySiegeWaitFixtureCommands
         var settlementStateRestored = matchesFixture
             ? (fixture == null && AreSettlementStatesRestored(activeFixture)).ToString()
             : "unknown";
+        var membershipRestored = matchesFixture
+            ? (fixture == null &&
+               IsClanMembershipRestored(
+                   activeFixture.PlayerClanMembership,
+                   activeFixture.FixtureKingdom,
+                   activeFixture.FixtureKingdomClanCount)).ToString()
+            : "unknown";
         var timePaused = matchesFixture &&
             fixture != null &&
             ContainerProvider.TryResolve<ITimeControlInterface>(out var activeTimeControl)
@@ -517,7 +607,8 @@ public class ArmySiegeWaitFixtureCommands
         var activeClientStateFixture = clientStateFixture ?? lastRestoredClientStateFixture;
         var matchesClientStateFixture = activeClientStateFixture != null &&
             activeClientStateFixture.LeaderParty == leader &&
-            activeClientStateFixture.Settlement == settlement;
+            activeClientStateFixture.Settlement == settlement &&
+            activeClientStateFixture.PlayerClanMembership.Clan == playerClan;
         var clientSettlementStateRestored = matchesClientStateFixture
             ? (clientStateFixture == null &&
                AreSettlementStatesRestored(activeClientStateFixture.SettlementSnapshots)).ToString()
@@ -527,6 +618,24 @@ public class ArmySiegeWaitFixtureCommands
                activeClientStateFixture.LeaderParty.Ai.RethinkAtNextHourlyTick ==
                     activeClientStateFixture.LeaderRethinkAtNextHourlyTick).ToString()
             : "unknown";
+        var clientMembershipRestored = matchesClientStateFixture
+            ? (clientStateFixture == null &&
+               IsClanMembershipRestored(
+                   activeClientStateFixture.PlayerClanMembership,
+                   activeClientStateFixture.FixtureKingdom,
+                   activeClientStateFixture.FixtureKingdomClanCount)).ToString()
+            : "unknown";
+        var membershipStaged = matchesFixture && fixture != null
+            ? IsClanMembershipStaged(
+                activeFixture.PlayerClanMembership,
+                activeFixture.FixtureKingdom,
+                activeFixture.FixtureKingdomClanCount)
+            : matchesClientStateFixture && clientStateFixture != null
+                ? IsClanMembershipStaged(
+                    activeClientStateFixture.PlayerClanMembership,
+                    activeClientStateFixture.FixtureKingdom,
+                    activeClientStateFixture.FixtureKingdomClanCount)
+                : IsClanCurrentlyInKingdom(playerClan, leaderKingdom);
         var playerBehaviorState = "unavailable";
         var leaderBehaviorState = "unavailable";
         if (ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var currentBehaviorSnapshot))
@@ -545,6 +654,17 @@ public class ArmySiegeWaitFixtureCommands
             : "unknown";
         return $"Fixture: settlement={settlement.StringId}, siege={settlement.SiegeEvent != null}, " +
                $"leader={DescribeParty(leader)}, player={DescribeParty(player)}, " +
+               $"playerClan={playerClan?.StringId ?? "none"}, " +
+               $"playerClanKingdom={playerClan?.Kingdom?.StringId ?? "none"}, " +
+               $"playerMapFaction={player?.MapFaction?.StringId ?? "none"}, " +
+               $"playerClanMercenary={playerClan?.IsUnderMercenaryService.ToString() ?? "unknown"}, " +
+               $"playerClanFiefCount={(playerClan == null ? -1 : GetClanFiefCount(playerClan))}, " +
+               $"playerClanCollections={DescribeClanCollections(playerClan)}, " +
+               $"leaderKingdom={leaderKingdom?.StringId ?? "none"}, " +
+               $"leaderMapFaction={leader.MapFaction?.StringId ?? "none"}, " +
+               $"playerClanInLeaderKingdom={KingdomContainsClan(leaderKingdom, playerClan)}, " +
+               $"leaderKingdomClanCount={leaderKingdom?.Clans.Count ?? -1}, " +
+               $"membershipStaged={membershipStaged}, " +
                $"playerPosition={DescribePosition(player.Position)}, " +
                $"leaderPosition={DescribePosition(leader.Position)}, " +
                $"playerBehavior={playerBehaviorState}, leaderBehavior={leaderBehaviorState}, " +
@@ -561,9 +681,11 @@ public class ArmySiegeWaitFixtureCommands
                $"leaderDisorganizedRestored={leaderDisorganizedRestored}, " +
                $"leaderRethinkRestored={leaderRethinkRestored}, " +
                $"settlementStateRestored={settlementStateRestored}, " +
+               $"membershipRestored={membershipRestored}, " +
                $"timePaused={timePaused}, timeRestored={timeRestored}, leaderHeroRestored={leaderHeroRestored}, " +
                $"clientSettlementStateRestored={clientSettlementStateRestored}, " +
                $"clientLeaderRethinkRestored={clientLeaderRethinkRestored}, " +
+               $"clientMembershipRestored={clientMembershipRestored}, " +
                $"encounter={PlayerEncounter.Current != null}, " +
                $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "none"}.";
     }
@@ -682,6 +804,16 @@ public class ArmySiegeWaitFixtureCommands
         catch (Exception exception)
         {
             restoreFailure = exception.Message;
+        }
+        try
+        {
+            RestoreClanMembership(activeFixture);
+        }
+        catch (Exception exception)
+        {
+            restoreFailure = restoreFailure == null
+                ? exception.Message
+                : $"{restoreFailure}; membership restoration failed: {exception.Message}";
         }
         if (restoreFailure == null)
         {
@@ -860,6 +992,195 @@ public class ArmySiegeWaitFixtureCommands
         party.Position.IsOnLand == behavior.PartyPosition.IsOnLand &&
         (party.Position - behavior.PartyPosition).LengthSquared < 0.0001f;
 
+    private static ClanMembershipSnapshot CaptureClanMembership(Clan clan, Kingdom fixtureKingdom) =>
+        new ClanMembershipSnapshot
+        {
+            Clan = clan,
+            Kingdom = clan.Kingdom,
+            MapFaction = clan.MapFaction,
+            IsUnderMercenaryService = clan.IsUnderMercenaryService,
+            FiefCount = GetClanFiefCount(clan),
+            CollectionKingdoms = GetClanCollectionKingdoms(clan),
+            FixtureKingdomClanList = fixtureKingdom._clans,
+            FixtureKingdomClans = fixtureKingdom._clans.ToArray(),
+        };
+
+    private static bool IsClanMembershipStaged(
+        ClanMembershipSnapshot snapshot,
+        Kingdom fixtureKingdom,
+        int fixtureKingdomClanCount)
+    {
+        if (snapshot?.Clan == null || fixtureKingdom == null ||
+            snapshot.FixtureKingdomClanList != fixtureKingdom._clans ||
+            fixtureKingdomClanCount != snapshot.FixtureKingdomClans.Length ||
+            fixtureKingdom._clans.Count != fixtureKingdomClanCount + 1 ||
+            !fixtureKingdom._clans.Take(fixtureKingdomClanCount)
+                .SequenceEqual(snapshot.FixtureKingdomClans) ||
+            fixtureKingdom._clans[fixtureKingdomClanCount] != snapshot.Clan)
+        {
+            return false;
+        }
+
+        var expectedCollectionKingdoms = snapshot.CollectionKingdoms
+            .Concat(new[] { fixtureKingdom })
+            .Distinct()
+            .ToArray();
+        return snapshot.Clan.Kingdom == fixtureKingdom &&
+            snapshot.Clan.MapFaction == fixtureKingdom &&
+            snapshot.Clan.IsUnderMercenaryService == snapshot.IsUnderMercenaryService &&
+            GetClanFiefCount(snapshot.Clan) == snapshot.FiefCount &&
+            HaveSameKingdoms(GetClanCollectionKingdoms(snapshot.Clan), expectedCollectionKingdoms);
+    }
+
+    private static bool IsClanMembershipRestored(
+        ClanMembershipSnapshot snapshot,
+        Kingdom fixtureKingdom,
+        int fixtureKingdomClanCount) =>
+        snapshot?.Clan != null &&
+        fixtureKingdom != null &&
+        snapshot.FixtureKingdomClanList == fixtureKingdom._clans &&
+        fixtureKingdomClanCount == snapshot.FixtureKingdomClans.Length &&
+        fixtureKingdom._clans.SequenceEqual(snapshot.FixtureKingdomClans) &&
+        snapshot.Clan.Kingdom == snapshot.Kingdom &&
+        snapshot.Clan.MapFaction == snapshot.MapFaction &&
+        snapshot.Clan.IsUnderMercenaryService == snapshot.IsUnderMercenaryService &&
+        GetClanFiefCount(snapshot.Clan) == snapshot.FiefCount &&
+        HaveSameKingdoms(GetClanCollectionKingdoms(snapshot.Clan), snapshot.CollectionKingdoms);
+
+    private static void RestoreClanMembership(Fixture activeFixture)
+    {
+        if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+            throw new InvalidOperationException("Unable to resolve kingdom membership state for restoration.");
+
+        kingdomMembershipState.MoveClanToKingdom(
+            activeFixture.FixtureKingdom,
+            activeFixture.PlayerClanMembership.Kingdom,
+            activeFixture.PlayerClanMembership.Clan,
+            publishCollectionChanges: true);
+        if (!IsClanMembershipRestored(
+                activeFixture.PlayerClanMembership,
+                activeFixture.FixtureKingdom,
+                activeFixture.FixtureKingdomClanCount))
+        {
+            throw new InvalidOperationException("Unable to restore the joining player's clan membership.");
+        }
+    }
+
+    private static bool TryGetFixturePlayerClan(
+        MobileParty playerParty,
+        out Clan playerClan,
+        out string error)
+    {
+        playerClan = playerParty?.LeaderHero?.Clan ?? playerParty?.ActualClan;
+        error = null;
+        if (playerClan != null)
+            return true;
+
+        error = "Unable to resolve the joining player's clan.";
+        return false;
+    }
+
+    private static bool TryValidateMembershipFixture(
+        Clan playerClan,
+        Kingdom fixtureKingdom,
+        out string error)
+    {
+        error = null;
+        if (playerClan.Kingdom != null)
+        {
+            error = $"The joining player clan already belongs to kingdom {playerClan.Kingdom.StringId}.";
+            return false;
+        }
+        if (playerClan.IsUnderMercenaryService)
+        {
+            error = "The joining player clan must not be under mercenary service.";
+            return false;
+        }
+        if (GetClanFiefCount(playerClan) != 0)
+        {
+            error = "The joining player clan must not own fiefs.";
+            return false;
+        }
+        if (fixtureKingdom == null)
+        {
+            error = "The AI leader does not belong to a kingdom.";
+            return false;
+        }
+        if (KingdomContainsClan(fixtureKingdom, playerClan))
+        {
+            error = $"Kingdom {fixtureKingdom.StringId} already contains the joining player clan.";
+            return false;
+        }
+        if (!HasInitializedRuntimeCollections(fixtureKingdom))
+        {
+            error = $"Kingdom {fixtureKingdom.StringId} does not have fully initialized runtime state.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool HasInitializedRuntimeCollections(Kingdom kingdom) =>
+        kingdom._activePolicies != null &&
+        kingdom._armies != null &&
+        kingdom._clans != null &&
+        kingdom._unresolvedDecisions != null &&
+        kingdom._factionsAtWarWith != null &&
+        kingdom._alliedKingdoms != null &&
+        kingdom._fiefsCache != null &&
+        kingdom._townsCache != null &&
+        kingdom._settlementsCache != null &&
+        kingdom._villagesCache != null &&
+        kingdom._heroesCache != null &&
+        kingdom._aliveLordsCache != null &&
+        kingdom._deadLordsCache != null &&
+        kingdom._warPartyComponentsCache != null &&
+        kingdom.EncyclopediaText != null &&
+        kingdom.EncyclopediaTitle != null &&
+        kingdom.EncyclopediaRulerTitle != null;
+
+    private static int GetClanFiefCount(Clan clan)
+    {
+        if (clan == null)
+            return -1;
+
+        var fiefs = new List<Town>();
+        if (clan.Fiefs != null)
+            fiefs.AddRange(clan.Fiefs.Where(fief => fief != null));
+        if (clan._fiefsCache != null)
+            fiefs.AddRange(clan._fiefsCache.Where(fief => fief != null));
+        return fiefs.Distinct().Count();
+    }
+
+    private static Kingdom[] GetClanCollectionKingdoms(Clan clan) =>
+        clan == null
+            ? Array.Empty<Kingdom>()
+            : Kingdom.All
+                .Where(kingdom => KingdomContainsClan(kingdom, clan))
+                .ToArray();
+
+    private static bool HaveSameKingdoms(Kingdom[] left, Kingdom[] right) =>
+        left.Length == right.Length && left.All(right.Contains);
+
+    private static bool KingdomContainsClan(Kingdom kingdom, Clan clan) =>
+        kingdom?._clans?.Contains(clan) == true;
+
+    private static bool IsClanCurrentlyInKingdom(Clan clan, Kingdom kingdom) =>
+        clan != null &&
+        kingdom != null &&
+        clan.Kingdom == kingdom &&
+        clan.MapFaction == kingdom &&
+        KingdomContainsClan(kingdom, clan);
+
+    private static string DescribeClanCollections(Clan clan)
+    {
+        var kingdomIds = GetClanCollectionKingdoms(clan)
+            .Select(kingdom => kingdom.StringId)
+            .OrderBy(kingdomId => kingdomId)
+            .ToArray();
+        return kingdomIds.Length == 0 ? "none" : string.Join(";", kingdomIds);
+    }
+
     private static bool TryGetConnectedPlayerParty(string controllerId, out MobileParty party, out string error)
     {
         party = null;
@@ -882,41 +1203,56 @@ public class ArmySiegeWaitFixtureCommands
         return playerFaction != null && playerFaction == leaderParty?.MapFaction;
     }
 
-    private static MobileParty FindEligibleLeader(MobileParty playerParty, Settlement settlement) =>
+    private static MobileParty FindEligibleLeader(Clan playerClan, Settlement settlement) =>
         MobileParty.AllLordParties
-            .Where(candidate => candidate.IsActive && !candidate.IsPlayerParty() && candidate.Army == null &&
-                candidate.AttachedTo == null && candidate.MapEvent == null &&
-                candidate.BesiegerCamp == null && candidate.CurrentSettlement == null &&
-                candidate.LeaderHero != null &&
-                HasSameMapFaction(playerParty, candidate) && candidate.MapFaction is Kingdom &&
-                candidate.MapFaction.IsAtWarWith(settlement.MapFaction))
+            .Where(candidate => IsEligibleLeader(candidate, playerClan, settlement, out _))
             .OrderByDescending(candidate => candidate.Party.CalculateCurrentStrength())
             .FirstOrDefault();
 
-    private static string DescribeLeaderCandidates(MobileParty playerParty, Settlement settlement)
+    private static bool IsEligibleLeader(
+        MobileParty candidate,
+        Clan playerClan,
+        Settlement settlement,
+        out Kingdom fixtureKingdom)
+    {
+        fixtureKingdom = candidate?.MapFaction as Kingdom;
+        return candidate?.IsActive == true &&
+            !candidate.IsPlayerParty() &&
+            candidate.Army == null &&
+            candidate.AttachedTo == null &&
+            candidate.MapEvent == null &&
+            candidate.BesiegerCamp == null &&
+            candidate.CurrentSettlement == null &&
+            candidate.LeaderHero != null &&
+            fixtureKingdom != null &&
+            fixtureKingdom.IsAtWarWith(settlement.MapFaction) &&
+            TryValidateMembershipFixture(playerClan, fixtureKingdom, out _);
+    }
+
+    private static string DescribeLeaderCandidates(Clan playerClan, Settlement settlement)
     {
         var lords = MobileParty.AllLordParties
             .Where(candidate => candidate.IsActive && !candidate.IsPlayerParty() && candidate.LeaderHero != null)
             .ToArray();
-        var sameFactionLords = lords
-            .Where(candidate => HasSameMapFaction(playerParty, candidate))
+        var hostileKingdomLords = lords
+            .Where(candidate =>
+                candidate.MapFaction is Kingdom &&
+                candidate.MapFaction.IsAtWarWith(settlement.MapFaction))
             .OrderByDescending(candidate => candidate.Party.CalculateCurrentStrength())
             .ToArray();
-        var hostileKingdomLords = lords.Count(candidate =>
-            candidate.MapFaction is Kingdom &&
-            candidate.MapFaction.IsAtWarWith(settlement.MapFaction));
-        var states = sameFactionLords
+        var states = hostileKingdomLords
             .Take(12)
             .Select(candidate =>
-                $"{candidate.StringId}[army={candidate.Army != null},attached={candidate.AttachedTo != null}," +
+                $"{candidate.StringId}[kingdom={candidate.MapFaction.StringId}," +
+                $"army={candidate.Army != null},attached={candidate.AttachedTo != null}," +
                 $"mapEvent={candidate.MapEvent != null},camp={candidate.BesiegerCamp != null}," +
                 $"settlement={candidate.CurrentSettlement?.StringId ?? "none"}," +
                 $"disorganized={candidate.IsDisorganized}]");
 
-        return $"playerFaction={playerParty.MapFaction?.StringId ?? "none"}, " +
-            $"playerFactionIsKingdom={playerParty.MapFaction is Kingdom}, " +
-            $"sameFactionLords={sameFactionLords.Length}, hostileKingdomLords={hostileKingdomLords}, " +
-            $"sameFactionStates={string.Join(";", states)}.";
+        return $"playerClan={playerClan?.StringId ?? "none"}, " +
+            $"playerKingdom={playerClan?.Kingdom?.StringId ?? "none"}, " +
+            $"hostileKingdomLords={hostileKingdomLords.Length}, " +
+            $"hostileStates={string.Join(";", states)}.";
     }
 
     private static bool IsFixturePartyReady(MobileParty party) =>
