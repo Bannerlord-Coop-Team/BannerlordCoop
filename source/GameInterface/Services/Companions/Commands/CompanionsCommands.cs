@@ -17,7 +17,9 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Helpers;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -339,6 +341,20 @@ internal class CompanionsCommands
 
         PartyScreenHelper.CloseScreen(true, true);
         return "PARTY_SCREEN_CLOSED";
+    }
+
+    [CommandLineArgumentFunction("commit_party_screen", "coop.debug.companions")]
+    public static string CommitPartyScreenCommand(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.companions.commit_party_screen";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState))
+            return "No active party screen.";
+
+        PartyScreenHelper.CloseScreen(false);
+        return Game.Current?.GameStateManager?.ActiveState is PartyState
+            ? "PARTY_SCREEN_COMMIT_REJECTED"
+            : "PARTY_SCREEN_COMMITTED";
     }
 
     private static Hero CreateFixtureCompanion(Hero template,

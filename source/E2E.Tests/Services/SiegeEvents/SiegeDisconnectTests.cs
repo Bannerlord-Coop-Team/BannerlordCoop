@@ -319,6 +319,7 @@ public class SiegeDisconnectTests : MapEventTestBase
         var (_, leaderPartyId) = CreatePlayerHeroParty("AssaultLeader");
         var (_, memberPartyId) = CreatePlayerHeroParty("AssaultMember");
         var (_, defenderPartyId) = CreatePlayerHeroParty("AssaultDefender");
+        var (_, bystanderPartyId) = CreatePlayerHeroParty("AssaultBystander");
         var siege = SetupSiege(leaderPartyId);
         var disabledMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
@@ -330,6 +331,7 @@ public class SiegeDisconnectTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leaderPartyId, out var leader));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(memberPartyId, out var member));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderPartyId, out var defender));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(bystanderPartyId, out var bystander));
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
@@ -357,6 +359,8 @@ public class SiegeDisconnectTests : MapEventTestBase
             defender._currentSettlement = siegeEvent.BesiegedSettlement;
             siegeEvent.BesiegedSettlement._partiesCache.Add(defender);
             defender.Party.MapEventSide = defenderSide;
+            bystander._currentSettlement = siegeEvent.BesiegedSettlement;
+            siegeEvent.BesiegedSettlement._partiesCache.Add(bystander);
             siegeEvent.BesiegedSettlement.Party.MapEventSide = defenderSide;
             Assert.True(mapEvent.IsSiegeAssault);
             Assert.False(mapEvent.HasWinner);

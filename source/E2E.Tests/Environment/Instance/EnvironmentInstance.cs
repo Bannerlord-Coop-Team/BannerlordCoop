@@ -219,8 +219,14 @@ public abstract class EnvironmentInstance : IDisposable
         {
             var disableMethod = AccessTools.Method(typeof(PatchScope), nameof(Disable));
             methods = disableMethods.ToArray();
+            // Priority.Last, not First: an explicit priority keeps the disable's position deterministic
+            // across container rebuilds (same-priority prefixes run in patch-insertion order, which varies),
+            // but it must sort AFTER the mod's own prefixes — a bool prefix returning false skips every
+            // later bool prefix, and tests drive real patched natives expecting their routing prefixes
+            // (e.g. SiegeEntryFlowPatches' publish-and-pre-null shapes) to still fire while only the
+            // native body is suppressed.
             patches = methods
-                .Select(_ => new HarmonyMethod(disableMethod) { priority = Priority.First })
+                .Select(_ => new HarmonyMethod(disableMethod) { priority = Priority.Last })
                 .ToArray();
 
             for (int i = 0; i < methods.Length; i++)

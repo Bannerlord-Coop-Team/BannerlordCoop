@@ -87,16 +87,14 @@ internal class SiegePreparationPromptPatches
         var camp = __instance.BesiegerCamp;
         var leaderParty = camp?.LeaderParty;
         var attackerParties = GetMobileParties(camp?.GetInvolvedPartiesForEventType());
-        var defenderParties = GetDefenderParties(settlement);
+        var defenderParties = interruptedActiveAssault
+            ? GetMapEventParties(mapEvent.DefenderSide)
+            : GetDefenderParties(settlement);
         if (interruptedActiveAssault)
         {
             leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty ?? leaderParty;
             attackerParties = attackerParties
                 .Concat(GetMapEventParties(mapEvent.AttackerSide))
-                .Distinct()
-                .ToArray();
-            defenderParties = defenderParties
-                .Concat(GetMapEventParties(mapEvent.DefenderSide))
                 .Distinct()
                 .ToArray();
         }

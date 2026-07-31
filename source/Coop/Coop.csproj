@@ -205,6 +205,7 @@
     <Compile Include="AssemblyHellscape.cs" />
     <Compile Include="BootPatches.cs" />
     <Compile Include="CoopMod.cs" />
+    <Compile Include="CrashReporting\CrashDiagnostics.cs" />
     <Compile Include="LiveTesting\LiveTestControlServer.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -224,6 +225,11 @@
       <Project>{442b73f2-b103-4ef6-8b4b-a2f36f169515}</Project>
       <Name>Coop.Core</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Coop.CrashReporter\Coop.CrashReporter.csproj">
+      <Project>{8D983480-E9ED-4850-AB2B-E089109AC1DF}</Project>
+      <Name>Coop.CrashReporter</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">
       <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
       <Name>GameInterface</Name>
@@ -238,6 +244,17 @@
     <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="CopyCrashReporterToOutput" AfterTargets="Build" BeforeTargets="DeployToGame">
+    <PropertyGroup>
+      <CrashReporterOutputPath>$(MSBuildProjectDirectory)\..\Coop.CrashReporter\bin\$(Configuration)\Coop.CrashReporter.exe</CrashReporterOutputPath>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(CrashReporterOutputPath)')"
+           Text="Crash reporter build output was not found at $(CrashReporterOutputPath)." />
+    <Copy SourceFiles="$(CrashReporterOutputPath)"
+          DestinationFolder="$(TargetDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(CrashReporterOutputPath)')" />
+  </Target>
   <!-- Deploy module into the Bannerlord install (mb2 junction). See Deploy.targets. -->
   <PropertyGroup>
     <ModName>Coop</ModName>

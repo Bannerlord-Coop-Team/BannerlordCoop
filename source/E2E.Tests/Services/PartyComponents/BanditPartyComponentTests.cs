@@ -1,4 +1,6 @@
 ﻿using E2E.Tests.Util;
+using GameInterface.Services.Bandits;
+using GameInterface.Utils;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -61,6 +63,7 @@ public class BanditPartyComponentTests : SyncTestBase
         // Act
         string? partyId = null;
         string? clanId = null;
+        string? settlementId = null;
 
         server.Call(() =>
         {
@@ -76,12 +79,15 @@ public class BanditPartyComponentTests : SyncTestBase
 
             Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
             Assert.True(server.ObjectManager.TryGetId(clan, out clanId));
+            Assert.True(server.ObjectManager.TryGetId(settlement, out settlementId));
             Assert.Same(clan, newParty.ActualClan);
+            Assert.Same(settlement, newParty.HomeSettlement);
         });
 
         // Assert
         Assert.NotNull(partyId);
         Assert.NotNull(clanId);
+        Assert.NotNull(settlementId);
 
         foreach (var client in TestEnvironment.Clients)
         {
@@ -95,7 +101,53 @@ public class BanditPartyComponentTests : SyncTestBase
             // MapFaction resolves via ActualClan for bandit parties.
             Assert.True(client.ObjectManager.TryGetObject<Clan>(clanId, out var clientClan));
             Assert.Same(clientClan, newParty.ActualClan);
+
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var clientSettlement));
+            Assert.Same(clientSettlement, newParty.HomeSettlement);
         }
+    }
+
+    [Fact]
+    public void RepairMissingHomeSettlements_WhenLooterSaveIsCorrupted_UsesNearestTown()
+    {
+        var server = TestEnvironment.Server;
+
+        server.Call(() =>
+        {
+            var nearSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            nearSettlement.Town = GameObjectCreator.CreateInitializedObject<Town>();
+            nearSettlement._position = new CampaignVec2(new Vec2(10, 10), true);
+
+            var farSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            farSettlement.Town = GameObjectCreator.CreateInitializedObject<Town>();
+            farSettlement._position = new CampaignVec2(new Vec2(100, 100), true);
+
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
+            var party = BanditPartyComponent.CreateLooterParty(
+                "CorruptedLooter",
+                clan,
+                nearSettlement,
+                false,
+                template,
+                new CampaignVec2(new Vec2(11, 11), true));
+            var component = Assert.IsType<BanditPartyComponent>(party.PartyComponent);
+
+            ReflectionUtils.SetPrivateField(
+                typeof(BanditPartyComponent),
+                nameof(BanditPartyComponent._relatedSettlement),
+                component,
+                null);
+            Assert.Null(party.HomeSettlement);
+
+            int repairedCount = server.Resolve<IBanditPartyHomeSettlementRepairer>()
+                .RepairMissingHomeSettlements(
+                    new[] { party },
+                    new[] { farSettlement, nearSettlement });
+
+            Assert.Equal(1, repairedCount);
+            Assert.Same(nearSettlement, party.HomeSettlement);
+        });
     }
 
     [Fact]

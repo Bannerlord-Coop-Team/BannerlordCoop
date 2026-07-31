@@ -165,7 +165,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (party.MapEvent != null) continue;
 
             deferredMapEventParking.Remove(party);
-            if (!party.IsActive || !IsDisconnectedPlayerParty(party)) continue;
+            if (!party.IsActive || !playerManager.IsOwnerOfPartyDisconnected(party)) continue;
 
             LeaveSiegeBeforeParking(party);
             party.IsActive = false;
@@ -176,12 +176,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
         }
     }
 
-    private bool IsDisconnectedPlayerParty(MobileParty party) =>
-        playerManager.Players.Any(player =>
-            !playerManager.IsConnected(player) &&
-            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) &&
-            ReferenceEquals(playerParty, party));
-
     private void LeaveSiegeBeforeParking(MobileParty party)
     {
         if (party.BesiegerCamp == null) return;
@@ -191,7 +185,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
             party.StringId);
         siegeEventInterface.BreakSiegeForPartyOnly(party);
     }
-
     /// <summary>
     /// Removes the party's map figure and tells every client to do the same, mirroring
     /// PartyVisualLifetimeHandler's NetworkDestroyPartyVisual path exactly, but triggered by us
