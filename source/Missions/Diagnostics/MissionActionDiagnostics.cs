@@ -44,6 +44,7 @@ internal static class MissionActionDiagnostics
     private const int MovementChannel = 2;
     private const int TraceAgentsPerMovementClass = 8;
     private const int MaximumTimelineEvents = 20000;
+    private const int MaximumRewindSamples = 64;
     private const float ProgressTolerance = 0.02f;
 
     private static readonly long[] PollTicks = new long[2];
@@ -468,19 +469,22 @@ internal static class MissionActionDiagnostics
             && startProgress + ProgressTolerance < currentProgress)
         {
             rewindCommands++;
-            AddEvent(
-                "animation-rewind",
-                agentId,
-                "observer",
-                source,
-                channel,
-                targetActionIndex,
-                agent.GetCurrentActionType(channel).ToString(),
-                startProgress,
-                sequence,
-                restart,
-                sameAction,
-                currentProgress: currentProgress);
+            if (rewindCommands <= MaximumRewindSamples)
+            {
+                AddEvent(
+                    "animation-rewind",
+                    agentId,
+                    "observer",
+                    source,
+                    channel,
+                    targetActionIndex,
+                    agent.GetCurrentActionType(channel).ToString(),
+                    startProgress,
+                    sequence,
+                    restart,
+                    sameAction,
+                    currentProgress: currentProgress);
+            }
         }
 
         AddEvent(

@@ -100,6 +100,26 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ApplyMount_DoesNotRewriteMatchingEmptyActionChannels()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+
+            new AgentMountData(sourceHorse).ApplyMount(puppetHorse);
+
+            Assert.Equal(0, puppetHorseMirror.SetActionChannelCalls);
+            Assert.Equal(0, puppetHorseMirror.SetCurrentActionProgressCalls);
+        });
+    }
+
+    [Fact]
     public void AgentData_AppliesRiderAndMountLocomotionFlagsWithoutClearingDefend()
     {
         using var fixture = new MissionEngineFixture();

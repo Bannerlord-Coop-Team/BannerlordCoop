@@ -50,7 +50,7 @@ namespace Missions.Agents.Packets
 
             // Channel 0 is the horse's GAIT (walk/trot/canter/gallop). A Controller.None puppet has no controller
             // to select it, so without replicating the owner's gait action the horse slides with no leg animation.
-            if (mountAgent.GetCurrentAction(0) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(0).Index != MountAction0Index)
+            if (mountAgent.GetCurrentAction(0).Index != MountAction0Index)
             {
                 string gaitActionName = AgentActionData.GetActionNameWithCode(MountAction0Index);
                 if (gaitActionName != null)
@@ -67,7 +67,7 @@ namespace Missions.Agents.Packets
                     mountAgent.SetActionChannel(0, ActionIndexCache.Create(gaitActionName), additionalFlags: (AnimFlags)MountAction0Flag, startProgress: MountAction0Progress);
                 }
             }
-            else
+            else if (MountAction0Index != ActionIndexCache.act_none.Index)
             {
 #if DEBUG
                 MissionActionDiagnostics.RecordMountProgressReplay(
@@ -80,7 +80,7 @@ namespace Missions.Agents.Packets
             }
 
             //Currently not doing anything afaik
-            if (mountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(1).Index != MountAction1Index)
+            if (mountAgent.GetCurrentAction(1).Index != MountAction1Index)
             {
                 string mActionName2 = AgentActionData.GetActionNameWithCode(MountAction1Index);
                 if (mActionName2 != null)
@@ -97,7 +97,7 @@ namespace Missions.Agents.Packets
                     mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (AnimFlags)MountAction1Flag, startProgress: MountAction1Progress);
                 }
             }
-            else
+            else if (MountAction1Index != ActionIndexCache.act_none.Index)
             {
 #if DEBUG
                 MissionActionDiagnostics.RecordMountProgressReplay(
