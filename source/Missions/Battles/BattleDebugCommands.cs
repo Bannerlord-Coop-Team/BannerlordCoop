@@ -358,6 +358,8 @@ internal static class BattleDebugCommands
         foreach (Agent rider in riders)
         {
             RestoreCavalryController(rider);
+            if (rider.MountAgent != null)
+                RestoreCavalryController(rider.MountAgent);
             rider.SetScriptedFlags(Agent.AIScriptedFrameFlags.None);
             rider.SetMaximumSpeedLimit(-1f, isMultiplier: false);
             rider.MountAgent?.SetMaximumSpeedLimit(-1f, isMultiplier: false);
@@ -417,6 +419,7 @@ internal static class BattleDebugCommands
             rider.SetIsAIPaused(true);
             if (rider.MountAgent != null)
             {
+                FreezeCavalryController(rider.MountAgent);
                 rider.MountAgent.SetMaximumSpeedLimit(0f, isMultiplier: false);
                 rider.MountAgent.MovementInputVector = Vec2.Zero;
                 rider.MountAgent.SetIsAIPaused(true);
