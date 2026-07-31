@@ -38,6 +38,7 @@ internal class SaveDataHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Unsubscribe<NetworkGameSaveStateChanged>(Handle_NetworkGameSaveStateChanged);
+        saveNotificationInterface.SetSaving(false);
     }
 
     private void Handle_NetworkGameSaveStateChanged(MessagePayload<NetworkGameSaveStateChanged> payload)

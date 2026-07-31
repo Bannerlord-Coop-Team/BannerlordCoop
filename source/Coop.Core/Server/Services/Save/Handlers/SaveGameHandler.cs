@@ -7,6 +7,7 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Save.Messages;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
@@ -21,6 +22,7 @@ internal class SaveGameHandler : IHandler
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IPlayerManager playerRegistry;
     private readonly INetwork network;
+    private readonly HashSet<object> activeSaveSources = new HashSet<object>();
 
     public SaveGameHandler(
         IMessageBroker messageBroker,
@@ -53,7 +55,20 @@ internal class SaveGameHandler : IHandler
 
     private void Handle_GameSaveStateChanged(MessagePayload<GameSaveStateChanged> payload)
     {
-        network.SendAll(new NetworkGameSaveStateChanged(payload.What.IsSaving));
+        lock (activeSaveSources)
+        {
+            if (payload.What.IsSaving)
+            {
+                if (!activeSaveSources.Add(payload.Who) || activeSaveSources.Count != 1)
+                    return;
+            }
+            else if (!activeSaveSources.Remove(payload.Who) || activeSaveSources.Count != 0)
+            {
+                return;
+            }
+
+            network.SendAll(new NetworkGameSaveStateChanged(payload.What.IsSaving));
+        }
     }
 
     private void Handle_GameSaved(MessagePayload<GameSaved> obj)

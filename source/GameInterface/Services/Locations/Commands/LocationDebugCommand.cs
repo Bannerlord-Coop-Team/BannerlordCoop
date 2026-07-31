@@ -27,7 +27,7 @@ public class LocationDebugCommand
             return "Run this command on a client.";
 
         if (args.Count != 1)
-            return "Usage: coop.debug.location.enter <LocationId>";
+            return "Usage: coop.debug.location.enter <LocationId>. Warning: this starts a client-local encounter and can desync from the server.";
 
         if (TryResolveLocation(args[0], out var location, out var error) == false)
             return error;

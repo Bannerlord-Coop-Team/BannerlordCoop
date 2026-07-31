@@ -26,4 +26,20 @@ public class SaveDataHandlerTests
             value => value.SetSaving(isSaving),
             Times.Once);
     }
+
+    [Fact]
+    public void Dispose_ClearsSavingNotification()
+    {
+        var messageBroker = new TestMessageBroker();
+        var saveNotificationInterface = new Mock<ISaveNotificationInterface>();
+        var handler = new SaveDataHandler(
+            messageBroker,
+            saveNotificationInterface.Object);
+
+        handler.Dispose();
+
+        saveNotificationInterface.Verify(
+            value => value.SetSaving(false),
+            Times.Once);
+    }
 }

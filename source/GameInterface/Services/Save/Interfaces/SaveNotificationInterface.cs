@@ -6,6 +6,7 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Save.Interfaces;
 
+/// <summary>Shows or clears the native saving overlay on a campaign-map client.</summary>
 public interface ISaveNotificationInterface : IGameAbstraction
 {
     void SetSaving(bool isSaving);
