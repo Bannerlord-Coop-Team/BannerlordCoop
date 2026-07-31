@@ -899,40 +899,8 @@ public class SiegeDebugCommand
             return "The campaign map screen is not active";
         }
 
-        MapScreen.Instance.MapCameraView.FastMoveCameraToPosition(settlement.Position, false);
+        MapScreen.Instance.FastMoveCameraToPosition(settlement.Position);
         return $"Centered the campaign camera on {settlement.Name} ({settlement.StringId})";
-    }
-
-    [CommandLineArgumentFunction("camera_state", "coop.debug.siege")]
-    public static string GetCameraState(List<string> args)
-    {
-        if (ModInformation.IsServer)
-        {
-            return "This command can only be used by a client";
-        }
-
-        if (args.Count != 0)
-        {
-            return "Usage: coop.debug.siege.camera_state";
-        }
-
-        var camera = MapScreen.Instance?.MapCameraView;
-        if (camera == null)
-        {
-            return "The campaign map screen is not active";
-        }
-
-        float targetDistanceSquared = camera.IdealCameraTarget.DistanceSquared(camera._cameraTarget);
-        bool targetSettled = targetDistanceSquared < 0.0001f;
-        bool zoomSettled = Math.Abs(camera.TargetCameraDistance - camera.CameraDistance) < 0.001f;
-        bool settled = !camera._doFastCameraMovementToTarget &&
-            !camera.CameraAnimationInProgress &&
-            targetSettled &&
-            zoomSettled;
-        return $"Campaign camera state: settled={settled}, " +
-            $"fastMove={camera._doFastCameraMovementToTarget}, " +
-            $"animation={camera.CameraAnimationInProgress}, " +
-            $"targetSettled={targetSettled}, zoomSettled={zoomSettled}";
     }
 
     // coop.debug.siege.dump_party <heroName|main|partyId>
