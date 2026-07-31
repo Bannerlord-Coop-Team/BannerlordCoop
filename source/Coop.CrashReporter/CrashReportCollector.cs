@@ -13,7 +13,6 @@ namespace Coop.CrashReporter
     internal sealed class CrashReportCollector
     {
         private const string RuntimeArgumentsMarker = "#TW#Runtime#TW#Arguments#TW#";
-        private static readonly TimeSpan CleanExitDumpDiscoveryTimeout = TimeSpan.FromSeconds(5);
         private static readonly TimeSpan CrashDumpDiscoveryTimeout = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DumpCompletionTimeout = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(250);
@@ -58,7 +57,7 @@ namespace Coop.CrashReporter
             process.WaitForExit();
             int exitCode = process.ExitCode;
             string dumpPath = exitCode == 0
-                ? WaitForMatchingDump(CleanExitDumpDiscoveryTimeout)
+                ? WaitForMatchingDump(CrashDumpDiscoveryTimeout)
                 : null;
             if (exitCode == 0 && dumpPath == null)
                 return 0;
