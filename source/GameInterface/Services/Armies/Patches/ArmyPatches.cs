@@ -5,11 +5,13 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Utils;
 using HarmonyLib;
 using Helpers;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
@@ -18,7 +20,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.LinQuick;
 using TaleWorlds.Localization;
 namespace GameInterface.Services.Armies.Patches;
 
@@ -188,58 +189,17 @@ public class ArmyPatches
     /// Replaces MobileParty.MainParty to IsPlayerParty
     /// else player created armies can get instantly disbanded
     /// </summary>
-    [HarmonyPatch(typeof(Army), nameof(Army.CheckArmyDispersion))]
-    [HarmonyPrefix]
-    private static bool CheckArmyDispersionPrefix(Army __instance)
+    [HarmonyTargetMethod]
+    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
     {
-        if (__instance.LeaderParty.IsPlayerParty())
-        {
-            if (__instance.Cohesion <= 0.1f)
-            {
-                DisbandArmyAction.ApplyByCohesionDepleted(__instance);
-                return false;
-            }
-            return false;
-        }
-        else
-        {
-            int num = __instance.LeaderParty.Party.IsStarving ? 1 : 0;
-            using (List<MobileParty>.Enumerator enumerator = __instance.LeaderParty.AttachedParties.GetEnumerator())
-            {
-                while (enumerator.MoveNext())
-                {
-                    if (enumerator.Current.Party.IsStarving)
-                    {
-                        num++;
-                    }
-                }
-            }
-            if ((float)num / (float)__instance.LeaderPartyAndAttachedPartiesCount > 0.5f)
-            {
-                DisbandArmyAction.ApplyByFoodProblem(__instance);
-                return false;
-            }
-            if (MBRandom.RandomFloat < 0.25f)
-            {
-                if (!__instance.LeaderParty.MapFaction.FactionsAtWarWith.AnyQ((IFaction x) => x.Fiefs.Any<Town>()))
-                {
-                    DisbandArmyAction.ApplyByNoActiveWar(__instance);
-                    return false;
-                }
-            }
-            if (__instance.Cohesion <= 0.1f)
-            {
-                DisbandArmyAction.ApplyByCohesionDepleted(__instance);
-                return false;
-            }
-            if (!__instance.LeaderParty.IsActive)
-            {
-                DisbandArmyAction.ApplyByUnknownReason(__instance);
-            }
-            __instance.CheckInactivity();
-            return false;
-        }
-    }
+        AccessTools.Method(typeof(Army), nameof(Army.CheckArmyDispersion)),
+        AccessTools.Method(typeof(Army), nameof(Army.HourlyTick))
+    };
+
+    [HarmonyTranspiler]
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        => MainPartyComparisonTranspiler.ReplaceMainPartyComparisonsWithIsPlayerParty(instructions);
+    
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
         GameThread.RunSafe(() =>
