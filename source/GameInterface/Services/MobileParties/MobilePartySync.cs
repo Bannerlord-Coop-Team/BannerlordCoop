@@ -1,4 +1,5 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.Services.Armies.Commands;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
@@ -11,6 +12,11 @@ internal class MobilePartySync : IAutoSync
         // Sync Fields
         autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect)), GameInterface.HARMONY_GAME_STARTED_CATEGORY);
         autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(MobilePartyAi), nameof(MobilePartyAi.GetFleeBehavior)));
+        autoSyncBuilder.AddTargetMethod(
+            typeof(MobileParty),
+            AccessTools.Method(
+                typeof(ArmySiegeWaitFixtureCommands),
+                nameof(ArmySiegeWaitFixtureCommands.RestoreDisorganizedState)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty.HasUnpaidWages)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._disorganizedUntilTime)));
