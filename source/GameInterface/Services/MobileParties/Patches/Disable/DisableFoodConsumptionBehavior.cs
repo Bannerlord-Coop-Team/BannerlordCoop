@@ -1,9 +1,12 @@
 ﻿using Common;
+using GameInterface.Extentions;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
@@ -50,18 +53,37 @@ internal class FoodConsumptionBehaviorPatches
 
         if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
 
-        // Custom implementation to move check for starving player parties into daily tick from OnTick
         foodConsumptionBehaviorInterface.DailyTickParty(__instance, party);
 
         return false;
     }
 
+    private static Dictionary<MobileParty, int> playerPartyLastItemVersions = new();
+
     [HarmonyPatch(nameof(FoodConsumptionBehavior.OnTick))]
     [HarmonyPrefix]
     public static bool OnTickPrefix(FoodConsumptionBehavior __instance, float dt)
     {
-        // Moved to be part of the daily tick.
-        // Avoids tying the server hero's item roster version number to the behavior's version number 
+        foreach (var playerParty in Campaign.Current.CampaignObjectManager.GetPlayerMobileParties())
+        {
+            int versionNo = playerParty.Party.ItemRoster.VersionNo;
+
+            if (!playerPartyLastItemVersions.ContainsKey(playerParty))
+            {
+                playerPartyLastItemVersions[playerParty] = versionNo;
+            }
+
+            if (playerParty.Party.IsStarving)
+            {
+                if (playerPartyLastItemVersions[playerParty] != versionNo)
+                {
+                    playerPartyLastItemVersions[playerParty] = versionNo;
+
+                    __instance.PartyConsumeFood(playerParty, true);
+                }
+            }
+        }
+
         return false;
     }
 
@@ -71,7 +93,6 @@ internal class FoodConsumptionBehaviorPatches
     {
         if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
 
-        // Custom implementation to handle IsMainParty -> IsPlayerParty replacements and client notifications
         foodConsumptionBehaviorInterface.PartyConsumeFood(__instance, mobileParty, starvingCheck);
 
         return false;
@@ -83,7 +104,6 @@ internal class FoodConsumptionBehaviorPatches
     {
         if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
 
-        // Custom implementation to handle IsMainParty -> IsPlayerParty replacement and client notification
         foodConsumptionBehaviorInterface.CheckAnimalBreeding(__instance, party);
 
         return false;

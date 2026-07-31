@@ -62,8 +62,7 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
 
             if (doesPartyConsumeFood)
             {
-                // Check for a player party starving here instead of OnTick
-                behavior.PartyConsumeFood(mobileParty, mobileParty.IsPlayerParty() && mobileParty.Party.IsStarving);
+                behavior.PartyConsumeFood(mobileParty, false);
             }
         });
     }
