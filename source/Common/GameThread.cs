@@ -22,6 +22,7 @@ public class GameThread : IUpdateable
         new Queue<(Action, EventWaitHandle, string, CancellationToken)>();
 
     private readonly object m_QueueLock = new object();
+    private object m_QueueTailBatch;
     private static readonly AsyncLocal<CancellationToken> m_AmbientCancellation =
         new AsyncLocal<CancellationToken>();
     private int m_GameLoopThreadId;
@@ -103,6 +104,7 @@ public class GameThread : IUpdateable
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
+            m_QueueTailBatch = null;
         }
 
         if (!Instrument)
@@ -248,7 +250,7 @@ public class GameThread : IUpdateable
             string resolved = label ?? BuildLabel(callerFile, callerMember);
             lock (Instance.m_QueueLock)
             {
-                Instance.m_Queue.Enqueue((action, ewh, resolved, cancellation));
+                Instance.EnqueueLocked((action, ewh, resolved, cancellation));
             }
 
             if (ewh == null) return;
@@ -309,7 +311,60 @@ public class GameThread : IUpdateable
         string label = context ?? BuildLabel(callerFile, callerMember);
         lock (Instance.m_QueueLock)
         {
-            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label, cancellation));
+            Instance.EnqueueLocked((WrapSafe(action, context), null, label, cancellation));
+        }
+    }
+
+    /// <summary>
+    /// Runs one item on the game thread. Adjacent calls using the same action instance and cancellation
+    /// scope share one queue entry while every item is still applied in FIFO order. Any other queued
+    /// action starts a new batch. Canceling <paramref name="lifetime"/> discards its pending items.
+    /// </summary>
+    public static void RunSafeBatched<T>(
+        T item,
+        Action<T> action,
+        CancellationToken lifetime = default,
+        string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
+    {
+        if (action == null)
+            throw new ArgumentNullException(nameof(action));
+
+        CancellationToken cancellation = m_AmbientCancellation.Value;
+        if (cancellation.IsCancellationRequested ||
+            lifetime.IsCancellationRequested) return;
+
+        if (Instance.IsGameThread)
+        {
+            InvokeSafe(action, item, context);
+            return;
+        }
+
+        lock (Instance.m_QueueLock)
+        {
+            if (cancellation.IsCancellationRequested ||
+                lifetime.IsCancellationRequested) return;
+
+            if (Instance.m_QueueTailBatch is QueuedBatch<T> batch &&
+                batch.TryAdd(action, cancellation, lifetime, item))
+            {
+                return;
+            }
+
+            if (cancellation.IsCancellationRequested ||
+                lifetime.IsCancellationRequested) return;
+
+            string label = context ?? BuildLabel(callerFile, callerMember);
+            batch = new QueuedBatch<T>(
+                action,
+                cancellation,
+                lifetime,
+                context,
+                item);
+            Instance.EnqueueLocked(
+                (batch.Run, null, label, cancellation),
+                batch);
         }
     }
 
@@ -381,6 +436,27 @@ public class GameThread : IUpdateable
         }
     };
 
+    internal static void InvokeSafe<T>(Action<T> action, T item, string context)
+    {
+        try
+        {
+            action(item);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
+        }
+    }
+
+    private void EnqueueLocked(
+        (Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task,
+        object tailBatch = null)
+    {
+        m_Queue.Enqueue(task);
+        // An ordinary queue entry is a FIFO barrier between adjacent batches.
+        m_QueueTailBatch = tailBatch;
+    }
+
     public void MarkGameThread()
     {
         m_GameLoopThreadId = Thread.CurrentThread.ManagedThreadId;
@@ -434,4 +510,5 @@ public class GameThread : IUpdateable
             m_AmbientCancellation.Value = previous;
         }
     }
+
 }

@@ -12,6 +12,7 @@ using Missions.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using AgentControllerType = TaleWorlds.Core.AgentControllerType;
@@ -54,6 +55,10 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IMovementBatchSender movementBatchSender;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
+    private readonly CancellationTokenSource movementReceiveCancellation = new CancellationTokenSource();
+    private readonly CancellationToken movementReceiveLifetime;
+    // The cached delegate is also the queue-batch identity for adjacent movement packets.
+    private readonly Action<MovementPacket> applyMovement;
 
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
@@ -105,6 +110,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.equipmentApplier = equipmentApplier;
         this.movementBatchSender = movementBatchSender;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
+        movementReceiveLifetime = movementReceiveCancellation.Token;
+        applyMovement = ApplyMovement;
 
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
@@ -134,6 +141,8 @@ public class AgentMovementHandler : IAgentMovementHandler
     {
         if (_disposed) return;
         _disposed = true;
+        movementReceiveCancellation.Cancel();
+        movementReceiveCancellation.Dispose();
 
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
@@ -454,71 +463,75 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             return;
         }
+        if (_disposed) return;
 
-        // Resolve and apply the whole batch in ONE game-thread action. Resolving here keeps this ordered behind
-        // earlier game-thread spawn/register work that may have been queued by reliable messages.
-        GameThread.RunSafe(() =>
+        GameThread.RunSafeBatched(
+            movement,
+            applyMovement,
+            movementReceiveLifetime);
+    }
+
+    private void ApplyMovement(MovementPacket movement)
+    {
+        if (_disposed || Mission.Current == null) return;
+
+        using (new AllowedThread())
         {
-            if (Mission.Current == null) return;
-
-            using (new AllowedThread())
+            for (int i = 0; i < movement.Agents.Length; i++)
             {
-                for (int i = 0; i < idCount; i++)
+                CoopAgentInfo agentInfo;
+                bool found = movement.AgentIds != null
+                    ? agentRegistry.TryGetAgentInfo(
+                        movement.IdentityScopeId, movement.AgentIds[i], out agentInfo)
+                    : agentRegistry.TryGetAgentInfo(
+                        movement.AgentGuids[i], out agentInfo);
+                if (!found) continue;
+
+                Agent agent = agentInfo.Agent;
+                AgentData data = movement.Agents[i];
+
+                // The agent may have become invalid (player left, mission torn down) between queueing
+                // and running; only apply while it is still active in the current mission.
+                if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
+                    continue;
+
+                // Re-check authority ON the game thread: a packet from the previous owner can be queued
+                // behind a host-migration adoption (both are game-thread actions queued from the network
+                // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
+                // stale position/input snapshot the AI then fights.
+                if (agentRegistry.IsLocallyControlled(agent))
+                    continue;
+
+                SyncMountState(
+                    agent,
+                    movement.IdentityScopeId ?? agentInfo.MovementScopeId,
+                    data);
+
+                // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
+                if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
                 {
-                    CoopAgentInfo agentInfo;
-                    bool found = movement.AgentIds != null
-                        ? agentRegistry.TryGetAgentInfo(
-                            movement.IdentityScopeId, movement.AgentIds[i], out agentInfo)
-                        : agentRegistry.TryGetAgentInfo(
-                            movement.AgentGuids[i], out agentInfo);
-                    if (!found) continue;
+                    puppetMount.Controller = AgentControllerType.None;
+                    puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
+                }
 
-                    Agent agent = agentInfo.Agent;
-                    AgentData data = movement.Agents[i];
+                data.Apply(agent);
 
-                    // The agent may have become invalid (player left, mission torn down) between queueing
-                    // and running; only apply while it is still active in the current mission.
-                    if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
-                        continue;
-
-                    // Re-check authority ON the game thread: a packet from the previous owner can be queued
-                    // behind a host-migration adoption (both are game-thread actions queued from the network
-                    // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
-                    // stale position/input snapshot the AI then fights.
-                    if (agentRegistry.IsLocallyControlled(agent))
-                        continue;
-
-                    SyncMountState(
-                        agent,
-                        movement.IdentityScopeId ?? agentInfo.MovementScopeId,
-                        data);
-
-                    // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
-                    if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
-                    {
-                        puppetMount.Controller = AgentControllerType.None;
-                        puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
-                    }
-
-                    data.Apply(agent);
-
-                    // Position is reconciled per-frame by the interpolator (smoother than a per-packet
-                    // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
-                    if (agent.HasMount && data.MountData != null)
-                    {
-                        // Mounted: feed target frames to the rider, since the mount is driven through its rider.
-                        // Keep the mount position only for rare large-gap snaps and drop any stale direct-horse
-                        // target from before the puppet mounted.
-                        _interpolator.Forget(agent.MountAgent);
-                        _interpolator.SetMountedRiderTarget(agent, data);
-                    }
-                    else
-                    {
-                        _interpolator.SetRiderTarget(agent, data);
-                    }
+                // Position is reconciled per-frame by the interpolator (smoother than a per-packet
+                // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
+                if (agent.HasMount && data.MountData != null)
+                {
+                    // Mounted: feed target frames to the rider, since the mount is driven through its rider.
+                    // Keep the mount position only for rare large-gap snaps and drop any stale direct-horse
+                    // target from before the puppet mounted.
+                    _interpolator.Forget(agent.MountAgent);
+                    _interpolator.SetMountedRiderTarget(agent, data);
+                }
+                else
+                {
+                    _interpolator.SetRiderTarget(agent, data);
                 }
             }
-        });
+        }
     }
 
     // [Game thread] Replicate the owner's mount/dismount onto its puppet. The per-tick AgentData reports
