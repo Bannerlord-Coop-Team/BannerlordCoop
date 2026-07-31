@@ -185,21 +185,6 @@ public class ArmyPatches
         value?.UpdateVersionNo();
     }
 
-    /// <summary>
-    /// Replaces MobileParty.MainParty to IsPlayerParty
-    /// else player created armies can get instantly disbanded
-    /// </summary>
-    [HarmonyTargetMethod]
-    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
-    {
-        AccessTools.Method(typeof(Army), nameof(Army.CheckArmyDispersion)),
-        AccessTools.Method(typeof(Army), nameof(Army.HourlyTick))
-    };
-
-    [HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => MainPartyComparisonTranspiler.ReplaceMainPartyComparisonsWithIsPlayerParty(instructions);
-    
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
         GameThread.RunSafe(() =>
@@ -314,4 +299,18 @@ public class ArmyPatches
             army._aiBehaviorObject = mapPoint;
         }
     }
+}
+[HarmonyPatch]
+internal class ArmyMainPartyComparisonPatch
+{
+    [HarmonyTargetMethods]
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(Army), nameof(Army.CheckArmyDispersion));
+        yield return AccessTools.Method(typeof(Army), nameof(Army.HourlyTick));
+    }
+
+    [HarmonyTranspiler]
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        => MainPartyComparisonTranspiler.ReplaceMainPartyComparisonsWithIsPlayerParty(instructions);
 }
