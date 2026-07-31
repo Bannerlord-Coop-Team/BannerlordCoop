@@ -26,13 +26,13 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
     public BattleDamageMirrorTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
-    [InlineData(true, 0, 90f)]
-    [InlineData(true, 1, 80f)]
-    [InlineData(true, 2, 60f)]
-    [InlineData(false, 0, 60f)]
-    public void RoutedDamage_UsesPlayerReceivedDamageDifficultyOnlyForMainAgent(
+    [InlineData(true, 0.25f, 90f)]
+    [InlineData(true, 0.5f, 80f)]
+    [InlineData(true, 1f, 60f)]
+    [InlineData(false, 0.25f, 60f)]
+    public void RoutedDamage_UsesPlayerDamageMultiplierOnlyForMainAgent(
         bool isMainAgent,
-        int difficulty,
+        float damageToPlayerMultiplier,
         float expectedHealth)
     {
         using var fixture = new MissionEngineFixture();
@@ -41,37 +41,28 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
 
         client.Call(() =>
         {
-            int previousDifficulty = BannerlordConfig.PlayerReceivedDamageDifficulty;
-            try
-            {
-                BannerlordConfig.PlayerReceivedDamageDifficulty = difficulty;
+            var mock = fixture.CreateMission(client);
+            mock.DamageToPlayerMultiplier = damageToPlayerMultiplier;
+            var controller = client.Resolve<CoopBattleController>();
+            var registry = client.Resolve<INetworkAgentRegistry>();
 
-                var mock = fixture.CreateMission(client);
-                var controller = client.Resolve<CoopBattleController>();
-                var registry = client.Resolve<INetworkAgentRegistry>();
+            var agent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(isMainAgent ? AgentControllerType.Player : AgentControllerType.AI));
+            if (isMainAgent)
+                mock.MainAgent = agent;
 
-                var agent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
-                    .Controller(isMainAgent ? AgentControllerType.Player : AgentControllerType.AI));
-                if (isMainAgent)
-                    mock.MainAgent = agent;
+            var victimId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("owner", victimId, agent));
 
-                var victimId = Guid.NewGuid();
-                Assert.True(registry.TryRegisterAgent("owner", victimId, agent));
+            var blow = new Blow(0) { InflictedDamage = 40, DamageType = DamageTypes.Pierce };
+            var collisionData = new AttackCollisionData { InflictedDamage = 40 };
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkApplyBattleDamage(victimId, Guid.Empty, blow, collisionData));
 
-                var blow = new Blow(0) { InflictedDamage = 40, DamageType = DamageTypes.Pierce };
-                var collisionData = new AttackCollisionData { InflictedDamage = 40 };
-                client.Resolve<IMessageBroker>().Publish(
-                    this,
-                    new NetworkApplyBattleDamage(victimId, Guid.Empty, blow, collisionData));
-
-                Assert.True(AgentMirror.TryGet(agent, out var mirror));
-                Assert.Equal(expectedHealth, mirror.Health);
-                GC.KeepAlive(controller);
-            }
-            finally
-            {
-                BannerlordConfig.PlayerReceivedDamageDifficulty = previousDifficulty;
-            }
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.Equal(expectedHealth, mirror.Health);
+            GC.KeepAlive(controller);
         });
     }
 
