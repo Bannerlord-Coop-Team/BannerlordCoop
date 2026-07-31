@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Armies.Commands;
 using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -16,6 +17,7 @@ internal class ArmyAiBehaviorObjectPatch
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return false;
+        if (ArmySiegeWaitFixtureCommands.ShouldSuppressAiBehaviorObjectChange(__instance, value)) return true;
 
         var message = new ArmyAiBehaviorObjectChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);

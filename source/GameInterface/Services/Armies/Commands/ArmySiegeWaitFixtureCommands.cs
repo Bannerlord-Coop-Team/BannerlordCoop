@@ -22,6 +22,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -120,8 +121,14 @@ public class ArmySiegeWaitFixtureCommands
     private static ClientFixture lastRestoredClientFixture;
     private static ClientStateFixture clientStateFixture;
     private static ClientStateFixture lastRestoredClientStateFixture;
+    private static bool restoreInProgress;
     private static readonly FixtureTimeGuard TimeGuard = new FixtureTimeGuard();
     private static readonly Func<bool> TimeUnpausePolicy = TimeGuard.CanUnpause;
+
+    internal static bool ShouldSuppressAiBehaviorObjectChange(Army army, IMapPoint value) =>
+        restoreInProgress &&
+        value == null &&
+        fixture?.Army == army;
 
     [CommandLineArgumentFunction("siege_wait_fixture_preflight", "coop.debug.army")]
     public static string Preflight(List<string> args)
@@ -359,21 +366,7 @@ public class ArmySiegeWaitFixtureCommands
             if (activeFixture.Army == null || activeFixture.Army.LeaderParty != leader)
                 throw new InvalidOperationException("The AI leader did not create an army.");
 
-            leader.Position = settlement.GatePosition;
-            leader.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
-            try
-            {
-                activeFixture.SiegeEvent = Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, leader);
-            }
-            finally
-            {
-                CaptureSiegeIdentity(activeFixture);
-            }
-            if (activeFixture.SiegeEvent?.BesiegerCamp?.LeaderParty != leader)
-                throw new InvalidOperationException("Garontor did not create the expected AI-led besieger camp.");
-            if (!activeFixture.SiegeEvent.CanPartyJoinSide(playerParty.Party, BattleSideEnum.Attacker))
-                throw new InvalidOperationException("The joining player cannot join the AI army's attacking siege side.");
-
+            MoveAndHold(leader, settlement.GatePosition);
             MoveAndHold(playerParty, new CampaignVec2(
                 new TaleWorlds.Library.Vec2(settlement.GatePosition.X + 3f, settlement.GatePosition.Y + 1f),
                 isOnLand: true));
@@ -400,20 +393,80 @@ public class ArmySiegeWaitFixtureCommands
         }
     }
 
+    [CommandLineArgumentFunction("siege_wait_fixture_begin_siege", "coop.debug.army")]
+    public static string BeginSiege(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.army.siege_wait_fixture_begin_siege";
+
+        var activeFixture = fixture;
+        if (activeFixture == null)
+            return "No army siege-wait fixture is active.";
+        if (activeFixture.SiegeEvent != null || activeFixture.Settlement.SiegeEvent != null)
+            return "The army siege-wait fixture siege is already active.";
+        if (activeFixture.Army == null ||
+            activeFixture.Army.LeaderParty != activeFixture.LeaderParty ||
+            activeFixture.LeaderParty.Army != activeFixture.Army)
+        {
+            return "The fixture AI army is no longer coherent.";
+        }
+
+        var settlement = activeFixture.Settlement;
+        var leader = activeFixture.LeaderParty;
+        leader.Position = settlement.GatePosition;
+        leader.SetMoveBesiegeSettlement(settlement, MobileParty.NavigationType.Default);
+        try
+        {
+            activeFixture.SiegeEvent = Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, leader);
+        }
+        finally
+        {
+            CaptureSiegeIdentity(activeFixture);
+        }
+        if (activeFixture.SiegeEvent?.BesiegerCamp?.LeaderParty != leader)
+            return $"Army siege-wait fixture siege setup failed. {RestoreFixture()}";
+        if (!activeFixture.SiegeEvent.CanPartyJoinSide(activeFixture.PlayerParty.Party, BattleSideEnum.Attacker))
+            return $"The joining player cannot join the AI army's attacking siege side. {RestoreFixture()}";
+
+        return $"Army siege-wait fixture siege started: settlement={settlement.StringId}, " +
+               $"leader={leader.StringId}, joiningPlayer={activeFixture.PlayerParty.StringId}.";
+    }
+
     [CommandLineArgumentFunction("siege_wait_fixture_open_join", "coop.debug.army")]
     public static string OpenJoin(List<string> args)
     {
         if (ModInformation.IsServer)
             return "Run this command on the joining client.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.army.siege_wait_fixture_open_join";
-
-        var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == "castle_EW1");
-        var leader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
-        if (settlement == null || leader == null)
-            return "Garontor Castle does not have an AI-led siege fixture.";
+        if (args.Count != 1)
+            return "Usage: coop.debug.army.siege_wait_fixture_open_join <leaderPartyId>";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(args[0], out var leader))
+            return $"Unable to resolve AI leader party {args[0]}.";
+        if (!(leader.Army?.AiBehaviorObject is Settlement settlement) ||
+            settlement.StringId != "castle_EW1" ||
+            leader.Army.LeaderParty != leader)
+        {
+            return "The AI leader is not leading the staged Garontor army.";
+        }
+        if (settlement.SiegeEvent != null || leader.BesiegerCamp != null)
+            return "Open the army encounter before starting the fixture siege.";
         if (MobileParty.MainParty.Army != null)
             return "The joining player is already in an army.";
+        if (clientFixture != null)
+            return "A joining-client army siege-wait fixture snapshot is already active.";
+        if (leader.LeaderHero == null)
+            return "The fixture army leader does not have a hero whose meeting state can be restored.";
+
+        clientFixture = new ClientFixture
+        {
+            LeaderHero = leader.LeaderHero,
+            LeaderHasMet = leader.LeaderHero.HasMet,
+            LeaderLastMeetingTime = leader.LeaderHero.LastMeetingTimeWithPlayer,
+        };
+        lastRestoredClientFixture = null;
 
         EncounterManager.StartPartyEncounter(MobileParty.MainParty.Party, leader.Party);
         return $"Opened the production party encounter with army leader {leader.Name}.";
@@ -443,18 +496,9 @@ public class ArmySiegeWaitFixtureCommands
         var conditionArgs = new MenuCallbackArgs((MenuContext)null, null);
         if (!behavior.game_menu_army_join_on_condition(conditionArgs) || !conditionArgs.IsEnabled)
             return "The production Join Army option is not available and enabled.";
-        if (clientFixture != null)
-            return "A joining-client army siege-wait fixture snapshot is already active.";
-        if (leader.LeaderHero == null)
-            return "The fixture army leader does not have a hero whose meeting state can be restored.";
+        if (clientFixture == null || clientFixture.LeaderHero != leader.LeaderHero)
+            return "The joining-client army encounter snapshot is missing.";
 
-        clientFixture = new ClientFixture
-        {
-            LeaderHero = leader.LeaderHero,
-            LeaderHasMet = leader.LeaderHero.HasMet,
-            LeaderLastMeetingTime = leader.LeaderHero.LastMeetingTimeWithPlayer,
-        };
-        lastRestoredClientFixture = null;
         behavior.game_menu_army_join_on_consequence(null);
         return "Invoked the rendered army-join consequence.";
     }
@@ -731,6 +775,19 @@ public class ArmySiegeWaitFixtureCommands
         if (activeFixture == null)
             return "No army siege-wait fixture is active.";
 
+        restoreInProgress = true;
+        try
+        {
+            return RestoreFixture(activeFixture);
+        }
+        finally
+        {
+            restoreInProgress = false;
+        }
+    }
+
+    private static string RestoreFixture(Fixture activeFixture)
+    {
         string restoreFailure = null;
         try
         {
