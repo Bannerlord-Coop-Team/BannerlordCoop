@@ -66,5 +66,8 @@ internal static class CreditsRoster
     public static readonly IReadOnlyList<string> Community = new string[0];
 
     /// <summary>People who supported the project financially (donations, Patreon).</summary>
-    public static readonly IReadOnlyList<string> Supporters = new string[0];
+    public static readonly IReadOnlyList<string> Supporters = new[]
+    {
+        "Koung",
+    };
 }
