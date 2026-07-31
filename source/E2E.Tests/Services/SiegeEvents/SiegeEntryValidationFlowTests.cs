@@ -266,7 +266,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void BesiegeRequest_ForOwnSettlement_IsRejectedAsDefender()
+    public void BesiegeRequest_ForOwnSettlement_IsRejectedAsDefenderAndStopsApproach()
     {
         var client = Clients.First();
         var context = CreateEntryContext(client, "PlayerOne");
@@ -289,6 +289,29 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         RequestSettlementInteraction(client, context);
         Server.NetworkSentMessages.Clear();
 
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(
+                context.SettlementId,
+                out var settlement));
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party.SetMoveGoToSettlement(
+                    settlement,
+                    MobileParty.NavigationType.Default,
+                    isTargetingThePort: false);
+            }
+
+            PlayerEncounter.Start();
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.Same(settlement, party.TargetSettlement);
+        });
+
         SendBesiegeAttempt(client, context);
 
         var result = Assert.Single(
@@ -297,12 +320,35 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         Assert.Equal(SiegeEntryDenialReason.DefenderDisposition, result.Reason);
         Assert.Equal(SiegeEntryDisposition.Map, result.Disposition);
 
+        var orderedMessages = Server.NetworkSentMessages.Messages;
+        var behaviorIndex = orderedMessages.FindIndex(
+            message => message is NetworkUpdatePartyBehavior);
+        var resultIndex = orderedMessages.FindIndex(
+            message => message is NetworkSiegeEntryResult);
+        Assert.True(behaviorIndex >= 0);
+        Assert.True(resultIndex > behaviorIndex);
+
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
                 context.SettlementId,
                 out var settlement));
             Assert.Null(settlement.SiegeEvent);
+            Assert.Equal(MoveModeType.Hold, party.PartyMoveMode);
+            Assert.Null(party.TargetSettlement);
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.Equal(MoveModeType.Hold, party.PartyMoveMode);
+            Assert.Null(party.TargetSettlement);
+            Assert.Null(PlayerEncounter.Current);
         });
     }
 

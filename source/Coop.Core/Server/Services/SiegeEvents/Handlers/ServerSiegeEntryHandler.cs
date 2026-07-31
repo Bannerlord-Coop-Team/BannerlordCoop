@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Network.Messages;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Common.Services.SiegeEvents;
@@ -21,6 +22,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.SiegeEvents.Handlers;
 
@@ -37,6 +39,7 @@ internal class ServerSiegeEntryHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly ISendCoalescer sendCoalescer;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISiegeInteractionGrantStore siegeInteractionGrantStore;
     private readonly ISiegeEntryValidator siegeEntryValidator;
@@ -46,6 +49,7 @@ internal class ServerSiegeEntryHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IPlayerManager playerManager,
+        ISendCoalescer sendCoalescer,
         ISiegeEventInterface siegeEventInterface,
         ISiegeInteractionGrantStore siegeInteractionGrantStore,
         ISiegeEntryValidator siegeEntryValidator)
@@ -54,6 +58,7 @@ internal class ServerSiegeEntryHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.sendCoalescer = sendCoalescer;
         this.siegeEventInterface = siegeEventInterface;
         this.siegeInteractionGrantStore = siegeInteractionGrantStore;
         this.siegeEntryValidator = siegeEntryValidator;
@@ -283,9 +288,10 @@ internal class ServerSiegeEntryHandler : IHandler
         if (!validation.IsValid)
         {
             if (validation.Reason == SiegeEntryDenialReason.MovementTargetMismatch ||
-                validation.Reason == SiegeEntryDenialReason.TooFar)
+                validation.Reason == SiegeEntryDenialReason.TooFar ||
+                validation.Reason == SiegeEntryDenialReason.DefenderDisposition)
             {
-                party.SetMoveModeHold();
+                StopApproachAndFlushBehavior(party, partyId);
             }
 
             Logger.Warning(
@@ -368,7 +374,7 @@ internal class ServerSiegeEntryHandler : IHandler
                 network.SendAll(
                     new NetworkClearStaleBesiegerCamp(player.MobilePartyId));
             }
-            party.SetMoveModeHold();
+            StopApproachAndFlushBehavior(party, player.MobilePartyId);
         }
 
         var canonicalState = siegeEntryValidator.GetCanonicalState(party);
@@ -386,6 +392,12 @@ internal class ServerSiegeEntryHandler : IHandler
     private void HandlePlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
         siegeInteractionGrantStore.Revoke(payload.What.PlayerId);
+    }
+
+    private void StopApproachAndFlushBehavior(MobileParty party, string partyId)
+    {
+        party.SetMoveModeHold();
+        sendCoalescer.FlushInstance(Compact(partyId, typeof(MobileParty)), network);
     }
 
     private void SendEntryResult(

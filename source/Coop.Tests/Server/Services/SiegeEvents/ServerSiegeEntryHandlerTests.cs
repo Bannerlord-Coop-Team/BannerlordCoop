@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
@@ -63,7 +64,7 @@ public class ServerSiegeEntryHandlerTests
                 settlement,
                 SiegeEntryAction.Join))
             .Returns(SiegeEntryValidationResult.Rejected(
-                SiegeEntryDenialReason.DefenderDisposition,
+                SiegeEntryDenialReason.InvalidFaction,
                 new SiegeEntryCanonicalState(
                     SiegeEntryDisposition.Settlement,
                     settlement)));
@@ -85,6 +86,7 @@ public class ServerSiegeEntryHandlerTests
             network,
             objectManager.Object,
             playerManager.Object,
+            new SendCoalescer(),
             siegeEventInterface.Object,
             grantStore,
             validator.Object);
@@ -99,7 +101,7 @@ public class ServerSiegeEntryHandlerTests
 
         var result = Assert.Single(
             network.GetPeerMessagesFromType<NetworkSiegeEntryResult>(peer));
-        Assert.Equal(SiegeEntryDenialReason.DefenderDisposition, result.Reason);
+        Assert.Equal(SiegeEntryDenialReason.InvalidFaction, result.Reason);
         Assert.True(
             grantStore.TryConsume(
                 peer,
@@ -180,6 +182,7 @@ public class ServerSiegeEntryHandlerTests
             network,
             objectManager.Object,
             playerManager.Object,
+            new SendCoalescer(),
             siegeEventInterface.Object,
             grantStore,
             validator.Object);
