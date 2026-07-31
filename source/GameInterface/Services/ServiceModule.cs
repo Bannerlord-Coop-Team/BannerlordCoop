@@ -3,7 +3,6 @@ using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Services.SiegeEvents.Validation;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -28,10 +27,6 @@ internal class ServiceModule : Module
         {
             builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
         }
-
-        builder.RegisterType<SiegeEntryValidator>()
-            .As<ISiegeEntryValidator>()
-            .InstancePerDependency();
 
         foreach (var type in GetGameAbstractions())
         {

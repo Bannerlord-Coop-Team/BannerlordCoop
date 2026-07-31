@@ -6,7 +6,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
@@ -42,8 +41,6 @@ public class MapEventResultCaptureTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(context.DefenderPartyId, out var defender));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
 
-            attacker.Party.MemberRoster = new TroopRoster(attacker.Party);
-            defender.Party.MemberRoster = new TroopRoster(defender.Party);
             attacker.MemberRoster.AddToCounts(troop, 1);
             defender.MemberRoster.AddToCounts(troop, 1);
             mapEvent._battleState = BattleState.AttackerVictory;

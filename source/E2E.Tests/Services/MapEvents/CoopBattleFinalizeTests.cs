@@ -631,7 +631,10 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
     /// <summary>
     /// Counts <see cref="GameMenu.ExitToLast"/> calls and attributes each to the instance whose container was
-    /// active at call time. The container directly identifies the handler scope across nested message delivery.
+    /// active at call time. Attribution is deliberately container-based, not party-based: a handler that sends
+    /// a message to another instance mid-flight leaves that instance's game statics behind
+    /// (EnvironmentInstance.StaticScope restores the container but not the game statics), so ambient state
+    /// like <see cref="MobileParty.MainParty"/> is unreliable inside the prefix while the container is not.
     /// </summary>
     private sealed class GameMenuExitToLastCounter : IDisposable
     {

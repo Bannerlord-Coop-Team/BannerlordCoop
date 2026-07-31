@@ -518,10 +518,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var player = CreateSyncedPlayerContext();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        var targetPlayer = CreateSyncedPlayerContext("TargetKingdomTimeout", _ => false);
 
         ConfigureClanInKingdom(player.ClanId, kingdomId);
-        ConfigureClanInKingdom(targetPlayer.ClanId, targetKingdomId);
         EnsureKingdomRegisteredEverywhere(kingdomId);
         EnsureKingdomRegisteredEverywhere(targetKingdomId);
 
@@ -533,11 +531,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
 
             decision = new DeclareWarDecision(playerClan, targetKingdom);
-            decision.TriggerTime = CampaignTime.Never;
             kingdom.AddDecision(decision);
 
-            Assert.False(decision.ShouldBeCancelled());
-            Assert.False(decision.TriggerTime.IsPast);
             CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
 
             Assert.Same(decision, Assert.Single(kingdom.UnresolvedDecisions));
@@ -550,8 +545,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
 
-            decision.TriggerTime = CampaignTime.Zero;
-            Assert.True(decision.TriggerTime.IsPast);
+            decision.TriggerTime = CampaignTime.HoursFromNow(-1);
             CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
 
             Assert.Empty(kingdom.UnresolvedDecisions);
@@ -1614,23 +1608,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var client = Clients.First();
         var settlementId = CreateSyncedSettlement();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(
-            ControllerId,
-            client.NetPeer));
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                player.PartyId,
-                out var party));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
-                settlementId,
-                out var settlement));
-
-            using (new AllowedThread())
-            {
-                party.CurrentSettlement = settlement;
-            }
-        });
 
         client.Call(() =>
         {
@@ -1792,7 +1769,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             this,
             new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
         Server.SimulateMessage(this, new NetworkRequestEndSettlementEncounter(player.PartyId));
-        Server.SimulateMessage(this, new PartyLeaveSettlementApplied(GetObject<MobileParty>(Server, player.PartyId)));
+        Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
 
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),

@@ -2,21 +2,15 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Common.Services.SiegeEvents;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
-using GameInterface.Services.SiegeEvents.Validation;
 using LiteNetLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Runtime.ExceptionServices;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -32,10 +26,6 @@ public class ServerSettlementExitEnterHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
     private readonly IKingdomCreationSettlementTracker settlementTracker;
-    private readonly IPlayerManager playerManager;
-    private readonly ISiegeInteractionGrantStore siegeInteractionGrantStore;
-    private readonly ISiegeEntryValidator siegeEntryValidator;
-    private readonly HashSet<MobileParty> requestedPartyLeaves = new HashSet<MobileParty>();
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
 
     public ServerSettlementExitEnterHandler(
@@ -43,24 +33,18 @@ public class ServerSettlementExitEnterHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         ISettlementInterface settlementInterface,
-        IKingdomCreationSettlementTracker settlementTracker,
-        IPlayerManager playerManager,
-        ISiegeInteractionGrantStore siegeInteractionGrantStore,
-        ISiegeEntryValidator siegeEntryValidator)
+        IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
         this.settlementTracker = settlementTracker;
-        this.playerManager = playerManager;
-        this.siegeInteractionGrantStore = siegeInteractionGrantStore;
-        this.siegeEntryValidator = siegeEntryValidator;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
         messageBroker.Subscribe<PartyEnterSettlementAttempted>(Handle);
-        messageBroker.Subscribe<PartyLeaveSettlementApplied>(Handle);
+        messageBroker.Subscribe<PartyLeaveSettlementAttempted>(Handle);
     }
 
     public void Dispose()
@@ -69,7 +53,7 @@ public class ServerSettlementExitEnterHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
         messageBroker.Unsubscribe<PartyEnterSettlementAttempted>(Handle);
-        messageBroker.Unsubscribe<PartyLeaveSettlementApplied>(Handle);
+        messageBroker.Unsubscribe<PartyLeaveSettlementAttempted>(Handle);
     }
 
     private void Handle(MessagePayload<NetworkRequestStartSettlementEncounter> obj)
@@ -79,16 +63,6 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.TryGetPlayer(peer, out var player) ||
-                player.MobilePartyId != payload.PartyId)
-            {
-                Logger.Warning(
-                    "Rejecting settlement interaction for party {PartyId} because the peer does not control it",
-                    payload.PartyId);
-                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
-                return;
-            }
-
             if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty))
             {
                 network.Send(peer, new NetworkSettlementEncounterRejected(payload));
@@ -100,14 +74,11 @@ public class ServerSettlementExitEnterHandler : IHandler
                 return;
             }
 
-            var validation = siegeEntryValidator.ValidateSettlementInteraction(mobileParty, settlement);
-            if (!validation.IsValid)
+            if (mobileParty.Party?.MapEventSide != null)
             {
                 Logger.Warning(
-                    "Rejecting settlement interaction for party {PartyId} at {SettlementId}: {Reason}",
-                    payload.PartyId,
-                    payload.SettlementId,
-                    validation.Reason);
+                    "Rejecting settlement entry for party {PartyId} because it is already in a map event",
+                    payload.PartyId);
                 network.Send(peer, new NetworkSettlementEncounterRejected(payload));
                 return;
             }
@@ -116,12 +87,6 @@ public class ServerSettlementExitEnterHandler : IHandler
             {
                 if (mobileParty.CurrentSettlement == settlement)
                 {
-                    siegeInteractionGrantStore.Grant(
-                        peer,
-                        payload.InteractionId,
-                        payload.PartyId,
-                        payload.SettlementId,
-                        settlement.SiegeEvent?.BesiegerCamp);
                     network.Send(peer, new NetworkStartSettlementEncounter(payload));
                 }
                 else
@@ -137,12 +102,6 @@ public class ServerSettlementExitEnterHandler : IHandler
                 return;
             }
 
-            siegeInteractionGrantStore.Grant(
-                peer,
-                payload.InteractionId,
-                payload.PartyId,
-                payload.SettlementId,
-                settlement.SiegeEvent?.BesiegerCamp);
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
 
             // Vanilla starts under-siege and under-raid encounters outside the settlement.
@@ -160,84 +119,39 @@ public class ServerSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
 
-        GameThread.RunSafe(() =>
+        objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
+        if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
         {
-            var peer = obj.Who as NetPeer;
-            objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
-            if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
-            {
-                if (peer != null)
-                {
-                    network.Send(
-                        peer,
-                        new NetworkSettlementEncounterLeaveResult(
-                            payload.PartyId,
-                            SettlementEncounterLeaveOutcome.Suppressed));
-                }
-                return;
-            }
-
-            if (peer == null) return;
-            if (mobileParty == null)
-            {
-                objectManager.TryGetObjectWithLogging<MobileParty>(
-                    payload.PartyId,
-                    out _);
-                siegeInteractionGrantStore.Revoke(peer);
-                network.Send(
-                    peer,
-                    new NetworkSettlementEncounterLeaveResult(
-                        payload.PartyId,
-                        SettlementEncounterLeaveOutcome.Applied));
-                return;
-            }
-
-            Exception leaveException = null;
-            requestedPartyLeaves.Add(mobileParty);
-            try
-            {
-                settlementInterface.PartyLeaveSettlement(mobileParty);
-            }
-            catch (Exception exception)
-            {
-                leaveException = exception;
-            }
-            finally
-            {
-                requestedPartyLeaves.Remove(mobileParty);
-            }
-
-            if (mobileParty.CurrentSettlement != null)
+            if (obj.Who is NetPeer suppressedPeer)
             {
                 network.Send(
-                    peer,
+                    suppressedPeer,
                     new NetworkSettlementEncounterLeaveResult(
                         payload.PartyId,
                         SettlementEncounterLeaveOutcome.Suppressed));
-                Rethrow(leaveException);
-                return;
             }
+            return;
+        }
 
-            // The sending client is currently in a settlement encounter, this is handled
-            // slightly differently from ai or other clients parties
-            siegeInteractionGrantStore.Revoke(peer);
-            network.Send(
-                peer,
-                new NetworkSettlementEncounterLeaveResult(
-                    payload.PartyId,
-                    SettlementEncounterLeaveOutcome.Applied));
+        var peer = (NetPeer)obj.Who;
 
-            network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
-                Compact(payload.PartyId, typeof(MobileParty))));
-            settlementInterface.OnPartyLeftSettlement(mobileParty);
-            Rethrow(leaveException);
-        }, context: nameof(NetworkRequestEndSettlementEncounter));
-    }
+        // The sending client is currently in a settlement encounter, this is handled
+        // slightly differently from ai or other clients parties
+        network.Send(
+            peer,
+            new NetworkSettlementEncounterLeaveResult(
+                payload.PartyId,
+                SettlementEncounterLeaveOutcome.Applied));
 
-    private static void Rethrow(Exception exception)
-    {
-        if (exception != null)
-            ExceptionDispatchInfo.Capture(exception).Throw();
+        network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
+            Compact(payload.PartyId, typeof(MobileParty))));
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
+
+            settlementInterface.PartyLeaveSettlement(mobileParty);
+        });
     }
 
     private void Handle(MessagePayload<PartyEnterSettlementAttempted> obj)
@@ -255,19 +169,16 @@ public class ServerSettlementExitEnterHandler : IHandler
         settlementInterface.OnPartyEnteredSettlement(payload.Settlement, payload.MobileParty);
     }
 
-    private void Handle(MessagePayload<PartyLeaveSettlementApplied> obj)
+    private void Handle(MessagePayload<PartyLeaveSettlementAttempted> obj)
     {
         var payload = obj.What;
 
-        if (requestedPartyLeaves.Contains(payload.MobileParty)) return;
         if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
 
         if (settlementTracker.TryConsumeLeave(payload.MobileParty, mobilePartyId))
         {
             return;
         }
-
-        siegeInteractionGrantStore.RevokeParty(mobilePartyId);
         network.SendAll(new NetworkPartyLeaveSettlement(
             Compact(mobilePartyId, typeof(MobileParty))));
 

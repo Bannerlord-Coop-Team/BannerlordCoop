@@ -24,7 +24,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
-using GameInterface.Services.SiegeEvents.Validation;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
 using Coop.Core.Server.Services.MobileParties;
@@ -108,7 +107,6 @@ internal abstract class TestComponentBase
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
         RegisterMock<ISiegeEventInterface>(builder);
-        RegisterMock<ISiegeEntryValidator>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);

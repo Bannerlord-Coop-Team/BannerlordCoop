@@ -16,13 +16,9 @@ internal class NetworkSettlementEncounterRejected : ICommand
     [ProtoMember(2)]
     public string SettlementId;
 
-    [ProtoMember(3)]
-    public string InteractionId;
-
     public NetworkSettlementEncounterRejected(NetworkRequestStartSettlementEncounter payload)
     {
         PartyId = payload.PartyId;
         SettlementId = payload.SettlementId;
-        InteractionId = payload.InteractionId;
     }
 }

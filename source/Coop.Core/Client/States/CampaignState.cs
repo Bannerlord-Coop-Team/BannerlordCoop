@@ -243,7 +243,6 @@ public class CampaignState : ClientStateBase
 
     private void CompleteCampaignEntry()
     {
-        messageBroker.Publish(this, new CampaignEntryCompleted());
         messageBroker.Publish(this, new PlayerKillFeedColorResendRequested());
         loadingInterface.HideLoadingScreen();
     }

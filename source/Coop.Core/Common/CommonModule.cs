@@ -6,7 +6,6 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Util;
 using Coop.Core.Common.Configuration;
-using Coop.Core.Common.Services.SiegeEvents;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -40,9 +39,6 @@ public abstract class CommonModule : Module
         #endregion
 
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
-        builder.RegisterType<SiegeInteractionGrantStore>()
-            .As<ISiegeInteractionGrantStore>()
-            .InstancePerLifetimeScope();
         builder.Register(_ => new CancellationTokenSource()).InstancePerLifetimeScope();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 

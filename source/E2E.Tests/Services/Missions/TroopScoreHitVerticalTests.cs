@@ -240,10 +240,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         Assert.NotNull(partyBaseId);
         Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
 
-        // The leave and finalization paths run normally; only the campaign-map locatable scan is unavailable headlessly.
-        Server.Call(
-            () => Server.Resolve<IMessageBroker>().Publish(this, new NetworkRequestLeaveBattle(partyBaseId!)),
-            new[] { AccessTools.Method(typeof(MapEvent), "ResetUnsuitablePartiesThatWereTargetingThisMapEvent") });
+        Server.SimulateMessage(this, new NetworkRequestLeaveBattle(partyBaseId!));
 
         var messages = Server.NetworkSentMessages.Messages;
         int contributionIndex = messages.FindIndex(message => IsContributionMessageFor(message, partyId));

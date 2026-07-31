@@ -3,10 +3,8 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
-using System;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -25,39 +23,18 @@ public class LeaveSettlementActionPatches
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
-    private static bool Prefix(MobileParty mobileParty, out Settlement __state)
+    private static bool Prefix(MobileParty mobileParty)
     {
-        __state = null;
         if (mobileParty.CurrentSettlement == null) return false;
         if (SuppressForPlayerSwitch) return false;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            var message = new PartyLeaveSettlementAttempted(mobileParty);
-            MessageBroker.Instance.Publish(mobileParty, message);
-            return false;
-        }
+        var message = new PartyLeaveSettlementAttempted(mobileParty);
+        MessageBroker.Instance.Publish(mobileParty, message);
 
-        __state = mobileParty.CurrentSettlement;
-        return true;
-    }
-
-    [HarmonyFinalizer]
-    [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
-    private static Exception Finalizer(
-        MobileParty mobileParty,
-        Settlement __state,
-        Exception __exception)
-    {
-        // Vanilla clears CurrentSettlement before callbacks that can still throw.
-        if (__state != null &&
-            mobileParty.CurrentSettlement == null)
-        {
-            var message = new PartyLeaveSettlementApplied(mobileParty);
-            MessageBroker.Instance.Publish(mobileParty, message);
-        }
-
-        return __exception;
+        // Client blocks (the server-applied leave replicates back); server runs the original so the
+        // leave actually happens. The server intentionally applies here rather than re-applying from
+        // the handler, which (without an allowed thread) would re-enter this prefix and recurse.
+        return ModInformation.IsServer;
     }
 }
