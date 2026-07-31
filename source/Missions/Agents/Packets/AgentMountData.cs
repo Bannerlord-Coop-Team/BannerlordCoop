@@ -107,35 +107,30 @@ namespace Missions.Agents.Packets
                 && !syntheticStationaryTurn
                 && currentAction0.Index == desiredAction0Index
                 && (ulong)mountAgent.GetCurrentAnimationFlag(0) != MountAction0Flag;
-            if (desiredAction0Index == NoActionIndex)
+            if (!syntheticStationaryTurn)
             {
-                if (currentAction0 != ActionIndexCache.act_none)
-                    mountAgent.SetActionChannel(0, ActionIndexCache.act_none);
-            }
-            else if (currentAction0 == ActionIndexCache.act_none
-                || currentAction0.Index != desiredAction0Index
-                || nativeTurnFlagsChanged)
-            {
-                mountAgent.SetActionChannel(
-                    0,
-                    new ActionIndexCache(desiredAction0Index),
-                    ignorePriority: stationaryTurn,
-                    additionalFlags: (AnimFlags)MountAction0Flag,
-                    actionSpeed: MountAction0Speed,
-                    startProgress: MountAction0Progress);
-            }
-            else if (!syntheticStationaryTurn)
-            {
-                mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
-                mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
-            }
-            else if (MountAction0Progress
-                > mountAgent.GetCurrentActionProgress(0))
-            {
-                mountAgent.SetCurrentActionProgress(
-                    0,
-                    MountAction0Progress);
-                mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
+                if (desiredAction0Index == NoActionIndex)
+                {
+                    if (currentAction0 != ActionIndexCache.act_none)
+                        mountAgent.SetActionChannel(0, ActionIndexCache.act_none);
+                }
+                else if (currentAction0 == ActionIndexCache.act_none
+                    || currentAction0.Index != desiredAction0Index
+                    || nativeTurnFlagsChanged)
+                {
+                    mountAgent.SetActionChannel(
+                        0,
+                        new ActionIndexCache(desiredAction0Index),
+                        ignorePriority: stationaryTurn,
+                        additionalFlags: (AnimFlags)MountAction0Flag,
+                        actionSpeed: MountAction0Speed,
+                        startProgress: MountAction0Progress);
+                }
+                else
+                {
+                    mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
+                    mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
+                }
             }
 
             //Currently not doing anything afaik
@@ -159,7 +154,7 @@ namespace Missions.Agents.Packets
             mountAgent.SetMaximumSpeedLimit(MountSpeed, isMultiplier: false);
             Agent.MovementControlFlag movementFlags =
                 (Agent.MovementControlFlag)MountMovementFlag;
-            if (stationaryTurn)
+            if (stationaryTurn && !syntheticStationaryTurn)
             {
                 movementFlags = WithStationaryTurnMovementFlag(
                     movementFlags,
