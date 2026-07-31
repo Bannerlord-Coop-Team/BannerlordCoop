@@ -27,6 +27,11 @@ internal static class BattleDebugCommands
     private static Camera ladderCamera;
 
 #if DEBUG
+    private static Agent wieldTestAgent;
+    private static Guid wieldTestAgentId;
+    private static EquipmentIndex wieldTestOriginalMainHand;
+    private static bool wieldTestActive;
+
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)
     {
@@ -91,6 +96,110 @@ internal static class BattleDebugCommands
                 return "Usage: coop.debug.battle.animation_trace " +
                        "<start|snapshot|stop|status>";
         }
+    }
+
+    [CommandLineArgumentFunction("wield_test", "coop.debug.battle")]
+    public static string WieldTest(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.battle.wield_test <start|restore|status>";
+        }
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "start":
+                return StartWieldTest();
+            case "restore":
+                return RestoreWieldTest();
+            case "status":
+                return wieldTestActive
+                    ? $"WIELD_TEST active agent={wieldTestAgentId:D}"
+                    : "WIELD_TEST inactive";
+            default:
+                return "Usage: coop.debug.battle.wield_test <start|restore|status>";
+        }
+    }
+
+    private static string StartWieldTest()
+    {
+        if (wieldTestActive) return "WIELD_TEST already active";
+        Agent agent = Agent.Main;
+        if (agent == null || !agent.IsActive() || agent.Mission != Mission.Current)
+            return "WIELD_TEST no active main agent";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry)
+            || !registry.TryGetAgentInfo(agent, out var info)
+            || !registry.IsLocallyControlled(info.AgentId))
+        {
+            return "WIELD_TEST main agent is not locally controlled";
+        }
+
+        EquipmentIndex original = agent.GetPrimaryWieldedItemIndex();
+        EquipmentIndex target = EquipmentIndex.None;
+        if (original == EquipmentIndex.None)
+        {
+            for (EquipmentIndex slot = EquipmentIndex.WeaponItemBeginSlot;
+                 slot < EquipmentIndex.NumAllWeaponSlots;
+                 slot++)
+            {
+                if (agent.Equipment[slot].Item == null) continue;
+                target = slot;
+                break;
+            }
+            if (target == EquipmentIndex.None)
+                return "WIELD_TEST main agent has no weapon";
+        }
+
+        wieldTestAgent = agent;
+        wieldTestAgentId = info.AgentId;
+        wieldTestOriginalMainHand = original;
+        wieldTestActive = true;
+        if (original == EquipmentIndex.None)
+        {
+            agent.TryToWieldWeaponInSlot(
+                target,
+                Agent.WeaponWieldActionType.WithAnimationUninterruptible,
+                isWieldedOnSpawn: false);
+        }
+        else
+        {
+            agent.TryToSheathWeaponInHand(
+                Agent.HandIndex.MainHand,
+                Agent.WeaponWieldActionType.WithAnimationUninterruptible);
+        }
+        return $"WIELD_TEST_STARTED agent={wieldTestAgentId:D} " +
+            $"original={(int)original} target={(int)target}";
+    }
+
+    private static string RestoreWieldTest()
+    {
+        if (!wieldTestActive) return "WIELD_TEST inactive";
+        if (wieldTestAgent == null
+            || !wieldTestAgent.IsActive()
+            || wieldTestAgent.Mission != Mission.Current)
+        {
+            return "WIELD_TEST agent unavailable";
+        }
+
+        if (wieldTestOriginalMainHand == EquipmentIndex.None)
+        {
+            wieldTestAgent.TryToSheathWeaponInHand(
+                Agent.HandIndex.MainHand,
+                Agent.WeaponWieldActionType.WithAnimationUninterruptible);
+        }
+        else
+        {
+            wieldTestAgent.TryToWieldWeaponInSlot(
+                wieldTestOriginalMainHand,
+                Agent.WeaponWieldActionType.WithAnimationUninterruptible,
+                isWieldedOnSpawn: false);
+        }
+        Guid restoredAgentId = wieldTestAgentId;
+        wieldTestAgent = null;
+        wieldTestAgentId = Guid.Empty;
+        wieldTestOriginalMainHand = EquipmentIndex.None;
+        wieldTestActive = false;
+        return $"WIELD_TEST_RESTORED agent={restoredAgentId:D}";
     }
 #endif
 
