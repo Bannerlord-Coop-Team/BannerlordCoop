@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
@@ -15,6 +15,7 @@ using Missions.Services.Network;
 using Missions.Taverns;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
+using System.Collections.Generic;
 
 namespace Missions;
 
@@ -27,22 +28,24 @@ namespace Missions;
 public class MissionModule : Module
 {
     internal const string MissilePatchCategory = "CoopMissilePatches";
+    internal const string ShieldDamagePatchCategory = "CoopShieldDamagePatches";
+    internal const string CombatHitPresentationPatchCategory = "CoopCombatHitPresentationPatches";
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
+    internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
 
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
 
-        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
-            typeof(AddMissileAuxPatch).Assembly,
-            MissilePatchCategory));
-        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(
-            typeof(AgentVoicePatch).Assembly,
-            AgentVoicePatchCategory));
+        foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
+            builder.RegisterInstance(registration);
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementBatchSender>()
+            .As<IMovementBatchSender>()
             .InstancePerDependency();
         builder.RegisterType<CompressedMovementPacketHandler>()
             .AsSelf()
@@ -66,6 +69,9 @@ public class MissionModule : Module
         // fresh CoopMissionController, which pulls a fresh ICoopMissionComponent and a fresh set of sync
         // handlers — so no agent/registry state from a previous mission leaks into the next.
         builder.RegisterType<CoopMissionComponent>().As<ICoopMissionComponent>().InstancePerDependency();
+        builder.RegisterType<GuardedHitWindow>()
+            .As<IGuardedHitWindow>()
+            .InstancePerDependency();
 
         // The location P2P controller. Resolved as ILocationMissionBehavior by PlayerLocationEntryPatches
         // and attached to every opened location mission (tavern/indoor, town centre, castle courtyard,
@@ -141,6 +147,10 @@ public class MissionModule : Module
             .AsSelf()
             .InstancePerLifetimeScope()
             .AutoActivate();
+        builder.RegisterType<BattleDebugRouteHandler>()
+            .AsSelf()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
 
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
@@ -161,6 +171,12 @@ public class MissionModule : Module
         builder.RegisterType<RemoteAgentActionProcessor>()
             .As<IRemoteAgentActionProcessor>()
             .InstancePerDependency();
+        builder.RegisterType<GuardReactionActionResolver>()
+            .As<IGuardReactionActionResolver>()
+            .InstancePerDependency();
+        builder.RegisterType<GuardReactionHandler>()
+            .As<IGuardReactionHandler>()
+            .InstancePerDependency();
         builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
         builder.RegisterType<VanillaOrderVoiceService>()
             .As<IVanillaOrderVoiceService>()
@@ -169,7 +185,29 @@ public class MissionModule : Module
         builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerDependency();
         builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerDependency();
         builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerDependency();
+        builder.RegisterType<CombatHitPresentationHandler>()
+            .As<ICombatHitPresentationHandler>()
+            .InstancePerDependency();
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
+    }
+
+    internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()
+    {
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(AddMissileAuxPatch).Assembly,
+            MissilePatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(ShieldDamagePatch).Assembly,
+            ShieldDamagePatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(MeleeHitPresentationPatch).Assembly,
+            CombatHitPresentationPatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(AgentVoicePatch).Assembly,
+            AgentVoicePatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(AgentPickupPatch).Assembly,
+            WeaponPickupPatchCategory);
     }
 }

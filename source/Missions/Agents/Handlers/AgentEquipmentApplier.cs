@@ -58,7 +58,9 @@ public class AgentEquipmentApplier : IAgentEquipmentApplier
                         continue;
                     }
 
-                    equipment.Equipment[i].Apply(agent);
+                    AgentEquipmentData currentEquipment = equipment.Equipment[i];
+                    compactInfo.RecordAuthoritativeEquipment(currentEquipment);
+                    currentEquipment.Apply(agent);
                 }
             }
         });

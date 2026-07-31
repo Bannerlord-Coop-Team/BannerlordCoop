@@ -23,6 +23,9 @@ public class PartyScreenRosterBaselineProviderTests
         logic._initialData.LeftMemberRoster = new TroopRoster();
         logic._initialData.RightPrisonerRoster = new TroopRoster();
         logic._initialData.LeftPrisonerRoster = new TroopRoster();
+        var rightItems = new ItemRoster();
+        logic.CurrentData.RightItemRoster = rightItems;
+        logic._initialData.RightItemRoster = new ItemRoster();
 
         var provider = new PartyScreenRosterBaselineProvider();
 
@@ -31,5 +34,7 @@ public class PartyScreenRosterBaselineProviderTests
         Assert.Same(logic._initialData.RightPrisonerRoster, provider.GetBaselineRoster(logic, rightPrisoner));
         Assert.Same(logic._initialData.LeftPrisonerRoster, provider.GetBaselineRoster(logic, leftPrisoner));
         Assert.Null(provider.GetBaselineRoster(logic, new TroopRoster()));
+        Assert.Same(logic._initialData.RightItemRoster, provider.GetBaselineRoster(logic, rightItems));
+        Assert.Null(provider.GetBaselineRoster(logic, new ItemRoster()));
     }
 }

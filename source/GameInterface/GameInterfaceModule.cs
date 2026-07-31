@@ -5,9 +5,11 @@ using Autofac.Core.Resolving.Pipeline;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
+using GameInterface.Configuration;
 using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
+using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
@@ -24,6 +26,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Stances;
 using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.Time;
+using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Serilog;
@@ -45,6 +48,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
+        // mod-config.json: one lazy read per session container (see IModConfig).
+        builder.RegisterType<ModConfig>().As<IModConfig>().InstancePerLifetimeScope();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
@@ -57,10 +62,13 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
+        builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();
         builder.RegisterType<PrisonerSaleValidator>().As<IPrisonerSaleValidator>().InstancePerDependency();
         builder.RegisterType<PlayerRansomReleaseSettlementProvider>().As<IPlayerRansomReleaseSettlementProvider>().InstancePerDependency();
         builder.RegisterType<PrisonerSaleProcessor>().As<IPrisonerSaleProcessor>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterBaselineProvider>().As<IPartyScreenRosterBaselineProvider>().InstancePerDependency();
+        builder.RegisterType<BanditPartyHomeSettlementRepairer>().As<IBanditPartyHomeSettlementRepairer>().InstancePerDependency();
+        builder.RegisterType<WorkshopRepairer>().As<IWorkshopRepairer>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().InstancePerLifetimeScope();
         builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().InstancePerLifetimeScope();
         builder.RegisterType<PartySyncPerformanceClock>().As<IPartySyncPerformanceClock>().InstancePerLifetimeScope();

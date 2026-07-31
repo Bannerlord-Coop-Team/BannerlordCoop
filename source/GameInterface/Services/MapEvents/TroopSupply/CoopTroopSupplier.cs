@@ -50,11 +50,11 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private readonly IObjectManager objectManager;
     // BR-110: the engine agent budget clamps wave/initial allocation to the mission's render capacity.
     private readonly IBattleAgentBudget agentBudget;
-
     public string MapEventId { get; }
     public BattleSideEnum Side { get; }
 
-    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager, IBattleAgentBudget agentBudget)
+    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager,
+        IBattleAgentBudget agentBudget)
     {
         MapEventId = mapEventId;
         Side = side;
@@ -101,12 +101,18 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                     if (priorSupplied.TryGetValue(party.PartyId, out var local) && local > supplied)
                         supplied = Math.Min(local, entries.Length);
                     priorSupplied.Remove(party.PartyId); // kept — not part of the dropped set
-                    parties.Add(new PartyState
+                    var state = new PartyState
                     {
                         PartyId = party.PartyId,
                         Entries = entries,
                         Supplied = supplied,
-                    });
+                    };
+                    // Allocate this client's own party first. Otherwise an army's AI parties can fill the
+                    // render cap before the local hero is reserved, leaving deployment without a player agent.
+                    if (party.IsReceiverPlayerParty)
+                        parties.Insert(0, state);
+                    else
+                        parties.Add(state);
                     if (party.IsReceiverPlayerParty)
                         playerPartyId = party.PartyId;
                     foreach (var entry in entries)

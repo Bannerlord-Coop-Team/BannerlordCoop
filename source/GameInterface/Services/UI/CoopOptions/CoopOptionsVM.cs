@@ -25,6 +25,7 @@ public class CoopOptionsVM : ViewModel
     public string MovieTextHeader => "Coop Options";
     public string ApplyButtonText => "Apply";
     public string CommunityText => "Join the Community";
+    public string CreditsButtonText => "Credits";
     public string DonateButtonText => "Donate";
     public string PatreonButtonText => "Patreon";
     public string DiscordButtonText => "Discord";
@@ -105,6 +106,8 @@ public class CoopOptionsVM : ViewModel
     }
 
     public void ActionDonate() => CommunityLinks.ShowDonatePopup();
+
+    public void ActionCredits() => CommunityLinks.ShowCreditsPopup();
 
     public void ActionPatreon() => CommunityLinks.OpenPatreon();
 

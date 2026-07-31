@@ -53,6 +53,18 @@ public class MobilePartyBehaviorSnapshotTests
         Assert.Equal(removedMoveTarget.Position, data.MoveTargetPoint);
     }
 
+    [Fact]
+    public void TryCreateJoinState_MissingAi_ReportsFailure()
+    {
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        var snapshot = new MobilePartyBehaviorSnapshot(Mock.Of<IObjectManager>());
+
+        bool created = snapshot.TryCreateJoinState(party, out _, out string failure);
+
+        Assert.False(created);
+        Assert.Equal("party AI is unavailable", failure);
+    }
+
     private static MobileParty CreateParty()
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
