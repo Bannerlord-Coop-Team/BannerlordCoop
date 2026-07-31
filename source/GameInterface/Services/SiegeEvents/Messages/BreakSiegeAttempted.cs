@@ -12,9 +12,11 @@ public readonly struct BreakSiegeAttempted : IEvent
 
     /// <summary>
     /// True for the leave-menu flows whose native continuation was suppressed: the approval then
-    /// finishes the local encounter/menu. False for camp writes embedded mid-flow (try-to-get-away,
-    /// player defeat, safe-passage barter), where the native flow already ran its own local
-    /// continuation and the approval must leave the menus alone.
+    /// finishes the local encounter/menu. False when something else already owns that continuation —
+    /// camp writes embedded mid-flow (try-to-get-away, player defeat, safe-passage barter) whose
+    /// native flow keeps running, and break_in_leave when a battle leave is routed alongside (its
+    /// returning NetworkPartyLeftBattle finishes the encounter) — so the approval must leave the
+    /// menus alone.
     /// </summary>
     public readonly bool FinishLocalMenus;
 

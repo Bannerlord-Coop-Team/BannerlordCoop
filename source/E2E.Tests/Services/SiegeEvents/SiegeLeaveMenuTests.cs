@@ -253,9 +253,16 @@ public class SiegeLeaveMenuTests : IDisposable
         Assert.Equal(partyBaseId, leaveRequest.PartyId);
         Assert.Empty(Clients.Last().NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
 
-        // ...and the camp break still routes alongside it.
+        // ...and the camp break still routes alongside it, but without the approval's menu finish: the
+        // routed leave's NetworkPartyLeftBattle already finishes this client's encounter, so a second
+        // exit from the break approval would pop one menu too many.
         var breakRequest = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
         Assert.Equal(partyId, breakRequest.PartyId);
+        Assert.False(breakRequest.FinishLocalMenus);
+
+        var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
+        Assert.True(approval.Approved);
+        Assert.False(approval.FinishLocalMenus);
         AssertBesiegerCamp(Server, partyId, expectCamp: false);
 
         // The leaver is still held.

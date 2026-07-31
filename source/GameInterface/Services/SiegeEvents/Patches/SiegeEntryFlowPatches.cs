@@ -197,12 +197,16 @@ internal class SiegeEntryFlowPatches
         // A besieger prompted into join_siege_event can already sit on a side of the sally-out/relief map
         // event; native removes it there before clearing the camp. That single-party removal is not
         // auto-synced, so route it or the party stays in that battle on the server.
-        if (mainParty.Party.MapEventSide != null)
+        var routesBattleLeave = mainParty.Party.MapEventSide != null;
+        if (routesBattleLeave)
         {
             MessageBroker.Instance.Publish(mainParty, new PlayerLeaveBattleAttempted(mainParty.Party));
         }
 
-        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(mainParty));
+        // The routed battle leave's returning NetworkPartyLeftBattle already finishes this client's
+        // encounter, so the break approval running its own menu finish on top would exit one menu too
+        // many; only ask the approval for the local finish when no battle leave was routed.
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(mainParty, finishLocalMenus: !routesBattleLeave));
         HoldAfterSiegeLeave(mainParty);
         return false;
     }
