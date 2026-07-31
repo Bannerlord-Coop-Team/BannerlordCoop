@@ -67,17 +67,8 @@ namespace Missions.Agents.Packets
                     mountAgent.SetActionChannel(0, ActionIndexCache.Create(gaitActionName), additionalFlags: (AnimFlags)MountAction0Flag, startProgress: MountAction0Progress);
                 }
             }
-            else if (MountAction0Index != ActionIndexCache.act_none.Index)
-            {
-#if DEBUG
-                MissionActionDiagnostics.RecordMountProgressReplay(
-                    MountAgentId,
-                    mountAgent,
-                    channel: 0,
-                    MountAction0Progress);
-#endif
-                mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
-            }
+            // Once the gait matches, let native animation advance it. Movement packets are unreliable, so
+            // replaying snapshot progress here can apply an older packet and visibly rewind the same gait.
 
             //Currently not doing anything afaik
             if (mountAgent.GetCurrentAction(1).Index != MountAction1Index)
@@ -96,17 +87,6 @@ namespace Missions.Agents.Packets
 #endif
                     mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (AnimFlags)MountAction1Flag, startProgress: MountAction1Progress);
                 }
-            }
-            else if (MountAction1Index != ActionIndexCache.act_none.Index)
-            {
-#if DEBUG
-                MissionActionDiagnostics.RecordMountProgressReplay(
-                    MountAgentId,
-                    mountAgent,
-                    channel: 1,
-                    MountAction1Progress);
-#endif
-                mountAgent.SetCurrentActionProgress(1, MountAction1Progress);
             }
             mountAgent.LookDirection = MountLookDirection;
             mountAgent.MovementInputVector = MountInputVector;
