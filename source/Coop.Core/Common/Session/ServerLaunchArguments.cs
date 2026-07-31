@@ -61,6 +61,38 @@ public static class ServerLaunchArguments
         return string.Join(" ", tokens.Select(QuoteArgument));
     }
 
+    /// <summary>
+    /// Builds the command line for the bundled dedicated-server launcher: only the coop
+    /// session tokens. The launcher owns its engine invocation — mode and module list
+    /// are pinned by the deployment — so the engine tokens the game-instance spawn
+    /// needs would be junk here.
+    /// </summary>
+    public static string BuildDedicatedServerArguments(string saveName, int ownerProcessId,
+        string password, ServerVisibility visibility)
+    {
+        if (saveName == null) throw new ArgumentNullException(nameof(saveName));
+        if (!Enum.IsDefined(typeof(ServerVisibility), visibility))
+            throw new ArgumentOutOfRangeException(nameof(visibility));
+
+        var tokens = new List<string>
+        {
+            SaveArgument,
+            saveName,
+            OwnerArgument,
+            ownerProcessId.ToString(CultureInfo.InvariantCulture),
+            VisibilityArgument,
+            FormatVisibility(visibility),
+        };
+
+        if (!string.IsNullOrEmpty(password))
+        {
+            tokens.Add(PasswordArgument);
+            tokens.Add(password);
+        }
+
+        return string.Join(" ", tokens.Select(QuoteArgument));
+    }
+
     /// <summary>Formats the module ids as the engine's <c>_MODULES_*A*B*_MODULES_</c> launch token.</summary>
     public static string BuildModuleList(IReadOnlyList<string> moduleIds)
     {
