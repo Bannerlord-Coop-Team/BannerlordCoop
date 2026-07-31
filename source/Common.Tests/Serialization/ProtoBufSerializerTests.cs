@@ -35,13 +35,15 @@ public class ProtoBufSerializerTests
     }
 
     [Fact]
-    public void ConfigureRuntimeModel_KeepsCompilationAndUsesDefaultInitializationForStructs()
+    public void ConfigureRuntimeModel_DisablesAutoCompileOnMonoAndUsesDefaultInitializationForStructs()
     {
         var model = RuntimeTypeModel.Create();
         ProtoBufSerializer.ConfigureRuntimeModel(model, isMonoRuntime: true);
         var metaType = model.Add(typeof(SkipConstructorStruct), applyDefaultBehaviour: true);
 
-        Assert.True(model.AutoCompile);
+        // Auto-compile is off on Mono so no contract is emitted implicitly; compilation is then
+        // attempted per type, and a runtime that rejects the IL simply keeps the reflection path.
+        Assert.False(model.AutoCompile);
         Assert.True(metaType.UseConstructor);
 
         var expected = new SkipConstructorStruct(42, "linux");
@@ -66,6 +68,31 @@ public class ProtoBufSerializerTests
         var metaType = model.Add(typeof(SkipConstructorClass), applyDefaultBehaviour: true);
 
         Assert.False(metaType.UseConstructor);
+    }
+
+    [Fact]
+    public void TryCompilePending_LeavesContractUsableWhenCompilationIsRejected()
+    {
+        // Wine-Mono rejects the IL protobuf-net emits for some contracts. TryCompilePending
+        // swallows that rejection, and the contract must still serialize on the reflection path.
+        var model = RuntimeTypeModel.Create();
+        ProtoBufSerializer.ConfigureRuntimeModel(model, isMonoRuntime: true);
+        model.Add(typeof(SkipConstructorStruct), applyDefaultBehaviour: true);
+
+        ProtoBufSerializer.TryCompilePending();
+
+        var expected = new SkipConstructorStruct(7, "fallback");
+        using var stream = new MemoryStream();
+        model.Serialize(stream, expected);
+        stream.Position = 0;
+
+        var actual = (SkipConstructorStruct)model.Deserialize(
+            stream,
+            value: null,
+            typeof(SkipConstructorStruct));
+
+        Assert.Equal(expected.Number, actual.Number);
+        Assert.Equal(expected.Text, actual.Text);
     }
 
     [Fact]
