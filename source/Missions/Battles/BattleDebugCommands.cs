@@ -648,28 +648,18 @@ internal static class BattleDebugCommands
             return "active=False";
         }
 
-        if (!UpdateMountCameraFrame())
-            return "active=False";
-
-        GameEntity visualEntity = focusedMount.AgentVisuals.GetEntity();
-        MatrixFrame visualFrame = visualEntity.GetGlobalFrame();
-        var localTarget = new Vec3(0f, 0f, 1.4f);
+        MatrixFrame cameraEntityFrame = mountCamera.Entity.GetGlobalFrame();
         Vec3 renderedPosition = missionScreen.CombatCamera.Position;
-        Vec3 expectedTarget = visualFrame.TransformToParent(in localTarget);
-        Vec3 targetDirection = expectedTarget - renderedPosition;
-        float directionDot = -1f;
-        if (targetDirection.LengthSquared > 0.0001f)
-        {
-            targetDirection.Normalize();
-            Vec3 renderedDirection = missionScreen.CombatCamera.Direction;
-            directionDot =
-                (renderedDirection.X * targetDirection.X)
-                + (renderedDirection.Y * targetDirection.Y)
-                + (renderedDirection.Z * targetDirection.Z);
-        }
+        Vec3 entityDirection = -cameraEntityFrame.rotation.u;
+        entityDirection.Normalize();
+        Vec3 renderedDirection = missionScreen.CombatCamera.Direction;
+        float directionDot =
+            (renderedDirection.X * entityDirection.X)
+            + (renderedDirection.Y * entityDirection.Y)
+            + (renderedDirection.Z * entityDirection.Z);
 
         float positionDelta =
-            (renderedPosition - mountCamera.Entity.GetGlobalFrame().origin).Length;
+            (renderedPosition - cameraEntityFrame.origin).Length;
         bool active = ReferenceEquals(missionScreen.CustomCamera, mountCamera);
         return string.Format(
             CultureInfo.InvariantCulture,
