@@ -123,12 +123,20 @@ public class E2ETestEnvironment : IDisposable
             }
             finally
             {
-                // Must run even when a disposal above throws: a live container left in ContainerProvider
-                // makes CallOriginalPolicy deny originals for every later environment-less test in the
-                // process (the shared Harmony patches stay applied), silently corrupting game-object
-                // construction there.
-                OutputSinkManager.RemoveLogCallback(TestOutputCallback);
-                ContainerProvider.Clear();
+                try
+                {
+                    // Must run even when a disposal above throws: a live container left in ContainerProvider
+                    // makes CallOriginalPolicy deny originals for every later environment-less test in the
+                    // process (the shared Harmony patches stay applied), silently corrupting game-object
+                    // construction there.
+                    OutputSinkManager.RemoveLogCallback(TestOutputCallback);
+                    ContainerProvider.Clear();
+                }
+                finally
+                {
+                    // Async tests can re-mark their continuation thread; keep it marked through fixture teardown.
+                    GameThread.Instance.UnmarkGameThread();
+                }
             }
         }
         finally

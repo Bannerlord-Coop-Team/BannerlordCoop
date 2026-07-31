@@ -1556,7 +1556,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 new NetworkConversationDenied(
                     ConversationDeniedReason.PartyEngaged,
                     firstRequest.RequestId)));
-        using var gameThreadMark = new GameThreadMarkScope();
+        Common.GameThread.Instance.MarkGameThread();
 
         Assert.Equal(firstRequest.RequestId, GetPendingConversationRequestId(client));
 
@@ -1647,7 +1647,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     forcePlayerOutFromSettlement: false,
                     ConversationRestartSource.EncounterManager,
                     secondRequestId)));
-        using var gameThreadMark = new GameThreadMarkScope();
+        Common.GameThread.Instance.MarkGameThread();
         Assert.True(Common.GameThread.Instance.QueueLength > 0);
 
         var getEncounterMenu = AccessTools.Method(
@@ -3185,19 +3185,6 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             requestId = (string?)field.GetValue(handler);
         });
         return requestId;
-    }
-
-    private sealed class GameThreadMarkScope : IDisposable
-    {
-        public GameThreadMarkScope()
-        {
-            Common.GameThread.Instance.MarkGameThread();
-        }
-
-        public void Dispose()
-        {
-            Common.GameThread.Instance.UnmarkGameThread();
-        }
     }
 
     private static bool ForceImmediateBattleEncounterMenu(
