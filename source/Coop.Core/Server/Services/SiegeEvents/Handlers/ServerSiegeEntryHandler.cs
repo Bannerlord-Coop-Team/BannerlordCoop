@@ -94,30 +94,14 @@ internal class ServerSiegeEntryHandler : IHandler
         NetPeer peer,
         NetworkRequestBreakInContinuation request)
     {
-        if (!playerManager.TryGetPlayer(peer, out var player) || player.MobilePartyId != request.PartyId)
-        {
-            Logger.Warning("Rejecting break-in request {RequestId} from a peer that does not control party {PartyId}",
-                request.RequestId, request.PartyId);
-            return false;
-        }
+        if (!DoesPeerControlParty(peer, request)) return false;
 
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(request.PartyId, out var party) ||
             !objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement))
             return false;
 
         var alreadyEntered = ReferenceEquals(party.CurrentSettlement, settlement);
-        var mapEventSide = party.Party?.MapEventSide;
-        var validEnteredMapEvent = alreadyEntered &&
-            ReferenceEquals(party.MapEvent, settlement.Party?.MapEvent) &&
-            party.Party.Side == BattleSideEnum.Defender;
-        var siegeEvent = settlement.SiegeEvent;
-
-        if (!party.IsActive ||
-            (party.CurrentSettlement != null && !alreadyEntered) ||
-            party.BesiegerCamp != null ||
-            (mapEventSide != null && !validEnteredMapEvent) ||
-            siegeEvent == null ||
-            !siegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Defender))
+        if (!CanApplyBreakInContinuation(party, settlement, alreadyEntered))
         {
             Logger.Warning("Rejecting break-in request {RequestId} for party {PartyId} and settlement {SettlementId}",
                 request.RequestId, request.PartyId, request.SettlementId);
@@ -136,6 +120,39 @@ internal class ServerSiegeEntryHandler : IHandler
         }
 
         return ReferenceEquals(party.CurrentSettlement, settlement);
+    }
+
+    private bool DoesPeerControlParty(
+        NetPeer peer,
+        NetworkRequestBreakInContinuation request)
+    {
+        if (playerManager.TryGetPlayer(peer, out var player) &&
+            player.MobilePartyId == request.PartyId)
+            return true;
+
+        Logger.Warning("Rejecting break-in request {RequestId} from a peer that does not control party {PartyId}",
+            request.RequestId, request.PartyId);
+        return false;
+    }
+
+    private static bool CanApplyBreakInContinuation(
+        MobileParty party,
+        Settlement settlement,
+        bool alreadyEntered)
+    {
+        if (!party.IsActive) return false;
+        if (party.CurrentSettlement != null && !alreadyEntered) return false;
+        if (party.BesiegerCamp != null) return false;
+
+        var mapEventSide = party.Party?.MapEventSide;
+        var validEnteredMapEvent = alreadyEntered &&
+            ReferenceEquals(party.MapEvent, settlement.Party?.MapEvent) &&
+            party.Party.Side == BattleSideEnum.Defender;
+        if (mapEventSide != null && !validEnteredMapEvent) return false;
+
+        var siegeEvent = settlement.SiegeEvent;
+        return siegeEvent != null &&
+            siegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Defender);
     }
 
     private void SendBreakInContinuationResult(
