@@ -21,11 +21,16 @@ public class MountMovementApplier : IPacketHandler
 {
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IAgentPositionInterpolator interpolator;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
 
-    public MountMovementApplier(INetworkAgentRegistry agentRegistry, IAgentPositionInterpolator interpolator)
+    public MountMovementApplier(
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator interpolator,
+        IPuppetMountStateRepairer puppetMountStateRepairer)
     {
         this.agentRegistry = agentRegistry;
         this.interpolator = interpolator;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
     }
 
     public PacketType PacketType => PacketType.MountMovement;
@@ -37,7 +42,12 @@ public class MountMovementApplier : IPacketHandler
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
         var movement = (MountMovementPacket)packet;
-        if (movement.MountIds == null) return;
+        int idCount = movement.MountIds?.Length ?? movement.MountGuids?.Length ?? 0;
+        if (idCount == 0 || movement.Mounts == null ||
+            movement.Mounts.Length != idCount)
+        {
+            return;
+        }
 
         GameThread.RunSafe(() =>
         {
@@ -46,11 +56,16 @@ public class MountMovementApplier : IPacketHandler
             // Resolve and apply the whole batch in ONE game-thread action, matching
             // AgentMovementHandler.HandlePacket.
             var toApply = new List<(Agent horse, AgentMountData data)>();
-            for (int i = 0; i < movement.MountIds.Length; i++)
+            for (int i = 0; i < idCount; i++)
             {
-                var mountId = movement.MountIds[i];
-                if (agentRegistry.IsLocallyControlled(mountId)) continue;
-                if (!agentRegistry.TryGetAgentInfo(mountId, out var mountInfo)) continue;
+                CoopAgentInfo mountInfo;
+                bool found = movement.MountIds != null
+                    ? agentRegistry.TryGetAgentInfo(
+                        movement.IdentityScopeId, movement.MountIds[i], out mountInfo)
+                    : agentRegistry.TryGetAgentInfo(
+                        movement.MountGuids[i], out mountInfo);
+                if (!found || agentRegistry.IsLocallyControlled(mountInfo.Agent))
+                    continue;
                 toApply.Add((mountInfo.Agent, movement.Mounts[i]));
             }
 
@@ -81,9 +96,10 @@ public class MountMovementApplier : IPacketHandler
 
                     if (horse.Controller != AgentControllerType.None)
                         horse.Controller = AgentControllerType.None;
+                    puppetMountStateRepairer.PreserveRiderlessPuppet(horse);
 
                     data.ApplyMount(horse);
-                    interpolator.SetMountTarget(horse, data.MountPosition, data.MountMovementDirection);
+                    interpolator.SetMountTarget(horse, data);
                 }
             }
         });

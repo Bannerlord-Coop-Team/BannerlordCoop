@@ -204,6 +204,11 @@ internal class ClientSiegeEntryHandler : IHandler
             return;
         }
 
+        // The server routed a battle leave instead of a camp break; the returning battle-leave
+        // reply owns the menu continuation.
+        if (payload.What.BattleLeaveApplied)
+            return;
+
         // Embedded camp writes (try-to-get-away, the defeat path, safe-passage barter) already ran
         // their native menu continuation; finishing here would tear down the menu they landed on.
         if (!payload.What.FinishLocalMenus) return;

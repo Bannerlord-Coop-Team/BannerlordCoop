@@ -5,6 +5,7 @@ using Common.Network;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.BesiegerCamps.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -220,14 +221,21 @@ internal class ServerSiegeEntryHandler : IHandler
 
             if (party.BesiegerCamp == null)
             {
+                if (party.MapEvent?.IsSiegeAssault == true && party.Party.Side == BattleSideEnum.Attacker)
+                {
+                    messageBroker.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
+                    network.Send(peer, new NetworkBreakSiegeApproved(true, true, obj.FinishLocalMenus));
+                    return;
+                }
+
                 Logger.Error("Party {PartyId} tried to leave a siege camp it is not in", obj.PartyId);
-                network.Send(peer, new NetworkBreakSiegeApproved(false, obj.FinishLocalMenus));
+                network.Send(peer, new NetworkBreakSiegeApproved(false, false, obj.FinishLocalMenus));
                 return;
             }
 
             siegeEventInterface.BreakSiege(party);
 
-            network.Send(peer, new NetworkBreakSiegeApproved(true, obj.FinishLocalMenus));
+            network.Send(peer, new NetworkBreakSiegeApproved(true, false, obj.FinishLocalMenus));
         });
     }
 

@@ -37,6 +37,54 @@ public class PlayerEncounterInterfaceTests
     }
 
     [Fact]
+    public void ShouldReleaseWithoutConversation_ForeignPlayerHero_ReturnsTrue()
+    {
+        var localClan = ObjectHelper.SkipConstructor<Clan>();
+        var ownerClan = ObjectHelper.SkipConstructor<Clan>();
+        var playerHero = ObjectHelper.SkipConstructor<Hero>();
+        playerHero._clan = ownerClan;
+        playerObjects.Add(playerHero, new ControlledObjectInfo("PlayerTwo", new ControllerIdProvider()));
+
+        try
+        {
+            Assert.True(PlayerEncounterInterface.ShouldReleaseWithoutConversation(playerHero, localClan));
+        }
+        finally
+        {
+            playerObjects.Remove(playerHero);
+        }
+    }
+
+    [Fact]
+    public void ShouldReleaseWithoutConversation_LocalPlayerHero_ReturnsFalse()
+    {
+        var localClan = ObjectHelper.SkipConstructor<Clan>();
+        var playerHero = ObjectHelper.SkipConstructor<Hero>();
+        playerHero._clan = localClan;
+        playerObjects.Add(playerHero, new ControlledObjectInfo("PlayerOne", new ControllerIdProvider()));
+
+        try
+        {
+            Assert.False(PlayerEncounterInterface.ShouldReleaseWithoutConversation(playerHero, localClan));
+        }
+        finally
+        {
+            playerObjects.Remove(playerHero);
+        }
+    }
+
+    [Fact]
+    public void ShouldReleaseWithoutConversation_AiLord_ReturnsFalse()
+    {
+        var localClan = ObjectHelper.SkipConstructor<Clan>();
+        var aiClan = ObjectHelper.SkipConstructor<Clan>();
+        var lord = ObjectHelper.SkipConstructor<Hero>();
+        lord._clan = aiClan;
+
+        Assert.False(PlayerEncounterInterface.ShouldReleaseWithoutConversation(lord, localClan));
+    }
+
+    [Fact]
     public void ShouldReleaseWithoutConversation_LocalPlayerCompanion_ReturnsFalse()
     {
         var localClan = ObjectHelper.SkipConstructor<Clan>();

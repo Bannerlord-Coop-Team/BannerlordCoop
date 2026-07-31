@@ -74,6 +74,42 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void HostMigration_AdoptsFleeingPuppet_WithoutChargingItBackIntoCombat()
+    {
+        using var fixture = new MissionEngineFixture();
+        var newHost = Clients.First();
+        SetControllerId(newHost, "B");
+
+        var npcId = Guid.NewGuid();
+
+        newHost.Call(() =>
+        {
+            var mock = fixture.CreateMission(newHost);
+            var controller = newHost.Resolve<CoopBattleController>();
+            var registry = newHost.Resolve<INetworkAgentRegistry>();
+            controller.Session.TryBegin("mapEvent1");
+
+            var npc = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            npc.IsRunningAway = true;
+            Assert.True(registry.TryRegisterAgent("A", npcId, npc));
+
+            newHost.Resolve<IMessageBroker>().Publish(
+                this, new BattleHostMigrated("mapEvent1", "A"));
+
+            Assert.True(AgentMirror.TryGet(npc, out var mirror));
+            Assert.Equal(AgentControllerType.AI, mirror.Controller);
+            Assert.Null(mirror.Formation);
+            Assert.True(npc.IsRunningAway);
+
+            Assert.True(registry.TryGetAgentInfo(npcId, out var info));
+            Assert.Equal("B", info.CurrentAuthority);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
     /// <summary>
     /// A host RETREAT is not a disconnect: the retreating host's OWN party withdraws (despawned on every
     /// client), while the AI it was running is adopted by the promoted successor — two DISJOINT sets, which is

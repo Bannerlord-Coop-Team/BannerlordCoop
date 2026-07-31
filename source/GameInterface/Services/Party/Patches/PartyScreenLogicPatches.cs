@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Serilog;
@@ -38,22 +37,25 @@ internal class PartyScreenLogicPatches
             return false;
         }
 
+        FlattenedTroopRoster releasedPrisonersRoster = new FlattenedTroopRoster(4);
         FlattenedTroopRoster takenPrisonersRoster = new FlattenedTroopRoster(4);
-        FlattenedTroopRoster donatedPrisonersRoster = new FlattenedTroopRoster(4);
         foreach (Tuple<CharacterObject, int> tuple in __instance.CurrentData.TransferredPrisonersHistory)
         {
             int number = MathF.Abs(tuple.Item2);
             if (tuple.Item2 < 0)
             {
-                takenPrisonersRoster.Add(tuple.Item1, number, 0);
+                releasedPrisonersRoster.Add(tuple.Item1, number, 0);
             }
             else if (tuple.Item2 > 0)
             {
-                donatedPrisonersRoster.Add(tuple.Item1, number, 0);
+                takenPrisonersRoster.Add(tuple.Item1, number, 0);
             }
         }
 
-        bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], donatedPrisonersRoster, takenPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+        PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
+        bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+        bool applyReleasedAndTakenPrisonerActions =
+            PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
         if (flag)
         {
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
@@ -70,8 +72,8 @@ internal class PartyScreenLogicPatches
 
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
+                releasedPrisonersRoster,
                 takenPrisonersRoster,
-                donatedPrisonersRoster,
                 recruitedPrisonersRoster,
                 __instance.MemberRosters[0],
                 __instance.PrisonerRosters[0],
@@ -88,7 +90,8 @@ internal class PartyScreenLogicPatches
                 __instance.CurrentData.PartyInfluenceChangeAmount.Item2,
                 __instance.CurrentData.PartyMoraleChangeAmount,
                 __instance.DoNotApplyGoldTransactions,
-                partyScreenMode
+                partyScreenMode,
+                applyReleasedAndTakenPrisonerActions
             );
 
             MessageBroker.Instance.Publish(__instance, message);
@@ -117,8 +120,10 @@ internal class PartyScreenLogicPatches
                     // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
                     // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
                     // For example, the left member roster when creating a new clan party is not managed on the server but the server does need this data.
-                    __instance.MemberRosters[0] = duplicateLeftMemberRoster;
-                    __instance.PrisonerRosters[1] = duplicateLeftPrisonerRoster;
+                    RestoreLeftRostersAfterCommit(
+                        __instance,
+                        duplicateLeftMemberRoster,
+                        duplicateLeftPrisonerRoster);
                 }
                 finally
                 {
@@ -130,22 +135,48 @@ internal class PartyScreenLogicPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(PartyScreenLogic.ExecuteTroop))]
-    [HarmonyPostfix]
-    public static void ExecuteTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command)
+    internal static void RestoreLeftRostersAfterCommit(
+        PartyScreenLogic partyScreenLogic,
+        TroopRoster leftMemberRoster,
+        TroopRoster leftPrisonerRoster)
     {
-        if (!__instance.ValidateCommand(command)) return;
-
-        // Send message to server to run KillCharacterAction.ApplyByExecution
-        var message = new HeroExecuted(command.Character.HeroObject, Hero.MainHero);
-        MessageBroker.Instance.Publish(__instance, message);
+        partyScreenLogic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftMemberRoster;
+        partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
     }
 
+    /// <summary>
+    /// Executing prisoner heroes is disabled in coop: the kill rides KillCharacterAction and its follow-on
+    /// death/inheritance handling, which crashes the game when it targets a lord or player
+    /// (<see href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/2310">issue #2310</see>).
+    /// Skipping the original also skips its local prisoner-roster mutation, so nothing diverges from the server.
+    /// </summary>
+    [HarmonyPatch(nameof(PartyScreenLogic.ExecuteTroop))]
+    [HarmonyPrefix]
+    public static bool ExecuteTroopPrefix() => false;
+
+    /// <summary>
+    /// Reports every prisoner as non-executable so the party screen disables the execute button and
+    /// <see cref="PartyScreenLogic.ValidateCommand"/> rejects any ExecuteTroop command (issue #2310).
+    /// </summary>
     [HarmonyPatch(nameof(PartyScreenLogic.IsExecutable))]
     [HarmonyPrefix]
-    public static bool IsExecutablePrefix(PartyScreenLogic.TroopType troopType, CharacterObject character, PartyScreenLogic.PartyRosterSide side)
+    public static bool IsExecutablePrefix(ref bool __result)
     {
-        // Executable if NOT player hero
-        return character.HeroObject?.IsPlayerHero() != true;
+        __result = false;
+        return false;
+    }
+
+    internal const string ExecutionDisabledReason = "Executing prisoners is disabled in Co-op.";
+
+    /// <summary>
+    /// The disabled execute button's tooltip; the native "Cannot execute hero right now" would suggest
+    /// execution can become available.
+    /// </summary>
+    [HarmonyPatch(nameof(PartyScreenLogic.GetExecutableReasonString))]
+    [HarmonyPrefix]
+    public static bool GetExecutableReasonStringPrefix(ref string __result)
+    {
+        __result = ExecutionDisabledReason;
+        return false;
     }
 }

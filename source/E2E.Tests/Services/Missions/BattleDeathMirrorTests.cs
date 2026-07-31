@@ -4,6 +4,7 @@ using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents.Messages;
 using Missions;
+using Missions.Agents;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.Core;
@@ -153,7 +154,8 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
             using var applier = new PuppetDeathApplier(
                 broker,
                 peer.Resolve<ICoopMissionComponent>(),
-                new CasualtyAttributionMap());
+                new CasualtyAttributionMap(),
+                peer.Resolve<IPuppetMountStateRepairer>());
 
             broker.Publish(this,
                 new NetworkBattleAgentDied(

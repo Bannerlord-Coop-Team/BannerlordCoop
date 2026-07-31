@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Tests.Utils;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Extensions;
 using LiteNetLib;
@@ -19,6 +20,18 @@ public sealed class DirectPacketSend
     }
 }
 
+public sealed class SerializedPacketSend
+{
+    public IPacket Packet { get; }
+    public byte[] Payload { get; }
+
+    public SerializedPacketSend(IPacket packet, byte[] payload)
+    {
+        Packet = packet;
+        Payload = payload;
+    }
+}
+
 /// <summary>
 /// Mock of the mission P2P mesh (<see cref="IBattleNetwork"/>) for E2E tests. The real mesh is a direct
 /// client-to-client LiteNetLib link; this routes <see cref="IMessage"/> traffic between client instances
@@ -30,8 +43,11 @@ public class MockBattleNetwork : IBattleNetwork
     private readonly MeshNetworkRouter router;
 
     public NetPeer NetPeer { get; } = NetPeerExtensions.CreatePeer();
+    public MessageCollection NetworkSentMessages { get; } = new MessageCollection();
     public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
     public List<DirectPacketSend> DirectPacketSends { get; } = new();
+    public List<SerializedPacketSend> SerializedPacketSends { get; } = new();
+    public int MaxUnreliablePayloadBytes { get; set; } = 1000;
 
     public MockBattleNetwork(MeshNetworkRouter router)
     {
@@ -42,16 +58,36 @@ public class MockBattleNetwork : IBattleNetwork
     public void Stop() { }
     public void ConnectToInstance(string instanceId) { }
 
-    public void SendAll(IMessage message) => router.SendAll(this, message);
-    public void Send(string controllerId, IMessage message) => router.Send(this, controllerId, message);
-    public void SendAllBut(string controllerId, IMessage message) => router.SendAllBut(this, controllerId, message);
+    public void SendAll(IMessage message)
+    {
+        NetworkSentMessages.Add(message);
+        router.SendAll(this, message);
+    }
+
+    public void Send(string controllerId, IMessage message)
+    {
+        NetworkSentMessages.Add(message);
+        router.Send(this, controllerId, message);
+    }
+
+    public void SendAllBut(string controllerId, IMessage message)
+    {
+        NetworkSentMessages.Add(message);
+        router.SendAllBut(this, controllerId, message);
+    }
 
     // Packet broadcasts are captured for sender-path assertions; packet-level mesh routing isn't exercised.
     public void SendAll(IPacket packet) => NetworkSentPackets.Add(packet);
+    public void SendAll(IPacket packet, byte[] serializedPacket)
+    {
+        NetworkSentPackets.Add(packet);
+        SerializedPacketSends.Add(new SerializedPacketSend(packet, serializedPacket));
+    }
     public void Send(string controllerId, IPacket packet)
     {
         NetworkSentPackets.Add(packet);
         DirectPacketSends.Add(new DirectPacketSend(controllerId, packet));
     }
     public void SendAllBut(string controllerId, IPacket packet) => throw new NotImplementedException();
+    public int GetMaxUnreliablePayloadBytes() => MaxUnreliablePayloadBytes;
 }
