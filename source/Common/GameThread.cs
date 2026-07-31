@@ -544,5 +544,4 @@ public class GameThread : IUpdateable
             m_AmbientCancellation.Value = previous;
         }
     }
-
 }
