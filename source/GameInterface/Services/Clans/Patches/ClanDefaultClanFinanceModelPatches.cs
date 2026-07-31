@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Interfaces;
 using GameInterface.Services.Heroes.Extensions;
@@ -95,8 +96,9 @@ internal class DefaultClanFinanceModelPatches
         ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
 
         // Don't tick gold change for disconnected players
-        var clanLeaderParty = clan.Leader.PartyBelongedTo;
-        if (clanLeaderParty != null && playerManager.IsOwnerOfPartyDisconnected(clanLeaderParty)) return false;
+        if (ModInformation.IsServer
+            && clan.Leader != null
+            && playerManager.IsOwnerOfHeroDisconnected(clan.Leader)) return false;
 
         var clanLeaderMapEvent = clan.Leader.PartyBelongedTo?.MapEvent;
 
