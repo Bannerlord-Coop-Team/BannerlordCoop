@@ -20,8 +20,10 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -268,6 +270,41 @@ public class SiegeDebugCommand
         GameMenu.SwitchToMenu("menu_siege_strategies");
         MobileParty.MainParty.SetMoveModeHold();
         return $"Joined the active siege assault at {settlement.Name}";
+    }
+
+    [CommandLineArgumentFunction("assault_entry_state", "coop.debug.siege")]
+    public static string AssaultEntryState(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.siege.assault_entry_state";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (Campaign.Current == null || PlayerEncounter.Current == null || MobileParty.MainParty == null)
+        {
+            return "The local player encounter is unavailable";
+        }
+
+        var callbackArgs = new MenuCallbackArgs((MenuContext)null, null);
+        bool conditionShown = new EncounterGameMenuBehavior()
+            .game_menu_encounter_attack_on_condition(callbackArgs);
+        var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
+        var renderedOption = menu?.MenuOptions
+            .FirstOrDefault(option => option.IdString == "attack");
+        var settlement = MobileParty.MainParty?.BesiegedSettlement;
+        var leader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
+
+        return $"menu={menu?.StringId ?? "none"} settlement={settlement?.StringId ?? "none"} " +
+            $"leader={leader?.StringId ?? "none"} localLeader={leader == MobileParty.MainParty} " +
+            $"conditionShown={conditionShown} conditionEnabled={callbackArgs.IsEnabled} " +
+            $"conditionTooltip={callbackArgs.Tooltip?.ToString() ?? "none"} " +
+            $"renderedRegistered={renderedOption != null} renderedEnabled={renderedOption?.IsEnabled ?? false} " +
+            $"renderedTooltip={renderedOption?.Tooltip?.ToString() ?? "none"}";
     }
 
     [CommandLineArgumentFunction("leave", "coop.debug.siege")]
