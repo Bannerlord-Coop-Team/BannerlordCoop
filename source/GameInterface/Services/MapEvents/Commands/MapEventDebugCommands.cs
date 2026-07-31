@@ -1580,7 +1580,7 @@ public class MapEventDebugCommands
 
     // coop.debug.mapevent.finish_player_encounter PlayerOne
     /// <summary>
-    /// Requests the connected client's encounter close through the existing authoritative leave message.
+    /// Closes the connected player's encounter through the existing authoritative leave path.
     /// </summary>
     [CommandLineArgumentFunction("finish_player_encounter", "coop.debug.mapevent")]
     public static string FinishPlayerEncounter(List<string> args)
@@ -1595,12 +1595,13 @@ public class MapEventDebugCommands
             return "Usage: coop.debug.mapevent.finish_player_encounter <controllerId>";
         }
 
-        if (!ContainerProvider.TryResolve<INetwork>(out var network))
-        {
-            return "Unable to resolve Network";
-        }
-
-        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+        if (!TryGetPlayerParty(
+                args[0],
+                requireReady: true,
+                out var objectManager,
+                out var playerParty,
+                out var error,
+                allowActiveMapEvent: true))
         {
             return error;
         }
@@ -1610,7 +1611,9 @@ public class MapEventDebugCommands
             return $"Unable to resolve PartyBase for player {args[0]}.";
         }
 
-        network.SendAll(new NetworkPartyLeftBattle(partyBaseId, false));
+        MessageBroker.Instance.Publish(
+            playerParty.Party,
+            new PlayerLeaveBattleAttempted(playerParty.Party));
         return $"Requested encounter finish for player {args[0]} (PartyBase id {partyBaseId}).";
     }
 
@@ -2324,7 +2327,8 @@ public class MapEventDebugCommands
         bool requireReady,
         out IObjectManager objectManager,
         out MobileParty playerParty,
-        out string error)
+        out string error,
+        bool allowActiveMapEvent = false)
     {
         objectManager = null;
         playerParty = null;
@@ -2360,7 +2364,7 @@ public class MapEventDebugCommands
             return false;
         }
 
-        if (requireReady && playerParty.MapEvent != null)
+        if (requireReady && !allowActiveMapEvent && playerParty.MapEvent != null)
         {
             error = $"Player {controllerId} is already in a map event.";
             return false;
