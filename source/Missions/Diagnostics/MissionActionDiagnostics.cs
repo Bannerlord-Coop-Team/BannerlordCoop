@@ -167,6 +167,7 @@ internal static class MissionActionDiagnostics
         public int ActionIndex { get; set; }
         public string ActionType { get; set; }
         public float Progress { get; set; }
+        public float CurrentProgress { get; set; }
         public long Sequence { get; set; }
         public bool Restart { get; set; }
         public bool SameAction { get; set; }
@@ -467,6 +468,19 @@ internal static class MissionActionDiagnostics
             && startProgress + ProgressTolerance < currentProgress)
         {
             rewindCommands++;
+            AddEvent(
+                "animation-rewind",
+                agentId,
+                "observer",
+                source,
+                channel,
+                targetActionIndex,
+                agent.GetCurrentActionType(channel).ToString(),
+                startProgress,
+                sequence,
+                restart,
+                sameAction,
+                currentProgress: currentProgress);
         }
 
         AddEvent(
@@ -796,7 +810,8 @@ internal static class MissionActionDiagnostics
         long sequence,
         bool restart,
         bool sameAction,
-        double durationMilliseconds = 0d)
+        double durationMilliseconds = 0d,
+        float currentProgress = 0f)
     {
         if (!kind.StartsWith("animation-", StringComparison.Ordinal)) return;
         if (agentId != Guid.Empty
@@ -817,6 +832,7 @@ internal static class MissionActionDiagnostics
             ActionIndex = actionIndex,
             ActionType = actionType,
             Progress = progress,
+            CurrentProgress = currentProgress,
             Sequence = sequence,
             Restart = restart,
             SameAction = sameAction,
