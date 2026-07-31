@@ -798,6 +798,7 @@ internal static class MissionActionDiagnostics
         bool sameAction,
         double durationMilliseconds = 0d)
     {
+        if (!kind.StartsWith("animation-", StringComparison.Ordinal)) return;
         if (agentId != Guid.Empty
             && !TraceAgentIds.Contains(agentId)) return;
         if (Timeline.Count >= MaximumTimelineEvents) return;
