@@ -43,6 +43,7 @@ internal static class MissionActionDiagnostics
     private const int PostNative = 1;
     private const int MovementChannel = 2;
     private const int TraceAgentsPerMovementClass = 32;
+    private const int TraceAgentsPerActionClass = 16;
     private const int MaximumTimelineEvents = 20000;
     private const int MaximumRewindSamples = 64;
     private const float ProgressTolerance = 0.02f;
@@ -58,6 +59,12 @@ internal static class MissionActionDiagnostics
     private static readonly List<TraceEvent> Timeline =
         new List<TraceEvent>();
     private static readonly HashSet<Guid> TraceAgentIds =
+        new HashSet<Guid>();
+    private static readonly HashSet<Guid> AttackTraceAgentIds =
+        new HashSet<Guid>();
+    private static readonly HashSet<Guid> GuardTraceAgentIds =
+        new HashSet<Guid>();
+    private static readonly HashSet<Guid> WieldTraceAgentIds =
         new HashSet<Guid>();
 
     [ThreadStatic]
@@ -325,6 +332,9 @@ internal static class MissionActionDiagnostics
         Tracks.Clear();
         Timeline.Clear();
         TraceAgentIds.Clear();
+        AttackTraceAgentIds.Clear();
+        GuardTraceAgentIds.Clear();
+        WieldTraceAgentIds.Clear();
         traceAgentsSelected = false;
         traceGeneration = 0;
         outboundUpdates = 0;
@@ -550,8 +560,12 @@ internal static class MissionActionDiagnostics
                     || agent.Mission != Mission.Current
                     || !agent.IsActive()
                     || !agent.IsHuman
-                    || agent.IsMount
-                    || !TraceAgentIds.Contains(info.AgentId))
+                    || agent.IsMount)
+                {
+                    continue;
+                }
+                if (!TraceAgentIds.Contains(info.AgentId)
+                    && !TrySelectActionTraceAgent(info.AgentId, agent))
                 {
                     continue;
                 }
@@ -602,6 +616,31 @@ internal static class MissionActionDiagnostics
             TraceAgentIds.Add(info.AgentId);
         }
         traceAgentsSelected = true;
+    }
+
+    private static bool TrySelectActionTraceAgent(Guid agentId, Agent agent)
+    {
+        bool selected = TrySelectActionTraceAgent(
+            agentId,
+            GetActionCategory(agent.GetCurrentActionType(0)));
+        return TrySelectActionTraceAgent(
+            agentId,
+            GetActionCategory(agent.GetCurrentActionType(1))) || selected;
+    }
+
+    private static bool TrySelectActionTraceAgent(Guid agentId, string category)
+    {
+        HashSet<Guid> categoryAgentIds;
+        if (category == "attack") categoryAgentIds = AttackTraceAgentIds;
+        else if (category == "guard") categoryAgentIds = GuardTraceAgentIds;
+        else if (category == "wield") categoryAgentIds = WieldTraceAgentIds;
+        else return false;
+
+        if (categoryAgentIds.Contains(agentId)) return true;
+        if (categoryAgentIds.Count >= TraceAgentsPerActionClass) return false;
+        categoryAgentIds.Add(agentId);
+        TraceAgentIds.Add(agentId);
+        return true;
     }
 
     private static void SampleAction(
