@@ -80,6 +80,7 @@ public class ArmySiegeWaitFixtureCommands
         public Hero SettlementOwnerHero;
         public Hero LeaderHero;
         public int OwnerLeaderRelation;
+        public bool PlayerWasActive;
         public bool PlayerDisorganized;
         public bool LeaderDisorganized;
         public CampaignTime PlayerDisorganizedUntilTime;
@@ -103,7 +104,9 @@ public class ArmySiegeWaitFixtureCommands
     private sealed class ClientStateFixture
     {
         public Settlement Settlement;
+        public MobileParty PlayerParty;
         public MobileParty LeaderParty;
+        public bool PlayerWasActive;
         public ClanMembershipSnapshot PlayerClanMembership;
         public Kingdom FixtureKingdom;
         public int FixtureKingdomClanCount;
@@ -202,7 +205,9 @@ public class ArmySiegeWaitFixtureCommands
         clientStateFixture = new ClientStateFixture
         {
             Settlement = settlement,
+            PlayerParty = playerParty,
             LeaderParty = leader,
+            PlayerWasActive = playerParty.IsActive,
             PlayerClanMembership = CaptureClanMembership(playerClan, fixtureKingdom),
             FixtureKingdom = fixtureKingdom,
             FixtureKingdomClanCount = fixtureKingdom.Clans.Count,
@@ -214,6 +219,7 @@ public class ArmySiegeWaitFixtureCommands
         return $"Client army siege-wait fixture snapshot captured: leader={leader.StringId}, " +
                $"playerClan={playerClan.StringId}, leaderKingdom={fixtureKingdom.StringId}, " +
                $"leaderKingdomClanCount={fixtureKingdom.Clans.Count}, " +
+               $"playerActive={playerParty.IsActive}, " +
                $"leaderRethinkAtNextHourlyTick={leader.Ai.RethinkAtNextHourlyTick}, " +
                $"settlementSnapshots={settlementSnapshots.Length}.";
     }
@@ -293,6 +299,7 @@ public class ArmySiegeWaitFixtureCommands
             SettlementOwnerHero = settlementOwnerHero,
             LeaderHero = leader.LeaderHero,
             OwnerLeaderRelation = CharacterRelationManager.GetHeroRelation(settlementOwnerHero, leader.LeaderHero),
+            PlayerWasActive = playerParty.IsActive,
             PlayerDisorganized = playerParty.IsDisorganized,
             LeaderDisorganized = leader.IsDisorganized,
             PlayerDisorganizedUntilTime = playerParty.DisorganizedUntilTime,
@@ -308,6 +315,16 @@ public class ArmySiegeWaitFixtureCommands
 
         try
         {
+            timeControl.AddUnpausePolicy(TimeUnpausePolicy);
+            activeFixture.TimePolicyAdded = true;
+            timeControl.ServerSetTimeControl(TimeControlEnum.Pause);
+            if (timeControl.GetTimeControl() != TimeControlEnum.Pause)
+                throw new InvalidOperationException("Unable to pause authoritative campaign time.");
+
+            if (!activeFixture.PlayerWasActive)
+                playerParty.IsActive = true;
+            if (!playerParty.IsActive)
+                throw new InvalidOperationException("Unable to activate the joining player party.");
             if (activeFixture.PlayerDisorganized)
                 playerParty.SetDisorganized(false);
             if (playerParty.IsDisorganized)
@@ -316,12 +333,6 @@ public class ArmySiegeWaitFixtureCommands
                 leader.SetDisorganized(false);
             if (leader.IsDisorganized)
                 throw new InvalidOperationException("Unable to clear the AI leader's transient disorganized state.");
-
-            timeControl.AddUnpausePolicy(TimeUnpausePolicy);
-            activeFixture.TimePolicyAdded = true;
-            timeControl.ServerSetTimeControl(TimeControlEnum.Pause);
-            if (timeControl.GetTimeControl() != TimeControlEnum.Pause)
-                throw new InvalidOperationException("Unable to pause authoritative campaign time.");
 
             kingdomMembershipState.MoveClanToKingdom(
                 playerClanMembership.Kingdom,
@@ -376,6 +387,7 @@ public class ArmySiegeWaitFixtureCommands
                    $"leaderKingdomOriginalClanCount={activeFixture.FixtureKingdomClanCount}, " +
                    $"playerDisorganized={activeFixture.PlayerDisorganized}, " +
                    $"playerDisorganizedUntilTicks={activeFixture.PlayerDisorganizedUntilTime.NumTicks}, " +
+                   $"playerActive={activeFixture.PlayerWasActive}, " +
                    $"leaderDisorganized={activeFixture.LeaderDisorganized}, " +
                    $"leaderDisorganizedUntilTicks={activeFixture.LeaderDisorganizedUntilTime.NumTicks}, " +
                    $"leaderRethinkAtNextHourlyTick={activeFixture.LeaderRethinkAtNextHourlyTick}, " +
@@ -461,6 +473,7 @@ public class ArmySiegeWaitFixtureCommands
             return "No client army siege-wait fixture snapshot is active.";
         if (activeClientStateFixture != null &&
             (activeClientStateFixture.Settlement.SiegeEvent != null ||
+             activeClientStateFixture.PlayerParty.IsActive != activeClientStateFixture.PlayerWasActive ||
              activeClientStateFixture.LeaderParty.Army != null ||
              activeClientStateFixture.LeaderParty.BesiegerCamp != null ||
              !IsClanMembershipRestored(
@@ -494,6 +507,7 @@ public class ArmySiegeWaitFixtureCommands
                 throw new InvalidOperationException("Unable to restore the AI leader's client-local meeting state.");
             if (activeClientStateFixture != null &&
                 (!AreSettlementStatesRestored(activeClientStateFixture.SettlementSnapshots) ||
+                 activeClientStateFixture.PlayerParty.IsActive != activeClientStateFixture.PlayerWasActive ||
                  activeClientStateFixture.LeaderParty.Ai.RethinkAtNextHourlyTick !=
                     activeClientStateFixture.LeaderRethinkAtNextHourlyTick ||
                  !IsClanMembershipRestored(
@@ -514,6 +528,7 @@ public class ArmySiegeWaitFixtureCommands
                    $"meetingState={activeClientFixture != null}, " +
                    $"settlementState={activeClientStateFixture != null}, " +
                    $"leaderRethinkState={activeClientStateFixture != null}, " +
+                   $"clientPlayerActiveRestored={activeClientStateFixture != null}, " +
                    $"clientMembershipRestored={activeClientStateFixture != null}.";
         }
         catch (Exception exception)
@@ -566,6 +581,9 @@ public class ArmySiegeWaitFixtureCommands
                 activeFixture.PlayerDisorganized,
                 activeFixture.PlayerDisorganizedUntilTime).ToString()
             : "unknown";
+        var playerActiveRestored = matchesFixture
+            ? (activeFixture.PlayerParty.IsActive == activeFixture.PlayerWasActive).ToString()
+            : "unknown";
         var leaderDisorganizedRestored = matchesFixture
             ? IsDisorganizedStateRestored(
                 activeFixture.LeaderParty,
@@ -612,6 +630,11 @@ public class ArmySiegeWaitFixtureCommands
         var clientSettlementStateRestored = matchesClientStateFixture
             ? (clientStateFixture == null &&
                AreSettlementStatesRestored(activeClientStateFixture.SettlementSnapshots)).ToString()
+            : "unknown";
+        var clientPlayerActiveRestored = matchesClientStateFixture
+            ? (clientStateFixture == null &&
+               activeClientStateFixture.PlayerParty.IsActive ==
+                    activeClientStateFixture.PlayerWasActive).ToString()
             : "unknown";
         var clientLeaderRethinkRestored = matchesClientStateFixture
             ? (clientStateFixture == null &&
@@ -677,6 +700,7 @@ public class ArmySiegeWaitFixtureCommands
                $"relationRestored={relationRestored}, playerPositionRestored={playerPositionRestored}, " +
                $"leaderPositionRestored={leaderPositionRestored}, playerSeaRestored={playerSeaRestored}, " +
                $"leaderSeaRestored={leaderSeaRestored}, " +
+               $"playerActiveRestored={playerActiveRestored}, " +
                $"playerDisorganizedRestored={playerDisorganizedRestored}, " +
                $"leaderDisorganizedRestored={leaderDisorganizedRestored}, " +
                $"leaderRethinkRestored={leaderRethinkRestored}, " +
@@ -684,6 +708,7 @@ public class ArmySiegeWaitFixtureCommands
                $"membershipRestored={membershipRestored}, " +
                $"timePaused={timePaused}, timeRestored={timeRestored}, leaderHeroRestored={leaderHeroRestored}, " +
                $"clientSettlementStateRestored={clientSettlementStateRestored}, " +
+               $"clientPlayerActiveRestored={clientPlayerActiveRestored}, " +
                $"clientLeaderRethinkRestored={clientLeaderRethinkRestored}, " +
                $"clientMembershipRestored={clientMembershipRestored}, " +
                $"encounter={PlayerEncounter.Current != null}, " +
@@ -814,6 +839,18 @@ public class ArmySiegeWaitFixtureCommands
             restoreFailure = restoreFailure == null
                 ? exception.Message
                 : $"{restoreFailure}; membership restoration failed: {exception.Message}";
+        }
+        try
+        {
+            activeFixture.PlayerParty.IsActive = activeFixture.PlayerWasActive;
+            if (activeFixture.PlayerParty.IsActive != activeFixture.PlayerWasActive)
+                throw new InvalidOperationException("Unable to restore the joining player party active state.");
+        }
+        catch (Exception exception)
+        {
+            restoreFailure = restoreFailure == null
+                ? exception.Message
+                : $"{restoreFailure}; active-state restoration failed: {exception.Message}";
         }
         if (restoreFailure == null)
         {
@@ -1265,7 +1302,7 @@ public class ArmySiegeWaitFixtureCommands
         !party.IsDisorganized;
 
     private static bool IsFixturePartyRecoverable(MobileParty party) =>
-        party?.IsActive == true &&
+        party != null &&
         party.CurrentSettlement == null &&
         party.Army == null &&
         party.AttachedTo == null &&
@@ -1294,7 +1331,8 @@ public class ArmySiegeWaitFixtureCommands
     private static string DescribeParty(MobileParty party) =>
         party == null ? "null" :
         $"{party.StringId}|army={party.Army != null}|attached={party.AttachedTo?.StringId ?? "none"}|" +
-        $"camp={party.BesiegerCamp != null}|disorganized={party.IsDisorganized}|atSea={party.IsCurrentlyAtSea}";
+        $"camp={party.BesiegerCamp != null}|disorganized={party.IsDisorganized}|" +
+        $"atSea={party.IsCurrentlyAtSea}|active={party.IsActive}";
 
     private static string DescribeBehavior(PartyBehaviorUpdateData behavior) =>
         $"{behavior.NewAiBehavior}|{behavior.InteractablePointId ?? "none"}|" +
