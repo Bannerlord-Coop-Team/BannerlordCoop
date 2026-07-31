@@ -11,6 +11,7 @@ using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using LiteNetLib;
 using Serilog;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -100,6 +101,28 @@ public class ServerSettlementExitEnterHandler : IHandler
                     network.Send(peer, new NetworkSettlementEncounterRejected(payload));
                 }
                 return;
+            }
+
+            var encounterModel = Campaign.Current?.Models?.EncounterModel;
+            if (encounterModel != null)
+            {
+                bool usePort = mobileParty.IsTargetingPort && settlement.HasPort;
+                float maximumDistance = usePort && settlement.SiegeEvent?.IsBlockadeActive == true
+                    ? encounterModel.NeededMaximumDistanceForEncounteringBlockade
+                    : settlement.IsTown
+                        ? encounterModel.NeededMaximumDistanceForEncounteringTown
+                        : encounterModel.NeededMaximumDistanceForEncounteringVillage;
+                var targetPosition = usePort ? settlement.PortPosition : settlement.GatePosition;
+
+                if (mobileParty.Position.Distance(targetPosition) > maximumDistance + 0.5f)
+                {
+                    Logger.Warning(
+                        "Rejecting settlement entry for party {PartyId} because it is too far from settlement {SettlementId}",
+                        payload.PartyId,
+                        payload.SettlementId);
+                    network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                    return;
+                }
             }
 
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
