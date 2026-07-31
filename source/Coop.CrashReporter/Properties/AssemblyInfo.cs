@@ -1,6 +1,8 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
+[assembly: InternalsVisibleTo("Coop.CrashReporter.Tests")]
 [assembly: AssemblyTitle("Coop Crash Reporter")]
 [assembly: AssemblyDescription("Preserves local Bannerlord crash diagnostics for BannerlordCoop.")]
 [assembly: AssemblyCompany("")]
