@@ -600,21 +600,26 @@ internal static class BattleDebugCommands
 
         ReleaseLadderCamera();
         ReleaseMountCamera();
+        Agent mount = info.Agent;
+        MBAgentVisuals visuals = mount.AgentVisuals;
+        GameEntity visualEntity = visuals?.GetEntity();
+        if (visualEntity == null)
+            return $"Mount {mountId:N} has no active visual entity";
+
         mountCamera = Camera.CreateCamera();
         mountCamera.FillParametersFrom(missionScreen.CombatCamera);
-
-        Agent mount = info.Agent;
-        Vec2 direction = mount.GetMovementDirection();
-        if (direction.LengthSquared <= 0.0001f)
-            direction = Vec2.Forward;
-        else
-            direction.Normalize();
-
-        var forward = new Vec3(direction.X, direction.Y, 0f);
-        var side = new Vec3(-direction.Y, direction.X, 0f);
-        var target = mount.VisualPosition + (Vec3.Up * 1.4f);
-        var position = target - (forward * 11f) + (side * 4f) + (Vec3.Up * 4f);
-        mountCamera.LookAt(position, target, Vec3.Up);
+        var localTarget = new Vec3(0f, 0f, 1.4f);
+        var localPosition = new Vec3(-4f, -11f, 5.4f);
+        mountCamera.LookAt(localPosition, localTarget, Vec3.Up);
+        MatrixFrame localCameraFrame = mountCamera.Frame;
+        GameEntity cameraEntity = GameEntity.CreateEmpty(
+            mission.Scene,
+            isModifiableFromEditor: false,
+            createPhysics: false,
+            callScriptCallbacks: false);
+        cameraEntity.SetFrame(ref localCameraFrame);
+        visualEntity.AddChild(cameraEntity);
+        mountCamera.Entity = cameraEntity;
         focusedMount = mount;
         focusedMountId = mountId;
         missionScreen.CustomCamera = mountCamera;
@@ -632,13 +637,16 @@ internal static class BattleDebugCommands
             || focusedMount == null
             || !focusedMount.IsActive()
             || !(ScreenManager.TopScreen is MissionScreen missionScreen)
-            || missionScreen.CombatCamera == null)
+            || missionScreen.CombatCamera == null
+            || mountCamera.Entity == null)
         {
             return "active=False";
         }
 
         Vec3 renderedPosition = missionScreen.CombatCamera.Position;
-        Vec3 expectedTarget = focusedMount.VisualPosition + (Vec3.Up * 1.4f);
+        Vec3 expectedTarget =
+            focusedMount.AgentVisuals.GetEntity().GetGlobalFrame().origin
+            + (Vec3.Up * 1.4f);
         Vec3 targetDirection = expectedTarget - renderedPosition;
         float directionDot = -1f;
         if (targetDirection.LengthSquared > 0.0001f)
@@ -651,7 +659,8 @@ internal static class BattleDebugCommands
                 + (renderedDirection.Z * targetDirection.Z);
         }
 
-        float positionDelta = (renderedPosition - mountCamera.Position).Length;
+        float positionDelta =
+            (renderedPosition - mountCamera.Entity.GetGlobalFrame().origin).Length;
         bool active = ReferenceEquals(missionScreen.CustomCamera, mountCamera);
         return string.Format(
             CultureInfo.InvariantCulture,
@@ -682,7 +691,10 @@ internal static class BattleDebugCommands
             missionScreen.CustomCamera = null;
         }
 
-        mountCamera.ReleaseCamera();
+        if (mountCamera.Entity == null)
+            mountCamera.ReleaseCamera();
+        else
+            mountCamera.ReleaseCameraEntity();
         mountCamera = null;
         focusedMount = null;
         focusedMountId = Guid.Empty;
