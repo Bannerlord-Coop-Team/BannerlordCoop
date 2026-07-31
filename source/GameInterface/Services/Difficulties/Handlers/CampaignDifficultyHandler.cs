@@ -67,7 +67,7 @@ internal class CampaignDifficultyHandler : IHandler
 
         // Unset on a headless host still means Realistic — see the class summary.
         DifficultyLevel? playerReceivedDamage = config.PlayerReceivedDamage;
-        if (playerReceivedDamage == null && IsHeadlessHost)
+        if (playerReceivedDamage == null && ModInformation.IsHeadlessHost)
         {
             playerReceivedDamage = DifficultyLevel.Realistic;
         }
@@ -101,11 +101,6 @@ internal class CampaignDifficultyHandler : IHandler
 
         Logger.Information("difficulty (effective): {Effective}", string.Join(" ", effective));
     }
-
-    /// <summary>Headless/container hosts set BANNERLORD_USER_DIR (the same marker
-    /// CoopSaveManager keys its data root on); graphical hosts never do.</summary>
-    private static bool IsHeadlessHost =>
-        string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR")) == false;
 
     /// <summary>By name, not ordinal — the game enum's numbering is not ours to rely on.</summary>
     private static CampaignOptions.Difficulty ToCampaign(DifficultyLevel level)

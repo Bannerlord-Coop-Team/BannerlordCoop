@@ -9,6 +9,19 @@ public static class ModInformation
     public static bool IsClient => !IsServer;
 
     /// <summary>
+    /// Whether this process is a headless host — the bundled dedicated server or a container —
+    /// as opposed to a graphical one. Headless hosts set BANNERLORD_USER_DIR to their data root
+    /// before the coop container is built; graphical hosts never do. The same marker already
+    /// keys the coop save root and the mod-config directory.
+    /// </summary>
+    /// <remarks>
+    /// Read live rather than cached: the dedicated server sets the variable during its own
+    /// start-up, which can run either side of the first read.
+    /// </remarks>
+    public static bool IsHeadlessHost =>
+        !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR"));
+
+    /// <summary>
     /// The mod build stamped on this assembly. Its semantic version comes from the same build
     /// property as the deployed module manifest.
     /// </summary>
