@@ -408,16 +408,40 @@ public class SiegeDebugCommand
         }
         else
         {
+            var connectedPlayerFactions = new List<IFaction>();
+            if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            {
+                return "Unable to resolve PlayerManager";
+            }
+
+            foreach (var player in playerManager.Players.Where(playerManager.IsConnected))
+            {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+                {
+                    return $"Unable to resolve player party {player.MobilePartyId}";
+                }
+
+                if (playerParty.MapFaction == null)
+                {
+                    return $"Player party {player.MobilePartyId} has no map faction";
+                }
+
+                connectedPlayerFactions.Add(playerParty.MapFaction);
+            }
+
             besieger = MobileParty.AllLordParties
                 .Where(party => !party.IsPlayerParty()
                     && party.MapFaction?.IsAtWarWith(settlement.MapFaction) == true
+                    && connectedPlayerFactions.All(playerFaction =>
+                        !party.MapFaction.IsAtWarWith(playerFaction))
                     && party.LeaderHero != null && party.CurrentSettlement == null
                     && party.MapEvent == null && party.BesiegerCamp == null && party.Army == null)
                 .OrderByDescending(party => party.Party.CalculateCurrentStrength())
                 .FirstOrDefault();
             if (besieger == null)
             {
-                return $"No hostile lord party available to besiege {settlement.Name}; pass a partyId explicitly";
+                return $"No hostile lord party compatible with the connected players is available to besiege " +
+                    $"{settlement.Name}; pass a partyId explicitly";
             }
         }
 
