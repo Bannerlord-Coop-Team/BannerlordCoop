@@ -12,6 +12,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -37,6 +38,8 @@ internal sealed partial class LordBarterHandler : IHandler
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly LocationConversationTracker locationConversationTracker;
     private readonly IBarterClientPresentation presentation;
+    private readonly ISafePassagePartyResolver safePassagePartyResolver;
+    private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISendCoalescer sendCoalescer;
     private readonly Dictionary<NetPeer, LordBarterAuthorization> authorizations =
         new Dictionary<NetPeer, LordBarterAuthorization>();
@@ -51,6 +54,8 @@ internal sealed partial class LordBarterHandler : IHandler
         ConversationPartyTracker conversationPartyTracker,
         LocationConversationTracker locationConversationTracker,
         IBarterClientPresentation presentation,
+        ISafePassagePartyResolver safePassagePartyResolver,
+        ISiegeEventInterface siegeEventInterface,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -60,6 +65,8 @@ internal sealed partial class LordBarterHandler : IHandler
         this.conversationPartyTracker = conversationPartyTracker;
         this.locationConversationTracker = locationConversationTracker;
         this.presentation = presentation;
+        this.safePassagePartyResolver = safePassagePartyResolver;
+        this.siegeEventInterface = siegeEventInterface;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NetworkAuthorizeLordBarter>(HandleAuthorization);
         messageBroker.Subscribe<NetworkCancelLordBarterAuthorization>(HandleAuthorizationCanceled);

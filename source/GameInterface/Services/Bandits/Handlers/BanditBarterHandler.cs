@@ -43,6 +43,7 @@ internal sealed class BanditBarterHandler : IHandler
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly ISessionInteractionsPlayerDataInterface interactions;
     private readonly IBarterClientPresentation barterClientPresentation;
+    private readonly ISafePassagePartyResolver safePassagePartyResolver;
     private readonly ISendCoalescer sendCoalescer;
 
     public BanditBarterHandler(
@@ -53,6 +54,7 @@ internal sealed class BanditBarterHandler : IHandler
         ConversationPartyTracker conversationPartyTracker,
         ISessionInteractionsPlayerDataInterface interactions,
         IBarterClientPresentation barterClientPresentation,
+        ISafePassagePartyResolver safePassagePartyResolver,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -62,6 +64,7 @@ internal sealed class BanditBarterHandler : IHandler
         this.conversationPartyTracker = conversationPartyTracker;
         this.interactions = interactions;
         this.barterClientPresentation = barterClientPresentation;
+        this.safePassagePartyResolver = safePassagePartyResolver;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<NetworkRequestBanditBarter>(HandleRequest);
@@ -248,7 +251,7 @@ internal sealed class BanditBarterHandler : IHandler
             return false;
         }
 
-        var safePassageParties = SafePassagePartyResolver.Resolve(
+        var safePassageParties = safePassagePartyResolver.Resolve(
             playerParty,
             banditParty);
         offer = new ValidatedOffer(

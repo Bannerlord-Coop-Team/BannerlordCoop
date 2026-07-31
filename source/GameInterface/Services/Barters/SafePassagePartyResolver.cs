@@ -5,11 +5,21 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Barters;
 
-internal static class SafePassagePartyResolver
+internal interface ISafePassagePartyResolver
 {
-    // Resolves the parties native PlayerEncounter would include without
-    // requiring a client-side encounter on the dedicated server.
-    internal static (
+    (
+        List<MobileParty> PlayerSide,
+        List<MobileParty> OpponentSide) Resolve(
+        MobileParty playerParty,
+        MobileParty encounteredParty);
+}
+
+/// <summary>
+/// Resolves safe-passage encounter parties without requiring PlayerEncounter.
+/// </summary>
+internal sealed class SafePassagePartyResolver : ISafePassagePartyResolver
+{
+    public (
         List<MobileParty> PlayerSide,
         List<MobileParty> OpponentSide) Resolve(
         MobileParty playerParty,
@@ -38,7 +48,7 @@ internal static class SafePassagePartyResolver
             nearbyParties);
     }
 
-    internal static (
+    internal (
         List<MobileParty> PlayerSide,
         List<MobileParty> OpponentSide) ResolveFromCandidates(
         MobileParty playerParty,

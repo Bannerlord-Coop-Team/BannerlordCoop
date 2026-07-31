@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -15,7 +16,7 @@ namespace GameInterface.Services.Barters.Handlers;
 
 internal sealed partial class LordBarterHandler
 {
-    private static (
+    private (
         float OfferValue,
         IReadOnlyList<MobileParty> OpponentParties) EvaluateSafePassageOffer(
         BarterData barter,
@@ -24,7 +25,7 @@ internal sealed partial class LordBarterHandler
         Hero targetHero,
         MobileParty targetParty)
     {
-        var parties = SafePassagePartyResolver.Resolve(playerParty, targetParty);
+        var parties = safePassagePartyResolver.Resolve(playerParty, targetParty);
         var value = CalculateSafePassageOfferValue(
             barter,
             playerHero,
@@ -73,10 +74,7 @@ internal sealed partial class LordBarterHandler
         IEnumerable<MobileParty> playerSide,
         IEnumerable<MobileParty> opponentSide)
     {
-        var strengthRatio = CalculateStrengthRatio(
-            playerParty,
-            playerSide,
-            opponentSide);
+        var strengthRatio = CalculateStrengthRatio(playerSide, opponentSide);
         var wealth = CalculatePlayerWealth(playerHero, playerParty);
         var wealthFactor = CalculateWealthFactor(strengthRatio, playerParty);
         var relationFactor = CalculateRelationFactor(playerHero, targetHero);
@@ -94,13 +92,11 @@ internal sealed partial class LordBarterHandler
     }
 
     private static float CalculateStrengthRatio(
-        MobileParty playerParty,
         IEnumerable<MobileParty> playerSide,
         IEnumerable<MobileParty> opponentSide)
     {
-        var strengthContext = playerParty.IsCurrentlyAtSea
-            ? MapEvent.PowerCalculationContext.SeaBattle
-            : MapEvent.PowerCalculationContext.PlainBattle;
+        const MapEvent.PowerCalculationContext strengthContext =
+            MapEvent.PowerCalculationContext.PlainBattle;
         var playerStrength = playerSide.Sum(party =>
             party.Party.GetCustomStrength(BattleSideEnum.Defender, strengthContext));
         var opponentStrength = opponentSide.Sum(party =>
@@ -150,7 +146,7 @@ internal sealed partial class LordBarterHandler
                 1.1f);
     }
 
-    internal static void ApplySafePassage(
+    internal void ApplySafePassage(
         MobileParty targetParty,
         MobileParty playerParty,
         IEnumerable<MobileParty> opponentParties)
@@ -178,5 +174,35 @@ internal sealed partial class LordBarterHandler
             playerParty,
             targetParty.MapFaction,
             factionProtectionEnds);
+
+        ApplyAuthoritativeSiegeConsequences(targetParty, playerParty);
+    }
+
+    private void ApplyAuthoritativeSiegeConsequences(
+        MobileParty targetParty,
+        MobileParty playerParty)
+    {
+        var targetSiege = targetParty.SiegeEvent;
+        var playerIsDefending =
+            targetSiege != null &&
+            targetSiege.BesiegerCamp.HasInvolvedPartyForEventType(targetParty.Party) &&
+            targetSiege.BesiegedSettlement.HasInvolvedPartyForEventType(playerParty.Party);
+        if (playerIsDefending)
+        {
+            if (targetSiege.BesiegedSettlement.MapFaction == playerParty.MapFaction)
+            {
+                GainKingdomInfluenceAction.ApplyForSiegeSafePassageBarter(
+                    playerParty,
+                    -10f);
+            }
+
+            return;
+        }
+
+        var playerSiege = playerParty.SiegeEvent;
+        var playerIsBesieging = playerSiege?.BesiegerCamp
+            .HasInvolvedPartyForEventType(playerParty.Party) == true;
+        if (playerIsBesieging)
+            siegeEventInterface.BreakSiege(playerParty);
     }
 }

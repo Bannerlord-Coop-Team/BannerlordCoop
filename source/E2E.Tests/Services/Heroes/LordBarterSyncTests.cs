@@ -14,6 +14,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -317,12 +319,14 @@ public class LordBarterSyncTests : MapEventTestBase
                 Assert.Null(nearbyOpponentParty.AttachedTo);
                 Assert.DoesNotContain(nearbyOpponentParty, targetParty.AttachedParties);
 
-                var safePassageParties = SafePassagePartyResolver.ResolveFromCandidates(
-                    playerParty,
-                    targetParty,
-                    new[] { targetParty, nearbyOpponentParty });
+                var safePassageParties = Server
+                    .Resolve<SafePassagePartyResolver>()
+                    .ResolveFromCandidates(
+                        playerParty,
+                        targetParty,
+                        new[] { targetParty, nearbyOpponentParty });
                 Assert.Contains(nearbyOpponentParty, safePassageParties.OpponentSide);
-                LordBarterHandler.ApplySafePassage(
+                Server.Resolve<LordBarterHandler>().ApplySafePassage(
                     targetParty,
                     playerParty,
                     safePassageParties.OpponentSide);
@@ -342,6 +346,120 @@ public class LordBarterSyncTests : MapEventTestBase
             safePassagePlayerFaction = null;
             safePassageTargetFaction = null;
             safePassageNearbyFaction = null;
+            Server.Call(DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections);
+        }
+    }
+
+    [Fact]
+    public void SafePassage_OwnFactionSiege_ChargesInfluenceOnServer()
+    {
+        const float initialInfluence = 100f;
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var siegeEventId = CreateSyntheticSiegeEvent();
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(
+                    player.HeroId,
+                    out var playerHero));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    player.MobilePartyId,
+                    out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    target.MobilePartyId,
+                    out var targetParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(
+                    kingdomId,
+                    out var kingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Town>(
+                    townId,
+                    out var town));
+                Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(
+                    siegeEventId,
+                    out var siegeEvent));
+
+                playerHero.Clan.Kingdom = kingdom;
+                kingdom.RulingClan = playerHero.Clan;
+                playerHero.Clan.Influence = initialInfluence;
+
+                var settlement = siegeEvent.BesiegedSettlement;
+                settlement.SetSettlementComponent(town);
+                town.OwnerClan = playerHero.Clan;
+                town.IsOwnerUnassigned = false;
+
+                var besiegerCamp = siegeEvent.BesiegerCamp;
+                besiegerCamp._faction = targetParty.MapFaction;
+                besiegerCamp._besiegerParties.Add(targetParty);
+                targetParty._besiegerCamp = besiegerCamp;
+                VillageHostileFactionStanceHelper.ApplyWarStance(
+                    playerParty.MapFaction,
+                    targetParty.MapFaction);
+                playerParty.CurrentSettlement = settlement;
+
+                Assert.True(besiegerCamp.HasInvolvedPartyForEventType(targetParty.Party));
+                Assert.True(settlement.HasInvolvedPartyForEventType(playerParty.Party));
+                Assert.Equal(playerParty.MapFaction, settlement.MapFaction);
+
+                Server.Resolve<LordBarterHandler>().ApplySafePassage(
+                    targetParty,
+                    playerParty,
+                    new[] { targetParty });
+
+                Assert.Equal(initialInfluence - 10f, playerHero.Clan.Influence);
+            });
+        }
+        finally
+        {
+            Server.Call(DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections);
+        }
+    }
+
+    [Fact]
+    public void SafePassage_Besieger_ClearsCampOnServer()
+    {
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+        var siegeEventId = CreateSyntheticSiegeEvent();
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    player.MobilePartyId,
+                    out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                    target.MobilePartyId,
+                    out var targetParty));
+                Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(
+                    siegeEventId,
+                    out var siegeEvent));
+
+                var besiegerCamp = siegeEvent.BesiegerCamp;
+                besiegerCamp._besiegerParties.Add(playerParty);
+                playerParty._besiegerCamp = besiegerCamp;
+                Assert.True(besiegerCamp.HasInvolvedPartyForEventType(playerParty.Party));
+
+                Server.Resolve<LordBarterHandler>().ApplySafePassage(
+                    targetParty,
+                    playerParty,
+                    new[] { targetParty });
+
+                Assert.Null(playerParty.BesiegerCamp);
+            }, new[]
+            {
+                AccessTools.Method(
+                    typeof(MobileParty),
+                    nameof(MobileParty.OnPartyLeftSiegeInternal)),
+            });
+        }
+        finally
+        {
             Server.Call(DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections);
         }
     }
@@ -427,6 +545,22 @@ public class LordBarterSyncTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetId(party.Party, out partyId));
         });
         return (heroId, mobilePartyId, partyId);
+    }
+
+    private string CreateSyntheticSiegeEvent()
+    {
+        return TestEnvironment.CreateRegisteredObject<SiegeEvent>(new[]
+        {
+            AccessTools.Method(
+                typeof(MobileParty),
+                nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+            AccessTools.Method(
+                typeof(BesiegerCamp),
+                nameof(BesiegerCamp.InitializeSiegeEventSide)),
+            AccessTools.Method(
+                typeof(Settlement),
+                nameof(Settlement.InitializeSiegeEventSide)),
+        });
     }
 
     private void RegisterPlayer(EnvironmentInstance client, string heroId, string mobilePartyId)
