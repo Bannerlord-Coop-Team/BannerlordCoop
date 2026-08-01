@@ -1,0 +1,57 @@
+using GameInterface.Services.Players.Messages;
+using ProtoBuf;
+
+namespace Coop.IntegrationTests.Players;
+
+public class DeletePlayerNetworkMessageSerializationTest
+{
+    [Fact]
+    public void NetworkRequestDeletePlayer_RoundTrips()
+    {
+        var original = new NetworkRequestDeletePlayer("Hero_Player");
+
+        var copy = RoundTrip(original);
+
+        Assert.Equal("Hero_Player", copy.HeroId);
+    }
+
+    [Fact]
+    public void NetworkRequestDeletePlayer_RoundTrips_WithoutHero()
+    {
+        // The hero id is advisory; a client that cannot resolve its own hero sends null.
+        var original = new NetworkRequestDeletePlayer(null);
+
+        var copy = RoundTrip(original);
+
+        Assert.Null(copy.HeroId);
+    }
+
+    [Fact]
+    public void NetworkPlayerRemoved_RoundTrips()
+    {
+        var original = new NetworkPlayerRemoved("Controller_1", "Hero_Player");
+
+        var copy = RoundTrip(original);
+
+        Assert.Equal("Controller_1", copy.ControllerId);
+        Assert.Equal("Hero_Player", copy.HeroId);
+    }
+
+    [Fact]
+    public void NetworkDeletePlayerDenied_RoundTrips()
+    {
+        var original = new NetworkDeletePlayerDenied("Cannot delete a player whose party is in a battle or siege.");
+
+        var copy = RoundTrip(original);
+
+        Assert.Equal("Cannot delete a player whose party is in a battle or siege.", copy.Reason);
+    }
+
+    private static T RoundTrip<T>(T original)
+    {
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, original);
+        stream.Position = 0;
+        return Serializer.Deserialize<T>(stream);
+    }
+}
