@@ -114,10 +114,10 @@ internal class ClientSiegeEntryHandler : IHandler
 
             if (!obj.Approved)
             {
-                var currentMenuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
+                var rejectionMenuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
                 var shouldRecoverFromDebrief =
                     ReferenceEquals(PlayerEncounter.Current, pending.Encounter) &&
-                    currentMenuId == pending.MenuId;
+                    rejectionMenuId == pending.MenuId;
                 ClearPendingBreakInContinuation(pending, restoreLocationEncounter: true);
                 if (shouldRecoverFromDebrief)
                 {
