@@ -14,9 +14,9 @@
             <Tag Value="Partial Conversion" />
             <Tag Value="Native" />
             <Tag Value="Singleplayer" />
-            <Tag Value="v1.1.6" />
+            <Tag Value="v1.4.7" />
         </Tags>
-        <Image Value="C:\Users\PC\Downloads\Banner.png"/>
+        <Image Value="E:\Mod Development\BannerlordCoop\img\banner.png"/>
         <!-- Determines the featured image displayed on Steam Workshop, a direct path to it must be inserted here (the image should be smaller than 1 MB) -->
         <Visibility Value="Private"/>
         <!-- Determines visibility on Steam Workshop. Can be: Public, FriendsOnly, Private -->

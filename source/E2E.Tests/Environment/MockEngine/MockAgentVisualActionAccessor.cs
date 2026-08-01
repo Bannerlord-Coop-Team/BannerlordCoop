@@ -49,6 +49,45 @@ public class MockAgentVisualActionAccessor : IAgentVisualActionAccessor
             || rawVisualAction >= 0;
     }
 
+    public bool TrySetAction(
+        Agent agent,
+        int channel,
+        in ActionIndexCache action,
+        float progress,
+        float blendPeriodOverride)
+    {
+        if (!AgentMirror.TryGet(agent, out MirrorAgent mirror)
+            || !mirror.HasVisualSkeleton)
+        {
+            return false;
+        }
+
+        if (channel == 0)
+        {
+            if (mirror.SkeletonAction0Index != action.Index)
+            {
+                mirror.InstallAgentVisualActionCalls++;
+                mirror.LastAgentVisualActionBlendPeriodOverride =
+                    blendPeriodOverride;
+            }
+            mirror.SkeletonAction0Index = action.Index;
+            mirror.RawVisualAction0Progress = progress;
+        }
+        else
+        {
+            if (mirror.SkeletonAction1Index != action.Index)
+            {
+                mirror.InstallAgentVisualActionCalls++;
+                mirror.LastAgentVisualActionBlendPeriodOverride =
+                    blendPeriodOverride;
+            }
+            mirror.SkeletonAction1Index = action.Index;
+            mirror.RawVisualAction1Progress = progress;
+        }
+
+        return true;
+    }
+
     private static int GetAnimationIndex(
         MirrorAgent mirror,
         int actionIndex)

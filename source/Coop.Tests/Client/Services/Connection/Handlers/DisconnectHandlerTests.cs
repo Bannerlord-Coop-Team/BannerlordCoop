@@ -12,7 +12,7 @@ namespace Coop.Tests.Client.Services.Connection.Handlers;
 public class DisconnectHandlerTests
 {
     [Fact]
-    public void Timeout_FinalizesWithActionablePopupBeforeContainerTeardown()
+    public void Timeout_ReturnsToMainMenuThenFinalizesWithActionablePopup()
     {
         const string expected =
             "Connection to the co-op server timed out.\nCheck your internet connection and try joining again.";
@@ -21,7 +21,7 @@ public class DisconnectHandlerTests
     }
 
     [Fact]
-    public void NonTimeout_FinalizesWithGenericPopupBeforeContainerTeardown()
+    public void NonTimeout_ReturnsToMainMenuThenFinalizesWithGenericPopup()
     {
         RunDisconnect(DisconnectReason.ConnectionFailed, "You have been Disconnected");
     }
@@ -31,9 +31,13 @@ public class DisconnectHandlerTests
         var messageBroker = new TestMessageBroker();
         var finalizer = new Mock<ICoopFinalizer>(MockBehavior.Strict);
         var gameState = new Mock<IGameStateInterface>(MockBehavior.Strict);
+
+        // GoToMainMenu must run before Finalize: Finalize queues the container teardown that
+        // cancels the network session, which would drop GoToMainMenu's still-queued blocking
+        // EndGame marshal and strand the player in a campaign with no coop container.
         var sequence = new MockSequence();
-        finalizer.InSequence(sequence).Setup(value => value.Finalize(expectedMessage));
         gameState.InSequence(sequence).Setup(value => value.GoToMainMenu());
+        finalizer.InSequence(sequence).Setup(value => value.Finalize(expectedMessage));
         using var handler = new DisconnectHandler(
             messageBroker,
             finalizer.Object,

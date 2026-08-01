@@ -27,6 +27,21 @@ public readonly struct NetworkChangeBattleState : ICommand
     }
 }
 
+/// <summary>[Local] Requests the server to commit a battle conclusion reconciled from mission members.</summary>
+public readonly struct AuthoritativeBattleConclusionRequested : IEvent
+{
+    public readonly string MapEventId;
+    public readonly BattleState BattleState;
+    public readonly int HostEpoch;
+
+    public AuthoritativeBattleConclusionRequested(string mapEventId, BattleState battleState, int hostEpoch)
+    {
+        MapEventId = mapEventId;
+        BattleState = battleState;
+        HostEpoch = hostEpoch;
+    }
+}
+
 /// <summary>[Local] Reports whether a received battle-state change reached the authoritative map event.</summary>
 public readonly struct BattleStateChangeProcessed : IEvent
 {

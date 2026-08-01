@@ -2,6 +2,9 @@
 using Common.Serialization;
 using K4os.Compression.LZ4;
 using Missions.Agents.Packets;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using System;
 using System.Buffers;
 
@@ -27,6 +30,14 @@ public class MovementPacketCompressor : IMovementPacketCompressor
     public byte[] Serialize(IPacket packet)
     {
         byte[] original = serializer.Serialize(packet);
+#if DEBUG
+        if (packet is AgentActionPacket actionPacket)
+        {
+            MissionActionDiagnostics.RecordActionPacketSent(
+                actionPacket,
+                original.Length);
+        }
+#endif
         if (!IsMovement(packet))
             return original;
 

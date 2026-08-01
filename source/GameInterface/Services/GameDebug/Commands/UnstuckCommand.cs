@@ -6,22 +6,15 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.MobileParties.Commands;
+namespace GameInterface.Services.GameDebug.Commands;
 
-/// <summary>
-/// Client-side recovery command that forces the local player party out of stuck states —
-/// captivity, map event, army membership, siege camp, settlement, and player encounter. Routed
-/// through the dedicated unstuck flow (<see cref="Handlers.PlayerUnstuckHandler"/>): the server
-/// force-applies the synced exits and its reply clears the local encounter/menu state, so
-/// recovery works even when a normal exit request flow is what is wedged.
-/// </summary>
 public class UnstuckCommand
 {
     // coop.debug.mobileparty.unstuck
     /// <summary>
     /// Requests a server-authoritative unstuck of the local player party. Client only.
     /// </summary>
-    [CommandLineArgumentFunction("unstuck", "coop.debug.mobileparty")]
+    [CommandLineArgumentFunction("unstuck", "coop")]
     public static string Unstuck(List<string> args)
     {
         if (!ModInformation.IsClient) return "Command can only be run on a client.";
