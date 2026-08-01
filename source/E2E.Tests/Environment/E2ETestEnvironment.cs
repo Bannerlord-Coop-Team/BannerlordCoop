@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
+using Coop.Core.Server.Services.Time.Handlers;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
@@ -59,6 +60,8 @@ public class E2ETestEnvironment : IDisposable
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
+        StopCampaignTimeHeartbeat();
+
         SetupMainHero();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
@@ -72,6 +75,28 @@ public class E2ETestEnvironment : IDisposable
             Server.ObjectManager.AddExisting(settlement.StringId, settlement);
         }
     }
+
+    /// <summary>
+    /// Stops the server's authoritative campaign-time heartbeat for the lifetime of this environment.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="CampaignTimeSyncHandler"/> starts a 250 ms <see cref="System.Timers.Timer"/> in its
+    /// constructor and is AutoActivate'd into the server container, so in the harness it fires on a
+    /// thread-pool thread straight into <c>TestNetworkRouter</c> → <c>EnvironmentInstance.SimulatePacket</c>.
+    /// That runs client packet handling — and the Harmony-patched game code behind it — CONCURRENTLY with the
+    /// test thread, which patches and unpatches those same methods in <c>EnvironmentInstance.PatchScope</c>
+    /// (outside <c>GameInstance.@lock</c>, and <c>SimulatePacket</c> never takes <c>EnvironmentInstance._lock</c>
+    /// at all). Rewriting a detour while another thread executes it makes interception intermittently not fire,
+    /// which surfaces as a server change silently never replicating — the shared signature of a long-running
+    /// family of CI-only E2E failures. It also leaves the game statics pointing at a client at arbitrary
+    /// moments, since StaticScope.Dispose does not restore them.
+    ///
+    /// E2E drives campaign time explicitly, so no test needs the heartbeat; the handler's own coverage lives in
+    /// Coop.Tests, a separate assembly and process. Disposing is idempotent (the handler guards on a disposed
+    /// flag), so the container's later disposal stays valid.
+    /// </remarks>
+    private void StopCampaignTimeHeartbeat()
+        => Server.Resolve<CampaignTimeSyncHandler>().Dispose();
 
     /// <summary>
     /// Associates an already registered player with a connected E2E client peer.
