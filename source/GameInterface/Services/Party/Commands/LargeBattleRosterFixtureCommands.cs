@@ -167,8 +167,15 @@ internal static class LargeBattleRosterFixtureCommands
             return secondError;
         }
 
-        Restore(activeFixture.FirstParty);
-        Restore(activeFixture.SecondParty);
+        bool firstRestoredDeadHero =
+            Restore(activeFixture.FirstParty);
+        bool secondRestoredDeadHero =
+            Restore(activeFixture.SecondParty);
+        bool restoredDeadHero =
+            firstRestoredDeadHero || secondRestoredDeadHero;
+        string warning = restoredDeadHero
+            ? "WARNING: the restored roster contains a dead hero and may be invalid.\n"
+            : string.Empty;
 
         string firstFingerprint = Fingerprint(
             activeFixture.FirstParty.Party.MemberRoster);
@@ -178,6 +185,7 @@ internal static class LargeBattleRosterFixtureCommands
             || secondFingerprint != activeFixture.SecondParty.Fingerprint)
         {
             return "Large-battle roster restoration did not reproduce the original fingerprints.\n" +
+                   warning +
                    FormatState(
                        "restore-failed",
                        activeFixture.FirstParty.Party,
@@ -187,6 +195,7 @@ internal static class LargeBattleRosterFixtureCommands
         fixture = null;
         return
             "LARGE_BATTLE_ROSTER_FIXTURE_RESTORED\n" +
+            warning +
             FormatState(
                 "none",
                 activeFixture.FirstParty.Party,
@@ -260,8 +269,9 @@ internal static class LargeBattleRosterFixtureCommands
         return copy;
     }
 
-    private static void Restore(PartySnapshot snapshot)
+    private static bool Restore(PartySnapshot snapshot)
     {
+        bool restoredDeadHero = false;
         TroopRoster roster = snapshot.Party.MemberRoster;
         for (int index = roster.Count - 1; index >= 0; index--)
         {
@@ -278,7 +288,11 @@ internal static class LargeBattleRosterFixtureCommands
 
         foreach (TroopRosterElement element in snapshot.MemberRoster)
         {
-            // This also restores heroes that died during the fixture battle.
+            if (element.Character.IsHero
+                && element.Character.HeroObject?.IsDead == true)
+            {
+                restoredDeadHero = true;
+            }
             roster.AddToCounts(
                 element.Character,
                 element.Number,
@@ -287,6 +301,8 @@ internal static class LargeBattleRosterFixtureCommands
                 element.Xp,
                 true);
         }
+
+        return restoredDeadHero;
     }
 
     private static string FormatState(

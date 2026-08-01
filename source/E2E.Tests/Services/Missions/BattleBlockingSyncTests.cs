@@ -113,6 +113,49 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void PollActionsAfterNativeTick_FormerMainPlayer_DoesNotRetainStaleInput()
+    {
+        RunScenario("owner", context =>
+        {
+            var formerMainAgentId = Guid.NewGuid();
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                formerMainAgentId,
+                AgentControllerType.Player,
+                out MirrorAgent formerMainAgentMirror);
+
+            formerMainAgentMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendLeft;
+            formerMainAgentMirror.GuardMode = Agent.GuardMode.Left;
+            context.Component.AgentActionHandler.PollActions();
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            formerMainAgentMirror.MovementFlags =
+                Agent.MovementControlFlag.None;
+            formerMainAgentMirror.GuardMode = Agent.GuardMode.None;
+
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            Assert.Equal(
+                formerMainAgentId,
+                Assert.Single(packet.AgentIds));
+            Assert.Equal(
+                Agent.GuardMode.None,
+                Assert.Single(packet.Actions).GuardMode);
+        });
+    }
+
     [Theory]
     [InlineData(Agent.ActionCodeType.ReleaseMelee)]
     [InlineData(Agent.ActionCodeType.EquipUnequip)]

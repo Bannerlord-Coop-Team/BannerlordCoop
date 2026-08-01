@@ -223,6 +223,7 @@ public class AgentActionHandler : IAgentActionHandler
         bool retainInputBoundary =
             afterNativeTick
             && isPlayerControlled
+            && agent == Mission.Current.MainAgent
             && state.HasInputBoundaryObservation;
         Agent.GuardMode actionGuardMode =
             AgentActionData.GetGuardModeFromDefendingAction(agent);

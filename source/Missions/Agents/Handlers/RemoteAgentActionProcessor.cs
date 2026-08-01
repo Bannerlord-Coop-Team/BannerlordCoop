@@ -239,10 +239,20 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     public void ClearLocalAgentStates()
     {
-        foreach (CoopAgentInfo info in agentRegistry.GetAgents(
-            controllerIdProvider.ControllerId))
+        List<Guid> localAgentIds = null;
+        foreach (Guid agentId in _agentStates.Keys)
         {
-            ClearForLocalAgent(info.AgentId, info.Agent);
+            if (agentRegistry.IsLocallyControlled(agentId))
+                (localAgentIds ??= new List<Guid>()).Add(agentId);
+        }
+
+        if (localAgentIds == null) return;
+        foreach (Guid agentId in localAgentIds)
+        {
+            agentRegistry.TryGetAgentInfo(
+                agentId,
+                out CoopAgentInfo info);
+            ClearForLocalAgent(agentId, info?.Agent);
         }
     }
 
