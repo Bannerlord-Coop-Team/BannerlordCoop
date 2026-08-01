@@ -84,15 +84,16 @@ public static class ManagedServerLauncher
 
     /// <summary>
     /// True when every module is loadable by the dedicated server's pinned module list:
-    /// official game modules, this mod itself, and the DedicatedServer.* host modules
+    /// official non-DLC game modules, this mod itself, and the DedicatedServer.* host modules
     /// (the same set <see cref="Modules.Validators.ModuleValidator"/> exempts from matching).
+    /// DLC is official but not part of that pinned list, so it disqualifies the dedicated server.
     /// </summary>
     public static bool CanDedicatedServerHostModules(IEnumerable<ModuleInfo> modules)
     {
         if (modules == null) return false;
 
         return modules.All(module =>
-            module.IsOfficial ||
+            (module.IsOfficial && !module.IsDlc) ||
             string.Equals(module.Id, CoopModuleId, StringComparison.OrdinalIgnoreCase) ||
             (module.Id != null &&
                 module.Id.StartsWith("DedicatedServer.", StringComparison.OrdinalIgnoreCase)));

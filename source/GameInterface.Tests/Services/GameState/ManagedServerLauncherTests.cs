@@ -99,6 +99,19 @@ public class ManagedServerLauncherTests
     }
 
     [Fact]
+    public void CanDedicatedServerHostModules_RejectsDlcModules()
+    {
+        var modules = new List<ModuleInfo>
+        {
+            new ModuleInfo("Native", isOfficial: true, isDlc: false, default),
+            new ModuleInfo("Coop", isOfficial: false, isDlc: false, default),
+            new ModuleInfo("WarSails", isOfficial: true, isDlc: true, default),
+        };
+
+        Assert.False(ManagedServerLauncher.CanDedicatedServerHostModules(modules));
+    }
+
+    [Fact]
     public void CanDedicatedServerHostModules_RejectsNullCollection()
     {
         Assert.False(ManagedServerLauncher.CanDedicatedServerHostModules(null));
