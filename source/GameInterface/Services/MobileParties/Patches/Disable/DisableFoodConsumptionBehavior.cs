@@ -3,6 +3,7 @@ using GameInterface.Extentions;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -42,13 +43,7 @@ internal class FoodConsumptionBehaviorPatches
 
         ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
 
-        // Don't tick food change for disconnected players
-        if (playerManager.IsOwnerOfPartyDisconnected(party)) return false;
-
-        // Use AI join window to determine if a player party should consume food and breed animals.
-        // This way players only have food change at most once during a map event.
-        if (party.MapEvent != null
-            && !InteractionPatches.IsWithinAiJoinWindow(party.MapEvent)) return false;
+        if (!ShouldTickFoodChange(playerManager, party)) return false;
 
         if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
 
@@ -63,13 +58,21 @@ internal class FoodConsumptionBehaviorPatches
     [HarmonyPrefix]
     public static bool OnTickPrefix(FoodConsumptionBehavior __instance, float dt)
     {
-        foreach (var playerParty in Campaign.Current.CampaignObjectManager.GetPlayerMobileParties())
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return false;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
+
+        foreach (var player in playerManager.Players)
         {
+            var playerPartyId = player.MobilePartyId;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(playerPartyId, out var playerParty)) continue;
+
+            if (!ShouldTickFoodChange(playerManager, playerParty)) return false;
+
             int versionNo = playerParty.Party.ItemRoster.VersionNo;
 
             if (!playerPartyLastItemVersions.ContainsKey(playerParty))
             {
-                playerPartyLastItemVersions[playerParty] = versionNo;
+                playerPartyLastItemVersions[playerParty] = -1;
             }
 
             if (playerParty.Party.IsStarving)
@@ -108,5 +111,18 @@ internal class FoodConsumptionBehaviorPatches
         foodConsumptionBehaviorInterface.CheckAnimalBreeding(__instance, party);
 
         return false;
+    }
+
+    private static bool ShouldTickFoodChange(IPlayerManager playerManager, MobileParty playerParty)
+    {
+        // Don't tick food change for disconnected players
+        if (playerManager.IsOwnerOfPartyDisconnected(playerParty)) return false;
+
+        // Use AI join window to determine if a player party should consume food.
+        // This way players only have food change at most once during a map event.
+        if (playerParty.MapEvent != null
+            && !InteractionPatches.IsWithinAiJoinWindow(playerParty.MapEvent)) return false;
+
+        return true;
     }
 }
