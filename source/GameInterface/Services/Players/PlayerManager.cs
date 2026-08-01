@@ -54,6 +54,16 @@ public interface IPlayerManager
     void ClearPeer(NetPeer peer);
 
     /// <summary>
+    /// Deletes a player's registration entirely: the Player entry, every peer link, and the
+    /// controlled-object markers on its hero/party/clan. The game objects themselves are
+    /// untouched. Used when a player's character is deleted; afterwards a rejoin with the same
+    /// controller id goes through character creation again.
+    /// </summary>
+    /// <param name="player">The player to delete from the registry</param>
+    /// <returns>true if the player was registered and is now removed</returns>
+    bool RemovePlayer(Player player);
+
+    /// <summary>
     /// Resolves the Player currently controlled by a connected peer.
     /// </summary>
     bool TryGetPlayer(NetPeer peer, out Player player);
@@ -84,9 +94,21 @@ public class PlayerManager : IPlayerManager
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ConcurrentDictionary<NetPeer, Player> peerToPlayer = new();
     private readonly Dictionary<string, NetPeer> controllerToPeer = new();
-    private readonly object peerSync = new();
 
-    public IReadOnlyCollection<Player> Players => _players;
+    // Guards _players and controllerToPeer: registrations mutate on the game thread (e.g. a
+    // player deletion) while join handlers read them on the network thread.
+    private readonly object registrySync = new();
+
+    public IReadOnlyCollection<Player> Players
+    {
+        get
+        {
+            lock (registrySync)
+            {
+                return _players.ToArray();
+            }
+        }
+    }
     private readonly HashSet<Player> _players = new HashSet<Player>();
 
     public PlayerManager(ILogger logger, IObjectManager objectManager, IControllerIdProvider controllerIdProvider)
@@ -99,7 +121,10 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.AddPlayer(Player)"/>
     public bool AddPlayer(Player player)
     {
-        if (!_players.Add(player)) return false;
+        lock (registrySync)
+        {
+            if (!_players.Add(player)) return false;
+        }
 
         // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
         AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
@@ -143,7 +168,10 @@ public class PlayerManager : IPlayerManager
 
     public bool TryGetPlayer(string controllerId, out Player player)
     {
-        player = _players.SingleOrDefault(player => player.ControllerId == controllerId);
+        lock (registrySync)
+        {
+            player = _players.SingleOrDefault(player => player.ControllerId == controllerId);
+        }
 
         return player != null;
     }
@@ -166,7 +194,7 @@ public class PlayerManager : IPlayerManager
             return;
         }
 
-        lock (peerSync)
+        lock (registrySync)
         {
             peerToPlayer[peer] = player;
             controllerToPeer[controllerId] = peer;
@@ -175,7 +203,7 @@ public class PlayerManager : IPlayerManager
 
     public bool TryGetPeer(string controllerId, out NetPeer peer)
     {
-        lock (peerSync)
+        lock (registrySync)
         {
             return controllerToPeer.TryGetValue(controllerId, out peer);
         }
@@ -183,13 +211,56 @@ public class PlayerManager : IPlayerManager
 
     public void ClearPeer(NetPeer peer)
     {
-        lock (peerSync)
+        lock (registrySync)
         {
             if (!peerToPlayer.TryRemove(peer, out var player)) return;
 
             if (controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) &&
                 ReferenceEquals(currentPeer, peer))
                 controllerToPeer.Remove(player.ControllerId);
+        }
+    }
+
+    /// <inheritdoc cref="IPlayerManager.RemovePlayer(Player)"/>
+    public bool RemovePlayer(Player player)
+    {
+        if (player == null) return false;
+
+        lock (registrySync)
+        {
+            if (!_players.Remove(player)) return false;
+
+            controllerToPeer.Remove(player.ControllerId);
+
+            // A rejoin adds a fresh peer link without clearing the old one, so sweep every peer
+            // still mapped to this player, not just the current one.
+            foreach (var stalePeer in peerToPlayer
+                         .Where(kvp => ReferenceEquals(kvp.Value, player))
+                         .Select(kvp => kvp.Key).ToArray())
+            {
+                peerToPlayer.TryRemove(stalePeer, out _);
+            }
+        }
+
+        RemovePlayerObject<MobileParty>(player.MobilePartyId);
+        RemovePlayerObject<Hero>(player.HeroId);
+        RemovePlayerObject<Clan>(player.ClanId);
+
+        return true;
+    }
+
+    private void RemovePlayerObject<T>(string networkId)
+    {
+        if (string.IsNullOrEmpty(networkId)) return;
+
+        // The object may already be gone (e.g. a destroyed party); nothing to unmark then.
+        if (!objectManager.TryGetObject<T>(networkId, out var obj)) return;
+
+        PlayerObjects.Remove(obj);
+
+        if (obj is MobileParty mobileParty)
+        {
+            InvalidatePlayerPartySpeedCache(mobileParty);
         }
     }
 

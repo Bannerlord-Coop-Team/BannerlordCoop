@@ -77,6 +77,10 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._characterAttributes)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._deathDay))); // Despite having a property, directly set by SetDeathDay() method
+            // _heroState is NOT registered here: native state transitions (KillCharacterAction.MakeDead,
+            // captivity, ...) go through Hero.ChangeState, whose direct field store is already intercepted
+            // and replicated by HeroFieldPatches.HeroStateTranspiler; registering the field here would be
+            // inert (that transpiler consumes the store before this one sees it).
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Level)));
         }
     }
