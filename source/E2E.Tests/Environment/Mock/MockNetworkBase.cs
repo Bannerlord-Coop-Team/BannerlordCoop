@@ -84,6 +84,10 @@ public abstract class MockNetworkBase : INetwork
         networkOrchestrator.SendAllBut(NetPeer, excludedPeer, message);
     }
 
+    public void FlushPendingMessages()
+    {
+    }
+
     public void Start()
     {
         throw new NotImplementedException();

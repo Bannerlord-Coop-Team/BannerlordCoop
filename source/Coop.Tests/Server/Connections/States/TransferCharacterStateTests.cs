@@ -2,12 +2,14 @@
 using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.States;
+using Coop.Core.Server.Services.Save.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
 using LiteNetLib;
 using Moq;
+using System;
 using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
@@ -90,6 +92,47 @@ namespace Coop.Tests.Server.Connections.States
                 serverComponent.TestNetwork.SentPackets.TryGetValue(differentPeer.Id, out var packets) &&
                 packets.OfType<GameSaveDataChunkPacket>().Any();
             Assert.False(otherPeerGotSave);
+        }
+
+        [Fact]
+        public void EnteringState_BroadcastsSavingStateAroundSnapshot()
+        {
+            var saveMock = serverComponent.Container.Resolve<Mock<ISaveInterface>>();
+            saveMock
+                .Setup(value => value.SaveCurrentGame())
+                .Callback(() =>
+                {
+                    var messages = serverComponent.TestNetwork
+                        .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
+                        .ToArray();
+                    Assert.Single(messages);
+                    Assert.True(messages[0].IsSaving);
+                    Assert.Equal(1, serverComponent.TestNetwork.FlushPendingMessagesCalls);
+                })
+                .Returns(new SaveResults(true, new byte[] { 1, 2, 3 }, "12345"));
+
+            connectionLogic.SetState<TransferSaveState>();
+
+            var messages = serverComponent.TestNetwork
+                .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
+                .ToArray();
+            Assert.Equal(new[] { true, false }, messages.Select(message => message.IsSaving));
+        }
+
+        [Fact]
+        public void EnteringState_FlushFailureStillClearsSavingState()
+        {
+            serverComponent.TestNetwork.FlushPendingMessagesException =
+                new InvalidOperationException("Flush failed.");
+
+            connectionLogic.SetState<TransferSaveState>();
+
+            var messages = serverComponent.TestNetwork
+                .GetPeerMessagesFromType<NetworkGameSaveStateChanged>(differentPeer)
+                .ToArray();
+            Assert.Equal(new[] { true, false }, messages.Select(message => message.IsSaving));
+            Assert.Single(
+                serverComponent.TestNetwork.GetPeerPacketsFromType<GameSaveDataChunkPacket>(playerPeer));
         }
 
         [Fact]
