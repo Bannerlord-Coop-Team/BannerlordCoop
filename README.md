@@ -130,17 +130,5 @@ Please read through [the #faq channel in our discord server](https://discord.gg/
 
 Bannerlord Coop is source-available, not open source. The code may be viewed and contributed to, but it may not be copied, redistributed, relicensed, or used in another project without written permission from the maintainers. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for the full terms.
 
-## Credits
-
-- Trailer by [medievalsniper](https://www.youtube.com/@medievalsniper9)
-- Artwork by [timbermold](https://www.instagram.com/timbermold/)
-
 ### Acknowledgments
-
-- Zetrith for [Multiplayer](https://github.com/Zetrith/Multiplayer).
 - Salminar for [NoHarmony](https://github.com/Salminar/NoHarmony).
-- ashoulson for [RailgunNet](https://github.com/ashoulson/RailgunNet).
-
----
-
-**Now go — conquer your friends' castles!**
