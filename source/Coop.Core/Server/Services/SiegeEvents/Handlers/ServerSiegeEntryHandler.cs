@@ -144,15 +144,16 @@ internal class ServerSiegeEntryHandler : IHandler
         if (party.CurrentSettlement != null && !alreadyEntered) return false;
         if (party.BesiegerCamp != null) return false;
 
-        var mapEventSide = party.Party?.MapEventSide;
+        var partyBase = party.Party;
+        var mapEventSide = partyBase.MapEventSide;
         var validEnteredMapEvent = alreadyEntered &&
             ReferenceEquals(party.MapEvent, settlement.Party?.MapEvent) &&
-            party.Party.Side == BattleSideEnum.Defender;
+            partyBase.Side == BattleSideEnum.Defender;
         if (mapEventSide != null && !validEnteredMapEvent) return false;
 
         var siegeEvent = settlement.SiegeEvent;
         return siegeEvent != null &&
-            siegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Defender);
+            siegeEvent.CanPartyJoinSide(partyBase, BattleSideEnum.Defender);
     }
 
     private void SendBreakInContinuationResult(

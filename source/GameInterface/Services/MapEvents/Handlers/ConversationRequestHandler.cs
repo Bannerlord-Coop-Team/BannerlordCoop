@@ -15,6 +15,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -55,13 +56,15 @@ internal class ConversationRequestHandler : IHandler
     private string activeConversationRequestId;
     private bool hasActiveConversationRequest;
     private long conversationActivationVersion;
-    private bool isApplyingApprovedRestart;
+    private int approvedRestartDepth;
 
     // [Server] Player-vs-player interactions in progress, keyed by the attacking player's peer -> the defending
     // player's party id. Lets the defender be told when the interaction ends (the attacker has no AI party to hold,
     // so this is the only record of a PvP engagement). The defender's "hold on" popup is driven from these broadcasts.
     private readonly ConcurrentDictionary<NetPeer, PvpInteraction> pvpDefenderByAttacker =
         new ConcurrentDictionary<NetPeer, PvpInteraction>();
+    private readonly Queue<IMessage> pvpInteractionNotifications = new Queue<IMessage>();
+    private bool isDrainingPvpInteractionNotifications;
 
     private readonly struct PvpInteraction
     {
@@ -455,6 +458,7 @@ internal class ConversationRequestHandler : IHandler
     /// </summary>
     private void NotifyPvpInteractionStarted(NetPeer requestingPeer, NetworkRequestConversation request, PartyBase attacker)
     {
+        bool shouldDrainNotifications;
         lock (pvpInteractionSync)
         {
             // TryAdd returns false when this attacker already has a recorded interaction; the popup is already up.
@@ -474,8 +478,12 @@ internal class ConversationRequestHandler : IHandler
             conversationPartyTracker.BeginPvpConversation(request.AttackerId, request.DefenderId);
 
             var attackerName = attacker.LeaderHero?.Name?.ToString() ?? attacker.Name?.ToString() ?? "Another player";
-            network.SendAll(new NetworkPlayerInteractionStarted(request.DefenderId, attackerName));
+            shouldDrainNotifications = EnqueuePvpInteractionNotification(
+                new NetworkPlayerInteractionStarted(request.DefenderId, attackerName));
         }
+
+        if (shouldDrainNotifications)
+            DrainPvpInteractionNotifications();
     }
 
     /// <summary>[Server] True when <paramref name="partyId"/> is already in a PvP conversation with someone other than
@@ -499,9 +507,11 @@ internal class ConversationRequestHandler : IHandler
     {
         if (attackerPeer == null) return;
 
+        bool shouldDrainNotifications;
         lock (pvpInteractionSync)
         {
-            if (!pvpDefenderByAttacker.TryGetValue(attackerPeer, out var interaction))
+            PvpInteraction interaction;
+            if (!pvpDefenderByAttacker.TryGetValue(attackerPeer, out interaction))
                 return;
 
             if (requireRequestIdMatch && interaction.RequestId != requestId)
@@ -511,7 +521,58 @@ internal class ConversationRequestHandler : IHandler
                 return;
 
             conversationPartyTracker.EndPvpConversation(interaction.DefenderPartyId);
-            network.SendAll(new NetworkPlayerInteractionEnded(interaction.DefenderPartyId));
+            shouldDrainNotifications = EnqueuePvpInteractionNotification(
+                new NetworkPlayerInteractionEnded(interaction.DefenderPartyId));
+        }
+
+        if (shouldDrainNotifications)
+            DrainPvpInteractionNotifications();
+    }
+
+    /// <summary>
+    /// Adds a notification while <see cref="pvpInteractionSync"/> is held. A single caller drains the queue after
+    /// releasing the state lock, preserving state-transition order even when a send synchronously triggers another
+    /// transition.
+    /// </summary>
+    private bool EnqueuePvpInteractionNotification(IMessage notification)
+    {
+        pvpInteractionNotifications.Enqueue(notification);
+        if (isDrainingPvpInteractionNotifications)
+            return false;
+
+        isDrainingPvpInteractionNotifications = true;
+        return true;
+    }
+
+    private void DrainPvpInteractionNotifications()
+    {
+        try
+        {
+            while (true)
+            {
+                IMessage notification;
+                lock (pvpInteractionSync)
+                {
+                    if (pvpInteractionNotifications.Count == 0)
+                    {
+                        isDrainingPvpInteractionNotifications = false;
+                        return;
+                    }
+
+                    notification = pvpInteractionNotifications.Dequeue();
+                }
+
+                network.SendAll(notification);
+            }
+        }
+        catch
+        {
+            lock (pvpInteractionSync)
+            {
+                pvpInteractionNotifications.Clear();
+                isDrainingPvpInteractionNotifications = false;
+            }
+            throw;
         }
     }
 
@@ -561,7 +622,7 @@ internal class ConversationRequestHandler : IHandler
                     return;
                 }
 
-                isApplyingApprovedRestart = true;
+                approvedRestartDepth++;
                 try
                 {
                     using (new AllowedThread())
@@ -579,7 +640,7 @@ internal class ConversationRequestHandler : IHandler
                 }
                 finally
                 {
-                    isApplyingApprovedRestart = false;
+                    approvedRestartDepth--;
                 }
 
                 ActivateConversationRequest(message.RequestId, observedActivationVersion);
@@ -598,7 +659,7 @@ internal class ConversationRequestHandler : IHandler
     /// <summary>[Client] This player's encounter finished; tell the server to release the held party.</summary>
     private void Handle_ConversationEnded(MessagePayload<ConversationEnded> payload)
     {
-        if (isApplyingApprovedRestart) return;
+        if (approvedRestartDepth > 0) return;
 
         var pendingRequestId = pendingConversationRequestId;
         var activeRequestId = activeConversationRequestId;

@@ -30,12 +30,20 @@ internal class ClientSiegeEntryHandler : IHandler
     private readonly ISiegeEventInterface siegeEventInterface;
     private PendingBreakInContinuation pendingBreakInContinuation;
 
-    public ClientSiegeEntryHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface)
+    internal TimeSpan BreakInContinuationTimeout { get; set; }
+
+    public ClientSiegeEntryHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        INetworkConfig configuration,
+        IObjectManager objectManager,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.siegeEventInterface = siegeEventInterface;
+        BreakInContinuationTimeout = configuration.ObjectCreationTimeout;
         messageBroker.Subscribe<BesiegeSettlementAttempted>(HandleBesiegeAttempt);
         messageBroker.Subscribe<JoinSiegeCampAttempted>(HandleJoinAttempt);
         messageBroker.Subscribe<BreakSiegeAttempted>(HandleBreakAttempt);
@@ -54,8 +62,23 @@ internal class ClientSiegeEntryHandler : IHandler
 
     private void HandleBreakInContinuationAttempt(MessagePayload<BreakInContinuationAttempted> payload)
     {
-        if (pendingBreakInContinuation != null)
-            return;
+        var now = DateTime.UtcNow;
+        var pending = pendingBreakInContinuation;
+        if (pending != null)
+        {
+            if (pending.ExpiresAtUtc > now)
+            {
+                Logger.Information(
+                    "Ignoring break-in continuation attempt while request {RequestId} is pending",
+                    pending.RequestId);
+                return;
+            }
+
+            Logger.Warning(
+                "Retrying break-in continuation after request {RequestId} timed out",
+                pending.RequestId);
+            ClearPendingBreakInContinuation(pending, restoreLocationEncounter: true);
+        }
 
         var obj = payload.What;
         if (!objectManager.TryGetIdWithLogging(obj.Party, out var partyId)) return;
@@ -71,7 +94,8 @@ internal class ClientSiegeEntryHandler : IHandler
             PlayerEncounter.Current,
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
             previousLocationEncounter,
-            stagedLocationEncounter);
+            stagedLocationEncounter,
+            now + BreakInContinuationTimeout);
 
         network.SendAll(new NetworkRequestBreakInContinuation(requestId, partyId, settlementId));
     }
@@ -90,8 +114,20 @@ internal class ClientSiegeEntryHandler : IHandler
 
             if (!obj.Approved)
             {
+                var currentMenuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
+                var shouldRecoverFromDebrief =
+                    ReferenceEquals(PlayerEncounter.Current, pending.Encounter) &&
+                    currentMenuId == pending.MenuId;
                 ClearPendingBreakInContinuation(pending, restoreLocationEncounter: true);
-                Logger.Information("Server rejected the break-in continuation; staying at the current menu");
+                if (shouldRecoverFromDebrief)
+                {
+                    siegeEventInterface.FinishLocalPlayerSiegeLeave();
+                    Logger.Information("Server rejected the break-in continuation; returning to the campaign map");
+                }
+                else
+                {
+                    Logger.Information("Server rejected the break-in continuation after the encounter changed");
+                }
                 return;
             }
 
@@ -345,6 +381,7 @@ internal class ClientSiegeEntryHandler : IHandler
         public readonly string MenuId;
         public readonly LocationEncounter PreviousLocationEncounter;
         public readonly LocationEncounter StagedLocationEncounter;
+        public readonly DateTime ExpiresAtUtc;
 
         public PendingBreakInContinuation(
             string requestId,
@@ -352,7 +389,8 @@ internal class ClientSiegeEntryHandler : IHandler
             PlayerEncounter encounter,
             string menuId,
             LocationEncounter previousLocationEncounter,
-            LocationEncounter stagedLocationEncounter)
+            LocationEncounter stagedLocationEncounter,
+            DateTime expiresAtUtc)
         {
             RequestId = requestId;
             SettlementId = settlementId;
@@ -360,6 +398,7 @@ internal class ClientSiegeEntryHandler : IHandler
             MenuId = menuId;
             PreviousLocationEncounter = previousLocationEncounter;
             StagedLocationEncounter = stagedLocationEncounter;
+            ExpiresAtUtc = expiresAtUtc;
         }
     }
 }
