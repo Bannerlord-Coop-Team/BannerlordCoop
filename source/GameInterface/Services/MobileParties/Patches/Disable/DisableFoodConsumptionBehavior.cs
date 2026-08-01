@@ -66,7 +66,7 @@ internal class FoodConsumptionBehaviorPatches
             var playerPartyId = player.MobilePartyId;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(playerPartyId, out var playerParty)) continue;
 
-            if (!ShouldTickFoodChange(playerManager, playerParty)) return false;
+            if (!ShouldTickFoodChange(playerManager, playerParty)) continue;
 
             int versionNo = playerParty.Party.ItemRoster.VersionNo;
 
