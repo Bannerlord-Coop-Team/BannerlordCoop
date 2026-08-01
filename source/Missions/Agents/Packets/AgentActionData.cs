@@ -1,5 +1,8 @@
 ﻿using ProtoBuf;
 using Missions.Agents.Handlers;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -117,6 +120,15 @@ namespace Missions.Agents.Packets
             int channel)
         {
             // Retire the cyclic sibling before native guard input can select it again.
+#if DEBUG
+            MissionActionDiagnostics.RecordActionCommand(
+                agent,
+                channel,
+                ActionIndexCache.act_none.Index,
+                startProgress: 0f,
+                AnimFlags.anf_restart,
+                "mounted-guard-clear");
+#endif
             agent.SetActionChannel(
                 channel,
                 ActionIndexCache.act_none,
@@ -454,6 +466,15 @@ namespace Missions.Agents.Packets
                             GuardMode);
                         actionFlags |= AnimFlags.anf_restart;
                     }
+#if DEBUG
+                    MissionActionDiagnostics.RecordActionCommand(
+                        agent,
+                        channel: 0,
+                        action0.Index,
+                        Action0Progress,
+                        actionFlags,
+                        "action-packet");
+#endif
                     agent.SetActionChannel(
                         0,
                         action0,
@@ -497,6 +518,15 @@ namespace Missions.Agents.Packets
                             GuardMode);
                         actionFlags |= AnimFlags.anf_restart;
                     }
+#if DEBUG
+                    MissionActionDiagnostics.RecordActionCommand(
+                        agent,
+                        channel: 1,
+                        action1.Index,
+                        Action1Progress,
+                        actionFlags,
+                        "action-packet");
+#endif
                     agent.SetActionChannel(
                         1,
                         action1,

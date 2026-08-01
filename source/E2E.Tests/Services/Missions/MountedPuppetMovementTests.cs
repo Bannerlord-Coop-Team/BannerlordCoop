@@ -100,6 +100,57 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ApplyMount_DoesNotRewriteMatchingEmptyActionChannels()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+
+            new AgentMountData(sourceHorse).ApplyMount(puppetHorse);
+
+            Assert.Equal(0, puppetHorseMirror.SetActionChannelCalls);
+            Assert.Equal(0, puppetHorseMirror.SetCurrentActionProgressCalls);
+        });
+    }
+
+    [Fact]
+    public void ApplyMount_DoesNotRewindMatchingActiveActionChannels()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceHorse = mock.SpawnMount();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
+            sourceHorseMirror.Action0Index = 1001;
+            sourceHorseMirror.Action0Progress = 0.25f;
+            sourceHorseMirror.Action1Index = 1002;
+            sourceHorseMirror.Action1Progress = 0.2f;
+            puppetHorseMirror.Action0Index = 1001;
+            puppetHorseMirror.Action0Progress = 0.75f;
+            puppetHorseMirror.Action1Index = 1002;
+            puppetHorseMirror.Action1Progress = 0.8f;
+
+            new AgentMountData(sourceHorse).ApplyMount(puppetHorse);
+
+            Assert.Equal(0, puppetHorseMirror.SetActionChannelCalls);
+            Assert.Equal(0, puppetHorseMirror.SetCurrentActionProgressCalls);
+            Assert.Equal(0.75f, puppetHorseMirror.Action0Progress);
+            Assert.Equal(0.8f, puppetHorseMirror.Action1Progress);
+        });
+    }
+
+    [Fact]
     public void AgentData_AppliesRiderAndMountLocomotionFlagsWithoutClearingDefend()
     {
         using var fixture = new MissionEngineFixture();
