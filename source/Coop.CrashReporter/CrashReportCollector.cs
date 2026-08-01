@@ -41,10 +41,12 @@ namespace Coop.CrashReporter
             Func<string, string, bool> tryCopyDumpAttempt)
         {
             if (options == null) throw new ArgumentNullException(nameof(options));
+#pragma warning disable CA1512 // ThrowIfLessThanOrEqual is unavailable on .NET Framework 4.7.2.
             if (dumpCompletionTimeout <= TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(dumpCompletionTimeout));
             if (retryInterval <= TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(retryInterval));
+#pragma warning restore CA1512
 
             this.options = options;
             this.dumpCompletionTimeout = dumpCompletionTimeout;
