@@ -9,14 +9,24 @@ using TaleWorlds.Library;
 namespace GameInterface.Configuration;
 
 /// <summary>
-/// Loads mod-config.json from %BANNERLORD_USER_DIR%, else the engine's user
-/// directory; seeds it from the module's template when absent, and falls back to
-/// defaults if it cannot be read. Never touches the dedicated server's
-/// server-config.json — the two configs are independent by design.
+/// Loads mod-config.json from the mod's shared CoopData folder — ONE gameplay
+/// config however the world is hosted: %COOP_DATA_DIR% when a dedicated server
+/// set it (it points at &lt;game user data&gt;\CoopData, or at the server's own data
+/// dir for deployments that keep the file there), else %BANNERLORD_USER_DIR%
+/// (older DS builds, containers), else &lt;engine user directory&gt;\CoopData — for a
+/// client-hosted session that is Documents\Mount and Blade II
+/// Bannerlord\CoopData, beside the mod's CoopMapData. Seeds it from the
+/// module's template when absent, and falls back to defaults if it cannot be
+/// read. Never touches the dedicated server's server-config.json — the two
+/// configs are independent by design.
 /// </summary>
 internal sealed class ModConfig : IModConfig
 {
     private const string FileName = "mod-config.json";
+
+    /// <summary>The mod's folder under the game's user data; the DS nests its own
+    /// DedicatedServer home inside the same folder.</summary>
+    private const string CoopDataFolderName = "CoopData";
 
     /// <summary>Ships in the module root — the only copy of the defaults.</summary>
     private const string TemplateFileName = "mod-config.default.json";
@@ -78,8 +88,16 @@ internal sealed class ModConfig : IModConfig
             return directoryOverride;
         }
 
-        // Headless hosts set this just before building the container; reading
-        // any earlier silently misses the file.
+        // Headless hosts set these just before building the container; reading
+        // any earlier silently misses the file. COOP_DATA_DIR is the current DS
+        // contract (the shared CoopData folder, or the server's own data dir when
+        // an established deployment keeps the file there); BANNERLORD_USER_DIR is
+        // kept as the fallback for DS builds that predate it.
+        var coopDataDir = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
+        if (string.IsNullOrEmpty(coopDataDir) == false)
+        {
+            return coopDataDir;
+        }
         var userDir = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
         if (string.IsNullOrEmpty(userDir) == false)
         {
@@ -88,6 +106,9 @@ internal sealed class ModConfig : IModConfig
 
         // Via the interface, so a host running its own helper (the dedicated
         // server redirects PlatformFileType.User) resolves to ITS user root.
+        // Client-hosted sessions land in the game's own user directory; the
+        // mod's files live in a CoopData folder there (beside CoopMapData),
+        // shared with a dedicated server running on the same account.
         var helper = TaleWorlds.Library.Common.PlatformFileHelper;
         if (helper != null)
         {
@@ -95,7 +116,7 @@ internal sealed class ModConfig : IModConfig
             string probe = helper.GetFileFullPath(new PlatformFilePath(userRoot, FileName));
             if (string.IsNullOrEmpty(probe) == false)
             {
-                return Path.GetDirectoryName(probe);
+                return Path.Combine(Path.GetDirectoryName(probe), CoopDataFolderName);
             }
         }
 
