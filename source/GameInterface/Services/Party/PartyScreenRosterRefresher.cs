@@ -354,8 +354,10 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         var sortType = logic.GetActiveSortTypeForSide(identity.Side);
         if (sortType != PartyScreenLogic.TroopSortType.Count) return;
 
+        var troopComparer = logic.GetComparer(sortType);
+        troopComparer.SetIsAscending(logic.GetIsAscendingSortForSide(identity.Side));
         var comparer = new TaleWorlds.CampaignSystem.ViewModelCollection.Party.PartyVM.TroopVMComparer(
-            logic.GetComparer(sortType));
+            troopComparer);
         if (identity.Side == PartyScreenLogic.PartyRosterSide.Right)
         {
             if (identity.Type == PartyScreenLogic.TroopType.Member)
