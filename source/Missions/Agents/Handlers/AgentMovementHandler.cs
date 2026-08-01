@@ -586,10 +586,19 @@ public class AgentMovementHandler : IAgentMovementHandler
             || activeTurn.ActionIndex
                 != mountData.MountAction0TurnActionIndex)
         {
+            if (!AgentActionData.TryResolveActionIndex(
+                    mountData.MountAction0TurnActionIndex,
+                    out ActionIndexCache turnAction))
+            {
+                if (activeTurn != null)
+                    activeTurn.ClearRequested = true;
+                return;
+            }
+
             _remoteSyntheticMountTurns[mount] =
                 new RemoteSyntheticMountTurnState(
                     mountData.MountAction0TurnDirection,
-                    mountData.MountAction0TurnActionIndex,
+                    turnAction.Index,
                     mountData.MountAction0Progress);
             return;
         }

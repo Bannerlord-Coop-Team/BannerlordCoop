@@ -1,4 +1,7 @@
 ﻿using ProtoBuf;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using System;
 using System.Collections.Concurrent;
 using TaleWorlds.Engine;
@@ -106,9 +109,6 @@ namespace Missions.Agents.Packets
                 MountAction0IsLocomotion,
                 MountAction0TurnDirection,
                 MountAction0TurnActionIndex);
-            string desiredAction0Name = desiredAction0Index == NoActionIndex
-                ? null
-                : AgentActionData.GetActionNameWithCode(desiredAction0Index);
             bool syntheticStationaryTurn = stationaryTurn
                 && MountAction0IsSyntheticTurn;
             ActionIndexCache currentAction0 = mountAgent.GetCurrentAction(0);
@@ -127,8 +127,19 @@ namespace Missions.Agents.Packets
                     || currentAction0.Index != desiredAction0Index
                     || nativeTurnFlagsChanged)
                 {
+                    string desiredAction0Name =
+                        AgentActionData.GetActionNameWithCode(desiredAction0Index);
                     if (desiredAction0Name != null)
                     {
+#if DEBUG
+                        MissionActionDiagnostics.RecordMountActionCommand(
+                            MountAgentId,
+                            mountAgent,
+                            channel: 0,
+                            desiredAction0Index,
+                            MountAction0Progress,
+                            (AnimFlags)MountAction0Flag);
+#endif
                         mountAgent.SetActionChannel(
                             0,
                             ActionIndexCache.Create(desiredAction0Name),
@@ -140,21 +151,29 @@ namespace Missions.Agents.Packets
                 }
                 else
                 {
-                    mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
                     mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
                 }
             }
+            // Once the gait matches, let native animation advance it. Movement packets are unreliable, so
+            // replaying snapshot progress here can apply an older packet and visibly rewind the same gait.
 
             //Currently not doing anything afaik
-            if (mountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(1).Index != MountAction1Index)
+            if (mountAgent.GetCurrentAction(1).Index != MountAction1Index)
             {
                 string mActionName2 = AgentActionData.GetActionNameWithCode(MountAction1Index);
                 if (mActionName2 != null)
+                {
+#if DEBUG
+                    MissionActionDiagnostics.RecordMountActionCommand(
+                        MountAgentId,
+                        mountAgent,
+                        channel: 1,
+                        MountAction1Index,
+                        MountAction1Progress,
+                        (AnimFlags)MountAction1Flag);
+#endif
                     mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (AnimFlags)MountAction1Flag, startProgress: MountAction1Progress);
-            }
-            else
-            {
-                mountAgent.SetCurrentActionProgress(1, MountAction1Progress);
+                }
             }
             mountAgent.LookDirection = MountLookDirection;
             mountAgent.MovementInputVector = MountSpeed <= StationarySpeedThreshold && !stationaryTurn
