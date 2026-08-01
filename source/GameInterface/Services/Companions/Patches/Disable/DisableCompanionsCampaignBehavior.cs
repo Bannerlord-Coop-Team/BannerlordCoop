@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using GameInterface.Extentions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -19,6 +20,14 @@ internal class DisableCompanionsCampaignBehavior
 [HarmonyPatch(typeof(CompanionsCampaignBehavior))]
 internal class CompanionsCampaignBehaviorPatches
 {
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior._desiredTotalCompanionCount), MethodType.Getter)]
+    [HarmonyPrefix]
+    public static bool DesiredTotalCompanionCountGetterPrefix(ref float __result)
+    {
+        __result = ModConfigProvider.ModOptions.WandererLimit;
+        return false;
+    }
+
     /// <summary>
     /// Replace vanilla implementation to not use Hero.MainHero which is null on the headless server.
     /// </summary>

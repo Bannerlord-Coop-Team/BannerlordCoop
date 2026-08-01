@@ -27,4 +27,46 @@
     // "birthAndDeath": true,                 // aging, births, natural deaths
     // "autoAllocateClanMemberPerks": false,
   },
+  "modOptions": {
+    // Toggle Gold & food change while in settlements. THIS INCLUDES INCOME
+    // false: Gold & food will remain the same while being in a settlement, including walking around the settlement, participating in tournaments etc.
+    // (Default) true: Gold & food will change the same in settlements as on the campaign map.
+    "goldFoodChangeInSettlements": true,
+
+    // Set gold & food change mode for battles. THIS INCLUDES INCOME
+    // Disabled: No gold or food will change while in battles.
+    // (Default) OneDayMax: Gold and food change can happen at most once during a battle. e.g. Only paying for troops once during a 15 day siege.
+    // Enabled: Gold and food change happen regardless of whether a player is in a battle or not.
+    "goldFoodChangeInBattles": "OneDayMax",
+
+    // Set gold & food change for disconnected players. THIS INCLUDES INCOME
+    // (Default) false: Disconnected players won't have any gold or food change.
+    // true: Disconnected players have gold and food change.
+    "goldFoodChangeForDisconnectedPlayers": false,
+
+    // Set grace period (hours) for AI parties to be able to join battles involving players.
+    // Default is 24, meaning AI parties can only join a player battle within a day of it starting.
+    // If set to 0, AI parties will not join in player battles.
+    "playerBattleAiJoinWindowHours": 24,
+
+    // Number of wanderers/companions that can exist at a time.
+    // Vanilla/default limit is numberOfTowns * 0.6 ≈ 32.
+    "wandererLimit": 32,
+
+    // Set a custom clan tier required to form a player kingdom.
+    // Vanilla/default allows players to start kingdoms from clan tier 4 onwards.
+    "playerKingdomClanTierRequired": 4,
+
+    // Toggle recovering stamina outside of settlements.
+    // In vanilla players have to wait in settlements to regenerate smithing stamina.
+    // false: More like vanilla, players have to wait in settlements to get their smithing stamina back.
+    // (Default) true: Players recovery stamina when moving around the world map as well in settlements.
+    "smithingStaminaRecoveryOutsideSettlements": true,
+
+    // Set a factor for increasing/decreasing smithing stamina recovery speed.
+    // The vanilla rate is 1. The default for this mod is 0.1 as stamina regenerates in the smithing screen.
+    // Setting any lower than this won't decrease speed more.
+    // Stamina is stored as an integer and ticks are rounded up to ensure heroes always recover some stamina.
+    "smithingStaminaRecoveryFactor": 0.1
+  }
 }

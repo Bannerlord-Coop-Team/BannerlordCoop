@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventParties.Messages;
@@ -262,20 +263,23 @@ internal class MapEventPatches
 [HarmonyPatch]
 internal class InteractionPatches
 {
-    private sealed class PlayerBattleAiJoinWindow
+    private sealed class PlayerBattleWindows
     {
-        public CampaignTime ExpiresAt { get; }
+        public CampaignTime AiJoinWindowExpiresAt { get; }
+        public CampaignTime GoldFoodConsumptionWindowExpiresAt { get; }
 
-        public PlayerBattleAiJoinWindow(int durationHours)
+        public PlayerBattleWindows(int aiJoinWindowHours, int goldFoodConsumptionWindowHours = 24)
         {
-            ExpiresAt = CampaignTime.HoursFromNow(durationHours);
+            AiJoinWindowExpiresAt = CampaignTime.HoursFromNow(aiJoinWindowHours);
+            GoldFoodConsumptionWindowExpiresAt = CampaignTime.HoursFromNow(goldFoodConsumptionWindowHours);
         }
 
-        public bool Expired => CampaignTime.Now > ExpiresAt;
+        public bool AiJoinWindowExpired => CampaignTime.Now > AiJoinWindowExpiresAt;
+        public bool GoldFoodConsumptionExpired => CampaignTime.Now > GoldFoodConsumptionWindowExpiresAt;
     }
 
 
-    private static readonly ConditionalWeakTable<MobileParty, PlayerBattleAiJoinWindow> interactionDebounce = new();
+    private static readonly ConditionalWeakTable<MobileParty, PlayerBattleWindows> interactionDebounce = new();
 
     [HarmonyPatch(typeof(PartyBase), "TaleWorlds.CampaignSystem.Map.IInteractablePoint.CanPartyInteract")]
     [HarmonyPostfix]
@@ -302,13 +306,16 @@ internal class InteractionPatches
         }
     }
 
-    private static readonly ConditionalWeakTable<MapEvent, PlayerBattleAiJoinWindow> playerBattleAiJoinWindows = new();
+    private static readonly ConditionalWeakTable<MapEvent, PlayerBattleWindows> playerBattleWindows = new();
 
     /// <summary>True while a player's battle is still within its post-start window for AI parties to join as
-    /// reinforcements (<see cref="MapEventConfig.PlayerBattleAiJoinWindowHours"/>). The window is opened in
+    /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened in
     /// <see cref="Postfix_Initialize"/>; only the server ever populates it, so this is a server-side query.</summary>
     public static bool IsWithinAiJoinWindow(MapEvent mapEvent)
-        => playerBattleAiJoinWindows.TryGetValue(mapEvent, out var window) && !window.Expired;
+        => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.AiJoinWindowExpired;
+
+    public static bool IsWithinGoldFoodConsumptionWindow(MapEvent mapEvent)
+        => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.GoldFoodConsumptionExpired;
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.CanPartyJoinBattle))]
     [HarmonyPrefix]
@@ -411,8 +418,8 @@ internal class InteractionPatches
 
         MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
 
-        playerBattleAiJoinWindows.GetValue(
+        playerBattleWindows.GetValue(
             __instance,
-            _ => new PlayerBattleAiJoinWindow(MapEventConfig.PlayerBattleAiJoinWindowHours));
+            _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
     }
 }
