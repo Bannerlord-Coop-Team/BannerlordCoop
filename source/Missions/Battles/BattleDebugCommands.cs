@@ -36,6 +36,23 @@ internal static class BattleDebugCommands
     private static Agent capturedMount;
     private static Guid capturedMountId;
     private static float mountPoseCaptureStartTime;
+    private static BattleDebugTickBehavior battleDebugTickBehavior;
+
+    private sealed class BattleDebugTickBehavior : MissionBehavior
+    {
+        public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
+
+        public override void OnPreDisplayMissionTick(float dt)
+        {
+            CaptureMountPoseFrame();
+        }
+
+        public override void OnRemoveBehavior()
+        {
+            if (ReferenceEquals(battleDebugTickBehavior, this))
+                battleDebugTickBehavior = null;
+        }
+    }
 
     private sealed class MountPoseSample
     {
@@ -224,6 +241,7 @@ internal static class BattleDebugCommands
         }
 
         ObserveMission(mission);
+        EnsureBattleDebugTickBehavior(mission);
         capturedMount = mount;
         capturedMountId = mountId;
         mountPoseCaptureStartTime = mission.CurrentTime;
@@ -269,7 +287,7 @@ internal static class BattleDebugCommands
         return output.ToString().TrimEnd();
     }
 
-    internal static void CaptureMountPoseFrame()
+    private static void CaptureMountPoseFrame()
     {
         UpdateMountCameraFrame();
 
@@ -546,6 +564,18 @@ internal static class BattleDebugCommands
         observedMission = mission;
     }
 
+    private static void EnsureBattleDebugTickBehavior(Mission mission)
+    {
+        if (!ReferenceEquals(battleDebugTickBehavior, null)
+            && ReferenceEquals(battleDebugTickBehavior.Mission, mission))
+        {
+            return;
+        }
+
+        battleDebugTickBehavior = new BattleDebugTickBehavior();
+        mission.AddMissionBehavior(battleDebugTickBehavior);
+    }
+
     private static bool TryGetActiveMount(Guid mountId, out Agent mount)
     {
         mount = null;
@@ -603,11 +633,14 @@ internal static class BattleDebugCommands
             return "The mission screen is not active";
 
         ReleaseLadderCamera();
+        ObserveMission(mission);
         Agent mount = info.Agent;
         MBAgentVisuals visuals = mount.AgentVisuals;
         GameEntity visualEntity = visuals?.GetEntity();
         if (ReferenceEquals(visualEntity, null))
             return $"Mount {mountId:N} has no active visual entity";
+
+        EnsureBattleDebugTickBehavior(mission);
 
         if (ReferenceEquals(mountCamera, null)
             || ReferenceEquals(mountCamera.Entity, null))

@@ -49,17 +49,22 @@ namespace Missions.Agents.Packets
             MountAction0Progress = syntheticStationaryTurn
                 ? mountAction0TurnProgress ?? 0f
                 : mountAgent.GetCurrentActionProgress(0);
-            GetRenderedAction0State(
-                mountAgent,
-                out string renderedAction0Animation,
-                out float renderedAction0Speed);
+            MountSpeed = mountAgent.GetRealGlobalVelocity().AsVec2.Length;
+            string renderedAction0Animation = null;
+            float renderedAction0Speed = 1f;
+            if (MountSpeed <= StationarySpeedThreshold)
+            {
+                GetRenderedAction0State(
+                    mountAgent,
+                    out renderedAction0Animation,
+                    out renderedAction0Speed);
+            }
             MountAction1Flag = (ulong)mountAgent.GetCurrentAnimationFlag(1);
             MountAction1Progress = mountAgent.GetCurrentActionProgress(1);
             MountAction1Index = mountAgent.GetCurrentAction(1).Index;
             MountLookDirection = mountAgent.LookDirection;
             MountMovementDirection = mountAgent.GetMovementDirection();
             MountPosition = mountAgent.Position;
-            MountSpeed = mountAgent.GetRealGlobalVelocity().AsVec2.Length;
             MountMovementFlag = (uint)AgentData.GetLocomotionMovementFlags(
                 mountAgent.MovementFlags);
             MountMovementId = mountMovementId;
@@ -73,11 +78,12 @@ namespace Missions.Agents.Packets
                     ?? IsLocomotionAction(MountAction0Index, renderedAction0Animation));
             MountAction0TurnDirection = mountAction0TurnDirection
                 ?? GetTurnDirection(MountAction0Index, renderedAction0Animation);
-            MountAction0TurnActionIndex = mountAction0TurnActionIndex
+            int resolvedTurnActionIndex = mountAction0TurnActionIndex
                 ?? ResolveStationaryTurnActionIndex(
                     MountAction0Index,
                     MountAction0TurnDirection,
                     mountAgent.Monster?.MonsterUsage);
+            MountAction0TurnActionIndexWire = resolvedTurnActionIndex + 1;
         }
 
         public AgentMountData(Agent mountAgent, Guid mountAgentId)
@@ -100,6 +106,9 @@ namespace Missions.Agents.Packets
                 MountAction0IsLocomotion,
                 MountAction0TurnDirection,
                 MountAction0TurnActionIndex);
+            string desiredAction0Name = desiredAction0Index == NoActionIndex
+                ? null
+                : AgentActionData.GetActionNameWithCode(desiredAction0Index);
             bool syntheticStationaryTurn = stationaryTurn
                 && MountAction0IsSyntheticTurn;
             ActionIndexCache currentAction0 = mountAgent.GetCurrentAction(0);
@@ -114,22 +123,25 @@ namespace Missions.Agents.Packets
                     if (currentAction0 != ActionIndexCache.act_none)
                         mountAgent.SetActionChannel(0, ActionIndexCache.act_none);
                 }
-                else if (currentAction0 == ActionIndexCache.act_none
-                    || currentAction0.Index != desiredAction0Index
-                    || nativeTurnFlagsChanged)
+                else if (desiredAction0Name != null)
                 {
-                    mountAgent.SetActionChannel(
-                        0,
-                        new ActionIndexCache(desiredAction0Index),
-                        ignorePriority: stationaryTurn,
-                        additionalFlags: (AnimFlags)MountAction0Flag,
-                        actionSpeed: MountAction0Speed,
-                        startProgress: MountAction0Progress);
-                }
-                else
-                {
-                    mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
-                    mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
+                    if (currentAction0 == ActionIndexCache.act_none
+                        || currentAction0.Index != desiredAction0Index
+                        || nativeTurnFlagsChanged)
+                    {
+                        mountAgent.SetActionChannel(
+                            0,
+                            ActionIndexCache.Create(desiredAction0Name),
+                            ignorePriority: stationaryTurn,
+                            additionalFlags: (AnimFlags)MountAction0Flag,
+                            actionSpeed: MountAction0Speed,
+                            startProgress: MountAction0Progress);
+                    }
+                    else
+                    {
+                        mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
+                        mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
+                    }
                 }
             }
 
@@ -464,9 +476,11 @@ namespace Missions.Agents.Packets
         /// <summary>The owner's rendered stationary turn direction: -1 left, 0 none, 1 right.</summary>
         [ProtoMember(18)]
         public int MountAction0TurnDirection { get; }
-        /// <summary>The native movement action for the owner's mount type and stationary turn direction.</summary>
+        // Shift by one so protobuf omits the common no-turn value.
         [ProtoMember(19)]
-        public int MountAction0TurnActionIndex { get; }
+        private int MountAction0TurnActionIndexWire { get; set; }
+        /// <summary>The native movement action for the owner's mount type and stationary turn direction.</summary>
+        public int MountAction0TurnActionIndex => MountAction0TurnActionIndexWire - 1;
         /// <summary>Whether channel zero is being driven through the bounded synthetic turn timeline.</summary>
         [ProtoMember(20)]
         public bool MountAction0IsSyntheticTurn { get; }

@@ -526,6 +526,15 @@ public class AgentMovementHandler : IAgentMovementHandler
                 continue;
             }
 
+            Agent rider = mount.RiderAgent;
+            if (agentRegistry.IsLocallyControlled(mount)
+                || (rider != null
+                    && agentRegistry.IsLocallyControlled(rider)))
+            {
+                _completedRemoteSyntheticMountTurns.Add(mount);
+                continue;
+            }
+
             visualActionAccessor.TrySetAction(
                 mount,
                 0,
@@ -585,7 +594,9 @@ public class AgentMovementHandler : IAgentMovementHandler
             return;
         }
 
-        if (mountData.MountAction0Progress > activeTurn.Progress)
+        if (activeTurn.ClearRequested)
+            activeTurn.Progress = mountData.MountAction0Progress;
+        else if (mountData.MountAction0Progress > activeTurn.Progress)
             activeTurn.Progress = mountData.MountAction0Progress;
         activeTurn.FramesSinceUpdate = 0;
         activeTurn.ClearRequested = false;

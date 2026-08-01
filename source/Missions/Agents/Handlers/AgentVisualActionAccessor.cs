@@ -121,7 +121,7 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
 
             return true;
         }
-        catch
+        catch (NullReferenceException)
         {
             return false;
         }

@@ -2,7 +2,6 @@
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
-using Missions.Battles;
 using Missions.Messages;
 using Serilog;
 using System; 
@@ -98,7 +97,6 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
         coopMissionComponent.AgentMovementHandler
             .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
-        BattleDebugCommands.CaptureMountPoseFrame();
 
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
         coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
