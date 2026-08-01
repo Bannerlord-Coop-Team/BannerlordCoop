@@ -598,17 +598,19 @@ internal static class BattleDebugCommands
             return $"Active mount {mountId:N} was not found";
         }
 
-        if (!(ScreenManager.TopScreen is MissionScreen missionScreen) || missionScreen.CombatCamera == null)
+        if (!(ScreenManager.TopScreen is MissionScreen missionScreen)
+            || ReferenceEquals(missionScreen.CombatCamera, null))
             return "The mission screen is not active";
 
         ReleaseLadderCamera();
         Agent mount = info.Agent;
         MBAgentVisuals visuals = mount.AgentVisuals;
         GameEntity visualEntity = visuals?.GetEntity();
-        if (visualEntity == null)
+        if (ReferenceEquals(visualEntity, null))
             return $"Mount {mountId:N} has no active visual entity";
 
-        if (mountCamera == null || mountCamera.Entity == null)
+        if (ReferenceEquals(mountCamera, null)
+            || ReferenceEquals(mountCamera.Entity, null))
         {
             ReleaseMountCamera();
             mountCamera = Camera.CreateCamera();
@@ -638,12 +640,12 @@ internal static class BattleDebugCommands
         if (args.Count != 0)
             return "Usage: coop.debug.battle.mount_camera_state";
 
-        if (mountCamera == null
-            || focusedMount == null
+        if (ReferenceEquals(mountCamera, null)
+            || ReferenceEquals(focusedMount, null)
             || !focusedMount.IsActive()
             || !(ScreenManager.TopScreen is MissionScreen missionScreen)
-            || missionScreen.CombatCamera == null
-            || mountCamera.Entity == null)
+            || ReferenceEquals(missionScreen.CombatCamera, null)
+            || ReferenceEquals(mountCamera.Entity, null))
         {
             return "active=False";
         }
@@ -672,16 +674,16 @@ internal static class BattleDebugCommands
 
     private static bool UpdateMountCameraFrame()
     {
-        if (mountCamera == null
-            || mountCamera.Entity == null
-            || focusedMount == null
+        if (ReferenceEquals(mountCamera, null)
+            || ReferenceEquals(mountCamera.Entity, null)
+            || ReferenceEquals(focusedMount, null)
             || !focusedMount.IsActive())
         {
             return false;
         }
 
         GameEntity visualEntity = focusedMount.AgentVisuals?.GetEntity();
-        if (visualEntity == null)
+        if (ReferenceEquals(visualEntity, null))
             return false;
 
         MatrixFrame visualFrame = visualEntity.GetGlobalFrame();
@@ -703,15 +705,15 @@ internal static class BattleDebugCommands
 
     private static bool ReleaseMountCamera()
     {
-        if (mountCamera == null) return false;
+        if (ReferenceEquals(mountCamera, null)) return false;
 
         if (ScreenManager.TopScreen is MissionScreen missionScreen
-            && missionScreen.CustomCamera == mountCamera)
+            && ReferenceEquals(missionScreen.CustomCamera, mountCamera))
         {
             missionScreen.CustomCamera = null;
         }
 
-        if (mountCamera.Entity == null)
+        if (ReferenceEquals(mountCamera.Entity, null))
             mountCamera.ReleaseCamera();
         else
             mountCamera.ReleaseCameraEntity();
