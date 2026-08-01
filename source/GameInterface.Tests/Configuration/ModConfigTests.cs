@@ -160,7 +160,9 @@ public class ModConfigTests : IDisposable
     [Fact]
     public void NoDiscoverableLocation_RunsDefaults_WritesNothing()
     {
+        string savedData = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
         string savedEnv = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+        Environment.SetEnvironmentVariable("COOP_DATA_DIR", null);
         Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", null);
         try
         {
@@ -169,7 +171,7 @@ public class ModConfigTests : IDisposable
             // there. Fail loudly instead of writing outside the test sandbox.
             Assert.Null(TaleWorlds.Library.Common.PlatformFileHelper);
 
-            // Production constructor: no override, no env var, no platform helper
+            // Production constructor: no override, no env vars, no platform helper
             // — every rung comes up empty.
             var config = new ModConfig().Data;
 
@@ -178,6 +180,31 @@ public class ModConfigTests : IDisposable
         }
         finally
         {
+            Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
+            Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
+        }
+    }
+
+    [Fact]
+    public void CoopDataDirRung_WinsOverUserDirRung()
+    {
+        string savedData = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
+        string savedEnv = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+        string decoy = Path.Combine(tempDir, "decoy-user-dir");
+        Directory.CreateDirectory(decoy);
+        Environment.SetEnvironmentVariable("COOP_DATA_DIR", tempDir);
+        Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", decoy);
+        try
+        {
+            _ = new ModConfig().Data;
+
+            Assert.True(File.Exists(ConfigPath), "COOP_DATA_DIR should win the discovery");
+            Assert.False(File.Exists(Path.Combine(decoy, "mod-config.json")),
+                "BANNERLORD_USER_DIR must not be consulted when COOP_DATA_DIR is set");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
             Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
         }
     }
@@ -185,7 +212,9 @@ public class ModConfigTests : IDisposable
     [Fact]
     public void EnvVarRung_WinsWhenNoOverride()
     {
+        string savedData = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
         string savedEnv = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+        Environment.SetEnvironmentVariable("COOP_DATA_DIR", null);
         Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", tempDir);
         try
         {
@@ -195,6 +224,7 @@ public class ModConfigTests : IDisposable
         }
         finally
         {
+            Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
             Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
         }
     }
