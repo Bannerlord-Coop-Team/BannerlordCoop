@@ -4,25 +4,25 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages.Roles;
 
-public readonly struct AllPartyRolesOfHeroRemoved : IEvent
+public readonly struct RemoveAllPartyRolesOfHero : IEvent
 {
     public readonly Hero Hero;
     public readonly MobileParty MobileParty;
 
-    public AllPartyRolesOfHeroRemoved(Hero hero, MobileParty mobileParty)
+    public RemoveAllPartyRolesOfHero(Hero hero, MobileParty mobileParty)
     {
         Hero = hero;
         MobileParty = mobileParty;
     }
 }
 
-public readonly struct PartyRoleOfHeroRemoved : IEvent
+public readonly struct RemovePartyRoleOfHero : IEvent
 {
     public readonly Hero Hero;
     public readonly MobileParty MobileParty;
     public readonly PartyRole PartyRole;
 
-    public PartyRoleOfHeroRemoved(Hero hero, MobileParty mobileParty, PartyRole partyRole)
+    public RemovePartyRoleOfHero(Hero hero, MobileParty mobileParty, PartyRole partyRole)
     {
         Hero = hero;
         MobileParty = mobileParty;
@@ -30,48 +30,84 @@ public readonly struct PartyRoleOfHeroRemoved : IEvent
     }
 }
 
-public readonly struct PartyScoutSet : IEvent
+public readonly struct RemoveOnePartyRoleOfHero : IEvent
 {
     public readonly Hero Hero;
     public readonly MobileParty MobileParty;
 
-    public PartyScoutSet(Hero hero, MobileParty mobileParty)
+    public RemoveOnePartyRoleOfHero(Hero hero, MobileParty mobileParty)
     {
         Hero = hero;
         MobileParty = mobileParty;
     }
 }
 
-public readonly struct PartyQuartermasterSet : IEvent
+public readonly struct SetPartyScout : IEvent
 {
     public readonly Hero Hero;
     public readonly MobileParty MobileParty;
 
-    public PartyQuartermasterSet(Hero hero, MobileParty mobileParty)
+    public SetPartyScout(Hero hero, MobileParty mobileParty)
     {
         Hero = hero;
         MobileParty = mobileParty;
     }
 }
 
-public readonly struct PartyEngineerSet : IEvent
+public readonly struct SetPartyQuartermaster : IEvent
 {
     public readonly Hero Hero;
     public readonly MobileParty MobileParty;
 
-    public PartyEngineerSet(Hero hero, MobileParty mobileParty)
+    public SetPartyQuartermaster(Hero hero, MobileParty mobileParty)
     {
         Hero = hero;
         MobileParty = mobileParty;
     }
 }
 
-public readonly struct PartySurgeonSet : IEvent
+public readonly struct SetPartyEngineer : IEvent
 {
     public readonly Hero Hero;
     public readonly MobileParty MobileParty;
 
-    public PartySurgeonSet(Hero hero, MobileParty mobileParty)
+    public SetPartyEngineer(Hero hero, MobileParty mobileParty)
+    {
+        Hero = hero;
+        MobileParty = mobileParty;
+    }
+}
+
+public readonly struct SetPartySurgeon : IEvent
+{
+    public readonly Hero Hero;
+    public readonly MobileParty MobileParty;
+
+    public SetPartySurgeon(Hero hero, MobileParty mobileParty)
+    {
+        Hero = hero;
+        MobileParty = mobileParty;
+    }
+}
+
+public readonly struct SetPartyFirstMate : IEvent
+{
+    public readonly Hero Hero;
+    public readonly MobileParty MobileParty;
+
+    public SetPartyFirstMate(Hero hero, MobileParty mobileParty)
+    {
+        Hero = hero;
+        MobileParty = mobileParty;
+    }
+}
+
+public readonly struct SetPartyNavigator : IEvent
+{
+    public readonly Hero Hero;
+    public readonly MobileParty MobileParty;
+
+    public SetPartyNavigator(Hero hero, MobileParty mobileParty)
     {
         Hero = hero;
         MobileParty = mobileParty;

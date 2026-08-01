@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 
 namespace GameInterface.Services.Clans.Handlers;
@@ -25,6 +26,7 @@ internal class ClanManagementRefreshHandler : IHandler
         messageBroker.Subscribe<RefreshPartiesList>(Handle_RefreshPartiesList);
         messageBroker.Subscribe<RefreshWorkshopsList>(Handle_RefreshWorkshopsList);
         messageBroker.Subscribe<RefreshClanMembersList>(Handle_RefreshClanMembersList);
+        messageBroker.Subscribe<RefreshAfterRoleAssignment>(Handle_RefreshAfterRoleAssignment);
 
         currentClanManagementVM = null;
     }
@@ -35,6 +37,7 @@ internal class ClanManagementRefreshHandler : IHandler
         messageBroker.Unsubscribe<RefreshPartiesList>(Handle_RefreshPartiesList);
         messageBroker.Unsubscribe<RefreshWorkshopsList>(Handle_RefreshWorkshopsList);
         messageBroker.Unsubscribe<RefreshClanMembersList>(Handle_RefreshClanMembersList);
+        messageBroker.Unsubscribe<RefreshAfterRoleAssignment>(Handle_RefreshAfterRoleAssignment);
     }
 
     private void Handle_ClanManagementVMCreated(MessagePayload<ClanManagementVMCreated> obj)
@@ -65,6 +68,25 @@ internal class ClanManagementRefreshHandler : IHandler
         {
             currentClanManagementVM?.ClanMembers?.RefreshMembersList();
             currentClanManagementVM?.ClanFiefs?.RefreshAllLists(); // Needed to refresh governors
+        });
+    }
+
+    private void Handle_RefreshAfterRoleAssignment(MessagePayload<RefreshAfterRoleAssignment> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+
+            if (currentClanManagementVM == null) return;
+
+            foreach (var partyItemVM in currentClanManagementVM.ClanParties._parties)
+            {
+                if (partyItemVM.Party.IsMobile && partyItemVM.Party.MobileParty == mobileParty)
+                {
+                    partyItemVM.OnRoleAssigned();
+                    break;
+                }
+            }
         });
     }
 }
