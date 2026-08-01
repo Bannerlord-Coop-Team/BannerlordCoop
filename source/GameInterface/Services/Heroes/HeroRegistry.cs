@@ -46,22 +46,18 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
         }
     }
 
+    // A client's instance is allocated by FormatterServices.GetUninitializedObject, so nothing the constructor
+    // assigns exists on it. Run the real constructor instead of restating its assignments here: the hand-written
+    // version of this drifted from it and left Hero._exSpouses null, which took the clan screen down (#2551).
+    // Hero's constructor only assigns fields - it registers nothing and raises no events - so running it on an
+    // already-allocated instance leaves exactly the state a constructed hero has.
+    private static readonly ConstructorInfo HeroConstructor = AccessTools.Constructor(typeof(Hero));
+
     public override void OnClientCreated(Hero obj, string id)
     {
         using(new AllowedThread())
         {
-            obj._health = 1;
-            //obj.Init();
-            AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
-            AccessTools.Field(typeof(Hero), nameof(Hero._ownedWorkshops)).SetValue(obj, new MBList<Workshop>());
-            AccessTools.Property(typeof(Hero), nameof(Hero.OwnedAlleys)).SetValue(obj, new MBList<Alley>());
-            AccessTools.Property(typeof(Hero), nameof(Hero.OwnedCaravans)).SetValue(obj, new MBList<CaravanPartyComponent>());
-            AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
-            obj._heroDeveloper = new HeroDeveloper(obj);
-            obj._heroTraits = new PropertyOwner<TraitObject>();
-            obj._heroPerks = new PropertyOwner<PerkObject>();
-            obj._heroSkills = new PropertyOwner<SkillObject>();
-            obj._characterAttributes = new PropertyOwner<CharacterAttribute>();
+            HeroConstructor.Invoke(obj, null);
         }
 
         GameThread.RunSafe(() =>

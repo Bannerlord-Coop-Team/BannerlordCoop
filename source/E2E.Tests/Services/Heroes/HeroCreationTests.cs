@@ -76,6 +76,26 @@ public class HeroCreationTests : IDisposable
     }
 
     [Fact]
+    public void ServerCreateBareHero_InitializesConstructorStateOnClients()
+    {
+        Hero? serverHero = null;
+
+        TestEnvironment.Server.Call(() => serverHero = new Hero());
+        Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverHero!, out var heroId));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var clientHero));
+
+            // A null one of these takes down any UI that walks a hero's relations: the clan screen reads
+            // ExSpouses through ConversationHelper.GetHeroRelationToHeroTextShort (issue #2551).
+            Assert.NotNull(clientHero.ExSpouses);
+            Assert.NotNull(clientHero.SpecialItems);
+            Assert.Equal(CampaignTime.Never, clientHero.DeathDay);
+        }
+    }
+
+    [Fact]
     public void ServerCreateHeroes_ClientHeroesGetUniqueNonZeroIds()
     {
         // Arrange
