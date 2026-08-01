@@ -12,6 +12,7 @@ using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -179,6 +180,9 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         var weaponModifierId = "";
         if (data.WeaponModifier != null && !objectManager.TryGetIdWithLogging(data.WeaponModifier, out weaponModifierId)) return;
 
+        string craftingOrderId = null;
+        if (data.CraftingOrder != null && !objectManager.TryGetIdWithLogging(data.CraftingOrder, out craftingOrderId)) return;
+
         NetworkCreateCraftedWeaponInternalServer message = new(
             data.IsFreeMode,
             craftingHeroId,
@@ -190,7 +194,8 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             scalePercentages,
             weaponModifierId,
             playerHeroId,
-            itemModifierGroupId
+            itemModifierGroupId,
+            craftingOrderId
         );
         network.SendAll(message);
     }
@@ -251,6 +256,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
                 if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
                 if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return;
+                if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
                 ItemModifierGroup itemModifierGroup = null;
                 if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return;
@@ -262,6 +268,9 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
                 CultureObject culture = null;
                 if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return;
+
+                CraftingOrder craftingOrder = null;
+                if (data.CraftingOrderId != null && !objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder)) return;
 
                 // Replace original TaleWorlds implementation
                 string nextCraftedItemId = data.NextCraftedItemId;
@@ -275,9 +284,12 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !data.IsFreeMode);
 
                 // Only run on crafting client
-                if (GameStateManager.Current.ActiveState is CraftingState currentState && playerHero == Hero.MainHero)
+                if (playerHero == Hero.MainHero)
                 {
-                    currentState.CraftingLogic._craftedItemObject = craftedItemObject;
+                    if (GameStateManager.Current.ActiveState is CraftingState currentState)
+                    {
+                        currentState.CraftingLogic._craftedItemObject = craftedItemObject;
+                    }
 
                     // Update client's WeaponDesignVM to be referencing this crafted item instead
                     messageBroker.Publish(this, new UpdateCraftedItem(craftedItemObject));
@@ -288,14 +300,14 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
                     // Add to item rosters after the item has finished being created on clients
                     // Won't resolve on clients when running AddToCounts otherwise
-                    if (data.IsFreeMode) 
+                    if (data.IsFreeMode)
                     {
                         var message = new NetworkAddCraftedItemToRoster(craftedItemId, data.PlayerHeroId, data.WeaponModifierId);
                         network.SendAll(message);
                     }
                     else // Complete order
                     {
-                        messageBroker.Publish(this, new CompleteOrderFromVM(craftedItemObject));
+                        messageBroker.Publish(this, new CompleteOrderFromVM(craftingOrder, craftedItemObject, craftingHero));
                     }
                 }
             }

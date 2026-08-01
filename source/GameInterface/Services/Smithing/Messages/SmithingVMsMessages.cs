@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
@@ -71,11 +73,18 @@ public readonly struct RefreshWeaponDesignVM : IEvent
 
 public readonly struct CompleteOrderFromVM : IEvent
 {
+    public readonly CraftingOrder CraftingOrder;
     public readonly ItemObject CraftedItemObject;
+    public readonly Hero CraftingHero;
 
-    public CompleteOrderFromVM(ItemObject craftedItemObject)
+    public CompleteOrderFromVM(
+        CraftingOrder craftingOrder,
+        ItemObject craftedItemObject,
+        Hero craftingHero)
     {
+        CraftingOrder = craftingOrder;
         CraftedItemObject = craftedItemObject;
+        CraftingHero = craftingHero;
     }
 }
 

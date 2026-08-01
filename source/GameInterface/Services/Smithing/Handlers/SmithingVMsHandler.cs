@@ -3,36 +3,34 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
-using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
-using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign.Order;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Smithing.Handlers;
 
-internal class SmithingRefreshHandler : IHandler
+internal class SmithingVMsHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<SmithingRefreshHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<SmithingVMsHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly ISmithingVMsProvider smithingVMsProvider;
 
-    private SmeltingVM currentSmeltingVM;
-    private RefinementVM currentRefinementVM;
-    private CraftingVM currentCraftingVM;
-    private WeaponDesignVM currentWeaponDesignVM;
-
-    public SmithingRefreshHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public SmithingVMsHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        ISmithingVMsProvider smithingVMsProvider)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.smithingVMsProvider = smithingVMsProvider;
 
         messageBroker.Subscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
         messageBroker.Subscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
@@ -45,11 +43,6 @@ internal class SmithingRefreshHandler : IHandler
         messageBroker.Subscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
 
         messageBroker.Subscribe<CompleteOrderFromVM>(Handle_CompleteOrderFromVM);
-
-        currentSmeltingVM = null;
-        currentRefinementVM = null;
-        currentCraftingVM = null;
-        currentWeaponDesignVM = null;
     }
 
     public void Dispose()
@@ -69,22 +62,22 @@ internal class SmithingRefreshHandler : IHandler
 
     private void Handle_SmeltingVMCreated(MessagePayload<SmeltingVMCreated> obj)
     {
-        currentSmeltingVM = obj.What.SmeltingVM;
+        smithingVMsProvider.SetCurrentSmeltingVM(obj.What.SmeltingVM);
     }
 
     private void Handle_RefinementVMCreated(MessagePayload<RefinementVMCreated> obj)
     {
-        currentRefinementVM = obj.What.RefinementVM;
+        smithingVMsProvider.SetCurrentRefinementVM(obj.What.RefinementVM);
     }
 
     private void Handle_CraftingVMCreated(MessagePayload<CraftingVMCreated> obj)
     {
-        currentCraftingVM = obj.What.CraftingVM;
+        smithingVMsProvider.SetCurrentCraftingVM(obj.What.CraftingVM);
     }
 
     private void Handle_WeaponDesignVMCreated(MessagePayload<WeaponDesignVMCreated> obj)
     {
-        currentWeaponDesignVM = obj.What.WeaponDesignVM;
+        smithingVMsProvider.SetCurrentWeaponDesignVM(obj.What.WeaponDesignVM);
     }
 
     private void Handle_RefreshWeaponDesignVM(MessagePayload<RefreshWeaponDesignVM> obj)
@@ -96,6 +89,8 @@ internal class SmithingRefreshHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            var currentSmeltingVM = smithingVMsProvider.GetCurrentSmeltingVM();
+
             currentSmeltingVM?.RefreshValues();
             currentSmeltingVM?.RefreshList();
 
@@ -116,6 +111,9 @@ internal class SmithingRefreshHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
 
+            var currentRefinementVM = smithingVMsProvider.GetCurrentRefinementVM();
+            var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
+
             currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
             currentCraftingVM?.OnRefinementSelectionChange();
 
@@ -135,13 +133,15 @@ internal class SmithingRefreshHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
+
             if (currentWeaponDesignVM == null) return;
 
             currentWeaponDesignVM._craftingBehavior.CompleteOrder(
                 Settlement.CurrentSettlement.Town,
                 currentWeaponDesignVM.ActiveCraftingOrder.CraftingOrder,
                 obj.What.CraftedItemObject,
-                currentWeaponDesignVM._getCurrentCraftingHero().Hero);
+                obj.What.CraftingHero);
 
             currentWeaponDesignVM.CraftedItemObject = null;
         });
@@ -149,12 +149,17 @@ internal class SmithingRefreshHandler : IHandler
 
     private void RefreshCraftingVM()
     {
+        var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
+
         currentCraftingVM?.RefreshValues();
         currentCraftingVM?.UpdateAll();
     }
 
     private void RefreshWeaponDesignVM(Town town)
     {
+        var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
+        var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
+
         if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
 
         GameThread.RunSafe(() =>

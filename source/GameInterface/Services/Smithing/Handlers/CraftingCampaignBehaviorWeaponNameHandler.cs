@@ -8,6 +8,7 @@ using GameInterface.Services.Smithing.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Smithing.Handlers;
@@ -112,7 +113,17 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
         {
             if (currentWeaponDesignResultPopupVM == null) return;
 
+            var craftedItem = currentWeaponDesignResultPopupVM._craftedItem;
+
             currentWeaponDesignResultPopupVM._craftedItem.StringId = obj.What.CraftedItemObject.StringId;
+
+            // If the player finalized crafting before this point replay the rename so the crafted item keeps the generated name
+            TextObject textObject = new TextObject("{=!}" + currentWeaponDesignResultPopupVM.ItemName, null);
+            currentWeaponDesignResultPopupVM._crafting.SetCraftedWeaponName(textObject);
+            currentWeaponDesignResultPopupVM._craftingBehavior.SetCraftedWeaponName(obj.What.CraftedItemObject, textObject);
+
+            // Unregister object used for visual in VM
+            MBObjectManager.Instance.UnregisterObject(craftedItem);
         });
     }
 }

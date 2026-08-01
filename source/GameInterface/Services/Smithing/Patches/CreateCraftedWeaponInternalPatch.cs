@@ -2,6 +2,9 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.Clans.Interfaces;
+using GameInterface.Services.Smithing.Handlers;
+using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
@@ -41,6 +44,9 @@ internal class CreateCraftedWeaponInternalPatch
         }
         Crafting craftingLogic = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic;
 
+        ContainerProvider.TryResolve<ISmithingVMsProvider>(out var smithingVMsProvider);
+        var activeCraftingOrder = smithingVMsProvider.GetActiveCraftingOrder();
+
         // Need to return the ItemObject for client's CraftingVM
         __result = craftedItemObject;
 
@@ -49,7 +55,7 @@ internal class CreateCraftedWeaponInternalPatch
 
         // Publish message with data. Local ClientVisual not sent.
         // Actual item created on server and all clients in CraftingCampaignBehaviorCraftingHandler.
-        var message = new CreatedCraftedWeaponInternal(isFreeMode, crafterHero, craftedItemObject.Name, craftedItemObject.Culture, weaponDesign, weaponModifier, Hero.MainHero, craftingLogic);
+        var message = new CreatedCraftedWeaponInternal(isFreeMode, crafterHero, craftedItemObject.Name, craftedItemObject.Culture, weaponDesign, weaponModifier, Hero.MainHero, craftingLogic, activeCraftingOrder);
         MessageBroker.Instance.Publish(__instance, message);
 
         // Skip original to override original client saving

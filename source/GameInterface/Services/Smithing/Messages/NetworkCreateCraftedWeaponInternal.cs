@@ -41,6 +41,9 @@ public readonly struct NetworkCreateCraftedWeaponInternalServer : ICommand
     [ProtoMember(11)]
     public readonly string ItemModifierGroupId;
 
+    [ProtoMember(12)]
+    public readonly string CraftingOrderId;
+
     public NetworkCreateCraftedWeaponInternalServer(
         bool isFreeMode,
         string craftingHeroId,
@@ -52,7 +55,8 @@ public readonly struct NetworkCreateCraftedWeaponInternalServer : ICommand
         List<int> weaponDesignElementScalePercentages,
         string weaponModifierId,
         string playerHeroId,
-        string itemModifierGroupId)
+        string itemModifierGroupId,
+        string craftingOrderId)
     {
         IsFreeMode = isFreeMode;
         CraftingHeroId = craftingHeroId;
@@ -65,6 +69,7 @@ public readonly struct NetworkCreateCraftedWeaponInternalServer : ICommand
         WeaponModifierId = weaponModifierId;
         PlayerHeroId = playerHeroId;
         ItemModifierGroupId = itemModifierGroupId;
+        CraftingOrderId = craftingOrderId;
     }
 }
 
@@ -104,6 +109,12 @@ public readonly struct NetworkCreateCraftedWeaponInternalClients : ICommand
     [ProtoMember(11)]
     public readonly string NextCraftedItemId;
 
+    [ProtoMember(12)]
+    public readonly string CraftingHeroId;
+
+    [ProtoMember(13)]
+    public readonly string CraftingOrderId;
+
     public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject, string nextCraftedItemId)
     {
         Name = cloneObject.Name;
@@ -117,5 +128,7 @@ public readonly struct NetworkCreateCraftedWeaponInternalClients : ICommand
         ItemModifierGroupId = cloneObject.ItemModifierGroupId;
         PlayerHeroId = cloneObject.PlayerHeroId;
         NextCraftedItemId = nextCraftedItemId;
+        CraftingHeroId = cloneObject.CraftingHeroId;
+        CraftingOrderId = cloneObject.CraftingOrderId;
     }
 }
