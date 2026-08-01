@@ -56,7 +56,7 @@ internal class CompanionsCommands
         {
             if (hero.IsWanderer)
             {
-                stringBuilder.AppendLine(hero.CurrentSettlement + " (" + hero.Name.ToString() + ")");
+                stringBuilder.AppendLine($"{hero.Name} ({hero.StringId}) in {hero.CurrentSettlement}");
             }
         }
 
@@ -65,7 +65,26 @@ internal class CompanionsCommands
         {
             return result;
         }
-        return "Hero not found.";
+        return "No wanderers found.";
+    }
+
+    /// <summary>
+    /// Clear the wanderers from the map to roll new ones
+    /// </summary>
+    [CommandLineArgumentFunction("clearwanderers", "coop.debug.companions")]
+    public static string ClearWanderersCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "This command can only be run on the server.";
+
+        foreach (var hero in Hero.AllAliveHeroes.ToList())
+        {
+            if (hero.IsWanderer)
+            {
+                KillCharacterAction.ApplyByRemove(hero, false, true);
+            }
+        }
+
+        return "All wanderers removed.";
     }
 
     [CommandLineArgumentFunction("dismissal_fixture_setup", "coop.debug.companions")]
