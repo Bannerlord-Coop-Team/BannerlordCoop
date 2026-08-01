@@ -14,13 +14,17 @@ namespace GameInterface.Services.Caravans.Patches;
 internal class DefaultCaravanModelPatches
 {
     [HarmonyPatch(nameof(DefaultCaravanModel.GetInitialTradeGold))]
-    [HarmonyPostfix]
-    public static void GetInitialTradeGoldPrefix(ref int __result, Hero owner)
+    [HarmonyPrefix]
+    public static bool GetInitialTradeGoldPrefix(ref int __result, Hero owner, bool navalCaravan, bool largeCaravan)
     {
-        // Add the same 5000 extra for any player hero as vanilla does for Hero.MainHero
-        if (owner != null && owner.IsPlayerHero())
+        int fromType = 10000;
+        int fromPlayerOwner = (owner.IsPlayerHero()) ? 5000 : 0;
+        if (largeCaravan)
         {
-            __result += 5000;
+            fromType = 17500;
         }
+        __result = fromType + fromPlayerOwner;
+
+        return false;
     }
 }
