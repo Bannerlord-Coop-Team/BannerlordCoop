@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -14,6 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Coop.CrashReporter\Coop.CrashReporter.csproj" />
+    <Compile Include="..\Coop.CrashReporter\CrashReportCollector.cs" Link="CrashReporter\CrashReportCollector.cs" />
+    <Compile Include="..\Coop.CrashReporter\CrashReporterOptions.cs" Link="CrashReporter\CrashReporterOptions.cs" />
+    <Compile Include="..\Coop.CrashReporter\MinidumpProcessIdReader.cs" Link="CrashReporter\MinidumpProcessIdReader.cs" />
   </ItemGroup>
 </Project>
