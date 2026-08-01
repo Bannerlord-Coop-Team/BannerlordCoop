@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
@@ -50,7 +51,8 @@ namespace Coop.Tests.Client.States
             Assert.NotEmpty(clientComponent.TestNetwork.Peers);
 
             var message = Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer));
-            Assert.IsType<NetworkModuleVersionsValidate>(message);
+            var validateMessage = Assert.IsType<NetworkModuleVersionsValidate>(message);
+            Assert.Equal(ModInformation.BuildVersion, validateMessage.BuildVersion);
         }
 
         [Fact]

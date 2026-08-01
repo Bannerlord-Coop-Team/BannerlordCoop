@@ -3,6 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+source_revision=$(git -C "$repo_root" rev-parse HEAD)
 docker_image=${E2E_IMAGE:-garrettluskey/bannerlordcoop:latest}
 shard_count=${E2E_SHARDS:-8}
 run_id="bannerlordcoop-e2e-$(date +%s)-$$"
@@ -45,10 +46,10 @@ docker exec "$seed_container" /bin/sh -c 'mkdir -p /workspace'
 docker cp "$repo_root/source" "$seed_container:/workspace/source"
 docker cp "$repo_root/deploy" "$seed_container:/workspace/deploy"
 docker cp "$repo_root/.github/scripts/run-e2e-shard.sh" "$seed_container:/workspace/run-e2e-shard.sh"
-docker exec "$seed_container" /bin/sh -eu -c '
+docker exec -e COOP_SOURCE_REVISION="$source_revision" "$seed_container" /bin/sh -eu -c '
     find /workspace/source -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
     ln -s /home/mb2 /workspace/mb2
-    dotnet build /workspace/source/CoopTests.slnf -c Release
+    dotnet build /workspace/source/CoopTests.slnf -c Release -p:SourceRevisionId="$COOP_SOURCE_REVISION"
 '
 docker commit "$seed_container" "$local_image" >/dev/null
 docker rm --force "$seed_container" >/dev/null

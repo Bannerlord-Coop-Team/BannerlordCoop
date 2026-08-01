@@ -6,6 +6,7 @@
     <Platforms>x64</Platforms>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <InformationalVersion>$(CoopVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -42,5 +43,21 @@
     <PackageReference Include="System.Text.Json" Version="9.0.2" />
     <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
   </ItemGroup>
+
+  <Target Name="ResolveCoopSourceRevision" BeforeTargets="AddSourceRevisionToInformationalVersion">
+    <Exec Command="git -C &quot;$(MSBuildThisFileDirectory)../..&quot; rev-parse HEAD"
+          ConsoleToMSBuild="true"
+          IgnoreExitCode="true"
+          StandardOutputImportance="Low"
+          Condition="'$(SourceRevisionId)' == ''">
+      <Output TaskParameter="ConsoleOutput" ItemName="_CoopSourceRevisionOutput" />
+      <Output TaskParameter="ExitCode" PropertyName="_CoopSourceRevisionExitCode" />
+    </Exec>
+    <PropertyGroup Condition="'$(SourceRevisionId)' == '' and '$(_CoopSourceRevisionExitCode)' == '0'">
+      <SourceRevisionId>@(_CoopSourceRevisionOutput)</SourceRevisionId>
+    </PropertyGroup>
+    <Error Condition="$([System.String]::Copy('$(SourceRevisionId)').Length) != 40"
+           Text="Common requires a 40-character Git SourceRevisionId so co-op build compatibility cannot collapse to the semantic module version." />
+  </Target>
 
 </Project>

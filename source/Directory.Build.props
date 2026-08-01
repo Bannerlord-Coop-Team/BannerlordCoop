@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <!-- Bannerlord requires a dotted numeric module version. This also seeds the exact build label
-         advertised through Steam; the SDK may append source-revision metadata to that label. -->
+    <!-- Bannerlord requires a dotted numeric module version. Common appends the required Git
+         revision to form the exact build label used for compatibility checks. -->
     <CoopVersion>0.1.1</CoopVersion>
   </PropertyGroup>
 </Project>

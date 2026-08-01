@@ -1,3 +1,4 @@
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -71,10 +72,19 @@ public class ResolveCharacterState : ConnectionStateBase
         string error;
         try
         {
-            var clientModules = obj.What.Modules;
-            var serverModules = moduleInfoProvider.GetModuleInfos();
+            if (!ModInformation.MatchesBuildVersion(obj.What.BuildVersion))
+            {
+                result = false;
+                error = $"Wrong co-op build detected. Server uses '{ModInformation.BuildVersion}', " +
+                    $"client uses '{obj.What.BuildVersion ?? "unknown"}'.";
+            }
+            else
+            {
+                var clientModules = obj.What.Modules;
+                var serverModules = moduleInfoProvider.GetModuleInfos();
 
-            result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo), out error);
+                result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo), out error);
+            }
         }
         catch (Exception e)
         {

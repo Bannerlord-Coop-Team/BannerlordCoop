@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
@@ -137,6 +138,28 @@ namespace Coop.Tests.Server.Connections.States
 
             var castedMessage = (NetworkModuleVersionsValidated)message;
             Assert.False(castedMessage.Matches);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_BuildMismatch()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var moduleInfoProvider = serverComponent.Container.Resolve<Mock<IModuleInfoProvider>>();
+
+            // Act
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer,
+                new NetworkModuleVersionsValidate(System.Array.Empty<ModuleInfo>(), "different-build"));
+            currentState.Handle_ModuleVersionsValidate(payload);
+
+            // Assert
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            var castedMessage = Assert.IsType<NetworkModuleVersionsValidated>(message);
+            Assert.False(castedMessage.Matches);
+            Assert.Contains(ModInformation.BuildVersion, castedMessage.Reason);
+            Assert.Contains("different-build", castedMessage.Reason);
+            moduleInfoProvider.Verify(mip => mip.GetModuleInfos(), Times.Never);
         }
 
         [Fact]
