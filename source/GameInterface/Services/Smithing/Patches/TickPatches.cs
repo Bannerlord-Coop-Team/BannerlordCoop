@@ -45,7 +45,6 @@ namespace GameInterface.Services.Smithing.Patches
                         keyValuePair.Value.CraftingStamina = MathF.Min(maxHeroCraftingStamina, keyValuePair.Value.CraftingStamina + CraftingCampaignBehavior.GetStaminaHourlyRecoveryRate(keyValuePair.Key));
                     }
                 }
-                    
             }
 
             // Update on all clients with message including up to date crafting records
