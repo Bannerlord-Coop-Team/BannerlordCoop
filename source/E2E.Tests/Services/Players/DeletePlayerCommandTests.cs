@@ -127,15 +127,17 @@ public class DeletePlayerCommandTests : IDisposable
             Assert.True(Client.Resolve<IPlayerManager>().TryGetPlayer(fixture.ControllerId, out _));
         });
 
-        // The hero is dead on the server. In production the state flip replicates through the
-        // HeroFieldPatches chain (HeroStateChanged → NetworkHeroStateChanged → ChangeHeroState,
-        // relay covered by Coop.IntegrationTests HeroFieldTests); it cannot be asserted on the
-        // other client here because the harness patches AFTER environment startup already ran
-        // Hero.ChangeState, and that pre-patch-JITted method never fires its transpiled
-        // intercept in-process.
+        // The hero is dead on the server, and on the remaining client through the removal
+        // broadcast's native death transition (the field-sync relay additionally confirms the
+        // state in production; its Coop.Core legs are covered by HeroFieldTests).
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var hero));
+            Assert.False(hero.IsAlive);
+        });
+        OtherClient.Call(() =>
+        {
+            Assert.True(OtherClient.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var hero));
             Assert.False(hero.IsAlive);
         });
 
@@ -144,6 +146,33 @@ public class DeletePlayerCommandTests : IDisposable
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkApplyDestroyParty>());
         Assert.False(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PartyId, out _));
         Assert.False(OtherClient.ObjectManager.TryGetObject<MobileParty>(fixture.PartyId, out _));
+    }
+
+    [Fact]
+    public void ServerDeleteRequest_WithDeactivatedParty_StillDestroysIt()
+    {
+        // Captivity parks the registered player party with IsActive = false; deletion must not
+        // leave that party behind.
+        var fixture = SetupRegisteredPlayer();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PartyId, out var party));
+            party.IsActive = false;
+        });
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new NetworkRequestDeletePlayer(fixture.HeroId));
+        }, new[] { CreateObituaryMethod });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerRemoved>());
+        Assert.False(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PartyId, out _));
+        Server.Call(() =>
+        {
+            Assert.False(Server.Resolve<IPlayerManager>().TryGetPlayer(fixture.ControllerId, out _));
+        });
     }
 
     [Fact]

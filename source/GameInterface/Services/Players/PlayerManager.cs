@@ -94,9 +94,21 @@ public class PlayerManager : IPlayerManager
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ConcurrentDictionary<NetPeer, Player> peerToPlayer = new();
     private readonly Dictionary<string, NetPeer> controllerToPeer = new();
-    private readonly object peerSync = new();
 
-    public IReadOnlyCollection<Player> Players => _players;
+    // Guards _players and controllerToPeer: registrations mutate on the game thread (e.g. a
+    // player deletion) while join handlers read them on the network thread.
+    private readonly object registrySync = new();
+
+    public IReadOnlyCollection<Player> Players
+    {
+        get
+        {
+            lock (registrySync)
+            {
+                return _players.ToArray();
+            }
+        }
+    }
     private readonly HashSet<Player> _players = new HashSet<Player>();
 
     public PlayerManager(ILogger logger, IObjectManager objectManager, IControllerIdProvider controllerIdProvider)
@@ -109,7 +121,10 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.AddPlayer(Player)"/>
     public bool AddPlayer(Player player)
     {
-        if (!_players.Add(player)) return false;
+        lock (registrySync)
+        {
+            if (!_players.Add(player)) return false;
+        }
 
         // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
         AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
@@ -153,7 +168,10 @@ public class PlayerManager : IPlayerManager
 
     public bool TryGetPlayer(string controllerId, out Player player)
     {
-        player = _players.SingleOrDefault(player => player.ControllerId == controllerId);
+        lock (registrySync)
+        {
+            player = _players.SingleOrDefault(player => player.ControllerId == controllerId);
+        }
 
         return player != null;
     }
@@ -176,7 +194,7 @@ public class PlayerManager : IPlayerManager
             return;
         }
 
-        lock (peerSync)
+        lock (registrySync)
         {
             peerToPlayer[peer] = player;
             controllerToPeer[controllerId] = peer;
@@ -185,7 +203,7 @@ public class PlayerManager : IPlayerManager
 
     public bool TryGetPeer(string controllerId, out NetPeer peer)
     {
-        lock (peerSync)
+        lock (registrySync)
         {
             return controllerToPeer.TryGetValue(controllerId, out peer);
         }
@@ -193,7 +211,7 @@ public class PlayerManager : IPlayerManager
 
     public void ClearPeer(NetPeer peer)
     {
-        lock (peerSync)
+        lock (registrySync)
         {
             if (!peerToPlayer.TryRemove(peer, out var player)) return;
 
@@ -206,10 +224,12 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.RemovePlayer(Player)"/>
     public bool RemovePlayer(Player player)
     {
-        if (player == null || !_players.Remove(player)) return false;
+        if (player == null) return false;
 
-        lock (peerSync)
+        lock (registrySync)
         {
+            if (!_players.Remove(player)) return false;
+
             controllerToPeer.Remove(player.ControllerId);
 
             // A rejoin adds a fresh peer link without clearing the old one, so sweep every peer

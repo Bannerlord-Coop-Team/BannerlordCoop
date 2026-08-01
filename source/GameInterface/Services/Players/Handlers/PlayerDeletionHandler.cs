@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Messages;
 using LiteNetLib;
@@ -151,36 +152,51 @@ internal class PlayerDeletionHandler : IHandler
             TryStep("hero kill", () => KillCharacterAction.ApplyByRemove(hero, false, true));
         }
 
-        if (party != null && party.IsActive)
+        // Re-resolved because the kill can cascade into destroying the party itself. Inactive
+        // parties are destroyed too: captivity parks the registered player party deactivated,
+        // and it must not outlive the deleted player.
+        if (objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out MobileParty remainingParty))
         {
-            TryStep("party destroy", () => DestroyPartyAction.Apply(null, party));
+            TryStep("party destroy", () => DestroyPartyAction.Apply(null, remainingParty));
         }
     }
 
     /// <summary>
     /// Client: the server deleted a player — drop it from the local registry so the follow-up
-    /// kill/destroy replication applies. The world-side changes themselves arrive through the
-    /// normal sync flows (the hero state via the hero field sync, the party via the destroy
-    /// broadcast); this message only carries the session-level registration, which no game-state
-    /// sync can.
+    /// kill/destroy replication applies, and run the native death transition for its hero. The
+    /// hero state itself also arrives through the hero field sync, but that wire application
+    /// only assigns the field; ChangeState here keeps the clan alive-lord caches and
+    /// CampaignObjectManager's alive/dead lists correct too.
     /// </summary>
     private void Handle_NetworkPlayerRemoved(MessagePayload<NetworkPlayerRemoved> payload)
     {
         if (ModInformation.IsServer) return;
 
         var data = payload.What;
+        // Blocking: a client still loading in can replay [player created, player removed, player
+        // created again] back to back, and RemotePlayerHeroHandler's duplicate check reads the
+        // registry on this thread — the removal must be applied before the next message.
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.TryGetPlayer(data.ControllerId, out var player))
+            if (playerManager.TryGetPlayer(data.ControllerId, out var player))
+            {
+                playerManager.RemovePlayer(player);
+                Logger.Information("Player {ControllerId} (hero {HeroId}) was deleted by the server",
+                    data.ControllerId, data.HeroId);
+            }
+            else
             {
                 Logger.Debug("Deleted player {ControllerId} was not registered on this client", data.ControllerId);
-                return;
             }
 
-            playerManager.RemovePlayer(player);
-            Logger.Information("Player {ControllerId} (hero {HeroId}) was deleted by the server",
-                data.ControllerId, data.HeroId);
-        }, context: nameof(PlayerDeletionHandler));
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var hero) && hero.IsAlive)
+            {
+                using (new AllowedThread())
+                {
+                    hero.ChangeState(Hero.CharacterStates.Dead);
+                }
+            }
+        }, blocking: true, context: nameof(PlayerDeletionHandler));
     }
 
     /// <summary>
