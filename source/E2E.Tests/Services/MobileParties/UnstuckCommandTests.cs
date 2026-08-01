@@ -4,6 +4,7 @@ using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.GameDebug.Commands;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using TaleWorlds.CampaignSystem;
