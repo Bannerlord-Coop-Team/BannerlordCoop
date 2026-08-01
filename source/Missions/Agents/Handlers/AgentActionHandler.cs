@@ -262,7 +262,8 @@ public class AgentActionHandler : IAgentActionHandler
             state.InputBoundaryDefendFlags = defendFlags;
             state.InputBoundaryGuardMode = guardMode;
         }
-        else if (!isPlayerControlled)
+        else if (!isPlayerControlled
+            || agent != Mission.Current.MainAgent)
         {
             state.HasInputBoundaryObservation = false;
             state.InputBoundaryDefendFlags =

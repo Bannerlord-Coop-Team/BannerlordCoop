@@ -153,6 +153,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(
                 Agent.GuardMode.None,
                 Assert.Single(packet.Actions).GuardMode);
+
+            context.Component.AgentActionHandler.CatchUpJoiner("joiner");
+            Assert.Empty(context.Network.DirectPacketSends);
         });
     }
 
