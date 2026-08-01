@@ -317,6 +317,9 @@ internal class PartyCommands
         int index = roster.FindIndexOfTroop(character);
         bool oldExists = index >= 0;
         var oldState = oldExists ? roster.GetElementCopyAtIndex(index) : default;
+        int oldNumber = oldExists ? oldState.Number : 0;
+        int oldWounded = oldExists ? oldState.WoundedNumber : 0;
+        int oldXp = oldExists ? oldState.Xp : 0;
 
         if (index < 0 && shouldExist)
         {
@@ -336,7 +339,7 @@ internal class PartyCommands
         }
 
         return $"TROOP_STATE_SET party={strings[0]} character={strings[1]} " +
-               $"oldExists={oldExists} oldNumber={oldState.Number} oldWounded={oldState.WoundedNumber} oldXp={oldState.Xp} " +
+               $"oldExists={oldExists} oldNumber={oldNumber} oldWounded={oldWounded} oldXp={oldXp} " +
                $"newExists={shouldExist} newNumber={number} newWounded={woundedCount} newXp={xp}";
     }
 
