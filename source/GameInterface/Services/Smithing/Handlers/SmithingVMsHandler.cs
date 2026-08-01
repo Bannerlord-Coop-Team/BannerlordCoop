@@ -22,15 +22,18 @@ internal class SmithingVMsHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ISmithingVMsProvider smithingVMsProvider;
+    private readonly ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface;
 
     public SmithingVMsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ISmithingVMsProvider smithingVMsProvider)
+        ISmithingVMsProvider smithingVMsProvider,
+        ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.smithingVMsProvider = smithingVMsProvider;
+        this.craftingCampaignBehaviorInterface = craftingCampaignBehaviorInterface;
 
         messageBroker.Subscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
         messageBroker.Subscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
@@ -137,9 +140,13 @@ internal class SmithingVMsHandler : IHandler
 
             if (currentWeaponDesignVM == null) return;
 
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
+
+            if (!craftingBehavior._craftingOrders[obj.What.CurrentSettlement.Town].Slots.Any(x => x == obj.What.CraftingOrder)) return;
+
             currentWeaponDesignVM._craftingBehavior.CompleteOrder(
-                Settlement.CurrentSettlement.Town,
-                currentWeaponDesignVM.ActiveCraftingOrder.CraftingOrder,
+                obj.What.CurrentSettlement.Town,
+                obj.What.CraftingOrder,
                 obj.What.CraftedItemObject,
                 obj.What.CraftingHero);
 

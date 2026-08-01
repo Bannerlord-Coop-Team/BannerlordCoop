@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -168,6 +169,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(data.CraftingHero, out var craftingHeroId)) return;
         if (!objectManager.TryGetIdWithLogging(data.WeaponDesign.Template, out var craftingTemplateId)) return;
         if (!objectManager.TryGetIdWithLogging(data.PlayerHero, out var playerHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.CurrentSettlement, out var currentSettlementId)) return;
 
         string itemModifierGroupId = null;
         if (data.CraftingLogic.CurrentItemModifierGroup != null && !objectManager.TryGetIdWithLogging(data.CraftingLogic.CurrentItemModifierGroup, out itemModifierGroupId)) return;
@@ -195,7 +197,8 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             weaponModifierId,
             playerHeroId,
             itemModifierGroupId,
-            craftingOrderId
+            craftingOrderId,
+            currentSettlementId
         );
         network.SendAll(message);
     }
@@ -257,6 +260,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
                 if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return;
                 if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
+                if (!objectManager.TryGetObjectWithLogging(data.CurrentSettlementId, out Settlement currentSettlement)) return;
 
                 ItemModifierGroup itemModifierGroup = null;
                 if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return;
@@ -295,20 +299,20 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                     messageBroker.Publish(this, new UpdateCraftedItem(craftedItemObject));
 
                     AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingBehavior, craftedItemObject);
+                }
 
-                    if (!objectManager.TryGetIdWithLogging(craftedItemObject, out var craftedItemId)) return;
+                if (!objectManager.TryGetIdWithLogging(craftedItemObject, out var craftedItemId)) return;
 
-                    // Add to item rosters after the item has finished being created on clients
-                    // Won't resolve on clients when running AddToCounts otherwise
-                    if (data.IsFreeMode)
-                    {
-                        var message = new NetworkAddCraftedItemToRoster(craftedItemId, data.PlayerHeroId, data.WeaponModifierId);
-                        network.SendAll(message);
-                    }
-                    else // Complete order
-                    {
-                        messageBroker.Publish(this, new CompleteOrderFromVM(craftingOrder, craftedItemObject, craftingHero));
-                    }
+                // Add to item rosters after the item has finished being created on clients
+                // Won't resolve on clients when running AddToCounts otherwise
+                if (data.IsFreeMode)
+                {
+                    var message = new NetworkAddCraftedItemToRoster(craftedItemId, data.PlayerHeroId, data.WeaponModifierId);
+                    network.SendAll(message);
+                }
+                else // Complete order
+                {
+                    messageBroker.Publish(this, new CompleteOrderFromVM(currentSettlement, craftingOrder, craftedItemObject, craftingHero));
                 }
             }
         });
@@ -326,7 +330,10 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             ItemModifier weaponModifier = null;
             if (data.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(data.WeaponModifierId, out weaponModifier)) return;
 
-            craftingCampaignBehaviorInterface.AddCraftedItemToRoster(playerHero.PartyBelongedTo.ItemRoster, weaponModifier, craftedItemObject);
+            if (playerHero.PartyBelongedTo.ItemRoster.FindIndexOfItem(craftedItemObject) == -1)
+            {
+                craftingCampaignBehaviorInterface.AddCraftedItemToRoster(playerHero.PartyBelongedTo.ItemRoster, weaponModifier, craftedItemObject);
+            }
         });
     }
 

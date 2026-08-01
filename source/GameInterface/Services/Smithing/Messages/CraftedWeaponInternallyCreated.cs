@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CraftingSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -17,6 +18,7 @@ public readonly struct CreatedCraftedWeaponInternal : IEvent
     public readonly Hero PlayerHero;
     public readonly Crafting CraftingLogic;
     public readonly CraftingOrder CraftingOrder;
+    public readonly Settlement CurrentSettlement;
 
     public CreatedCraftedWeaponInternal(
         bool isFreeMode,
@@ -27,7 +29,8 @@ public readonly struct CreatedCraftedWeaponInternal : IEvent
         ItemModifier weaponModifier,
         Hero playerHero,
         Crafting craftingLogic,
-        CraftingOrder craftingOrder)
+        CraftingOrder craftingOrder,
+        Settlement currentSettlement)
     {
         IsFreeMode = isFreeMode;
         CraftingHero = craftingHero;
@@ -38,5 +41,6 @@ public readonly struct CreatedCraftedWeaponInternal : IEvent
         PlayerHero = playerHero;
         CraftingLogic = craftingLogic;
         CraftingOrder = craftingOrder;
+        CurrentSettlement = currentSettlement;
     }
 }

@@ -2,8 +2,6 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.Clans.Interfaces;
-using GameInterface.Services.Smithing.Handlers;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
@@ -12,6 +10,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -55,7 +54,17 @@ internal class CreateCraftedWeaponInternalPatch
 
         // Publish message with data. Local ClientVisual not sent.
         // Actual item created on server and all clients in CraftingCampaignBehaviorCraftingHandler.
-        var message = new CreatedCraftedWeaponInternal(isFreeMode, crafterHero, craftedItemObject.Name, craftedItemObject.Culture, weaponDesign, weaponModifier, Hero.MainHero, craftingLogic, activeCraftingOrder);
+        var message = new CreatedCraftedWeaponInternal(
+            isFreeMode,
+            crafterHero,
+            craftedItemObject.Name,
+            craftedItemObject.Culture,
+            weaponDesign,
+            weaponModifier,
+            Hero.MainHero,
+            craftingLogic,
+            activeCraftingOrder,
+            Settlement.CurrentSettlement);
         MessageBroker.Instance.Publish(__instance, message);
 
         // Skip original to override original client saving

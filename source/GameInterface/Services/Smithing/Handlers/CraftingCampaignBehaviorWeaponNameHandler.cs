@@ -113,7 +113,8 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
         {
             if (currentWeaponDesignResultPopupVM == null) return;
 
-            var craftedItem = currentWeaponDesignResultPopupVM._craftedItem;
+            // Unregister object used for visual in VM
+            MBObjectManager.Instance.UnregisterObject(currentWeaponDesignResultPopupVM._craftedItem);
 
             currentWeaponDesignResultPopupVM._craftedItem.StringId = obj.What.CraftedItemObject.StringId;
 
@@ -121,9 +122,6 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
             TextObject textObject = new TextObject("{=!}" + currentWeaponDesignResultPopupVM.ItemName, null);
             currentWeaponDesignResultPopupVM._crafting.SetCraftedWeaponName(textObject);
             currentWeaponDesignResultPopupVM._craftingBehavior.SetCraftedWeaponName(obj.What.CraftedItemObject, textObject);
-
-            // Unregister object used for visual in VM
-            MBObjectManager.Instance.UnregisterObject(craftedItem);
         });
     }
 }

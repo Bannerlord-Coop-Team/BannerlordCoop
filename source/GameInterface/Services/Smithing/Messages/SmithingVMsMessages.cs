@@ -73,15 +73,18 @@ public readonly struct RefreshWeaponDesignVM : IEvent
 
 public readonly struct CompleteOrderFromVM : IEvent
 {
+    public readonly Settlement CurrentSettlement;
     public readonly CraftingOrder CraftingOrder;
     public readonly ItemObject CraftedItemObject;
     public readonly Hero CraftingHero;
 
     public CompleteOrderFromVM(
+        Settlement currentSettlement,
         CraftingOrder craftingOrder,
         ItemObject craftedItemObject,
         Hero craftingHero)
     {
+        CurrentSettlement = currentSettlement;
         CraftingOrder = craftingOrder;
         CraftedItemObject = craftedItemObject;
         CraftingHero = craftingHero;
