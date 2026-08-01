@@ -36,6 +36,29 @@ namespace Missions.Agents.Packets
             return getActionNameWithCode?.Invoke(animation, new object[] { actionCode }) as string;
         }
 
+        internal static bool TryResolveActionIndex(
+            int actionIndex,
+            out ActionIndexCache action)
+        {
+            string actionName = GetActionNameWithCode(actionIndex);
+            if (actionName != null)
+            {
+                action = ActionIndexCache.Create(actionName);
+                return action.Index >= 0;
+            }
+
+            // The E2E runtime has no animation resolver. Keep its narrow raw-index fallback without
+            // allowing an unknown wire index through when the live engine can validate it.
+            if (actionIndex >= 0 && AnimationField?.GetValue(null) == null)
+            {
+                action = new ActionIndexCache(actionIndex);
+                return true;
+            }
+
+            action = ActionIndexCache.act_none;
+            return false;
+        }
+
         internal static Agent.MovementControlFlag GetDefendMovementFlags(
             Agent.MovementControlFlag movementFlags)
         {

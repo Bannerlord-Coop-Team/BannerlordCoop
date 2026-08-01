@@ -98,6 +98,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // A headless mission participant would need an equivalent non-display boundary for AI action sync.
         coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick();
 
+        coopMissionComponent.AgentMovementHandler
+            .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
         coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
 #if DEBUG
