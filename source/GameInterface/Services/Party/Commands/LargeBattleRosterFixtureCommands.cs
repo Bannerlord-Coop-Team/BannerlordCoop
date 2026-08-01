@@ -22,12 +22,14 @@ internal static class LargeBattleRosterFixtureCommands
 
     private sealed class LargeBattleRosterFixture
     {
+        public Campaign Campaign;
         public PartySnapshot FirstParty;
         public PartySnapshot SecondParty;
     }
 
     private sealed class PartySnapshot
     {
+        public string PartyId;
         public MobileParty Party;
         public TroopRosterElement[] MemberRoster;
         public string Fingerprint;
@@ -77,6 +79,7 @@ internal static class LargeBattleRosterFixtureCommands
 
         var activeFixture = new LargeBattleRosterFixture
         {
+            Campaign = Campaign.Current,
             FirstParty = Capture(firstParty),
             SecondParty = Capture(secondParty),
         };
@@ -97,6 +100,8 @@ internal static class LargeBattleRosterFixtureCommands
     [CommandLineArgumentFunction("large_battle_roster_status", "coop.debug.mobileparty")]
     public static string Status(List<string> args)
     {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
         if (args.Count != 2)
         {
             return "Usage: coop.debug.mobileparty.large_battle_roster_status " +
@@ -138,6 +143,30 @@ internal static class LargeBattleRosterFixtureCommands
             return "No large-battle roster fixture is pending restoration.";
 
         LargeBattleRosterFixture activeFixture = fixture;
+        if (activeFixture.Campaign != Campaign.Current)
+        {
+            fixture = null;
+            return "The fixture belongs to a previous campaign and was discarded.";
+        }
+        if (!TryGetObjectManager(out IObjectManager objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!TryResolveSnapshotParty(
+                objectManager,
+                activeFixture.FirstParty,
+                out string firstError))
+        {
+            fixture = null;
+            return firstError;
+        }
+        if (!TryResolveSnapshotParty(
+                objectManager,
+                activeFixture.SecondParty,
+                out string secondError))
+        {
+            fixture = null;
+            return secondError;
+        }
+
         Restore(activeFixture.FirstParty);
         Restore(activeFixture.SecondParty);
 
@@ -192,10 +221,30 @@ internal static class LargeBattleRosterFixtureCommands
         return false;
     }
 
+    private static bool TryResolveSnapshotParty(
+        IObjectManager objectManager,
+        PartySnapshot snapshot,
+        out string error)
+    {
+        if (objectManager.TryGetObject(
+                snapshot.PartyId,
+                out MobileParty party))
+        {
+            snapshot.Party = party;
+            error = null;
+            return true;
+        }
+
+        error =
+            $"The captured party {snapshot.PartyId} is no longer available; the fixture was discarded.";
+        return false;
+    }
+
     private static PartySnapshot Capture(MobileParty party)
     {
         return new PartySnapshot
         {
+            PartyId = party.StringId,
             Party = party,
             MemberRoster = CopyRoster(party.MemberRoster),
             Fingerprint = Fingerprint(party.MemberRoster),
@@ -229,6 +278,7 @@ internal static class LargeBattleRosterFixtureCommands
 
         foreach (TroopRosterElement element in snapshot.MemberRoster)
         {
+            // This also restores heroes that died during the fixture battle.
             roster.AddToCounts(
                 element.Character,
                 element.Number,

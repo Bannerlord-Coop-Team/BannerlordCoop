@@ -97,9 +97,6 @@ internal static class MissionActionDiagnostics
     private static long afterMovementGuardReplays;
     private static long afterNativeGuardReplays;
     private static long mountActionCommands;
-    private static long mountProgressReplays;
-    private static long mountProgressWraps;
-    private static long mountProgressRewinds;
     private static long sampledProgressDrops;
 
     internal sealed class PollSample
@@ -349,33 +346,15 @@ internal static class MissionActionDiagnostics
         afterMovementGuardReplays = 0;
         afterNativeGuardReplays = 0;
         mountActionCommands = 0;
-        mountProgressReplays = 0;
-        mountProgressWraps = 0;
-        mountProgressRewinds = 0;
         sampledProgressDrops = 0;
         traceStartedAt = Stopwatch.GetTimestamp();
         animationTraceEnabled = true;
     }
 
-    public static void RecordOutboundAction(
-        Guid agentId,
-        AgentActionData data,
-        long sequence)
+    public static void RecordOutboundAction()
     {
         if (!animationTraceEnabled) return;
         outboundUpdates++;
-        AddEvent(
-            "outbound-update",
-            agentId,
-            "owner",
-            null,
-            -1,
-            data.Action0Index,
-            null,
-            data.Action0Progress,
-            sequence,
-            false,
-            false);
     }
 
     public static RemoteActionApplyMeasurement MeasureRemoteApply(
@@ -497,36 +476,6 @@ internal static class MissionActionDiagnostics
             }
         }
 
-        AddEvent(
-            source + "-command",
-            agentId,
-            "observer",
-            null,
-            channel,
-            targetActionIndex,
-            agent.GetCurrentActionType(channel).ToString(),
-            startProgress,
-            sequence,
-            restart,
-            sameAction);
-    }
-
-    public static void RecordMountProgressReplay(
-        Guid agentId,
-        Agent mount,
-        int channel,
-        float targetProgress)
-    {
-        if (!animationTraceEnabled) return;
-        mountProgressReplays++;
-        float currentProgress = mount.GetCurrentActionProgress(channel);
-        if (targetProgress + ProgressTolerance < currentProgress)
-        {
-            if (currentProgress > 0.9f && targetProgress < 0.1f)
-                mountProgressWraps++;
-            else
-                mountProgressRewinds++;
-        }
     }
 
     public static void RecordRetainedGuardReplay(string phase)
@@ -810,9 +759,6 @@ internal static class MissionActionDiagnostics
                 afterMovementGuardReplays,
                 afterNativeGuardReplays,
                 mountActionCommands,
-                mountProgressReplays,
-                mountProgressWraps,
-                mountProgressRewinds,
                 sampledProgressDrops,
             },
             timelineTruncated = Timeline.Count >= MaximumTimelineEvents,
@@ -856,7 +802,6 @@ internal static class MissionActionDiagnostics
         double durationMilliseconds = 0d,
         float currentProgress = 0f)
     {
-        if (!kind.StartsWith("animation-", StringComparison.Ordinal)) return;
         if (agentId != Guid.Empty
             && !TraceAgentIds.Contains(agentId)) return;
         if (Timeline.Count >= MaximumTimelineEvents) return;

@@ -738,16 +738,16 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                    action.Sequence))
 #endif
         {
-        action.Data.Apply(
-            agent,
-            agentVisualActionAccessor,
-            suppressMountedGuardActionTransition:
-                mountedGuardRearm != MountedGuardRearmPhase.None,
-            neutralizeMountedGuardDirection:
-                mountedGuardRearm
-                    == MountedGuardRearmPhase.NeutralInput
-                || mountedGuardRearm
-                    == MountedGuardRearmPhase.NeutralInputObserved);
+            action.Data.Apply(
+                agent,
+                agentVisualActionAccessor,
+                suppressMountedGuardActionTransition:
+                    mountedGuardRearm != MountedGuardRearmPhase.None,
+                neutralizeMountedGuardDirection:
+                    mountedGuardRearm
+                        == MountedGuardRearmPhase.NeutralInput
+                    || mountedGuardRearm
+                        == MountedGuardRearmPhase.NeutralInputObserved);
         }
         bool retainsGuard = action.Data.DefendFlags != Agent.MovementControlFlag.None
             || AgentActionData.IsGuardMode(action.Data.GuardMode)

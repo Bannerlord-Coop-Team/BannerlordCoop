@@ -433,10 +433,7 @@ public class AgentActionHandler : IAgentActionHandler
             guardMode,
             guardReactionChannel);
 #if DEBUG
-        MissionActionDiagnostics.RecordOutboundAction(
-            info.AgentId,
-            actionData,
-            sequence);
+        MissionActionDiagnostics.RecordOutboundAction();
 #endif
         (ids ??= new List<Guid>()).Add(info.AgentId);
         (actions ??= new List<AgentActionData>()).Add(actionData);
