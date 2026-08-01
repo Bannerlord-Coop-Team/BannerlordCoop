@@ -885,6 +885,10 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
 
             Assert.Equal(
+                20,
+                network.NetworkSentPackets.GetPackets<MovementPacket>().Count());
+
+            Assert.Equal(
                 Agent.MovementControlFlag.Backward |
                     Agent.MovementControlFlag.DefendBlock,
                 riderMirror.MovementFlags);
@@ -1796,6 +1800,42 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.Equal(-1f, oldHorseMirror.MaximumSpeedLimit);
             Assert.Equal(1, oldHorseMirror.SetMaximumSpeedLimitCalls);
             Assert.Equal(AgentControllerType.None, newHorseMirror.Controller);
+        });
+    }
+
+    [Fact]
+    public void GuidMovementPacket_UsesTheRegisteredRiderScopeToResolveACompactMount()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            const string movementScopeId = "owner-movement-scope";
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            Guid riderId = Guid.NewGuid();
+            Guid horseId = Guid.NewGuid();
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount();
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, riderId, 1, rider));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "owner", movementScopeId, horseId, 2, horse));
+
+            AgentData data = CreateAgentData(
+                riderPosition: Vec3.Zero,
+                riderDirection: Vec2.Forward,
+                ownerSpeed: 0f,
+                mountData: new AgentMountData(horse, 2));
+            component.AgentMovementHandler.HandlePacket(
+                null,
+                new MovementPacket(new[] { riderId }, new[] { data }));
+
+            Assert.Same(horse, rider.MountAgent);
         });
     }
 

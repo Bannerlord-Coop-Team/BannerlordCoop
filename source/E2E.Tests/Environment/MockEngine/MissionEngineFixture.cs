@@ -33,6 +33,7 @@ public sealed class MissionEngineFixture : IDisposable
         // Mission statics / members
         Prefix(typeof(Mission), "get_Current", nameof(Mission_get_Current));
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
+        Prefix(typeof(Mission), "get_DamageToPlayerMultiplier", nameof(Mission_get_DamageToPlayerMultiplier));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
         Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
@@ -215,6 +216,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out _)) return true;
         __result = 0f;
+        return false;
+    }
+
+    private static bool Mission_get_DamageToPlayerMultiplier(Mission __instance, ref float __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DamageToPlayerMultiplier;
         return false;
     }
 

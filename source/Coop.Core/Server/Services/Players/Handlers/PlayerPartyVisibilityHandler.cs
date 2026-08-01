@@ -159,7 +159,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (party.MapEvent != null) continue;
 
             deferredMapEventParking.Remove(party);
-            if (!party.IsActive || !IsDisconnectedPlayerParty(party)) continue;
+            if (!party.IsActive || !playerManager.IsOwnerOfPartyDisconnected(party)) continue;
 
             party.IsActive = false;
             RemoveVisual(party);
@@ -168,12 +168,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 party.StringId);
         }
     }
-
-    private bool IsDisconnectedPlayerParty(MobileParty party) =>
-        playerManager.Players.Any(player =>
-            !playerManager.IsConnected(player) &&
-            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) &&
-            ReferenceEquals(playerParty, party));
 
     /// <summary>
     /// Removes the party's map figure and tells every client to do the same, mirroring

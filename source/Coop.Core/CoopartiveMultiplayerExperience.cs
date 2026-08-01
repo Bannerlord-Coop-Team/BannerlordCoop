@@ -38,6 +38,7 @@ namespace Coop.Core
         private IContainer container;
         private readonly SteamOrDirectJoinEndpointPreparer joinEndpointPreparer = new SteamOrDirectJoinEndpointPreparer();
         private readonly ServerProcessManager serverProcessManager;
+        private readonly Action<string> setCrashPhase;
         private readonly object containerGate = new object();
         private readonly bool standaloneServerProcess;
         private volatile bool coopStarting;
@@ -51,13 +52,16 @@ namespace Coop.Core
         // A spawned server has to load the whole campaign save before it binds its port.
         public static readonly TimeSpan HostedServerStartTimeout = TimeSpan.FromMinutes(5);
 
-        public CoopartiveMultiplayerExperience(bool standaloneServerProcess = false)
+        public CoopartiveMultiplayerExperience(
+            bool standaloneServerProcess = false,
+            Action<string> setCrashPhase = null)
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
             configuration = new NetworkConfig();
             serverProcessManager = new ServerProcessManager(messageBroker);
             this.standaloneServerProcess = standaloneServerProcess;
+            this.setCrashPhase = setCrashPhase ?? (_ => { });
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<AttemptHost>(Handle);
@@ -248,6 +252,7 @@ namespace Coop.Core
         private void Handle(MessagePayload<NetworkConnected> obj)
         {
             clientConnectedOnce = true;
+            setCrashPhase("connected");
         }
 
         private void Handle(MessagePayload<SessionJoinInfoResolved> obj)
@@ -373,6 +378,8 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<EndCoopMode> payload)
         {
+            setCrashPhase("ending-session");
+
             // Network callbacks can publish this event from the poller. Teardown on the game thread
             // lets the poll callback return before the container waits for that poller to stop.
             GameThread.RunSafe(() =>
@@ -416,6 +423,7 @@ namespace Coop.Core
                 throw new ArgumentOutOfRangeException(nameof(visibility));
 
             DestroyContainer();
+            setCrashPhase("starting-server");
 
             ModInformation.IsServer = true;
 
@@ -438,6 +446,7 @@ namespace Coop.Core
             // Headless server has no loading window to keep alive; patch synchronously
             if (!loadingInterface.IsLoadingScreenAvailable)
             {
+                setCrashPhase("applying-patches");
                 gameInterface.PatchAll();
                 StartServerLogic(saveName);
                 return;
@@ -459,7 +468,12 @@ namespace Coop.Core
 
             if (saveName != null)
             {
+                setCrashPhase("loading-save");
                 container.Resolve<IGameStateInterface>().LoadGame(saveName);
+            }
+            else
+            {
+                setCrashPhase("server-running");
             }
         }
 
@@ -468,6 +482,7 @@ namespace Coop.Core
         {
             int startGeneration = Interlocked.Increment(ref coopStartGeneration);
             coopStarting = true;
+            setCrashPhase("applying-patches");
             CancellationToken sessionCancellation = container.Resolve<CancellationTokenSource>().Token;
 
             Task.Factory.StartNew(() =>
@@ -561,6 +576,7 @@ namespace Coop.Core
             if (coopStarting) return;
 
             DestroyContainer();
+            setCrashPhase("starting-client");
 
             ModInformation.IsServer = false;
 
@@ -595,14 +611,20 @@ namespace Coop.Core
             {
                 loadingInterface.ShowLoadingScreen("Connecting to Coop Server", "Applying patches...");
 
-                PatchAllOffGameThread(gameInterface, loadingInterface, () => container.Resolve<ILogic>().Start());
+                PatchAllOffGameThread(gameInterface, loadingInterface, () =>
+                {
+                    setCrashPhase("connecting");
+                    container.Resolve<ILogic>().Start();
+                });
                 return;
             }
 
+            setCrashPhase("applying-patches");
             gameInterface.PatchAll();
 #endif
 
             var logic = container.Resolve<ILogic>();
+            setCrashPhase("connecting");
             logic.Start();
         }
 
@@ -625,6 +647,7 @@ namespace Coop.Core
             if (oldContainer == null)
             {
                 GameInterface.ContainerProvider.Clear();
+                setCrashPhase("idle");
                 return;
             }
 
@@ -647,6 +670,7 @@ namespace Coop.Core
                 {
                     // Post-session resolves (console cheats, leftover patches) must fail gracefully.
                     GameInterface.ContainerProvider.Clear();
+                    setCrashPhase("idle");
                 }
             }
         }

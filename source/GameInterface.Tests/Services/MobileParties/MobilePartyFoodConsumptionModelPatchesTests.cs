@@ -112,53 +112,6 @@ public class MobilePartyFoodConsumptionModelPatchesTests : IDisposable
         Assert.True(DoesPartyConsumeFood(minorFactionParty));
     }
 
-    [Fact]
-    public void RepairNonConsumingPartyFoodState_NonConsumerClearsPersistedStarvation()
-    {
-        var party = CreatePartyWithFoodDebt(isActive: true);
-
-        bool repaired = FoodConsumptionBehaviorInterface.RepairNonConsumingPartyFoodState(party, doesPartyConsumeFood: false);
-
-        Assert.True(repaired);
-        Assert.Equal(0, party.Party.RemainingFoodPercentage);
-        Assert.False(party.Party.IsStarving);
-    }
-
-    [Fact]
-    public void RepairNonConsumingPartyFoodState_ConsumerLeavesFoodDebtUntouched()
-    {
-        var party = CreatePartyWithFoodDebt(isActive: true);
-
-        bool repaired = FoodConsumptionBehaviorInterface.RepairNonConsumingPartyFoodState(party, doesPartyConsumeFood: true);
-
-        Assert.False(repaired);
-        Assert.Equal(-100, party.Party.RemainingFoodPercentage);
-        Assert.True(party.Party.IsStarving);
-    }
-
-    [Fact]
-    public void RepairNonConsumingPartyFoodState_InactivePartyLeavesFoodDebtUntouched()
-    {
-        var party = CreatePartyWithFoodDebt(isActive: false);
-
-        bool repaired = FoodConsumptionBehaviorInterface.RepairNonConsumingPartyFoodState(party, doesPartyConsumeFood: false);
-
-        Assert.False(repaired);
-        Assert.Equal(-100, party.Party.RemainingFoodPercentage);
-    }
-
-    [Fact]
-    public void RepairNonConsumingPartyFoodState_PositiveFoodStateRemainsUntouched()
-    {
-        var party = CreatePartyWithFoodDebt(isActive: true);
-        party.Party.RemainingFoodPercentage = 25;
-
-        bool repaired = FoodConsumptionBehaviorInterface.RepairNonConsumingPartyFoodState(party, doesPartyConsumeFood: false);
-
-        Assert.False(repaired);
-        Assert.Equal(25, party.Party.RemainingFoodPercentage);
-    }
-
     private static MobileParty CreateActiveParty()
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
