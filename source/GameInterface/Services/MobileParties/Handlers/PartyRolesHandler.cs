@@ -5,7 +5,6 @@ using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -104,7 +103,7 @@ internal class PartyRolesHandler : IHandler
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
 
             mobileParty.RemoveAllPartyRolesOfHero(hero);
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -126,7 +125,7 @@ internal class PartyRolesHandler : IHandler
 
             mobileParty.RemovePartyRoleOfHero(hero, data.PartyRole);
 
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -148,7 +147,7 @@ internal class PartyRolesHandler : IHandler
 
             mobileParty.RemoveOnePartyRoleOfHero(hero);
 
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -171,7 +170,7 @@ internal class PartyRolesHandler : IHandler
             mobileParty.SetPartyScout(hero);
             mobileParty.ResetCached();
 
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -194,7 +193,7 @@ internal class PartyRolesHandler : IHandler
             mobileParty.SetPartyQuartermaster(hero);
             mobileParty.ResetCached(); // Ensure new party size
 
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -217,7 +216,7 @@ internal class PartyRolesHandler : IHandler
             mobileParty.SetPartyEngineer(hero);
             mobileParty.ResetCached();
 
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -240,7 +239,7 @@ internal class PartyRolesHandler : IHandler
             mobileParty.SetPartySurgeon(hero);
             mobileParty.ResetCached();
 
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -263,7 +262,7 @@ internal class PartyRolesHandler : IHandler
             mobileParty.SetPartyFirstMate(hero);
             mobileParty.ResetCached();
 
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -286,7 +285,7 @@ internal class PartyRolesHandler : IHandler
             mobileParty.SetPartyNavigator(hero);
             mobileParty.ResetCached();
 
-            UpdateClientVM(obj.Who, data.MobilePartyId);
+            UpdateClientVM(data.MobilePartyId);
         });
     }
 
@@ -312,8 +311,8 @@ internal class PartyRolesHandler : IHandler
         return true;
     }
 
-    private void UpdateClientVM(object who, string mobilePartyId)
+    private void UpdateClientVM(string mobilePartyId)
     {
-        network.Send(who as NetPeer, new RefreshAfterRoleAssignment(mobilePartyId));
+        network.SendAll(new RefreshAfterRoleAssignment(mobilePartyId));
     }
 }
