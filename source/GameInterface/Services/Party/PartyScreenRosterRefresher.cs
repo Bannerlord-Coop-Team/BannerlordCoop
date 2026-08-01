@@ -1,12 +1,15 @@
 ﻿using Common.Logging;
+using SandBox.GauntletUI;
 using Serilog;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Party;
 
@@ -237,7 +240,31 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
     private static void RefreshScreen(PartyScreenLogic logic)
     {
+        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+        var previousSelection = partyVm != null && ReferenceEquals(partyVm.PartyScreenLogic, logic)
+            ? partyVm.CurrentCharacter
+            : null;
+        bool restoreSelection = previousSelection?.IsSelected == true;
+        var selectedCharacter = previousSelection?.Character;
+        var selectedSide = previousSelection?.Side;
+        var selectedType = previousSelection?.Type;
+
         logic.OnReset(false);
+
+        if (!restoreSelection) return;
+
+        var replacement = partyVm.MainPartyTroops
+            .Concat(partyVm.MainPartyPrisoners)
+            .Concat(partyVm.OtherPartyTroops)
+            .Concat(partyVm.OtherPartyPrisoners)
+            .FirstOrDefault(row =>
+                ReferenceEquals(row.Character, selectedCharacter) &&
+                row.Side == selectedSide &&
+                row.Type == selectedType);
+        if (replacement == null) return;
+
+        partyVm.SetSelectedCharacter(replacement);
+        replacement.IsSelected = true;
     }
 
     private static void NotifyPendingChangesReset()

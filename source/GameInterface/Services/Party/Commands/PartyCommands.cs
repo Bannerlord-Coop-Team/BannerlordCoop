@@ -139,7 +139,7 @@ internal class PartyCommands
     [CommandLineArgumentFunction("restore_position", "coop.debug.mobileparty")]
     public static string RestorePositionCommand(List<string> strings)
     {
-        if (!ModInformation.IsServer) return "Command can only be run on the server.";
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
         if (strings.Count != 4 ||
             !float.TryParse(strings[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionX) ||
             !float.TryParse(strings[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionY) ||
@@ -288,6 +288,86 @@ internal class PartyCommands
     }
 
     /// <summary>
+    /// Sets one member-roster troop's exact state and reports the state it replaced.
+    /// </summary>
+    [CommandLineArgumentFunction("set_troop_state", "coop.debug.mobileparty")]
+    public static string SetTroopStateCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (strings.Count != 6)
+            return "Usage: coop.debug.mobileparty.set_troop_state <party id> <character id> <exists> <number> <wounded count> <xp>";
+
+        if (!bool.TryParse(strings[2], out var shouldExist) ||
+            !int.TryParse(strings[3], out var number) ||
+            !int.TryParse(strings[4], out var woundedCount) ||
+            !int.TryParse(strings[5], out var xp))
+            return "Exists must be true or false, and number, wounded count, and xp must be integers.";
+        if (number < 0 || woundedCount < 0 || woundedCount > number || xp < 0 || (number == 0 && xp != 0) ||
+            (!shouldExist && (number != 0 || woundedCount != 0 || xp != 0)))
+            return "State requires number >= 0, wounded between 0 and number, xp >= 0, zero xp when number is zero, and all zero values when exists is false.";
+
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found.";
+        if (!objectManager.TryGetObject(strings[1], out CharacterObject character))
+            return $"Character with id {strings[1]} not found.";
+        if (character.IsHero) return "Hero roster elements are not supported by this command.";
+
+        var roster = party.MemberRoster;
+        int index = roster.FindIndexOfTroop(character);
+        bool oldExists = index >= 0;
+        var oldState = oldExists ? roster.GetElementCopyAtIndex(index) : default;
+
+        if (index < 0 && shouldExist)
+        {
+            roster.AddToCounts(character, System.Math.Max(number, 1), removeDepleted: false);
+            index = roster.FindIndexOfTroop(character);
+        }
+
+        if (index >= 0)
+        {
+            int currentWounded = roster.GetElementWoundedNumber(index);
+            if (currentWounded > number) roster.SetElementWoundedNumber(index, number);
+            roster.SetElementNumber(index, number);
+            roster.SetElementWoundedNumber(index, woundedCount);
+            roster.SetElementXp(index, xp);
+            if (!shouldExist) roster.RemoveZeroCounts();
+            roster.InitializeCachedData();
+        }
+
+        return $"TROOP_STATE_SET party={strings[0]} character={strings[1]} " +
+               $"oldExists={oldExists} oldNumber={oldState.Number} oldWounded={oldState.WoundedNumber} oldXp={oldState.Xp} " +
+               $"newExists={shouldExist} newNumber={number} newWounded={woundedCount} newXp={xp}";
+    }
+
+    /// <summary>
+    /// Selects a real right-member row so live tests can observe its inline upgrade choices.
+    /// </summary>
+    [CommandLineArgumentFunction("select_party_screen_troop", "coop.debug.mobileparty")]
+    public static string SelectPartyScreenTroopCommand(List<string> strings)
+    {
+        if (ModInformation.IsServer) return "Command can only be run on a client.";
+        if (strings.Count != 1)
+            return "Usage: coop.debug.mobileparty.select_party_screen_troop <character id>";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
+            return $"Character with id {strings[0]} not found.";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState))
+            return "No active party screen.";
+
+        var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
+        if (partyVm == null) return "No active Party screen view model.";
+
+        var row = partyVm.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
+        if (row == null) return $"{strings[0]} is not in the right member roster.";
+
+        if (!row.IsSelected) partyVm.ExecuteSelectCharacterTuple(row);
+        return $"PARTY_SCREEN_TROOP_SELECTED character={strings[0]} selected={row.IsSelected} " +
+               $"upgradeTargets={row.Upgrades.Count} ready={row.NumOfReadyToUpgradeTroops} " +
+               $"upgradeable={row.NumOfUpgradeableTroops}";
+    }
+
+    /// <summary>
     /// Creates a real pending Party-screen transfer for live synchronization tests.
     /// </summary>
     [CommandLineArgumentFunction("stage_party_screen_transfer", "coop.debug.mobileparty")]
@@ -335,17 +415,19 @@ internal class PartyCommands
         var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
         var row = partyVm?.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
         var rendered = row == null
-            ? (number: -1, wounded: -1)
-            : (number: row.Troop.Number, wounded: row.Troop.WoundedNumber);
+            ? (number: -1, wounded: -1, xp: -1)
+            : (number: row.Troop.Number, wounded: row.Troop.WoundedNumber, xp: row.Troop.Xp);
 
         return $"PARTY_SCREEN_TROOP_STATE character={strings[0]} " +
-               $"visibleNumber={visible.number} visibleWounded={visible.wounded} " +
-               $"baselineNumber={baseline.number} baselineWounded={baseline.wounded} " +
-               $"vmNumber={rendered.number} vmWounded={rendered.wounded} " +
+               $"visibleNumber={visible.number} visibleWounded={visible.wounded} visibleXp={visible.xp} " +
+               $"baselineNumber={baseline.number} baselineWounded={baseline.wounded} baselineXp={baseline.xp} " +
+               $"vmNumber={rendered.number} vmWounded={rendered.wounded} vmXp={rendered.xp} " +
+               $"selected={row?.IsSelected == true} upgradeTargets={row?.Upgrades.Count ?? 0} " +
+               $"ready={row?.NumOfReadyToUpgradeTroops ?? 0} upgradeable={row?.NumOfUpgradeableTroops ?? 0} " +
                $"pending={logic.IsThereAnyChanges()}";
     }
 
-    private static (int number, int wounded) GetRosterElement(
+    private static (int number, int wounded, int xp) GetRosterElement(
         TroopRoster roster,
         CharacterObject character)
     {
@@ -353,7 +435,7 @@ internal class PartyCommands
         if (index < 0) return default;
 
         var element = roster.GetElementCopyAtIndex(index);
-        return (element.Number, element.WoundedNumber);
+        return (element.Number, element.WoundedNumber, element.Xp);
     }
 
     /// <summary>

@@ -12,6 +12,7 @@ internal class MobilePartyBuilder : IObjectBuilder
         var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
         var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
         var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+        clan.Culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
         
         leaderHero.Clan = clan;
         clan.SetLeader(leaderHero);
