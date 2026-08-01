@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
@@ -52,7 +53,7 @@ internal class FoodConsumptionBehaviorPatches
         return false;
     }
 
-    private static Dictionary<MobileParty, int> playerPartyLastItemVersions = new();
+    private static readonly ConditionalWeakTable<FoodConsumptionBehavior, Dictionary<MobileParty, int>> campaignPlayerPartyLastItemVersions = new();
 
     [HarmonyPatch(nameof(FoodConsumptionBehavior.OnTick))]
     [HarmonyPrefix]
@@ -60,6 +61,8 @@ internal class FoodConsumptionBehaviorPatches
     {
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return false;
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
+
+        var playerPartyLastItemVersions = campaignPlayerPartyLastItemVersions.GetOrCreateValue(__instance);
 
         foreach (var player in playerManager.Players)
         {
