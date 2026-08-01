@@ -294,17 +294,13 @@ internal class PartyCommands
     public static string SetTroopStateCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
-        if (strings.Count != 6)
-            return "Usage: coop.debug.mobileparty.set_troop_state <party id> <character id> <exists> <number> <wounded count> <xp>";
-
-        if (!bool.TryParse(strings[2], out var shouldExist) ||
-            !int.TryParse(strings[3], out var number) ||
-            !int.TryParse(strings[4], out var woundedCount) ||
-            !int.TryParse(strings[5], out var xp))
-            return "Exists must be true or false, and number, wounded count, and xp must be integers.";
-        if (number < 0 || woundedCount < 0 || woundedCount > number || xp < 0 || (number == 0 && xp != 0) ||
-            (!shouldExist && (number != 0 || woundedCount != 0 || xp != 0)))
-            return "State requires number >= 0, wounded between 0 and number, xp >= 0, zero xp when number is zero, and all zero values when exists is false.";
+        string validationError = ValidateTroopStateArgs(
+            strings,
+            out var shouldExist,
+            out var number,
+            out var woundedCount,
+            out var xp);
+        if (validationError != null) return validationError;
 
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
         if (!objectManager.TryGetObject(strings[0], out MobileParty party))
@@ -343,6 +339,32 @@ internal class PartyCommands
                $"newExists={shouldExist} newNumber={number} newWounded={woundedCount} newXp={xp}";
     }
 
+    private static string ValidateTroopStateArgs(
+        List<string> strings,
+        out bool shouldExist,
+        out int number,
+        out int woundedCount,
+        out int xp)
+    {
+        shouldExist = false;
+        number = 0;
+        woundedCount = 0;
+        xp = 0;
+        if (strings.Count != 6)
+            return "Usage: coop.debug.mobileparty.set_troop_state <party id> <character id> <exists> <number> <wounded count> <xp>";
+
+        if (!bool.TryParse(strings[2], out shouldExist) ||
+            !int.TryParse(strings[3], out number) ||
+            !int.TryParse(strings[4], out woundedCount) ||
+            !int.TryParse(strings[5], out xp))
+            return "Exists must be true or false, and number, wounded count, and xp must be integers.";
+        if (number < 0 || woundedCount < 0 || woundedCount > number || xp < 0 || (number == 0 && xp != 0) ||
+            (!shouldExist && (number != 0 || woundedCount != 0 || xp != 0)))
+            return "State requires number >= 0, wounded between 0 and number, xp >= 0, zero xp when number is zero, and all zero values when exists is false.";
+
+        return null;
+    }
+
     /// <summary>
     /// Selects a real right-member row so live tests can observe its inline upgrade choices.
     /// </summary>
@@ -376,7 +398,7 @@ internal class PartyCommands
     [CommandLineArgumentFunction("stage_party_screen_transfer", "coop.debug.mobileparty")]
     public static string StagePartyScreenTransferCommand(List<string> strings)
     {
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (ModInformation.IsServer) return "Command can only be run on a client.";
         if (strings.Count != 1)
             return "Usage: coop.debug.mobileparty.stage_party_screen_transfer <character id>";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
@@ -403,7 +425,7 @@ internal class PartyCommands
     [CommandLineArgumentFunction("party_screen_troop_state", "coop.debug.mobileparty")]
     public static string PartyScreenTroopStateCommand(List<string> strings)
     {
-        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (ModInformation.IsServer) return "Command can only be run on a client.";
         if (strings.Count != 1)
             return "Usage: coop.debug.mobileparty.party_screen_troop_state <character id>";
         if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
@@ -435,7 +457,7 @@ internal class PartyCommands
         CharacterObject character)
     {
         var index = roster.FindIndexOfTroop(character);
-        if (index < 0) return default;
+        if (index < 0) return (-1, -1, -1);
 
         var element = roster.GetElementCopyAtIndex(index);
         return (element.Number, element.WoundedNumber, element.Xp);
