@@ -1,4 +1,7 @@
 ﻿using ProtoBuf;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using System;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -47,27 +50,43 @@ namespace Missions.Agents.Packets
 
             // Channel 0 is the horse's GAIT (walk/trot/canter/gallop). A Controller.None puppet has no controller
             // to select it, so without replicating the owner's gait action the horse slides with no leg animation.
-            if (mountAgent.GetCurrentAction(0) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(0).Index != MountAction0Index)
+            if (mountAgent.GetCurrentAction(0).Index != MountAction0Index)
             {
                 string gaitActionName = AgentActionData.GetActionNameWithCode(MountAction0Index);
                 if (gaitActionName != null)
+                {
+#if DEBUG
+                    MissionActionDiagnostics.RecordMountActionCommand(
+                        MountAgentId,
+                        mountAgent,
+                        channel: 0,
+                        MountAction0Index,
+                        MountAction0Progress,
+                        (AnimFlags)MountAction0Flag);
+#endif
                     mountAgent.SetActionChannel(0, ActionIndexCache.Create(gaitActionName), additionalFlags: (AnimFlags)MountAction0Flag, startProgress: MountAction0Progress);
+                }
             }
-            else
-            {
-                mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
-            }
+            // Once the gait matches, let native animation advance it. Movement packets are unreliable, so
+            // replaying snapshot progress here can apply an older packet and visibly rewind the same gait.
 
             //Currently not doing anything afaik
-            if (mountAgent.GetCurrentAction(1) == ActionIndexCache.act_none || mountAgent.GetCurrentAction(1).Index != MountAction1Index)
+            if (mountAgent.GetCurrentAction(1).Index != MountAction1Index)
             {
                 string mActionName2 = AgentActionData.GetActionNameWithCode(MountAction1Index);
                 if (mActionName2 != null)
+                {
+#if DEBUG
+                    MissionActionDiagnostics.RecordMountActionCommand(
+                        MountAgentId,
+                        mountAgent,
+                        channel: 1,
+                        MountAction1Index,
+                        MountAction1Progress,
+                        (AnimFlags)MountAction1Flag);
+#endif
                     mountAgent.SetActionChannel(1, ActionIndexCache.Create(mActionName2), additionalFlags: (AnimFlags)MountAction1Flag, startProgress: MountAction1Progress);
-            }
-            else
-            {
-                mountAgent.SetCurrentActionProgress(1, MountAction1Progress);
+                }
             }
             mountAgent.LookDirection = MountLookDirection;
             mountAgent.MovementInputVector = MountInputVector;
