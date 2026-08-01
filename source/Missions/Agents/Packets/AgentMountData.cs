@@ -123,11 +123,11 @@ namespace Missions.Agents.Packets
                     if (currentAction0 != ActionIndexCache.act_none)
                         mountAgent.SetActionChannel(0, ActionIndexCache.act_none);
                 }
-                else if (desiredAction0Name != null)
+                else if (currentAction0 == ActionIndexCache.act_none
+                    || currentAction0.Index != desiredAction0Index
+                    || nativeTurnFlagsChanged)
                 {
-                    if (currentAction0 == ActionIndexCache.act_none
-                        || currentAction0.Index != desiredAction0Index
-                        || nativeTurnFlagsChanged)
+                    if (desiredAction0Name != null)
                     {
                         mountAgent.SetActionChannel(
                             0,
@@ -137,11 +137,11 @@ namespace Missions.Agents.Packets
                             actionSpeed: MountAction0Speed,
                             startProgress: MountAction0Progress);
                     }
-                    else
-                    {
-                        mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
-                        mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
-                    }
+                }
+                else
+                {
+                    mountAgent.SetCurrentActionProgress(0, MountAction0Progress);
+                    mountAgent.SetCurrentActionSpeed(0, MountAction0Speed);
                 }
             }
 

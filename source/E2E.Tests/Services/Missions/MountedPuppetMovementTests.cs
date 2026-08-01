@@ -540,14 +540,16 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.Equal(0, puppetHorseMirror.SetCurrentActionProgressCalls);
             Assert.Equal(0, puppetHorseMirror.SetMovementFlagsCalls);
 
-            sourceHorseMirror.Action0Index = 902;
+            int nativeTurnActionIndex =
+                ActionIndexCache.Create("act_horse_turn_right").Index;
+            sourceHorseMirror.Action0Index = nativeTurnActionIndex;
             sourceHorseMirror.Action0Progress = 0.35f;
             sourceHorseMirror.Action0Flags = AnimFlags.anf_cyclic;
             var nativeTurnData = new AgentMountData(
                 sourceHorse,
                 mountAction0Speed: 0.7f,
                 mountAction0TurnDirection: AgentMountData.TurnRight,
-                mountAction0TurnActionIndex: 902);
+                mountAction0TurnActionIndex: nativeTurnActionIndex);
             nativeTurnData.ApplyMount(puppetHorse);
 
             Assert.False(nativeTurnData.MountAction0IsSyntheticTurn);
