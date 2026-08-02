@@ -120,22 +120,22 @@ internal class FoodConsumptionBehaviorPatches
     {
         // Don't tick food change for disconnected players based on config
         if (ModInformation.IsServer
-            && !ModConfigProvider.ModOptions.GoldFoodChangeForDisconnectedPlayers
+            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeForDisconnectedPlayers
             && playerManager.IsOwnerOfPartyDisconnected(playerParty)) return false;
 
         // Don't tick food change when party is in a settlement based on config
         if (playerParty.CurrentSettlement != null
-            && !ModConfigProvider.ModOptions.GoldFoodChangeInSettlements) return false;
+            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInSettlements) return false;
 
         // Party not in a map event, calculate gold change normally
         if (playerParty.MapEvent == null) return true;
 
         // Food change is disabled in battles, skip this tick
-        if (ModConfigProvider.ModOptions.GoldFoodChangeInBattles == GoldFoodChangeMode.Disabled) return false;
+        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.Disabled) return false;
 
         // Use gold food consumption window to determine if a player party should consume food based on config.
         // This way players only have food change at most once during a map event when set to OneDayMax.
-        if (ModConfigProvider.ModOptions.GoldFoodChangeInBattles == GoldFoodChangeMode.OneDayMax
+        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.OneDayMax
             && !InteractionPatches.IsWithinGoldFoodConsumptionWindow(playerParty.MapEvent)) return false;
 
         return true;

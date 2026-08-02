@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ProtoBuf;
 using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
@@ -67,21 +68,29 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
-    public bool GoldFoodChangeInSettlements { get; set; } = true;
+    public bool? FastForwardEnabled { get; set; }
 
-    public GoldFoodChangeMode GoldFoodChangeInBattles { get; set; } = GoldFoodChangeMode.OneDayMax;
+    public bool? AutoPauseEnabled { get; set; }
 
-    public bool GoldFoodChangeForDisconnectedPlayers { get; set; } = false;
+    public bool? GoldFoodInfluenceChangeInSettlements { get; set; }
 
-    public int PlayerBattleAiJoinWindowHours { get; set; } = 24;
+    public GoldFoodChangeMode? GoldFoodInfluenceChangeInBattles { get; set; }
 
-    public int WandererLimit { get; set; } = 32;
+    public bool? GoldFoodInfluenceChangeForDisconnectedPlayers { get; set; }
 
-    public int PlayerKingdomClanTierRequired { get; set; } = 4;
+    public int? PlayerBattleAiJoinWindowHours { get; set; }
 
-    public bool SmithingStaminaRecoveryOutsideSettlements { get; set; } = true;
+    public bool? SpeedLimitWhilePlayersInBattle { get; set; }
 
-    public float SmithingStaminaRecoveryFactor { get; set; } = 0.1f;
+    public int? WandererLimit { get; set; }
+
+    public int? PlayerKingdomClanTierRequired { get; set; }
+
+    public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }
+
+    public float? SmithingStaminaRecoveryMultiplier { get; set; }
+
+    public float? MaximumBanditsMultiplier { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }

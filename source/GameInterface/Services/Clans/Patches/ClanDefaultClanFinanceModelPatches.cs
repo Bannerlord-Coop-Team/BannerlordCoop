@@ -98,12 +98,12 @@ internal class DefaultClanFinanceModelPatches
 
         // Don't tick gold change for disconnected players based on config
         if (ModInformation.IsServer
-            && !ModConfigProvider.ModOptions.GoldFoodChangeForDisconnectedPlayers
+            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeForDisconnectedPlayers
             && playerManager.IsOwnerOfHeroDisconnected(clan.Leader)) return false;
 
         // Don't tick gold change when clan leader is in a settlement based on config
         if (clan.Leader.CurrentSettlement != null
-            && !ModConfigProvider.ModOptions.GoldFoodChangeInSettlements) return false;
+            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInSettlements) return false;
 
         var clanLeaderMapEvent = clan.Leader.PartyBelongedTo?.MapEvent;
 
@@ -111,11 +111,11 @@ internal class DefaultClanFinanceModelPatches
         if (clanLeaderMapEvent == null) return true;
 
         // Gold change is disabled in battles, skip this tick
-        if (ModConfigProvider.ModOptions.GoldFoodChangeInBattles == GoldFoodChangeMode.Disabled) return false;
+        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.Disabled) return false;
 
         // Use gold food consumption window to determine if the gold change should be calculated based on config.
         // This way players only have a gold change at most once during a map event when set to OneDayMax.
-        if (ModConfigProvider.ModOptions.GoldFoodChangeInBattles == GoldFoodChangeMode.OneDayMax
+        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.OneDayMax
             && !InteractionPatches.IsWithinGoldFoodConsumptionWindow(clanLeaderMapEvent)) return false;
 
         return true;

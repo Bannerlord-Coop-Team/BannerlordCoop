@@ -1,6 +1,7 @@
 using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEvents;
@@ -50,7 +51,7 @@ internal class PlayerOccupancyPauseHandler : IHandler
 
     private void Handle_PartyOccupancyChanged(MessagePayload<PartyOccupancyChanged> payload)
     {
-        if (ModInformation.IsClient)
+        if (ModInformation.IsClient || !ModConfigProvider.ModOptions.AutoPauseEnabled)
             return;
 
         if (!AllPlayersOccupied())

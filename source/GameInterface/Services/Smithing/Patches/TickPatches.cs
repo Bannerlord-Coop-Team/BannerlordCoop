@@ -66,7 +66,7 @@ namespace GameInterface.Services.Smithing.Patches
 
             // Multiply the vanilla result by the config factor
             // Round up the result so that crafting stamina always regenerates partially
-            __result = MathF.Ceiling((float)(num * ModConfigProvider.ModOptions.SmithingStaminaRecoveryFactor));
+            __result = MathF.Ceiling((float)(num * ModConfigProvider.ModOptions.SmithingStaminaRecoveryMultiplier));
             return false;
         }
 
