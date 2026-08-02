@@ -12,6 +12,8 @@ internal class MobilePartyBuilder : IObjectBuilder
         var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
         var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
         var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+        // Real clans always have a culture; surrender paths read it while building encounter state.
+        clan.Culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
         
         leaderHero.Clan = clan;
         clan.SetLeader(leaderHero);

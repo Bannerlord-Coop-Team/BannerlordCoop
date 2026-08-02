@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Party;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -129,6 +130,65 @@ public class PartyScreenRosterRefresherTests
     }
 
     [Fact]
+    public void FindSelectionReplacement_MatchesCharacterSideAndType()
+    {
+        var character = new CharacterObject();
+        var expected = new SelectionCandidate(
+            character,
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Member);
+        var selection = expected.Identity;
+
+        var replacement = PartyScreenRosterRefresher.FindSelectionReplacement(
+            new[]
+            {
+                new SelectionCandidate(
+                    new CharacterObject(),
+                    PartyScreenLogic.PartyRosterSide.Right,
+                    PartyScreenLogic.TroopType.Member),
+                expected
+            },
+            new[]
+            {
+                new SelectionCandidate(
+                    character,
+                    PartyScreenLogic.PartyRosterSide.Right,
+                    PartyScreenLogic.TroopType.Prisoner)
+            },
+            new[]
+            {
+                new SelectionCandidate(
+                    character,
+                    PartyScreenLogic.PartyRosterSide.Left,
+                    PartyScreenLogic.TroopType.Member)
+            },
+            Array.Empty<SelectionCandidate>(),
+            selection,
+            candidate => candidate.Identity);
+
+        Assert.Same(expected, replacement);
+    }
+
+    [Fact]
+    public void FindSelectionReplacement_ReturnsNullWhenSelectionWasRemoved()
+    {
+        var selection = new PartyScreenSelectionIdentity(
+            new CharacterObject(),
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Member);
+
+        var replacement = PartyScreenRosterRefresher.FindSelectionReplacement(
+            Array.Empty<SelectionCandidate>(),
+            Array.Empty<SelectionCandidate>(),
+            Array.Empty<SelectionCandidate>(),
+            Array.Empty<SelectionCandidate>(),
+            selection,
+            candidate => candidate.Identity);
+
+        Assert.Null(replacement);
+    }
+
+    [Fact]
     public void ItemServerUpdate_RefreshesSavedPopupStateWithoutSavingPendingChanges()
     {
         var character = new CharacterObject();
@@ -245,5 +305,18 @@ public class PartyScreenRosterRefresherTests
         public TroopRoster GetBaselineRoster(PartyScreenLogic logic, TroopRoster roster) => baseline;
 
         public ItemRoster GetBaselineRoster(PartyScreenLogic logic, ItemRoster roster) => null!;
+    }
+
+    private sealed class SelectionCandidate
+    {
+        public PartyScreenSelectionIdentity Identity { get; }
+
+        public SelectionCandidate(
+            CharacterObject character,
+            PartyScreenLogic.PartyRosterSide side,
+            PartyScreenLogic.TroopType type)
+        {
+            Identity = new PartyScreenSelectionIdentity(character, side, type);
+        }
     }
 }

@@ -103,7 +103,7 @@ Bannerlord Coop is developed by a volunteer team and will always be available fo
 
 Support helps cover development tools, hosting infrastructure, dedicated servers, distribution costs, and other project expenses. Choose whichever platform works best for you:
 
-- [**Patreon**](https://www.patreon.com/c/bannerlordcoop) — Become a monthly supporter
+- [**Patreon**](https://www.patreon.com/c/bannerlordcoop/membership) — Become a monthly supporter
 - [**Buy Me a Coffee**](https://buymeacoffee.com/bannerlordcoop) — Send a one-time contribution
 - [**PayPal**](https://www.paypal.com/donate/?hosted_button_id=KHBSK4FXQ9GKS) — Donate directly
 - [**Afdian**](https://ifdian.net/a/BannerlordCoop) — Support us from China
