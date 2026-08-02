@@ -1,5 +1,5 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
+using GameInterface.Services.UI;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -24,19 +24,16 @@ internal class ScreenManagerRobustnessPatches
 
 #if DEBUG
     [HarmonyPostfix]
-    private static void Postfix_Tick(float dt)
+    private static void Postfix_Tick()
     {
-        GameThread gameThread = GameThread.Instance;
-        if (!ShouldPumpGameThread(IsLiveTestRun, gameThread.IsGameThread, gameThread.QueueLength)) return;
+        if (!IsLiveTestRun) return;
 
-        gameThread.Update(TimeSpan.FromSeconds(dt));
+        LiveTestScreenThreadDispatcher.Update();
     }
 
     internal static bool HasLiveTestRunArgument(string[] arguments) =>
         Array.Exists(arguments, argument => string.Equals(argument, "/cooptestrun", StringComparison.OrdinalIgnoreCase));
 
-    internal static bool ShouldPumpGameThread(bool isLiveTestRun, bool isGameThread, int queueLength) =>
-        isLiveTestRun && isGameThread && queueLength > 0;
 #endif
 
     [HarmonyFinalizer]
