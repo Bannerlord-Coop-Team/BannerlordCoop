@@ -155,6 +155,22 @@ internal class CompanionsCommands
         }
     }
 
+    [CommandLineArgumentFunction("role_fixture_conversation_state", "coop.debug.companions")]
+    public static string RoleFixtureConversationStateCommand(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.companions.role_fixture_conversation_state";
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (args.Count != 0) return usage;
+
+        var companion = FindRoleFixtureCompanion();
+        var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+        bool conversationActive = Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
+        bool mapConversationActive = mapState?.MapConversationActive == true;
+        bool conversationHeroMatched = companion != null && Hero.OneToOneConversationHero == companion;
+        return $"ROLE_CONVERSATION_STATE active={conversationActive} mapActive={mapConversationActive} " +
+            $"companion={companion?.StringId ?? "none"} conversationHeroMatched={conversationHeroMatched}";
+    }
+
     [CommandLineArgumentFunction("role_fixture_prepare_client", "coop.debug.companions")]
     public static string RoleFixturePrepareClientCommand(List<string> args)
     {
