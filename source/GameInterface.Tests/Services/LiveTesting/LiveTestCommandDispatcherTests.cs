@@ -59,8 +59,18 @@ public class LiveTestCommandDispatcherTests
         LiveTestCommandResult result = new LiveTestCommandDispatcher().Execute(NonDebugCommand, new List<string>());
 
         Assert.False(result.Found);
-        Assert.Equal("Only coop.debug. commands may be run through live testing", result.Output);
+        Assert.Equal("Only coop.debug. commands and coop.delete_player may be run through live testing", result.Output);
         Assert.Equal(0, nonDebugInvocations);
+    }
+
+    [Fact]
+    public void Execute_DeletePlayerCommand_IsAllowed()
+    {
+        LiveTestCommandResult result = new LiveTestCommandDispatcher().Execute(
+            "coop.delete_player",
+            new List<string>());
+
+        Assert.True(result.Found);
     }
 
     [CommandLineFunctionality.CommandLineArgumentFunction("capture", "coop.debug.live_testing_dispatcher_test")]

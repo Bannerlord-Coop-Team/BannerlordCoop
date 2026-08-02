@@ -21,6 +21,7 @@ internal class SaveGameHandler : IHandler
     private readonly ICoopSaveManager saveManager;
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IPlayerManager playerRegistry;
+    private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly INetwork network;
     private readonly HashSet<object> activeSaveSources = new HashSet<object>();
 
@@ -29,12 +30,14 @@ internal class SaveGameHandler : IHandler
         ICoopSaveManager saveManager,
         ICoopSessionProvider coopSessionProvider,
         IPlayerManager playerRegistry,
+        IPlayerPartyRestorer playerPartyRestorer,
         INetwork network)
     {
         this.messageBroker = messageBroker;
         this.saveManager = saveManager;
         this.coopSessionProvider = coopSessionProvider;
         this.playerRegistry = playerRegistry;
+        this.playerPartyRestorer = playerPartyRestorer;
         this.network = network;
 
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
@@ -121,6 +124,7 @@ internal class SaveGameHandler : IHandler
 
         foreach (var player in savedSession.Players)
         {
+            playerPartyRestorer.Restore(player);
             playerRegistry.AddPlayer(player);
         }
     }

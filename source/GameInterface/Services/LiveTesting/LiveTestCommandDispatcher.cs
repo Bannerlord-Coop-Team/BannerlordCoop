@@ -16,6 +16,7 @@ public interface ILiveTestCommandDispatcher
 public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 {
     private const string AllowedCommandPrefix = "coop.debug.";
+    private const string DeletePlayerCommand = "coop.delete_player";
 
     private static bool functionsCollected;
 
@@ -42,9 +43,10 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
     public LiveTestCommandResult Execute(string command, List<string> arguments)
     {
         if (string.IsNullOrEmpty(command) ||
-            command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal) == false)
+            (command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal) == false &&
+             command.Equals(DeletePlayerCommand, StringComparison.Ordinal) == false))
         {
-            return new LiveTestCommandResult(false, $"Only {AllowedCommandPrefix} commands may be run through live testing");
+            return new LiveTestCommandResult(false, $"Only {AllowedCommandPrefix} commands and {DeletePlayerCommand} may be run through live testing");
         }
 
         if (arguments == null) throw new ArgumentNullException(nameof(arguments));

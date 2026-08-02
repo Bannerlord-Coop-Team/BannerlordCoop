@@ -107,12 +107,13 @@ namespace Coop.LiveTesting
                 return Failure(request.Id, "invalid_parameters", error, false);
             }
 
-            if (!command.StartsWith("coop.debug.", StringComparison.Ordinal))
+            if (!command.StartsWith("coop.debug.", StringComparison.Ordinal) &&
+                !command.Equals("coop.delete_player", StringComparison.Ordinal))
             {
                 return Failure(
                     request.Id,
                     "command_not_allowed",
-                    "Only coop.debug.* commands may be run through live testing.",
+                    "Only coop.debug.* commands and coop.delete_player may be run through live testing.",
                     false);
             }
 
