@@ -9,7 +9,6 @@ using Coop.Core.Server;
 using GameInterface;
 using GameInterface.Services.LiveTesting;
 using GameInterface.Services.Players;
-using GameInterface.Services.UI;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -168,7 +167,7 @@ namespace Coop.LiveTesting
                 return Failure(request.Id, "invalid_parameters", exception.Message, false);
             }
 
-            return ExecuteOnScreenThread(request, () =>
+            try
             {
                 string directory = System.IO.Path.GetDirectoryName(screenshotPath);
                 if (string.IsNullOrEmpty(directory))
@@ -187,59 +186,16 @@ namespace Coop.LiveTesting
                     path = screenshotPath,
                     captureRequested = true,
                 });
-            }, true);
-        }
-
-        private LiveTestResponse ExecuteOnScreenThread(
-            LiveTestRequest request,
-            Func<LiveTestResponse> operation,
-            bool timeoutOutcomeUncertain)
-        {
-            LiveTestResponse response = null;
-            Exception operationException = null;
-
-            try
-            {
-                LiveTestScreenThreadDispatcher.Run(() =>
-                {
-                    try
-                    {
-                        using (AllowedThread.Suspend())
-                        {
-                            response = operation();
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        operationException = exception;
-                    }
-                });
             }
-            catch (TimeoutException exception)
+            catch (Exception exception)
             {
-                Logger.Error(exception, "[LiveTest] Screen-thread timeout for {Method} request {RequestId}", request.Method, request.Id);
-                return Failure(
-                    request.Id,
-                    "screen_thread_timeout",
-                    "The screen thread did not complete the request within 30 seconds.",
-                    timeoutOutcomeUncertain);
-            }
-
-            if (operationException != null)
-            {
-                Logger.Error(operationException, "[LiveTest] {Method} request {RequestId} failed", request.Method, request.Id);
+                Logger.Error(exception, "[LiveTest] {Method} request {RequestId} failed", request.Method, request.Id);
                 return Failure(
                     request.Id,
                     "operation_failed",
-                    operationException.Message,
-                    timeoutOutcomeUncertain);
+                    exception.Message,
+                    true);
             }
-
-            return response ?? Failure(
-                request.Id,
-                "empty_response",
-                "The screen-thread operation returned no response.",
-                timeoutOutcomeUncertain);
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)
