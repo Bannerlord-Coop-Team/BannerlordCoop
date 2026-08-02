@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.CoopSessionData;
@@ -7,6 +8,7 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Save.Messages;
+using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,6 +19,8 @@ namespace Coop.Core.Server.Services.Save.Handlers;
 /// </summary>
 internal class SaveGameHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<SaveGameHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly ICoopSaveManager saveManager;
     private readonly ICoopSessionProvider coopSessionProvider;
@@ -121,7 +125,15 @@ internal class SaveGameHandler : IHandler
 
         foreach (var player in savedSession.Players)
         {
-            playerRegistry.AddPlayer(player);
+            // A save written before controller ids were made unique can carry two entries for one
+            // controller; AddPlayer keeps the first. The owner heals the leftover by joining — a
+            // registration naming a missing hero is dropped in ResolveCharacterState — but say so,
+            // because a silently skipped registration is exactly what made this hard to diagnose.
+            if (!playerRegistry.AddPlayer(player))
+                Logger.Warning(
+                    "Skipped saved registration for controller {ControllerId} (hero {HeroId}): " +
+                    "that controller is already registered",
+                    player?.ControllerId, player?.HeroId);
         }
     }
 }

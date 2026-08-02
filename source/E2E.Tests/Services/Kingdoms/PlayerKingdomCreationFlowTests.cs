@@ -1275,16 +1275,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
             var playerManager = Server.Resolve<IPlayerManager>();
-            var players = (HashSet<Player>)AccessTools.Field(playerManager.GetType(), "_players").GetValue(playerManager);
-            var oldPlayer = players.Single(player => player.ControllerId == SecondControllerId);
+            var players = (Dictionary<string, Player>)AccessTools.Field(playerManager.GetType(), "_players").GetValue(playerManager);
+            Assert.True(players.ContainsKey(SecondControllerId));
 
-            Assert.True(players.Remove(oldPlayer));
-            Assert.True(players.Add(new Player(
+            players[SecondControllerId] = new Player(
                 SecondControllerId,
                 "missingHero",
                 player2.PartyId,
                 player2.ClanId,
-                player2.CharacterId)));
+                player2.CharacterId);
 
             kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
         });
