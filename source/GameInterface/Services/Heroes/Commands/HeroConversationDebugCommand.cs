@@ -22,13 +22,12 @@ internal class HeroConversationDebugCommand
             return "A conversation is already active.";
         if (PlayerEncounter.Current != null) return "A player encounter is already active.";
 
-        PlayerEncounter.Start();
-        Campaign.Current.CurrentConversationContext = ConversationContext.PartyEncounter;
+        Campaign.Current.CurrentConversationContext = ConversationContext.Default;
         CampaignMapConversation.OpenConversation(
             new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true),
             new ConversationCharacterData(
                 hero.CharacterObject,
-                hero.PartyBelongedTo?.Party ?? PartyBase.MainParty,
+                hero.PartyBelongedTo?.Party,
                 noHorse: true));
 
         return GetState(hero);
