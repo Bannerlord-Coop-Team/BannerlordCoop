@@ -49,7 +49,9 @@ internal class CraftingCampaignBehaviorTickHandler : IHandler
         Dictionary<string, int> heroIdCraftingRecords = new Dictionary<string, int>();
         foreach(KeyValuePair<Hero, HeroCraftingRecord> keyValuePair in craftingBehavior._heroCraftingRecords)
         {
-            if (!objectManager.TryGetIdWithLogging(keyValuePair.Key, out var currentHeroId)) return;
+            // Only skip heroes that don't resolve, don't skip update entirely
+            // Dismissed companions can still have leftover data in the hero crafting records
+            if (!objectManager.TryGetIdWithLogging(keyValuePair.Key, out var currentHeroId)) continue;
 
             heroIdCraftingRecords[currentHeroId] = keyValuePair.Value.CraftingStamina;
         }
@@ -70,7 +72,7 @@ internal class CraftingCampaignBehaviorTickHandler : IHandler
             var heroCraftingRecords = craftingBehavior._heroCraftingRecords;
             foreach (KeyValuePair<string, int> keyValuePair in data.HeroIdCraftingRecords)
             {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) return;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) continue;
 
                 heroCraftingRecords[currentHero] = new HeroCraftingRecord(keyValuePair.Value);
             }
