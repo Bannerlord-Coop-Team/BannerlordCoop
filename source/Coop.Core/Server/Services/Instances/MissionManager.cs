@@ -564,5 +564,4 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             instance.PunchEndpoints.RemoveAll(e => e.External.Equals(external));
         }
     }
-
 }
