@@ -48,7 +48,7 @@ internal class CompanionsCommands
     /// <summary>
     /// View a list of all wanderers in the game
     /// </summary>
-    [CommandLineArgumentFunction("listwanderers", "coop.debug.companions")]
+    [CommandLineArgumentFunction("list_wanderers", "coop.debug.companions")]
     public static string ListWanderersCommand(List<string> strings)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -56,7 +56,7 @@ internal class CompanionsCommands
         {
             if (hero.IsWanderer)
             {
-                stringBuilder.AppendLine(hero.CurrentSettlement + " (" + hero.Name.ToString() + ")");
+                stringBuilder.AppendLine($"{hero.Name} (ID: {hero.StringId})");
             }
         }
 

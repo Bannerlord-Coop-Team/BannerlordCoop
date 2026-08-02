@@ -204,6 +204,34 @@ namespace GameInterface.Services.GameDebug.Commands
             return companion.Name.ToString() + " has joined " + clan.Name.ToString();
         }
 
+        [CommandLineArgumentFunction("remove_companion", "coop.debug.clan")]
+        public static string RemoveCompanion(List<string> args)
+        {
+            if (args.Count < 1)
+            {
+                return "Usage: coop.debug.clan.remove_companion <heroId>";
+            }
+
+            if (!TryGetObjectManager(out IObjectManager objectManager))
+            {
+                return "Unable to resolve ObjectManager";
+            }
+
+            string heroId = args[0];
+
+            if (!objectManager.TryGetObject(heroId, out Hero companion))
+            {
+                return $"Argument2: Hero not found by ID: {heroId}";
+            }
+
+            if (companion.Clan == null) return "Wanderer/companion is not in a clan.";
+
+            var clanName = companion.Clan.Name;
+            RemoveCompanionAction.ApplyByFire(companion.Clan, companion);
+
+            return companion.Name.ToString() + " has left " + clanName.ToString();
+        }
+
         [CommandLineArgumentFunction("add_renown", "coop.debug.clan")]
         public static string AddRenown(List<string> args)
         {
