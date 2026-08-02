@@ -1,7 +1,11 @@
 ﻿using Common;
+using GameInterface.Utils.Commands;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Save.Commands
@@ -10,6 +14,39 @@ namespace GameInterface.Services.Save.Commands
     {
 #if DEBUG
         private static int evidenceHoldMilliseconds;
+
+        [CommandLineArgumentFunction("save_as", "coop.debug.save")]
+        public static string SaveAs(List<string> args)
+        {
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.save.save_as")) return error;
+            if (args.Count != 1 ||
+                args[0].Length < 1 ||
+                args[0].Length > 64 ||
+                args[0].Any(character => !char.IsLetterOrDigit(character) && character != '_' && character != '-'))
+            {
+                return "Usage: coop.debug.save.save_as <1-64 letters, digits, underscores, or hyphens>";
+            }
+
+            if (Campaign.Current?.SaveHandler == null) return "No active campaign / SaveHandler.";
+            if (Campaign.Current.SaveHandler.IsSaving) return "A save is already queued.";
+            if (MBSaveLoad.GetSaveFiles(null).Any(save =>
+                string.Equals(save.Name, args[0], StringComparison.OrdinalIgnoreCase)))
+            {
+                return $"Refusing to overwrite existing save '{args[0]}'.";
+            }
+
+            Campaign.Current.SaveHandler.SaveAs(args[0]);
+            return $"SAVE_AS_QUEUED name={args[0]}";
+        }
+
+        [CommandLineArgumentFunction("status", "coop.debug.save")]
+        public static string Status(List<string> args)
+        {
+            if (args.Count != 0) return "Usage: coop.debug.save.status";
+            if (Campaign.Current?.SaveHandler == null) return "SAVE_STATUS campaign=false isSaving=false";
+
+            return $"SAVE_STATUS campaign=true isSaving={Campaign.Current.SaveHandler.IsSaving}";
+        }
 #endif
 
         /// <summary>
