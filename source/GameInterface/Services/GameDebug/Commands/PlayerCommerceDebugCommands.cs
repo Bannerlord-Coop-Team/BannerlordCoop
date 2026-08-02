@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Inventory;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
@@ -67,12 +68,52 @@ internal class PlayerCommerceDebugCommands
         var danustica = Settlement.Find("town_ES1");
         if (danustica == null)
             return "Danustica (town_ES1) was not found.";
+        if (!TryFinalizeIdleMapEvent(party, out var mapEventError))
+            return mapEventError;
         if (party.CurrentSettlement != null && party.CurrentSettlement != danustica)
             LeaveSettlementAction.ApplyForParty(party);
         if (party.CurrentSettlement != danustica)
             EnterSettlementAction.ApplyForParty(party, danustica);
+        if (party.CurrentSettlement != danustica)
+            return $"Failed to place {party.StringId} in Danustica (town_ES1).";
 
         return $"Placed {party.StringId} in Danustica (town_ES1).";
+    }
+
+    private static bool TryFinalizeIdleMapEvent(MobileParty party, out string error)
+    {
+        var mapEvent = party.MapEvent;
+        if (mapEvent == null)
+        {
+            error = null;
+            return true;
+        }
+
+        if (mapEvent.IsFinalized)
+        {
+            error = $"Party {party.StringId} is still attached to a finalized map event.";
+            return false;
+        }
+        if (mapEvent.BattleState != BattleState.None)
+        {
+            error = $"Refusing to finalize map event with battle state {mapEvent.BattleState}.";
+            return false;
+        }
+        if (mapEvent.MapEventSettlement != null || mapEvent.BattleObserver != null)
+        {
+            error = "Refusing to finalize a settlement or active simulation map event.";
+            return false;
+        }
+
+        mapEvent.FinalizeEvent();
+        if (party.MapEvent != null || party.Party?.MapEventSide != null)
+        {
+            error = $"Party {party.StringId} remained attached to its map event after finalization.";
+            return false;
+        }
+
+        error = null;
+        return true;
     }
 
     [CommandLineArgumentFunction("open_danustica_town", "coop.debug.playercommerce")]
