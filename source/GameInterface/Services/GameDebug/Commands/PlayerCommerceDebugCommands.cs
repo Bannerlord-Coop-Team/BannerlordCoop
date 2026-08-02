@@ -129,6 +129,12 @@ internal class PlayerCommerceDebugCommands
         if (party?.CurrentSettlement != danustica)
             return "The client party is not in Danustica (town_ES1).";
 
+        if (PlayerEncounter.Current != null &&
+            PlayerEncounter.EncounterSettlement == null &&
+            party.MapEvent == null)
+        {
+            PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+        }
         if (PlayerEncounter.Current == null)
             EncounterManager.StartSettlementEncounter(party, danustica);
         if (PlayerEncounter.EncounterSettlement != danustica)
