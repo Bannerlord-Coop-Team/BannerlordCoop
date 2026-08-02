@@ -130,7 +130,7 @@ internal class PlayerCommerceDebugCommands
             return "The client party is not in Danustica (town_ES1).";
 
         if (PlayerEncounter.Current != null &&
-            PlayerEncounter.EncounterSettlement == null &&
+            PlayerEncounter.EncounterSettlement != danustica &&
             party.MapEvent == null)
         {
             PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
