@@ -15,6 +15,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -358,10 +359,9 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     {
         var (ctx, _, _, _) = SetupTwoAlliedPlayersInBattle();
 
-        // Each player is in its own local post-battle encounter (no attached map event, so Finish's FinalizeBattle
-        // is a no-op).
-        SetMockPlayerEncounter(Clients.First());
-        SetMockPlayerEncounter(Clients.Last());
+        // Each player is in its own local post-battle encounter for this exact shared battle.
+        SetMockPlayerEncounter(Clients.First(), mapEventId: ctx.MapEventId);
+        SetMockPlayerEncounter(Clients.Last(), mapEventId: ctx.MapEventId);
 
         // Conclude the battle: the allied attackers win. A client commits the victory BattleState, which the
         // server applies (OnBattleWon). The world-dependent loot/result/capture steps need a live campaign, so
@@ -549,6 +549,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), ctx.AttackerPartyId);
         RegisterAsPlayerParty("2", TestEnvironment.CreateRegisteredObject<Hero>(), player2PartyId);
+        Server.Resolve<IPlayerManager>().SetPeer("1", Clients.First().NetPeer);
+        Server.Resolve<IPlayerManager>().SetPeer("2", Clients.Last().NetPeer);
 
         // Each client controls its own party as MainParty (set inside that client's static scope), with the
         // minimal campaign state for PlayerEncounter.Finish to run headless.

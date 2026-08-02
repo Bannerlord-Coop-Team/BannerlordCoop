@@ -31,6 +31,7 @@ public class KingdomHandler : IHandler
     private readonly IKingdomDecisionVoteManager decisionVoteManager;
     private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly IKingdomInterface kingdomInterface;
+    private readonly IKingdomCreator kingdomCreator;
 
     public KingdomHandler(
         IMessageBroker messageBroker,
@@ -38,7 +39,8 @@ public class KingdomHandler : IHandler
         IPlayerManager playerManager,
         IKingdomDecisionVoteManager decisionVoteManager,
         IKingdomMembershipState kingdomMembershipState,
-        IKingdomInterface kingdomInterface)
+        IKingdomInterface kingdomInterface,
+        IKingdomCreator kingdomCreator)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -46,6 +48,7 @@ public class KingdomHandler : IHandler
         this.decisionVoteManager = decisionVoteManager;
         this.kingdomMembershipState = kingdomMembershipState;
         this.kingdomInterface = kingdomInterface;
+        this.kingdomCreator = kingdomCreator;
         messageBroker.Subscribe<AddDecision>(HandleAddDecision);
         messageBroker.Subscribe<RemoveDecision>(HandleRemoveDecision);
         messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
@@ -107,64 +110,11 @@ public class KingdomHandler : IHandler
                 return;
             }
 
-            var campaign = Campaign.Current;
-            var campaignObjectManager = campaign.CampaignObjectManager;
-            var kingdomManager = campaign.KingdomManager;
-
-            TextObject kingdomName = new TextObject(payload.KingdomName);
-            Kingdom createdKingdom = null;
-
-            try
+            if (!kingdomCreator.TryCreateKingdom(clan, payload.KingdomName, culture, payload.ControllerId, out _, out string createError))
             {
-                kingdomManager.CreateKingdom(
-                    kingdomName,
-                    kingdomName,
-                    culture,
-                    clan,
-                    culture.DefaultPolicyList,
-                    TextObject.GetEmpty(),
-                    kingdomName,
-                    TextObject.GetEmpty());
-            }
-            catch (Exception e)
-            {
-                Logger.Warning(
-                    e,
-                    "Native kingdom creation failed for {KingdomName}; falling back to coop kingdom state creation.",
-                    payload.KingdomName);
-            }
-
-            createdKingdom = clan.Kingdom ?? campaignObjectManager.Kingdoms
-                .FirstOrDefault(kingdom => kingdom?.RulingClan == clan && kingdom.Name?.ToString() == payload.KingdomName)
-                ?? CreateCoopKingdom(kingdomName, culture, clan);
-
-            if (createdKingdom == null)
-            {
-                FailCreateKingdomRequest(payload, "native creation completed but no kingdom was assigned to the clan");
+                FailCreateKingdomRequest(payload, createError);
                 return;
             }
-
-            EnsureKingdomRegisteredInCampaign(createdKingdom, campaignObjectManager);
-
-            string kingdomId = null;
-            if (!objectManager.TryGetId(createdKingdom, out kingdomId))
-            {
-                messageBroker.Publish(this, new InstanceCreated<Kingdom>(createdKingdom));
-            }
-
-            SyncCreatedKingdomProperties(createdKingdom, kingdomName, culture);
-
-            if (!objectManager.TryGetId(createdKingdom, out kingdomId))
-            {
-                FailCreateKingdomRequest(payload, "created kingdom could not be registered with the coop object manager");
-                return;
-            }
-
-            kingdomMembershipState.EnsureClanInKingdom(createdKingdom, clan, publishCollectionChanges: true);
-
-            messageBroker.Publish(
-                this,
-                new PlayerKingdomCreated(payload.ControllerId, kingdomId, payload.KingdomName, player.ClanId, payload.CultureId));
         }
         catch (Exception e)
         {
@@ -176,46 +126,6 @@ public class KingdomHandler : IHandler
                 e.Message,
                 e.StackTrace);
             ShowInformationMessage($"Unable to create kingdom {payload.KingdomName}: {e.Message}");
-        }
-    }
-
-    private static Kingdom CreateCoopKingdom(TextObject kingdomName, CultureObject culture, Clan clan)
-    {
-        var kingdom = new Kingdom();
-
-        kingdom._rulingClan = clan;
-        SyncCreatedKingdomProperties(kingdom, kingdomName, culture);
-        return kingdom;
-    }
-
-    private static void SyncCreatedKingdomProperties(Kingdom kingdom, TextObject kingdomName, CultureObject culture)
-    {
-        KingdomRegistry.EnsureRuntimeCollections(kingdom);
-
-        kingdom.Name = kingdomName;
-        kingdom.InformalName = kingdomName;
-        kingdom.Culture = culture;
-        kingdom.EncyclopediaText = TextObject.GetEmpty();
-        kingdom.EncyclopediaTitle = kingdomName;
-        kingdom.EncyclopediaRulerTitle = TextObject.GetEmpty();
-        kingdom._isEliminated = false;
-    }
-
-    private static void EnsureKingdomRegisteredInCampaign(Kingdom kingdom, CampaignObjectManager campaignObjectManager)
-    {
-        if (campaignObjectManager == null || campaignObjectManager.Kingdoms.Contains(kingdom)) return;
-
-        using (new AllowedThread())
-        {
-            kingdom._isEliminated = false;
-        }
-
-        campaignObjectManager.AddKingdom(kingdom);
-        if (!campaignObjectManager.Kingdoms.Contains(kingdom)
-            && campaignObjectManager._kingdoms != null
-            && !campaignObjectManager._kingdoms.Contains(kingdom))
-        {
-            campaignObjectManager._kingdoms.Add(kingdom);
         }
     }
 
@@ -296,7 +206,7 @@ public class KingdomHandler : IHandler
             KingdomRegistry.EnsureRuntimeCollections(kingdom);
         }
 
-        EnsureKingdomRegisteredInCampaign(kingdom, Campaign.Current?.CampaignObjectManager);
+        KingdomCreator.EnsureKingdomRegisteredInCampaign(kingdom, Campaign.Current?.CampaignObjectManager);
 
         using (new AllowedThread())
         {

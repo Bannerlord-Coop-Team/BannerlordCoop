@@ -23,7 +23,8 @@ namespace Missions.Battles;
 /// Peer-side spawn application for a coop battle: spawns the agents other owners replicate over the mesh
 /// (<see cref="NetworkSpawnBattleAgents"/>) as local puppets driven by their owner's movement. Spawns that
 /// arrive before their team or explicit party identity exists are buffered and drained on tick. During local
-/// deployment, only this client's own withheld records wait for commit; remote NPCs are visible and frozen.
+/// deployment setup, remote records wait until native team setup completes; this client's own withheld records
+/// wait for commit.
 /// </summary>
 public interface IPuppetSpawner : IDisposable
 {
@@ -47,6 +48,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly IPuppetRoutApplier puppetRoutApplier;
 
     // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
     // agents without that identity later break team ownership and scoreboard attribution.
@@ -65,7 +67,8 @@ public class PuppetSpawner : IPuppetSpawner
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        IPuppetRoutApplier puppetRoutApplier = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -76,6 +79,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
         this.agentBudget = agentBudget;
+        this.puppetRoutApplier = puppetRoutApplier;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -107,7 +111,7 @@ public class PuppetSpawner : IPuppetSpawner
 
         // Spawn on the game thread, but do NOT block the network (receive) thread: while the mission is still
         // loading the game loop isn't draining the GameThread queue, so a blocking wait here deadlocks the
-        // receive thread. Buffer missing mission identity and local pre-commit records for the tick drain.
+        // receive thread. Buffer missing mission identity and deployment-gated records for the tick drain.
         GameThread.RunSafe(() =>
         {
             // One puppet from the receive path: size the running slot budget to the live remaining capacity.
@@ -118,7 +122,7 @@ public class PuppetSpawner : IPuppetSpawner
     }
 
     // [Game thread] Spawn one puppet, consuming <paramref name="slotsAvailable"/> render slots on success.
-    // Returns false when a required team, explicit party identity, local deployment commit, or render slot is pending.
+    // Returns false when a required team, explicit party identity, deployment state, or render slot is pending.
     private bool TrySpawnPuppetNow(BattleAgentSpawnData data, ref int slotsAvailable)
     {
         var registry = coopMissionComponent.AgentRegistry;
@@ -127,11 +131,8 @@ public class PuppetSpawner : IPuppetSpawner
         if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
 
-        // Keep only our own withheld deployment records out of the mission until commit. Remote NPCs must remain
-        // visible (frozen) during deployment; the foreign-team deployment patch keeps their plan-less team from
-        // stalling this client's own spawn gate.
         bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
-        if (isOwnAgent && LocalDeploymentInProgress()) return false;
+        if (LocalDeploymentBlocksSpawn(isOwnAgent)) return false;
 
         // BR-110: the engine renders at most a fixed number of agents. At capacity the puppet is deferred, not
         // dropped — buffered and retried by DrainPendingPuppets as removals free slots. A mounted record spawns
@@ -240,7 +241,17 @@ public class PuppetSpawner : IPuppetSpawner
             agent.SetIsAIPaused(false);
         }
 
-        registry.TryRegisterAgent(data.OwnerControllerId, data.AgentId, agent);
+        registry.TryRegisterAgent(
+            data.OwnerControllerId,
+            data.OriginalOwnerControllerId,
+            data.MovementScopeId,
+            data.AgentId,
+            data.MovementId,
+            agent);
+        if (data.IsRunningAway)
+            puppetRoutApplier?.ApplyFleeing(agent);
+        if (data.HasCurrentEquipment)
+            data.CurrentEquipment.Apply(agent);
 
         // The owner registered its cavalry's horse with its own network id; our engine spawned a matching
         // horse implicitly (same equipment) inside SpawnAgent. Register OUR copy under the same id, so mount
@@ -250,7 +261,13 @@ public class PuppetSpawner : IPuppetSpawner
         if (data.MountAgentId != Guid.Empty)
         {
             if (agent.MountAgent is Agent mount)
-                registry.TryRegisterAgent(data.OwnerControllerId, data.MountAgentId, mount);
+                registry.TryRegisterAgent(
+                    data.OwnerControllerId,
+                    data.MountOriginalOwnerControllerId,
+                    data.MountMovementScopeId,
+                    data.MountAgentId,
+                    data.MountMovementId,
+                    mount);
             else
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
         }
@@ -341,11 +358,14 @@ public class PuppetSpawner : IPuppetSpawner
             && character.HeroObject == hero;
     }
 
-    // True while THIS client is still in its own Order-of-Battle deployment. Only locally owned records use this
-    // gate; remote NPC puppets may populate foreign teams because the deployment patch treats those as planned.
-    private bool LocalDeploymentInProgress()
-        => !deployment.IsCommitted
-           && Mission.Current?.GetMissionBehavior<DeploymentMissionController>() != null;
+    private bool LocalDeploymentBlocksSpawn(bool isOwnAgent)
+    {
+        if (deployment.IsCommitted)
+            return false;
+
+        var controller = Mission.Current?.GetMissionBehavior<DeploymentMissionController>();
+        return controller != null && (isOwnAgent || !controller.TeamSetupOver);
+    }
 
     public void DrainPendingPuppets()
     {

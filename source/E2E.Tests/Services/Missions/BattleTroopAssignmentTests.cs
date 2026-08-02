@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using TaleWorlds.CampaignSystem;
@@ -70,6 +70,7 @@ public class BattleTroopAssignmentTests : MissionTestEnvironment
             var only = Assert.Single(supplied);
             Assert.Equal(soloOwnPartyId, only.partyId);
             Assert.Equal(0, only.supplied);
+            Assert.Equal(soloOwnPartyId, ownSupplier.PlayerPartyId);
 
             // The troops the player receives control of equal the troops assigned from its own party.
             Assert.Equal(assignedTroops, ownSupplier.GetNumberOfPlayerControllableTroops());
@@ -118,21 +119,26 @@ public class BattleTroopAssignmentTests : MissionTestEnvironment
 
             var builder = Server.Resolve<IBattleTroopReserveBuilder>();
             var hostOwned = builder.GetOwnedReserves(mapEvent, "host", isHost: true)
-                .SelectMany(side => side.Parties).Select(party => party.PartyId).ToArray();
+                .SelectMany(side => side.Parties).ToArray();
             var nonHostOwned = builder.GetOwnedReserves(mapEvent, "playerB", isHost: false)
-                .SelectMany(side => side.Parties).Select(party => party.PartyId).ToArray();
+                .SelectMany(side => side.Parties).ToArray();
 
             // BR-012: the host controls the unowned NPC party...
-            Assert.Contains(aiMapEventPartyId, hostOwned);
+            Assert.Contains(hostOwned, reserve => reserve.PartyId == aiMapEventPartyId);
             // ...and its own party...
-            Assert.Contains(hostMapEventPartyId, hostOwned);
+            Assert.Contains(hostOwned, reserve => reserve.PartyId == hostMapEventPartyId);
             // ...but never a party assigned to another player.
-            Assert.DoesNotContain(playerBMapEventPartyId, hostOwned);
+            Assert.DoesNotContain(hostOwned, reserve => reserve.PartyId == playerBMapEventPartyId);
 
             // The NPC party is the HOST's responsibility only — a non-host player is not issued it.
-            Assert.DoesNotContain(aiMapEventPartyId, nonHostOwned);
+            Assert.DoesNotContain(nonHostOwned, reserve => reserve.PartyId == aiMapEventPartyId);
             // A non-host still receives its own party.
-            Assert.Contains(playerBMapEventPartyId, nonHostOwned);
+            Assert.Contains(nonHostOwned, reserve => reserve.PartyId == playerBMapEventPartyId);
+
+            Assert.Equal(hostMapEventPartyId,
+                Assert.Single(hostOwned, reserve => reserve.IsReceiverPlayerParty).PartyId);
+            Assert.Equal(playerBMapEventPartyId,
+                Assert.Single(nonHostOwned, reserve => reserve.IsReceiverPlayerParty).PartyId);
         }, MapEventDisabledMethods);
     }
 }

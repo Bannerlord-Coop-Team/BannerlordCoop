@@ -23,6 +23,7 @@ using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using Serilog;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.Library;
 
@@ -37,24 +38,30 @@ namespace Coop.Core
         private IContainer container;
         private readonly SteamOrDirectJoinEndpointPreparer joinEndpointPreparer = new SteamOrDirectJoinEndpointPreparer();
         private readonly ServerProcessManager serverProcessManager;
+        private readonly Action<string> setCrashPhase;
+        private readonly object containerGate = new object();
         private readonly bool standaloneServerProcess;
         private volatile bool coopStarting;
         private volatile bool hostedSession;
         private volatile bool clientConnectedOnce;
         private bool passwordInquiryPending;
+        private int coopStartGeneration;
         // Bumped when a new host attempt starts, so a prior attempt's deferred exit handling drops out.
         private volatile int hostSessionGeneration;
 
         // A spawned server has to load the whole campaign save before it binds its port.
         public static readonly TimeSpan HostedServerStartTimeout = TimeSpan.FromMinutes(5);
 
-        public CoopartiveMultiplayerExperience(bool standaloneServerProcess = false)
+        public CoopartiveMultiplayerExperience(
+            bool standaloneServerProcess = false,
+            Action<string> setCrashPhase = null)
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
             configuration = new NetworkConfig();
             serverProcessManager = new ServerProcessManager(messageBroker);
             this.standaloneServerProcess = standaloneServerProcess;
+            this.setCrashPhase = setCrashPhase ?? (_ => { });
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<AttemptHost>(Handle);
@@ -245,6 +252,7 @@ namespace Coop.Core
         private void Handle(MessagePayload<NetworkConnected> obj)
         {
             clientConnectedOnce = true;
+            setCrashPhase("connected");
         }
 
         private void Handle(MessagePayload<SessionJoinInfoResolved> obj)
@@ -370,14 +378,21 @@ namespace Coop.Core
 
         private void Handle(MessagePayload<EndCoopMode> payload)
         {
-            DestroyContainer();
+            setCrashPhase("ending-session");
 
-            // Ending the client session never owns the standalone server's lifetime. This includes
-            // startup failures and watchdog timeouts; only the user closing that process stops it.
-            hostedSession = false;
-            clientConnectedOnce = false;
+            // Network callbacks can publish this event from the poller. Teardown on the game thread
+            // lets the poll callback return before the container waits for that poller to stop.
+            GameThread.RunSafe(() =>
+            {
+                DestroyContainer();
 
-            messageBroker.Publish(this, new CoopModeEnded());
+                // Ending the client session never owns the standalone server's lifetime. This includes
+                // startup failures and watchdog timeouts; only the user closing that process stops it.
+                hostedSession = false;
+                clientConnectedOnce = false;
+
+                messageBroker.Publish(this, new CoopModeEnded());
+            }, context: nameof(EndCoopMode));
         }
 
         public int Priority => 0;
@@ -390,6 +405,14 @@ namespace Coop.Core
 
         public void StartAsServer(string saveName, string password, ServerVisibility visibility)
         {
+            lock (containerGate)
+            {
+                StartAsServerCore(saveName, password, visibility);
+            }
+        }
+
+        private void StartAsServerCore(string saveName, string password, ServerVisibility visibility)
+        {
             // A second Host or Join click while patches are still applying would tear down the in-flight start
             if (coopStarting) return;
 
@@ -400,6 +423,7 @@ namespace Coop.Core
                 throw new ArgumentOutOfRangeException(nameof(visibility));
 
             DestroyContainer();
+            setCrashPhase("starting-server");
 
             ModInformation.IsServer = true;
 
@@ -422,6 +446,7 @@ namespace Coop.Core
             // Headless server has no loading window to keep alive; patch synchronously
             if (!loadingInterface.IsLoadingScreenAvailable)
             {
+                setCrashPhase("applying-patches");
                 gameInterface.PatchAll();
                 StartServerLogic(saveName);
                 return;
@@ -443,54 +468,115 @@ namespace Coop.Core
 
             if (saveName != null)
             {
+                setCrashPhase("loading-save");
                 container.Resolve<IGameStateInterface>().LoadGame(saveName);
+            }
+            else
+            {
+                setCrashPhase("server-running");
             }
         }
 
         // The ~30s patch compile must stay off the game thread so the loading window keeps drawing, like the client patching on its network thread
         private void PatchAllOffGameThread(IGameInterface gameInterface, ILoadingInterface loadingInterface, Action continueStart)
         {
+            int startGeneration = Interlocked.Increment(ref coopStartGeneration);
             coopStarting = true;
+            setCrashPhase("applying-patches");
+            CancellationToken sessionCancellation = container.Resolve<CancellationTokenSource>().Token;
 
             Task.Factory.StartNew(() =>
             {
-                try
+                using (GameThread.ActivateCancellation(sessionCancellation))
                 {
-                    gameInterface.PatchAll();
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Applying patches failed while starting coop");
-                    coopStarting = false;
-                    GameThread.RunSafe(loadingInterface.HideLoadingScreen);
-                    return;
-                }
+                    if (CompleteCanceledStart(sessionCancellation, startGeneration)) return;
 
-                GameThread.RunSafe(() =>
-                {
                     try
                     {
-                        continueStart();
+                        // Teardown must not dispose the scope while patching is still binding handlers.
+                        lock (containerGate)
+                        {
+                            if (CompleteCanceledStart(sessionCancellation, startGeneration)) return;
+
+                            gameInterface.PatchAll();
+                        }
                     }
-                    catch
+                    catch (Exception e)
                     {
-                        loadingInterface.HideLoadingScreen();
-                        throw;
+                        Logger.Error(e, "Applying patches failed while starting coop");
+                        CompleteCoopStart(startGeneration);
+                        GameThread.RunSafe(loadingInterface.HideLoadingScreen);
+                        return;
                     }
-                    finally
+
+                    if (CompleteCanceledStart(sessionCancellation, startGeneration)) return;
+
+                    GameThread.RunSafe(() =>
                     {
-                        coopStarting = false;
-                    }
-                });
+                        lock (containerGate)
+                        {
+                            if (sessionCancellation.IsCancellationRequested ||
+                                Volatile.Read(ref coopStartGeneration) != startGeneration)
+                            {
+                                CompleteCoopStart(startGeneration);
+                                return;
+                            }
+
+                            try
+                            {
+                                continueStart();
+                            }
+                            catch
+                            {
+                                loadingInterface.HideLoadingScreen();
+                                throw;
+                            }
+                            finally
+                            {
+                                CompleteCoopStart(startGeneration);
+                            }
+                        }
+                    });
+                }
             }, TaskCreationOptions.LongRunning);
         }
 
+        private bool CompleteCanceledStart(CancellationToken cancellation, int startGeneration)
+        {
+            if (!cancellation.IsCancellationRequested) return false;
+
+            CompleteCoopStart(startGeneration);
+            return true;
+        }
+
+        private void CompleteCoopStart(int startGeneration)
+        {
+            lock (containerGate)
+            {
+                if (Volatile.Read(ref coopStartGeneration) == startGeneration)
+                {
+                    coopStarting = false;
+                }
+            }
+        }
+
         public void StartAsClient(INetworkConfig configuration = null, SessionAdvertisementConfig advertisementConfig = null)
+        {
+            lock (containerGate)
+            {
+                StartAsClientCore(configuration, advertisementConfig);
+            }
+        }
+
+        private void StartAsClientCore(
+            INetworkConfig configuration,
+            SessionAdvertisementConfig advertisementConfig)
         {
             // A second Host or Join click while patches are still applying would tear down the in-flight start
             if (coopStarting) return;
 
             DestroyContainer();
+            setCrashPhase("starting-client");
 
             ModInformation.IsServer = false;
 
@@ -525,34 +611,68 @@ namespace Coop.Core
             {
                 loadingInterface.ShowLoadingScreen("Connecting to Coop Server", "Applying patches...");
 
-                PatchAllOffGameThread(gameInterface, loadingInterface, () => container.Resolve<ILogic>().Start());
+                PatchAllOffGameThread(gameInterface, loadingInterface, () =>
+                {
+                    setCrashPhase("connecting");
+                    container.Resolve<ILogic>().Start();
+                });
                 return;
             }
 
+            setCrashPhase("applying-patches");
             gameInterface.PatchAll();
 #endif
 
             var logic = container.Resolve<ILogic>();
+            setCrashPhase("connecting");
             logic.Start();
         }
 
         private void DestroyContainer()
         {
-            container?.Resolve<IGameInterface>().UnpatchAll();
+            lock (containerGate)
+            {
+                DestroyContainerCore();
+            }
+        }
 
-            // UnpatchAll is currently disabled (see GameInterface.UnpatchAll), so AutoSync-intercepted setters
-            // stay live through container.Dispose() below. Clearing the provider first makes any patched call
-            // triggered by a disposed handler (e.g. ConversationPartyTracker releasing a held party) see "no
-            // container" and fail open, instead of resolving against a lifetime scope mid-disposal and throwing
-            // ObjectDisposedException.
-            GameInterface.ContainerProvider.Clear();
+        private void DestroyContainerCore()
+        {
+            Interlocked.Increment(ref coopStartGeneration);
+            coopStarting = false;
 
-            container?.Dispose();
+            IContainer oldContainer = container;
             container = null;
 
-            // Post-session resolves (console cheats, leftover patches) must fail gracefully
-            // instead of hitting the disposed scope.
-            GameInterface.ContainerProvider.Clear();
+            if (oldContainer == null)
+            {
+                GameInterface.ContainerProvider.Clear();
+                setCrashPhase("idle");
+                return;
+            }
+
+            try
+            {
+                oldContainer.Resolve<CancellationTokenSource>().Cancel();
+                oldContainer.Resolve<INetwork>().Dispose();
+                oldContainer.Resolve<IGameInterface>().UnpatchAll();
+            }
+            finally
+            {
+                // UnpatchAll is currently disabled (see GameInterface.UnpatchAll), so patched setters
+                // must stop resolving against the scope before its handlers are disposed.
+                GameInterface.ContainerProvider.Clear();
+                try
+                {
+                    oldContainer.Dispose();
+                }
+                finally
+                {
+                    // Post-session resolves (console cheats, leftover patches) must fail gracefully.
+                    GameInterface.ContainerProvider.Clear();
+                    setCrashPhase("idle");
+                }
+            }
         }
     }
 }

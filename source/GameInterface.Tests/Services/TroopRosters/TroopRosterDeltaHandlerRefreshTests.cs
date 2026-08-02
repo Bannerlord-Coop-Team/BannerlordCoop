@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using GameInterface.Services.TroopRosters.Handlers;
 using GameInterface.Services.TroopRosters.Messages;
 using Moq;
@@ -39,12 +40,14 @@ public class TroopRosterDeltaHandlerRefreshTests
 
         using var refreshed = new ManualResetEventSlim(false);
         var refresher = new RecordingEncounterMenuConditionRefresher(refreshed);
+        var partyScreenRefresher = new ApplyingPartyScreenRosterRefresher();
 
         using var handler = new TroopRosterDeltaHandler(
             messageBroker.Object,
             objectManager.Object,
             new Mock<INetwork>().Object,
-            refresher);
+            refresher,
+            partyScreenRefresher);
 
         Assert.NotNull(subscriber);
         subscriber!(new MessagePayload<NetworkTroopRosterElementBatch>(
@@ -63,6 +66,7 @@ public class TroopRosterDeltaHandlerRefreshTests
         Assert.Same(roster, refresher.RefreshedRoster);
         Assert.Equal(1, refresher.HealthyCountAtRefresh);
         Assert.Equal(1, refresher.RefreshCount);
+        Assert.Equal(1, partyScreenRefresher.ApplyCount);
     }
 
     private sealed class RecordingEncounterMenuConditionRefresher : IEncounterMenuConditionRefresher
@@ -89,5 +93,24 @@ public class TroopRosterDeltaHandlerRefreshTests
             RefreshCount++;
             refreshed.Set();
         }
+    }
+
+    private sealed class ApplyingPartyScreenRosterRefresher : IPartyScreenRosterRefresher
+    {
+        public int ApplyCount { get; private set; }
+
+        public bool TryApply(
+            TroopRoster authoritativeRoster,
+            CharacterObject character,
+            Action<TroopRoster, CharacterObject> applyAuthoritative)
+        {
+            ApplyCount++;
+            applyAuthoritative(authoritativeRoster, character);
+            return true;
+        }
+
+        public bool TryRemoveZeroCounts(TroopRoster authoritativeRoster) => false;
+
+        public bool TryApply(ItemRoster authoritativeRoster, Action<ItemRoster> applyAuthoritative) => false;
     }
 }

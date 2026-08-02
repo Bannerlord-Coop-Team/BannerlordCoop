@@ -83,7 +83,8 @@ namespace Coop.Tests.Server.Connections.States
 
             // Assert — the joining peer is sent the server-assigned ids, then we send the save and wait
             // for the client to load (LoadingState).
-            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            var message = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessagesFromType<NetworkHeroRecieved>(playerPeer));
             Assert.IsType<NetworkHeroRecieved>(message);
             Assert.IsType<LoadingState>(connectionLogic.State);
         }
@@ -94,18 +95,23 @@ namespace Coop.Tests.Server.Connections.States
             // Arrange
             SetupUnpackedHero();
             var currentState = connectionLogic.SetState<CreateCharacterState>();
+            byte[] heroData = { 1, 2, 3 };
 
             // Act
             var payload = new MessagePayload<NetworkTransferNewHero>(
-                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>()));
+                playerPeer, new NetworkTransferNewHero("MyId", heroData));
             currentState.Handle_NetworkTransferNewHero(payload);
 
             // Assert — every other connected peer is told a new player hero was created, and the broadcast Player
             // carries the new player's CharacterObject id so other clients register it instead of falling back to
             // the default character object.
-            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(differentPeer));
+            var message = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessagesFromType<NetworkNewPlayerHeroCreated>(differentPeer));
             var created = Assert.IsType<NetworkNewPlayerHeroCreated>(message);
             Assert.Equal(TestCharacterObjectId, created.Player.CharacterObjectId);
+            Assert.Equal(heroData, created.HeroData);
+            serverComponent.Container.Resolve<Mock<IHeroInterface>>()
+                .Verify(x => x.ServerUnpackHero(heroData), Times.Once);
             Assert.IsType<LoadingState>(connectionLogic.State);
         }
 

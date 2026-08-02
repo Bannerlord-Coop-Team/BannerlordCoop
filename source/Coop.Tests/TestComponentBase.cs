@@ -24,8 +24,10 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Time.Interfaces;
+using Coop.Core.Server.Services.MobileParties;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI;
 using GameInterface.Services.UI.Interfaces;
@@ -98,6 +100,7 @@ internal abstract class TestComponentBase
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
+        RegisterMock<IJoinCampaignBaselineSender>(builder);
         RegisterMock<ILoadingInterface>(builder);
         RegisterMock<ICoopSessionProvider>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
@@ -118,6 +121,7 @@ internal abstract class TestComponentBase
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
         RegisterMock<IServerOptionsProvider>(builder);
+        RegisterMock<ISaveNotificationInterface>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does

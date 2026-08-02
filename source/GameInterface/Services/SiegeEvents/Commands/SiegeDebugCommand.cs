@@ -8,6 +8,7 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Commands;
 using GameInterface.Services.Players;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
@@ -19,8 +20,13 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
@@ -223,6 +229,106 @@ public class SiegeDebugCommand
         return $"Requested that the local player party assault {settlement.Name}";
     }
 
+    [CommandLineArgumentFunction("join_active_assault", "coop.debug.siege")]
+    public static string JoinActiveAssault(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.join_active_assault <settlementId>";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            || !ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface)
+            || !objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Unable to resolve the settlement encounter for {args[0]}";
+        }
+
+        var mapEvent = settlement.Party.MapEvent;
+        if (mapEvent?.IsSiegeAssault != true)
+        {
+            return $"{settlement.Name} does not have an active siege assault";
+        }
+
+        if (!mapEvent.CanPartyJoinBattle(PartyBase.MainParty, BattleSideEnum.Attacker))
+        {
+            return $"The local player party cannot join the assault at {settlement.Name}";
+        }
+
+        settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        if (PlayerEncounter.Current == null)
+        {
+            return $"Unable to start the local encounter at {settlement.Name}";
+        }
+
+        PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
+        GameMenu.SwitchToMenu("menu_siege_strategies");
+        MobileParty.MainParty.SetMoveModeHold();
+        return $"Joined the active siege assault at {settlement.Name}";
+    }
+
+    [CommandLineArgumentFunction("assault_entry_state", "coop.debug.siege")]
+    public static string AssaultEntryState(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.siege.assault_entry_state";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (Campaign.Current == null || PlayerEncounter.Current == null || MobileParty.MainParty == null)
+        {
+            return "The local player encounter is unavailable";
+        }
+
+        var callbackArgs = new MenuCallbackArgs((MenuContext)null, null);
+        bool conditionShown = new EncounterGameMenuBehavior()
+            .game_menu_encounter_attack_on_condition(callbackArgs);
+        var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
+        var renderedOption = menu?.MenuOptions
+            .FirstOrDefault(option => option.IdString == "attack");
+        var settlement = MobileParty.MainParty?.BesiegedSettlement;
+        var leader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
+
+        return $"menu={menu?.StringId ?? "none"} settlement={settlement?.StringId ?? "none"} " +
+            $"leader={leader?.StringId ?? "none"} localLeader={leader == MobileParty.MainParty} " +
+            $"conditionShown={conditionShown} conditionEnabled={callbackArgs.IsEnabled} " +
+            $"conditionTooltip={callbackArgs.Tooltip?.ToString() ?? "none"} " +
+            $"renderedRegistered={renderedOption != null} renderedEnabled={renderedOption?.IsEnabled ?? false} " +
+            $"renderedTooltip={renderedOption?.Tooltip?.ToString() ?? "none"}";
+    }
+
+    [CommandLineArgumentFunction("leave", "coop.debug.siege")]
+    public static string Leave(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.siege.leave";
+        }
+
+        if (ModInformation.IsServer)
+        {
+            return "This command can only be used by a client";
+        }
+
+        if (MobileParty.MainParty == null)
+        {
+            return "The local player party is unavailable";
+        }
+
+        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
+        return "Requested that the local player party leave its siege";
+    }
+
     [CommandLineArgumentFunction("leave_settlement", "coop.debug.siege")]
     public static string LeaveSettlement(List<string> args)
     {
@@ -302,16 +408,40 @@ public class SiegeDebugCommand
         }
         else
         {
+            var connectedPlayerFactions = new List<IFaction>();
+            if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+            {
+                return "Unable to resolve PlayerManager";
+            }
+
+            foreach (var player in playerManager.Players.Where(playerManager.IsConnected))
+            {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty))
+                {
+                    return $"Unable to resolve player party {player.MobilePartyId}";
+                }
+
+                if (playerParty.MapFaction == null)
+                {
+                    return $"Player party {player.MobilePartyId} has no map faction";
+                }
+
+                connectedPlayerFactions.Add(playerParty.MapFaction);
+            }
+
             besieger = MobileParty.AllLordParties
                 .Where(party => !party.IsPlayerParty()
                     && party.MapFaction?.IsAtWarWith(settlement.MapFaction) == true
+                    && connectedPlayerFactions.All(playerFaction =>
+                        !party.MapFaction.IsAtWarWith(playerFaction))
                     && party.LeaderHero != null && party.CurrentSettlement == null
                     && party.MapEvent == null && party.BesiegerCamp == null && party.Army == null)
                 .OrderByDescending(party => party.Party.CalculateCurrentStrength())
                 .FirstOrDefault();
             if (besieger == null)
             {
-                return $"No hostile lord party available to besiege {settlement.Name}; pass a partyId explicitly";
+                return $"No hostile lord party compatible with the connected players is available to besiege " +
+                    $"{settlement.Name}; pass a partyId explicitly";
             }
         }
 
@@ -353,7 +483,8 @@ public class SiegeDebugCommand
             return $"Settlement with id {args[0]} not found";
         }
 
-        var leader = settlement.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        var camp = settlement.SiegeEvent?.BesiegerCamp;
+        var leader = camp?.LeaderParty;
         if (leader == null)
         {
             return $"{settlement.Name} has no active siege leader";
@@ -364,7 +495,21 @@ public class SiegeDebugCommand
             return "Unable to resolve SiegeEventInterface";
         }
 
+        var siegeParties = camp._besiegerParties.ToArray();
+        foreach (var party in siegeParties)
+        {
+            if (party != leader)
+            {
+                siegeEventInterface.BreakSiege(party);
+            }
+        }
+
         siegeEventInterface.BreakSiege(leader);
+        if (settlement.SiegeEvent != null)
+        {
+            return $"Failed to stop the siege of {settlement.Name}; " +
+                $"{settlement.SiegeEvent.BesiegerCamp?._besiegerParties.Count ?? 0} parties remain";
+        }
 
         var restoreResult = PartyCommands.RestorePositionCommand(new List<string>
         {
@@ -465,6 +610,117 @@ public class SiegeDebugCommand
 
         return $"Joined {joined.Count} connected player parties to the siege of {settlement.Name}:\n" +
             string.Join(Environment.NewLine, joined);
+    }
+
+    [CommandLineArgumentFunction("player_state", "coop.debug.siege")]
+    public static string PlayerState(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.player_state <partyId>";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<MobileParty>(args[0], out var party))
+        {
+            return $"Party with id {args[0]} not found";
+        }
+
+        var mapEvent = party.MapEvent;
+        var mapEventId = mapEvent != null && objectManager.TryGetId(mapEvent, out string id) ? id : "none";
+        var camp = party.BesiegerCamp?.SiegeEvent?.BesiegedSettlement?.StringId ?? "none";
+        var army = party.Army?.LeaderParty?.StringId ?? "none";
+        var settlement = party.CurrentSettlement?.StringId ?? "none";
+        var heroHitPoints = party.LeaderHero?.HitPoints.ToString() ?? "none";
+        bool isMainParty = party == MobileParty.MainParty;
+
+        return $"party={party.StringId} mapEvent={mapEventId} siegeAssault={mapEvent?.IsSiegeAssault == true} " +
+            $"side={party.Party.Side} besiegerCamp={camp} army={army} settlement={settlement} heroHitPoints={heroHitPoints} " +
+            $"playerSiege={isMainParty && PlayerSiege.PlayerSiegeEvent != null} encounter={isMainParty && PlayerEncounter.Current != null}";
+    }
+
+    [CommandLineArgumentFunction("prepare_ladders_only", "coop.debug.siege")]
+    public static string PrepareLaddersOnly(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.siege.prepare_ladders_only <settlementId>";
+        }
+
+        if (ModInformation.IsClient)
+        {
+            return "This command can only be used by the server";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement))
+        {
+            return $"Settlement with id {args[0]} not found";
+        }
+
+        var siegeEvent = settlement.SiegeEvent;
+        var attackerEngines = siegeEvent?.BesiegerCamp?.SiegeEngines;
+        var defenderEngines = settlement.SiegeEngines;
+        if (siegeEvent == null || attackerEngines == null || defenderEngines == null)
+        {
+            return $"{settlement.Name} is not under siege";
+        }
+
+        ClearSiegeEngines(attackerEngines);
+        ClearSiegeEngines(defenderEngines);
+        if (attackerEngines.DeployedSiegeEngines.Count > 0
+            || attackerEngines.ReservedSiegeEngines.Count > 0
+            || defenderEngines.DeployedSiegeEngines.Count > 0
+            || defenderEngines.ReservedSiegeEngines.Count > 0)
+        {
+            return $"Failed to remove the campaign siege engines from {settlement.Name}";
+        }
+
+        var preparations = attackerEngines.SiegePreparations;
+        if (!preparations.IsConstructed)
+        {
+            preparations.SetProgress(1f);
+            siegeEvent.CreateSiegeObject(preparations, siegeEvent.GetSiegeEventSide(BattleSideEnum.Attacker));
+        }
+
+        return $"Prepared a ladder-only assault at {settlement.Name} ({settlement.StringId}): " +
+            $"preparation={preparations.Progress:0.00} attackerEngines=0 defenderEngines=0";
+    }
+
+    private static void ClearSiegeEngines(SiegeEnginesContainer siegeEngines)
+    {
+        for (int i = siegeEngines.DeployedRangedSiegeEngines.Length - 1; i >= 0; i--)
+        {
+            if (siegeEngines.DeployedRangedSiegeEngines[i] != null)
+            {
+                siegeEngines.RemoveDeployedSiegeEngine(i, isRanged: true, moveToReserve: false);
+            }
+        }
+
+        for (int i = siegeEngines.DeployedMeleeSiegeEngines.Length - 1; i >= 0; i--)
+        {
+            if (siegeEngines.DeployedMeleeSiegeEngines[i] != null)
+            {
+                siegeEngines.RemoveDeployedSiegeEngine(i, isRanged: false, moveToReserve: false);
+            }
+        }
+
+        while (siegeEngines.ReservedSiegeEngines.Count > 0)
+        {
+            var siegeEngine = siegeEngines.ReservedSiegeEngines[0];
+            if (!siegeEngines.RemovedSiegeEngineFromReservedSiegeEngines(siegeEngine))
+            {
+                break;
+            }
+        }
     }
 
     [CommandLineArgumentFunction("stage_machines", "coop.debug.siege")]
@@ -878,7 +1134,8 @@ public class SiegeDebugCommand
                     $" disabled={(machine.IsDisabled ? 1 : 0)} visible={(machine.GameEntity.IsVisibleIncludeParents() ? 1 : 0)}" +
                     $" deactivated={(machine.IsDeactivated ? 1 : 0)} aiOff={(machine.IsDisabledForAI ? 1 : 0)}" +
                     $" simLocal={(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id) ? 1 : 0)}" +
-                    $" pts={machine.StandingPoints.Count} ptsOff={deactivatedPoints} ptsUsed={usedPoints}");
+                    $" pts={machine.StandingPoints.Count} ptsOff={deactivatedPoints} ptsUsed={usedPoints}" +
+                    DescribeMissionMachineState(machine));
             }
             else if (missionObject is TaleWorlds.MountAndBlade.DeploymentPoint deploymentPoint)
             {
@@ -905,5 +1162,21 @@ public class SiegeDebugCommand
         var dump = string.Join(Environment.NewLine, lines);
         Logger.Information("[MachineDump]\n{Dump}", dump);
         return dump;
+    }
+
+    private static string DescribeMissionMachineState(TaleWorlds.MountAndBlade.UsableMachine machine)
+    {
+        if (!(machine is TaleWorlds.MountAndBlade.SiegeLadder ladder))
+        {
+            return string.Empty;
+        }
+
+        int animationIndex = ladder._ladderSkeleton.GetAnimationIndexAtChannel(0);
+        float animationProgress = animationIndex >= 0
+            ? ladder._ladderSkeleton.GetAnimationParameterAtChannel(0)
+            : 0f;
+
+        return $" ladderState={ladder.State} ladderAnimation={ladder._animationState}" +
+            $" ladderAnimationIndex={animationIndex} ladderProgress={animationProgress:0.000}";
     }
 }

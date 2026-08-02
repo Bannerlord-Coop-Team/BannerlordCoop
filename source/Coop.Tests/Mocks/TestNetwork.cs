@@ -19,7 +19,10 @@ public class TestNetwork : INetwork
 
     public readonly Dictionary<int, List<IMessage>> SentNetworkMessages = new Dictionary<int, List<IMessage>>();
     public readonly Dictionary<int, List<IPacket>> SentPackets = new Dictionary<int, List<IPacket>>();
+    public readonly Dictionary<int, List<object>> SentPayloads = new Dictionary<int, List<object>>();
     public readonly List<NetPeer> Peers = new List<NetPeer>();
+    public int FlushPendingMessagesCalls { get; private set; }
+    public Exception? FlushPendingMessagesException { get; set; }
 
     private static int NewPeerId => Interlocked.Increment(ref _peerId);
     private static int _peerId = 0;
@@ -48,6 +51,8 @@ public class TestNetwork : INetwork
         return SentPackets[peer.Id].Where(pkt => pkt is T).Cast<T>();
     }
 
+    public IEnumerable<object> GetPeerPayloads(NetPeer peer) => SentPayloads[peer.Id];
+
     public void Send(NetPeer netPeer, IPacket packet)
     {
         var packets = SentPackets.ContainsKey(netPeer.Id) ?
@@ -55,6 +60,7 @@ public class TestNetwork : INetwork
         packets.Add(packet);
 
         SentPackets[netPeer.Id] = packets;
+        RecordPayload(netPeer, packet);
     }
 
     public void SendAll(IPacket packet)
@@ -80,6 +86,7 @@ public class TestNetwork : INetwork
         messages.Add(message);
 
         SentNetworkMessages[netPeer.Id] = messages;
+        RecordPayload(netPeer, message);
     }
 
     public void SendImmediate(NetPeer netPeer, IPacket packet) => Send(netPeer, packet);
@@ -102,6 +109,13 @@ public class TestNetwork : INetwork
         }
     }
 
+    public void FlushPendingMessages()
+    {
+        FlushPendingMessagesCalls++;
+        if (FlushPendingMessagesException != null)
+            throw FlushPendingMessagesException;
+    }
+
     public void Start()
     {
     }
@@ -118,6 +132,18 @@ public class TestNetwork : INetwork
     {
         SentNetworkMessages.Clear();
         SentPackets.Clear();
+        SentPayloads.Clear();
+        FlushPendingMessagesCalls = 0;
+        FlushPendingMessagesException = null;
+    }
+
+    private void RecordPayload(NetPeer netPeer, object payload)
+    {
+        var payloads = SentPayloads.ContainsKey(netPeer.Id) ?
+                       SentPayloads[netPeer.Id] : new List<object>();
+        payloads.Add(payload);
+
+        SentPayloads[netPeer.Id] = payloads;
     }
 
     public void Dispose()

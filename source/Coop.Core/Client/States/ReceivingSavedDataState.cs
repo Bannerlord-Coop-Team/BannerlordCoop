@@ -2,6 +2,7 @@
 using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
+using System.Globalization;
 
 namespace Coop.Core.Client.States;
 
@@ -24,6 +25,7 @@ public class ReceivingSavedDataState : ClientStateBase
         this.loadingInterface = loadingInterface;
         this.gameStateInterface = gameStateInterface;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+        messageBroker.Subscribe<NetworkGameSaveDataProgress>(Handle_NetworkGameSaveDataProgress);
 
         loadingInterface.ShowLoadingScreen(
             "Joining Coop Campaign",
@@ -33,6 +35,21 @@ public class ReceivingSavedDataState : ClientStateBase
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+        messageBroker.Unsubscribe<NetworkGameSaveDataProgress>(Handle_NetworkGameSaveDataProgress);
+    }
+
+    internal void Handle_NetworkGameSaveDataProgress(MessagePayload<NetworkGameSaveDataProgress> obj)
+    {
+        int remaining = obj.What.PacketsRemaining;
+        string description = remaining > 0
+            ? "Waiting for host save data... " +
+              remaining.ToString("N0", CultureInfo.InvariantCulture) +
+              " save packets remaining"
+            : "Host save data received.";
+
+        loadingInterface.SetLoadingMessage(
+            "Joining Coop Campaign",
+            description);
     }
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)

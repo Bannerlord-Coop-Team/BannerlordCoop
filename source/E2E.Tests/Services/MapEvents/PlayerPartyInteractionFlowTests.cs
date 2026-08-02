@@ -1202,6 +1202,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.HostileDemand);
         SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.ConfirmHostileDemand);
 
+        SetMainParty(client1, initiatorPartyId);
+        SetMainParty(client2, responderPartyId);
         Server.NetworkSentMessages.Clear();
         SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.RefuseHostileDemand, MapEventDisabledMethods);
 
@@ -1228,8 +1230,6 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             AssertHostileEncounterMapEvent(syncedClient, hostileEncounterStarted.MapEventId, initiatorPartyId, responderPartyId);
         }
 
-        SetMainParty(client1, initiatorPartyId);
-        SetMainParty(client2, responderPartyId);
         EnableHeadlessEncounterFinish(client1);
         EnableHeadlessEncounterFinish(client2);
         client1.Call(() =>

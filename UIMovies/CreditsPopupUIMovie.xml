@@ -1,0 +1,104 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
+      <Children>
+        <!-- Dim backdrop. A plain Widget tints correctly; a ButtonWidget renders the raw white
+             sprite (ignores Color), which whited-out the whole screen. Input to the screen below is
+             already blocked by the focus layer, so the backdrop needs no click handling. -->
+        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.7"/>
+
+        <!-- Dialog border. -->
+        <Widget WidthSizePolicy="Fixed" SuggestedWidth="600" HeightSizePolicy="CoverChildren"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Sprite="BlankWhiteSquare_9" Color="#6E5A3AFF">
+          <Children>
+            <!-- Dialog body. -->
+            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                       MarginTop="3" MarginBottom="3" MarginLeft="3" MarginRight="3"
+                       Sprite="BlankWhiteSquare_9" Color="#1C1712FF"
+                       StackLayout.LayoutMethod="VerticalTopToBottom">
+              <Children>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                            MarginTop="24" MarginLeft="34" MarginRight="34" MarginBottom="10"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="40"
+                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                            Text="@TitleText"/>
+
+                <!-- Scrollable name sections. -->
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="520"
+                        MarginLeft="34" MarginRight="24">
+                  <Children>
+                    <ScrollablePanel Id="CreditsScrollablePanel" WidthSizePolicy="StretchToParent"
+                                     HeightSizePolicy="StretchToParent" MarginRight="18"
+                                     AutoHideScrollBars="true" ClipRect="CreditsClipRect"
+                                     InnerPanel="CreditsClipRect\CreditsSections" VerticalScrollbar="..\CreditsScrollbar">
+                      <Children>
+                        <Widget Id="CreditsClipRect" WidthSizePolicy="StretchToParent"
+                                HeightSizePolicy="StretchToParent" ClipContents="true">
+                          <Children>
+                            <ListPanel Id="CreditsSections" WidthSizePolicy="StretchToParent"
+                                       HeightSizePolicy="CoverChildren"
+                                       StackLayout.LayoutMethod="VerticalTopToBottom">
+                              <Children>
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="32"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@ContributorsHeaderText"/>
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="24" Brush="Clan.TabControl.Text" Brush.FontSize="23"
+                                            Brush.FontColor="#B8B8B8FF"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@ContributorsText"/>
+
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="32"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@CommunityHeaderText"/>
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="24" Brush="Clan.TabControl.Text" Brush.FontSize="23"
+                                            Brush.FontColor="#B8B8B8FF"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@CommunityText"/>
+
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="32"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@SupportersHeaderText"/>
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="23"
+                                            Brush.FontColor="#B8B8B8FF"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@SupportersText"/>
+                              </Children>
+                            </ListPanel>
+                          </Children>
+                        </Widget>
+                      </Children>
+                    </ScrollablePanel>
+
+                    <ScrollbarWidget Id="CreditsScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="8"
+                                     HeightSizePolicy="StretchToParent" HorizontalAlignment="Right"
+                                     AlignmentAxis="Vertical" Handle="CreditsScrollbarHandle" MaxValue="100" MinValue="0">
+                      <Children>
+                        <Widget WidthSizePolicy="Fixed" SuggestedWidth="2" HeightSizePolicy="StretchToParent"
+                                HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#5A4033FF" AlphaFactor="0.2"/>
+                        <ImageWidget Id="CreditsScrollbarHandle" WidthSizePolicy="Fixed" SuggestedWidth="4"
+                                     HeightSizePolicy="Fixed" SuggestedHeight="10" HorizontalAlignment="Center"
+                                     Brush="FaceGen.Scrollbar.Handle" Brush.AlphaFactor="0.7"/>
+                      </Children>
+                    </ScrollbarWidget>
+                  </Children>
+                </Widget>
+
+                <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="168" HeightSizePolicy="Fixed" SuggestedHeight="56"
+                                 HorizontalAlignment="Center" MarginTop="16" MarginBottom="24"
+                                 Command.Click="ActionClose" Parameter.Text="@CloseButtonText"/>
+              </Children>
+            </ListPanel>
+          </Children>
+        </Widget>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>
