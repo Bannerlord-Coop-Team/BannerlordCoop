@@ -524,6 +524,13 @@ namespace Coop
                 m_IsFirstTick = false;
             }
 
+#if DEBUG
+            if (liveTestControlServer != null)
+            {
+                LiveTestScreenThreadDispatcher.Update();
+            }
+#endif
+
             var isAtMainMenu = GameStateManager.Current?.ActiveState is InitialState;
             TryApplyAutomaticCrashReports();
             TryShowCrashReportingConsent(isAtMainMenu);

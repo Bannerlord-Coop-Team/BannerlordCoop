@@ -34,7 +34,7 @@ public static class LiveTestScreenThreadDispatcher
         }
     }
 
-    internal static void Update()
+    public static void Update()
     {
         while (Queue.TryDequeue(out WorkItem workItem))
         {
