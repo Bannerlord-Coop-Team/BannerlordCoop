@@ -1,7 +1,14 @@
-﻿using GameInterface.Services.Heroes.Patches;
+﻿using Common;
+using Common.Messaging;
+using GameInterface.Policies;
+using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -39,6 +46,34 @@ namespace GameInterface.Services.Clans.Patches
             ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
             CampaignEventDispatcher.Instance.OnClanCreated(clan, true);
             __result = clan;
+            return false;
+        }
+        [HarmonyPatch(nameof(Clan.SetKingdomInternal))]
+        [HarmonyPrefix]
+        public static bool KingdomSetterPrefix(Clan __instance, Kingdom value)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (ModInformation.IsClient) return false;
+            if (__instance.Kingdom == value) return false;
+            var message = new SetClanKingdom(__instance, value);
+            MessageBroker.Instance.Publish(__instance, message);
+            return true;
+        }
+        [HarmonyPatch(nameof(Clan.OnSupportedByClan))]
+        [HarmonyPrefix]
+        private static bool OnSupportedByClanPrefix(Clan __instance, Clan supporterClan)
+        {
+            DiplomacyModel diplomacyModel = Campaign.Current.Models.DiplomacyModel;
+            int influenceCostOfSupportingClan = diplomacyModel.GetInfluenceCostOfSupportingClan();
+            if (supporterClan.Influence >= (float)influenceCostOfSupportingClan)
+            {
+                int influenceValueOfSupportingClan = diplomacyModel.GetInfluenceValueOfSupportingClan();
+                int relationValueOfSupportingClan = diplomacyModel.GetRelationValueOfSupportingClan();
+
+                MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(supporterClan, (int)(float)(float)influenceCostOfSupportingClan));
+                MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(__instance, -((int)(float)influenceValueOfSupportingClan)));
+                MessageBroker.Instance.Publish(__instance, new ChangeRelationBetweenHeroes(supporterClan.Leader, __instance.Leader, relationValueOfSupportingClan));
+            }
             return false;
         }
     }
