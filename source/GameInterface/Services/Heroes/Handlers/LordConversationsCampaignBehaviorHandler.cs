@@ -190,11 +190,9 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
+            if (!conversationHero.IsPrisoner) return;
 
-            if (conversationHero.IsPrisoner)
-            {
-                EndCaptivityAction.ApplyByReleasedByChoice(conversationHero, mainHero);
-            }
+            EndCaptivityAction.ApplyByReleasedByChoice(conversationHero, mainHero);
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, conversationHero, LetLordGoReward);
             
             // TODO

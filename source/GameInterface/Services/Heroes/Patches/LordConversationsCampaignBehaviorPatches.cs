@@ -5,6 +5,7 @@ using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -78,6 +79,7 @@ internal class LordConversationsCampaignBehaviorPatches
 
         var message = new TakeLordPrisoner(Campaign.Current.MainParty.Party, Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(null, message);
+        MarkFreedLordConversationHandled(Hero.OneToOneConversationHero);
 
         return false;
     }
@@ -88,7 +90,17 @@ internal class LordConversationsCampaignBehaviorPatches
     {
         var message = new LordFreedToRelease(Hero.MainHero, Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(null, message);
+        MarkFreedLordConversationHandled(Hero.OneToOneConversationHero);
 
         return false;
+    }
+
+    private static void MarkFreedLordConversationHandled(Hero conversationHero)
+    {
+        var pendingHeroes = PlayerEncounter.Current?._capturedAlreadyPrisonerHeroes;
+        if (pendingHeroes == null) return;
+
+        // Vanilla advances this list through its synchronous captivity action before the next encounter update.
+        pendingHeroes.RemoveAll(element => element.Character?.HeroObject == conversationHero);
     }
 }
