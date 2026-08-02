@@ -69,6 +69,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
+    <Reference Include="SandBox.GauntletUI">
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="SandBox.View">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
     </Reference>
@@ -94,6 +97,9 @@
     <Reference Include="TaleWorlds.Engine">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.Engine.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
@@ -115,6 +121,9 @@
     <Reference Include="TaleWorlds.SaveSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ScreenSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -129,6 +138,8 @@
   </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />
+    <Publicize Include="SandBox.GauntletUI" />
+    <Publicize Include="SandBox.View" />
     <Publicize Include="TaleWorlds.CampaignSystem" />
     <Publicize Include="TaleWorlds.Core" />
     <Publicize Include="TaleWorlds.Engine" />
