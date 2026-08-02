@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Heroes.Extensions;
+﻿using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MobileParties.Extensions;
 using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -47,7 +49,9 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
                 // Replace to check for any player hero.
                 // Non-leader player heroes shouldn't have wages as the money wouldn't be transferred to them.
                 // In future multiple players in a party and/or clan could be paid separately with a different clan expense.
-                if (hero.IsClanLeader || (hero.IsPlayerHero() && hero.Occupation == Occupation.Lord)) continue;
+                if (hero.IsClanLeader
+                    || hero.IsPlayerHero()
+                    || (mobileParty.IsPlayerParty() && hero.Clan.IsPlayerClan() && hero.Occupation == Occupation.Lord)) continue;
 
                 if (mobileParty.LeaderHero != null && mobileParty.LeaderHero.GetPerkValue(DefaultPerks.Steward.PaidInPromise))
                 {
