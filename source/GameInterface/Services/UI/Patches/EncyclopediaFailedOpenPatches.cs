@@ -4,6 +4,7 @@ using SandBox.GauntletUI.Encyclopedia;
 using Serilog;
 using System;
 using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -32,6 +33,12 @@ internal class EncyclopediaFailedOpenPatches
 
         try
         {
+            // RemoveLayer finalizes the layer without clearing ScreenManager.FocusedLayer, so the
+            // next TrySetFocus would call HandleLoseFocus on a dead layer. Drop focus while the
+            // layer can still handle it.
+            data._activeGauntletLayer.IsFocusLayer = false;
+            ScreenManager.TryLoseFocus(data._activeGauntletLayer);
+
             __instance.CloseEncyclopedia();
         }
         catch (Exception closeException)

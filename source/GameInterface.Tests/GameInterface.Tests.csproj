@@ -100,6 +100,12 @@
     <Reference Include="TaleWorlds.Engine.GauntletUI">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.InputSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
@@ -143,6 +149,8 @@
     <Publicize Include="TaleWorlds.CampaignSystem" />
     <Publicize Include="TaleWorlds.Core" />
     <Publicize Include="TaleWorlds.Engine" />
+    <Publicize Include="TaleWorlds.Engine.GauntletUI" />
+    <Publicize Include="TaleWorlds.GauntletUI" />
     <Publicize Include="TaleWorlds.Library" />
     <Publicize Include="TaleWorlds.Localization" />
     <Publicize Include="TaleWorlds.ModuleManager" />
@@ -150,6 +158,7 @@
     <Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library" />
     <Publicize Include="TaleWorlds.ObjectSystem" />
     <Publicize Include="TaleWorlds.SaveSystem" />
+    <Publicize Include="TaleWorlds.ScreenSystem" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="AutoSync\Snapshots\" />
