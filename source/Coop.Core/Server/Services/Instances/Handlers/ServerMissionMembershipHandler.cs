@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Network.Session;
 using Coop.Core.Common.Session;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
 using System.Globalization;
@@ -20,13 +21,15 @@ public class ServerMissionMembershipHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IMissionManager missionManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly ISessionTunnelIdentityResolver tunnelIdentityResolver;
 
     public ServerMissionMembershipHandler(
         IMessageBroker messageBroker,
         IMissionManager missionManager,
-        INetwork network)
-        : this(messageBroker, missionManager, network, null)
+        INetwork network,
+        IPlayerManager playerManager)
+        : this(messageBroker, missionManager, network, playerManager, null)
     {
     }
 
@@ -34,11 +37,13 @@ public class ServerMissionMembershipHandler : IHandler
         IMessageBroker messageBroker,
         IMissionManager missionManager,
         INetwork network,
+        IPlayerManager playerManager,
         ISessionTunnelIdentityResolver tunnelIdentityResolver)
     {
         this.messageBroker = messageBroker;
         this.missionManager = missionManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.tunnelIdentityResolver = tunnelIdentityResolver;
 
         messageBroker.Subscribe<NetworkMissionEntered>(Handle_MissionEntered);
@@ -55,33 +60,40 @@ public class ServerMissionMembershipHandler : IHandler
 
     private void Handle_MissionEntered(MessagePayload<NetworkMissionEntered> payload)
     {
-        var peer = (NetPeer)payload.Who;
+        if (payload.Who is not NetPeer peer)
+            return;
+
         var message = payload.What;
+        if (!TryGetCurrentController(peer, out var controllerId))
+            return;
+
         GameThread.RunSafe(() =>
         {
-            if (!missionManager.TryEnterMission(
-                    peer,
-                    message.ControllerId,
-                    message.InstanceId,
-                    out var others,
-                    out var isFirstMember))
+            if (!missionManager.TryEnterMission(peer, controllerId, message.InstanceId, out var result) ||
+                result.Status == MissionEntryStatus.Unchanged)
             {
                 return;
             }
 
-            messageBroker.Publish(this,
-                new MissionMemberEntered(message.ControllerId, message.InstanceId, isFirstMember));
+            foreach (var departure in result.PreviousDepartures)
+                PublishDeparture(departure, wasRetreat: true);
+
+            if (result.Status == MissionEntryStatus.Entered)
+            {
+                messageBroker.Publish(this,
+                    new MissionMemberEntered(result.ControllerId, result.InstanceId, result.IsFirstMember));
+            }
 
             // Introduce the newcomer and each existing member to each other so BOTH sides send their join info.
-            var newcomerSteamId = ResolveSteamId(peer, message.ControllerId);
-            foreach (var (otherControllerId, otherPeer) in others)
+            var newcomerSteamId = ResolveSteamId(peer, result.ControllerId);
+            foreach (var (otherControllerId, otherPeer) in result.ExistingMembers)
             {
                 var existingSteamId = ResolveSteamId(otherPeer, otherControllerId);
 
                 network.Send(otherPeer, new NetworkMissionPeerEntered(
-                    message.ControllerId, message.InstanceId, newcomerSteamId));
+                    result.ControllerId, result.InstanceId, newcomerSteamId));
                 network.Send(peer, new NetworkMissionPeerEntered(
-                    otherControllerId, message.InstanceId, existingSteamId));
+                    otherControllerId, result.InstanceId, existingSteamId));
             }
         }, context: nameof(Handle_MissionEntered));
     }
@@ -108,42 +120,65 @@ public class ServerMissionMembershipHandler : IHandler
 
     private void Handle_MissionLeft(MessagePayload<NetworkMissionLeft> payload)
     {
-        var peer = (NetPeer)payload.Who;
+        if (payload.Who is not NetPeer peer)
+            return;
+
         var message = payload.What;
+        if (!TryGetCurrentController(peer, out var controllerId))
+            return;
+
+        missionManager.RevokeRelay(peer);
+
         GameThread.RunSafe(() =>
         {
-            var remaining = missionManager.LeaveMission(peer, message.ControllerId, message.InstanceId);
+            if (!missionManager.TryLeaveMission(peer, controllerId, message.InstanceId, out var departure))
+                return;
 
-            // Mirror the entry fan-out: tell the members still present that the controller is gone.
-            foreach (var (_, otherPeer) in remaining)
-                network.Send(otherPeer, new MissionPeerLeft(message.ControllerId, message.InstanceId));
-
-            // A graceful leave is a retreat, so a rejoin must spawn fresh reserves.
-            messageBroker.Publish(this, new MissionMemberDeparted(
-                message.ControllerId,
-                message.InstanceId,
-                wasRetreat: true,
-                isInstanceEmpty: remaining.Count == 0));
+            PublishDeparture(departure, wasRetreat: true);
         }, context: nameof(Handle_MissionLeft));
     }
 
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
         var peer = payload.What.PlayerId;
+        missionManager.RevokeRelay(peer);
+
         GameThread.RunSafe(() =>
         {
-            if (!missionManager.TryHandleDisconnect(peer, out var controllerId, out var instanceId, out var remaining))
-                return;
-
-            foreach (var (_, otherPeer) in remaining)
-                network.Send(otherPeer, new MissionPeerDisconnected(controllerId, instanceId));
-
-            // A drop preserves the reserve so the battle host can field the disconnected player's remaining troops.
-            messageBroker.Publish(this, new MissionMemberDeparted(
-                controllerId,
-                instanceId,
-                wasRetreat: false,
-                isInstanceEmpty: remaining.Count == 0));
+            var departures = missionManager.HandleDisconnect(peer);
+            foreach (var departure in departures)
+                PublishDeparture(departure, wasRetreat: false);
         }, context: nameof(Handle_PlayerDisconnected));
+    }
+
+    private bool TryGetCurrentController(NetPeer peer, out string controllerId)
+    {
+        controllerId = null;
+        if (!playerManager.TryGetPlayer(peer, out var player) ||
+            !playerManager.TryGetPeer(player.ControllerId, out var currentPeer) ||
+            !object.ReferenceEquals(currentPeer, peer))
+        {
+            return false;
+        }
+
+        controllerId = player.ControllerId;
+        return true;
+    }
+
+    private void PublishDeparture(MissionDeparture departure, bool wasRetreat)
+    {
+        foreach (var (_, otherPeer) in departure.RemainingMembers)
+        {
+            if (wasRetreat)
+                network.Send(otherPeer, new MissionPeerLeft(departure.ControllerId, departure.InstanceId));
+            else
+                network.Send(otherPeer, new MissionPeerDisconnected(departure.ControllerId, departure.InstanceId));
+        }
+
+        messageBroker.Publish(this, new MissionMemberDeparted(
+            departure.ControllerId,
+            departure.InstanceId,
+            wasRetreat,
+            departure.IsInstanceEmpty));
     }
 }

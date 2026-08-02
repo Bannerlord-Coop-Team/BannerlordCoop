@@ -2152,6 +2152,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         var (initiatorHeroId, initiatorMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var (responderHeroId, responderMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            playerManager.SetPeer("PlayerOne", client1.NetPeer);
+            playerManager.SetPeer("PlayerTwo", client2.NetPeer);
+        });
 
         return (
             client1,

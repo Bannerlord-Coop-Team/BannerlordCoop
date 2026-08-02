@@ -5,6 +5,8 @@ using Coop.Core.Common.Session;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Missions.Messages;
 using Moq;
@@ -107,23 +109,118 @@ public class ServerMissionMembershipHandlerTests
         var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51007), 7);
         var messageBroker = new TestMessageBroker();
         var missionManager = new Mock<IMissionManager>();
-        IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers =
-            Array.Empty<(string, NetPeer)>();
-        var isFirstMember = true;
+        var playerManager = CreatePlayerManager(peer, "first");
+        var entry = new MissionEntryResult(
+            "first",
+            InstanceId,
+            MissionEntryStatus.Entered,
+            Array.Empty<(string, NetPeer)>(),
+            Array.Empty<MissionDeparture>(),
+            isFirstMember: true);
         missionManager
             .Setup(manager => manager.TryEnterMission(
-                peer, "first", InstanceId, out existingMembers, out isFirstMember))
+                peer, "first", InstanceId, out entry))
             .Returns(true);
         MissionMemberEntered? entered = null;
         messageBroker.Subscribe<MissionMemberEntered>(payload => entered = payload.What);
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, new TestNetwork());
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
 
         messageBroker.Publish(peer, new NetworkMissionEntered("first", InstanceId));
         DrainGameThread();
 
         Assert.True(entered.HasValue);
         Assert.True(entered.Value.IsFirstMember);
+    }
+
+    [Fact]
+    public void MissionEntered_UsesCurrentPeerIdentityInsteadOfPayloadController()
+    {
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51008), 8);
+        var messageBroker = new TestMessageBroker();
+        var missionManager = new Mock<IMissionManager>();
+        var playerManager = CreatePlayerManager(peer, "current");
+        var entry = new MissionEntryResult(
+            "current",
+            InstanceId,
+            MissionEntryStatus.Entered,
+            Array.Empty<(string, NetPeer)>(),
+            Array.Empty<MissionDeparture>(),
+            isFirstMember: true);
+        missionManager
+            .Setup(manager => manager.TryEnterMission(peer, "current", InstanceId, out entry))
+            .Returns(true);
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+
+        messageBroker.Publish(peer, new NetworkMissionEntered("stale", InstanceId));
+        DrainGameThread();
+
+        missionManager.Verify(manager => manager.TryEnterMission(peer, "current", InstanceId, out entry), Times.Once);
+    }
+
+    [Fact]
+    public void MissionEntered_RejectsPeerReplacedByReconnect()
+    {
+        var oldPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51009), 9);
+        var currentPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51010), 10);
+        var player = new Player("current", string.Empty, string.Empty, string.Empty, string.Empty);
+        var playerManager = new Mock<IPlayerManager>();
+        var mappedPlayer = player;
+        var mappedPeer = currentPeer;
+        playerManager.Setup(manager => manager.TryGetPlayer(oldPeer, out mappedPlayer)).Returns(true);
+        playerManager.Setup(manager => manager.TryGetPeer("current", out mappedPeer)).Returns(true);
+        var missionManager = new Mock<IMissionManager>();
+        var messageBroker = new TestMessageBroker();
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+
+        messageBroker.Publish(oldPeer, new NetworkMissionEntered("current", InstanceId));
+
+        missionManager.Verify(
+            manager => manager.TryEnterMission(
+                It.IsAny<NetPeer>(), It.IsAny<string>(), It.IsAny<string>(), out It.Ref<MissionEntryResult>.IsAny),
+            Times.Never);
+    }
+
+    [Fact]
+    public void MissionLeft_PublishesNothingWhenMembershipWasNotRemoved()
+    {
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51011), 11);
+        var messageBroker = new TestMessageBroker();
+        var missionManager = new Mock<IMissionManager>();
+        var playerManager = CreatePlayerManager(peer, "current");
+        MissionDeparture published = null!;
+        MissionMemberDeparted? departed = null;
+        messageBroker.Subscribe<MissionMemberDeparted>(payload => departed = payload.What);
+        missionManager
+            .Setup(manager => manager.TryLeaveMission(peer, "current", InstanceId, out published))
+            .Returns(false);
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+
+        messageBroker.Publish(peer, new NetworkMissionLeft("stale", InstanceId));
+        DrainGameThread();
+
+        Assert.False(departed.HasValue);
+    }
+
+    [Fact]
+    public void MissionLeft_RemovesEntryThatWasStillQueued()
+    {
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51012), 12);
+        var messageBroker = new TestMessageBroker();
+        var missionManager = new MissionManager();
+        var playerManager = CreatePlayerManager(peer, "current");
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager, new TestNetwork(), playerManager.Object);
+
+        messageBroker.Publish(peer, new NetworkMissionEntered("current", InstanceId));
+        messageBroker.Publish(peer, new NetworkMissionLeft("current", InstanceId));
+        DrainGameThread();
+
+        Assert.False(missionManager.TryGetControllers(InstanceId, out _));
+        Assert.False(missionManager.TryGetRelayTarget(peer, InstanceId, "current", out _));
     }
 
     private static TestNetwork PublishEntry(
@@ -135,28 +232,45 @@ public class ServerMissionMembershipHandlerTests
     {
         var messageBroker = new TestMessageBroker();
         var missionManager = new Mock<IMissionManager>();
+        var playerManager = CreatePlayerManager(newcomer, newcomerControllerId);
         IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers =
             new List<(string controllerId, NetPeer peer)>
         {
             (existingControllerId, existing),
         };
-        var isFirstMember = false;
+        var entry = new MissionEntryResult(
+            newcomerControllerId,
+            InstanceId,
+            MissionEntryStatus.Entered,
+            existingMembers,
+            Array.Empty<MissionDeparture>(),
+            isFirstMember: false);
         missionManager
             .Setup(manager => manager.TryEnterMission(
                 newcomer,
                 newcomerControllerId,
                 InstanceId,
-                out existingMembers,
-                out isFirstMember))
+                out entry))
             .Returns(true);
 
         var network = new TestNetwork();
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, network, tunnelHost);
+            messageBroker, missionManager.Object, network, playerManager.Object, tunnelHost);
 
         messageBroker.Publish(newcomer, new NetworkMissionEntered(newcomerControllerId, InstanceId));
         DrainGameThread();
         return network;
+    }
+
+    private static Mock<IPlayerManager> CreatePlayerManager(NetPeer peer, string controllerId)
+    {
+        var playerManager = new Mock<IPlayerManager>();
+        var player = new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        var mappedPlayer = player;
+        var mappedPeer = peer;
+        playerManager.Setup(manager => manager.TryGetPlayer(peer, out mappedPlayer)).Returns(true);
+        playerManager.Setup(manager => manager.TryGetPeer(controllerId, out mappedPeer)).Returns(true);
+        return playerManager;
     }
 
     private static void DrainGameThread() => GameThread.Run(() => { }, blocking: true);

@@ -25,38 +25,36 @@ public interface IMissionManager
     /// </summary>
     void HandleIntroductionRequest(NatPunchModule natPunchModule, IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token);
 
-    bool TryGetRelayTarget(string instanceId, string controllerId, out NetPeer peer);
+    /// <summary>Resolve a relay target only when source and target are current members of the named instance.</summary>
+    bool TryGetRelayTarget(NetPeer sourcePeer, string instanceId, string controllerId, out NetPeer peer);
+
+    /// <summary>Immediately fence relay traffic tied to a peer before its queued leave or disconnect.</summary>
+    void RevokeRelay(NetPeer peer);
 
     /// <summary>
     /// Record that <paramref name="controllerId"/> has entered <paramref name="instanceId"/>, mapping it to
     /// the connection the announcement arrived on (<paramref name="peer"/>) so the relay fallback can reach
     /// it. Creates the instance if this is its first member. Driven by a client <c>MissionEntered</c>.
-    /// Returns false after result finalization claimed the empty instance. On success, returns whether this is
-    /// the first member and the members already present so the caller can publish post-entry state and introductions.
+    /// Returns false after result finalization claimed the instance. The result reports every membership
+    /// change made atomically before the new entry.
     /// </summary>
     bool TryEnterMission(
         NetPeer peer,
         string controllerId,
         string instanceId,
-        out IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers,
-        out bool isFirstMember);
+        out MissionEntryResult result);
 
     /// <summary>
     /// Record that <paramref name="controllerId"/> (on <paramref name="peer"/>) has left
-    /// <paramref name="instanceId"/>, dropping it from the relay routing table. No-op if the instance is
-    /// unknown. Driven by a client <c>MissionLeft</c>. Returns the members still present so the caller can
-    /// notify them the controller is gone.
+    /// <paramref name="instanceId"/>, dropping it from the relay routing table. Returns false unless that
+    /// exact authoritative membership existed; otherwise returns the membership actually removed.
     /// </summary>
-    IReadOnlyList<(string controllerId, NetPeer peer)> LeaveMission(NetPeer peer, string controllerId, string instanceId);
+    bool TryLeaveMission(NetPeer peer, string controllerId, string instanceId, out MissionDeparture departure);
 
     /// <summary>
-    /// Drop <paramref name="peer"/> from whichever instance it belongs to after an ungraceful disconnect,
-    /// resolving its <paramref name="controllerId"/> and <paramref name="instanceId"/>. Returns false if the
-    /// peer was in no instance. On success <paramref name="remaining"/> holds the members still present so
-    /// the caller can notify them.
+    /// Drop every membership still tied to <paramref name="peer"/> after an ungraceful disconnect.
     /// </summary>
-    bool TryHandleDisconnect(NetPeer peer, out string controllerId, out string instanceId,
-        out IReadOnlyList<(string controllerId, NetPeer peer)> remaining);
+    IReadOnlyList<MissionDeparture> HandleDisconnect(NetPeer peer);
 
     /// <summary>
     /// The controllers currently routed through <paramref name="instanceId"/> (relay-fallback membership).
@@ -80,6 +78,57 @@ public interface IMissionManager
     bool CompleteInstanceConclusion(string instanceId, bool succeeded);
 }
 
+public enum MissionEntryStatus
+{
+    Entered,
+    Reconnected,
+    Unchanged,
+}
+
+public sealed class MissionEntryResult
+{
+    public string ControllerId { get; }
+    public string InstanceId { get; }
+    public MissionEntryStatus Status { get; }
+    public IReadOnlyList<(string controllerId, NetPeer peer)> ExistingMembers { get; }
+    public IReadOnlyList<MissionDeparture> PreviousDepartures { get; }
+    public bool IsFirstMember { get; }
+
+    public MissionEntryResult(
+        string controllerId,
+        string instanceId,
+        MissionEntryStatus status,
+        IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers,
+        IReadOnlyList<MissionDeparture> previousDepartures,
+        bool isFirstMember)
+    {
+        ControllerId = controllerId;
+        InstanceId = instanceId;
+        Status = status;
+        ExistingMembers = existingMembers;
+        PreviousDepartures = previousDepartures;
+        IsFirstMember = isFirstMember;
+    }
+}
+
+public sealed class MissionDeparture
+{
+    public string ControllerId { get; }
+    public string InstanceId { get; }
+    public IReadOnlyList<(string controllerId, NetPeer peer)> RemainingMembers { get; }
+    public bool IsInstanceEmpty => RemainingMembers.Count == 0;
+
+    public MissionDeparture(
+        string controllerId,
+        string instanceId,
+        IReadOnlyList<(string controllerId, NetPeer peer)> remainingMembers)
+    {
+        ControllerId = controllerId;
+        InstanceId = instanceId;
+        RemainingMembers = remainingMembers;
+    }
+}
+
 /// <inheritdoc cref="IMissionManager"/>
 public class MissionManager : IMissionManager, IMissionMembershipRegistry
 {
@@ -87,6 +136,9 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
     private readonly object gate = new object();
     private readonly Dictionary<string, MissionInstance> byInstanceId = new Dictionary<string, MissionInstance>();
+    private readonly Dictionary<NetPeer, MissionMembership> byPeer = new Dictionary<NetPeer, MissionMembership>();
+    private readonly Dictionary<string, MissionMembership> byController = new Dictionary<string, MissionMembership>();
+    private readonly Dictionary<NetPeer, long> relayRevocationCounts = new Dictionary<NetPeer, long>();
     private readonly Dictionary<string, MissionInstance> pendingEmptyInstances = new Dictionary<string, MissionInstance>();
     private readonly HashSet<string> concludingInstances = new HashSet<string>();
     private readonly HashSet<string> concludedInstances = new HashSet<string>();
@@ -140,22 +192,46 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    public bool TryGetRelayTarget(string instanceId, string controllerId, out NetPeer peer)
+    public bool TryGetRelayTarget(NetPeer sourcePeer, string instanceId, string controllerId, out NetPeer peer)
     {
         peer = null;
 
-        if (instanceId == null)
+        if (sourcePeer == null || string.IsNullOrEmpty(instanceId))
             return false;
 
-        if (controllerId == null)
+        if (string.IsNullOrEmpty(controllerId))
             return false;
 
         lock (gate)
         {
-            if (!byInstanceId.TryGetValue(instanceId, out var instance))
+            if (!byPeer.TryGetValue(sourcePeer, out var sourceMembership) ||
+                sourceMembership.Instance.Id != instanceId ||
+                IsRelayRevoked(sourceMembership))
+            {
                 return false;
+            }
 
-            return instance.TryGetPeer(controllerId, out peer);
+            if (!byController.TryGetValue(controllerId, out var targetMembership) ||
+                !ReferenceEquals(sourceMembership.Instance, targetMembership.Instance) ||
+                IsRelayRevoked(targetMembership))
+            {
+                return false;
+            }
+
+            peer = targetMembership.Peer;
+            return true;
+        }
+    }
+
+    public void RevokeRelay(NetPeer peer)
+    {
+        if (peer == null)
+            return;
+
+        lock (gate)
+        {
+            relayRevocationCounts.TryGetValue(peer, out var count);
+            relayRevocationCounts[peer] = count + 1;
         }
     }
 
@@ -163,23 +239,66 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         NetPeer peer,
         string controllerId,
         string instanceId,
-        out IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers,
-        out bool isFirstMember)
+        out MissionEntryResult result)
     {
+        result = null;
+        if (peer == null || string.IsNullOrEmpty(controllerId) || string.IsNullOrEmpty(instanceId))
+            return false;
+
         lock (gate)
         {
             if (IsConclusionFenced(instanceId))
             {
-                existingMembers = Array.Empty<(string, NetPeer)>();
-                isFirstMember = false;
                 Logger.Information("Ignoring mission entry by {Controller} for concluded instance {Instance}",
                     controllerId, instanceId);
                 return false;
             }
 
-            // Shares the instance dictionary with the NAT-punch flow, so the relay context and the punch
-            // endpoints for one mission live in the SAME MissionInstance — provided both sides derive the
-            // same instance id (see MissionEntered).
+            byPeer.TryGetValue(peer, out var peerMembership);
+            byController.TryGetValue(controllerId, out var controllerMembership);
+
+            if (ReferenceEquals(peerMembership, controllerMembership) &&
+                peerMembership != null &&
+                peerMembership.Instance.Id == instanceId)
+            {
+                result = new MissionEntryResult(
+                    controllerId,
+                    instanceId,
+                    MissionEntryStatus.Unchanged,
+                    Array.Empty<(string, NetPeer)>(),
+                    Array.Empty<MissionDeparture>(),
+                    isFirstMember: false);
+                return true;
+            }
+
+            var previousDepartures = new List<MissionDeparture>();
+            if (controllerMembership != null && controllerMembership.Instance.Id == instanceId)
+            {
+                if (peerMembership != null && !ReferenceEquals(peerMembership, controllerMembership))
+                    previousDepartures.Add(RemoveMembership(peerMembership));
+
+                byPeer.Remove(controllerMembership.Peer);
+                controllerMembership.Peer = peer;
+                byPeer[peer] = controllerMembership;
+
+                var existingMembers = Members(controllerMembership.Instance, controllerId);
+                result = new MissionEntryResult(
+                    controllerId,
+                    instanceId,
+                    MissionEntryStatus.Reconnected,
+                    existingMembers,
+                    previousDepartures,
+                    isFirstMember: false);
+                Logger.Information("Controller {Controller} replaced its peer in instance {Instance} with {Peer}",
+                    controllerId, instanceId, peer);
+                return true;
+            }
+
+            if (peerMembership != null)
+                previousDepartures.Add(RemoveMembership(peerMembership));
+            if (controllerMembership != null && !ReferenceEquals(controllerMembership, peerMembership))
+                previousDepartures.Add(RemoveMembership(controllerMembership));
+
             if (byInstanceId.TryGetValue(instanceId, out var instance) == false)
             {
                 instance = new MissionInstance(instanceId);
@@ -188,71 +307,80 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                     instanceId, controllerId);
             }
 
-            // Snapshot the members already present BEFORE adding the newcomer, so the caller can introduce
-            // the newcomer and the existing members to each other.
-            isFirstMember = instance.Controllers.Count == 0;
-            existingMembers = instance.Controllers
-                .Where(id => id != controllerId)
-                .Select(id => instance.TryGetPeer(id, out var existingPeer) ? (id, existingPeer) : default)
-                .Where(pair => pair.Item2 != null)
-                .ToList();
+            bool isFirstMember = instance.Memberships.Count == 0;
+            var others = Members(instance);
+            var membership = new MissionMembership(controllerId, peer, instance);
+            instance.Memberships.Add(membership);
+            byPeer[peer] = membership;
+            byController[controllerId] = membership;
 
-            instance.MapPeer(controllerId, peer);
             Logger.Information("Controller {Controller} entered instance {Instance} on {Peer}",
                 controllerId, instanceId, peer);
 
+            result = new MissionEntryResult(
+                controllerId,
+                instanceId,
+                MissionEntryStatus.Entered,
+                others,
+                previousDepartures,
+                isFirstMember);
             return true;
         }
     }
 
-    public IReadOnlyList<(string controllerId, NetPeer peer)> LeaveMission(NetPeer peer, string controllerId, string instanceId)
+    public bool TryLeaveMission(NetPeer peer, string controllerId, string instanceId, out MissionDeparture departure)
     {
-        lock (gate)
-        {
-            if (byInstanceId.TryGetValue(instanceId, out var instance) == false)
-            {
-                Logger.Warning("Mission leave for unknown instance {Instance} from {Controller}",
-                    instanceId, controllerId);
-                return Array.Empty<(string, NetPeer)>();
-            }
-
-            instance.RemovePeer(peer);
-            Logger.Information("Controller {Controller} left instance {Instance}", controllerId, instanceId);
-
-            var remaining = Members(instance);
-            PruneIfEmpty(instanceId, remaining.Count);
-            return remaining;
-        }
-    }
-
-    public bool TryHandleDisconnect(NetPeer peer, out string controllerId, out string instanceId,
-        out IReadOnlyList<(string controllerId, NetPeer peer)> remaining)
-    {
-        controllerId = null;
-        instanceId = null;
-        remaining = Array.Empty<(string, NetPeer)>();
+        departure = null;
+        if (peer == null)
+            return false;
 
         lock (gate)
         {
-            // A peer is in at most one instance; find the one that still lists this connection.
-            MissionInstance found = null;
-            foreach (var entry in byInstanceId)
-            {
-                if (entry.Value.TryGetController(peer, out controllerId) == false) continue;
+            CompleteRelayRevocation(peer);
 
-                instanceId = entry.Key;
-                found = entry.Value;
-                break; // leave the enumeration before mutating the dictionary (PruneIfEmpty removes the entry)
-            }
-
-            if (found == null)
+            if (string.IsNullOrEmpty(controllerId) || string.IsNullOrEmpty(instanceId))
                 return false;
 
-            found.RemovePeer(peer);
-            remaining = Members(found);
-            Logger.Information("Controller {Controller} disconnected from instance {Instance}", controllerId, instanceId);
-            PruneIfEmpty(instanceId, remaining.Count);
+            if (!byPeer.TryGetValue(peer, out var membership) ||
+                membership.ControllerId != controllerId ||
+                membership.Instance.Id != instanceId)
+            {
+                Logger.Warning("Ignoring unmatched mission leave for instance {Instance} from {Controller}",
+                    instanceId, controllerId);
+                return false;
+            }
+
+            departure = RemoveMembership(membership);
+            Logger.Information("Controller {Controller} left instance {Instance}", controllerId, instanceId);
             return true;
+        }
+    }
+
+    public IReadOnlyList<MissionDeparture> HandleDisconnect(NetPeer peer)
+    {
+        if (peer == null)
+            return Array.Empty<MissionDeparture>();
+
+        lock (gate)
+        {
+            var staleMemberships = byInstanceId.Values
+                .SelectMany(instance => instance.Memberships)
+                .Where(membership => ReferenceEquals(membership.Peer, peer))
+                .Distinct()
+                .ToList();
+
+            var departures = new List<MissionDeparture>(staleMemberships.Count);
+            foreach (var membership in staleMemberships)
+            {
+                var departure = RemoveMembership(membership);
+                departures.Add(departure);
+                Logger.Information("Controller {Controller} disconnected from instance {Instance}",
+                    departure.ControllerId, departure.InstanceId);
+            }
+
+            CompleteRelayRevocation(peer);
+
+            return departures;
         }
     }
 
@@ -263,7 +391,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
-            return byInstanceId.Values.Any(instance => instance.TryGetPeer(controllerId, out _));
+            return byController.ContainsKey(controllerId);
         }
     }
 
@@ -386,11 +514,46 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private bool IsConclusionFenced(string instanceId) =>
         concludingInstances.Contains(instanceId) || concludedInstances.Contains(instanceId);
 
+    private bool IsRelayRevoked(MissionMembership membership) =>
+        relayRevocationCounts.ContainsKey(membership.Peer);
+
+    private void CompleteRelayRevocation(NetPeer peer)
+    {
+        if (!relayRevocationCounts.TryGetValue(peer, out var count))
+            return;
+
+        if (count == 1)
+            relayRevocationCounts.Remove(peer);
+        else
+            relayRevocationCounts[peer] = count - 1;
+    }
+
     // Snapshot the (controllerId, peer) pairs still routed through the instance. Caller holds the lock.
-    private static IReadOnlyList<(string controllerId, NetPeer peer)> Members(MissionInstance instance)
-        => instance.Controllers
-            .Select(id => instance.TryGetPeer(id, out var peer) ? (id, peer) : default)
-            .Where(pair => pair.Item2 != null)
+    private MissionDeparture RemoveMembership(MissionMembership membership)
+    {
+        membership.Instance.Memberships.Remove(membership);
+        if (byPeer.TryGetValue(membership.Peer, out var peerMembership) &&
+            ReferenceEquals(peerMembership, membership))
+        {
+            byPeer.Remove(membership.Peer);
+        }
+        if (byController.TryGetValue(membership.ControllerId, out var controllerMembership) &&
+            ReferenceEquals(controllerMembership, membership))
+        {
+            byController.Remove(membership.ControllerId);
+        }
+
+        var remaining = Members(membership.Instance);
+        PruneIfEmpty(membership.Instance.Id, remaining.Count);
+        return new MissionDeparture(membership.ControllerId, membership.Instance.Id, remaining);
+    }
+
+    private static IReadOnlyList<(string controllerId, NetPeer peer)> Members(
+        MissionInstance instance,
+        string excludedControllerId = null)
+        => instance.Memberships
+            .Where(member => member.ControllerId != excludedControllerId)
+            .Select(member => (member.ControllerId, member.Peer))
             .ToList();
 
     // A peer is in at most one instance, so any prior listing for this endpoint is stale on a new punch.
@@ -401,4 +564,5 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             instance.PunchEndpoints.RemoveAll(e => e.External.Equals(external));
         }
     }
+
 }
