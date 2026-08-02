@@ -245,6 +245,22 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             // Create weapon on all clients
             NetworkCreateCraftedWeaponInternalClients message = new(data, nextCraftedItemId);
             network.SendAll(message);
+
+            // Complete order on server and send result to clients
+            if (!data.IsFreeMode)
+            {
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
+                if (!objectManager.TryGetObjectWithLogging<CraftingOrder>(data.CraftingOrderId, out var craftingOrder)) return;
+                if (!objectManager.TryGetObjectWithLogging<ItemObject>(nextCraftedItemId, out var craftedItem)) return;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
+
+                messageBroker.Publish(this, new CompleteOrderServer(
+                    currentSettlement.Town,
+                    craftingOrder,
+                    craftedItem,
+                    craftingHero,
+                    playerHero));
+            }
         });
     }
 
@@ -309,10 +325,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 {
                     var message = new NetworkAddCraftedItemToRoster(craftedItemId, data.PlayerHeroId, data.WeaponModifierId);
                     network.SendAll(message);
-                }
-                else // Complete order
-                {
-                    messageBroker.Publish(this, new CompleteOrderFromVM(currentSettlement, craftingOrder, craftedItemObject, craftingHero));
                 }
             }
         });

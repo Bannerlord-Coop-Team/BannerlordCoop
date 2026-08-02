@@ -45,8 +45,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
         messageBroker.Subscribe<CraftingOrderReplaced>(Handle_CraftingOrderReplaced);
         messageBroker.Subscribe<NetworkReplaceCraftingOrder>(Handle_NetworkReplaceCraftingOrder);
 
-        messageBroker.Subscribe<OrderCompleted>(Handle_OrderCompleted);
-        messageBroker.Subscribe<NetworkCompleteOrderServer>(Handle_NetworkCompleteOrderServer);
+        messageBroker.Subscribe<CompleteOrderServer>(Handle_CompleteOrderServer);
         messageBroker.Subscribe<NetworkCompleteOrderClients>(Handle_NetworkCompleteOrderClients);
     }
 
@@ -58,8 +57,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
         messageBroker.Unsubscribe<CraftingOrderReplaced>(Handle_CraftingOrderReplaced);
         messageBroker.Unsubscribe<NetworkReplaceCraftingOrder>(Handle_NetworkReplaceCraftingOrder);
 
-        messageBroker.Unsubscribe<OrderCompleted>(Handle_OrderCompleted);
-        messageBroker.Unsubscribe<NetworkCompleteOrderServer>(Handle_NetworkCompleteOrderServer);
+        messageBroker.Unsubscribe<CompleteOrderServer>(Handle_CompleteOrderServer);
         messageBroker.Unsubscribe<NetworkCompleteOrderClients>(Handle_NetworkCompleteOrderClients);
     }
 
@@ -82,12 +80,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
         ReplaceCraftingOrder(obj.What);
     }
 
-    private void Handle_OrderCompleted(MessagePayload<OrderCompleted> obj)
-    {
-        SendOrderCompleted(obj.What);
-    }
-
-    private void Handle_NetworkCompleteOrderServer(MessagePayload<NetworkCompleteOrderServer> obj)
+    private void Handle_CompleteOrderServer(MessagePayload<CompleteOrderServer> obj)
     {
         CompleteOrderServer(obj.What);
     }
@@ -192,43 +185,25 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
         });
     }
 
-    private void SendOrderCompleted(OrderCompleted obj)
-    {
-        if (!objectManager.TryGetIdWithLogging(obj.Town, out var townId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.CompleterHero, out var completerHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.MainHero, out var mainHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.CraftingOrder, out var craftingOrderId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.CraftedItem, out var craftedItemId)) return;
-
-        // Send to clients from server
-        NetworkCompleteOrderServer message = new(
-            townId,
-            craftingOrderId,
-            craftedItemId,
-            completerHeroId,
-            mainHeroId,
-            obj.Flag
-        );
-        network.SendAll(message);
-    }
-
-    private void CompleteOrderServer(NetworkCompleteOrderServer obj)
+    private void CompleteOrderServer(CompleteOrderServer data)
     {
         GameThread.RunSafe(() =>
         {
             if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.MainHeroId, out Hero mainHero)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
+
+            var craftingOrder = data.CraftingOrder;
+            var craftedItem = data.CraftedItem;
+            var town = data.Town;
+            var completerHero = data.CompleterHero;
 
             // Replace TaleWorlds implementation
             int amount = craftingBehavior.CalculateOrderPriceDifference(craftingOrder, craftedItem);
-            GiveGoldAction.ApplyBetweenCharacters(null, mainHero, amount, false);
+            GiveGoldAction.ApplyBetweenCharacters(null, data.MainHero, amount, false);
 
             Hero orderOwner = craftingOrder.OrderOwner;
             CraftingOrder previousOrder = null;
+
+            craftingBehavior.GetOrderResult(craftingOrder, craftedItem, out var isSucceed, out _, out _, out _);
             if (craftingBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))
             {
                 craftingBehavior._craftingOrders[town].RemoveCustomOrder(craftingOrder);
@@ -242,7 +217,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
                     {
                         craftingBehavior.GiveTroopToNobleAtWeaponTier((int)craftedItem.Tier, orderOwner);
                     }
-                    if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.SteelMaker3))
+                    if (isSucceed && completerHero.GetPerkValue(DefaultPerks.Crafting.SteelMaker3))
                     {
                         ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.SteelMaker3.SecondaryBonus, true);
                     }
@@ -250,7 +225,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
                 else
                 {
                     orderOwner.AddPower((float)(craftedItem.Tier + 1));
-                    if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.ExperiencedSmith))
+                    if (isSucceed && completerHero.GetPerkValue(DefaultPerks.Crafting.ExperiencedSmith))
                     {
                         ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.ExperiencedSmith.SecondaryBonus, true);
                     }
@@ -262,7 +237,12 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
 
             CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
 
-            network.SendAll(new NetworkCompleteOrderClients(obj));
+            if (!objectManager.TryGetIdWithLogging(data.Town, out var townId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.CraftingOrder, out var craftingOrderId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.CraftedItem, out var craftedItemId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.CompleterHero, out var completerHeroId)) return;
+
+            network.SendAll(new NetworkCompleteOrderClients(townId, craftingOrderId, craftedItemId, completerHeroId));
 
             // Remove previous order from objectManager
             // Queue destroying the instance after sending NetworkCompleteOrderClients message
@@ -282,7 +262,7 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
+            //if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
 
             using (new AllowedThread())
             {
@@ -296,7 +276,8 @@ internal class CraftingCampaignBehaviorTownOrderHandler : IHandler
                     craftingBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
                 }
 
-                CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
+                // Crafted item hasn't been created by this point. This call might be needed on clients later though for quests
+                //CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
 
                 MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(town));
             }

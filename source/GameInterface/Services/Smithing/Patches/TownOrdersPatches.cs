@@ -89,17 +89,7 @@ internal class TownOrdersPatches
     [HarmonyPrefix]
     public static bool CompleteOrderPrefix(ref CraftingCampaignBehavior __instance, Town town, CraftingOrder craftingOrder, ItemObject craftedItem, Hero completerHero)
     {
-        bool flag = false;
-        using (new AllowedThread())
-        {
-            __instance.GetOrderResult(craftingOrder, craftedItem, out flag, out var _, out var _, out var _);
-        }
-
-        // Publish message with data
-        var message = new OrderCompleted(town, craftingOrder, craftedItem, completerHero, Hero.MainHero, flag);
-        MessageBroker.Instance.Publish(__instance, message);
-
-        // Skip original
+        // Skip original, handled by server
         return false;
     }
 }

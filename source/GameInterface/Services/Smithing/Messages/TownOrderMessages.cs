@@ -31,23 +31,26 @@ public readonly struct CraftingOrderReplaced : IEvent
     }
 }
 
-public readonly struct OrderCompleted : IEvent
+public readonly struct CompleteOrderServer : IEvent
 {
     public readonly Town Town;
     public readonly CraftingOrder CraftingOrder;
     public readonly ItemObject CraftedItem;
     public readonly Hero CompleterHero;
     public readonly Hero MainHero;
-    public readonly bool Flag;
 
-    public OrderCompleted(Town town, CraftingOrder craftingOrder, ItemObject craftedItem, Hero completerHero, Hero mainHero, bool flag)
+    public CompleteOrderServer(
+        Town town,
+        CraftingOrder craftingOrder,
+        ItemObject craftedItem,
+        Hero completerHero,
+        Hero mainHero)
     {
         Town = town;
         CraftingOrder = craftingOrder;
         CraftedItem = craftedItem;
         CompleterHero = completerHero;
         MainHero = mainHero;
-        Flag = flag;
     }
 }
 
@@ -96,38 +99,6 @@ internal readonly struct NetworkReplaceCraftingOrder : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkCompleteOrderServer : ICommand
-{
-    [ProtoMember(1)]
-    public readonly string TownId;
-
-    [ProtoMember(2)]
-    public readonly string CraftingOrderId;
-
-    [ProtoMember(3)]
-    public readonly string CraftedItemId;
-
-    [ProtoMember(4)]
-    public readonly string CompleterHeroId;
-
-    [ProtoMember(5)]
-    public readonly string MainHeroId;
-
-    [ProtoMember(6)]
-    public readonly bool Flag;
-
-    public NetworkCompleteOrderServer(string townId, string craftingOrderId, string craftedItemId, string completerHeroId, string mainHeroId, bool flag)
-    {
-        TownId = townId;
-        CraftingOrderId = craftingOrderId;
-        CraftedItemId = craftedItemId;
-        CompleterHeroId = completerHeroId;
-        MainHeroId = mainHeroId;
-        Flag = flag;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkCompleteOrderClients : ICommand
 {
     [ProtoMember(1)]
@@ -142,11 +113,15 @@ internal readonly struct NetworkCompleteOrderClients : ICommand
     [ProtoMember(4)]
     public readonly string CompleterHeroId;
 
-    public NetworkCompleteOrderClients(NetworkCompleteOrderServer cloneObject)
+    public NetworkCompleteOrderClients(
+        string townId,
+        string craftingOrderId,
+        string craftedItemId,
+        string completerHeroId)
     {
-        TownId = cloneObject.TownId;
-        CraftingOrderId = cloneObject.CraftingOrderId;
-        CraftedItemId = cloneObject.CraftedItemId;
-        CompleterHeroId = cloneObject.CompleterHeroId;
+        TownId = townId;
+        CraftingOrderId = craftingOrderId;
+        CraftedItemId = craftedItemId;
+        CompleterHeroId = completerHeroId;
     }
 }

@@ -22,18 +22,15 @@ internal class SmithingVMsHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ISmithingVMsProvider smithingVMsProvider;
-    private readonly ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface;
 
     public SmithingVMsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ISmithingVMsProvider smithingVMsProvider,
-        ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface)
+        ISmithingVMsProvider smithingVMsProvider)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.smithingVMsProvider = smithingVMsProvider;
-        this.craftingCampaignBehaviorInterface = craftingCampaignBehaviorInterface;
 
         messageBroker.Subscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
         messageBroker.Subscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
@@ -44,8 +41,6 @@ internal class SmithingVMsHandler : IHandler
         messageBroker.Subscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
         messageBroker.Subscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
         messageBroker.Subscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
-
-        messageBroker.Subscribe<CompleteOrderFromVM>(Handle_CompleteOrderFromVM);
     }
 
     public void Dispose()
@@ -59,8 +54,6 @@ internal class SmithingVMsHandler : IHandler
         messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
         messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
         messageBroker.Unsubscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
-
-        messageBroker.Unsubscribe<CompleteOrderFromVM>(Handle_CompleteOrderFromVM);
     }
 
     private void Handle_SmeltingVMCreated(MessagePayload<SmeltingVMCreated> obj)
@@ -129,28 +122,6 @@ internal class SmithingVMsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             RefreshCraftingVM();
-        });
-    }
-
-    private void Handle_CompleteOrderFromVM(MessagePayload<CompleteOrderFromVM> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
-
-            if (currentWeaponDesignVM == null) return;
-
-            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
-
-            if (!craftingBehavior._craftingOrders[obj.What.CurrentSettlement.Town].Slots.Any(x => x == obj.What.CraftingOrder)) return;
-
-            currentWeaponDesignVM._craftingBehavior.CompleteOrder(
-                obj.What.CurrentSettlement.Town,
-                obj.What.CraftingOrder,
-                obj.What.CraftedItemObject,
-                obj.What.CraftingHero);
-
-            currentWeaponDesignVM.CraftedItemObject = null;
         });
     }
 
