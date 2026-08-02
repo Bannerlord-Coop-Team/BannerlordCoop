@@ -34,6 +34,9 @@ jobs:
     timeout-minutes: 30
     container:
       image: garrettluskey/bannerlordcoop:latest
+    outputs:
+      file_name: ${{ steps.artifact.outputs.file_name }}
+      head_sha: ${{ steps.artifact.outputs.head_sha }}
 
     steps:
       - name: Checkout requested commit
@@ -101,18 +104,11 @@ jobs:
           head_sha=$(git rev-parse HEAD)
           short_sha=$(printf '%.7s' "$head_sha")
           file_name="Coop $short_sha.7z"
-          mkdir -p artifact
           printf 'file_name=%s\nhead_sha=%s\n' "$file_name" "$head_sha" >> "$GITHUB_OUTPUT"
 
-      - name: Package module
-        env:
-          FILE_NAME: ${{ steps.artifact.outputs.file_name }}
-          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
-          SERVER_SHA: ${{ inputs.server_sha }}
-          BUILD_ID: ${{ inputs.build_id }}
+      - name: Stage module
         run: |
           set -eu
-          apk add --no-cache 7zip >/dev/null
           module=release-stage/Coop
           binary="$module/bin/Win64_Shipping_Client"
           mkdir -p "$binary" "$module/GUI/Prefabs"
@@ -143,6 +139,70 @@ jobs:
             -e "s/\${game_version}/$game_version/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
 
+      - name: Upload unsigned module
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-module
+          path: release-stage/
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-and-package:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download unsigned module
+        uses: actions/download-artifact@v8
+        with:
+          name: unsigned-module
+          path: release-stage
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign module binaries
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.SIGNING_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}\release-stage\Coop\bin\Win64_Shipping_Client
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify signatures
+        shell: pwsh
+        run: |
+          $binaries = @(Get-ChildItem 'release-stage\Coop\bin\Win64_Shipping_Client\*' -Include '*.dll', '*.exe')
+          if ($binaries.Count -eq 0) { throw 'No module binaries found to verify' }
+          $unsigned = @($binaries | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' })
+          foreach ($file in $unsigned) {
+            Write-Host "Not validly signed: $($file.Name) ($((Get-AuthenticodeSignature $file.FullName).Status))"
+          }
+          if ($unsigned.Count -gt 0) { throw "$($unsigned.Count) of $($binaries.Count) binaries are not validly signed" }
+          Write-Host "Verified Authenticode signatures on $($binaries.Count) binaries"
+
+      - name: Package module
+        shell: bash
+        env:
+          FILE_NAME: ${{ needs.build.outputs.file_name }}
+          HEAD_SHA: ${{ needs.build.outputs.head_sha }}
+          SERVER_SHA: ${{ inputs.server_sha }}
+          BUILD_ID: ${{ inputs.build_id }}
+        run: |
+          set -eu
+          mkdir -p artifact
           (cd release-stage && 7z a -t7z -m0=LZMA2 -mx=9 -ms=on \
             "../artifact/$FILE_NAME" Coop >/dev/null)
           release_size=$(stat -c %s "artifact/$FILE_NAME")
@@ -161,19 +221,23 @@ jobs:
             "$R2_PRIVATE_BUCKET" "$r2_key" "$archive_bytes" "$archive_sha256" \
             > artifact/manifest.json
 
+      - name: Install rclone
+        shell: bash
+        run: choco install rclone -y --no-progress >/dev/null
+
       - name: Publish temporary dedicated-server client input
+        shell: bash
         env:
           RCLONE_CONFIG_R2_TYPE: s3
           RCLONE_CONFIG_R2_PROVIDER: Cloudflare
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PRIVATE_ACCESS_KEY_ID }}
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PRIVATE_SECRET_ACCESS_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          FILE_NAME: ${{ steps.artifact.outputs.file_name }}
-          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
+          FILE_NAME: ${{ needs.build.outputs.file_name }}
+          HEAD_SHA: ${{ needs.build.outputs.head_sha }}
           BUILD_ID: ${{ inputs.build_id }}
         run: |
           set -eu
-          apk add --no-cache rclone >/dev/null
           test -n "$R2_ACCOUNT_ID"
           export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           prefix="manual/$BUILD_ID/client"
@@ -191,7 +255,7 @@ jobs:
       - name: Upload manual build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: manual-build-${{ steps.artifact.outputs.head_sha }}
+          name: manual-build-${{ needs.build.outputs.head_sha }}
           path: artifact/*
           compression-level: 0
           if-no-files-found: error
