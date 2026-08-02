@@ -5,11 +5,13 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Utils;
 using HarmonyLib;
 using Helpers;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
@@ -297,4 +299,18 @@ public class ArmyPatches
             army._aiBehaviorObject = mapPoint;
         }
     }
+}
+[HarmonyPatch]
+internal class ArmyMainPartyComparisonPatch
+{
+    [HarmonyTargetMethods]
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(Army), nameof(Army.CheckArmyDispersion));
+        yield return AccessTools.Method(typeof(Army), nameof(Army.HourlyTick));
+    }
+
+    [HarmonyTranspiler]
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        => MainPartyComparisonTranspiler.ReplaceMainPartyComparisonsWithIsPlayerParty(instructions);
 }

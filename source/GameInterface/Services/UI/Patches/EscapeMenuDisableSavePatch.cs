@@ -9,7 +9,7 @@ using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 namespace GameInterface.Services.UI.Patches
 {
     /// <summary>
-    /// Greys out the "Save" and "Save As" buttons in the client's campaign-map escape menu.
+    /// Greys out the "Save" and "Save As" and "Save and Exit" buttons in the client's campaign-map escape menu.
     /// </summary>
     [HarmonyPatch(typeof(MapScreen), "GetEscapeMenuItems")]
     internal class EscapeMenuDisableSavePatch
@@ -19,6 +19,7 @@ namespace GameInterface.Services.UI.Patches
         // the item is replaced with a clone whose func always reports disabled.
         private static readonly TextObject SaveButtonText = new TextObject("{=bV75iwKa}Save");
         private static readonly TextObject SaveAsButtonText = new TextObject("{=e0KdfaNe}Save As");
+        private static readonly TextObject SaveAndExitButtonText = new TextObject("{=AbEh2y8o}Save And Exit");
         private static readonly TextObject DisabledReason =
             new TextObject("Saving is disabled on clients; the host saves the campaign.");
 
@@ -29,6 +30,7 @@ namespace GameInterface.Services.UI.Patches
 
             DisableItem(__result, SaveButtonText);
             DisableItem(__result, SaveAsButtonText);
+            DisableItem(__result, SaveAndExitButtonText);
         }
 
         private static void DisableItem(List<EscapeMenuItemVM> items, TextObject buttonText)
