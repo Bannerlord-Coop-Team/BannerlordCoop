@@ -5,10 +5,10 @@ using Common.Logging;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Utils.Commands;
-using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -138,7 +138,6 @@ internal class CompanionsCommands
 
         try
         {
-            PlayerEncounter.Start();
             Campaign.Current.CurrentConversationContext = ConversationContext.PartyEncounter;
             CampaignMapConversation.OpenConversation(
                 new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true),
@@ -152,7 +151,6 @@ internal class CompanionsCommands
         {
             if (Campaign.Current.ConversationManager.IsConversationInProgress)
                 Campaign.Current.ConversationManager.EndConversation();
-            Campaign.Current.PlayerEncounter = null;
             return "Failed to open the live role conversation: " + exception.Message;
         }
     }
@@ -199,14 +197,12 @@ internal class CompanionsCommands
         {
             behavior.companion_becomes_scout_on_consequence();
             Campaign.Current.ConversationManager.EndConversation();
-            Campaign.Current.PlayerEncounter = null;
             return $"ROLE_CONVERSATION_ASSIGNED companion={companion.StringId} role=Scout conversationHeroMatched=True";
         }
         catch (Exception exception)
         {
             if (Campaign.Current.ConversationManager.IsConversationInProgress)
                 Campaign.Current.ConversationManager.EndConversation();
-            Campaign.Current.PlayerEncounter = null;
             return "Failed to assign the live conversation role: " + exception.Message;
         }
     }
