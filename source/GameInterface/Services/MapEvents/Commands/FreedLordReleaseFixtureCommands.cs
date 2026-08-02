@@ -177,8 +177,8 @@ internal static class FreedLordReleaseFixtureCommands
             partySnapshots,
             heroSnapshots,
             clanSnapshots,
-            CharacterRelationManager.GetHeroRelation(playerHero, mesui),
-            CharacterRelationManager.GetHeroRelation(playerHero, bagai),
+            GetEffectiveRelation(playerHero, mesui),
+            GetEffectiveRelation(playerHero, bagai),
             AiLordPeaceReleaseFixtureCommands.StanceLinkSnapshot.Capture(playerFaction, captorFaction));
         fixture = pendingFixture;
 
@@ -226,6 +226,7 @@ internal static class FreedLordReleaseFixtureCommands
                 playerPartyId,
                 mapEventId));
 
+            StartRelationObservation(pendingFixture);
             return FormatServerState("Freed-lord release fixture started", pendingFixture, mapEventId);
         }
         catch (Exception setupException)
@@ -592,18 +593,77 @@ internal static class FreedLordReleaseFixtureCommands
         output.AppendLine($"Setting=west of Danustica|Settlement={activeFixture.Settlement.StringId}|{activeFixture.Settlement.Name}");
         output.AppendLine($"MapEvent={mapEventId}|Finalized={activeFixture.MapEvent?.IsFinalized.ToString() ?? "none"}|EnemiesRouted={activeFixture.EnemiesRouted}");
         output.AppendLine($"Captor={activeFixture.Rhagaea.StringId}|Party={activeFixture.CaptorParty?.StringId ?? "none"}|Active={activeFixture.CaptorParty?.IsActive.ToString() ?? "none"}");
-        AppendServerHeroState(output, activeFixture.PlayerHero, activeFixture.Mesui, activeFixture.MesuiRelation);
-        AppendServerHeroState(output, activeFixture.PlayerHero, activeFixture.Bagai, activeFixture.BagaiRelation);
+        AppendServerHeroState(
+            output,
+            activeFixture.PlayerHero,
+            activeFixture.Mesui,
+            activeFixture.MesuiRelation,
+            activeFixture.MesuiRelationValues);
+        AppendServerHeroState(
+            output,
+            activeFixture.PlayerHero,
+            activeFixture.Bagai,
+            activeFixture.BagaiRelation,
+            activeFixture.BagaiRelationValues);
         output.Append($"AtWar={activeFixture.PlayerHero.MapFaction.IsAtWarWith(activeFixture.Rhagaea.MapFaction)}|OriginallyAtWar={activeFixture.Stance.WasAtWar}");
         return output.ToString();
     }
 
-    private static void AppendServerHeroState(StringBuilder output, Hero playerHero, Hero lord, int baselineRelation)
+    private static void AppendServerHeroState(
+        StringBuilder output,
+        Hero playerHero,
+        Hero lord,
+        int baselineRelation,
+        IReadOnlyCollection<int> relationValues)
     {
-        int relation = CharacterRelationManager.GetHeroRelation(playerHero, lord);
+        int relation = GetEffectiveRelation(playerHero, lord);
         output.AppendLine($"FreedLord={lord.StringId}|Name={lord.Name}|IsPrisoner={lord.IsPrisoner}|" +
                           $"CaptorParty={FormatPartyBaseId(lord.PartyBelongedToAsPrisoner)}|" +
-                          $"Relation={relation}|BaselineRelation={baselineRelation}|Delta={relation - baselineRelation}");
+                          $"Relation={relation}|BaselineRelation={baselineRelation}|Delta={relation - baselineRelation}|" +
+                          $"RelationChanges={relationValues.Count}|" +
+                          $"RelationValues={(relationValues.Count == 0 ? "none" : string.Join(",", relationValues))}");
+    }
+
+    private static void StartRelationObservation(FreedLordReleaseFixture activeFixture)
+    {
+        CampaignEvents.HeroRelationChanged.AddNonSerializedListener(
+            activeFixture,
+            (effectiveHero, effectiveGainedRelationWith, _, _, _, originalHero, originalGainedRelationWith) =>
+            {
+                int relation = CharacterRelationManager.GetHeroRelation(effectiveHero, effectiveGainedRelationWith);
+                if (IsRelationPair(originalHero, originalGainedRelationWith, activeFixture.PlayerHero, activeFixture.Mesui))
+                    activeFixture.MesuiRelationValues.Add(relation);
+                else if (IsRelationPair(originalHero, originalGainedRelationWith, activeFixture.PlayerHero, activeFixture.Bagai))
+                    activeFixture.BagaiRelationValues.Add(relation);
+            });
+    }
+
+    private static bool IsRelationPair(Hero hero1, Hero hero2, Hero first, Hero second) =>
+        (hero1 == first && hero2 == second) || (hero1 == second && hero2 == first);
+
+    private static void StopRelationObservation(FreedLordReleaseFixture activeFixture)
+    {
+        CampaignEvents.HeroRelationChanged.ClearListeners(activeFixture);
+    }
+
+    private static int GetEffectiveRelation(Hero hero1, Hero hero2)
+    {
+        Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+            hero1,
+            hero2,
+            out var effectiveHero1,
+            out var effectiveHero2);
+        return CharacterRelationManager.GetHeroRelation(effectiveHero1, effectiveHero2);
+    }
+
+    private static void SetEffectiveRelation(Hero hero1, Hero hero2, int value)
+    {
+        Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(
+            hero1,
+            hero2,
+            out var effectiveHero1,
+            out var effectiveHero2);
+        CharacterRelationManager.SetHeroRelation(effectiveHero1, effectiveHero2, value);
     }
 
     private static string FormatPartyBaseId(PartyBase party) =>
@@ -613,6 +673,7 @@ internal static class FreedLordReleaseFixtureCommands
         FreedLordReleaseFixture activeFixture,
         IMobilePartyBehaviorSnapshot behaviorSnapshot)
     {
+        StopRelationObservation(activeFixture);
         if (activeFixture.MapEvent != null && !activeFixture.MapEvent.IsFinalized)
             activeFixture.MapEvent.FinalizeEvent();
 
@@ -634,8 +695,8 @@ internal static class FreedLordReleaseFixtureCommands
         foreach (var clan in activeFixture.Clans)
             RestoreClan(clan);
 
-        CharacterRelationManager.SetHeroRelation(activeFixture.PlayerHero, activeFixture.Mesui, activeFixture.MesuiRelation);
-        CharacterRelationManager.SetHeroRelation(activeFixture.PlayerHero, activeFixture.Bagai, activeFixture.BagaiRelation);
+        SetEffectiveRelation(activeFixture.PlayerHero, activeFixture.Mesui, activeFixture.MesuiRelation);
+        SetEffectiveRelation(activeFixture.PlayerHero, activeFixture.Bagai, activeFixture.BagaiRelation);
         activeFixture.Stance.Restore(true);
     }
 
@@ -789,9 +850,9 @@ internal static class FreedLordReleaseFixtureCommands
                 clan.Clan._tier != clan.Tier)
                 return $"progression differs for clan {clan.Clan.StringId}.";
         }
-        if (CharacterRelationManager.GetHeroRelation(restoredFixture.PlayerHero, restoredFixture.Mesui) != restoredFixture.MesuiRelation)
+        if (GetEffectiveRelation(restoredFixture.PlayerHero, restoredFixture.Mesui) != restoredFixture.MesuiRelation)
             return "Mesui relation differs from the baseline.";
-        if (CharacterRelationManager.GetHeroRelation(restoredFixture.PlayerHero, restoredFixture.Bagai) != restoredFixture.BagaiRelation)
+        if (GetEffectiveRelation(restoredFixture.PlayerHero, restoredFixture.Bagai) != restoredFixture.BagaiRelation)
             return "Bagai relation differs from the baseline.";
         return restoredFixture.Stance.VerifyRestored();
     }
@@ -835,6 +896,8 @@ internal static class FreedLordReleaseFixtureCommands
         public ClanSnapshot[] Clans { get; }
         public int MesuiRelation { get; }
         public int BagaiRelation { get; }
+        public List<int> MesuiRelationValues { get; } = new List<int>();
+        public List<int> BagaiRelationValues { get; } = new List<int>();
         public AiLordPeaceReleaseFixtureCommands.StanceLinkSnapshot Stance { get; }
         public MobileParty CaptorParty { get; set; }
         public MapEvent MapEvent { get; set; }
