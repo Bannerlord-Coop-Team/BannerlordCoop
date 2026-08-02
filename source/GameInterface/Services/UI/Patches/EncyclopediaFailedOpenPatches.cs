@@ -56,9 +56,20 @@ internal class EncyclopediaFailedOpenPatches
 [HarmonyPatch(typeof(GauntletLayer), nameof(GauntletLayer.ReleaseMovie))]
 internal class ReleaseMissingMovieRobustnessPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ReleaseMissingMovieRobustnessPatch>();
+
     // Vanilla reports an unknown identifier through Debug.FailedAssert, which reads
     // identifier.MovieName and so throws before it can report a null one. Skipping the call leaves
     // every caller that owns a real movie untouched, and lets a caller holding none finish closing.
     [HarmonyPrefix]
-    internal static bool SkipMissingIdentifier(GauntletMovieIdentifier identifier) => identifier != null;
+    internal static bool SkipMissingIdentifier(GauntletMovieIdentifier identifier)
+    {
+        if (identifier != null) return true;
+
+        // This guard covers every gauntlet layer, not just the encyclopedia, so say when it fires.
+        // A silent skip would hide the next screen that loses track of its movie the same way.
+        Logger.Error("Skipped releasing a null movie identifier; a layer was closed without one");
+
+        return false;
+    }
 }
