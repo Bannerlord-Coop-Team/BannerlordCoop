@@ -20,30 +20,33 @@ public readonly struct ModOptions
     [ProtoMember(2)]
     public readonly bool AutoPauseEnabled { get; } = true;
     [ProtoMember(3)]
-    public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = true;
+    public readonly bool ClientsCanUseCheats { get; } = false;
     [ProtoMember(4)]
-    public readonly GoldFoodChangeMode GoldFoodInfluenceChangeInBattles { get; } = GoldFoodChangeMode.OneDayMax;
+    public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = true;
     [ProtoMember(5)]
-    public readonly bool GoldFoodInfluenceChangeForDisconnectedPlayers { get; } = false;
+    public readonly GoldFoodChangeMode GoldFoodInfluenceChangeInBattles { get; } = GoldFoodChangeMode.OneDayMax;
     [ProtoMember(6)]
-    public readonly int PlayerBattleAiJoinWindowHours { get; } = 24;
+    public readonly bool GoldFoodInfluenceChangeForDisconnectedPlayers { get; } = false;
     [ProtoMember(7)]
-    public readonly bool SpeedLimitWhilePlayersInBattle { get; } = false;
+    public readonly int PlayerBattleAiJoinWindowHours { get; } = 24;
     [ProtoMember(8)]
-    public readonly int WandererLimit { get; } = 32;
+    public readonly bool SpeedLimitWhilePlayersInBattle { get; } = false;
     [ProtoMember(9)]
-    public readonly int PlayerKingdomClanTierRequired { get; } = 4;
+    public readonly int WandererLimit { get; } = 32;
     [ProtoMember(10)]
-    public readonly bool SmithingStaminaRecoveryOutsideSettlements { get; } = true;
+    public readonly int PlayerKingdomClanTierRequired { get; } = 4;
     [ProtoMember(11)]
-    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
+    public readonly bool SmithingStaminaRecoveryOutsideSettlements { get; } = true;
     [ProtoMember(12)]
+    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
+    [ProtoMember(13)]
     public readonly float MaximumBanditsMultiplier { get; } = 1f;
 
     public ModOptions(ModOptionsData modOptionsData)
     {
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
         AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;
+        ClientsCanUseCheats = modOptionsData.ClientsCanUseCheats ?? ClientsCanUseCheats;
         GoldFoodInfluenceChangeInSettlements = modOptionsData.GoldFoodInfluenceChangeInSettlements ?? GoldFoodInfluenceChangeInSettlements;
         GoldFoodInfluenceChangeInBattles = modOptionsData.GoldFoodInfluenceChangeInBattles ?? GoldFoodInfluenceChangeInBattles;
         GoldFoodInfluenceChangeForDisconnectedPlayers = modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers ?? GoldFoodInfluenceChangeForDisconnectedPlayers;

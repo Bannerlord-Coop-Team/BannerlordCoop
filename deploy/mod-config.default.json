@@ -38,6 +38,11 @@
     // false: Auto pause is disabled. The game will still automatically pause for clients catching up and when there are no players online.
     "autoPauseEnabled": true,
 
+    // Toggle clients being able to use cheats
+    // Vanilla bannerlord commands are always disabled on clients but this disables cheating in troops, equipment, teleporting etc.
+    // Default is false.
+    "clientsCanUseCheats": false,
+
     // Toggle Gold & food change while in settlements. THIS INCLUDES INCOME
     // false: Gold & food will remain the same while being in a settlement, including walking around the settlement, participating in tournaments etc.
     // (Default) true: Gold & food will change the same in settlements as on the campaign map.
