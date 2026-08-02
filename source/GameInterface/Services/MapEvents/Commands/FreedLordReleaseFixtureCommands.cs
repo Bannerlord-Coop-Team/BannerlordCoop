@@ -42,8 +42,9 @@ internal static class FreedLordReleaseFixtureCommands
     private const string RhagaeaId = "lord_1_14";
     private const string MesuiId = "lord_6_4";
     private const string BagaiId = "lord_6_3";
-    private const string ReleaseOptionId = "talk_lord_freed_to_lord_release";
-    private const string DefeatCaptureOptionId = "talk_lord_defeat_to_lord_capture";
+    private const string FreedReleaseOptionId = "talk_lord_freed_to_lord_release";
+    private const string LiberateStartOptionId = "liberate_hero_3";
+    private const string LiberateFinishOptionId = "liberate_hero_7";
     private const int PlayerTroops = 80;
     private const int CaptorTroops = 6;
 
@@ -313,7 +314,8 @@ internal static class FreedLordReleaseFixtureCommands
         output.AppendLine("ConversationInProgress=" + (conversationManager?.IsConversationInProgress.ToString() ?? "False"));
         output.AppendLine("ConversationHero=" + (Hero.OneToOneConversationHero?.StringId ?? "none"));
         output.AppendLine("ConversationOptions=" + (options == null ? "none" : string.Join(",", options.Select(option => option.Id))));
-        output.AppendLine("ReleaseOptionAvailable=" + (options?.Any(option => option.Id == ReleaseOptionId) == true));
+        output.AppendLine("ReleaseOptionAvailable=" +
+                          (options?.Any(option => option.Id == FreedReleaseOptionId || option.Id == LiberateStartOptionId) == true));
         AppendClientHeroState(output, MesuiId, pending);
         AppendClientHeroState(output, BagaiId, pending);
         return output.ToString().TrimEnd();
@@ -332,33 +334,30 @@ internal static class FreedLordReleaseFixtureCommands
             return "No freed-lord conversation is active.";
         if (Hero.OneToOneConversationHero?.StringId != args[0])
             return $"The active conversation hero is {Hero.OneToOneConversationHero?.StringId ?? "none"}, not {args[0]}.";
-        if (conversationManager.CurOptions?.Any(option => option.Id == ReleaseOptionId) != true)
-            return $"The native {ReleaseOptionId} option is not available.";
+        var optionIds = conversationManager.CurOptions?.Select(option => option.Id).ToArray() ?? Array.Empty<string>();
+        string selectedOptions;
+        if (optionIds.Contains(FreedReleaseOptionId))
+        {
+            conversationManager.DoOption(FreedReleaseOptionId);
+            selectedOptions = FreedReleaseOptionId;
+        }
+        else if (optionIds.Contains(LiberateStartOptionId))
+        {
+            conversationManager.DoOption(LiberateStartOptionId);
+            if (conversationManager.CurOptions?.Any(option => option.Id == LiberateFinishOptionId) != true)
+                return $"The native {LiberateFinishOptionId} option is not available after {LiberateStartOptionId}.";
 
-        conversationManager.DoOption(ReleaseOptionId);
+            conversationManager.DoOption(LiberateFinishOptionId);
+            selectedOptions = LiberateStartOptionId + "," + LiberateFinishOptionId;
+        }
+        else
+        {
+            return $"No native freed-lord release option is available; options={string.Join(",", optionIds)}.";
+        }
+
         ClientSelections.TryGetValue(args[0], out int count);
         ClientSelections[args[0]] = count + 1;
-        return $"Selected native option {ReleaseOptionId} for {args[0]}; selections={count + 1}.";
-    }
-
-    [CommandLineArgumentFunction("freed_lord_defeated_captor_choose_capture", "coop.debug.mapevent")]
-    public static string ChooseDefeatedCaptorCapture(List<string> args)
-    {
-        if (ModInformation.IsServer)
-            return "Run this command on a client.";
-        if (args.Count != 0)
-            return "Usage: coop.debug.mapevent.freed_lord_defeated_captor_choose_capture";
-
-        var conversationManager = Campaign.Current?.ConversationManager;
-        if (conversationManager?.IsConversationInProgress != true)
-            return "No defeated-captor conversation is active.";
-        if (Hero.OneToOneConversationHero?.StringId != RhagaeaId)
-            return $"The active conversation hero is {Hero.OneToOneConversationHero?.StringId ?? "none"}, not {RhagaeaId}.";
-        if (conversationManager.CurOptions?.Any(option => option.Id == DefeatCaptureOptionId) != true)
-            return $"The native {DefeatCaptureOptionId} option is not available.";
-
-        conversationManager.DoOption(DefeatCaptureOptionId);
-        return $"Selected native option {DefeatCaptureOptionId} for {RhagaeaId}.";
+        return $"Selected native option(s) {selectedOptions} for {args[0]}; selections={count + 1}.";
     }
 
     [CommandLineArgumentFunction("freed_lord_release_fixture_restore", "coop.debug.mapevent")]

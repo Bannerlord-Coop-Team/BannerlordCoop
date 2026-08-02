@@ -18,6 +18,7 @@ internal class LordConversationsCampaignBehaviorPatches
     {
         var message = new LiberateLordPrisoner(Hero.MainHero, Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(null, message);
+        MarkFreedLordConversationHandled(Hero.OneToOneConversationHero);
 
         return false;
     }

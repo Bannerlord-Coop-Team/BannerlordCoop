@@ -82,13 +82,10 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var playerHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
+            if (!conversationHero.IsPrisoner) return;
 
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, conversationHero, PrisonerLiberationRelationReward);
-
-            if (conversationHero.IsPrisoner)
-            {
-                EndCaptivityAction.ApplyByReleasedAfterBattle(conversationHero);
-            }
+            EndCaptivityAction.ApplyByReleasedAfterBattle(conversationHero);
         },
         context: nameof(Handle_NetworkLiberateLordPrisoner));
     }
