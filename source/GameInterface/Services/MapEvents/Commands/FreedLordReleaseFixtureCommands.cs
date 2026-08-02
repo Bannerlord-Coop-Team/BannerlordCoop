@@ -73,15 +73,17 @@ internal static class FreedLordReleaseFixtureCommands
             !TryValidateFixtureHero(bagai, out error))
             return error;
 
-        var parties = new[] { playerParty, rhagaea.PartyBelongedTo, mesui.PartyBelongedTo, bagai.PartyBelongedTo };
-        if (parties.Any(party => party == null) || parties.Distinct().Count() != parties.Length)
-            return "The player, Rhagaea, Mesui, and Bagai must each lead a different party.";
+        var parties = new[] { playerParty, rhagaea.PartyBelongedTo, mesui.PartyBelongedTo, bagai.PartyBelongedTo }
+            .Where(party => party != null)
+            .ToArray();
+        if (parties.Distinct().Count() != parties.Length)
+            return "Existing fixture parties must be different.";
         if (parties.Any(party => !party.IsActive || party.MapEvent != null || party.Army != null))
             return "Every fixture party must be active and outside armies and map events.";
-        if (rhagaea.PartyBelongedTo.LeaderHero != rhagaea ||
-            mesui.PartyBelongedTo.LeaderHero != mesui ||
-            bagai.PartyBelongedTo.LeaderHero != bagai)
-            return "Rhagaea, Mesui, and Bagai must each lead their own party.";
+        if (rhagaea.PartyBelongedTo == null || rhagaea.PartyBelongedTo.LeaderHero != rhagaea ||
+            (mesui.PartyBelongedTo != null && mesui.PartyBelongedTo.LeaderHero != mesui) ||
+            (bagai.PartyBelongedTo != null && bagai.PartyBelongedTo.LeaderHero != bagai))
+            return "Rhagaea must lead her party; Mesui and Bagai must lead any party they belong to.";
         if (Settlement.Find(DanusticaId) == null)
             return "Danustica (town_ES1) was not found.";
         if (playerHero.MapFaction == null || rhagaea.MapFaction == null || playerHero.MapFaction == rhagaea.MapFaction)
@@ -126,15 +128,15 @@ internal static class FreedLordReleaseFixtureCommands
             rhagaea.PartyBelongedTo,
             mesui.PartyBelongedTo,
             bagai.PartyBelongedTo,
-        };
-        if (sourceParties.Any(party => party == null) || sourceParties.Distinct().Count() != sourceParties.Length)
-            return "The player, Rhagaea, Mesui, and Bagai must each lead a different party.";
+        }.Where(party => party != null).ToArray();
+        if (sourceParties.Distinct().Count() != sourceParties.Length)
+            return "Existing fixture parties must be different.";
         if (sourceParties.Any(party => !party.IsActive || party.MapEvent != null || party.Army != null))
             return "Every fixture party must be active and outside armies and map events.";
-        if (rhagaea.PartyBelongedTo.LeaderHero != rhagaea ||
-            mesui.PartyBelongedTo.LeaderHero != mesui ||
-            bagai.PartyBelongedTo.LeaderHero != bagai)
-            return "Rhagaea, Mesui, and Bagai must each lead their own party.";
+        if (rhagaea.PartyBelongedTo == null || rhagaea.PartyBelongedTo.LeaderHero != rhagaea ||
+            (mesui.PartyBelongedTo != null && mesui.PartyBelongedTo.LeaderHero != mesui) ||
+            (bagai.PartyBelongedTo != null && bagai.PartyBelongedTo.LeaderHero != bagai))
+            return "Rhagaea must lead her party; Mesui and Bagai must lead any party they belong to.";
 
         var playerFaction = playerHero.MapFaction;
         var captorFaction = rhagaea.MapFaction;
@@ -441,9 +443,9 @@ internal static class FreedLordReleaseFixtureCommands
 
     private static bool TryValidateFixtureHero(Hero hero, out string error)
     {
-        if (!hero.IsAlive || !hero.IsActive || hero.IsPrisoner || hero.PartyBelongedTo == null)
+        if (!hero.IsAlive || !hero.IsActive || hero.IsPrisoner)
         {
-            error = $"{hero.Name} ({hero.StringId}) must be alive, active, free, and leading a party.";
+            error = $"{hero.Name} ({hero.StringId}) must be alive, active, and free.";
             return false;
         }
 
