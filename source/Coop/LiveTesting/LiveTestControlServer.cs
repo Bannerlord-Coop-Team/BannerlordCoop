@@ -167,7 +167,7 @@ namespace Coop.LiveTesting
                 return Failure(request.Id, "invalid_parameters", exception.Message, false);
             }
 
-            try
+            return ExecuteOnGameThread(request, () =>
             {
                 string directory = System.IO.Path.GetDirectoryName(screenshotPath);
                 if (string.IsNullOrEmpty(directory))
@@ -186,16 +186,7 @@ namespace Coop.LiveTesting
                     path = screenshotPath,
                     captureRequested = true,
                 });
-            }
-            catch (Exception exception)
-            {
-                Logger.Error(exception, "[LiveTest] {Method} request {RequestId} failed", request.Method, request.Id);
-                return Failure(
-                    request.Id,
-                    "operation_failed",
-                    exception.Message,
-                    true);
-            }
+            }, true);
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)

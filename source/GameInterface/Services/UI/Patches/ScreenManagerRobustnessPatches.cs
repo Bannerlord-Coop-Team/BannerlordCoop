@@ -12,7 +12,6 @@ namespace GameInterface.Services.UI.Patches;
 internal class ScreenManagerRobustnessPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ScreenManagerRobustnessPatches>();
-
     private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
     {
         AccessTools.Method(typeof(ScreenManager), nameof(ScreenManager.Tick))
