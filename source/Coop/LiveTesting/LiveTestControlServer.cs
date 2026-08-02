@@ -33,6 +33,7 @@ namespace Coop.LiveTesting
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
+        private readonly ILiveTestCommandDispatcher processCommandDispatcher = new LiveTestCommandDispatcher();
         private int shutdownScheduled;
 
         public LiveTestControlServer(bool isServer, string logFilePath)
@@ -118,14 +119,9 @@ namespace Coop.LiveTesting
 
             return ExecuteOnGameThread(request, () =>
             {
-                if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
-                {
-                    return Failure(
-                        request.Id,
-                        "session_not_ready",
-                        "The co-op session command dispatcher is not available yet.",
-                        false);
-                }
+                var dispatcher = ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var sessionDispatcher)
+                    ? sessionDispatcher
+                    : processCommandDispatcher;
 
                 LiveTestCommandResult result = dispatcher.Execute(command, arguments);
                 if (!result.Found)
@@ -241,9 +237,10 @@ namespace Coop.LiveTesting
                 }
             }
 
-            bool commandRegistryReady =
-                ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher) &&
-                dispatcher.EnsureReady();
+            var dispatcher = ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var sessionDispatcher)
+                ? sessionDispatcher
+                : processCommandDispatcher;
+            bool commandRegistryReady = dispatcher.EnsureReady();
             string activeState = GameStateManager.Current?.ActiveState?.GetType().FullName;
             string topScreen = ScreenManager.TopScreen?.GetType().FullName;
             string activeMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;

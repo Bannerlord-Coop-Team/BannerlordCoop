@@ -98,9 +98,13 @@ public class ServerModule : CommonModule
             .As<ISteamLobbyApi>()
             .As<ISteamPublicLobbyApi>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<SteamLobbyLeaseRenewer>()
+            .As<ISteamLobbyLeaseRenewer>()
+            .InstancePerDependency();
         builder.Register(context => new SteamPublicLobbyAdvertiser(
                 context.Resolve<ISteamPublicLobbyApi>(),
-                context.Resolve<SessionAdvertisementConfig>().Visibility))
+                context.Resolve<SessionAdvertisementConfig>().Visibility,
+                context.Resolve<ISteamLobbyLeaseRenewer>()))
             .As<ISessionAdvertiser>()
             .As<ISteamLobbyOwner>()
             .InstancePerLifetimeScope();
