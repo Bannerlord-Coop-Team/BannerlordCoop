@@ -1955,10 +1955,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private string CreateSyncedClanFief(string clanId)
     {
         var fiefId = TestEnvironment.CreateRegisteredObject<Town>();
-        ConfigureClanFief(Server, clanId, fiefId);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        ConfigureClanFief(Server, clanId, fiefId, settlementId);
         foreach (var client in Clients)
         {
-            ConfigureClanFief(client, clanId, fiefId);
+            ConfigureClanFief(client, clanId, fiefId, settlementId);
         }
 
         return fiefId;
@@ -2051,15 +2052,21 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         return policiesVm;
     }
 
-    private static void ConfigureClanFief(EnvironmentInstance instance, string clanId, string fiefId)
+    private static void ConfigureClanFief(EnvironmentInstance instance, string clanId, string fiefId, string settlementId)
     {
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
             Assert.True(instance.ObjectManager.TryGetObject<Town>(fiefId, out var fief));
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
             using (new AllowedThread())
             {
+                if (settlement.Town == null)
+                {
+                    fief.Owner = settlement.Party;
+                    settlement.Town = fief;
+                }
                 fief._ownerClan = clan;
                 clan._fiefsCache ??= new MBList<Town>();
                 if (!clan._fiefsCache.Contains(fief))

@@ -23,7 +23,6 @@ internal class ClanKingdomHandler : IHandler
         IObjectManager objectManager,
         INetwork network)
     { 
-    
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
@@ -53,7 +52,6 @@ internal class ClanKingdomHandler : IHandler
 
         network.SendAll(new NetworkSetClanKingdom(clanId, kingdomId));
     }
-
 
     private void HandleNetworkSetClanKingdom(MessagePayload<NetworkSetClanKingdom> payload)
     {
