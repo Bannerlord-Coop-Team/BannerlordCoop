@@ -45,6 +45,8 @@ internal class PlayerCommerceDebugCommands
             $"grain={grainCount}|" +
             $"gold={leader?.Gold ?? -1}|" +
             $"settlement={party.CurrentSettlement?.StringId ?? "none"}|" +
+            $"mapEvent={party.MapEvent?.StringId ?? "none"}|" +
+            $"encounterSettlement={PlayerEncounter.EncounterSettlement?.StringId ?? "none"}|" +
             $"x={party.Position.X:R}|" +
             $"y={party.Position.Y:R}|" +
             $"isOnLand={party.Position.IsOnLand}|" +
@@ -136,9 +138,16 @@ internal class PlayerCommerceDebugCommands
             PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
         }
         if (PlayerEncounter.Current == null)
+        {
             EncounterManager.StartSettlementEncounter(party, danustica);
+            return "Requested the Danustica town encounter.";
+        }
         if (PlayerEncounter.EncounterSettlement != danustica)
-            return "A player encounter with another settlement is active.";
+        {
+            var encounterSettlementId = PlayerEncounter.EncounterSettlement?.StringId ?? "none";
+            var mapEventId = party.MapEvent?.StringId ?? "none";
+            return $"A player encounter with settlement '{encounterSettlementId}' is active while party map event is '{mapEventId}'.";
+        }
 
         PlayerEncounter.EnterSettlement();
         GameMenu.SwitchToMenu("town");
