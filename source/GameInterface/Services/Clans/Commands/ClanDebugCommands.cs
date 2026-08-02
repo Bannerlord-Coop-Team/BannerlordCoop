@@ -41,6 +41,8 @@ namespace GameInterface.Services.GameDebug.Commands
             if (args.Count != 0) return "Usage: coop.debug.clan.open";
             if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
             if (Game.Current.GameStateManager.ActiveState is ClanState) return "CLAN_SCREEN_ALREADY_OPEN";
+            if (Hero.MainHero == null || Hero.MainHero.IsDead)
+                return "The local main hero is unavailable.";
 
             Game.Current.GameStateManager.PushState(
                 Game.Current.GameStateManager.CreateState<ClanState>(), 0);
@@ -68,7 +70,8 @@ namespace GameInterface.Services.GameDebug.Commands
             var clanScreen = ScreenManager.TopScreen as GauntletClanScreen;
             return $"CLAN_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is ClanState} " +
                 $"topScreen={clanScreen != null} dataSource={clanScreen?._dataSource != null} " +
-                $"parties={clanScreen?._dataSource?.ClanParties?._parties?.Count ?? -1}";
+                $"parties={clanScreen?._dataSource?.ClanParties?._parties?.Count ?? -1} " +
+                $"mainHero={Hero.MainHero?.StringId ?? "none"}";
         }
 
         [CommandLineArgumentFunction("refresh_burst", "coop.debug.clan")]

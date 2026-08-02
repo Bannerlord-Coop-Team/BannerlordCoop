@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Utils.Commands;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -21,6 +22,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Helpers;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -153,6 +155,30 @@ internal class CompanionsCommands
             Campaign.Current.PlayerEncounter = null;
             return "Failed to open the live role conversation: " + exception.Message;
         }
+    }
+
+    [CommandLineArgumentFunction("role_fixture_prepare_client", "coop.debug.companions")]
+    public static string RoleFixturePrepareClientCommand(List<string> args)
+    {
+        const string usage = "Usage: coop.debug.companions.role_fixture_prepare_client";
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (args.Count != 0) return usage;
+        var companion = FindRoleFixtureCompanion();
+        if (companion == null) return "The companion-role fixture hero was not found.";
+        if (Hero.MainHero == null) return "The local main hero is unavailable.";
+
+        bool initializedExSpouses = companion.ExSpouses == null;
+        if (initializedExSpouses)
+        {
+            AccessTools.Field(typeof(Hero), nameof(Hero._exSpouses))
+                .SetValue(companion, new MBList<Hero>());
+        }
+
+        string relation = ConversationHelper.GetHeroRelationToHeroTextShort(
+            companion, Hero.MainHero, uppercaseFirst: true);
+        return $"ROLE_FIXTURE_CLIENT_READY companion={companion.StringId} " +
+            $"mainHero={Hero.MainHero.StringId} initializedExSpouses={initializedExSpouses} " +
+            $"relation={relation}";
     }
 
     [CommandLineArgumentFunction("role_fixture_assign_scout", "coop.debug.companions")]
