@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
@@ -44,8 +44,14 @@ public class MissionModule : Module
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
             .InstancePerDependency();
+        builder.RegisterType<MovementTrafficBudget>()
+            .As<IMovementTrafficBudget>()
+            .InstancePerDependency();
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
+            .InstancePerDependency();
+        builder.RegisterType<BattleAgentSpawnBatchCodec>()
+            .As<IBattleAgentSpawnBatchCodec>()
             .InstancePerDependency();
         builder.RegisterType<CompressedMovementPacketHandler>()
             .AsSelf()

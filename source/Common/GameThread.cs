@@ -22,6 +22,7 @@ public class GameThread : IUpdateable
         new Queue<(Action, EventWaitHandle, string, CancellationToken)>();
 
     private readonly object m_QueueLock = new object();
+    private object m_QueueTailBatch;
     private static readonly AsyncLocal<CancellationToken> m_AmbientCancellation =
         new AsyncLocal<CancellationToken>();
     private int m_GameLoopThreadId;
@@ -103,6 +104,7 @@ public class GameThread : IUpdateable
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
+            m_QueueTailBatch = null;
         }
 
         if (!Instrument)
@@ -248,7 +250,7 @@ public class GameThread : IUpdateable
             string resolved = label ?? BuildLabel(callerFile, callerMember);
             lock (Instance.m_QueueLock)
             {
-                Instance.m_Queue.Enqueue((action, ewh, resolved, cancellation));
+                Instance.EnqueueLocked((action, ewh, resolved, cancellation));
             }
 
             if (ewh == null) return;
@@ -309,7 +311,58 @@ public class GameThread : IUpdateable
         string label = context ?? BuildLabel(callerFile, callerMember);
         lock (Instance.m_QueueLock)
         {
-            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label, cancellation));
+            Instance.EnqueueLocked((WrapSafe(action, context), null, label, cancellation));
+        }
+    }
+
+    /// <summary>
+    /// Queues the latest value for each key in one adjacent queue segment. An ordinary queued action is a FIFO
+    /// barrier, so continuous state is never coalesced across reliable game-state work.
+    /// </summary>
+    public static void RunSafeCoalesced<TKey, T>(
+        IEnumerable<T> items,
+        Func<T, TKey> keySelector,
+        Action<IReadOnlyList<T>> action,
+        CancellationToken lifetime = default,
+        string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
+    {
+        if (items == null) throw new ArgumentNullException(nameof(items));
+        if (keySelector == null) throw new ArgumentNullException(nameof(keySelector));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+
+        CancellationToken cancellation = m_AmbientCancellation.Value;
+        if (cancellation.IsCancellationRequested || lifetime.IsCancellationRequested) return;
+
+        T[] snapshot = items.ToArray();
+        if (snapshot.Length == 0) return;
+
+        if (Instance.IsGameThread)
+        {
+            InvokeSafe(() => action(snapshot), context);
+            return;
+        }
+
+        lock (Instance.m_QueueLock)
+        {
+            if (cancellation.IsCancellationRequested || lifetime.IsCancellationRequested) return;
+
+            if (Instance.m_QueueTailBatch is QueuedLatestBatch<TKey, T> batch &&
+                batch.TryAdd(keySelector, action, cancellation, lifetime, snapshot))
+            {
+                return;
+            }
+
+            string label = context ?? BuildLabel(callerFile, callerMember);
+            batch = new QueuedLatestBatch<TKey, T>(
+                keySelector,
+                action,
+                cancellation,
+                lifetime,
+                context,
+                snapshot);
+            Instance.EnqueueLocked((batch.Run, null, label, cancellation), batch);
         }
     }
 
@@ -380,6 +433,26 @@ public class GameThread : IUpdateable
             Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
         }
     };
+
+    internal static void InvokeSafe(Action action, string context)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
+        }
+    }
+
+    private void EnqueueLocked(
+        (Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task,
+        object tailBatch = null)
+    {
+        m_Queue.Enqueue(task);
+        m_QueueTailBatch = tailBatch;
+    }
 
     public void MarkGameThread()
     {

@@ -95,7 +95,8 @@ public class CoopBattleController : CoopMissionController
         IHostEpochPolicy hostEpochPolicy,
         IBattleAgentBudget agentBudget,
         IGuardedHitWindow guardedHitWindow,
-        IPuppetMountStateRepairer puppetMountStateRepairer)
+        IPuppetMountStateRepairer puppetMountStateRepairer,
+        IBattleAgentSpawnBatchCodec spawnBatchCodec)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         var session = new BattleSession(controllerIdProvider, hostRegistry);
@@ -104,11 +105,11 @@ public class CoopBattleController : CoopMissionController
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
 
         lifecycle = new BattleInstanceLifecycle(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, missionContext);
-        replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment);
+        replicator = new OwnedAgentReplicator(network, messageBroker, objectManager, coopMissionComponent, session, casualties, deployment, spawnBatchCodec);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
-        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget, puppetRoutApplier);
+        puppetSpawner = new PuppetSpawner(messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, agentBudget, puppetRoutApplier, spawnBatchCodec);
         puppetDeathApplier = new PuppetDeathApplier(
             messageBroker,
             coopMissionComponent,
@@ -194,6 +195,8 @@ public class CoopBattleController : CoopMissionController
 
     public override void OnMissionTick(float dt)
     {
+        // Reliable spawn work is queued before this frame's unreliable movement traffic.
+        replicator.FlushPendingSpawns();
         base.OnMissionTick(dt);
 
         // The mission host is the single siege authority (engine deployment and machine simulation);
@@ -359,8 +362,7 @@ public class CoopBattleController : CoopMissionController
 
         siegeEngineDeployment.MarkLocalDeploymentFinished();
 
-        if (Deployment.OnLocalDeploymentFinished())
-            replicator.BroadcastOwnDeployedTroops();
+        Deployment.OnLocalDeploymentFinished(replicator.BroadcastOwnDeployedTroops);
 
         ResultCommitter.ReportAcceptedResult();
     }
@@ -376,23 +378,29 @@ public class CoopBattleController : CoopMissionController
         network.Send(controllerId, joinInfo);
         Logger.Information("[BattleSync] Sent join info to {Controller} for instance {Instance}", controllerId, Session.InstanceId);
 
-        // Catch a mid-battle joiner up on the activation state (a no-op while the battle is not live)...
-        Deployment.CatchUpJoiner(controllerId);
-
-        // ...and on the live battle itself: replay the agents WE own so the joiner spawns matching puppets,
-        // plus the siege engine placement when we are the deployer (a no-op in field battles).
-        replicator.ReplicateCurrentAgentsTo(controllerId);
-        siegeEngineDeployment.CatchUpJoiner(controllerId);
-        siegeMachineState.CatchUpJoiner(controllerId);
-
-        if (Session.IsLocalHost && ResultCommitter.TryGetResolvedState(out var battleState))
+        void ReplayJoinState()
         {
-            network.Send(controllerId, new NetworkBattleResultSnapshot(
-                Session.InstanceId,
-                Session.OwnControllerId,
-                Session.HostEpoch,
-                battleState));
+            replicator.ReplicateCurrentAgentsTo(controllerId);
+            siegeEngineDeployment.CatchUpJoiner(controllerId);
+            siegeMachineState.CatchUpJoiner(controllerId);
+            Deployment.CatchUpJoiner(controllerId);
+
+            if (Session.IsLocalHost && ResultCommitter.TryGetResolvedState(out var battleState))
+            {
+                network.Send(controllerId, new NetworkBattleResultSnapshot(
+                    Session.InstanceId,
+                    Session.OwnControllerId,
+                    Session.HostEpoch,
+                    battleState));
+            }
         }
+
+        // An active battle needs a barrier so later reliable sends cannot pass its replay. During mission
+        // loading the game-thread queue does not drain yet, so the ordinary pre-activation handshake defers.
+        GameThread.RunSafe(
+            ReplayJoinState,
+            blocking: Deployment.IsActivated,
+            context: nameof(SendJoinInfo));
     }
 
     protected override void HandleJoinInfo(NetPeer peer, NetworkMissionJoinInfo joinInfo)
