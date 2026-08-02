@@ -23,6 +23,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Barters.Handlers;
@@ -376,7 +377,8 @@ internal sealed partial class LordBarterHandler : IHandler
         playerParty = mobileParty.Party;
         targetParty = targetHero.PartyBelongedTo?.Party;
 
-        if ((PeaceConversationContext)request.Context == PeaceConversationContext.MapParty)
+        var context = (PeaceConversationContext)request.Context;
+        if (context == PeaceConversationContext.MapParty)
         {
             if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty) ||
                 requestedParty != targetParty ||
@@ -392,7 +394,7 @@ internal sealed partial class LordBarterHandler : IHandler
                 return false;
             }
         }
-        else
+        else if (context == PeaceConversationContext.Location)
         {
             if (targetHero.CharacterObject == null ||
                 !objectManager.TryGetId(targetHero.CharacterObject, out var characterId) ||
@@ -400,6 +402,16 @@ internal sealed partial class LordBarterHandler : IHandler
                 npcKey != LocationConversationTracker.ComposeKey(request.ContextId, characterId))
             {
                 reason = "The lord conversation is no longer active.";
+                return false;
+            }
+        }
+        else
+        {
+            if (!objectManager.TryGetObject(request.ContextId, out Settlement settlement) ||
+                mobileParty.CurrentSettlement != settlement ||
+                targetHero.CurrentSettlement != settlement)
+            {
+                reason = "The lord settlement conversation is no longer active.";
                 return false;
             }
         }

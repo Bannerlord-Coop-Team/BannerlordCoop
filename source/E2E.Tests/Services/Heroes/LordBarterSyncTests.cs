@@ -4,6 +4,7 @@ using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Barters.Handlers;
 using GameInterface.Services.Barters.Messages;
+using GameInterface.Services.Barters.Patches;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobilePartyAIs.Patches;
@@ -11,6 +12,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -142,6 +144,139 @@ public class LordBarterSyncTests : MapEventTestBase
             harmony.UnpatchAll(harmony.Id);
             observedBarterAcceptedDispatches = 0;
         }
+    }
+
+    [Fact]
+    public void StationarySettlementConversation_ClientResolversUseSettlementContext()
+    {
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var targetHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        SetMainHero(player.HeroId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            playerParty.CurrentSettlement = settlement;
+            targetHero.StayingInSettlement = settlement;
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.Null(targetHero.PartyBelongedTo);
+
+            var barter = new BarterData(playerHero, targetHero, playerParty.Party, null, null);
+            Assert.True(LordBarterPatch.TryGetConversationContext(
+                barter,
+                client.ObjectManager,
+                out var lordContext,
+                out var lordContextId));
+            Assert.Equal(PeaceConversationContext.Settlement, lordContext);
+            Assert.Equal(settlementId, lordContextId);
+
+            Assert.True(PeaceBarterPatch.TryGetConversationContext(
+                barter,
+                client.ObjectManager,
+                out var peaceContext,
+                out var peaceContextId));
+            Assert.Equal(PeaceConversationContext.Settlement, peaceContext);
+            Assert.Equal(settlementId, peaceContextId);
+
+            Assert.True(MarriageBarterPatch.TryGetConversationContext(
+                barter,
+                client.ObjectManager,
+                out var marriageContext,
+                out var marriageContextId));
+            Assert.Equal(MarriageConversationContext.Settlement, marriageContext);
+            Assert.Equal(settlementId, marriageContextId);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenericLordBarter_StationarySettlementConversation_ValidatesCurrentPresence(bool targetLeaves)
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int initialTargetGold = 50;
+        const int offeredGold = 500_000;
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var targetHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var requestId = Guid.NewGuid().ToString("N");
+
+        RegisterPlayer(client, player.HeroId, player.MobilePartyId);
+        SetMainHero(player.HeroId);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            playerHero.Gold = initialPlayerGold;
+            targetHero.Gold = initialTargetGold;
+            playerParty.CurrentSettlement = settlement;
+            targetHero.StayingInSettlement = settlement;
+            Assert.Null(targetHero.PartyBelongedTo);
+        });
+        Server.NetworkSentMessages.Clear();
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+            requestId,
+            targetHeroId,
+            PeaceConversationContext.Settlement,
+            settlementId,
+            LordBarterKind.Generic)));
+        if (targetLeaves)
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+                targetHero.StayingInSettlement = null;
+            });
+        }
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+            targetHeroId,
+            PeaceConversationContext.Settlement,
+            settlementId,
+            LordBarterKind.Generic,
+            new[]
+            {
+                new PeaceBarterTerm(
+                    PeaceBarterTermType.Gold,
+                    player.HeroId,
+                    null,
+                    null,
+                    true,
+                    offeredGold),
+            },
+            requestId)));
+        TestEnvironment.FlushCoalescer();
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+        Assert.Equal(!targetLeaves, result.Accepted);
+        if (targetLeaves)
+            Assert.Contains("settlement conversation", result.Reason);
+        else
+            Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.Equal(targetLeaves ? initialPlayerGold : initialPlayerGold - offeredGold, playerHero.Gold);
+            Assert.Equal(targetLeaves ? initialTargetGold : initialTargetGold + offeredGold, targetHero.Gold);
+        });
     }
 
     [Fact]

@@ -18,6 +18,7 @@ using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Siege;
@@ -1067,12 +1068,40 @@ internal class DefaultNotificationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.FirstHeroId, out var firstHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.SecondHeroId, out var secondHero)) return;
 
-            notificationsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
+            if (TryGetNotificationsBehavior(out var notificationsBehavior))
+                notificationsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
+
+            var firstHeroHasCulture = TryRestoreSceneCharacterCulture(firstHero);
+            var secondHeroHasCulture = TryRestoreSceneCharacterCulture(secondHero);
+            if (firstHeroHasCulture && secondHeroHasCulture)
+                ShowMarriageSceneForMainHero(firstHero, secondHero);
         });
+    }
+
+    private static void ShowMarriageSceneForMainHero(Hero firstHero, Hero secondHero)
+    {
+        if (firstHero != Hero.MainHero && secondHero != Hero.MainHero) return;
+
+        var husband = firstHero.IsFemale ? secondHero : firstHero;
+        MBInformationManager.ShowSceneNotification(
+            new MarriageSceneNotificationItem(husband, husband.Spouse, CampaignTime.Now, default));
+    }
+
+    private static bool TryRestoreSceneCharacterCulture(Hero hero)
+    {
+        BasicCharacterObject character = hero.CharacterObject;
+        if (character.Culture != null) return true;
+
+        using (new AllowedThread())
+            character.Culture = hero.Culture ?? hero.Clan?.Culture;
+
+        if (character.Culture != null) return true;
+
+        Logger.Warning("Skipping marriage scene because hero {heroId} has no character culture", hero.StringId);
+        return false;
     }
 
     private void Handle_NotifyChildConceived(MessagePayload<NotifyChildConceived> obj)

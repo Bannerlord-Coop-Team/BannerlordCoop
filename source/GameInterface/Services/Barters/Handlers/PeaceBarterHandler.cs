@@ -21,6 +21,7 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -98,6 +99,7 @@ internal sealed class PeaceBarterHandler : IHandler
     {
         Hero playerHero = null;
         BarterPlayerContext playerContext = null;
+        var mutationApplied = false;
         try
         {
             if (!TryResolveContext(
@@ -148,6 +150,7 @@ internal sealed class PeaceBarterHandler : IHandler
                 if (!(barterable is PeaceBarterable))
                     barterable.Apply();
             }
+            mutationApplied = true;
             CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offeredBarterables);
             ApplyOverpayRelationBonus(playerHero, targetHero, MathF.Max(0f, offerValue));
 
@@ -155,15 +158,17 @@ internal sealed class PeaceBarterHandler : IHandler
                 ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
             FlushHeroGold(playerHero);
             FlushHeroGold(targetHero);
-            network.Send(peer, new NetworkPeaceBarterResult(
-                request.ContextId,
-                true,
-                playerHero.Gold,
-                requestId: request.RequestId));
+            Accept(peer, request, playerHero.Gold);
         }
         catch (Exception exception)
         {
             Logger.Error(exception, "Failed to apply an authoritative peace barter");
+            if (mutationApplied)
+            {
+                Accept(peer, request, playerHero?.Gold ?? 0);
+                return;
+            }
+
             Reject(peer, request, playerHero?.Gold ?? 0, "The server could not process the peace offer.");
         }
         finally
@@ -226,7 +231,7 @@ internal sealed class PeaceBarterHandler : IHandler
 
             targetParty = targetPartyBase;
         }
-        else
+        else if (context == PeaceConversationContext.Location)
         {
             if (targetHero.CharacterObject == null ||
                 !objectManager.TryGetId(targetHero.CharacterObject, out var characterId) ||
@@ -236,6 +241,21 @@ internal sealed class PeaceBarterHandler : IHandler
                 reason = "The peace conversation is no longer active.";
                 return false;
             }
+        }
+        else if (context == PeaceConversationContext.Settlement)
+        {
+            if (!objectManager.TryGetObject(request.ContextId, out Settlement settlement) ||
+                playerMobileParty.CurrentSettlement != settlement ||
+                targetHero.CurrentSettlement != settlement)
+            {
+                reason = "The peace settlement conversation is no longer active.";
+                return false;
+            }
+        }
+        else
+        {
+            reason = "The peace conversation context is not supported.";
+            return false;
         }
 
         if (!CanNegotiatePeace(playerHero, targetHero, out reason))
@@ -441,6 +461,15 @@ internal sealed class PeaceBarterHandler : IHandler
     {
         if (sendCoalescer == null || hero == null || !objectManager.TryGetId(hero, out var heroId)) return;
         sendCoalescer.FlushInstance(heroId, network);
+    }
+
+    private void Accept(NetPeer peer, NetworkRequestPeaceBarter request, int playerGold)
+    {
+        network.Send(peer, new NetworkPeaceBarterResult(
+            request.ContextId,
+            true,
+            playerGold,
+            requestId: request.RequestId));
     }
 
     private void Reject(NetPeer peer, NetworkRequestPeaceBarter request, int playerGold, string reason)
