@@ -3,7 +3,6 @@ using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Time.Messages;
-using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEvents;

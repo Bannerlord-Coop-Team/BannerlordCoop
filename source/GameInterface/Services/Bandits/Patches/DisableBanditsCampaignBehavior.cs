@@ -19,6 +19,6 @@ internal class BanditSpawnCampaignBehaviorPatches
     [HarmonyPostfix]
     public static void GetCurrentLimitForLootersPostfix(ref int __result)
     {
-        __result = (int)(__result * ModConfigProvider.ModOptions.MaximumBanditsMultiplier);
+        __result = (int)(__result * ModConfigProvider.ModOptions.MaximumLootersMultiplier);
     }
 }

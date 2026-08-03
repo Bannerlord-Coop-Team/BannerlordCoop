@@ -4,7 +4,13 @@ namespace GameInterface.Configuration;
 
 public class ModConfigProvider
 {
-    public static ModOptions ModOptions = new();
+    /// <summary>What the session runs on until a config is loaded (server) or received (client).
+    /// Built from an all-absent <see cref="ModOptionsData"/> so every option falls back to its
+    /// documented default. It has to go through that constructor: the options struct has NO
+    /// parameterless constructor — deliberately, so protobuf keeps deserializing it from a zeroed
+    /// instance — so a plain <c>new ModOptions()</c> is just <c>default</c>, skipping the property
+    /// initializers below and reading back false/0 for everything.</summary>
+    public static ModOptions ModOptions = new(new ModOptionsData());
 
     public static void LoadModConfig(ModOptionsData modOptionsData)
     {
@@ -30,7 +36,7 @@ public readonly struct ModOptions
     [ProtoMember(7)]
     public readonly int PlayerBattleAiJoinWindowHours { get; } = 24;
     [ProtoMember(8)]
-    public readonly bool SpeedLimitWhilePlayersInBattle { get; } = false;
+    public readonly bool SpeedLimitWhilePlayersInBattle { get; } = true;
     [ProtoMember(9)]
     public readonly int WandererLimit { get; } = 32;
     [ProtoMember(10)]
@@ -42,7 +48,7 @@ public readonly struct ModOptions
     [ProtoMember(13)]
     public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
     [ProtoMember(14)]
-    public readonly float MaximumBanditsMultiplier { get; } = 1f;
+    public readonly float MaximumLootersMultiplier { get; } = 1f;
 
     public ModOptions(ModOptionsData modOptionsData)
     {
@@ -59,6 +65,6 @@ public readonly struct ModOptions
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
-        MaximumBanditsMultiplier = modOptionsData.MaximumBanditsMultiplier ?? MaximumBanditsMultiplier;
+        MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;
     }
 }

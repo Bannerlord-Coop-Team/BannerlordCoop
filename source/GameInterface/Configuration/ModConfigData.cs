@@ -94,7 +94,7 @@ public sealed class ModOptionsData
 
     public float? SmithingStaminaRecoveryMultiplier { get; set; }
 
-    public float? MaximumBanditsMultiplier { get; set; }
+    public float? MaximumLootersMultiplier { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
