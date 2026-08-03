@@ -121,11 +121,13 @@ internal static class BattleDebugCommands
                 .Select(group => group.First())
                 .ToArray()
             : Array.Empty<CoopAgentInfo>();
-        CoopAgentInfo[] registeredActiveAgents = registeredAgents
-            .Where(info => info.Agent != null
-                && info.Agent.Mission == mission
-                && info.Agent.IsActive())
-            .ToArray();
+        CoopAgentInfo[] registeredActiveAgents = mission == null
+            ? Array.Empty<CoopAgentInfo>()
+            : registeredAgents
+                .Where(info => info.Agent != null
+                    && info.Agent.Mission == mission
+                    && info.Agent.IsActive())
+                .ToArray();
         int registeredLocalActive = registeredActiveAgents.Count(
             info => registryAvailable && registry.IsLocallyControlled(info.AgentId));
         int registeredRemoteActive = registeredActiveAgents.Length - registeredLocalActive;
