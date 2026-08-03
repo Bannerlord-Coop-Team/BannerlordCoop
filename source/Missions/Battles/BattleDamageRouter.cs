@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using Missions.Agents;
 using Missions.Messages;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
@@ -34,9 +35,11 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
+    private readonly IGuardedHitWindow guardedHitWindow;
     private readonly Func<Agent, bool?> mountAuthorityProbe;
     private readonly object inboundDamageGate = new();
     private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
+    private readonly Queue<PendingLocalDamage> pendingLocalDamage = new();
     private readonly Queue<DeferredDamage> deferredDamage = new();
     private readonly Dictionary<(Guid AgentId, long ShotSequence), ReconstructionInfo> reconstructions = new();
     private readonly Queue<(Guid AgentId, long ShotSequence)> reconstructionHistory = new();
@@ -90,13 +93,41 @@ public class BattleDamageRouter : IBattleDamageRouter
         }
     }
 
+    private sealed class PendingLocalDamage
+    {
+        public BattlePuppetHit Hit { get; }
+        public Guid AttackerId { get; }
+        public long ShotSequence { get; }
+        public WeaponComponentData AttackerWeapon { get; }
+        public long ReadyEpoch { get; }
+        public long GuardCandidateId { get; }
+
+        public PendingLocalDamage(
+            BattlePuppetHit hit,
+            Guid attackerId,
+            long shotSequence,
+            WeaponComponentData attackerWeapon,
+            long readyEpoch,
+            long guardCandidateId)
+        {
+            Hit = hit;
+            AttackerId = attackerId;
+            ShotSequence = shotSequence;
+            AttackerWeapon = attackerWeapon;
+            ReadyEpoch = readyEpoch;
+            GuardCandidateId = guardCandidateId;
+        }
+    }
+
     public BattleDamageRouter(IBattleNetwork network, IMessageBroker messageBroker,
-        ICoopMissionComponent coopMissionComponent, IBattleSession session)
+        ICoopMissionComponent coopMissionComponent, IBattleSession session,
+        IGuardedHitWindow guardedHitWindow)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
+        this.guardedHitWindow = guardedHitWindow;
 
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
@@ -119,12 +150,15 @@ public class BattleDamageRouter : IBattleDamageRouter
         messageBroker.Unsubscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
         messageBroker.Unsubscribe<MissileReconstructed>(Handle_MissileReconstructed);
         deferredDamage.Clear();
+        pendingLocalDamage.Clear();
         reconstructions.Clear();
         reconstructionHistory.Clear();
         while (inboundDamage.TryDequeue(out _)) { }
 
         if (BattleSpawnGate.MountAuthorityProbe == mountAuthorityProbe)
             BattleSpawnGate.MountAuthorityProbe = null;
+
+        guardedHitWindow.Dispose();
     }
 
     private bool? ProbeMountAuthority(Agent mount)
@@ -152,6 +186,8 @@ public class BattleDamageRouter : IBattleDamageRouter
         if (disposed || closing)
             return;
 
+        guardedHitWindow.Advance();
+        DrainPendingLocalDamage();
         presentationEpoch++;
         if (!float.IsNaN(dt) && !float.IsInfinity(dt) && dt > 0f)
             presentationTime += Math.Min(dt, MaximumTickSeconds);
@@ -184,6 +220,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             closing = true;
         }
 
+        DrainPendingLocalDamage(force: true);
         while (deferredDamage.Count > 0)
             ApplyDeferredDamage(deferredDamage.Dequeue().Damage);
         while (inboundDamage.TryDequeue(out NetworkApplyBattleDamage damage))
@@ -228,30 +265,89 @@ public class BattleDamageRouter : IBattleDamageRouter
             }
         }
 
-        GameThread.RunSafe(() =>
+        Blow candidateBlow = payload.What.Blow;
+        AttackCollisionData candidateCollision =
+            payload.What.CollisionData;
+        long guardCandidateId = payload.What.IsMount
+            ? 0
+            : guardedHitWindow.RegisterCandidate(
+                payload.What.Victim,
+                payload.What.Attacker,
+                in candidateBlow,
+                in candidateCollision);
+        var pending = new PendingLocalDamage(
+            payload.What,
+            attackerId,
+            shotSequence,
+            attackerWeapon,
+            guardedHitWindow.Epoch + 1,
+            guardCandidateId);
+
+        if (payload.What.IsMount)
         {
-            if (disposed || closing)
-                return;
+            RouteLocalDamage(pending);
+            return;
+        }
 
-            if (registry.TryGetAgentInfo(payload.What.Victim, out var victimInfo))
+        pendingLocalDamage.Enqueue(pending);
+    }
+
+    private void DrainPendingLocalDamage(bool force = false)
+    {
+        int count = pendingLocalDamage.Count;
+        for (int i = 0; i < count; i++)
+        {
+            PendingLocalDamage pending = pendingLocalDamage.Dequeue();
+            if (!force &&
+                pending.ReadyEpoch > guardedHitWindow.Epoch)
             {
-                network.SendAll(new NetworkApplyBattleDamage(victimInfo.AgentId, attackerId,
-                    payload.What.Blow, payload.What.CollisionData,
-                    missileShotSequence: shotSequence, attackerWeapon: attackerWeapon));
-                return;
+                pendingLocalDamage.Enqueue(pending);
+                continue;
             }
 
-            if (payload.What.IsMount && payload.What.Victim?.RiderAgent is Agent rider
-                && registry.TryGetAgentInfo(rider, out var riderInfo))
+            if (guardedHitWindow.CompleteCandidate(
+                    pending.GuardCandidateId))
             {
-                network.SendAll(new NetworkApplyBattleDamage(riderInfo.AgentId, attackerId,
-                    payload.What.Blow, payload.What.CollisionData, isMount: true,
-                    missileShotSequence: shotSequence, attackerWeapon: attackerWeapon));
-                return;
+                continue;
             }
 
-            Logger.Warning("Local hit on an unregistered puppet could not be routed");
-        });
+            RouteLocalDamage(pending);
+        }
+    }
+
+    private void RouteLocalDamage(PendingLocalDamage pending)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+        BattlePuppetHit hit = pending.Hit;
+        if (registry.TryGetAgentInfo(hit.Victim, out var victimInfo))
+        {
+            network.SendAll(new NetworkApplyBattleDamage(
+                victimInfo.AgentId,
+                pending.AttackerId,
+                hit.Blow,
+                hit.CollisionData,
+                missileShotSequence: pending.ShotSequence,
+                attackerWeapon: pending.AttackerWeapon));
+            return;
+        }
+
+        if (hit.IsMount &&
+            hit.Victim?.RiderAgent is Agent rider &&
+            registry.TryGetAgentInfo(rider, out var riderInfo))
+        {
+            network.SendAll(new NetworkApplyBattleDamage(
+                riderInfo.AgentId,
+                pending.AttackerId,
+                hit.Blow,
+                hit.CollisionData,
+                isMount: true,
+                missileShotSequence: pending.ShotSequence,
+                attackerWeapon: pending.AttackerWeapon));
+            return;
+        }
+
+        Logger.Warning(
+            "Local hit on an unregistered puppet could not be routed");
     }
 
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
@@ -411,18 +507,32 @@ public class BattleDamageRouter : IBattleDamageRouter
         if (Mission.Current == null || victim == null || !victim.IsActive() || victim.Health <= 0)
             return;
 
-        if (damage.AttackerAgentId != Guid.Empty
-            && registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo)
-            && attackerInfo.Agent != null)
+        Agent attacker = null;
+        string attackerControllerId = null;
+        if (damage.AttackerAgentId != Guid.Empty &&
+            registry.TryGetAgentInfo(damage.AttackerAgentId, out var attackerInfo) &&
+            attackerInfo.Agent != null)
         {
-            blow.OwnerId = attackerInfo.Agent.Index;
+            attacker = attackerInfo.Agent;
+            attackerControllerId = attackerInfo.CurrentAuthority;
+            blow.OwnerId = attacker.Index;
         }
         else
         {
             blow.OwnerId = -1;
         }
 
+        // The source calculated this blow against a puppet, so vanilla could not apply its main-agent multiplier.
+        ApplyPlayerReceivedDamageMultiplier(victim, ref blow, ref collisionData);
+
         bool wasMissile = IsMissileDamage(damage);
+        // The victim owner relays blood so a fatal effect stays ordered before its death broadcast.
+        coopMissionComponent.CombatHitPresentationHandler.PresentRoutedMeleeBlood(
+            victim,
+            attacker,
+            in blow,
+            in collisionData,
+            attackerControllerId);
         if (wasMissile)
         {
             blow.WeaponRecord._isMissile = false;
@@ -439,5 +549,19 @@ public class BattleDamageRouter : IBattleDamageRouter
         {
             hero.HitPoints = Math.Max(1, (int)victim.Health);
         }
+    }
+
+    private static void ApplyPlayerReceivedDamageMultiplier(
+        Agent victim,
+        ref Blow blow,
+        ref AttackCollisionData collisionData)
+    {
+        if (!victim.IsMainAgent)
+            return;
+
+        int scaledDamage = TaleWorlds.Library.MathF.Round(
+            blow.InflictedDamage * Mission.Current.DamageToPlayerMultiplier);
+        blow.InflictedDamage = scaledDamage;
+        collisionData.InflictedDamage = scaledDamage;
     }
 }

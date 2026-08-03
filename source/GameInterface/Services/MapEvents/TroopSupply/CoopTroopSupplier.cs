@@ -41,6 +41,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     // seed -> partyId, rebuilt alongside `parties` in SetReserve, so GetParty/FindPartyId is O(1) instead of
     // scanning every party's entries per agent. Entry seeds are server-unique, so one seed maps to one party.
     private readonly Dictionary<int, string> seedToPartyId = new Dictionary<int, string>();
+    private string playerPartyId;
     private bool populated;
     private int reserveRevision;
     private int numWounded, numKilled, numRouted;
@@ -49,11 +50,11 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private readonly IObjectManager objectManager;
     // BR-110: the engine agent budget clamps wave/initial allocation to the mission's render capacity.
     private readonly IBattleAgentBudget agentBudget;
-
     public string MapEventId { get; }
     public BattleSideEnum Side { get; }
 
-    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager, IBattleAgentBudget agentBudget)
+    public CoopTroopSupplier(string mapEventId, BattleSideEnum side, IObjectManager objectManager,
+        IBattleAgentBudget agentBudget)
     {
         MapEventId = mapEventId;
         Side = side;
@@ -90,6 +91,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
             parties.Clear();
             seedToPartyId.Clear();
+            playerPartyId = null;
             if (reserve != null)
             {
                 foreach (var party in reserve)
@@ -99,12 +101,20 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                     if (priorSupplied.TryGetValue(party.PartyId, out var local) && local > supplied)
                         supplied = Math.Min(local, entries.Length);
                     priorSupplied.Remove(party.PartyId); // kept — not part of the dropped set
-                    parties.Add(new PartyState
+                    var state = new PartyState
                     {
                         PartyId = party.PartyId,
                         Entries = entries,
                         Supplied = supplied,
-                    });
+                    };
+                    // Allocate this client's own party first. Otherwise an army's AI parties can fill the
+                    // render cap before the local hero is reserved, leaving deployment without a player agent.
+                    if (party.IsReceiverPlayerParty)
+                        parties.Insert(0, state);
+                    else
+                        parties.Add(state);
+                    if (party.IsReceiverPlayerParty)
+                        playerPartyId = party.PartyId;
                     foreach (var entry in entries)
                         seedToPartyId[entry.Seed] = party.PartyId;
                 }
@@ -117,8 +127,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 dropped.Add((prior.Key, prior.Value));
         }
 
-        Logger.Information("[TroopSupply] Supplier {MapEvent} side {Side}: SetReserve {Parties} parties / {Entries} troops ({Dropped} parties dropped)",
-            MapEventId, Side, parties.Count, NumTroopsNotSupplied, dropped.Count);
+        Logger.Information("[TroopSupply] Supplier {MapEvent} side {Side}: SetReserve {Parties} parties / {Entries} troops ({Dropped} parties dropped), receiver party {PlayerParty}",
+            MapEventId, Side, parties.Count, NumTroopsNotSupplied, dropped.Count, PlayerPartyId);
         return dropped;
     }
 
@@ -138,6 +148,9 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     /// <summary>Whether the server's reserve has arrived (counts/identity known and final).</summary>
     public bool IsPopulated { get { lock (gate) { return populated; } } }
+
+    /// <summary>The server-authored reserve id of this client's own party, when it belongs to this side.</summary>
+    public string PlayerPartyId { get { lock (gate) { return playerPartyId; } } }
 
     /// <summary>Monotonic count of authoritative reserve snapshots applied to this supplier.</summary>
     public int ReserveRevision { get { lock (gate) { return reserveRevision; } } }

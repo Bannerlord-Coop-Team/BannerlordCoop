@@ -1065,6 +1065,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (encounter == null) return;
         if (localSide != BattleSideEnum.Attacker && localSide != BattleSideEnum.Defender) return;
 
+        var localParty = localSide == BattleSideEnum.Attacker ? attacker : defender;
+        localParty._mapEventSide = mapEvent.GetMapEventSide(localSide);
         encounter._attackerParty = attacker;
         encounter._defenderParty = defender;
         encounter._encounteredParty = localSide == BattleSideEnum.Attacker ? defender : attacker;

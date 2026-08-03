@@ -3,6 +3,7 @@ using Common.PacketHandlers;
 using Common.Util;
 using LiteNetLib;
 using Missions.Agents.Packets;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 using AgentControllerType = TaleWorlds.Core.AgentControllerType;
@@ -21,11 +22,19 @@ public class MountMovementApplier : IPacketHandler
 {
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IAgentPositionInterpolator interpolator;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
+    private readonly Action<Agent, AgentMountData> updateSyntheticTurn;
 
-    public MountMovementApplier(INetworkAgentRegistry agentRegistry, IAgentPositionInterpolator interpolator)
+    public MountMovementApplier(
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator interpolator,
+        IPuppetMountStateRepairer puppetMountStateRepairer,
+        Action<Agent, AgentMountData> updateSyntheticTurn)
     {
         this.agentRegistry = agentRegistry;
         this.interpolator = interpolator;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
+        this.updateSyntheticTurn = updateSyntheticTurn;
     }
 
     public PacketType PacketType => PacketType.MountMovement;
@@ -91,9 +100,11 @@ public class MountMovementApplier : IPacketHandler
 
                     if (horse.Controller != AgentControllerType.None)
                         horse.Controller = AgentControllerType.None;
+                    puppetMountStateRepairer.PreserveRiderlessPuppet(horse);
 
                     data.ApplyMount(horse);
-                    interpolator.SetMountTarget(horse, data.MountPosition, data.MountMovementDirection);
+                    updateSyntheticTurn(horse, data);
+                    interpolator.SetMountTarget(horse, data);
                 }
             }
         });

@@ -1,12 +1,14 @@
-using Common.Util;
-using E2E.Tests.Environment;
+﻿using Common.Util;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.MobileParties.Commands;
+using GameInterface.Services.GameDebug.Commands;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -20,21 +22,11 @@ namespace E2E.Tests.Services.MobileParties;
 /// independently and replies with <see cref="NetworkPlayerUnstuckResult"/>, and the requesting
 /// client runs local cleanup and publishes <see cref="PlayerUnstuckCompleted"/>.
 /// </summary>
-public class UnstuckCommandTests : IDisposable
+public class UnstuckCommandTests : MapEventTestBase
 {
-    private E2ETestEnvironment TestEnvironment { get; }
-    private EnvironmentInstance Server => TestEnvironment.Server;
     private EnvironmentInstance Client => TestEnvironment.Clients.First();
 
-    public UnstuckCommandTests(ITestOutputHelper output)
-    {
-        TestEnvironment = new E2ETestEnvironment(output);
-    }
-
-    public void Dispose()
-    {
-        TestEnvironment.Dispose();
-    }
+    public UnstuckCommandTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
     public void Unstuck_OnServer_IsRejected()
@@ -151,6 +143,37 @@ public class UnstuckCommandTests : IDisposable
         Assert.Equal(player.PartyId, result.PartyId);
         Assert.NotNull(result.Actions);
         Assert.Contains(result.Actions, action => action.Contains("captivity release"));
+    }
+
+    [Fact]
+    public void ServerUnstuckRequest_WithMapEvent_RemovesPartyAndBroadcastsLeave()
+    {
+        var player = SetupRegisteredMainHeroAndParty();
+        var mapEventContext = CreateServerMapEvent();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+
+            party.Party.MapEventSide = mapEvent.AttackerSide;
+
+            Assert.Same(mapEvent, party.MapEvent);
+        }, MapEventDisabledMethods);
+
+        Server.SimulateMessage(this, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var party));
+            Assert.Null(party.MapEvent);
+        });
+
+        var leave = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+        Assert.False(leave.LeaveSiege);
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
+        Assert.Contains(result.Actions, action => action.Contains("map event"));
     }
 
     [Fact]

@@ -8,26 +8,25 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.Smithing.Patches
+namespace GameInterface.Services.Smithing.Patches;
+
+[HarmonyPatch(typeof(CraftingCampaignBehavior))]
+internal class DoRefinementPatch
 {
-    [HarmonyPatch(typeof(CraftingCampaignBehavior))]
-    internal class DoRefinementPatch
+    private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
+
+    [HarmonyPatch(nameof(CraftingCampaignBehavior.DoRefinement))]
+    [HarmonyPrefix]
+    public static bool DoRefinementPrefix(ref CraftingCampaignBehavior __instance, Hero hero, Crafting.RefiningFormula refineFormula)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        [HarmonyPatch("DoRefinement")]
-        [HarmonyPrefix]
-        public static bool DoRefinement(ref CraftingCampaignBehavior __instance, Hero hero, Crafting.RefiningFormula refineFormula)
-        {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        // Publish message with data
+        var message = new DoRefinement(hero, refineFormula);
+        MessageBroker.Instance.Publish(__instance, message);
 
-            // Publish message with data
-            var message = new RefinementDone(__instance, hero, refineFormula);
-            MessageBroker.Instance.Publish(__instance, message);
-
-            // Skip original to override original client saving
-            return false;
-        }
+        // Skip original to override original client saving
+        return false;
     }
 }

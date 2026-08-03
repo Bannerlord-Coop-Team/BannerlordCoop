@@ -59,26 +59,12 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
         {
             behavior.CheckAnimalBreeding(mobileParty);
             bool doesPartyConsumeFood = Campaign.Current.Models.MobilePartyFoodConsumptionModel.DoesPartyConsumeFood(mobileParty);
-            if (RepairNonConsumingPartyFoodState(mobileParty, doesPartyConsumeFood))
-            {
-                mobileParty.Party.OnConsumedFood();
-            }
 
             if (doesPartyConsumeFood)
             {
-                // Check for a player party starving here instead of OnTick
-                behavior.PartyConsumeFood(mobileParty, mobileParty.IsPlayerParty() && mobileParty.Party.IsStarving);
+                behavior.PartyConsumeFood(mobileParty, false);
             }
         });
-    }
-
-    internal static bool RepairNonConsumingPartyFoodState(MobileParty mobileParty, bool doesPartyConsumeFood)
-    {
-        if (!mobileParty.IsActive || doesPartyConsumeFood || mobileParty.Party.RemainingFoodPercentage >= 0) return false;
-
-        // Repair food debt persisted by the old predicate for parties vanilla excludes from consumption.
-        mobileParty.Party.RemainingFoodPercentage = 0;
-        return true;
     }
 
     public void PartyConsumeFood(FoodConsumptionBehavior behavior, MobileParty mobileParty, bool starvingCheck = false)

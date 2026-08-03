@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.MobilePartyAIs.Patches;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -60,6 +61,11 @@ internal sealed class MapEventBattleFactory
     {
         if (attacker == null || defender == null || ReferenceEquals(attacker, defender) ||
             attacker.MapEventSide != null || defender.MapEventSide != null) return false;
+
+        if (DefaultMobilePartyAIModelPatches.IsAttackPrevented(
+                attacker.MobileParty,
+                defender.MobileParty))
+            return false;
 
         if (!WillCreateFieldBattle(attacker, defender, flags)) return true;
         var attackerMobileParty = attacker.MobileParty;

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Heroes.Messages.LordConversations;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
@@ -555,7 +556,7 @@ Runs the client-side rescued-prisoner liberation consequence for the given hero.
         {
             MessageBroker.Instance.Publish(
                 behavior,
-                new PrisonerLiberationAttempted(hero));
+                new LiberateLordPrisoner(Hero.MainHero, hero));
             EndCaptivityAction.ApplyByReleasedAfterBattle(hero);
             return $"Liberated '{GetHeroDisplayName(hero)}' after battle.";
         }

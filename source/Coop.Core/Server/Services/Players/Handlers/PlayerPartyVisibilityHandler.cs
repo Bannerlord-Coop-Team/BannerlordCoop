@@ -20,6 +20,7 @@ using SandBox.View.Map.Managers;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -140,6 +141,18 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 return; // fresh join, never parked, nothing to restore
             }
 
+            // Retrieves the player and outs it to the Hero Object
+            // Checks if the player is prisoner or if they belong there
+            // If they do, the Debug message appears.
+            if (objectManager.TryGetObject(player.HeroId, out Hero hero) &&
+                (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null))
+            {
+                Logger.Debug("Keeping captive party {PartyId} parked for peer {Peer}",
+                    party.StringId,
+                    peer.Id);
+                return;
+            }
+
             party.IsActive = true;
             CreateVisual(party, player.MobilePartyId);
             party.Party.UpdateVisibilityAndInspected(party.Position);
@@ -159,7 +172,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (party.MapEvent != null) continue;
 
             deferredMapEventParking.Remove(party);
-            if (!party.IsActive || !IsDisconnectedPlayerParty(party)) continue;
+            if (!party.IsActive || !playerManager.IsOwnerOfPartyDisconnected(party)) continue;
 
             party.IsActive = false;
             RemoveVisual(party);
@@ -168,12 +181,6 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 party.StringId);
         }
     }
-
-    private bool IsDisconnectedPlayerParty(MobileParty party) =>
-        playerManager.Players.Any(player =>
-            !playerManager.IsConnected(player) &&
-            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) &&
-            ReferenceEquals(playerParty, party));
 
     /// <summary>
     /// Removes the party's map figure and tells every client to do the same, mirroring
