@@ -1,6 +1,10 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using GameInterface.Extentions;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -19,6 +23,51 @@ internal class DisableCompanionsCampaignBehavior
 [HarmonyPatch(typeof(CompanionsCampaignBehavior))]
 internal class CompanionsCampaignBehaviorPatches
 {
+    // Alternative way to increase companion limit scaled by player clan tiers suggested by tester.
+    // See "wandererLimitScalesWithPlayers" in mod-config.default.json for a more detailed description of what this config is.
+    private static readonly Dictionary<int, int> ClanTierScalingValues = new()
+    {
+        { 0, 0 },
+        { 1, 0 },
+        { 2, 5 },
+        { 3, 5 },
+        { 4, 5 },
+        { 5, 10 },
+        { 6, 10 },
+    };
+
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior._desiredTotalCompanionCount), MethodType.Getter)]
+    [HarmonyPrefix]
+    public static bool DesiredTotalCompanionCountGetterPrefix(ref float __result)
+    {
+        // Use fixed wanderer limit
+        if (!ModConfigProvider.ModOptions.WandererLimitScalesWithPlayers)
+        {
+            __result = ModConfigProvider.ModOptions.WandererLimit;
+            return false;
+        }
+
+        // Calculate scaling limit. Session teardown clears the container without unpatching, so this
+        // prefix can outlive it — fall through to vanilla rather than NRE on the resolved managers
+        // (vanilla's count formula doesn't touch Hero.MainHero, so it is safe on a headless server).
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return true;
+
+        // Start with vanilla limit
+        var total = 32;
+        foreach (var player in playerManager.Players)
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(player.ClanId, out var playerClan))
+                continue;
+
+            if (ClanTierScalingValues.TryGetValue(playerClan.Tier, out int valueFromTier))
+                total += valueFromTier;
+        }
+
+        __result = total;
+        return false;
+    }
+
     /// <summary>
     /// Replace vanilla implementation to not use Hero.MainHero which is null on the headless server.
     /// </summary>
