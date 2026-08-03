@@ -336,19 +336,25 @@ internal static class LordBarterPatch
             return true;
         }
 
+        if (barterData.OtherParty?.MobileParty?.IsActive == true && manager.TryGetId(barterData.OtherParty, out contextId))
+        {
+            context = PeaceConversationContext.MapParty;
+            return true;
+        }
+
+        // Last: a settlement-menu conversation. There is no location mission and no map party to
+        // point at, so identify the conversation by the settlement both sides are standing in.
+        // Checked after the two above so an ordinary map or location conversation keeps its stronger
+        // context - this only catches what would otherwise have no context at all.
         var settlement = barterData.OffererParty?.MobileParty?.CurrentSettlement;
-        if (settlement != null && barterData.OtherHero?.CurrentSettlement == settlement &&
+        if (settlement != null &&
+            barterData.OtherHero?.CurrentSettlement == settlement &&
             manager.TryGetId(settlement, out contextId))
         {
             context = PeaceConversationContext.Settlement;
             return true;
         }
 
-        if (barterData.OtherParty?.MobileParty?.IsActive == true && manager.TryGetId(barterData.OtherParty, out contextId))
-        {
-            context = PeaceConversationContext.MapParty;
-            return true;
-        }
         context = default;
         contextId = null;
         return false;
