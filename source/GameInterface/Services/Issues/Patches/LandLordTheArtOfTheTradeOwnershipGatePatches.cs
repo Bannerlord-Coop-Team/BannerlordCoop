@@ -39,4 +39,15 @@ internal class LandLordTheArtOfTheTradeOwnershipGatePatches
     private static bool QuestFailedPlayerBrokeTheAgreementPrefix(
         LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssueQuest __instance) =>
         VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(__instance.QuestGiver);
+
+    // OnTimedOut applies the same ChangeCrimeRatingAction(+5, faction-wide) and a -10 relation hit as
+    // QuestFailedPlayerBrokeTheAgreement, but unlike the three methods above it's driven by
+    // QuestManager.HourlyTick -> CompleteQuestWithTimeOut(), which is not host/client-gated anywhere in this
+    // codebase - every peer's own mirrored quest independently reaches its due time at the same in-game
+    // moment and would otherwise apply this penalty once per connected peer instead of once, total.
+    [HarmonyPatch("OnTimedOut")]
+    [HarmonyPrefix]
+    private static bool OnTimedOutPrefix(
+        LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssueQuest __instance) =>
+        VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(__instance.QuestGiver);
 }
