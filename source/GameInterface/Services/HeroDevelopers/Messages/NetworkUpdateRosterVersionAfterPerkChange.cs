@@ -4,12 +4,12 @@ using ProtoBuf;
 namespace GameInterface.Services.HeroDevelopers.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkUpdateRosterVersionAfterPerkActivation : ICommand
+public readonly struct NetworkUpdateRosterVersionAfterPerkChange : ICommand
 {
     [ProtoMember(1)]
     public readonly string MemberRosterId;
 
-    public NetworkUpdateRosterVersionAfterPerkActivation(string memberRosterId)
+    public NetworkUpdateRosterVersionAfterPerkChange(string memberRosterId)
     {
         MemberRosterId = memberRosterId;
     }

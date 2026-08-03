@@ -1,42 +1,23 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Smithing.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkDoSmelting : ICommand
+internal readonly struct NetworkDoSmelting : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly string CraftingHeroId;
 
     [ProtoMember(2)]
-    public string CraftingHeroId;
-
-    [ProtoMember(3)]
-    public string ItemId;
-
-    [ProtoMember(4)]
-    public string ItemModifierId;
-
-    [ProtoMember(5)]
-    public string CosmeticItemId;
-
-    [ProtoMember(6)]
-    public bool IsQuestItem;
+    public readonly EquipmentElement EquipmentElement;
 
     public NetworkDoSmelting(
-        string craftingCampaignBehaviorId,
         string craftingHeroId,
-        string itemId,
-        string itemModifierId,
-        string cosmeticItemId,
-        bool isQuestItem)
+        EquipmentElement equipmentElement)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         CraftingHeroId = craftingHeroId;
-        ItemId = itemId;
-        ItemModifierId = itemModifierId;
-        CosmeticItemId = cosmeticItemId;
-        IsQuestItem = isQuestItem;
+        EquipmentElement = equipmentElement;
     }
 }

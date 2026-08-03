@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using Common.Network;
@@ -280,7 +280,8 @@ public class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IControllerIdProvider>(),
                 peer.Resolve<IAgentEquipmentApplier>(),
                 new MovementBatchSender(network, compressor),
-                peer.Resolve<IPuppetMountStateRepairer>());
+                peer.Resolve<IPuppetMountStateRepairer>(),
+                peer.Resolve<IAgentVisualActionAccessor>());
             network.MaxUnreliablePayloadBytes = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
                 serializer,
                 "MapEvent_Created_0000",

@@ -70,6 +70,197 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollActions_PreNative_EmitsOnlyMainPlayerInput()
+    {
+        RunScenario("owner", context =>
+        {
+            var playerId = Guid.NewGuid();
+            var aiId = Guid.NewGuid();
+
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                playerId,
+                AgentControllerType.Player,
+                out MirrorAgent playerMirror);
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                aiId,
+                AgentControllerType.AI,
+                out MirrorAgent aiMirror);
+
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            playerMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendLeft;
+            playerMirror.GuardMode = Agent.GuardMode.Left;
+            aiMirror.Action0Index = 1001;
+            aiMirror.Action0CodeType = Agent.ActionCodeType.ReleaseMelee;
+
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            Assert.Equal(playerId, Assert.Single(packet.AgentIds));
+            AgentActionData action = Assert.Single(packet.Actions);
+            Assert.Equal(Agent.GuardMode.Left, action.GuardMode);
+            Assert.DoesNotContain(aiId, packet.AgentIds);
+        });
+    }
+
+    [Fact]
+    public void PollActionsAfterNativeTick_FormerMainPlayer_DoesNotRetainStaleInput()
+    {
+        RunScenario("owner", context =>
+        {
+            var formerMainAgentId = Guid.NewGuid();
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                formerMainAgentId,
+                AgentControllerType.Player,
+                out MirrorAgent formerMainAgentMirror);
+
+            formerMainAgentMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendLeft;
+            formerMainAgentMirror.GuardMode = Agent.GuardMode.Left;
+            context.Component.AgentActionHandler.PollActions();
+            context.Network.NetworkSentPackets.Packets.Clear();
+
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            formerMainAgentMirror.MovementFlags =
+                Agent.MovementControlFlag.None;
+            formerMainAgentMirror.GuardMode = Agent.GuardMode.None;
+
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            Assert.Equal(
+                formerMainAgentId,
+                Assert.Single(packet.AgentIds));
+            Assert.Equal(
+                Agent.GuardMode.None,
+                Assert.Single(packet.Actions).GuardMode);
+
+            context.Component.AgentActionHandler.CatchUpJoiner("joiner");
+            Assert.Empty(context.Network.DirectPacketSends);
+        });
+    }
+
+    [Theory]
+    [InlineData(Agent.ActionCodeType.ReleaseMelee)]
+    [InlineData(Agent.ActionCodeType.EquipUnequip)]
+    public void PollActionsAfterNativeTick_LocalAiDiscreteAction_SendsOnce(
+        Agent.ActionCodeType actionType)
+    {
+        RunScenario("owner", context =>
+        {
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            var aiId = Guid.NewGuid();
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                aiId,
+                AgentControllerType.AI,
+                out MirrorAgent aiMirror);
+
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            aiMirror.Action0Index = 1001;
+            aiMirror.Action0CodeType = actionType;
+
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            Assert.Equal(aiId, Assert.Single(packet.AgentIds));
+            Assert.Equal(1001, Assert.Single(packet.Actions).Action0Index);
+            Assert.Equal(1L, Assert.Single(packet.Sequences));
+
+            context.Network.NetworkSentPackets.Packets.Clear();
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+        });
+    }
+
+    [Fact]
+    public void PollActionsAfterNativeTick_LocalAiGuard_SendsOnce()
+    {
+        RunScenario("owner", context =>
+        {
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            var aiId = Guid.NewGuid();
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                aiId,
+                AgentControllerType.AI,
+                out MirrorAgent aiMirror);
+
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            aiMirror.MovementFlags =
+                Agent.MovementControlFlag.DefendBlock
+                | Agent.MovementControlFlag.DefendLeft;
+            aiMirror.GuardMode = Agent.GuardMode.Left;
+            aiMirror.Action1Index = 202;
+            aiMirror.Action1CodeType = Agent.ActionCodeType.Guard;
+            aiMirror.Action1Direction = Agent.UsageDirection.DefendLeft;
+
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            Assert.Equal(aiId, Assert.Single(packet.AgentIds));
+            AgentActionData action = Assert.Single(packet.Actions);
+            Assert.Equal(
+                Agent.MovementControlFlag.DefendBlock
+                    | Agent.MovementControlFlag.DefendLeft,
+                action.DefendFlags);
+            Assert.Equal(Agent.GuardMode.Left, action.GuardMode);
+            Assert.Equal(1L, Assert.Single(packet.Sequences));
+
+            context.Network.NetworkSentPackets.Packets.Clear();
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+        });
+    }
+
+    [Fact]
     public void PollActions_DefendFlagsWithoutNativeGuard_SendsEffectiveGuard()
     {
         RunScenario("owner", context =>
@@ -2266,6 +2457,11 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     {
         Agent agent = SpawnAgent(context, controllerType, out mirror);
         Assert.True(context.Registry.TryRegisterAgent(controllerId, agentId, agent));
+        if (controllerType == AgentControllerType.Player
+            && context.Registry.IsLocallyControlled(agent))
+        {
+            context.Mock.MainAgent = agent;
+        }
         return agent;
     }
 

@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
+using Coop.Core.Server.Services.Time.Handlers;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
@@ -59,6 +60,8 @@ public class E2ETestEnvironment : IDisposable
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
+        StopCampaignTimeHeartbeat();
+
         SetupMainHero();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
@@ -72,6 +75,12 @@ public class E2ETestEnvironment : IDisposable
             Server.ObjectManager.AddExisting(settlement.StringId, settlement);
         }
     }
+
+    /// <summary>
+    /// Stops the server's authoritative campaign-time heartbeat for the lifetime of this environment.
+    /// </summary>
+    private void StopCampaignTimeHeartbeat()
+        => Server.Resolve<CampaignTimeSyncHandler>().Dispose();
 
     /// <summary>
     /// Associates an already registered player with a connected E2E client peer.

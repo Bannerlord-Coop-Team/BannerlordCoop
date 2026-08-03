@@ -4,20 +4,16 @@ using ProtoBuf;
 namespace GameInterface.Services.Smithing.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkSetHeroCraftingStamina : ICommand
+public readonly struct NetworkSetHeroCraftingStamina : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly string CraftingHeroId;
 
     [ProtoMember(2)]
-    public string CraftingHeroId;
+    public readonly int Value;
 
-    [ProtoMember(3)]
-    public int Value;
-
-    public NetworkSetHeroCraftingStamina(string craftingCampaignBehaviorId, string craftingHeroId, int value)
+    public NetworkSetHeroCraftingStamina(string craftingHeroId, int value)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         CraftingHeroId = craftingHeroId;
         Value = value;
     }
