@@ -2064,7 +2064,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void BanditSafePassage_FailureAfterPayment_AcceptsOnlyAfterSafePassageIsInstalled(
+    public void BanditSafePassage_Failure_ChargesOnlyAfterSafePassageIsInstalled(
         bool failBeforeSafePassageIsInstalled)
     {
         const int initialPlayerGold = 1000;
@@ -2136,13 +2136,19 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBanditBarterResult>());
             Assert.Equal(!failBeforeSafePassageIsInstalled, result.Accepted);
             Assert.Equal(requestId, result.RequestId);
-            Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
+            var expectedPlayerGold = failBeforeSafePassageIsInstalled
+                ? initialPlayerGold
+                : initialPlayerGold - offeredGold;
+            var expectedBanditGold = failBeforeSafePassageIsInstalled
+                ? initialBanditGold
+                : initialBanditGold + offeredGold;
+            Assert.Equal(expectedPlayerGold, result.PlayerGold);
             AssertBanditBarterGold(
                 Server,
                 playerHeroId,
                 banditMobilePartyId,
-                initialPlayerGold - offeredGold,
-                initialBanditGold + offeredGold);
+                expectedPlayerGold,
+                expectedBanditGold);
         }
         finally
         {

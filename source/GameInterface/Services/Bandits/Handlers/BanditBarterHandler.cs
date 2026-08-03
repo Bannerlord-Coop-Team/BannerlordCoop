@@ -117,8 +117,6 @@ internal sealed class BanditBarterHandler : IHandler
                 return;
             }
 
-            ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
-
             var protectionUntil = CampaignTime.HoursFromNow(32);
             foreach (var protectedParty in offer.EnemyParties)
             {
@@ -135,6 +133,9 @@ internal sealed class BanditBarterHandler : IHandler
                 player.HeroId,
                 request.BanditPartyId,
                 BanditInteractionsCampaignBehavior.PlayerInteraction.PaidOffParty);
+
+            // Keep payment after safe-passage setup so a rejected setup failure cannot charge the player.
+            ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
             mutationApplied = true;
 
             ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
