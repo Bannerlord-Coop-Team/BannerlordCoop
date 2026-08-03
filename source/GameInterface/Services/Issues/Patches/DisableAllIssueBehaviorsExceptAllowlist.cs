@@ -85,6 +85,15 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // mechanism (HeadmanNeedsGrainPriceCachePatches/HeadmanNeedsGrainPricePersistencePatches), not part of
         // this allowlist/dispatch choke point at all.
         typeof(HeadmanNeedsGrainIssueBehavior),
+        // Deliver the Herd to Town - TaleWorlds.CampaignSystem.dll, same allowlist/dispatch shape as every
+        // other Group 1C entry above. Its own dynamically-registered second DialogFlow (GetDeliveryDialogFlow,
+        // added imperatively outside SetDialogs()/AddDialogs()) is a separate, standalone ownership-gate
+        // mechanism (HeadmanNeedsToDeliverAHerdOwnershipGatePatches), not part of this allowlist/dispatch
+        // choke point at all - see that patch's own doc comment. A leftover orphaned
+        // DisableHeadmanNeedsToDeliverAHerdIssueBehavior patch (predating this allowlist) was found blocking
+        // this type's RegisterEvents entirely and has been deleted, same bug shape as commits e96018702/
+        // 479f810e7/the 12-type sweep - see VerifyAllowlistIntegrity's own doc comment.
+        typeof(HeadmanNeedsToDeliverAHerdIssueBehavior),
     };
 
     /// <summary>

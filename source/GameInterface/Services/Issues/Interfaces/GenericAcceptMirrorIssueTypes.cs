@@ -51,6 +51,13 @@ internal static class GenericAcceptMirrorIssueTypes
         // SimpleIssueFactoryRegistry's doc comment) - a bare replay of IssueManager.StartIssueQuest lands on a
         // byte-identical HeadmanNeedsGrainIssueQuest on every peer.
         typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue),
+        // Deliver the Herd to Town: GenerateIssueQuest(questId) forwards IssueOwner/AnimalCountToDeliver/
+        // _herdTypeToDeliver/_targetSettlement/RewardGold/_targetHero - all already frozen (three chained
+        // rolls, forced at creation - see IHeadmanNeedsToDeliverAHerdIssueInterface's doc comment) or pure
+        // functions of those frozen fields plus the same deterministic IssueDifficultyMultiplier every other
+        // type here already relies on. A bare replay of IssueManager.StartIssueQuest lands on a
+        // byte-identical HeadmanNeedsToDeliverAHerdIssueQuest on every peer.
+        typeof(HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -91,6 +98,10 @@ internal static class GenericAcceptMirrorIssueTypes
         // ownership-gated HourlyTick mechanism every other Tier 1 Group 1C/1D type uses - see
         // NewIssueTypesAlternativeSolutionPatches's Village Needs Grain Seeds registration.
         typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue),
+        // Deliver the Herd to Town: IsThereAlternativeSolution == true, AlternativeSolutionScaleFlags is
+        // Duration only (confirmed against the decompiled source - no FailureRisk/Casualties), so
+        // MirrorAlternativeAccepted's generic force-write is all any other peer's mirror copy needs.
+        typeof(HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>
