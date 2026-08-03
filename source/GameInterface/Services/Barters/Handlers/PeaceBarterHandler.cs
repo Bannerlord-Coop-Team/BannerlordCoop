@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -21,6 +21,7 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -98,6 +99,7 @@ internal sealed class PeaceBarterHandler : IHandler
     {
         Hero playerHero = null;
         BarterPlayerContext playerContext = null;
+        var mutationApplied = false;
         try
         {
             if (!TryResolveContext(
@@ -136,6 +138,11 @@ internal sealed class PeaceBarterHandler : IHandler
             }
 
             MakePeaceAction.Apply(playerHero.MapFaction, targetHero.MapFaction);
+
+            // The war is over on the authoritative server from here; a later failure must not be
+            // reported as a rejection or the client rolls back a change that really happened.
+            mutationApplied = true;
+
             if (playerHero.MapFaction.FactionsAtWarWith?.Contains(targetHero.MapFaction) == true ||
                 targetHero.MapFaction.FactionsAtWarWith?.Contains(playerHero.MapFaction) == true)
             {
@@ -164,6 +171,18 @@ internal sealed class PeaceBarterHandler : IHandler
         catch (Exception exception)
         {
             Logger.Error(exception, "Failed to apply an authoritative peace barter");
+
+            if (mutationApplied)
+            {
+                // Peace is already made server-side; reporting failure would be the desync.
+                network.Send(peer, new NetworkPeaceBarterResult(
+                    request.ContextId,
+                    true,
+                    playerHero?.Gold ?? 0,
+                    requestId: request.RequestId));
+                return;
+            }
+
             Reject(peer, request, playerHero?.Gold ?? 0, "The server could not process the peace offer.");
         }
         finally
@@ -225,6 +244,20 @@ internal sealed class PeaceBarterHandler : IHandler
             }
 
             targetParty = targetPartyBase;
+        }
+        else if (context == PeaceConversationContext.Settlement)
+        {
+            // A settlement-menu conversation holds no engagement (no agent, no location mission),
+            // so authority comes from both sides actually being in the settlement named by the
+            // request. Without this branch such a conversation fell into the Location check below,
+            // found no lock, and every peace barter from a castle or town menu was refused.
+            if (!objectManager.TryGetObject(request.ContextId, out Settlement conversationSettlement) ||
+                playerMobileParty.CurrentSettlement != conversationSettlement ||
+                targetHero.CurrentSettlement != conversationSettlement)
+            {
+                reason = "The peace settlement conversation is no longer active.";
+                return false;
+            }
         }
         else
         {

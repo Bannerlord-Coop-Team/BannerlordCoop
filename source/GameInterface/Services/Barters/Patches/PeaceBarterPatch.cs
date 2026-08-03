@@ -189,6 +189,18 @@ internal static class PeaceBarterPatch
             return true;
         }
 
+        // A settlement-menu conversation: no location mission and no map party, so identify it by
+        // the settlement both sides stand in. Checked last so map and location conversations keep
+        // their stronger context.
+        var settlement = barterData.OffererParty?.MobileParty?.CurrentSettlement;
+        if (settlement != null &&
+            barterData.OtherHero?.CurrentSettlement == settlement &&
+            objectManager.TryGetId(settlement, out contextId))
+        {
+            context = PeaceConversationContext.Settlement;
+            return true;
+        }
+
         context = default;
         contextId = null;
         return false;

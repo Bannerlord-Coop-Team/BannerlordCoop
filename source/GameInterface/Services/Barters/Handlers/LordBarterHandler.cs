@@ -24,6 +24,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Barters.Handlers;
@@ -454,7 +455,23 @@ internal sealed partial class LordBarterHandler : IHandler
         playerParty = mobileParty.Party;
         targetParty = targetHero.PartyBelongedTo?.Party;
 
-        if ((PeaceConversationContext)request.Context == PeaceConversationContext.MapParty)
+        var conversationContext = (PeaceConversationContext)request.Context;
+        if (conversationContext == PeaceConversationContext.Settlement)
+        {
+            // A settlement-menu conversation acquires no engagement - there is no agent and no
+            // location mission to lock - so authority comes from co-location instead: both the
+            // requesting party and the target must actually be inside the settlement named by the
+            // request. That is as strong as the hold for this case, because a player who is not in
+            // the settlement cannot be talking to someone who is.
+            if (!objectManager.TryGetObject(request.ContextId, out Settlement conversationSettlement) ||
+                mobileParty.CurrentSettlement != conversationSettlement ||
+                targetHero.CurrentSettlement != conversationSettlement)
+            {
+                reason = "The lord settlement conversation is no longer active.";
+                return false;
+            }
+        }
+        else if (conversationContext == PeaceConversationContext.MapParty)
         {
             if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty) ||
                 requestedParty != targetParty ||
