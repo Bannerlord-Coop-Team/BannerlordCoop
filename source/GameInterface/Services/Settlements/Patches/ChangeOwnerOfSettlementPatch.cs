@@ -27,6 +27,16 @@ namespace GameInterface.Services.Settlements.Patches
 
             if (ModInformation.IsClient)
             {
+                // A client ruler gifting a fief lands here. Blocking without forwarding made the
+                // kingdom screen's "Give Settlement" a silent no-op, so ask the server to do it;
+                // the server re-validates authority and the change comes back as
+                // NetworkChangeSettlementOwnership like any other ownership move.
+                if (detail == ChangeOwnerOfSettlementDetail.ByGift && settlement != null && newOwner != null)
+                {
+                    MessageBroker.Instance.Publish(settlement, new SettlementGiftRequested(settlement, newOwner));
+                    return false;
+                }
+
                 Logger.Error("Client called unmanaged {name}", typeof(ChangeOwnerOfSettlementAction));
                 return false;
             }
