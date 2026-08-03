@@ -122,6 +122,20 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void HeadmanNeedsGrainRegisterEventsPostfix(HeadmanNeedsGrainIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Deliver the Herd to Town - same shared choke point, no new per-type file needed.
+    // HeadmanNeedsToDeliverAHerdIssue.AlternativeSolutionScaleFlags is Duration only (confirmed against the
+    // decompiled source), so like Grain Seeds above, its alternative solution always succeeds deterministically
+    // and routing it through this generic, success-only trigger is safe. Added by independent review of the
+    // Deliver the Herd pass, which found this type was registered in GenericAcceptMirrorIssueTypes'
+    // AlternativeSolutionMirrorEligible set but the matching HourlyTick registration here was never carried
+    // out - without it, a client-owner's alternative-solution completion could never fire (IssueManager.DailyTick,
+    // the only other path to CompleteIssueWithAlternativeSolution, is server-only), leaving the quest
+    // permanently stuck in SolvingWithAlternativeSolution for that player.
+    [HarmonyPatch(typeof(HeadmanNeedsToDeliverAHerdIssueBehavior), nameof(HeadmanNeedsToDeliverAHerdIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void HeadmanNeedsToDeliverAHerdRegisterEventsPostfix(HeadmanNeedsToDeliverAHerdIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;
