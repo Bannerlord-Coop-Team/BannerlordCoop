@@ -11,16 +11,18 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Hideouts.Patches.Disable;
 
-[HarmonyPatch(typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.HideoutCampaignBehavior))]
-internal class HideoutCampaignBehavior
+[HarmonyPatch(typeof(HideoutCampaignBehavior))]
+internal class HideoutCampaignBehaviorPatch
 {
-    [HarmonyPatch(nameof(HideoutCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => ModInformation.IsServer;
-
     [HarmonyPatch(nameof(HideoutCampaignBehavior.HourlyTickSettlement))]
     [HarmonyPrefix]
     public static bool HourlyTickSettlement(Settlement settlement)
     {
+        if (!ModInformation.IsServer)
+        {
+            return false;
+        }
+
         if (settlement.IsHideout && settlement.Hideout.IsInfested && !settlement.Hideout.IsSpotted)
         {
             float hideoutSpottingDistance = Campaign.Current.Models.MapVisibilityModel.GetHideoutSpottingDistance();
