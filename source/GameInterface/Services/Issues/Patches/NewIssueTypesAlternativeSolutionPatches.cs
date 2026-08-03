@@ -77,6 +77,36 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void LordNeedsGarrisonTroopsRegisterEventsPostfix(LordNeedsGarrisonTroopsIssueQuestBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Tier 1 Group 1C/1D additions - same shared choke point, no new per-type file needed. RuralNotableInnAndOut/
+    // ProdigalSon/TheSpyParty are SandBox.dll types (this project's first cross-assembly issue types) - the
+    // compile-time-typed [HarmonyPatch(typeof(...))] attribute works identically regardless of which assembly
+    // the behavior lives in, since GameInterface.csproj already references SandBox.dll directly (see
+    // DisableAllIssueBehaviorsExceptAllowlist's doc comment).
+    [HarmonyPatch(typeof(NearbyBanditBaseIssueBehavior), nameof(NearbyBanditBaseIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void NearbyBanditBaseRegisterEventsPostfix(NearbyBanditBaseIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    [HarmonyPatch(typeof(LandLordTheArtOfTheTradeIssueBehavior), nameof(LandLordTheArtOfTheTradeIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void LandLordTheArtOfTheTradeRegisterEventsPostfix(LandLordTheArtOfTheTradeIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    [HarmonyPatch(typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior), nameof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void RuralNotableInnAndOutRegisterEventsPostfix(SandBox.Issues.RuralNotableInnAndOutIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    [HarmonyPatch(typeof(SandBox.Issues.ProdigalSonIssueBehavior), nameof(SandBox.Issues.ProdigalSonIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void ProdigalSonRegisterEventsPostfix(SandBox.Issues.ProdigalSonIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    [HarmonyPatch(typeof(SandBox.Issues.TheSpyPartyIssueQuestBehavior), nameof(SandBox.Issues.TheSpyPartyIssueQuestBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void TheSpyPartyRegisterEventsPostfix(SandBox.Issues.TheSpyPartyIssueQuestBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;

@@ -37,6 +37,15 @@ internal static class GenericAcceptMirrorIssueTypes
         typeof(CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue),
         typeof(ArmyNeedsSuppliesIssueBehavior.ArmyNeedsSuppliesIssue),
         typeof(ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue),
+        // Tier 1 Group 1C/1D additions - GenerateIssueQuest is deterministic for all four given what's already
+        // captured/forced at creation time (see each type's own bespoke Interfaces/*IssueInterface.cs, or
+        // SimpleIssueFactoryRegistry's doc comment for Art of the Trade/Rural Notable). TheSpyPartyIssue is
+        // deliberately NOT here - its GenerateIssueQuest rolls the load-bearing spy identity itself, at accept
+        // time, and needs its own bespoke capture instead (see ITheSpyPartyIssueInterface's doc comment).
+        typeof(NearbyBanditBaseIssueBehavior.NearbyBanditBaseIssue),
+        typeof(LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue),
+        typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue),
+        typeof(SandBox.Issues.ProdigalSonIssueBehavior.ProdigalSonIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -55,6 +64,20 @@ internal static class GenericAcceptMirrorIssueTypes
         typeof(LandLordNeedsManualLaborersIssueBehavior.LandLordNeedsManualLaborersIssue),
         typeof(HeadmanVillageNeedsDraughtAnimalsIssueBehavior.HeadmanVillageNeedsDraughtAnimalsIssue),
         typeof(LordNeedsGarrisonTroopsIssueQuestBehavior.LordNeedsGarrisonTroopsIssue),
+        // Tier 1 Group 1C/1D additions - all five have IsThereAlternativeSolution == true and need no
+        // additional per-client-divergent field beyond what MirrorAlternativeAccepted already forces. Nearby
+        // Bandit Base/Rural Notable/Prodigal Son/The Spy Party all have AlternativeSolutionScaleFlag.FailureRisk
+        // (like CapturedByBountyHuntersIssue above) - see NewIssueTypesAlternativeSolutionCompletionPatches'
+        // TryTriggerOwnedAlternativeSolutionCompletion doc comment for why that's still safe to route through
+        // this same generic trigger. TheSpyPartyIssue IS included here even though it's NOT in
+        // QuestSolutionMirrorEligible above - its alternative-solution path never reads the accept-time
+        // selected-spy roll at all (AlternativeSolutionEndWithSuccess/FailureConsequence only touch IssueBase-
+        // level relation/renown/town state), so it has no analogous divergence to fix on this path.
+        typeof(NearbyBanditBaseIssueBehavior.NearbyBanditBaseIssue),
+        typeof(LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue),
+        typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue),
+        typeof(SandBox.Issues.ProdigalSonIssueBehavior.ProdigalSonIssue),
+        typeof(SandBox.Issues.TheSpyPartyIssueQuestBehavior.TheSpyPartyIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>

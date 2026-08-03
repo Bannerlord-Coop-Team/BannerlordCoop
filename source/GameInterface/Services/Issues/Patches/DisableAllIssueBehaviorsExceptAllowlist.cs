@@ -71,6 +71,15 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         typeof(BettingFraudIssueBehavior),
         typeof(GangLeaderNeedsSpecialWeaponsIssueBehavior),
         typeof(LordNeedsGarrisonTroopsIssueQuestBehavior),
+        // Tier 1 Group 1C (TaleWorlds.CampaignSystem) + Group 1D (SandBox.dll - the first cross-assembly issue
+        // types this project syncs; verified the scan/dispatch below already handles them unmodified, since it
+        // scans both assemblies and every choke point below dispatches on the shared IssueBase/QuestBase base
+        // types rather than anything assembly-specific).
+        typeof(NearbyBanditBaseIssueBehavior),
+        typeof(LandLordTheArtOfTheTradeIssueBehavior),
+        typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior),
+        typeof(SandBox.Issues.ProdigalSonIssueBehavior),
+        typeof(SandBox.Issues.TheSpyPartyIssueQuestBehavior),
     };
 
     /// <summary>

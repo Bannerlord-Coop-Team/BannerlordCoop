@@ -8,10 +8,13 @@ namespace GameInterface.Services.Issues.Interfaces;
 
 /// <summary>
 /// Factory registry backing <see cref="Patches.SimpleIssueCreationPatch"/>/<see cref="Handlers.SimpleIssueCreationHandler"/>
-/// for issue types whose Issue class has a plain <c>(Hero issueOwner)</c> constructor that rolls NO field a
-/// client would need captured/forced to replicate byte-identically (verified per type against the decompiled
-/// source - see each type's own survey notes in the branch report). For these, "replicate this issue" needs no
-/// payload beyond "which owner, which type" - a client can just call the type's own real constructor.
+/// for issue types whose Issue class can be reconstructed from JUST the owner Hero - rolling NO field a client
+/// would need captured/forced to replicate byte-identically (verified per type against the decompiled source -
+/// see each type's own survey notes in the branch report). For these, "replicate this issue" needs no payload
+/// beyond "which owner, which type" - a client can just call the type's own real constructor (most entries have
+/// a plain <c>(Hero issueOwner)</c> ctor; <c>LandLordTheArtOfTheTradeIssue</c> below is the one exception - its
+/// ctor takes an extra, deterministically-owner-derivable argument, still safely coverable by a
+/// <c>Func&lt;Hero, IssueBase&gt;</c> lambda that derives it inline).
 ///
 /// This still needs its OWN server-authoritative-creation-broadcast-then-replicate flow (not "just let every
 /// client construct one independently") for one reason unrelated to randomness: <c>IssueManagerCreateNewIssuePatches.Prefix</c>
@@ -20,12 +23,13 @@ namespace GameInterface.Services.Issues.Interfaces;
 ///
 /// Types NOT in this registry (<c>VillageNeedsToolsIssue</c>, <c>VillageNeedsCraftingMaterialsIssue</c>,
 /// <c>LordNeedsHorsesIssue</c>, <c>CapturedByBountyHuntersIssue</c>, <c>ScoutEnemyGarrissonsIssue</c>,
-/// <c>HeadmanVillageNeedsDraughtAnimalsIssue</c>, <c>LordNeedsGarrisonTroopsIssue</c>) roll or reference at
-/// least one field at creation time that genuinely needs capturing+forcing, so they keep their own bespoke
-/// Interface/Messages/Patches/Handler file set instead. <c>LandLordNeedsManualLaborersIssue</c>/
-/// <c>BettingFraudIssue</c>/<c>GangLeaderNeedsSpecialWeaponsIssue</c> ARE registered here for CREATION (their
-/// Issue ctor rolls nothing) but still keep their own bespoke ACCEPT-time capture files - see each type's own
-/// Interfaces/*IssueInterface.cs doc comment.
+/// <c>HeadmanVillageNeedsDraughtAnimalsIssue</c>, <c>LordNeedsGarrisonTroopsIssue</c>, <c>NearbyBanditBaseIssue</c>,
+/// <c>ProdigalSonIssue</c>, <c>TheSpyPartyIssue</c>) roll or reference at least one field at creation (or, for
+/// The Spy Party, ACCEPT) time that genuinely needs capturing+forcing rather than being safely re-derivable from
+/// the owner alone, so they keep their own bespoke Interface/Messages/Patches/Handler file set instead.
+/// <c>LandLordNeedsManualLaborersIssue</c>/<c>BettingFraudIssue</c>/<c>GangLeaderNeedsSpecialWeaponsIssue</c> ARE
+/// registered here for CREATION (their Issue ctor rolls nothing) but still keep their own bespoke ACCEPT-time
+/// capture files - see each type's own Interfaces/*IssueInterface.cs doc comment.
 /// </summary>
 internal static class SimpleIssueFactoryRegistry
 {
@@ -86,6 +90,30 @@ internal static class SimpleIssueFactoryRegistry
             typeof(GangLeaderNeedsSpecialWeaponsIssueBehavior.GangLeaderNeedsSpecialWeaponsIssue),
             owner => new GangLeaderNeedsSpecialWeaponsIssueBehavior.GangLeaderNeedsSpecialWeaponsIssue(owner),
             IssueBase.IssueFrequency.VeryCommon),
+        // Tier 1 Group 1C: LandLordTheArtOfTheTradeIssue's ctor takes an extra ItemObject param, but it's never
+        // rolled - it's a pure, deterministic derivation of the owner's own CurrentSettlement
+        // (Village.VillageType.PrimaryProduction), the SAME derivation vanilla's own OnGameLoad() independently
+        // re-runs on every load (this field isn't even a [SaveableField] - confirmed by the decompiled source -
+        // vanilla itself treats it as safely recomputable from the owner alone, never needing persistence). A
+        // client reconstructing via this lambda at the moment it receives the creation broadcast lands on the
+        // exact same value the server did, without needing a bespoke Interfaces/Messages/Patches/Handler file
+        // set the way NearbyBanditBaseIssue's target-hideout pick (NOT re-derivable - see its own bespoke
+        // interface) needed.
+        [typeof(LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue)] = new Entry(
+            "LandLordTheArtOfTheTrade",
+            typeof(LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue),
+            owner => new LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue(
+                owner, owner.CurrentSettlement.Village.VillageType.PrimaryProduction),
+            IssueBase.IssueFrequency.VeryCommon),
+        // Tier 1 Group 1D: RuralNotableInnAndOutIssue (SandBox.dll) has a genuinely plain (Hero) ctor - its
+        // _targetSettlement/_boardGameType fields are derived the same "safely recomputable, not a
+        // [SaveableField]" way as above (confirmed by its own OnGameLoad() override, which just re-derives them
+        // instead of expecting them restored).
+        [typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue)] = new Entry(
+            "RuralNotableInnAndOut",
+            typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue),
+            owner => new SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue(owner),
+            IssueBase.IssueFrequency.Common),
     };
 
     private static readonly Dictionary<string, Entry> ByKey = BuildByKey();
