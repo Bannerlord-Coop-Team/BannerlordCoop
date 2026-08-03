@@ -1,5 +1,4 @@
-﻿using Common;
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.MobileParties.Patches;
@@ -7,6 +6,6 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(LordDefectionCampaignBehavior))]
 internal class DisableLordDefectionCampaignBehavior
 {
-    [HarmonyPatch(nameof(LordDefectionCampaignBehavior.OnDailyTick))]
-    static bool Prefix() => ModInformation.IsServer;
+    [HarmonyPatch(nameof(LordDefectionCampaignBehavior.RegisterEvents))]
+    static bool Prefix() => false;
 }
