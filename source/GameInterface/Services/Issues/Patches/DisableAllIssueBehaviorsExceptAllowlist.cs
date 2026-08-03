@@ -94,6 +94,29 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // this type's RegisterEvents entirely and has been deleted, same bug shape as commits e96018702/
         // 479f810e7/the 12-type sweep - see VerifyAllowlistIntegrity's own doc comment.
         typeof(HeadmanNeedsToDeliverAHerdIssueBehavior),
+        // Tier 2 Group B - NEEDS-NEW-INFRASTRUCTURE, second-location tracking, no spawned MobileParty. Artisan
+        // Can't Sell Products At A Fair Price - TaleWorlds.CampaignSystem.dll. Its own dynamically-registered
+        // SECOND and THIRD DialogFlows (GetDeliveryDialogFlow/GetCounterOfferDialogFlow, both added imperatively
+        // outside SetDialogs()/AddDialogs(), from the same two call sites Deliver the Herd's own second dialogue
+        // uses) are a separate, standalone ownership-gate mechanism
+        // (ArtisanCantSellProductsAtAFairPriceOwnershipGatePatches), not part of this allowlist/dispatch choke
+        // point at all - see that patch's own doc comment. Its Lord Solution path is disabled (unbuilt
+        // infrastructure, same gap as Lady's Knight Out) via ArtisanCantSellProductsAtAFairPriceLordSolutionDisablePatch.
+        // A leftover orphaned DisableArtisanCantSellProductsAtAFairPriceIssueBehavior patch (predating this
+        // allowlist) was found blocking this type's RegisterEvents entirely and has been deleted, same bug
+        // shape as commits e96018702/479f810e7/the 12-type sweep - see VerifyAllowlistIntegrity's own doc
+        // comment.
+        typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior),
+        // Gang Leader Needs to Offload Stolen Goods - TaleWorlds.CampaignSystem.dll. Second location is a
+        // hideout (_issueHideout/_questHideout), with hideout-battle wiring and IsSettlementBusy priority-
+        // locking - see GangLeaderNeedsToOffloadStolenGoodsOwnershipGatePatches's doc comment for the full
+        // ownership-gate derivation, and IGangLeaderNeedsToOffloadStolenGoodsIssueInterface's doc comment for
+        // its bespoke accept-time price-capture mechanism (this type is NOT in GenericAcceptMirrorIssueTypes'
+        // QuestSolutionMirrorEligible set - its required-amount/price/reward are re-derived per-client at
+        // accept time, same shape as Village Needs Crafting Materials). A leftover orphaned
+        // DisableGangLeaderNeedsToOffloadStolenGoodsIssueBehavior patch (predating this allowlist) was found
+        // blocking this type's RegisterEvents entirely and has been deleted, same bug shape as above.
+        typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior),
     };
 
     /// <summary>

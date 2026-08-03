@@ -136,6 +136,22 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void HeadmanNeedsToDeliverAHerdRegisterEventsPostfix(HeadmanNeedsToDeliverAHerdIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Tier 2 Group B additions - same shared choke point, no new per-type file needed. Both confirmed
+    // AlternativeSolutionScaleFlags == None (Artisan does not override it; Gang Leader does not either - see
+    // GenericAcceptMirrorIssueTypes's doc comment), so both always succeed deterministically. Added alongside
+    // the AlternativeSolutionMirrorEligible registration in the same commit this time (see that file's own
+    // lesson-learned comment on Deliver the Herd, where the two were split across commits and the HourlyTick
+    // registration was initially missed).
+    [HarmonyPatch(typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior), nameof(ArtisanCantSellProductsAtAFairPriceIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void ArtisanCantSellProductsAtAFairPriceRegisterEventsPostfix(ArtisanCantSellProductsAtAFairPriceIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    [HarmonyPatch(typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior), nameof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void GangLeaderNeedsToOffloadStolenGoodsRegisterEventsPostfix(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;

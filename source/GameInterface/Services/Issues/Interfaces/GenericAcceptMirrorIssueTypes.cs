@@ -58,6 +58,18 @@ internal static class GenericAcceptMirrorIssueTypes
         // type here already relies on. A bare replay of IssueManager.StartIssueQuest lands on a
         // byte-identical HeadmanNeedsToDeliverAHerdIssueQuest on every peer.
         typeof(HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue),
+        // Tier 2 Group B: Artisan Can't Sell Products At A Fair Price - GenerateIssueQuest(questId) forwards
+        // IssueOwner/CampaignTime.DaysFromNow(18f)/_targetSettlement/_rawMaterialsToBeDelivered/
+        // RawMaterialCountToBeDelivered/RewardGold/_targetHero/CounterOfferHero - all already frozen (four
+        // independent rolls, forced at creation - see IArtisanCantSellProductsAtAFairPriceIssueInterface's doc
+        // comment) or pure functions of those frozen fields plus the same deterministic IssueDifficultyMultiplier
+        // every other type here already relies on. A bare replay of IssueManager.StartIssueQuest lands on a
+        // byte-identical ArtisanCantSellProductsAtAFairPriceIssueQuest on every peer. Gang Leader Needs to
+        // Offload Stolen Goods is deliberately NOT here - its GenerateIssueQuest re-derives
+        // StolenTradeGoodAmount/StolenTradeGoodPrice/RewardGold from live Town.GetItemPrice AND
+        // IssueDifficultyMultiplier at accept time, both genuinely per-client-divergent - needs its own bespoke
+        // capture instead (see IGangLeaderNeedsToOffloadStolenGoodsIssueInterface's doc comment).
+        typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -102,6 +114,18 @@ internal static class GenericAcceptMirrorIssueTypes
         // Duration only (confirmed against the decompiled source - no FailureRisk/Casualties), so
         // MirrorAlternativeAccepted's generic force-write is all any other peer's mirror copy needs.
         typeof(HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue),
+        // Tier 2 Group B: Artisan Can't Sell Products At A Fair Price - IsThereAlternativeSolution == true,
+        // AlternativeSolutionScaleFlags is Duration only (confirmed against the decompiled source - no
+        // FailureRisk/Casualties), so MirrorAlternativeAccepted's generic force-write is all any other peer's
+        // mirror copy needs. Gang Leader Needs to Offload Stolen Goods IS included here too, even though it's
+        // NOT in QuestSolutionMirrorEligible above (its GenerateIssueQuest needs bespoke capture, but its
+        // alternative-solution path's own AlternativeSolutionEndWithSuccessConsequence is always gated to the
+        // recorded owner - see GangLeaderNeedsToOffloadStolenGoodsOwnershipGatePatches - so the generic issue-
+        // state force-write here is exactly what every OTHER (non-owning) peer's mirror copy needs);
+        // AlternativeSolutionScaleFlags for it is the base IssueBase default (None - confirmed against the
+        // decompiled source, not overridden), so no FailureRisk either.
+        typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue),
+        typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>
