@@ -76,6 +76,9 @@ namespace GameInterface.Services.GameDebug.Commands
         [CommandLineArgumentFunction("add_influence", "coop.debug.clan")]
         public static string AddClanInfluence(List<string> args)
         {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
             if (args.Count != 2) return "Usage: coop.debug.clan.add_influence <clanId> <amount>";
             if (!TryGetObjectManager(out IObjectManager objectManager)) return "Unable to resolve ObjectManager";
             if (!objectManager.TryGetObject(args[0], out Clan clan)) return $"Unable to find clan with id: {args[0]}";
@@ -89,6 +92,9 @@ namespace GameInterface.Services.GameDebug.Commands
         [CommandLineArgumentFunction("change_clan_leader", "coop.debug.clan")]
         public static string ChangeClanLeader(List<string> args)
         {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
             if (args.Count < 2)
             {
                 return "Usage: coop.debug.clan.change_clan_leader <clanId> <heroId>";
@@ -120,6 +126,9 @@ namespace GameInterface.Services.GameDebug.Commands
         [CommandLineArgumentFunction("change_clan_kingdom", "coop.debug.clan")]
         public static string ChangeClanKingdom(List<string> args)
         {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
             if (args.Count < 2)
             {
                 return "Usage: coop.debug.clan.change_clan_kingdom <clanId> <kingdomId>";
@@ -151,6 +160,9 @@ namespace GameInterface.Services.GameDebug.Commands
         [CommandLineArgumentFunction("destroy_clan", "coop.debug.clan")]
         public static string DestroyClan(List<string> args)
         {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
             if (args.Count < 1)
             {
                 return "Usage: coop.debug.clan.destroy_clan <clanId>";
@@ -176,6 +188,9 @@ namespace GameInterface.Services.GameDebug.Commands
         [CommandLineArgumentFunction("add_companion", "coop.debug.clan")]
         public static string AddCompanion(List<string> args)
         {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
             if (args.Count < 2)
             {
                 return "Usage: coop.debug.clan.add_companion <clanId> <heroId>";
@@ -207,6 +222,9 @@ namespace GameInterface.Services.GameDebug.Commands
         [CommandLineArgumentFunction("remove_companion", "coop.debug.clan")]
         public static string RemoveCompanion(List<string> args)
         {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
             if (args.Count < 1)
             {
                 return "Usage: coop.debug.clan.remove_companion <heroId>";
@@ -221,7 +239,7 @@ namespace GameInterface.Services.GameDebug.Commands
 
             if (!objectManager.TryGetObject(heroId, out Hero companion))
             {
-                return $"Argument2: Hero not found by ID: {heroId}";
+                return $"Argument1: Hero not found by ID: {heroId}";
             }
 
             if (companion.Clan == null) return "Wanderer/companion is not in a clan.";
@@ -235,6 +253,9 @@ namespace GameInterface.Services.GameDebug.Commands
         [CommandLineArgumentFunction("add_renown", "coop.debug.clan")]
         public static string AddRenown(List<string> args)
         {
+            if (ModInformation.IsClient)
+                return "Command is only available to run on the server";
+
             if (args.Count < 2)
             {
                 return "Usage: coop.debug.clan.add_renown <clanId> <renown>";
