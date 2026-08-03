@@ -4,13 +4,13 @@ using ProtoBuf;
 namespace GameInterface.Services.ItemObjects.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkSetCraftedWeaponNameServer : ICommand
+internal readonly struct NetworkSetCraftedWeaponNameServer : ICommand
 {
     [ProtoMember(1)]
-    public string WeaponId;
+    public readonly string WeaponId;
 
     [ProtoMember(2)]
-    public string StringName;
+    public readonly string StringName;
 
     public NetworkSetCraftedWeaponNameServer(
         string weaponId,
@@ -22,13 +22,13 @@ public class NetworkSetCraftedWeaponNameServer : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkSetCraftedWeaponNameClients : ICommand
+internal readonly struct NetworkSetCraftedWeaponNameClients : ICommand
 {
     [ProtoMember(1)]
-    public string WeaponId;
+    public readonly string WeaponId;
 
     [ProtoMember(2)]
-    public string StringName;
+    public readonly string StringName;
 
     public NetworkSetCraftedWeaponNameClients(NetworkSetCraftedWeaponNameServer cloneObject)
     {

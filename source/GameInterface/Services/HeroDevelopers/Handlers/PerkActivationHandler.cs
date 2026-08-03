@@ -26,17 +26,17 @@ internal class PerkActivationHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
 
-        messageBroker.Subscribe<UpdateRosterVersionAfterPerkActivation>(Handle_UpdateRosterVersionAfterPerkActivation);
-        messageBroker.Subscribe<NetworkUpdateRosterVersionAfterPerkActivation>(Handle_NetworkUpdateRosterVersionAfterPerkActivation);
+        messageBroker.Subscribe<UpdateRosterVersionAfterPerkChange>(Handle_UpdateRosterVersionAfterPerkActivation);
+        messageBroker.Subscribe<NetworkUpdateRosterVersionAfterPerkChange>(Handle_NetworkUpdateRosterVersionAfterPerkActivation);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<UpdateRosterVersionAfterPerkActivation>(Handle_UpdateRosterVersionAfterPerkActivation);
-        messageBroker.Unsubscribe<NetworkUpdateRosterVersionAfterPerkActivation>(Handle_NetworkUpdateRosterVersionAfterPerkActivation);
+        messageBroker.Unsubscribe<UpdateRosterVersionAfterPerkChange>(Handle_UpdateRosterVersionAfterPerkActivation);
+        messageBroker.Unsubscribe<NetworkUpdateRosterVersionAfterPerkChange>(Handle_NetworkUpdateRosterVersionAfterPerkActivation);
     }
 
-    private void Handle_UpdateRosterVersionAfterPerkActivation(MessagePayload<UpdateRosterVersionAfterPerkActivation> obj)
+    private void Handle_UpdateRosterVersionAfterPerkActivation(MessagePayload<UpdateRosterVersionAfterPerkChange> obj)
     {
         var data = obj.What;
 
@@ -44,12 +44,12 @@ internal class PerkActivationHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(data.MemberRoster, out var memberRosterId)) return;
 
-            var message = new NetworkUpdateRosterVersionAfterPerkActivation(memberRosterId);
+            var message = new NetworkUpdateRosterVersionAfterPerkChange(memberRosterId);
             network.SendAll(message);
         });
     }
 
-    private void Handle_NetworkUpdateRosterVersionAfterPerkActivation(MessagePayload<NetworkUpdateRosterVersionAfterPerkActivation> obj)
+    private void Handle_NetworkUpdateRosterVersionAfterPerkActivation(MessagePayload<NetworkUpdateRosterVersionAfterPerkChange> obj)
     {
         var data = obj.What;
 
@@ -60,5 +60,4 @@ internal class PerkActivationHandler : IHandler
             memberRoster.UpdateVersion();
         });
     }
-
 }
