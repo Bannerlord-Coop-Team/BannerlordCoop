@@ -6,10 +6,22 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Issues.Interfaces;
 
 /// <summary>
-/// Records which connected player's <see cref="Player.ControllerId"/> genuinely accepted a given Village
-/// Needs Tools issue - the missing "real ownership" concept both the dialogue-gate fix
-/// (<see cref="Patches.VillageNeedsToolsIssueOwnershipGatePatches"/>) and the alternative-solution
-/// completion fix (<see cref="Patches.VillageNeedsToolsAlternativeSolutionCompletionPatches"/>) need.
+/// Records which connected player's <see cref="Player.ControllerId"/> genuinely accepted a given village-issue
+/// (Village Needs Tools OR Village Needs Crafting Materials - despite the "Tools" name, this registry is
+/// type-agnostic and Hero-keyed, so it's shared unchanged by both features' dialogue-gate/alternative-solution
+/// fixes) - the missing "real ownership" concept both the dialogue-gate fix
+/// (<see cref="Patches.VillageNeedsToolsIssueOwnershipGatePatches"/>/<see cref="Patches.VillageNeedsCraftingMaterialsQuestOwnershipGatePatch"/>)
+/// and the alternative-solution completion fix
+/// (<see cref="Patches.VillageNeedsToolsAlternativeSolutionCompletionPatches"/>/<see cref="Patches.VillageNeedsCraftingMaterialsAlternativeSolutionCompletionPatches"/>)
+/// need.
+///
+/// Fragile-coupling note (flagged, not fixed - see the design critique this stems from): persistence
+/// (<see cref="Patches.VillageNeedsToolsIssueOwnershipPersistencePatches"/>) piggybacks on
+/// <c>VillageNeedsToolsIssueBehavior.SyncData</c> specifically, since that's the only currently-allowlisted
+/// behavior with a non-empty <c>SyncData</c> override. This registry's own save/restore correctly covers BOTH
+/// issue types today only because Tools remains active - if Tools were ever removed while Crafting Materials
+/// remained, persistence would silently break. Worth revisiting (a type-neutral rename, or its own dedicated
+/// SyncData hook) if that ever happens.
 ///
 /// Keyed by the issue's owning/quest-giver <see cref="Hero"/> rather than by the
 /// <c>VillageNeedsToolsIssue</c>/<c>VillageNeedsToolsIssueQuest</c> instance, because each peer holds a
