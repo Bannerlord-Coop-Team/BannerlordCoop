@@ -155,6 +155,65 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
             "Issues allowlist applied: disabled RegisterEvents on {DisabledCount} vanilla issue behavior(s), " +
             "left {AllowedCount} allowlisted active: {Allowed}. Disabled: {Disabled}",
             disabled.Count, skippedAllowlisted.Count, string.Join(", ", skippedAllowlisted), string.Join(", ", disabled));
+
+        VerifyAllowlistIntegrity();
+    }
+
+    /// <summary>
+    /// Structural safeguard against the exact bug fixed in e96018702, 479f810e7, and the 12-type sweep that
+    /// followed it: an implementer adds a type to <see cref="Allowlist"/> without noticing/removing a
+    /// pre-existing standalone "Disable&lt;Type&gt;IssueBehavior" patch elsewhere in the codebase (a leftover
+    /// from before this allowlist mechanism existed) that unconditionally no-ops the SAME type's
+    /// RegisterEvents. The loop in <see cref="ApplyAllowlist"/> above explicitly SKIPS patching allowlisted
+    /// types, on the assumption nothing else is blocking them - so it does nothing to counteract such an
+    /// orphaned patch. The type then silently never registers, exactly as if it had never been allowlisted,
+    /// and nothing would ever notice until an independent review caught it (three times now).
+    ///
+    /// This runs once, right after every patch this method intends to apply has been applied, and asks
+    /// Harmony itself (not our own bookkeeping) whether any allowlisted type's RegisterEvents still carries
+    /// ANY prefix patch at all. No patch in this mod is ever meant to prefix an allowlisted issue behavior's
+    /// RegisterEvents specifically - the loop above never does (it skips these types), and the handful of
+    /// other patches that touch allowlisted issue types target different methods entirely (e.g. an Instance
+    /// property getter, IssueManager.CreateNewIssue, a quest's own accept-condition delegate - see
+    /// BettingFraudInstanceResolutionPatch and LordNeedsGarrisonTroopsIssueCreationPatch). So ANY RegisterEvents
+    /// prefix found here can only be a leftover orphaned disable patch, and this fails loudly and early - at
+    /// the same "first RegisterEvents call" chokepoint as the allowlist itself - instead of shipping silently
+    /// broken again.
+    /// </summary>
+    private static void VerifyAllowlistIntegrity()
+    {
+        var offenders = new List<string>();
+
+        foreach (var type in Allowlist)
+        {
+            var method = AccessTools.DeclaredMethod(type, nameof(CampaignBehaviorBase.RegisterEvents));
+            if (method == null)
+            {
+                Logger.Warning("Allowlist integrity check: could not find a declared RegisterEvents on " +
+                    "allowlisted type {Type}; cannot verify it isn't being blocked by an orphaned patch", type.FullName);
+                continue;
+            }
+
+            var info = Harmony.GetPatchInfo(method);
+            if (info?.Prefixes == null || info.Prefixes.Count == 0) continue;
+
+            var owners = string.Join("; ", info.Prefixes.Select(p =>
+                $"owner='{p.owner}' method={p.PatchMethod.DeclaringType?.FullName}.{p.PatchMethod.Name}"));
+            offenders.Add($"{type.FullName} [{owners}]");
+        }
+
+        if (offenders.Count == 0) return;
+
+        Logger.Error(
+            "!!!!! ISSUES ALLOWLIST INTEGRITY FAILURE !!!!! {Count} allowlisted issue behavior type(s) still " +
+            "have a RegisterEvents prefix patch applied, meaning they can NEVER be offered to any hero despite " +
+            "being correctly allowlisted here. This is the exact orphaned-disable-patch bug already fixed 3 " +
+            "times (commits e96018702, 479f810e7, and the 12-type sweep that followed it): a leftover " +
+            "standalone 'Disable<Type>IssueBehavior' Harmony patch class elsewhere in the codebase, predating " +
+            "this allowlist, unconditionally no-ops RegisterEvents. Find and DELETE the offending patch " +
+            "class(es) - do not add any CallOriginalPolicy/category gate to them, they should not exist at " +
+            "all now that the type is allowlisted. Affected: {Offenders}",
+            offenders.Count, string.Join(" | ", offenders));
     }
 
     private static bool DisablePrefix() => false;
