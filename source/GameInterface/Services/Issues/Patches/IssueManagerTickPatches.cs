@@ -4,6 +4,7 @@ using GameInterface.Policies;
 using HarmonyLib;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Patches;
@@ -46,10 +47,29 @@ internal class IssueManagerTickPatches
     {
         if (__exception != null)
         {
-            Logger.Error(__exception,
-                "IssueManager.DailyTick threw on the server; swallowing to keep the server tick alive " +
-                "(likely the alternative-solution reward/return path's Hero.MainHero dependency - see " +
-                "the type doc comment for the known, unsolved limitation).");
+            // Hero.MainHero (and MobileParty.MainParty) are both null on a dedicated host with no local
+            // player - the one documented, expected failure mode (see the type doc comment). Checking that
+            // precondition directly is more precise than matching the exception's type: the known failure is
+            // a NullReferenceException, but so would a totally unrelated bug several calls deeper be, and
+            // exception-type matching alone can't tell those apart. Distinguishing on Hero.MainHero == null
+            // instead means a genuinely new, unexpected failure gets logged (and found) as one, rather than
+            // silently swallowed alongside the known one.
+            if (Hero.MainHero == null)
+            {
+                Logger.Warning(__exception,
+                    "IssueManager.DailyTick threw on the server, most likely the alternative-solution " +
+                    "reward/return path's Hero.MainHero dependency on a dedicated host with no local player " +
+                    "(see the type doc comment for the known, unsolved limitation) - swallowing to keep the " +
+                    "server tick alive.");
+            }
+            else
+            {
+                Logger.Error(__exception,
+                    "IssueManager.DailyTick threw on the server even though Hero.MainHero is not null, so " +
+                    "this is NOT the known alternative-solution/dedicated-host limitation documented on this " +
+                    "type - this is an unexpected failure and needs investigating. Swallowing to keep the " +
+                    "server tick alive regardless.");
+            }
         }
         return null;
     }
@@ -67,5 +87,9 @@ internal class IssueManagerTickPatches
     // called out on DailyTick above; out of scope for this prototype.
     [HarmonyPatch(nameof(IssueManager.HourlyTick))]
     [HarmonyPrefix]
-    private static bool HourlyTickPrefix() => ModInformation.IsClient;
+    private static bool HourlyTickPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return ModInformation.IsClient;
+    }
 }
