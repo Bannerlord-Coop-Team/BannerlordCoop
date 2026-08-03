@@ -6,11 +6,7 @@ using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.Clans.Handlers;
 

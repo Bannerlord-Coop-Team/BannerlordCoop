@@ -52,6 +52,7 @@ internal class ClanPatches
     {
         if (ModInformation.IsClient) return;
 
+        // Doesn't update on clients from auto sync. Manually update
         var message = new ClanEntersKingdom(__instance);
         MessageBroker.Instance.Publish(__instance, message);
     }
@@ -62,6 +63,7 @@ internal class ClanPatches
     {
         if (ModInformation.IsClient) return;
 
+        // Doesn't update on clients from auto sync. Manually update
         var message = new ClanLeavesKingdom(__instance);
         MessageBroker.Instance.Publish(__instance, message);
     }
