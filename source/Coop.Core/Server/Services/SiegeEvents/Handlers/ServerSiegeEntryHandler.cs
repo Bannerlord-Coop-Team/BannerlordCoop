@@ -48,6 +48,7 @@ internal class ServerSiegeEntryHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         messageBroker.Subscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
         messageBroker.Subscribe<NetworkRequestJoinSiegeCamp>(HandleJoin);
+        messageBroker.Subscribe<NetworkRequestBreakIntoSettlement>(HandleBreakIn);
         messageBroker.Subscribe<NetworkRequestBreakSiege>(HandleBreak);
         messageBroker.Subscribe<NetworkRequestSiegeAssault>(HandleAssault);
         messageBroker.Subscribe<SiegeAssaultStarted>(HandleAssaultStarted);
@@ -207,6 +208,42 @@ internal class ServerSiegeEntryHandler : IHandler
             siegeEventInterface.JoinSiegeCamp(party, settlement);
 
             network.Send(peer, new NetworkJoinSiegeCampApproved(obj.SettlementId, true));
+        });
+    }
+
+    /// <summary>
+    /// Mirrors a client's break-in into a besieged settlement.
+    /// </summary>
+    /// <remarks>
+    /// The client has already applied this locally - it had to, because vanilla's break-in
+    /// consequence dereferences the entered settlement immediately - so this is validation after the
+    /// fact rather than approval. Applying it here without an AllowedThread is deliberate: the
+    /// EnterSettlementAction prefix then publishes PartyEnterSettlementAttempted, which is what
+    /// broadcasts the move to the other clients.
+    /// </remarks>
+    private void HandleBreakIn(MessagePayload<NetworkRequestBreakIntoSettlement> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var party)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            if (party.CurrentSettlement == settlement) return;
+
+            if (settlement.SiegeEvent == null ||
+                !settlement.SiegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Defender) ||
+                party.BesiegerCamp != null)
+            {
+                Logger.Error(
+                    "Party {PartyId} cannot break into {SettlementId}",
+                    obj.PartyId,
+                    obj.SettlementId);
+                return;
+            }
+
+            EnterSettlementAction.ApplyForParty(party, settlement);
         });
     }
 

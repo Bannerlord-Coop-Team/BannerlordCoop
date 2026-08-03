@@ -34,6 +34,7 @@ internal class ClientSiegeEntryHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         messageBroker.Subscribe<BesiegeSettlementAttempted>(HandleBesiegeAttempt);
         messageBroker.Subscribe<JoinSiegeCampAttempted>(HandleJoinAttempt);
+        messageBroker.Subscribe<BreakIntoSettlementAttempted>(HandleBreakInAttempt);
         messageBroker.Subscribe<BreakSiegeAttempted>(HandleBreakAttempt);
         messageBroker.Subscribe<NetworkBesiegeSettlementApproved>(HandleBesiegeApproved);
         messageBroker.Subscribe<NetworkJoinSiegeCampApproved>(HandleJoinApproved);
@@ -138,6 +139,18 @@ internal class ClientSiegeEntryHandler : IHandler
     }
 
     // Runs on the game thread already — published from the join-siege menu consequence; only resolves ids and sends, so no GameThread.RunSafe.
+    // Reports a break-in the client has already applied locally, so the server can mirror it. The
+    // client cannot wait for approval here - vanilla dereferences the entered settlement immediately.
+    private void HandleBreakInAttempt(MessagePayload<BreakIntoSettlementAttempted> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Party, out var partyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        network.SendAll(new NetworkRequestBreakIntoSettlement(partyId, settlementId));
+    }
+
     private void HandleJoinAttempt(MessagePayload<JoinSiegeCampAttempted> payload)
     {
         var obj = payload.What;

@@ -12,6 +12,7 @@ using HarmonyLib;
 using Helpers;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -30,6 +31,53 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch]
 internal class SiegeEntryFlowPatches
 {
+    /// <summary>
+    /// Completes a break-in into a besieged settlement on the client, and reports it to the server.
+    /// </summary>
+    /// <remarks>
+    /// Vanilla's consequence is:
+    /// <code>
+    /// if (Hero.MainHero.CurrentSettlement == null) PlayerEncounter.EnterSettlement();
+    /// ...
+    /// Hero.MainHero.CurrentSettlement.Party.MapEvent          // two instructions later
+    /// </code>
+    /// PlayerEncounter.EnterSettlement is CreateLocationEncounter + EnterSettlementAction.ApplyForParty,
+    /// and the co-op prefix on ApplyForParty returns false on a client. So the location encounter was
+    /// created while the party never actually entered: CurrentSettlement stayed null and the very next
+    /// dereference threw. That is the crash - and the same split explains the rest of it, because the
+    /// static Settlement.CurrentSettlement resolves through PlayerEncounter.EncounterSettlement, so the
+    /// client rendered a copy of the party inside the walls while its real party, and its army, stayed
+    /// out on the map.
+    ///
+    /// The entry has to happen before native continues, so this cannot wait for the server to approve.
+    /// Apply it locally with the original allowed, then tell the server, which validates and applies
+    /// the authoritative move and broadcasts it to everyone else.
+    /// </remarks>
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "break_in_debrief_continue_on_consequence")]
+    [HarmonyPrefix]
+    private static bool BreakInDebriefContinuePrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        var party = MobileParty.MainParty;
+        var settlement = PlayerEncounter.EncounterSettlement;
+        if (party == null || settlement == null) return true;
+
+        if (party.CurrentSettlement != settlement)
+        {
+            // AllowedThread lets the suppressed ApplyForParty through for this one call, so native's
+            // continuation finds a real CurrentSettlement instead of throwing.
+            using (new AllowedThread())
+            {
+                EnterSettlementAction.ApplyForParty(party, settlement);
+            }
+        }
+
+        MessageBroker.Instance.Publish(null, new BreakIntoSettlementAttempted(party, settlement));
+        return true;
+    }
+
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_town_town_besiege_on_consequence))]
     [HarmonyPrefix]
     private static bool BesiegeConsequencePrefix()
