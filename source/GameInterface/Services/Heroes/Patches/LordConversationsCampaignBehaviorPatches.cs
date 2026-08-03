@@ -11,6 +11,19 @@ namespace GameInterface.Services.Heroes.Patches;
 [HarmonyPatch(typeof(LordConversationsCampaignBehavior))]
 internal class LordConversationsCampaignBehaviorPatches
 {
+    /// <summary>
+    /// Keeps the barter-accepted reaction off the server.
+    /// </summary>
+    /// <remarks>
+    /// The server dispatches OnBarterAccepted itself when it applies a client's barter, and vanilla's
+    /// reaction here is presentation - conversation follow-up and popups - aimed at whoever is in the
+    /// conversation. Nobody is, on a headless host, so it either shows a popup no one can dismiss or
+    /// reacts on behalf of the host's own hero. The client that made the offer runs its own copy.
+    /// </remarks>
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.OnBarterAccepted))]
+    [HarmonyPrefix]
+    public static bool OnBarterAcceptedPrefix() => !ModInformation.IsServer;
+
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_player_liberates_prisoner_on_consequence))]
     [HarmonyPrefix]
     public static bool ConversationPlayerLiberatesPrisonerOnConsequencePrefix()
