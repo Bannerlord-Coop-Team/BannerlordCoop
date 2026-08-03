@@ -100,10 +100,21 @@ public interface ITheSpyPartyIssueInterface : IGameAbstraction
 
     /// <summary>
     /// Rolls a losing peer's own already-applied (optimistic) local acceptance back after the server tells it
-    /// another peer won the same-issue accept race. Identical, fully generic logic to
-    /// <see cref="VillageNeedsToolsIssueInterface.RejectAcceptance"/>, duplicated here rather than shared so
-    /// this feature stays self-contained (same precedent as
-    /// <see cref="IVillageNeedsCraftingMaterialsIssueInterface.RejectAcceptance"/>).
+    /// another peer won the same-issue accept race. Same shape and same fix as
+    /// <see cref="VillageNeedsToolsIssueInterface.RejectAcceptance"/> (reuses <c>IssueBase.CompleteIssueWithCancel()</c>,
+    /// which needs no type-specific handling) - duplicated here rather than shared so this feature stays
+    /// self-contained (same precedent as <see cref="IVillageNeedsCraftingMaterialsIssueInterface.RejectAcceptance"/>).
+    /// Critically, this MUST also check whether an owner is already recorded (see the implementation's own
+    /// comment) before rolling back - the winning accept's own <c>SendAll</c> reaches every client, including
+    /// the one whose competing request is about to be rejected, so by the time this peer's own rejection
+    /// arrives it may have already correctly mirrored the real winner's quest.
+    ///
+    /// This was itself a THIRD copy of the exact same bug already found and fixed twice before (Village Needs
+    /// Tools, then Village Needs Crafting Materials) - this doc comment previously (incorrectly) claimed
+    /// "identical, fully generic logic to VillageNeedsToolsIssueInterface.RejectAcceptance", which was true of
+    /// Tools' OLD, pre-fix code, not its current one; the ownership guard was never ported over here either,
+    /// same as Crafting Materials. Found by the systemic sweep for this bug shape across every quest type - see
+    /// TheSpyPartyIssueTests' RequestTheSpyPartyIssueAcceptQuest_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer.
     /// </summary>
     void RejectAcceptance(Hero owner);
 }
@@ -192,6 +203,24 @@ public class TheSpyPartyIssueInterface : ITheSpyPartyIssueInterface
     public void RejectAcceptance(Hero owner)
     {
         if (owner?.Issue == null || owner.Issue.IsOngoingWithoutQuest) return;
+
+        // Bug fix (found by the systemic sweep for this bug shape, then confirmed by
+        // RequestTheSpyPartyIssueAcceptQuest_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer
+        // in E2E.Tests/Services/Issues/TheSpyPartyIssueTests.cs - the exact same bug shape as
+        // VillageNeedsToolsIssueInterface.RejectAcceptance/VillageNeedsCraftingMaterialsIssueInterface.RejectAcceptance,
+        // see VillageNeedsToolsIssueInterface.RejectAcceptance's comment for the full derivation): the winning
+        // accept's SendAll reaches EVERY client, including the one whose own competing request is about to be
+        // rejected - so by the time this losing requester's own NetworkTheSpyPartyIssueAcceptRejected arrives,
+        // it may already have correctly mirrored the ACTUAL winner's accept via
+        // Handle_NetworkTheSpyPartyIssueQuestAccepted (which always records ownership). The old guard here
+        // (IsOngoingWithoutQuest alone) cannot tell "this is still MY OWN unconfirmed optimistic accept" apart
+        // from "this is already the legitimate mirrored quest of whoever actually won" - both look identical -
+        // so it was cancelling the correctly-mirrored winning quest out from under this peer. Ownership is only
+        // ever recorded from that same authoritative broadcast, never optimistically by this peer's own accept
+        // trigger, so "no owner recorded yet" is exactly the signal that whatever is sitting in owner.Issue
+        // right now is still this peer's own, never-mirrored, optimistic accept - safe to roll back. Once an
+        // owner IS recorded, a legitimate mirror already superseded it and must be left alone.
+        if (VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out _)) return;
 
         using (new AllowedThread())
         {
