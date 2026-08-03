@@ -1,5 +1,6 @@
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -81,6 +82,11 @@ internal class IssueFinalizedPatches
             reason = pending;
             IssueManagerQuestCompletedReasonCapture.PendingReasons.Remove(owner);
         }
+
+        // Same leak concern as PendingReasons above, for the ownership registry (real ownership fix): drain
+        // unconditionally, on every finalize (genuine or mirrored, on every peer), so a stale owner entry
+        // never leaks into this hero's NEXT, unrelated issue.
+        VillageNeedsToolsIssueOwnership.Clear(owner);
 
         // Skip a mirrored replay (Interfaces.VillageNeedsToolsIssueInterface.FinalizeMirror runs under
         // AllowedThread) so applying a received broadcast never re-triggers another broadcast.

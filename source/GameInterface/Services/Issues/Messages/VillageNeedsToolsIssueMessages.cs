@@ -27,6 +27,18 @@ public enum VillageIssueFinalizeReason : byte
     /// same-issue double-accept race to roll its own already-applied (optimistic) local acceptance back via
     /// <c>IssueBase.CompleteIssueWithCancel()</c>. See <see cref="Patches.IssueAcceptancePatches"/>.</summary>
     RejectedAccept = 6,
+    /// <summary>Bug 2 fix: the owning peer's own <c>HourlyTickEvent</c> listener genuinely triggered
+    /// <c>IssueBase.CompleteIssueWithAlternativeSolution()</c> for real (see
+    /// <see cref="Interfaces.VillageNeedsToolsIssueInterface.TryTriggerOwnedAlternativeSolutionCompletion"/>
+    /// and <see cref="Patches.VillageNeedsToolsAlternativeSolutionCompletionPatches"/>). Purely a label for
+    /// legible logs/telemetry - <c>FinalizeMirror</c> needs no new <c>case</c> for it: an alternative-solution
+    /// completion never has an <c>IssueQuest</c>, so its existing switch already falls through to the
+    /// correct bare <c>IssueFinalized()</c> (teardown only, no reward, no troop mutation) for every
+    /// non-owning mirror peer. A "Fail" variant is deliberately not added: unreachable for this issue type
+    /// (see the deterministic-success note on <c>TryTriggerOwnedAlternativeSolutionCompletion</c>) - adding
+    /// it now would be speculative dead code for a hypothetical future issue type, so it's flagged here
+    /// rather than built.</summary>
+    AlternativeSolutionSuccess = 7,
 }
 
 // --- Local events ---
@@ -70,29 +82,35 @@ public readonly struct VillageIssueFinalizedTriggered : IEvent
 /// <summary>
 /// Published from <see cref="Patches.IssueAcceptancePatches"/> whenever <c>IssueManager.StartIssueQuest</c>
 /// genuinely runs (the accepting player's own live conversation, on whichever machine that is - not a
-/// mirrored replay of a received broadcast).
+/// mirrored replay of a received broadcast). <see cref="ControllerId"/> is the accepting machine's own
+/// <c>IControllerIdProvider.ControllerId</c> at the moment of the genuine accept - see
+/// <see cref="Interfaces.VillageNeedsToolsIssueOwnership"/>.
 /// </summary>
 public readonly struct VillageIssueQuestAcceptTriggered : IEvent
 {
     public readonly Hero Owner;
+    public readonly string ControllerId;
 
-    public VillageIssueQuestAcceptTriggered(Hero owner)
+    public VillageIssueQuestAcceptTriggered(Hero owner, string controllerId)
     {
         Owner = owner;
+        ControllerId = controllerId;
     }
 }
 
 /// <summary>
 /// Published from <see cref="Patches.IssueAcceptancePatches"/> whenever <c>IssueBase.StartIssueWithAlternativeSolution</c>
-/// genuinely runs.
+/// genuinely runs. See <see cref="VillageIssueQuestAcceptTriggered"/> for what <see cref="ControllerId"/> is.
 /// </summary>
 public readonly struct VillageIssueAlternativeAcceptTriggered : IEvent
 {
     public readonly Hero Owner;
+    public readonly string ControllerId;
 
-    public VillageIssueAlternativeAcceptTriggered(Hero owner)
+    public VillageIssueAlternativeAcceptTriggered(Hero owner, string controllerId)
     {
         Owner = owner;
+        ControllerId = controllerId;
     }
 }
 
@@ -190,16 +208,26 @@ public readonly struct RequestVillageIssueAcceptQuest : ICommand
 }
 
 /// <summary>Server -> all clients: confirms the quest-solution accept for this hero's issue; every other
-/// peer mirrors it via <c>VillageNeedsToolsIssueInterface.MirrorQuestAccepted</c>.</summary>
+/// peer mirrors it via <c>VillageNeedsToolsIssueInterface.MirrorQuestAccepted</c>. <see cref="OwnerControllerId"/>
+/// is the accepting player's <c>ControllerId</c>, resolved server-side (either the host's own, for the
+/// <c>ModInformation.IsServer</c> accept branch, or via <c>IPlayerManager.TryGetPlayer(NetPeer, out Player)</c>
+/// from the authenticated requester for the arbitrated-race branch - NEVER trusted from a client-claimed
+/// value, which is the load-bearing security point: a client cannot claim a different id to steal ownership).
+/// Every peer, including the original accepter, records this via
+/// <see cref="Interfaces.VillageNeedsToolsIssueOwnership.SetOwner"/> alongside the existing mirror call - see
+/// <see cref="Handlers.VillageNeedsToolsIssueHandler"/>.</summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkVillageIssueQuestAccepted : ICommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly string OwnerControllerId;
 
-    public NetworkVillageIssueQuestAccepted(string ownerId)
+    public NetworkVillageIssueQuestAccepted(string ownerId, string ownerControllerId)
     {
         OwnerId = ownerId;
+        OwnerControllerId = ownerControllerId;
     }
 }
 
@@ -218,16 +246,20 @@ public readonly struct RequestVillageIssueAcceptAlternative : ICommand
 }
 
 /// <summary>Server -> all clients equivalent of <see cref="NetworkVillageIssueQuestAccepted"/> for the
-/// alternative-solution accept option.</summary>
+/// alternative-solution accept option. See that type for what <see cref="OwnerControllerId"/> is and how
+/// it's resolved.</summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkVillageIssueAlternativeAccepted : ICommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly string OwnerControllerId;
 
-    public NetworkVillageIssueAlternativeAccepted(string ownerId)
+    public NetworkVillageIssueAlternativeAccepted(string ownerId, string ownerControllerId)
     {
         OwnerId = ownerId;
+        OwnerControllerId = ownerControllerId;
     }
 }
 

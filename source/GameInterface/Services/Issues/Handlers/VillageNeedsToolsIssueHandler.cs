@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -33,6 +34,18 @@ namespace GameInterface.Services.Issues.Handlers;
 /// <c>QuestBase.CompleteQuestWithXxx</c>/<c>IssueBase.CompleteIssueWithXxx</c> for the captured reason
 /// instead of a bare <c>IssueFinalized()</c> that would orphan an active mirrored quest (see
 /// IssueFinalizedPatches).
+///
+/// Real ownership (fixes both a "anyone can turn in someone else's accepted quest" bug and a "the
+/// alternative-solution reward/timer fires on the wrong machine, or crashes a dedicated host, forever" bug):
+/// every accept confirmation now also carries the accepting player's ControllerId, recorded into
+/// <see cref="VillageNeedsToolsIssueOwnership"/> by every peer (including the accepter) from the SAME
+/// broadcast that drives the existing mirror call, in the same synchronous block - so there is never a
+/// window where a peer has mirrored the accept but not yet recorded who owns it. For the arbitrated-race
+/// path (<see cref="Handle_RequestVillageIssueAcceptQuest"/>/<see cref="Handle_RequestVillageIssueAcceptAlternative"/>),
+/// that ControllerId is resolved server-side from the authenticated requesting <c>NetPeer</c> via
+/// <c>IPlayerManager.TryGetPlayer(NetPeer, out Player)</c> - NEVER trusted from a client-supplied
+/// value, which is the load-bearing security point: a client cannot claim a different ControllerId to steal
+/// ownership of someone else's accept.
 /// </summary>
 internal class VillageNeedsToolsIssueHandler : IHandler
 {
@@ -42,17 +55,20 @@ internal class VillageNeedsToolsIssueHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IVillageNeedsToolsIssueInterface issueInterface;
+    private readonly IPlayerManager playerManager;
 
     public VillageNeedsToolsIssueHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IVillageNeedsToolsIssueInterface issueInterface)
+        IVillageNeedsToolsIssueInterface issueInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.issueInterface = issueInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<VillageIssueCreated>(Handle_VillageIssueCreated);
         messageBroker.Subscribe<NetworkVillageIssueCreated>(Handle_NetworkVillageIssueCreated);
@@ -155,13 +171,20 @@ internal class VillageNeedsToolsIssueHandler : IHandler
 
         if (ModInformation.IsServer)
         {
-            // The host's own live conversation just accepted - already authoritative, confirm directly.
-            network.SendAll(new NetworkVillageIssueQuestAccepted(ownerId));
+            // The host's own live conversation just accepted - already authoritative. The host's own
+            // ControllerId (captured at accept time by IssueAcceptancePatches) IS the real owner here -
+            // record it locally too, exactly like every other peer will when this broadcast comes back to
+            // them (see Handle_NetworkVillageIssueQuestAccepted) - this is the "genuine accepter" case.
+            var hostControllerId = payload.What.ControllerId;
+            VillageNeedsToolsIssueOwnership.SetOwner(owner, hostControllerId);
+            network.SendAll(new NetworkVillageIssueQuestAccepted(ownerId, hostControllerId));
         }
         else
         {
             // A client's own live conversation already applied this locally (see IssueAcceptancePatches) -
-            // tell the server so it can arbitrate a same-issue double-accept race.
+            // tell the server so it can arbitrate a same-issue double-accept race. Deliberately no
+            // ControllerId field here: identity is derived server-side from the authenticated NetPeer (see
+            // Handle_RequestVillageIssueAcceptQuest), never trusted from a client-claimed value.
             network.SendAll(new RequestVillageIssueAcceptQuest(ownerId));
         }
     }
@@ -176,15 +199,28 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
 
+            // The accepting player's identity is derived server-side from the authenticated NetPeer via
+            // IPlayerManager - never trusted from a client-claimed value. This is the load-bearing security
+            // point: a client cannot claim a different ControllerId to steal ownership of someone else's
+            // accept.
+            if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
+            {
+                Logger.Error("Rejecting {Message} from an unregistered/unknown requester for owner {Owner}",
+                    nameof(RequestVillageIssueAcceptQuest), ownerId);
+                if (requester != null) network.Send(requester, new NetworkVillageIssueAcceptRejected(ownerId));
+                return;
+            }
+
             if (owner.Issue is VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue && owner.Issue.IsOngoingWithoutQuest)
             {
                 // First valid request wins the race - replay on the server's own authoritative copy, then
                 // confirm to everyone (including the requester, harmlessly idempotent for them since they
                 // already applied it locally).
                 issueInterface.MirrorQuestAccepted(owner);
-                network.SendAll(new NetworkVillageIssueQuestAccepted(ownerId));
+                VillageNeedsToolsIssueOwnership.SetOwner(owner, player.ControllerId);
+                network.SendAll(new NetworkVillageIssueQuestAccepted(ownerId, player.ControllerId));
             }
-            else if (requester != null)
+            else
             {
                 // Someone else already won the race (or the issue is gone) - tell just this requester to
                 // roll their own already-applied local copy back.
@@ -196,10 +232,15 @@ internal class VillageNeedsToolsIssueHandler : IHandler
     private void Handle_NetworkVillageIssueQuestAccepted(MessagePayload<NetworkVillageIssueQuestAccepted> payload)
     {
         var ownerId = payload.What.OwnerId;
+        var ownerControllerId = payload.What.OwnerControllerId;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+            // Mirror and ownership record are set in the same synchronous block driven off the same
+            // broadcast, so a non-owner peer can never observe "dialogue registered" without "ownership
+            // known" already being true in the same instant - no TOCTOU window.
             issueInterface.MirrorQuestAccepted(owner);
+            VillageNeedsToolsIssueOwnership.SetOwner(owner, ownerControllerId);
         });
     }
 
@@ -210,7 +251,9 @@ internal class VillageNeedsToolsIssueHandler : IHandler
 
         if (ModInformation.IsServer)
         {
-            network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId));
+            var hostControllerId = payload.What.ControllerId;
+            VillageNeedsToolsIssueOwnership.SetOwner(owner, hostControllerId);
+            network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId, hostControllerId));
         }
         else
         {
@@ -228,12 +271,21 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
 
+            if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
+            {
+                Logger.Error("Rejecting {Message} from an unregistered/unknown requester for owner {Owner}",
+                    nameof(RequestVillageIssueAcceptAlternative), ownerId);
+                if (requester != null) network.Send(requester, new NetworkVillageIssueAcceptRejected(ownerId));
+                return;
+            }
+
             if (owner.Issue is VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue && owner.Issue.IsOngoingWithoutQuest)
             {
                 issueInterface.MirrorAlternativeAccepted(owner);
-                network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId));
+                VillageNeedsToolsIssueOwnership.SetOwner(owner, player.ControllerId);
+                network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId, player.ControllerId));
             }
-            else if (requester != null)
+            else
             {
                 network.Send(requester, new NetworkVillageIssueAcceptRejected(ownerId));
             }
@@ -243,10 +295,12 @@ internal class VillageNeedsToolsIssueHandler : IHandler
     private void Handle_NetworkVillageIssueAlternativeAccepted(MessagePayload<NetworkVillageIssueAlternativeAccepted> payload)
     {
         var ownerId = payload.What.OwnerId;
+        var ownerControllerId = payload.What.OwnerControllerId;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
             issueInterface.MirrorAlternativeAccepted(owner);
+            VillageNeedsToolsIssueOwnership.SetOwner(owner, ownerControllerId);
         });
     }
 

@@ -1,5 +1,6 @@
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -43,7 +44,10 @@ internal class IssueQuestAcceptancePatch
         if (!__result) return;
         if (issueOwner?.Issue is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue) return;
 
-        MessageBroker.Instance.Publish(issueOwner, new VillageIssueQuestAcceptTriggered(issueOwner));
+        // Real ownership fix: capture this accepting machine's own ControllerId at the moment of the
+        // genuine accept - see VillageNeedsToolsIssueOwnership.
+        ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
+        MessageBroker.Instance.Publish(issueOwner, new VillageIssueQuestAcceptTriggered(issueOwner, controllerIdProvider?.ControllerId));
     }
 }
 
@@ -70,6 +74,7 @@ internal class IssueWithAlternativeSolutionAcceptancePatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (__instance is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue villageIssue) return;
 
-        MessageBroker.Instance.Publish(villageIssue, new VillageIssueAlternativeAcceptTriggered(villageIssue.IssueOwner));
+        ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
+        MessageBroker.Instance.Publish(villageIssue, new VillageIssueAlternativeAcceptTriggered(villageIssue.IssueOwner, controllerIdProvider?.ControllerId));
     }
 }
