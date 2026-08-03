@@ -49,7 +49,7 @@ internal class VassalAndMercenaryOfferCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnClanChangedKingdomPrefix(ref VassalAndMercenaryOfferCampaignBehavior __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification)
     {
-        if (clan.IsPlayerClan() || newKingdom == null)
+        if (!clan.IsPlayerClan() || newKingdom == null)
         {
             return false;
         }
