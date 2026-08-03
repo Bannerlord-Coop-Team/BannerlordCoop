@@ -15,18 +15,20 @@ namespace GameInterface.Services.Issues.Patches;
 /// quest instance, and the option itself appears unconditionally on every peer's "town"/"town_guard"/
 /// "castle_guard" menu regardless of which quest (if any) is locally relevant.
 ///
-/// Ordinary coop play can have TWO different players' LordNeedsGarrisonTroopsIssueQuest instances active at
-/// once (accepted from two different Lords, each with their own <c>_settlement</c>) - both mirrored onto every
-/// peer's shared <c>QuestManager.Quests</c> list. Vanilla's <c>Instance</c> deterministically resolves to
-/// whichever was created first, globally, for the rest of the session (the cache never re-evaluates once set
-/// to an <c>IsOngoing</c> quest). For the SECOND player this is a full soft-lock: at their own settlement,
-/// <c>Settlement.CurrentSettlement == Instance._settlement</c> would compare their settlement against the
-/// FIRST player's <c>_settlement</c>, deterministically fail, and "Talk to the garrison commander" would never
-/// even appear for them - the sole turn-in path for this issue type - permanently, regardless of the separate
-/// ownership gate already on <see cref="LordNeedsGarrisonTroopsQuestOwnershipGatePatch"/> (which never gets a
-/// chance to run).
+/// Correction (traced end-to-end against the real decompiled vanilla source and this mod's own mirror path,
+/// see project notes): a mirrored copy of another player's LordNeedsGarrisonTroopsIssueQuest is NOT added to
+/// this peer's own <c>QuestManager.Quests</c> - that list is only ever populated by <c>QuestBase.StartQuest()</c>
+/// (via <c>QuestManager.OnQuestStarted</c>), and <c>StartQuest()</c> only ever runs on the machine whose own
+/// live dialogue genuinely accepted the quest. This mod's mirror/replay path (and the full-save transfer a
+/// joining client receives) only ever reaches <c>IssueManager.StartIssueQuest</c>/<c>IssueBase.StartIssueWithQuest</c>,
+/// which construct the Quest object but never call <c>StartQuest()</c>. So the originally-suspected "two
+/// players' quests colliding in one shared list" scenario is not actually reachable today - each peer's own
+/// <c>QuestManager.Quests</c>, filtered to this type, only ever contains that peer's own genuinely-accepted
+/// quest (if any). This patch is kept anyway since resolving by settlement is more correct in principle than
+/// vanilla's first-found/cached behavior and costs nothing, but it is not fixing a bug that was actually
+/// reachable via that mechanism - treat it as a robustness improvement, not a confirmed-exploitable-bug fix.
 ///
-/// Fixed by resolving <c>Instance</c> to whichever ongoing quest's own <c>_settlement</c> actually matches
+/// Resolves <c>Instance</c> to whichever ongoing quest's own <c>_settlement</c> actually matches
 /// <see cref="Settlement.CurrentSettlement"/> - the settlement the local player is physically standing in when
 /// this menu is evaluated - rather than "first found"/cached. This is purely local (no network round-trip):
 /// each peer's own client just needs to find whichever campaign-wide quest is contextually relevant to where
