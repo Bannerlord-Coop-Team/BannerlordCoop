@@ -51,6 +51,7 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
     private static readonly HashSet<Type> Allowlist = new HashSet<Type>
     {
         typeof(VillageNeedsToolsIssueBehavior),
+        typeof(VillageNeedsCraftingMaterialsIssueBehavior),
     };
 
     private static bool applied;
