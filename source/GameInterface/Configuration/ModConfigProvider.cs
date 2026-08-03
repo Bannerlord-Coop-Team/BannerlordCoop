@@ -6,10 +6,9 @@ public class ModConfigProvider
 {
     /// <summary>What the session runs on until a config is loaded (server) or received (client).
     /// Built from an all-absent <see cref="ModOptionsData"/> so every option falls back to its
-    /// documented default. It has to go through that constructor: the options struct has NO
-    /// parameterless constructor — deliberately, so protobuf keeps deserializing it from a zeroed
-    /// instance — so a plain <c>new ModOptions()</c> is just <c>default</c>, skipping the property
-    /// initializers below and reading back false/0 for everything.</summary>
+    /// documented default. It has to go through that constructor: the options struct declares no
+    /// parameterless one, so a plain <c>new ModOptions()</c> is just <c>default</c> — the property
+    /// initializers below never run and every option reads back false/0.</summary>
     public static ModOptions ModOptions = new(new ModOptionsData());
 
     public static void LoadModConfig(ModOptionsData modOptionsData)

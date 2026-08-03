@@ -86,12 +86,12 @@ public class ModConfigTests : IDisposable
 
     /// <summary>
     /// The options a session runs on BEFORE any config is loaded (server) or received (client) must
-    /// already be the documented defaults. <see cref="ModOptions"/> is a struct with no parameterless
-    /// constructor — deliberately, so protobuf keeps deserializing it from a zeroed instance — so a
-    /// plain <c>new ModOptions()</c> is just <c>default</c>: the property initializers never run and
-    /// every option silently reads back false/0 (no auto-pause, no AI joining player battles, no
-    /// looters, no smithing stamina, no clan-tier requirement for a kingdom). The un-loaded default
-    /// must therefore be built through the real constructor from an all-absent config.
+    /// already be the documented defaults. <see cref="ModOptions"/> is a struct declaring no
+    /// parameterless constructor, so a plain <c>new ModOptions()</c> is just <c>default</c>: the
+    /// property initializers never run and every option silently reads back false/0 (no auto-pause,
+    /// no AI joining player battles, no looters, no smithing stamina, no clan-tier requirement for a
+    /// kingdom). The un-loaded default must therefore be built through the real constructor from an
+    /// all-absent config.
     /// </summary>
     [Fact]
     public void UnloadedModOptions_AreTheDocumentedDefaults_NotAZeroedStruct()

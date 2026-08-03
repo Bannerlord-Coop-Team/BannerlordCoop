@@ -51,7 +51,10 @@ internal class LoadModConfigHandler : IHandler
             return;
         }
 
-        ModConfigProvider.LoadModConfig(modConfig.Data.ModOptions);
+        // An explicit "modOptions": null in the file overwrites the property initializer, so this is
+        // not merely defensive — without it a hand-edited config NREs the CampaignReady dispatch and
+        // kills session start (CampaignDifficultyHandler guards the difficulty block the same way).
+        ModConfigProvider.LoadModConfig(modConfig.Data.ModOptions ?? new ModOptionsData());
         ApplyConfigs();
 
         network.SendAll(new NetworkLoadModConfig(ModConfigProvider.ModOptions));

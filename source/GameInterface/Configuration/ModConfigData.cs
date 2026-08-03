@@ -1,6 +1,5 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using ProtoBuf;
 using System.Collections.Generic;
 
 namespace GameInterface.Configuration;

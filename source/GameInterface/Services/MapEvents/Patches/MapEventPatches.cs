@@ -278,9 +278,6 @@ internal class InteractionPatches
         public bool GoldFoodConsumptionExpired => CampaignTime.Now > GoldFoodConsumptionWindowExpiresAt;
     }
 
-
-    private static readonly ConditionalWeakTable<MobileParty, PlayerBattleWindows> interactionDebounce = new();
-
     [HarmonyPatch(typeof(PartyBase), "TaleWorlds.CampaignSystem.Map.IInteractablePoint.CanPartyInteract")]
     [HarmonyPostfix]
     private static void Postfix_CanPartyInteract(

@@ -27,13 +27,13 @@ internal class CompanionsCampaignBehaviorPatches
     // See "wandererLimitScalesWithPlayers" in mod-config.default.json for a more detailed description of what this config is.
     private static readonly Dictionary<int, int> ClanTierScalingValues = new()
     {
-        { 0, 0 }, // Tier 0: 0
-        { 1, 0 }, // Tier 1: 1
-        { 2, 5 }, // Tier 2: 2
-        { 3, 5 }, // Tier 3: 3
-        { 4, 5 }, // Tier 4: 4
-        { 5, 10 }, // Tier 5: 5
-        { 6, 10 }, // Tier 6: 6
+        { 0, 0 },
+        { 1, 0 },
+        { 2, 5 },
+        { 3, 5 },
+        { 4, 5 },
+        { 5, 10 },
+        { 6, 10 },
     };
 
     [HarmonyPatch(nameof(CompanionsCampaignBehavior._desiredTotalCompanionCount), MethodType.Getter)]
@@ -47,9 +47,11 @@ internal class CompanionsCampaignBehaviorPatches
             return false;
         }
 
-        // Calculate scaling limit
-        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
-        ContainerProvider.TryResolve<IObjectManager>(out var objectManager);
+        // Calculate scaling limit. Session teardown clears the container without unpatching, so this
+        // prefix can outlive it — fall through to vanilla rather than NRE on the resolved managers
+        // (vanilla's count formula doesn't touch Hero.MainHero, so it is safe on a headless server).
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return true;
 
         // Start with vanilla limit
         var total = 32;
