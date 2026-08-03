@@ -8,6 +8,7 @@ using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
@@ -322,6 +323,119 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             message => message.ClanId == player.ClanId);
         Assert.Equal(kingdomId, factionChanged.OldKingdomId);
         Assert.Null(factionChanged.NewKingdomId);
+    }
+
+    // Every kingdom-membership path funnels through ChangeKingdomAction.ApplyInternal, which
+    // ClanKingdomMembershipReplicationPatch now postfixes on the server. Before that, only the call
+    // sites that remembered to call MoveClanToKingdom replicated; expel/leave/rebellion did not, so
+    // clients kept listing a departed clan in the kingdom roster until reload. This drives the
+    // vanilla action directly - NOT a debug command that republishes on its own - so it fails if the
+    // systemic patch is removed even while the command-level fixes stay in place.
+    [Fact]
+    public void LeavingAKingdom_ReplicatesRosterRemovalToClients()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        // Seed through the vanilla action rather than raw field writes: writes made under
+        // AllowedThread deliberately bypass the sync publish, so a hand-seeded roster never reaches
+        // the clients and the "before" state would be empty. Joining this way also exercises the
+        // patch in the other direction.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+            ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom, showNotification: false);
+        });
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                Assert.Same(kingdom, clan.Kingdom);
+                Assert.Contains(clan, kingdom.Clans);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+            ChangeKingdomAction.ApplyByLeaveKingdom(clan, showNotification: false);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+            Assert.Null(clan.Kingdom);
+            Assert.DoesNotContain(clan, kingdom.Clans);
+        });
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                Assert.Null(clan.Kingdom);
+                Assert.DoesNotContain(clan, kingdom.Clans);
+            });
+        }
+    }
+
+    // coop.debug.clan.join_kingdom is the in-game lever used to verify lord recruitment, and it used
+    // to call ChangeKingdomAction.ApplyByJoinToKingdom on its own. Clan._kingdom is AutoSynced, so a
+    // client would agree the clan had switched sides while the destination kingdom's own roster
+    // still omitted it - the kingdom screen and every Kingdom.Clans consumer stayed stale.
+    [Fact]
+    public void JoinKingdomCommand_ReplicatesKingdomRosterToClients()
+    {
+        var player = CreateSyncedPlayerContext();
+        var previousKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var newKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(previousKingdomId, out var previousKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+
+            using (new AllowedThread())
+            {
+                clan._kingdom = previousKingdom;
+                previousKingdom._clans ??= new MBList<Clan>();
+                previousKingdom._clans.Add(clan);
+            }
+        });
+
+        Server.Call(() =>
+        {
+            var result = ClanDebugCommands.JoinKingdom(new List<string> { player.ClanId, newKingdomId });
+            Assert.Contains("joined", result);
+
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(previousKingdomId, out var previousKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(newKingdomId, out var newKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+
+            Assert.Same(newKingdom, clan.Kingdom);
+            Assert.Contains(clan, newKingdom.Clans);
+            Assert.DoesNotContain(clan, previousKingdom.Clans);
+        });
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(previousKingdomId, out var previousKingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(newKingdomId, out var newKingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+
+                Assert.Same(newKingdom, clan.Kingdom);
+                Assert.Contains(clan, newKingdom.Clans);
+                Assert.DoesNotContain(clan, previousKingdom.Clans);
+            });
+        }
     }
 
     [Fact]

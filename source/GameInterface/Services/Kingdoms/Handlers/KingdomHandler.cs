@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common;
 using Common.Extensions;
 using Common.Util;
@@ -32,6 +33,7 @@ public class KingdomHandler : IHandler
     private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly IKingdomInterface kingdomInterface;
     private readonly IKingdomCreator kingdomCreator;
+    private readonly INetwork network;
 
     public KingdomHandler(
         IMessageBroker messageBroker,
@@ -40,7 +42,8 @@ public class KingdomHandler : IHandler
         IKingdomDecisionVoteManager decisionVoteManager,
         IKingdomMembershipState kingdomMembershipState,
         IKingdomInterface kingdomInterface,
-        IKingdomCreator kingdomCreator)
+        IKingdomCreator kingdomCreator,
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -49,6 +52,7 @@ public class KingdomHandler : IHandler
         this.kingdomMembershipState = kingdomMembershipState;
         this.kingdomInterface = kingdomInterface;
         this.kingdomCreator = kingdomCreator;
+        this.network = network;
         messageBroker.Subscribe<AddDecision>(HandleAddDecision);
         messageBroker.Subscribe<RemoveDecision>(HandleRemoveDecision);
         messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
@@ -57,6 +61,78 @@ public class KingdomHandler : IHandler
         messageBroker.Subscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Subscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
+        messageBroker.Subscribe<ClanKingdomMembershipChanged>(HandleClanKingdomMembershipChanged);
+        messageBroker.Subscribe<NetworkClanKingdomMembershipChanged>(HandleNetworkClanKingdomMembershipChanged);
+    }
+
+    /// <summary>Server: broadcast the clan's authoritative kingdom, including "none".</summary>
+    private void HandleClanKingdomMembershipChanged(MessagePayload<ClanKingdomMembershipChanged> payload)
+    {
+        if (!ModInformation.IsServer) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
+
+        // A null kingdom is the whole point of this message; only resolve an id when there is one.
+        string kingdomId = null;
+        if (payload.What.Kingdom != null &&
+            !objectManager.TryGetIdWithLogging(payload.What.Kingdom, out kingdomId)) return;
+
+        network.SendAll(new NetworkClanKingdomMembershipChanged(clanId, kingdomId));
+    }
+
+    /// <summary>Client: apply the authoritative kingdom the server sent.</summary>
+    private void HandleNetworkClanKingdomMembershipChanged(MessagePayload<NetworkClanKingdomMembershipChanged> payload)
+    {
+        if (!ModInformation.IsClient) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
+
+            Kingdom kingdom = null;
+            if (data.KingdomId != null &&
+                !objectManager.TryGetObjectWithLogging<Kingdom>(data.KingdomId, out kingdom)) return;
+
+            if (ReferenceEquals(clan.Kingdom, kingdom)) return;
+
+            using (new AllowedThread())
+            {
+                clan._kingdom = kingdom;
+            }
+
+            // The kingdom's own rosters arrive as their own collection messages; keeping the local
+            // caches consistent here avoids a window where the clan points at a kingdom that does
+            // not list it (or vice versa).
+            kingdomMembershipState.MoveClanToKingdom(
+                previousKingdom: null,
+                kingdom,
+                clan,
+                publishCollectionChanges: false);
+
+            RefreshSettlementVisuals(clan);
+        },
+            context: nameof(NetworkClanKingdomMembershipChanged));
+    }
+
+    /// <summary>
+    /// Redraws the map banners of every settlement the clan holds after its kingdom changed.
+    /// </summary>
+    /// <remarks>
+    /// A settlement's map colour comes from its owner clan's kingdom, so a defection silently changes
+    /// how every one of that clan's fiefs should look - but nothing invalidates the visual, so the
+    /// client keeps drawing the old realm's banner until something else happens to dirty it. The
+    /// ownership path already does this (SettlementOwnershipHandler); the kingdom-change path did not.
+    /// </remarks>
+    private static void RefreshSettlementVisuals(Clan clan)
+    {
+        var settlements = clan?.Settlements;
+        if (settlements == null) return;
+
+        foreach (var settlement in settlements)
+        {
+            // Villages included: they carry the owning clan's colours too.
+            settlement?.Party?.SetVisualAsDirty();
+        }
     }
 
     private void HandleCreateKingdom(MessagePayload<CreateKingdom> obj)
@@ -398,5 +474,7 @@ public class KingdomHandler : IHandler
         messageBroker.Unsubscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Unsubscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
+        messageBroker.Unsubscribe<ClanKingdomMembershipChanged>(HandleClanKingdomMembershipChanged);
+        messageBroker.Unsubscribe<NetworkClanKingdomMembershipChanged>(HandleNetworkClanKingdomMembershipChanged);
     }
 }
