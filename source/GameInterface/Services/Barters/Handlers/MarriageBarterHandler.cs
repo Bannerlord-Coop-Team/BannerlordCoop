@@ -211,6 +211,10 @@ internal sealed class MarriageBarterHandler : IHandler
             var offeredBarterables = barterData.GetOfferedBarterables();
             foreach (var barterable in offeredBarterables)
                 barterable.Apply();
+            // Past this point the marriage and any gold have already moved on the authoritative
+            // server. Anything that fails from here must NOT be reported as a rejection, or the
+            // client rolls its UI back and the two sides disagree about a change that really
+            // happened.
             mutationApplied = true;
             CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, barterData.OtherHero, offeredBarterables);
             ApplyOverpayRelationBonus(playerHero, barterData.OtherHero, MathF.Max(0f, offerValue));
@@ -231,6 +235,8 @@ internal sealed class MarriageBarterHandler : IHandler
             Logger.Error(exception, "Failed to apply an authoritative marriage barter");
             if (mutationApplied)
             {
+                // The marriage is already done server-side; telling the client it failed would be
+                // the desync, not the fix. Report success and let the replicated state stand.
                 Accept(peer, request, playerHero.Gold);
                 return;
             }
