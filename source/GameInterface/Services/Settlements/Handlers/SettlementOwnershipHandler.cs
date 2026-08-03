@@ -4,6 +4,8 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using GameInterface.Services.Settlements.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -20,21 +22,114 @@ namespace GameInterface.Services.Settlements.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
+        private readonly IPlayerManager playerManager;
         private static readonly ILogger Logger = LogManager.GetLogger<SettlementOwnershipHandler>();
 
-        public SettlementOwnershipHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        public SettlementOwnershipHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, IPlayerManager playerManager)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
+            this.playerManager = playerManager;
             messageBroker.Subscribe<SettlementOwnershipChanged>(Handle);
             messageBroker.Subscribe<NetworkChangeSettlementOwnership>(Handle);
+            messageBroker.Subscribe<SettlementGiftRequested>(Handle);
+            messageBroker.Subscribe<NetworkRequestSettlementOwnership>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<SettlementOwnershipChanged>(Handle);
             messageBroker.Unsubscribe<NetworkChangeSettlementOwnership>(Handle);
+            messageBroker.Unsubscribe<SettlementGiftRequested>(Handle);
+            messageBroker.Unsubscribe<NetworkRequestSettlementOwnership>(Handle);
+        }
+
+        /// <summary>Client side: forward the player's gift to the server.</summary>
+        private void Handle(MessagePayload<SettlementGiftRequested> obj)
+        {
+            if (!ModInformation.IsClient) return;
+
+            var payload = obj.What;
+            if (!objectManager.TryGetIdWithLogging(payload.Settlement, out var settlementId)) return;
+            if (!objectManager.TryGetIdWithLogging(payload.NewOwner, out var newOwnerId)) return;
+
+            network.SendAll(new NetworkRequestSettlementOwnership(settlementId, newOwnerId));
+        }
+
+        /// <summary>
+        /// Server side: a client asked to gift a settlement. Authority is re-derived here - the
+        /// request carries only two ids and is never trusted for who may give what away.
+        /// </summary>
+        private void Handle(MessagePayload<NetworkRequestSettlementOwnership> obj)
+        {
+            if (!ModInformation.IsServer) return;
+            if (!(obj.Who is NetPeer peer)) return;
+
+            var payload = obj.What;
+            if (!playerManager.TryGetPlayer(peer, out var player) ||
+                !objectManager.TryGetObject(player.HeroId, out Hero requestingHero))
+            {
+                Logger.Warning("Settlement gift rejected: the requesting player could not be identified");
+                return;
+            }
+
+            if (!objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) ||
+                !objectManager.TryGetObject(payload.NewOwnerId, out Hero newOwner))
+            {
+                Logger.Warning("Settlement gift rejected: settlement {Settlement} or hero {Hero} is unknown",
+                    payload.SettlementId, payload.NewOwnerId);
+                return;
+            }
+
+            if (!CanGift(requestingHero, settlement, newOwner, out var reason))
+            {
+                Logger.Warning("Settlement gift of {Settlement} by {Hero} rejected: {Reason}",
+                    settlement.StringId, requestingHero.StringId, reason);
+                return;
+            }
+
+            // ApplyByGift re-enters ChangeOwnerOfSettlementPatch on the server, which publishes
+            // SettlementOwnershipChanged and replicates to every client.
+            GameThread.RunSafe(
+                () => ChangeOwnerOfSettlementAction.ApplyByGift(settlement, newOwner),
+                context: nameof(NetworkRequestSettlementOwnership));
+        }
+
+        private static bool CanGift(Hero requestingHero, Settlement settlement, Hero newOwner, out string reason)
+        {
+            if (!requestingHero.IsAlive || !newOwner.IsAlive)
+            {
+                reason = "a participant is dead";
+                return false;
+            }
+
+            var ownerClan = settlement.OwnerClan;
+            if (ownerClan == null)
+            {
+                reason = "the settlement has no owner clan";
+                return false;
+            }
+
+            // Either the owning clan's leader gives away their own fief, or the kingdom's ruler
+            // grants one held by their realm - the two cases vanilla's Give Settlement covers.
+            var kingdom = ownerClan.Kingdom;
+            bool isOwner = ownerClan.Leader == requestingHero;
+            bool isRuler = kingdom != null && kingdom.Leader == requestingHero;
+            if (!isOwner && !isRuler)
+            {
+                reason = "the requester neither owns the settlement nor rules its kingdom";
+                return false;
+            }
+
+            if (newOwner.Clan == null || newOwner.Clan.Kingdom != kingdom)
+            {
+                reason = "the recipient is not in the same kingdom";
+                return false;
+            }
+
+            reason = null;
+            return true;
         }
 
         private void Handle(MessagePayload<SettlementOwnershipChanged> obj)
