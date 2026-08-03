@@ -5,6 +5,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions;
@@ -14,6 +15,8 @@ namespace Missions;
 /// </summary>
 public interface INetworkAgentRegistry : IDisposable
 {
+    long Version { get; }
+
     /// <summary>Clears all data.</summary>
     void Clear();
     bool TryRegisterAgent(string controllerId, Guid agentId, Agent agent);
@@ -58,6 +61,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
     private readonly Dictionary<(string Scope, ushort MovementId), CoopAgentInfo> MovementIdToInfo = new();
     private readonly Dictionary<string, List<CoopAgentInfo>> ControllerAgentMap = new();
     private readonly IControllerIdProvider controllerIdProvider;
+    private long version;
 
     public NetworkAgentRegistry(IControllerIdProvider controllerIdProvider)
     {
@@ -65,6 +69,8 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
     }
 
     public void Dispose() => Clear();
+
+    public long Version => Interlocked.Read(ref version);
 
     /// <inheritdoc/>
     public void Clear()
@@ -75,6 +81,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             IdToInfo.Clear();
             MovementIdToInfo.Clear();
             ControllerAgentMap.Clear();
+            Interlocked.Increment(ref version);
         }
     }
 
@@ -179,6 +186,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             }
 
             controlledAgents.Add(agentInfo);
+            Interlocked.Increment(ref version);
 
             return true;
         }
@@ -222,6 +230,8 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         succeeded &= AgentToInfo.Remove(agentInfo.Agent);
         if (agentInfo.MovementId != 0)
             succeeded &= MovementIdToInfo.Remove((agentInfo.MovementScopeId, agentInfo.MovementId));
+        if (succeeded)
+            Interlocked.Increment(ref version);
         return succeeded;
     }
 
@@ -304,7 +314,10 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
                     MovementIdToInfo.Remove((agentInfo.MovementScopeId, agentInfo.MovementId));
             }
 
-            return ControllerAgentMap.Remove(controllerId);
+            bool removed = ControllerAgentMap.Remove(controllerId);
+            if (removed)
+                Interlocked.Increment(ref version);
+            return removed;
         }
     }
 
@@ -383,6 +396,7 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
             }
 
             newAgents.Add(agentInfo);
+            Interlocked.Increment(ref version);
 
             return true;
         }

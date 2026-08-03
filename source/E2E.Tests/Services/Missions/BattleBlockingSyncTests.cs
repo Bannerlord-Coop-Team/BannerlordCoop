@@ -181,7 +181,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 AgentControllerType.AI,
                 out MirrorAgent aiMirror);
 
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            PollAiFallbackSweep(context.Component);
             Assert.Empty(
                 context.Network.NetworkSentPackets
                     .GetPackets<AgentActionPacket>());
@@ -189,7 +189,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             aiMirror.Action0Index = 1001;
             aiMirror.Action0CodeType = actionType;
 
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            PollAiFallbackSweep(context.Component);
 
             AgentActionPacket packet = Assert.Single(
                 context.Network.NetworkSentPackets
@@ -199,7 +199,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(1L, Assert.Single(packet.Sequences));
 
             context.Network.NetworkSentPackets.Packets.Clear();
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            PollAiFallbackSweep(context.Component);
             Assert.Empty(
                 context.Network.NetworkSentPackets
                     .GetPackets<AgentActionPacket>());
@@ -225,7 +225,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 AgentControllerType.AI,
                 out MirrorAgent aiMirror);
 
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            PollAiFallbackSweep(context.Component);
             Assert.Empty(
                 context.Network.NetworkSentPackets
                     .GetPackets<AgentActionPacket>());
@@ -238,7 +238,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             aiMirror.Action1CodeType = Agent.ActionCodeType.Guard;
             aiMirror.Action1Direction = Agent.UsageDirection.DefendLeft;
 
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            PollAiFallbackSweep(context.Component);
 
             AgentActionPacket packet = Assert.Single(
                 context.Network.NetworkSentPackets
@@ -253,10 +253,160 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(1L, Assert.Single(packet.Sequences));
 
             context.Network.NetworkSentPackets.Packets.Clear();
-            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            PollAiFallbackSweep(context.Component);
             Assert.Empty(
                 context.Network.NetworkSentPackets
                     .GetPackets<AgentActionPacket>());
+        });
+    }
+
+    [Fact]
+    public void PollActionsAfterNativeTick_BlockedLocalAi_IsPolledImmediately()
+    {
+        RunScenario("owner", context =>
+        {
+            Agent player = SpawnRegisteredAgent(
+                context,
+                "owner",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            Guid aiId = CreateAgentIdForPartition(partition: 3);
+            Agent aiAgent = SpawnRegisteredAgent(
+                context,
+                "owner",
+                aiId,
+                AgentControllerType.AI,
+                out MirrorAgent aiMirror);
+
+            PollAiFallbackSweep(context.Component);
+            aiMirror.Action0Index = 1001;
+            aiMirror.Action0CodeType =
+                Agent.ActionCodeType.ReleaseMelee;
+            MarkAgentDirtyThroughBlockedHit(
+                context.Component,
+                aiAgent,
+                player);
+
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            Assert.Equal(aiId, Assert.Single(packet.AgentIds));
+        });
+    }
+
+    [Fact]
+    public void PollActionsAfterNativeTick_RemovedDirtyAgent_IsPruned()
+    {
+        RunScenario("owner", context =>
+        {
+            Agent player = SpawnRegisteredAgent(
+                context,
+                "owner",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            Guid aiId = CreateAgentIdForPartition(partition: 3);
+            Agent oldAiAgent = SpawnRegisteredAgent(
+                context,
+                "owner",
+                aiId,
+                AgentControllerType.AI,
+                out _);
+
+            PollAiFallbackSweep(context.Component);
+            MarkAgentDirtyThroughBlockedHit(
+                context.Component,
+                oldAiAgent,
+                player);
+            Assert.True(context.Registry.RemoveAgent(aiId));
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+
+            SpawnRegisteredAgent(
+                context,
+                "owner",
+                aiId,
+                AgentControllerType.AI,
+                out MirrorAgent newAiMirror);
+            newAiMirror.Action0Index = 1001;
+            newAiMirror.Action0CodeType =
+                Agent.ActionCodeType.ReleaseMelee;
+
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            Assert.Equal(aiId, Assert.Single(packet.AgentIds));
+        });
+    }
+
+    [Fact]
+    public void PollActionsAfterNativeTick_TransferredDirtyAgent_IsPruned()
+    {
+        RunScenario("owner", context =>
+        {
+            Agent player = SpawnRegisteredAgent(
+                context,
+                "owner",
+                Guid.NewGuid(),
+                AgentControllerType.Player,
+                out _);
+            Guid aiId = CreateAgentIdForPartition(partition: 3);
+            Agent aiAgent = SpawnRegisteredAgent(
+                context,
+                "owner",
+                aiId,
+                AgentControllerType.AI,
+                out MirrorAgent aiMirror);
+
+            PollAiFallbackSweep(context.Component);
+            MarkAgentDirtyThroughBlockedHit(
+                context.Component,
+                aiAgent,
+                player);
+            Assert.True(context.Registry.TryTransferAuthority(
+                "remote",
+                aiId));
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            Assert.True(context.Registry.TryTransferAuthority(
+                "owner",
+                aiId));
+            aiMirror.Action0Index = 1001;
+            aiMirror.Action0CodeType =
+                Agent.ActionCodeType.ReleaseMelee;
+
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            Assert.Empty(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            context.Component.AgentActionHandler
+                .PollActionsAfterNativeTick();
+            AgentActionPacket packet = Assert.Single(
+                context.Network.NetworkSentPackets
+                    .GetPackets<AgentActionPacket>());
+            Assert.Equal(aiId, Assert.Single(packet.AgentIds));
         });
     }
 
@@ -2435,6 +2585,56 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     private static void DrainGameThread()
     {
         GameThread.Run(() => { }, blocking: true);
+    }
+
+    private static void PollAiFallbackSweep(
+        ICoopMissionComponent component)
+    {
+        for (int poll = 0;
+             poll < AgentActionPollScheduler.FallbackPartitionCount;
+             poll++)
+        {
+            component.AgentActionHandler.PollActionsAfterNativeTick();
+        }
+    }
+
+    private static void MarkAgentDirtyThroughBlockedHit(
+        ICoopMissionComponent component,
+        Agent affectedAgent,
+        Agent affectorAgent)
+    {
+        var blow = new Blow(affectorAgent.Index);
+        var collisionData = new AttackCollisionData
+        {
+            _collisionResult =
+                (int)CombatCollisionResult.Blocked
+        };
+        component.AgentActionHandler.ObserveBlockedHit(
+            affectedAgent,
+            affectorAgent,
+            isBlocked: true,
+            in blow,
+            in collisionData);
+    }
+
+    private static Guid CreateAgentIdForPartition(int partition)
+    {
+        for (int value = 1; ; value++)
+        {
+            byte[] bytes = new byte[16];
+            Buffer.BlockCopy(
+                BitConverter.GetBytes(value),
+                0,
+                bytes,
+                0,
+                sizeof(int));
+            var agentId = new Guid(bytes);
+            if (AgentActionPollScheduler.GetPartition(agentId)
+                == partition)
+            {
+                return agentId;
+            }
+        }
     }
 
     private static Agent SpawnAgent(

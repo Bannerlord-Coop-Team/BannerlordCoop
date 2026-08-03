@@ -69,10 +69,17 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
     private readonly IGuardReactionHandler guardReactionHandler;
+    private readonly IAgentActionPollScheduler actionPollScheduler;
 
     // Outbound observation and sequence share one record because both belong to the local agent's action stream.
     private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
         new Dictionary<Guid, LocalAgentActionState>();
+    private readonly HashSet<Guid> _inputPriorityAgentIds =
+        new HashSet<Guid>();
+    private readonly List<Guid> _inputPriorityAgentSnapshot =
+        new List<Guid>();
+    private readonly List<Guid> _refreshedAgentIds =
+        new List<Guid>();
 
     private bool _disposed;
 
@@ -107,7 +114,8 @@ public class AgentActionHandler : IAgentActionHandler
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IRemoteAgentActionProcessor remoteActionProcessor,
-        IGuardReactionHandler guardReactionHandler)
+        IGuardReactionHandler guardReactionHandler,
+        IAgentActionPollScheduler actionPollScheduler)
     {
         this.client = client;
         this.packetManager = packetManager;
@@ -116,6 +124,7 @@ public class AgentActionHandler : IAgentActionHandler
         this.controllerIdProvider = controllerIdProvider;
         this.remoteActionProcessor = remoteActionProcessor;
         this.guardReactionHandler = guardReactionHandler;
+        this.actionPollScheduler = actionPollScheduler;
 
         this.packetManager.RegisterPacketHandler(this);
         this.messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
@@ -148,16 +157,11 @@ public class AgentActionHandler : IAgentActionHandler
 
         if (afterNativeTick)
         {
-            foreach (CoopAgentInfo info in agentRegistry.GetAgents(
-                controllerIdProvider.ControllerId))
-            {
-                PollAgentAction(
-                    info,
-                    afterNativeTick: true,
-                    ref ids,
-                    ref actions,
-                    ref sequences);
-            }
+            PollPostNativeActions(
+                mission,
+                ref ids,
+                ref actions,
+                ref sequences);
         }
         else
         {
@@ -191,7 +195,127 @@ public class AgentActionHandler : IAgentActionHandler
             packet => client.SendAll(packet));
     }
 
-    private void PollAgentAction(
+    private void PollPostNativeActions(
+        Mission mission,
+        ref List<Guid> ids,
+        ref List<AgentActionData> actions,
+        ref List<long> sequences)
+    {
+        IReadOnlyCollection<Guid> refreshedAgentIds = null;
+        long registryVersion = agentRegistry.Version;
+        if (actionPollScheduler.RequiresAgentRefresh(registryVersion))
+        {
+            _refreshedAgentIds.Clear();
+            foreach (CoopAgentInfo info in agentRegistry.GetAgents(
+                controllerIdProvider.ControllerId))
+            {
+                _refreshedAgentIds.Add(info.AgentId);
+            }
+            refreshedAgentIds = _refreshedAgentIds;
+        }
+        actionPollScheduler.BeginPoll(
+            registryVersion,
+            refreshedAgentIds);
+
+        Agent mainAgent = mission.MainAgent;
+        if (mainAgent != null
+            && agentRegistry.TryGetAgentInfo(
+                mainAgent,
+                out CoopAgentInfo mainAgentInfo))
+        {
+            PollPostNativeAgent(
+                mainAgentInfo.AgentId,
+                mission,
+                ref ids,
+                ref actions,
+                ref sequences);
+        }
+
+        _inputPriorityAgentSnapshot.Clear();
+        foreach (Guid agentId in _inputPriorityAgentIds)
+            _inputPriorityAgentSnapshot.Add(agentId);
+        foreach (Guid agentId in _inputPriorityAgentSnapshot)
+        {
+            PollPostNativeAgent(
+                agentId,
+                mission,
+                ref ids,
+                ref actions,
+                ref sequences);
+        }
+
+        foreach (Guid agentId in
+                 actionPollScheduler.NewPriorityAgentIds)
+        {
+            PollPostNativeAgent(
+                agentId,
+                mission,
+                ref ids,
+                ref actions,
+                ref sequences);
+        }
+
+        foreach (Guid agentId in actionPollScheduler.GetDirtyAgentIds())
+        {
+            PollPostNativeAgent(
+                agentId,
+                mission,
+                ref ids,
+                ref actions,
+                ref sequences);
+        }
+
+        foreach (Guid agentId in
+                 actionPollScheduler.CurrentFallbackAgentIds)
+        {
+            PollPostNativeAgent(
+                agentId,
+                mission,
+                ref ids,
+                ref actions,
+                ref sequences);
+        }
+    }
+
+    private void PollPostNativeAgent(
+        Guid agentId,
+        Mission mission,
+        ref List<Guid> ids,
+        ref List<AgentActionData> actions,
+        ref List<long> sequences)
+    {
+        if (!actionPollScheduler.TryBeginAgent(agentId))
+            return;
+
+        if (!agentRegistry.TryGetAgentInfo(
+                agentId,
+                out CoopAgentInfo info)
+            || !agentRegistry.IsLocallyControlled(agentId))
+        {
+            actionPollScheduler.RemoveDirty(agentId);
+            _inputPriorityAgentIds.Remove(agentId);
+            return;
+        }
+
+        bool isMainAgent =
+            ReferenceEquals(info.Agent, mission.MainAgent);
+        bool consumesInputPriority =
+            !isMainAgent
+            && _inputPriorityAgentIds.Contains(agentId);
+        bool actionChanged = PollAgentAction(
+            info,
+            afterNativeTick: true,
+            ref ids,
+            ref actions,
+            ref sequences);
+        if (consumesInputPriority)
+            _inputPriorityAgentIds.Remove(agentId);
+        actionPollScheduler.CompletePoll(
+            agentId,
+            actionChanged && !isMainAgent);
+    }
+
+    private bool PollAgentAction(
         CoopAgentInfo info,
         bool afterNativeTick,
         ref List<Guid> ids,
@@ -212,7 +336,7 @@ public class AgentActionHandler : IAgentActionHandler
             agent,
             actionSyncedAgent);
 #endif
-        if (!actionSyncedAgent) return;
+        if (!actionSyncedAgent) return false;
 
         int action0 = agent.GetCurrentAction(0).Index;
         int action1 = agent.GetCurrentAction(1).Index;
@@ -259,6 +383,7 @@ public class AgentActionHandler : IAgentActionHandler
         if (!afterNativeTick && isPlayerControlled)
         {
             state.HasInputBoundaryObservation = true;
+            _inputPriorityAgentIds.Add(info.AgentId);
             state.InputBoundaryDefendFlags = defendFlags;
             state.InputBoundaryGuardMode = guardMode;
         }
@@ -266,6 +391,7 @@ public class AgentActionHandler : IAgentActionHandler
             || agent != Mission.Current.MainAgent)
         {
             state.HasInputBoundaryObservation = false;
+            _inputPriorityAgentIds.Remove(info.AgentId);
             state.InputBoundaryDefendFlags =
                 Agent.MovementControlFlag.None;
             state.InputBoundaryGuardMode = Agent.GuardMode.None;
@@ -324,7 +450,7 @@ public class AgentActionHandler : IAgentActionHandler
                 state.ActionGuardMode = actionGuardMode;
                 _localAgentStates[info.AgentId] = state;
             }
-            return;
+            return false;
         }
 
         bool action0Discrete =
@@ -423,7 +549,7 @@ public class AgentActionHandler : IAgentActionHandler
         }
         _localAgentStates[info.AgentId] = state;
         if (!broadcast)
-            return;
+            return false;
 
 #if DEBUG
         MissionActionDiagnostics.RecordActionUpdate();
@@ -440,6 +566,7 @@ public class AgentActionHandler : IAgentActionHandler
         (ids ??= new List<Guid>()).Add(info.AgentId);
         (actions ??= new List<AgentActionData>()).Add(actionData);
         (sequences ??= new List<long>()).Add(sequence);
+        return true;
     }
 
     public void CatchUpJoiner(string controllerId)
@@ -560,6 +687,12 @@ public class AgentActionHandler : IAgentActionHandler
         in Blow blow,
         in AttackCollisionData collisionData)
     {
+        if (isBlocked)
+        {
+            MarkActionPollDirty(affectedAgent);
+            MarkActionPollDirty(affectorAgent);
+        }
+
         if (isBlocked
             && affectedAgent != null
             && affectorAgent != null
@@ -581,6 +714,21 @@ public class AgentActionHandler : IAgentActionHandler
             blow.IsMissile,
             collisionData.CollisionResult,
             remoteActionProcessor.GetOutgoingBattleHostEpoch());
+    }
+
+    private void MarkActionPollDirty(Agent agent)
+    {
+        if (agent == null
+            || ReferenceEquals(agent, Mission.Current?.MainAgent)
+            || !agentRegistry.TryGetAgentInfo(
+                agent,
+                out CoopAgentInfo info)
+            || !agentRegistry.IsLocallyControlled(info.AgentId))
+        {
+            return;
+        }
+
+        actionPollScheduler.MarkDirty(info.AgentId);
     }
 
     private void Handle_BattleHostAssigned(
@@ -819,6 +967,10 @@ public class AgentActionHandler : IAgentActionHandler
         packetManager.RemovePacketHandler(this);
         remoteActionProcessor.Dispose();
         guardReactionHandler.Dispose();
+        actionPollScheduler.Clear();
         _localAgentStates.Clear();
+        _inputPriorityAgentIds.Clear();
+        _inputPriorityAgentSnapshot.Clear();
+        _refreshedAgentIds.Clear();
     }
 }

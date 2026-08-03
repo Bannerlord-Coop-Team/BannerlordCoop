@@ -89,6 +89,36 @@ public class NetworkAgentRegistryTests
     }
 
     [Fact]
+    public void Version_ChangesOnlyWhenRegistryStateChanges()
+    {
+        var registry = NewRegistry(localControllerId: "me");
+        var agent = ObjectHelper.SkipConstructor<Agent>();
+        Guid agentId = Guid.NewGuid();
+        long initialVersion = registry.Version;
+
+        Assert.True(registry.TryRegisterAgent(
+            "host",
+            agentId,
+            agent));
+        long registeredVersion = registry.Version;
+        Assert.True(registeredVersion > initialVersion);
+
+        Assert.True(registry.TryTransferAuthority("host", agentId));
+        Assert.Equal(registeredVersion, registry.Version);
+
+        Assert.True(registry.TryTransferAuthority("me", agentId));
+        long transferredVersion = registry.Version;
+        Assert.True(transferredVersion > registeredVersion);
+
+        Assert.True(registry.RemoveAgent(agentId));
+        long removedVersion = registry.Version;
+        Assert.True(removedVersion > transferredVersion);
+
+        Assert.False(registry.RemoveAgent(agentId));
+        Assert.Equal(removedVersion, registry.Version);
+    }
+
+    [Fact]
     public void TransferAuthority_ClearsEquipmentStateFromPreviousController()
     {
         var (registry, _, id) = RegisterAgent(ownerControllerId: "host", localControllerId: "me");

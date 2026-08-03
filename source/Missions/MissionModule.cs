@@ -183,6 +183,9 @@ public class MissionModule : Module
         builder.RegisterType<GuardReactionHandler>()
             .As<IGuardReactionHandler>()
             .InstancePerDependency();
+        builder.RegisterType<AgentActionPollScheduler>()
+            .As<IAgentActionPollScheduler>()
+            .InstancePerDependency();
         builder.RegisterType<AgentActionHandler>().As<IAgentActionHandler>().InstancePerDependency();
         builder.RegisterType<VanillaOrderVoiceService>()
             .As<IVanillaOrderVoiceService>()
