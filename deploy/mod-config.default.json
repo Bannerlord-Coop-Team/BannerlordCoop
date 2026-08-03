@@ -72,6 +72,14 @@
     // Vanilla/default limit is numberOfTowns * 0.6 ≈ 32.
     "wandererLimit": 32,
 
+    // Toggle scaling the wanderer/companion limit with the number of players on the campaign map.
+    // (Default) false: Use above setting "wandererLimit" to set the cap of wanderers/companions that can exist.
+    // true: Override "wandererLimit" to use a scaling cap with the number of players (including offline players).
+    // This option starts at the vanilla limit of 32 and increases depending on the player count.
+    // Each player's clan contributes to the total cap based on tier: 0, 0, 5, 5, 5, 10, 10
+    // e.g. With 3 players: 1 at tier 0 adds 0, 1 at tier 2 adds 5, 1 at tier 5 adds 10. This results in 32 + 0 + 5 + 10 = 47.
+    "wandererLimitScalesWithPlayers": false,
+
     // Set a custom clan tier required to form a player kingdom.
     // Vanilla/default allows players to start kingdoms from clan tier 4 onwards.
     "playerKingdomClanTierRequired": 4,

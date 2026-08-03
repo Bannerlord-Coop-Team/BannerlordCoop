@@ -86,6 +86,8 @@ public sealed class ModOptionsData
 
     public int? WandererLimit { get; set; }
 
+    public bool? WandererLimitScalesWithPlayers { get; set; }
+
     public int? PlayerKingdomClanTierRequired { get; set; }
 
     public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }

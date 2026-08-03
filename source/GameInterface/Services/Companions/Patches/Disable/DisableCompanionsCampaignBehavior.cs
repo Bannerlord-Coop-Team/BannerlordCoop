@@ -1,7 +1,10 @@
 ﻿using Common;
 using GameInterface.Configuration;
 using GameInterface.Extentions;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -20,11 +23,46 @@ internal class DisableCompanionsCampaignBehavior
 [HarmonyPatch(typeof(CompanionsCampaignBehavior))]
 internal class CompanionsCampaignBehaviorPatches
 {
+    // Alternative way to increase companion limit scaled by player clan tiers suggested by tester.
+    // See "wandererLimitScalesWithPlayers" in mod-config.default.json for a more detailed description of what this config is.
+    private static readonly Dictionary<int, int> ClanTierScalingValues = new()
+    {
+        { 0, 0 }, // Tier 0: 0
+        { 1, 0 }, // Tier 1: 1
+        { 2, 5 }, // Tier 2: 2
+        { 3, 5 }, // Tier 3: 3
+        { 4, 5 }, // Tier 4: 4
+        { 5, 10 }, // Tier 5: 5
+        { 6, 10 }, // Tier 6: 6
+    };
+
     [HarmonyPatch(nameof(CompanionsCampaignBehavior._desiredTotalCompanionCount), MethodType.Getter)]
     [HarmonyPrefix]
     public static bool DesiredTotalCompanionCountGetterPrefix(ref float __result)
     {
-        __result = ModConfigProvider.ModOptions.WandererLimit;
+        // Use fixed wanderer limit
+        if (!ModConfigProvider.ModOptions.WandererLimitScalesWithPlayers)
+        {
+            __result = ModConfigProvider.ModOptions.WandererLimit;
+            return false;
+        }
+
+        // Calculate scaling limit
+        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
+        ContainerProvider.TryResolve<IObjectManager>(out var objectManager);
+
+        // Start with vanilla limit
+        var total = 32;
+        foreach (var player in playerManager.Players)
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(player.ClanId, out var playerClan))
+                continue;
+
+            if (ClanTierScalingValues.TryGetValue(playerClan.Tier, out int valueFromTier))
+                total += valueFromTier;
+        }
+
+        __result = total;
         return false;
     }
 

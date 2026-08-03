@@ -34,12 +34,14 @@ public readonly struct ModOptions
     [ProtoMember(9)]
     public readonly int WandererLimit { get; } = 32;
     [ProtoMember(10)]
-    public readonly int PlayerKingdomClanTierRequired { get; } = 4;
+    public readonly bool WandererLimitScalesWithPlayers { get; } = false;
     [ProtoMember(11)]
-    public readonly bool SmithingStaminaRecoveryOutsideSettlements { get; } = true;
+    public readonly int PlayerKingdomClanTierRequired { get; } = 4;
     [ProtoMember(12)]
-    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
+    public readonly bool SmithingStaminaRecoveryOutsideSettlements { get; } = true;
     [ProtoMember(13)]
+    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
+    [ProtoMember(14)]
     public readonly float MaximumBanditsMultiplier { get; } = 1f;
 
     public ModOptions(ModOptionsData modOptionsData)
@@ -53,6 +55,7 @@ public readonly struct ModOptions
         PlayerBattleAiJoinWindowHours = modOptionsData.PlayerBattleAiJoinWindowHours ?? PlayerBattleAiJoinWindowHours;
         SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
+        WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
