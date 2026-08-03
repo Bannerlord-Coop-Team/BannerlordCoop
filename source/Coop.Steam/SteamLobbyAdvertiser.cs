@@ -10,6 +10,9 @@ namespace Coop.Steam;
 /// rich presence so friends get "Join Game" in their Steam friends list.
 /// </summary>
 public class SteamLobbyAdvertiser : ISessionAdvertiser, ISteamLobbyOwner
+#if DEBUG
+    , ISessionAdvertisementDebugInfo
+#endif
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamLobbyAdvertiser>();
 

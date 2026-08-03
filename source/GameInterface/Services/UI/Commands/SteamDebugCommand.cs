@@ -115,13 +115,21 @@ public class SteamDebugCommand
         if (!ContainerProvider.TryGetContainer(out _)) return "Steam integration active; no co-op session running";
         if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return "Steam integration active; this process has no session advertiser (server process?)";
 
+#if DEBUG
+        var lobbyStatus = advertiser is ISessionAdvertisementDebugInfo debugInfo
+            ? $"; lobbyId={debugInfo.LobbyId}"
+            : string.Empty;
+#else
+        const string lobbyStatus = "";
+#endif
+
         if (ContainerProvider.TryResolve<ISessionTunnelHost>(out var tunnelHost))
         {
-            return $"Steam integration active; advertising={advertiser.IsAdvertising}; " +
+            return $"Steam integration active; advertising={advertiser.IsAdvertising}{lobbyStatus}; " +
                 $"tunnelListening={tunnelHost.IsListening}; tunnelPeers={tunnelHost.PeerCount}";
         }
 
-        return $"Steam integration active; advertising={advertiser.IsAdvertising}";
+        return $"Steam integration active; advertising={advertiser.IsAdvertising}{lobbyStatus}";
     }
 
     [CommandLineArgumentFunction("host_lobby", "coop.debug.steam")]
