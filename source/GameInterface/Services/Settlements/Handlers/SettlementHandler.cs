@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
@@ -21,10 +22,12 @@ public class SettlementHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<SettlementHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
 
-    public SettlementHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public SettlementHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
+        this.network = network;
         this.objectManager = objectManager;
 
         messageBroker.Subscribe<ChangeSettlementBribePaid>(HandleBribePaid);
@@ -52,6 +55,8 @@ public class SettlementHandler : IHandler
         //Settlement.CanBeClaimed
         messageBroker.Subscribe<ChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
 
+        messageBroker.Subscribe<NewGarrisonParty>(HandleNewGarrisonParty);
+        messageBroker.Subscribe<NetworkNewGarrisonParty>(HandleNetworkNewGarrisonParty);
     }
 
     private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<ChangeSettlementClaimantCanBeClaimed> payload)
@@ -163,21 +168,23 @@ public class SettlementHandler : IHandler
 
     private void HandleMobileParty(MessagePayload<ChangeMobileParty> payload)
     {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
+            var obj = payload.What;
+            if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+            {
+                Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+                return;
+            }
 
+            if (objectManager.TryGetObject<MobileParty>(obj.MobilePartyId, out var mobileParty) == false)
+            {
+                Logger.Error("Unable to find MobileParty ({MobilePartyId})", obj.MobilePartyId);
+                return;
+            }
 
-        if (objectManager.TryGetObject<MobileParty>(obj.MobilePartyId, out var mobileParty) == false)
-        {
-            Logger.Error("Unable to find MobileParty ({MobilePartyId})", obj.MobilePartyId);
-            return;
-        }
-
-        MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.AddMobileParty);
+            MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.AddMobileParty);
+        });
     }
 
     private void HandleGarrisonWageLimit(MessagePayload<ChangeSettlementGarrisonWagePaymentLimit> payload)
@@ -271,6 +278,22 @@ public class SettlementHandler : IHandler
         BribePaidSettlementPatch.RunBribePaidChange(settlement, obj.BribePaid);
     }
 
+    private void HandleNewGarrisonParty(MessagePayload<NewGarrisonParty> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Settlement, out var settlementId)) return;
+
+        network.SendAll(new NetworkNewGarrisonParty(settlementId));
+    }
+
+    private void HandleNetworkNewGarrisonParty(MessagePayload<NetworkNewGarrisonParty> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement)) return;
+
+            settlement.AddGarrisonParty();
+        });
+    }
 
     public void Dispose()
     {
@@ -293,6 +316,7 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviourPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
         messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers>(HandleLordConversationCampaignBehaviorPlayerClaimValueOthers);
 
-
+        messageBroker.Unsubscribe<NewGarrisonParty>(HandleNewGarrisonParty);
+        messageBroker.Unsubscribe<NetworkNewGarrisonParty>(HandleNetworkNewGarrisonParty);
     }
 }
