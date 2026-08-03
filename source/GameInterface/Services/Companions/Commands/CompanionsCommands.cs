@@ -48,15 +48,23 @@ internal class CompanionsCommands
     /// <summary>
     /// View a list of all wanderers in the game
     /// </summary>
-    [CommandLineArgumentFunction("listwanderers", "coop.debug.companions")]
+    [CommandLineArgumentFunction("list_wanderers", "coop.debug.companions")]
     public static string ListWanderersCommand(List<string> strings)
     {
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in Hero.AllAliveHeroes)
         {
             if (hero.IsWanderer)
             {
-                stringBuilder.AppendLine(hero.CurrentSettlement + " (" + hero.Name.ToString() + ")");
+                if (!objectManager.TryGetIdWithLogging(hero, out var heroId))
+                {
+                    stringBuilder.AppendLine($"Failed to resolve hero id for wanderer with name {hero.Name}");
+                    continue;
+                }
+
+                stringBuilder.AppendLine($"{hero.Name} (ID: {heroId}) Current Settlement: {hero.CurrentSettlement}");
             }
         }
 

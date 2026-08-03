@@ -142,6 +142,87 @@ public class PlayerManagerTests
         Assert.Same(secondPeer, resolvedPeer);
     }
 
+    [Fact]
+    public void AddPlayer_SecondRegistrationForSameController_IsRefused()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var registered = new Player(ControllerId, "FirstHero", string.Empty, string.Empty, string.Empty);
+        var replacement = new Player(ControllerId, "SecondHero", string.Empty, string.Empty, string.Empty);
+
+        Assert.True(playerManager.AddPlayer(registered));
+
+        // A registration whose hero was gone used to send its owner through character creation,
+        // and the character created there registered this same controller a second time. Player
+        // has no value equality, so a set of instances accepted it and every later lookup for the
+        // controller threw — inside a message handler, killing the join with no reply.
+        Assert.False(playerManager.AddPlayer(replacement));
+
+        Assert.True(playerManager.TryGetPlayer(ControllerId, out var resolved));
+        Assert.Same(registered, resolved);
+        Assert.Same(registered, Assert.Single(playerManager.Players));
+    }
+
+    [Fact]
+    public void AddPlayer_SameInstanceTwice_IsRefused()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.False(playerManager.AddPlayer(player));
+
+        Assert.Same(player, Assert.Single(playerManager.Players));
+    }
+
+    [Fact]
+    public void AddPlayer_NoControllerId_IsRefused()
+    {
+        var playerManager = CreatePlayerManager(out _);
+
+        Assert.False(playerManager.AddPlayer(
+            new Player(string.Empty, "SomeHero", string.Empty, string.Empty, string.Empty)));
+
+        Assert.Empty(playerManager.Players);
+        Assert.False(playerManager.TryGetPlayer(string.Empty, out _));
+    }
+
+    [Fact]
+    public void RemovePlayer_ThenRegisterReplacement_SucceedsForSameController()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var stale = new Player(ControllerId, "MissingHero", string.Empty, string.Empty, string.Empty);
+        var replacement = new Player(ControllerId, "CreatedHero", string.Empty, string.Empty, string.Empty);
+
+        Assert.True(playerManager.AddPlayer(stale));
+
+        // The join flow deregisters a registration naming a hero that no longer exists before
+        // routing its owner to character creation, so the created character can take the id.
+        Assert.True(playerManager.RemovePlayer(stale));
+        Assert.True(playerManager.AddPlayer(replacement));
+
+        Assert.True(playerManager.TryGetPlayer(ControllerId, out var resolved));
+        Assert.Same(replacement, resolved);
+        Assert.Same(replacement, Assert.Single(playerManager.Players));
+    }
+
+    [Fact]
+    public void RemovePlayer_SupersededInstance_LeavesCurrentRegistrationIntact()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var stale = new Player(ControllerId, "MissingHero", string.Empty, string.Empty, string.Empty);
+        var current = new Player(ControllerId, "CreatedHero", string.Empty, string.Empty, string.Empty);
+
+        Assert.True(playerManager.AddPlayer(stale));
+        Assert.True(playerManager.RemovePlayer(stale));
+        Assert.True(playerManager.AddPlayer(current));
+
+        // A caller still holding the superseded Player must not deregister its successor.
+        Assert.False(playerManager.RemovePlayer(stale));
+
+        Assert.True(playerManager.TryGetPlayer(ControllerId, out var resolved));
+        Assert.Same(current, resolved);
+    }
+
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
             .Field(typeof(PlayerManager), "PlayerObjects")
