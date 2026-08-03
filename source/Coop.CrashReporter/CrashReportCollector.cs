@@ -69,6 +69,15 @@ namespace Coop.CrashReporter
             Directory.CreateDirectory(logsDirectory);
             List<string> copiedLogs = CopyLogs(logsDirectory);
 
+            // Written before the dump wait so the listed versions are the ones that were on
+            // disk at the crash, not whatever a launcher update replaced them with meanwhile.
+            string manifestPath = Path.Combine(reportDirectory, GameBinariesManifest.FileName);
+            bool manifestWritten;
+            string binariesSummary = GameBinariesManifest.Write(
+                manifestPath,
+                options.GameBinariesDirectory,
+                out manifestWritten);
+
             if (dumpPath == null)
                 dumpPath = WaitForMatchingDump(CrashDumpDiscoveryTimeout);
 
@@ -85,13 +94,15 @@ namespace Coop.CrashReporter
                 exitCode,
                 dumpCopied,
                 dumpCaptureDetails,
+                binariesSummary,
                 copiedLogs);
-            WriteReadme(readmePath, dumpCopied);
+            WriteReadme(readmePath, dumpCopied, manifestWritten);
             CreateShareableZip(
                 Path.Combine(reportDirectory, "shareable.zip"),
                 readmePath,
                 reportPath,
                 dumpCopied ? copiedDumpPath : null,
+                manifestWritten ? manifestPath : null,
                 copiedLogs);
             return 0;
         }
@@ -331,6 +342,7 @@ namespace Coop.CrashReporter
             int exitCode,
             bool dumpCopied,
             string dumpCaptureDetails,
+            string binariesSummary,
             IEnumerable<string> copiedLogs)
         {
             var lines = new[]
@@ -343,12 +355,17 @@ namespace Coop.CrashReporter
                 "Exit code: " + exitCode.ToString(CultureInfo.InvariantCulture),
                 "Dump captured: " + (dumpCopied ? "yes" : "no"),
                 "Dump capture details: " + dumpCaptureDetails,
+                "Game binaries directory: " + (options.GameBinariesDirectory ?? "unknown"),
+                "Game binaries: " + binariesSummary,
                 "Logs captured: " + copiedLogs.Count().ToString(CultureInfo.InvariantCulture),
             };
             File.WriteAllLines(reportPath, lines, new UTF8Encoding(false));
         }
 
-        private static void WriteReadme(string readmePath, bool dumpCopied)
+        private static void WriteReadme(
+            string readmePath,
+            bool dumpCopied,
+            bool manifestWritten)
         {
             var lines = new List<string>
             {
@@ -366,6 +383,14 @@ namespace Coop.CrashReporter
                 lines.Add("The ZIP contains dump.dmp for advanced debugging.");
             }
 
+            if (manifestWritten)
+            {
+                lines.Add("");
+                lines.Add(
+                    GameBinariesManifest.FileName +
+                    " lists the file names, sizes and versions found in the game's binaries folder.");
+            }
+
             File.WriteAllLines(readmePath, lines, new UTF8Encoding(false));
         }
 
@@ -374,6 +399,7 @@ namespace Coop.CrashReporter
             string readmePath,
             string reportPath,
             string dumpPath,
+            string manifestPath,
             IEnumerable<string> copiedLogs)
         {
             using (var stream = new FileStream(
@@ -387,6 +413,8 @@ namespace Coop.CrashReporter
                 AddFile(archive, reportPath, "report.txt", false);
                 if (dumpPath != null)
                     AddFile(archive, dumpPath, "dump.dmp", false);
+                if (manifestPath != null)
+                    AddFile(archive, manifestPath, GameBinariesManifest.FileName, false);
 
                 foreach (string logPath in copiedLogs)
                 {
