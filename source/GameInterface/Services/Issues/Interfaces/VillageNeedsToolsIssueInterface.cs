@@ -103,6 +103,17 @@ public interface IVillageNeedsToolsIssueInterface : IGameAbstraction
     /// <c>IsOngoingWithoutQuest</c> from staying true forever on every OTHER peer, which is Finding 1's actual
     /// concrete bug (a second player independently accepting the same issue). A no-op if the issue is no
     /// longer <c>IsOngoingWithoutQuest</c>.
+    ///
+    /// Deliberately does NOT touch <c>AlternativeSolutionReturnTimeForTroops</c> (left at its uninitialized,
+    /// always-in-the-past default) - an earlier design considered permanently pinning it to
+    /// <c>CampaignTime.Never</c> here to stop vanilla's own <c>IssueManager.DailyTick</c> from ever firing the
+    /// real consequence on this non-owner mirror copy, but that was rejected: since every (re)connection
+    /// resyncs from the SERVER's own live state (see <c>Coop.Core.Server.Connections.States.TransferSaveState</c>),
+    /// permanently overwriting this field on the server's mirror copy would get shipped right back to the
+    /// TRUE owner as their own "real" state on their very next reconnect, silently and permanently stranding
+    /// their real troops/reward. See <see cref="Patches.VillageNeedsToolsAlternativeSolutionOwnershipGatePatch"/>
+    /// for how the real consequence is prevented from firing on a non-owner instead - by gating the
+    /// consequence method itself on ownership, never by corrupting this field.
     /// </summary>
     void MirrorAlternativeAccepted(Hero owner);
 
@@ -117,6 +128,22 @@ public interface IVillageNeedsToolsIssueInterface : IGameAbstraction
     /// back - we never actually applied anything locally, e.g. a duplicate reject).
     /// </summary>
     void RejectAcceptance(Hero owner);
+
+    /// <summary>
+    /// Bug 2 fix: genuinely triggers <c>IssueBase.CompleteIssueWithAlternativeSolution()</c> for
+    /// <paramref name="owner"/>'s issue, but ONLY if the local peer is this issue's recorded owner (see
+    /// <see cref="Patches.VillageNeedsToolsAlternativeSolutionOwnershipGatePatch"/>, which is what actually
+    /// enforces this - the check here is a defensive, self-contained early-out so this method is safe to
+    /// call without relying on the caller having already checked) and its
+    /// <c>AlternativeSolutionReturnTimeForTroops</c> is genuinely past due. Deliberately NOT wrapped in
+    /// <see cref="AllowedThread"/> - unlike <see cref="MirrorQuestAccepted"/>/<see cref="MirrorAlternativeAccepted"/>,
+    /// this must look like a genuine local trigger so <see cref="Patches.IssueFinalizedPatches"/> correctly
+    /// publishes <c>VillageIssueFinalizedTriggered</c> and routes the real removal broadcast to every peer.
+    /// See <see cref="Patches.VillageNeedsToolsAlternativeSolutionCompletionPatches"/> for the only call site
+    /// (an unconditional, ownership-gated <c>HourlyTickEvent</c> listener). Returns false (no-op) if there's
+    /// nothing to trigger.
+    /// </summary>
+    bool TryTriggerOwnedAlternativeSolutionCompletion(Hero owner);
 }
 
 /// <inheritdoc cref="IVillageNeedsToolsIssueInterface"/>
@@ -276,5 +303,25 @@ public class VillageNeedsToolsIssueInterface : IVillageNeedsToolsIssueInterface
         {
             owner.Issue.CompleteIssueWithCancel();
         }
+    }
+
+    public bool TryTriggerOwnedAlternativeSolutionCompletion(Hero owner)
+    {
+        if (owner?.Issue is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue issue) return false;
+        if (!issue.IsSolvingWithAlternative || !issue.AlternativeSolutionReturnTimeForTroops.IsPast) return false;
+        if (!VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(owner)) return false;
+
+        // Seed the reason IssueFinalizedPatches.Postfix will pick up when IssueFinalized() cascades below -
+        // reuses the existing choke point (Patches.IssueManagerQuestCompletedReasonCapture.PendingReasons)
+        // instead of adding a new broadcast path. Deterministic success: VillageNeedsToolsIssue overrides
+        // AlternativeSolutionScaleFlags to Duration only (confirmed by inspecting the compiled property
+        // getter directly - it's a single `ldc.i4.1; ret`), so AlternativeSolutionHasFailureRisk is always
+        // false and _failureChance is always 0f - CompleteIssueWithAlternativeSolution's
+        // `MBRandom.RandomFloat > _failureChance` success check can never fail for this issue type. A
+        // "Fail" reason variant is deliberately not added - see VillageIssueFinalizeReason's doc comment.
+        Patches.IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = VillageIssueFinalizeReason.AlternativeSolutionSuccess;
+
+        issue.CompleteIssueWithAlternativeSolution(); // genuine call - NOT under AllowedThread, this is the real trigger
+        return true;
     }
 }
