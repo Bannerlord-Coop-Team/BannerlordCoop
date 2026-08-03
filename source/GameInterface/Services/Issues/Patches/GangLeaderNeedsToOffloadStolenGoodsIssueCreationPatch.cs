@@ -1,0 +1,32 @@
+using Common;
+using Common.Messaging;
+using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Issues.Messages;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
+
+namespace GameInterface.Services.Issues.Patches;
+
+/// <summary>
+/// Captures + broadcasts a genuine server-side <c>IssueManager.CreateNewIssue</c> creating a
+/// <see cref="GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue"/> - see
+/// <see cref="IGangLeaderNeedsToOffloadStolenGoodsIssueInterface"/>'s doc comment. This postfix runs AFTER
+/// <c>CreateNewIssue</c>'s own bookkeeping (including <c>AfterIssueCreation()</c>), so <c>issueOwner.Issue.CounterOfferHero</c>
+/// is already resolved by the time this reads it. Deliberately its own independent postfix (same reasoning as
+/// e.g. <see cref="HeadmanNeedsToDeliverAHerdIssueCreationPatch"/>): the client-creation-blocking Prefix on
+/// <see cref="IssueManagerCreateNewIssuePatches"/> is already fully generic.
+/// </summary>
+[HarmonyPatch(typeof(IssueManager))]
+internal class GangLeaderNeedsToOffloadStolenGoodsIssueCreationPatch
+{
+    [HarmonyPatch(nameof(IssueManager.CreateNewIssue))]
+    [HarmonyPostfix]
+    private static void Postfix(Hero issueOwner, bool __result)
+    {
+        if (!__result || ModInformation.IsClient) return;
+        if (issueOwner?.Issue is not GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue issue) return;
+
+        MessageBroker.Instance.Publish(issueOwner, new GangLeaderStolenGoodsIssueCreated(issue));
+    }
+}
