@@ -5,17 +5,20 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 namespace GameInterface.Services.Issues.Patches;
 
 /// <summary>
-/// Gates the three vanilla entry points that actually generate a fresh issue
-/// (<c>IssuesCampaignBehavior.DailyTickClan</c>, <c>OnSettlementDailyTick</c> and
-/// <c>OnNewGameCreatedPartialFollowUpEnd</c> - see <c>IssueManager.CheckForIssues</c>/
-/// <c>CreateNewIssue</c> callers) to the server only. All three roll ambient, unseeded randomness
-/// directly (generation-chance rolls via <c>MBRandom.RandomFloat</c>, candidate selection via
-/// <c>MBRandom.ChooseWeighted</c>, and a plain <c>System.Random</c> settlement shuffle in the new-game
-/// path) to decide WHICH hero gets a new issue and WHEN. If every client ran this locally, each would make
-/// a different random choice and the campaign would diverge - the same desync shape already hit and fixed
-/// elsewhere in this project for other ambient-Rand call sites. The resulting
-/// <c>VillageNeedsToolsIssue</c> creation is captured and replicated by
-/// <see cref="IssueManagerCreateNewIssuePatches"/> instead of letting clients re-derive it locally.
+/// Gates the four vanilla entry points that roll ambient, unseeded randomness to decide something about an
+/// issue WHEN/WHO/WHETHER (<c>IssuesCampaignBehavior.DailyTickClan</c>, <c>OnSettlementDailyTick</c>,
+/// <c>OnNewGameCreatedPartialFollowUpEnd</c> - see <c>IssueManager.CheckForIssues</c>/<c>CreateNewIssue</c>
+/// callers - and <c>OnSettlementEntered</c>, Finding 2 of the review this fixes) to the server only. The
+/// first three roll ambient randomness directly (generation-chance rolls via <c>MBRandom.RandomFloat</c>,
+/// candidate selection via <c>MBRandom.ChooseWeighted</c>, and a plain <c>System.Random</c> settlement
+/// shuffle in the new-game path) to decide WHICH hero gets a new issue and WHEN. <c>OnSettlementEntered</c>
+/// rolls a plain <c>MBRandom.RandomFloat</c> chance for a passing AI lord to instantly resolve an ongoing
+/// issue via <c>CompleteIssueWithAiLord</c> - the one entry point in this feature the first pass missed. If
+/// every client ran any of these locally, each would make a different random choice and the campaign would
+/// diverge - the same desync shape already hit and fixed elsewhere in this project for other ambient-Rand
+/// call sites. The resulting <c>VillageNeedsToolsIssue</c> creation is captured and replicated by
+/// <see cref="IssueManagerCreateNewIssuePatches"/>, and a resulting AI-lord finalize by
+/// <see cref="IssueFinalizedPatches"/>, instead of letting clients re-derive/re-apply either locally.
 ///
 /// <c>OnSessionLaunched</c> is deliberately left unpatched: it only calls <c>AddDialogues</c> (every
 /// human-player client needs the issue dialogue lines registered locally for its own conversation UI,
@@ -36,4 +39,8 @@ internal class IssuesCampaignBehaviorGenerationPatches
     [HarmonyPatch("OnNewGameCreatedPartialFollowUpEnd")]
     [HarmonyPrefix]
     private static bool OnNewGameCreatedPartialFollowUpEndPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch("OnSettlementEntered")]
+    [HarmonyPrefix]
+    private static bool OnSettlementEnteredPrefix() => ModInformation.IsServer;
 }
