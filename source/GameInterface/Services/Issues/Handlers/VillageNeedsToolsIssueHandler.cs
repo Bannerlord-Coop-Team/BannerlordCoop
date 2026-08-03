@@ -211,7 +211,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
                 return;
             }
 
-            if (owner.Issue is VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue && owner.Issue.IsOngoingWithoutQuest)
+            if (GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest)
             {
                 // First valid request wins the race - replay on the server's own authoritative copy, then
                 // confirm to everyone (including the requester, harmlessly idempotent for them since they
@@ -279,7 +279,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
                 return;
             }
 
-            if (owner.Issue is VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue && owner.Issue.IsOngoingWithoutQuest)
+            if (GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest)
             {
                 issueInterface.MirrorAlternativeAccepted(owner);
                 VillageNeedsToolsIssueOwnership.SetOwner(owner, player.ControllerId);
