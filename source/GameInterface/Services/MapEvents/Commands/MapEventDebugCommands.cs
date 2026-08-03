@@ -18,6 +18,9 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
+#if DEBUG
+using GameInterface.Services.Party.Commands;
+#endif
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Utils.Commands;
@@ -511,7 +514,7 @@ public class MapEventDebugCommands
                $"{nearest.MemberRoster.TotalManCount} troops, {nearest.Position.ToVec2().Distance(mainPos):0.0} away.";
     }
 
-    // coop.debug.mapevent.start_nearest_bandit_attack PlayerOne [excludedPartyId]
+    // coop.debug.mapevent.start_nearest_bandit_attack testclient 900
     /// <summary>
     /// Starts a server-authoritative bandit attack encounter against a connected player.
     /// </summary>
@@ -523,9 +526,18 @@ public class MapEventDebugCommands
             return "Run this command on the server.";
         }
 
-        if (args.Count < 1 || args.Count > 2)
+#if DEBUG
+        const int maximumArgumentCount = 3;
+        const string usage = "Usage: coop.debug.mapevent.start_nearest_bandit_attack " +
+                             "<controllerId> [targetTroopsPerParty] [excludedPartyId]";
+#else
+        const int maximumArgumentCount = 2;
+        const string usage = "Usage: coop.debug.mapevent.start_nearest_bandit_attack " +
+                             "<controllerId> [excludedPartyId]";
+#endif
+        if (args.Count < 1 || args.Count > maximumArgumentCount)
         {
-            return "Usage: coop.debug.mapevent.start_nearest_bandit_attack <controllerId> [excludedPartyId]";
+            return usage;
         }
 
         if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
@@ -533,36 +545,50 @@ public class MapEventDebugCommands
             return error;
         }
 
-        const int maximumFixtureTroops = 8;
-        var remainingFixtureTroops = maximumFixtureTroops;
-        var removedTroops = 0;
-        for (var index = playerParty.MemberRoster.Count - 1; index >= 0; index--)
+#if DEBUG
+        int? targetTroopsPerParty = null;
+#endif
+        string excludedPartyId = null;
+#if DEBUG
+        if (args.Count >= 2)
         {
-            var element = playerParty.MemberRoster.GetElementCopyAtIndex(index);
-            if (element.Character.IsHero)
-                continue;
-
-            var kept = Math.Min(element.Number, remainingFixtureTroops);
-            var removed = element.Number - kept;
-            if (removed > 0)
+            if (int.TryParse(args[1], out int parsedTarget))
             {
-                playerParty.MemberRoster.AddToCountsAtIndex(
-                    index,
-                    -removed,
-                    -Math.Min(element.WoundedNumber, removed),
-                    removeDepleted: false);
-                removedTroops += removed;
+                if (parsedTarget < 1
+                    || parsedTarget > LargeBattleRosterFixtureCommands.MaximumTargetTroopsPerParty)
+                {
+                    return $"Target troops per party must be from 1 to " +
+                           $"{LargeBattleRosterFixtureCommands.MaximumTargetTroopsPerParty}.";
+                }
+                targetTroopsPerParty = parsedTarget;
+                if (args.Count == 3)
+                    excludedPartyId = args[2];
             }
-            remainingFixtureTroops -= kept;
+            else
+            {
+                if (args.Count == 3)
+                {
+                    return usage;
+                }
+                excludedPartyId = args[1];
+            }
         }
-        playerParty.MemberRoster.RemoveZeroCounts();
+#else
+        if (args.Count == 2)
+            excludedPartyId = args[1];
+#endif
 
         if (playerParty.CurrentSettlement != null)
         {
+#if DEBUG
+            if (targetTroopsPerParty.HasValue)
+            {
+                return $"Player {args[0]} must be on the campaign map before an exact-roster battle starts.";
+            }
+#endif
             LeaveSettlementAction.ApplyForParty(playerParty);
         }
 
-        var excludedPartyId = args.Count == 2 ? args[1] : null;
         var playerPosition = playerParty.Position.ToVec2();
         var banditParty = MobileParty.All
             .Where(p => p.IsActive && p.IsBandit && p != playerParty
@@ -576,18 +602,104 @@ public class MapEventDebugCommands
             return "No active bandit/looter party found on the map.";
         }
 
-        StartBattleAction.Apply(banditParty.Party, playerParty.Party);
+        int removedTroops = 0;
+#if DEBUG
+        if (targetTroopsPerParty.HasValue)
+        {
+            if (!LargeBattleRosterFixtureCommands.TryBegin(
+                    playerParty,
+                    banditParty,
+                    targetTroopsPerParty.Value,
+                    out string fixtureResult))
+            {
+                return $"Unable to prepare exact battle rosters: {fixtureResult}";
+            }
+        }
+        else
+#endif
+        {
+            const int maximumFixtureTroops = 8;
+            int remainingFixtureTroops = maximumFixtureTroops;
+            for (int index = playerParty.MemberRoster.Count - 1; index >= 0; index--)
+            {
+                TroopRosterElement element = playerParty.MemberRoster.GetElementCopyAtIndex(index);
+                if (element.Character.IsHero)
+                    continue;
 
-        var partyId = objectManager.TryGetId(banditParty, out string registryId)
-            ? registryId
-            : banditParty.StringId;
-        var partyBaseId = objectManager.TryGetId(banditParty.Party, out string partyBaseRegistryId)
-            ? partyBaseRegistryId
+                int kept = Math.Min(element.Number, remainingFixtureTroops);
+                int removed = element.Number - kept;
+                if (removed > 0)
+                {
+                    playerParty.MemberRoster.AddToCountsAtIndex(
+                        index,
+                        -removed,
+                        -Math.Min(element.WoundedNumber, removed),
+                        removeDepleted: false);
+                    removedTroops += removed;
+                }
+                remainingFixtureTroops -= kept;
+            }
+            playerParty.MemberRoster.RemoveZeroCounts();
+        }
+
+        try
+        {
+            StartBattleAction.Apply(banditParty.Party, playerParty.Party);
+        }
+        catch (Exception exception)
+        {
+            string cleanup = "Legacy roster changes remain applied.";
+#if DEBUG
+            if (targetTroopsPerParty.HasValue)
+                cleanup = LargeBattleRosterFixtureCommands.AbortActiveFixture();
+#endif
+            return $"Bandit attack setup failed: {exception.Message}\n{cleanup}";
+        }
+
+        MapEvent mapEvent = playerParty.MapEvent;
+        if (mapEvent == null || banditParty.MapEvent != mapEvent)
+        {
+            string cleanup = "Legacy roster changes remain applied.";
+#if DEBUG
+            if (targetTroopsPerParty.HasValue)
+                cleanup = LargeBattleRosterFixtureCommands.AbortActiveFixture();
+#endif
+            return "Bandit attack setup did not create a shared map event.\n" + cleanup;
+        }
+        if (!objectManager.TryGetId(mapEvent, out string mapEventId))
+        {
+            string cleanup = "Legacy roster changes remain applied.";
+#if DEBUG
+            if (targetTroopsPerParty.HasValue)
+                cleanup = LargeBattleRosterFixtureCommands.AbortActiveFixture();
+#endif
+            return "Bandit attack map event was not registered.\n" + cleanup;
+        }
+
+        string playerMobilePartyId = objectManager.TryGetId(playerParty, out string resolvedPlayerMobilePartyId)
+            ? resolvedPlayerMobilePartyId
+            : playerParty.StringId;
+        string playerPartyId = objectManager.TryGetId(playerParty.Party, out string resolvedPlayerPartyId)
+            ? resolvedPlayerPartyId
             : "<unregistered>";
+        string banditMobilePartyId = objectManager.TryGetId(banditParty, out string resolvedBanditMobilePartyId)
+            ? resolvedBanditMobilePartyId
+            : banditParty.StringId;
+        string banditPartyId = objectManager.TryGetId(banditParty.Party, out string resolvedBanditPartyId)
+            ? resolvedBanditPartyId
+            : "<unregistered>";
+        string target = "legacy";
+#if DEBUG
+        if (targetTroopsPerParty.HasValue)
+            target = targetTroopsPerParty.Value.ToString();
+#endif
 
-        return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, " +
-               $"registry id {partyId}, PartyBase id {partyBaseId}) " +
-               $"against player {args[0]} after removing {removedTroops} excess fixture troops.";
+        return $"BANDIT_ATTACK_STARTED controller={args[0]} mapEvent={mapEventId} " +
+               $"playerMobileParty={playerMobilePartyId} playerParty={playerPartyId} " +
+               $"banditMobileParty={banditMobilePartyId} banditParty={banditPartyId} " +
+               $"playerTroops={playerParty.MemberRoster.TotalManCount} " +
+               $"banditTroops={banditParty.MemberRoster.TotalManCount} " +
+               $"targetPerParty={target} removedLegacyTroops={removedTroops}";
     }
 
     [CommandLineArgumentFunction("finish_non_battle_encounter", "coop.debug.mapevent")]

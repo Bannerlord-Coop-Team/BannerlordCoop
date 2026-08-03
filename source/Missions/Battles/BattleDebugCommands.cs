@@ -4,6 +4,7 @@ using GameInterface.Services.MapEvents;
 using Missions.Agents.Packets;
 #if DEBUG
 using Missions.Diagnostics;
+using System.Diagnostics;
 #endif
 using System;
 using System.Collections.Generic;
@@ -99,6 +100,82 @@ internal static class BattleDebugCommands
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
     private static bool wieldTestActive;
+
+    [CommandLineArgumentFunction("cpu_snapshot", "coop.debug.battle")]
+    public static string CpuSnapshot(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.cpu_snapshot";
+
+        Mission mission = Mission.Current;
+        CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
+        Agent[] activeAgents = mission == null
+            ? Array.Empty<Agent>()
+            : mission.Agents.Where(agent => agent.IsActive()).ToArray();
+        bool registryAvailable = ContainerProvider.TryResolve<INetworkAgentRegistry>(
+            out var registry);
+        CoopAgentInfo[] registeredAgents = registryAvailable
+            ? registry.GetControllerIds()
+                .SelectMany(registry.GetAgents)
+                .GroupBy(info => info.AgentId)
+                .Select(group => group.First())
+                .ToArray()
+            : Array.Empty<CoopAgentInfo>();
+        CoopAgentInfo[] registeredActiveAgents = registeredAgents
+            .Where(info => info.Agent != null
+                && info.Agent.Mission == mission
+                && info.Agent.IsActive())
+            .ToArray();
+        int registeredLocalActive = registeredActiveAgents.Count(
+            info => registryAvailable && registry.IsLocallyControlled(info.AgentId));
+        int registeredRemoteActive = registeredActiveAgents.Length - registeredLocalActive;
+        int registeredHumansActive = registeredActiveAgents.Count(info => info.Agent.IsHuman);
+        int registeredMountsActive = registeredActiveAgents.Count(info => info.Agent.IsMount);
+        bool deploymentReady = mission?
+            .GetMissionBehavior<DeploymentMissionController>()
+            ?.TeamSetupOver == true;
+        var result = mission?.MissionResult;
+
+        int processId;
+        double processCpuMilliseconds;
+        long workingSetMiB;
+        long privateMemoryMiB;
+        int threadCount;
+        using (Process process = Process.GetCurrentProcess())
+        {
+            processId = process.Id;
+            processCpuMilliseconds = process.TotalProcessorTime.TotalMilliseconds;
+            workingSetMiB = process.WorkingSet64 / (1024L * 1024L);
+            privateMemoryMiB = process.PrivateMemorySize64 / (1024L * 1024L);
+            threadCount = process.Threads.Count;
+        }
+
+        return $"CPU_SNAPSHOT pid={processId} " +
+               $"fps={Utilities.GetFps().ToString("0.00", CultureInfo.InvariantCulture)} " +
+               $"mainFps={Utilities.GetMainFps().ToString("0.00", CultureInfo.InvariantCulture)} " +
+               $"rendererFps={Utilities.GetRendererFps().ToString("0.00", CultureInfo.InvariantCulture)} " +
+               $"activeAgents={activeAgents.Length} " +
+               $"activeHumans={activeAgents.Count(agent => agent.IsHuman)} " +
+               $"activeMounts={activeAgents.Count(agent => agent.IsMount)} " +
+               $"registryAvailable={registryAvailable} " +
+               $"registeredAgents={registeredAgents.Length} " +
+               $"registeredActive={registeredActiveAgents.Length} " +
+               $"registeredHumansActive={registeredHumansActive} " +
+               $"registeredMountsActive={registeredMountsActive} " +
+               $"registeredLocalActive={registeredLocalActive} " +
+               $"registeredRemoteActive={registeredRemoteActive} " +
+               $"processCpuMs={processCpuMilliseconds.ToString("0", CultureInfo.InvariantCulture)} " +
+               $"workingSetMiB={workingSetMiB} privateMemoryMiB={privateMemoryMiB} threads={threadCount} " +
+               $"battleActive={controller != null} " +
+               $"instance={controller?.Session.InstanceId ?? "none"} " +
+               $"own={controller?.Session.OwnControllerId ?? "none"} " +
+               $"host={controller?.Session.IsLocalHost ?? false} " +
+               $"activated={controller?.Deployment.IsActivated ?? false} " +
+               $"committed={controller?.Deployment.IsCommitted ?? false} " +
+               $"deploymentReady={deploymentReady} " +
+               $"resultState={result?.BattleState.ToString() ?? "None"} " +
+               $"battleResolved={result?.BattleResolved ?? false}";
+    }
 
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)

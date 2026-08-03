@@ -9,6 +9,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -17,6 +18,7 @@ namespace GameInterface.Services.Party.Commands;
 
 internal static class LargeBattleRosterFixtureCommands
 {
+    internal const int MaximumTargetTroopsPerParty = 2000;
     private const string FixtureTroopId = "imperial_recruit";
     private static LargeBattleRosterFixture fixture;
 
@@ -41,15 +43,13 @@ internal static class LargeBattleRosterFixtureCommands
         if (!ModInformation.IsServer)
             return "Run this command on the server.";
         if (args.Count != 3
-            || !int.TryParse(args[2], out int addedPerParty)
-            || addedPerParty < 1
-            || addedPerParty > 500)
+            || !int.TryParse(args[2], out int targetTroopsPerParty)
+            || targetTroopsPerParty < 1
+            || targetTroopsPerParty > MaximumTargetTroopsPerParty)
         {
             return "Usage: coop.debug.mobileparty.large_battle_roster_begin " +
-                   "<firstPartyId> <secondPartyId> <troopsPerParty:1-500>";
+                   $"<firstPartyId> <secondPartyId> <targetTroopsPerParty:1-{MaximumTargetTroopsPerParty}>";
         }
-        if (fixture != null)
-            return "A large-battle roster fixture is already pending restoration.";
         if (!TryGetObjectManager(out IObjectManager objectManager))
             return "Unable to resolve ObjectManager.";
         if (!TryResolveParty(
@@ -68,13 +68,69 @@ internal static class LargeBattleRosterFixtureCommands
         {
             return secondError;
         }
+
+        TryBegin(
+            firstParty,
+            secondParty,
+            targetTroopsPerParty,
+            out string result);
+        return result;
+    }
+
+    internal static bool TryBegin(
+        MobileParty firstParty,
+        MobileParty secondParty,
+        int targetTroopsPerParty,
+        out string result)
+    {
+        if (!ModInformation.IsServer)
+        {
+            result = "Run this command on the server.";
+            return false;
+        }
+        if (targetTroopsPerParty < 1
+            || targetTroopsPerParty > MaximumTargetTroopsPerParty)
+        {
+            result =
+                $"Target troops per party must be from 1 to {MaximumTargetTroopsPerParty}.";
+            return false;
+        }
+        if (fixture != null)
+        {
+            result = "A large-battle roster fixture is already pending restoration.";
+            return false;
+        }
+        if (firstParty == null || secondParty == null)
+        {
+            result = "The fixture requires two available parties.";
+            return false;
+        }
         if (firstParty == secondParty)
-            return "The fixture requires two distinct parties.";
+        {
+            result = "The fixture requires two distinct parties.";
+            return false;
+        }
+        int firstTotal = firstParty.MemberRoster.TotalManCount;
+        int secondTotal = secondParty.MemberRoster.TotalManCount;
+        if (firstTotal > targetTroopsPerParty
+            || secondTotal > targetTroopsPerParty)
+        {
+            result =
+                $"Both parties must have at most {targetTroopsPerParty} troops before the fixture starts. " +
+                $"Actual totals: {firstParty.StringId}={firstTotal}, {secondParty.StringId}={secondTotal}.";
+            return false;
+        }
+        if (!TryGetObjectManager(out IObjectManager objectManager))
+        {
+            result = "Unable to resolve ObjectManager.";
+            return false;
+        }
         if (!objectManager.TryGetObject(
                 FixtureTroopId,
                 out CharacterObject fixtureTroop))
         {
-            return $"Unable to resolve fixture troop {FixtureTroopId}.";
+            result = $"Unable to resolve fixture troop {FixtureTroopId}.";
+            return false;
         }
 
         var activeFixture = new LargeBattleRosterFixture
@@ -85,16 +141,38 @@ internal static class LargeBattleRosterFixtureCommands
         };
         fixture = activeFixture;
 
-        firstParty.MemberRoster.AddToCounts(
-            fixtureTroop,
-            addedPerParty);
-        secondParty.MemberRoster.AddToCounts(
-            fixtureTroop,
-            addedPerParty);
+        try
+        {
+            int firstAdded = targetTroopsPerParty - firstTotal;
+            int secondAdded = targetTroopsPerParty - secondTotal;
+            if (firstAdded > 0)
+                firstParty.MemberRoster.AddToCounts(fixtureTroop, firstAdded);
+            if (secondAdded > 0)
+                secondParty.MemberRoster.AddToCounts(fixtureTroop, secondAdded);
+        }
+        catch (Exception exception)
+        {
+            try
+            {
+                Restore(activeFixture.FirstParty);
+                Restore(activeFixture.SecondParty);
+                fixture = null;
+                result = $"Large-battle roster fixture setup failed and was restored: {exception.Message}";
+            }
+            catch (Exception restoreException)
+            {
+                result =
+                    $"Large-battle roster fixture setup failed: {exception.Message}. " +
+                    $"Automatic restoration also failed: {restoreException.Message}. Run the abort command.";
+            }
+            return false;
+        }
 
-        return
-            $"LARGE_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} addedPerParty={addedPerParty}\n" +
+        result =
+            $"LARGE_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} " +
+            $"targetPerParty={targetTroopsPerParty}\n" +
             FormatState("active", firstParty, secondParty);
+        return true;
     }
 
     [CommandLineArgumentFunction("large_battle_roster_status", "coop.debug.mobileparty")]
@@ -139,6 +217,47 @@ internal static class LargeBattleRosterFixtureCommands
             return "Run this command on the server.";
         if (args.Count != 0)
             return "Usage: coop.debug.mobileparty.large_battle_roster_restore";
+        return RestoreActiveFixture();
+    }
+
+    [CommandLineArgumentFunction("large_battle_roster_abort", "coop.debug.mobileparty")]
+    public static string Abort(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mobileparty.large_battle_roster_abort";
+        return AbortActiveFixture();
+    }
+
+    internal static string AbortActiveFixture()
+    {
+        if (fixture == null)
+            return "No large-battle roster fixture is pending restoration.";
+
+        MobileParty firstParty = fixture.FirstParty.Party;
+        MobileParty secondParty = fixture.SecondParty.Party;
+        MapEvent mapEvent = firstParty?.MapEvent;
+        bool finalizedMapEvent = mapEvent != null
+            && mapEvent == secondParty?.MapEvent
+            && !mapEvent.IsFinalized;
+        string restoration;
+        try
+        {
+            if (finalizedMapEvent)
+                mapEvent.FinalizeEvent();
+        }
+        finally
+        {
+            restoration = RestoreActiveFixture();
+        }
+
+        return $"LARGE_BATTLE_ROSTER_FIXTURE_ABORTED finalizedMapEvent={finalizedMapEvent}\n" +
+               restoration;
+    }
+
+    internal static string RestoreActiveFixture()
+    {
         if (fixture == null)
             return "No large-battle roster fixture is pending restoration.";
 
@@ -155,7 +274,6 @@ internal static class LargeBattleRosterFixtureCommands
                 activeFixture.FirstParty,
                 out string firstError))
         {
-            fixture = null;
             return firstError;
         }
         if (!TryResolveSnapshotParty(
@@ -163,7 +281,6 @@ internal static class LargeBattleRosterFixtureCommands
                 activeFixture.SecondParty,
                 out string secondError))
         {
-            fixture = null;
             return secondError;
         }
 
