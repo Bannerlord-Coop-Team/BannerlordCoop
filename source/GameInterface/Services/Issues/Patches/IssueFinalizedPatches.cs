@@ -30,11 +30,17 @@ internal class IssueManagerQuestCompletedReasonCapture
     // Runs for both a genuine quest completion and a mirrored replay of one (VillageNeedsToolsIssueInterface.
     // FinalizeMirror calls the real QuestBase.CompleteQuestWithXxx under AllowedThread) - harmless either way,
     // since a replay's own IssueFinalized postfix below no-ops on CallOriginalPolicy.IsOriginalAllowed().
+    //
+    // Widened (was hardcoded to VillageNeedsToolsIssueQuest only) to also recognize
+    // VillageNeedsCraftingMaterialsIssueQuest - this is a shared single choke point (one PendingReasons
+    // dictionary) feeding any allowlisted quest type's mirroring handler, not something to duplicate per type.
     [HarmonyPatch(nameof(IssueManager.OnQuestCompleted))]
     [HarmonyPrefix]
     private static void Prefix(QuestBase quest, QuestBase.QuestCompleteDetails detail)
     {
-        if (quest is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest || quest.QuestGiver == null) return;
+        if (quest is not (VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest or
+            VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest)) return;
+        if (quest.QuestGiver == null) return;
 
         PendingReasons[quest.QuestGiver] = detail switch
         {
@@ -91,7 +97,12 @@ internal class IssueFinalizedPatches
         // Skip a mirrored replay (Interfaces.VillageNeedsToolsIssueInterface.FinalizeMirror runs under
         // AllowedThread) so applying a received broadcast never re-triggers another broadcast.
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-        if (__instance is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue) return;
+        // Widened (was hardcoded to VillageNeedsToolsIssue only) to also recognize
+        // VillageNeedsCraftingMaterialsIssue - this is the shared single choke point every allowlisted issue
+        // type's finalize broadcast funnels through (see VillageNeedsCraftingMaterialsIssueHandler's doc
+        // comment for why that handler deliberately does NOT add its own parallel subscription here).
+        if (__instance is not (VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue or
+            VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue)) return;
 
         MessageBroker.Instance.Publish(__instance, new VillageIssueFinalizedTriggered(owner, reason));
     }
