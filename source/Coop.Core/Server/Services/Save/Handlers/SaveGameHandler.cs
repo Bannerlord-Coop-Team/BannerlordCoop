@@ -6,11 +6,14 @@ using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Save.Messages;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
 
@@ -26,6 +29,7 @@ internal class SaveGameHandler : IHandler
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IPlayerManager playerRegistry;
     private readonly INetwork network;
+    private readonly IObjectManager objectManager;
     private readonly HashSet<object> activeSaveSources = new HashSet<object>();
 
     public SaveGameHandler(
@@ -33,13 +37,15 @@ internal class SaveGameHandler : IHandler
         ICoopSaveManager saveManager,
         ICoopSessionProvider coopSessionProvider,
         IPlayerManager playerRegistry,
-        INetwork network)
+        INetwork network,
+        IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.saveManager = saveManager;
         this.coopSessionProvider = coopSessionProvider;
         this.playerRegistry = playerRegistry;
         this.network = network;
+        this.objectManager = objectManager;
 
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
@@ -123,12 +129,8 @@ internal class SaveGameHandler : IHandler
         // there is no previous session (and no players) to restore.
         if (savedSession?.Players == null) return;
 
-        foreach (var player in savedSession.Players)
+        foreach (var player in SelectOneRegistrationPerController(savedSession.Players))
         {
-            // A save written before controller ids were made unique can carry two entries for one
-            // controller; AddPlayer keeps the first. The owner heals the leftover by joining — a
-            // registration naming a missing hero is dropped in ResolveCharacterState — but say so,
-            // because a silently skipped registration is exactly what made this hard to diagnose.
             if (!playerRegistry.AddPlayer(player))
                 Logger.Warning(
                     "Skipped saved registration for controller {ControllerId} (hero {HeroId}): " +
@@ -136,4 +138,41 @@ internal class SaveGameHandler : IHandler
                     player?.ControllerId, player?.HeroId);
         }
     }
+
+    /// <summary>
+    /// Picks the single registration to restore per controller. A save written before controller
+    /// ids were unique can carry more than one, in either order, so keep the one whose hero still
+    /// exists rather than the one that happens to come first: the campaign decides which
+    /// registration is real. Keeping the first would as often keep the dead one, which leaves the
+    /// live hero unregistered and sends its owner off to build yet another character.
+    /// </summary>
+    private IEnumerable<Player> SelectOneRegistrationPerController(IEnumerable<Player> players)
+    {
+        // AllGameObjectsRegistered means the campaign's objects are resolvable, so a hero lookup
+        // here is authoritative about which registration still has something behind it.
+        foreach (var group in players.Where(player => player != null).GroupBy(player => player.ControllerId))
+        {
+            var registrations = group.ToArray();
+            if (registrations.Length == 1)
+            {
+                yield return registrations[0];
+                continue;
+            }
+
+            var live = registrations.FirstOrDefault(HeroExists) ?? registrations[0];
+
+            Logger.Warning(
+                "Save carries {Count} registrations for controller {ControllerId} (heroes {HeroIds}); " +
+                "restoring {KeptHeroId} and dropping the rest",
+                registrations.Length,
+                group.Key,
+                string.Join(", ", registrations.Select(registration => registration.HeroId)),
+                live.HeroId);
+
+            yield return live;
+        }
+    }
+
+    private bool HeroExists(Player player) =>
+        !string.IsNullOrEmpty(player.HeroId) && objectManager.TryGetObject<Hero>(player.HeroId, out _);
 }
