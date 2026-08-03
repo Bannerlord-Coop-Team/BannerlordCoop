@@ -15,7 +15,9 @@ namespace GameInterface.Services.Issues.Patches;
 /// comment for the full derivation), consolidated into ONE shared patch/HourlyTick-scan pair covering every
 /// NEW issue type that has <c>IsThereAlternativeSolution == true</c>: <c>LordNeedsHorsesIssue</c>,
 /// <c>CapturedByBountyHuntersIssue</c>, <c>LandlordTrainingForRetainersIssue</c>,
-/// <c>GangLeaderNeedsRecruitsIssue</c> - all four need the identical fix (gate the real
+/// <c>GangLeaderNeedsRecruitsIssue</c>, and (Tier 1 Group 1B) <c>LandLordNeedsManualLaborersIssue</c>,
+/// <c>HeadmanVillageNeedsDraughtAnimalsIssue</c>, <c>LordNeedsGarrisonTroopsIssue</c> - all seven need the
+/// identical fix (gate the real
 /// <c>CompleteIssueWithAlternativeSolution</c> consequence to the recorded owner only, plus an
 /// unconditional, ownership-self-limiting <c>HourlyTickEvent</c> listener so the machine that actually needs
 /// to trigger it - very often a remote client, not the server - has a reason to). Written once here instead
@@ -57,6 +59,22 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     [HarmonyPatch(typeof(GangLeaderNeedsRecruitsIssueBehavior), nameof(GangLeaderNeedsRecruitsIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void GangLeaderNeedsRecruitsRegisterEventsPostfix(GangLeaderNeedsRecruitsIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    // Tier 1 Group 1B additions - same shared choke point, no new per-type file needed.
+    [HarmonyPatch(typeof(LandLordNeedsManualLaborersIssueBehavior), nameof(LandLordNeedsManualLaborersIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void LandLordNeedsManualLaborersRegisterEventsPostfix(LandLordNeedsManualLaborersIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    [HarmonyPatch(typeof(HeadmanVillageNeedsDraughtAnimalsIssueBehavior), nameof(HeadmanVillageNeedsDraughtAnimalsIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void HeadmanVillageNeedsDraughtAnimalsRegisterEventsPostfix(HeadmanVillageNeedsDraughtAnimalsIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    [HarmonyPatch(typeof(LordNeedsGarrisonTroopsIssueQuestBehavior), nameof(LordNeedsGarrisonTroopsIssueQuestBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void LordNeedsGarrisonTroopsRegisterEventsPostfix(LordNeedsGarrisonTroopsIssueQuestBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
     private static void OnHourlyTick()

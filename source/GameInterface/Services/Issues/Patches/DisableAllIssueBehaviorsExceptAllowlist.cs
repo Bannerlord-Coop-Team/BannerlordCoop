@@ -65,6 +65,12 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         typeof(GangLeaderNeedsRecruitsIssueBehavior),
         typeof(LadysKnightOutIssueBehavior),
         typeof(ScoutEnemyGarrisonsIssueBehavior),
+        // Tier 1 Group 1B
+        typeof(LandLordNeedsManualLaborersIssueBehavior),
+        typeof(HeadmanVillageNeedsDraughtAnimalsIssueBehavior),
+        typeof(BettingFraudIssueBehavior),
+        typeof(GangLeaderNeedsSpecialWeaponsIssueBehavior),
+        typeof(LordNeedsGarrisonTroopsIssueQuestBehavior),
     };
 
     /// <summary>

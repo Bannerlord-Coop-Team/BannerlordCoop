@@ -46,6 +46,15 @@ internal static class GenericAcceptMirrorIssueTypes
         typeof(CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue),
         typeof(LandlordTrainingForRetainersIssueBehavior.LandlordTrainingForRetainersIssue),
         typeof(GangLeaderNeedsRecruitsIssueBehavior.GangLeaderNeedsRecruitsIssue),
+        // Tier 1 Group 1B additions - all three have IsThereAlternativeSolution == true and need no
+        // additional per-client-divergent field beyond what MirrorAlternativeAccepted already forces.
+        // LordNeedsGarrisonTroopsIssue has AlternativeSolutionScaleFlag.FailureRisk (like
+        // CapturedByBountyHuntersIssue above) - see NewIssueTypesAlternativeSolutionCompletionPatches'
+        // TryTriggerOwnedAlternativeSolutionCompletion doc comment for why that's still safe to route through
+        // this same generic trigger.
+        typeof(LandLordNeedsManualLaborersIssueBehavior.LandLordNeedsManualLaborersIssue),
+        typeof(HeadmanVillageNeedsDraughtAnimalsIssueBehavior.HeadmanVillageNeedsDraughtAnimalsIssue),
+        typeof(LordNeedsGarrisonTroopsIssueQuestBehavior.LordNeedsGarrisonTroopsIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>

@@ -19,9 +19,13 @@ namespace GameInterface.Services.Issues.Interfaces;
 /// of issue type), so without this, a client would simply never receive one of these issues at all.
 ///
 /// Types NOT in this registry (<c>VillageNeedsToolsIssue</c>, <c>VillageNeedsCraftingMaterialsIssue</c>,
-/// <c>LordNeedsHorsesIssue</c>, <c>CapturedByBountyHuntersIssue</c>, <c>ScoutEnemyGarrissonsIssue</c>) roll or
-/// reference at least one field at creation time that genuinely needs capturing+forcing, so they keep their
-/// own bespoke Interface/Messages/Patches/Handler file set instead.
+/// <c>LordNeedsHorsesIssue</c>, <c>CapturedByBountyHuntersIssue</c>, <c>ScoutEnemyGarrissonsIssue</c>,
+/// <c>HeadmanVillageNeedsDraughtAnimalsIssue</c>, <c>LordNeedsGarrisonTroopsIssue</c>) roll or reference at
+/// least one field at creation time that genuinely needs capturing+forcing, so they keep their own bespoke
+/// Interface/Messages/Patches/Handler file set instead. <c>LandLordNeedsManualLaborersIssue</c>/
+/// <c>BettingFraudIssue</c>/<c>GangLeaderNeedsSpecialWeaponsIssue</c> ARE registered here for CREATION (their
+/// Issue ctor rolls nothing) but still keep their own bespoke ACCEPT-time capture files - see each type's own
+/// Interfaces/*IssueInterface.cs doc comment.
 /// </summary>
 internal static class SimpleIssueFactoryRegistry
 {
@@ -63,6 +67,25 @@ internal static class SimpleIssueFactoryRegistry
             typeof(LadysKnightOutIssueBehavior.LadysKnightOutIssue),
             owner => new LadysKnightOutIssueBehavior.LadysKnightOutIssue(owner),
             IssueBase.IssueFrequency.Common),
+        // Tier 1 Group 1B: LandLordNeedsManualLaborersIssue/BettingFraudIssue/GangLeaderNeedsSpecialWeaponsIssue
+        // all have a plain (Hero) Issue ctor that rolls nothing - each of their real per-client-divergent rolls
+        // happens later, at ACCEPT time inside GenerateIssueQuest (see each type's own bespoke
+        // Interfaces/*IssueInterface.cs for the accept-time capture that actually matters).
+        [typeof(LandLordNeedsManualLaborersIssueBehavior.LandLordNeedsManualLaborersIssue)] = new Entry(
+            "LandLordNeedsManualLaborers",
+            typeof(LandLordNeedsManualLaborersIssueBehavior.LandLordNeedsManualLaborersIssue),
+            owner => new LandLordNeedsManualLaborersIssueBehavior.LandLordNeedsManualLaborersIssue(owner),
+            IssueBase.IssueFrequency.VeryCommon),
+        [typeof(BettingFraudIssueBehavior.BettingFraudIssue)] = new Entry(
+            "BettingFraud",
+            typeof(BettingFraudIssueBehavior.BettingFraudIssue),
+            owner => new BettingFraudIssueBehavior.BettingFraudIssue(owner),
+            IssueBase.IssueFrequency.Rare),
+        [typeof(GangLeaderNeedsSpecialWeaponsIssueBehavior.GangLeaderNeedsSpecialWeaponsIssue)] = new Entry(
+            "GangLeaderNeedsSpecialWeapons",
+            typeof(GangLeaderNeedsSpecialWeaponsIssueBehavior.GangLeaderNeedsSpecialWeaponsIssue),
+            owner => new GangLeaderNeedsSpecialWeaponsIssueBehavior.GangLeaderNeedsSpecialWeaponsIssue(owner),
+            IssueBase.IssueFrequency.VeryCommon),
     };
 
     private static readonly Dictionary<string, Entry> ByKey = BuildByKey();
