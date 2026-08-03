@@ -458,8 +458,23 @@ internal sealed partial class LordBarterHandler : IHandler
         playerParty = mobileParty.Party;
         targetParty = targetHero.PartyBelongedTo?.Party;
 
-        var context = (PeaceConversationContext)request.Context;
-        if (context == PeaceConversationContext.MapParty)
+        var conversationContext = (PeaceConversationContext)request.Context;
+        if (conversationContext == PeaceConversationContext.Settlement)
+        {
+            // A settlement-menu conversation acquires no engagement - there is no agent and no
+            // location mission to lock - so authority comes from co-location instead: both the
+            // requesting party and the target must actually be inside the settlement named by the
+            // request. That is as strong as the hold for this case, because a player who is not in
+            // the settlement cannot be talking to someone who is.
+            if (!objectManager.TryGetObject(request.ContextId, out Settlement conversationSettlement) ||
+                mobileParty.CurrentSettlement != conversationSettlement ||
+                targetHero.CurrentSettlement != conversationSettlement)
+            {
+                reason = "The lord settlement conversation is no longer active.";
+                return false;
+            }
+        }
+        else if (conversationContext == PeaceConversationContext.MapParty)
         {
             if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty) ||
                 requestedParty != targetParty ||
@@ -475,7 +490,7 @@ internal sealed partial class LordBarterHandler : IHandler
                 return false;
             }
         }
-        else if (context == PeaceConversationContext.Location)
+        else if (conversationContext == PeaceConversationContext.Location)
         {
             if (targetHero.CharacterObject == null ||
                 !objectManager.TryGetId(targetHero.CharacterObject, out var characterId) ||
@@ -488,13 +503,10 @@ internal sealed partial class LordBarterHandler : IHandler
         }
         else
         {
-            if (!objectManager.TryGetObject(request.ContextId, out Settlement settlement) ||
-                mobileParty.CurrentSettlement != settlement ||
-                targetHero.CurrentSettlement != settlement)
-            {
-                reason = "The lord settlement conversation is no longer active.";
-                return false;
-            }
+            // Refused rather than validated as a settlement conversation - accepting a context we do
+            // not understand is how an unvalidated barter gets through.
+            reason = "The lord conversation context is not supported.";
+            return false;
         }
 
         if (targetHero.IsPrisoner || targetHero.Clan == null)
