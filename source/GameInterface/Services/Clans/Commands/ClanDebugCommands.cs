@@ -152,7 +152,20 @@ namespace GameInterface.Services.GameDebug.Commands
                 return $"Argument2: Kingdom not found by ID: {kingdomId}";
             }
 
+            if (!ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState))
+                return $"Unable to get {nameof(IKingdomMembershipState)}";
+
+            Kingdom previousKingdom = clan.Kingdom;
             ChangeKingdomAction.ApplyByJoinToKingdom(clan, newKingdom);
+
+            // Same reason as join_kingdom/leave_kingdom: the vanilla action alone does not
+            // replicate the kingdom's own clan/fief collections to clients.
+            kingdomMembershipState.MoveClanToKingdom(
+                previousKingdom,
+                newKingdom,
+                clan,
+                publishCollectionChanges: true,
+                republishExistingCollections: true);
 
             return clan.Name.ToString() + " has join the kingdom : " + newKingdom.Name.ToString();
         }
@@ -366,7 +379,20 @@ namespace GameInterface.Services.GameDebug.Commands
             if (objectManager.TryGetObject<Kingdom>(args[1], out var kingdom) == false)
                 return $"Unable to get Kingdom with {args[1]}";
 
+            if (ContainerProvider.TryResolve<IKingdomMembershipState>(out var kingdomMembershipState) == false)
+                return $"Unable to get {nameof(IKingdomMembershipState)}";
+
+            Kingdom previousKingdom = clan.Kingdom;
             ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom);
+
+            // Mirrors leave_kingdom: the vanilla action alone leaves clients with a clan that
+            // claims the kingdom while the kingdom's own roster still omits it.
+            kingdomMembershipState.MoveClanToKingdom(
+                previousKingdom,
+                kingdom,
+                clan,
+                publishCollectionChanges: true,
+                republishExistingCollections: true);
 
             return $"{clan.Name} joined {kingdom.Name}";
         }
