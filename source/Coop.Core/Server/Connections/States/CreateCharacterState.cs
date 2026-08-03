@@ -72,7 +72,18 @@ public class CreateCharacterState : ConnectionStateBase
         }
 
         if (!playerManager.AddPlayer(player))
-            Logger.Error("Player has been already added.");
+        {
+            // The controller already holds a registration — two joins for it raced into character
+            // creation before either finished. Everything below assumes this peer owns the player
+            // it just created, so continuing would bind the peer to the *other* registration and
+            // announce this refused one to the joiner and every other client. Drop the connection
+            // instead, exactly as a failed create does above.
+            Logger.Error(
+                "Controller {ControllerId} is already registered; disconnecting the joining peer",
+                controllerId);
+            ConnectionLogic.Peer.Disconnect();
+            return;
+        }
 
         // First join: associate this peer with the player it just created.
         playerManager.SetPeer(controllerId, netPeer);
