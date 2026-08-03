@@ -87,8 +87,18 @@ internal sealed partial class LordBarterHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestLordBarter>(HandleRequest);
         messageBroker.Unsubscribe<NetworkLordBarterResult>(HandleResult);
         messageBroker.Unsubscribe<PlayerDisconnected>(HandlePlayerDisconnected);
-        authorizations.Clear();
-        completedResults.Clear();
+
+        // Every other access to these dictionaries happens on the game thread (handlers are drained
+        // there), so clearing them from the disposing thread is a data race. Marshal, as
+        // ConversationPartyTracker.Dispose does.
+        GameThread.RunSafe(() =>
+        {
+            authorizations.Clear();
+            completedResults.Clear();
+        },
+            blocking: true,
+            context: nameof(LordBarterHandler));
+
         LordBarterPatch.ClearPendingRequest();
     }
 
@@ -215,12 +225,37 @@ internal sealed partial class LordBarterHandler : IHandler
 
             if (offerValue < -0.01f)
             {
-                Reject(peer, request, playerHero.Gold, "The lord will not accept this offer.");
+                // The client's barter UI auto-balances the offer to land the total at exactly the
+                // acceptance boundary (BarterVM.AutoBalanceAdd, fulfillRatio 1f), so it always shows
+                // the deal as acceptable at the minimum price. Both sides then run the SAME test
+                // (GetOfferValueForFaction vs targetHero.Clan, threshold -0.01f) - but any drift in
+                // the inputs it reads, above all Kingdom._clans / Kingdom._fiefsCache, moves the
+                // result. Those feed a quadratic term in DefaultDiplomacyModel
+                // (10000 - 100 * sum(WarPartyLimit)^2), so a roster difference of a couple of clans
+                // is worth hundreds of thousands of denars - and a one-denar gap at the boundary
+                // flips accept into reject.
+                //
+                // Log the number so this is diagnosable, and tell the player the shortfall instead of
+                // a flat refusal they have no way to act on.
+                LogOfferValueBreakdown(playerHero, targetHero, targetKingdom, barter, offerValue);
+
+                var shortfall = (int)Math.Ceiling(-offerValue);
+                Reject(
+                    peer,
+                    request,
+                    playerHero.Gold,
+                    $"The lord will not accept this offer - it is short by about {shortfall} denars. Offer more than the suggested amount.");
                 return;
             }
 
             authorizations.Remove(peer);
             mutationStarted = true;
+
+            // Captured before Apply(), which is what moves the clan out of targetHero's reach.
+            var joinTargetClan = (LordBarterKind)request.Kind == LordBarterKind.JoinKingdomAsClan
+                ? targetHero.Clan
+                : null;
+
             var offered = barter.GetOfferedBarterables();
             foreach (var barterable in offered)
             {
@@ -231,14 +266,28 @@ internal sealed partial class LordBarterHandler : IHandler
                 }
             }
 
-            if (kind == LordBarterKind.JoinKingdomAsClan)
+            // Clan._kingdom is AutoSynced, but the Kingdom._clans / fief collections are not reliably
+            // intercepted, so clients would otherwise see the clan claim the kingdom while the
+            // kingdom's own roster still omitted it. The clan and its previous kingdom are captured
+            // BEFORE Apply() above, which is what moves the clan out of targetHero's reach.
+            if (joinTargetClan != null)
             {
                 kingdomMembershipState.MoveClanToKingdom(
                     previousTargetKingdom,
                     targetKingdom,
-                    targetHero.Clan,
+                    joinTargetClan,
                     publishCollectionChanges: true,
                     republishExistingCollections: true);
+
+                if (targetKingdom != null && !targetKingdom.Clans.Contains(joinTargetClan))
+                {
+                    Logger.Error(
+                        "Lord defection did not add clan {Clan} to kingdom {Kingdom} collections",
+                        joinTargetClan.StringId,
+                        targetKingdom.StringId);
+                }
+
+                ApplyDefectionPersuasionXp(playerHero, request.PersuasionOutcomes);
             }
 
             if (isSafePassage)
@@ -255,6 +304,7 @@ internal sealed partial class LordBarterHandler : IHandler
 
             FlushGold(playerHero);
             FlushGold(targetHero);
+            FlushHeroDeveloper(playerHero);
             SendAccepted(peer, request, playerHero.Gold);
         }
         catch (Exception exception)
@@ -369,9 +419,16 @@ internal sealed partial class LordBarterHandler : IHandler
         targetParty = null;
         reason = null;
 
+        // Persuasion outcomes only belong on a defection, and the count is bounded so a tampered
+        // client cannot claim an arbitrary number of successful attempts. Rejected outright rather
+        // than truncated, so a malformed request fails loudly instead of earning partial credit.
         if (string.IsNullOrEmpty(request.RequestId) ||
             !Enum.IsDefined(typeof(PeaceConversationContext), request.Context) ||
-            !Enum.IsDefined(typeof(LordBarterKind), request.Kind))
+            !Enum.IsDefined(typeof(LordBarterKind), request.Kind) ||
+            (request.PersuasionOutcomes != null &&
+             (request.PersuasionOutcomes.Length > LordBarterPatch.MaxDefectionPersuasionOutcomes ||
+              ((LordBarterKind)request.Kind != LordBarterKind.JoinKingdomAsClan &&
+               request.PersuasionOutcomes.Length > 0))))
         {
             reason = "The server received an invalid lord barter request format.";
             return false;
@@ -386,7 +443,13 @@ internal sealed partial class LordBarterHandler : IHandler
             return false;
         }
 
-        if (targetHero.IsPlayerHero() || mobileParty.LeaderHero != playerHero || !mobileParty.IsActive)
+        // IsAlive matches MarriageBarterHandler's participant check: a hero can die between the
+        // authorization and the request, and every barterable dereferences both heroes.
+        if (targetHero.IsPlayerHero() ||
+            !targetHero.IsAlive ||
+            !playerHero.IsAlive ||
+            mobileParty.LeaderHero != playerHero ||
+            !mobileParty.IsActive)
         {
             reason = "The lord barter participants are no longer available.";
             return false;
@@ -616,6 +679,16 @@ internal sealed partial class LordBarterHandler : IHandler
     private void FlushGold(Hero hero)
     {
         if (sendCoalescer != null && hero != null && objectManager.TryGetId(hero, out var id)) sendCoalescer.FlushInstance(id, network);
+    }
+
+    // Both the Charm XP and the total XP are coalesced dictionary upserts on HeroDeveloper, so
+    // without this the recruiter sees no skill change until the next coalescer tick - long after the
+    // barter result lands.
+    private void FlushHeroDeveloper(Hero hero)
+    {
+        if (sendCoalescer != null && hero?.HeroDeveloper != null &&
+            objectManager.TryGetId(hero.HeroDeveloper, out var id))
+            sendCoalescer.FlushInstance(id, network);
     }
 
     private void Reject(NetPeer peer, NetworkRequestLordBarter request, int gold, string reason)
