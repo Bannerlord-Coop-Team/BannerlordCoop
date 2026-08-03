@@ -11,6 +11,7 @@ using SandBox.CampaignBehaviors;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -817,7 +818,6 @@ internal class DefaultNotificationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
 
             Kingdom oldKingdom = null;
@@ -828,8 +828,32 @@ internal class DefaultNotificationsHandler : IHandler
             if (obj.What.NewKingdomId != null &&
                 !objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.NewKingdomId, out newKingdom)) return;
 
-            notificationsBehavior.OnClanChangedFaction(clan, oldKingdom, newKingdom, obj.What.Detail, obj.What.ShowNotification);
+            if (TryGetNotificationsBehavior(out var notificationsBehavior))
+                notificationsBehavior.OnClanChangedFaction(clan, oldKingdom, newKingdom, obj.What.Detail, obj.What.ShowNotification);
+
+            ShowJoinKingdomScene(clan, newKingdom, obj.What.Detail, obj.What.ShowNotification);
         });
+    }
+
+    private static void ShowJoinKingdomScene(
+        Clan clan,
+        Kingdom newKingdom,
+        ChangeKingdomAction.ChangeKingdomActionDetail detail,
+        bool showNotification)
+    {
+        if (!showNotification || newKingdom == null) return;
+
+        var shouldShowScene =
+            (clan == Clan.PlayerClan && detail == ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom) ||
+            (Clan.PlayerClan?.Kingdom == newKingdom && detail == ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdomByDefection);
+        if (!shouldShowScene || !TryRestoreSceneCharacterCulture(clan.Leader)) return;
+
+        foreach (var hero in CampaignSceneNotificationHelper.GetMilitaryAudienceForKingdom(newKingdom).Take(5))
+        {
+            if (!TryRestoreSceneCharacterCulture(hero)) return;
+        }
+
+        MBInformationManager.ShowSceneNotification(new JoinKingdomSceneNotificationItem(clan, newKingdom));
     }
 
     private void Handle_NotifyArmyCreated(MessagePayload<NotifyArmyCreated> obj)
@@ -1100,7 +1124,7 @@ internal class DefaultNotificationsHandler : IHandler
 
         if (character.Culture != null) return true;
 
-        Logger.Warning("Skipping marriage scene because hero {heroId} has no character culture", hero.StringId);
+        Logger.Warning("Skipping scene notification because hero {heroId} has no character culture", hero.StringId);
         return false;
     }
 

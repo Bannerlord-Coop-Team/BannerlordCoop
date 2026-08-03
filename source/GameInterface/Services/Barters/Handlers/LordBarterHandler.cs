@@ -7,6 +7,7 @@ using Common.Network.Messages;
 using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.Barters.Patches;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
@@ -36,6 +37,7 @@ internal sealed partial class LordBarterHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly LocationConversationTracker locationConversationTracker;
     private readonly IBarterClientPresentation presentation;
@@ -52,6 +54,7 @@ internal sealed partial class LordBarterHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
+        IKingdomMembershipState kingdomMembershipState,
         ConversationPartyTracker conversationPartyTracker,
         LocationConversationTracker locationConversationTracker,
         IBarterClientPresentation presentation,
@@ -63,6 +66,7 @@ internal sealed partial class LordBarterHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.kingdomMembershipState = kingdomMembershipState;
         this.conversationPartyTracker = conversationPartyTracker;
         this.locationConversationTracker = locationConversationTracker;
         this.presentation = presentation;
@@ -184,7 +188,11 @@ internal sealed partial class LordBarterHandler : IHandler
                 return;
             }
 
-            var isSafePassage = (LordBarterKind)request.Kind == LordBarterKind.SafePassage;
+            var kind = (LordBarterKind)request.Kind;
+            var isSafePassage = kind == LordBarterKind.SafePassage;
+            var previousTargetKingdom = kind == LordBarterKind.JoinKingdomAsClan
+                ? targetHero.Clan.Kingdom
+                : null;
             IReadOnlyList<MobileParty> safePassageOpponents = Array.Empty<MobileParty>();
             float offerValue;
             if (isSafePassage)
@@ -221,6 +229,16 @@ internal sealed partial class LordBarterHandler : IHandler
                 {
                     barterable.Apply();
                 }
+            }
+
+            if (kind == LordBarterKind.JoinKingdomAsClan)
+            {
+                kingdomMembershipState.MoveClanToKingdom(
+                    previousTargetKingdom,
+                    targetKingdom,
+                    targetHero.Clan,
+                    publishCollectionChanges: true,
+                    republishExistingCollections: true);
             }
 
             if (isSafePassage)

@@ -130,7 +130,7 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
     }
 
     [Fact]
-    public void HeroesMarriedEvent_OnServer_DoesNotShowMarriageScene()
+    public void DefaultCutscenesBehavior_OnServer_DoesNotRegisterMarriageScene()
     {
         var playerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var spouseId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -159,10 +159,14 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
 
         try
         {
-            Server.Call(() => DefaultCutscenesCampaignBehavior.OnHeroesMarried(
-                Hero.MainHero,
-                Hero.MainHero.Spouse,
-                showNotification: true));
+            Server.Call(() =>
+            {
+                new DefaultCutscenesCampaignBehavior().RegisterEvents();
+                CampaignEventDispatcher.Instance.OnBeforeHeroesMarried(
+                    Hero.MainHero,
+                    Hero.MainHero.Spouse,
+                    showNotification: true);
+            });
 
             Server.Call(() => Assert.Null(shownMarriageScene));
         }
