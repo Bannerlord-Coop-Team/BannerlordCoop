@@ -368,17 +368,22 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        if (conversationPartyTracker.IsEngagedByOther(aiPartyId, requestingPeer) &&
-            !AreHostile(playerPartyBase, aiPartyBase))
+        // A map conversation is exclusive to one player, like a settlement conversation. The
+        // hostility carve-out that used to live here existed so simultaneous attackers converge on
+        // one MapEvent, but it also let two players hold a diplomacy conversation with the same lord
+        // and both apply its one-shot outcome. Attackers still converge: once the holder starts the
+        // battle, the attackerInMapEvent/defenderInMapEvent branch above approves the contender's
+        // retry so it joins that MapEvent.
+        if (conversationPartyTracker.IsEngagedByOther(aiPartyId, requestingPeer))
         {
             Logger.Debug(
-                "Rejecting shared conversation for a non-hostile party. PartyId={PartyId}",
+                "Rejecting conversation request: the party is already conversing with another player. PartyId={PartyId}",
                 aiPartyId);
             network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged));
             return;
         }
 
-        // A requester may share this hostile target but cannot replace its own live engagement with another target.
+        // A requester cannot replace its own live engagement with another target.
         if (!ConversationPartyHold.TryEngage(
                 conversationPartyTracker,
                 requestingPeer,
