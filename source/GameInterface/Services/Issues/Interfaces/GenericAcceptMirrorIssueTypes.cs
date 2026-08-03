@@ -46,6 +46,11 @@ internal static class GenericAcceptMirrorIssueTypes
         typeof(LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue),
         typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue),
         typeof(SandBox.Issues.ProdigalSonIssueBehavior.ProdigalSonIssue),
+        // Village Needs Grain Seeds: GenerateIssueQuest(questId) just forwards IssueOwner/IssueDifficultyMultiplier/
+        // RewardGold(0)/NeededGrainAmount, all already frozen/derivable by accept time (see
+        // SimpleIssueFactoryRegistry's doc comment) - a bare replay of IssueManager.StartIssueQuest lands on a
+        // byte-identical HeadmanNeedsGrainIssueQuest on every peer.
+        typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -78,6 +83,14 @@ internal static class GenericAcceptMirrorIssueTypes
         typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue),
         typeof(SandBox.Issues.ProdigalSonIssueBehavior.ProdigalSonIssue),
         typeof(SandBox.Issues.TheSpyPartyIssueQuestBehavior.TheSpyPartyIssue),
+        // Village Needs Grain Seeds: IsThereAlternativeSolution == true, AlternativeSolutionScaleFlags is
+        // Duration only (no FailureRisk - confirmed against the decompiled source), so
+        // MirrorAlternativeAccepted's generic force-write (issue state + IsTriedToSolveBefore + due time) is
+        // all any other peer's mirror copy needs; the real per-accepter-only consequence
+        // (AlternativeSolutionEndWithSuccessConsequence) is triggered exclusively through the same shared,
+        // ownership-gated HourlyTick mechanism every other Tier 1 Group 1C/1D type uses - see
+        // NewIssueTypesAlternativeSolutionPatches's Village Needs Grain Seeds registration.
+        typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>

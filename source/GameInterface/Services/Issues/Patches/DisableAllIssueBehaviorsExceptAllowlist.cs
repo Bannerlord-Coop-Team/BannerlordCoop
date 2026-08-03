@@ -80,6 +80,11 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior),
         typeof(SandBox.Issues.ProdigalSonIssueBehavior),
         typeof(SandBox.Issues.TheSpyPartyIssueQuestBehavior),
+        // Village Needs Grain Seeds - TaleWorlds.CampaignSystem.dll, same allowlist/dispatch shape as every
+        // other Group 1C entry above. Its behavior-singleton grain-price cache is a separate, standalone
+        // mechanism (HeadmanNeedsGrainPriceCachePatches/HeadmanNeedsGrainPricePersistencePatches), not part of
+        // this allowlist/dispatch choke point at all.
+        typeof(HeadmanNeedsGrainIssueBehavior),
     };
 
     /// <summary>

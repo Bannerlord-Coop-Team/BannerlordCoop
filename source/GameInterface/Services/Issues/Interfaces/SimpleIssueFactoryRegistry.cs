@@ -27,6 +27,11 @@ namespace GameInterface.Services.Issues.Interfaces;
 /// <c>ProdigalSonIssue</c>, <c>TheSpyPartyIssue</c>) roll or reference at least one field at creation (or, for
 /// The Spy Party, ACCEPT) time that genuinely needs capturing+forcing rather than being safely re-derivable from
 /// the owner alone, so they keep their own bespoke Interface/Messages/Patches/Handler file set instead.
+/// <c>HeadmanNeedsGrainIssue</c> (Village Needs Grain Seeds) IS registered here - its ctor rolls nothing - but
+/// it needs its OWN small, standalone piece of infrastructure the others don't: the behavior-singleton
+/// <c>_averageGrainPriceInCalradia</c> cache feeding its dialogue/reward math is NOT per-issue-instance state
+/// at all, so it can't be captured/forced through this per-issue creation path - see
+/// <see cref="Patches.HeadmanNeedsGrainPriceCachePatches"/>/<see cref="Patches.HeadmanNeedsGrainPricePersistencePatches"/>.
 /// <c>LandLordNeedsManualLaborersIssue</c>/<c>BettingFraudIssue</c>/<c>GangLeaderNeedsSpecialWeaponsIssue</c> ARE
 /// registered here for CREATION (their Issue ctor rolls nothing) but still keep their own bespoke ACCEPT-time
 /// capture files - see each type's own Interfaces/*IssueInterface.cs doc comment.
@@ -113,6 +118,19 @@ internal static class SimpleIssueFactoryRegistry
             "RuralNotableInnAndOut",
             typeof(SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue),
             owner => new SandBox.Issues.RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue(owner),
+            IssueBase.IssueFrequency.Common),
+        // Village Needs Grain Seeds: HeadmanNeedsGrainIssue's ctor is genuinely EMPTY (just the base(owner,
+        // CampaignTime.DaysFromNow(30f)) call) - NeededGrainAmount/AlternativeSolutionNeededGold are pure
+        // getters computed on demand from base.IssueDifficultyMultiplier (itself a deterministic function of
+        // Campaign.Current.PlayerProgress, never an ambient roll - see DefaultIssueModel.GetIssueDifficultyMultiplier)
+        // and the behavior-singleton _averageGrainPriceInCalradia (see HeadmanNeedsGrainPriceCachePatches for
+        // how THAT stays byte-identical across peers - a separate, standalone mechanism, since it's owned by
+        // the BEHAVIOR, not this Issue instance). Nothing here is rolled at construction time - the cheapest
+        // creation-side integration of any type in this registry.
+        [typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue)] = new Entry(
+            "HeadmanNeedsGrain",
+            typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue),
+            owner => new HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue(owner),
             IssueBase.IssueFrequency.Common),
     };
 

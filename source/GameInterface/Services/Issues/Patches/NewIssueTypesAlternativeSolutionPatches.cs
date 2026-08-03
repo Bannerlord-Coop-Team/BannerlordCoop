@@ -16,7 +16,10 @@ namespace GameInterface.Services.Issues.Patches;
 /// NEW issue type that has <c>IsThereAlternativeSolution == true</c>: <c>LordNeedsHorsesIssue</c>,
 /// <c>CapturedByBountyHuntersIssue</c>, <c>LandlordTrainingForRetainersIssue</c>,
 /// <c>GangLeaderNeedsRecruitsIssue</c>, and (Tier 1 Group 1B) <c>LandLordNeedsManualLaborersIssue</c>,
-/// <c>HeadmanVillageNeedsDraughtAnimalsIssue</c>, <c>LordNeedsGarrisonTroopsIssue</c> - all seven need the
+/// <c>HeadmanVillageNeedsDraughtAnimalsIssue</c>, <c>LordNeedsGarrisonTroopsIssue</c>, and (Tier 1 Group 1C/1D
+/// plus Village Needs Grain Seeds) <c>NearbyBanditBaseIssue</c>, <c>LandLordTheArtOfTheTradeIssue</c>,
+/// <c>RuralNotableInnAndOutIssue</c>, <c>ProdigalSonIssue</c>, <c>TheSpyPartyIssue</c>,
+/// <c>HeadmanNeedsGrainIssue</c> - all need the
 /// identical fix (gate the real
 /// <c>CompleteIssueWithAlternativeSolution</c> consequence to the recorded owner only, plus an
 /// unconditional, ownership-self-limiting <c>HourlyTickEvent</c> listener so the machine that actually needs
@@ -105,6 +108,18 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     [HarmonyPatch(typeof(SandBox.Issues.TheSpyPartyIssueQuestBehavior), nameof(SandBox.Issues.TheSpyPartyIssueQuestBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void TheSpyPartyRegisterEventsPostfix(SandBox.Issues.TheSpyPartyIssueQuestBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
+    // Village Needs Grain Seeds - same shared choke point, no new per-type file needed.
+    // HeadmanNeedsGrainIssue.AlternativeSolutionScaleFlags is Duration only (confirmed against the decompiled
+    // source - no FailureRisk flag), so like every type above except CapturedByBountyHunters, its alternative
+    // solution always succeeds deterministically: AlternativeSolutionEndWithFailureConsequence exists on the
+    // Issue class but is unreachable in practice (IssueBase._failureChance only becomes nonzero when
+    // AlternativeSolutionScaleFlags has FailureRisk), so routing it through this generic, success-only trigger
+    // is safe.
+    [HarmonyPatch(typeof(HeadmanNeedsGrainIssueBehavior), nameof(HeadmanNeedsGrainIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void HeadmanNeedsGrainRegisterEventsPostfix(HeadmanNeedsGrainIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
     private static void OnHourlyTick()
