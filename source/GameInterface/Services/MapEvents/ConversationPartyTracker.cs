@@ -158,8 +158,12 @@ internal sealed class ConversationPartyTracker : IHandler
                 return true;
             }
 
-            var existing = engagements.Values.FirstOrDefault(x => x.PartyId == partyId);
-            if (existing.PartyId != null) wasAiDisabled = existing.WasAiDisabled;
+            // One engager per party. Every server-side consequence of a map conversation is validated
+            // only as "this peer holds an engagement with this party" (LordBarterHandler,
+            // PeaceBarterHandler, MarriageBarterHandler, BanditBarterHandler), so a shared hold lets
+            // two players each apply the same one-shot outcome - e.g. two players persuading the same
+            // lord, both paying, and the lord defecting twice.
+            if (engagements.Values.Any(x => x.PartyId == partyId)) return false;
 
             engagements.Add(engagerKey, new Engagement(
                 engagerKey,
