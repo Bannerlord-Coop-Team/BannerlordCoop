@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.HeroDevelopers.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -57,7 +58,10 @@ internal class ClearFocusesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<HeroDeveloper>(data.HeroDeveloperId, out var heroDeveloper)) return;
 
-            heroDeveloper.ClearFocuses();
+            using (new AllowedThread())
+            {
+                heroDeveloper.ClearFocuses();
+            }
         });
     }
 }

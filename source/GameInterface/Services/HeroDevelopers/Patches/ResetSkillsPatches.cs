@@ -5,6 +5,10 @@ using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.HeroDevelopers.Patches;
 
@@ -26,14 +30,28 @@ internal class ResetSkillsPatches
 internal class PerkHelperPatches
 {
     [HarmonyPatch(nameof(PerkHelper.ClearPerksForSkill))]
-    [HarmonyPostfix]
-    public static void ClearPerksForSkill(Hero hero)
+    [HarmonyPrefix]
+    public static bool ClearPerksForSkill(Hero hero, SkillObject skill)
     {
-        if (ModInformation.IsClient) return;
+        if (ModInformation.IsClient) return false;
 
-        hero.PartyBelongedTo?.MemberRoster?.UpdateVersion();
+        foreach (PerkObject perkObject in PerkObject.All)
+        {
+            if (perkObject.Skill == skill)
+            {
+                PerkHelper.ClearPermanentBonusesIfExists(hero, perkObject);
+                hero.SetPerkValueInternal(perkObject, false);
+            }
+        }
+        hero.HitPoints = MathF.Min(hero.HitPoints, hero.MaxHitPoints);
 
+        if (hero.PartyBelongedTo?.MemberRoster == null) return false;
+
+        hero.PartyBelongedTo.MemberRoster.UpdateVersion();
+       
         var message = new UpdateRosterVersionAfterPerkChange(hero.PartyBelongedTo.MemberRoster);
         MessageBroker.Instance.Publish(null, message);
+
+        return false;
     }
 }
