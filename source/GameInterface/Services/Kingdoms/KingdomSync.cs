@@ -46,7 +46,9 @@ namespace GameInterface.Services.Kingdoms
 
             // Collection fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._armies)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._clans)));
+
+            // This doesn't seem to sync properly when changed. Moved to handle with ClanKingdomHandler
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._clans)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._fiefsCache)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._heroesCache)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._aliveLordsCache)));

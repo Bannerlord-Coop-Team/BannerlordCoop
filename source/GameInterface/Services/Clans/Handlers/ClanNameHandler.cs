@@ -2,75 +2,95 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
 using SandBox.GauntletUI;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 
-namespace GameInterface.Services.Clans.Handlers
+namespace GameInterface.Services.Clans.Handlers;
+
+public class ClanNameHandler : IHandler
 {
-    /// <summary>
-    /// Handles all changes to clans on client.
-    /// </summary>
-    public class ClanNameHandler : IHandler
+    private readonly ILogger Logger = LogManager.GetLogger<ClanNameHandler>();
+
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+
+    public ClanNameHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network)
     {
-        private readonly IMessageBroker messageBroker;
-        private readonly IObjectManager objectManager;
-        private readonly INetwork network;
-        private readonly ILogger Logger = LogManager.GetLogger<ClanNameHandler>();
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        this.network = network;
 
-        public ClanNameHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        messageBroker.Subscribe<ChangeClanName>(Handle_ChangeClanName);
+        messageBroker.Subscribe<NetworkChangeClanName>(Handle_NetworkChangeClanName);
+        messageBroker.Subscribe<NetworkRefreshAfterClanNameChange>(Handle_NetworkRefreshAfterClanNameChange);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<ChangeClanName>(Handle_ChangeClanName);
+        messageBroker.Unsubscribe<NetworkChangeClanName>(Handle_NetworkChangeClanName);
+        messageBroker.Unsubscribe<NetworkRefreshAfterClanNameChange>(Handle_NetworkRefreshAfterClanNameChange);
+    }
+
+    private void Handle_ChangeClanName(MessagePayload<ChangeClanName> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.Clan, out var clanId)) return;
+
+        if (ModInformation.IsServer)
         {
-            this.messageBroker = messageBroker;
-            this.objectManager = objectManager;
-            this.network = network;
-            messageBroker.Subscribe<ClanNameChanged>(Handle);
-            messageBroker.Subscribe<NetworkChangeClanName>(Handle);
+            ClanNameChangePatch.ChangeClanNameOverride(data.Clan, data.Name, data.InformalName);
+
+            network.SendAll(new NetworkRefreshAfterClanNameChange(clanId, data.Name, data.InformalName));
+
+            return;
         }
 
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<ClanNameChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkChangeClanName>(Handle);
-        }
+        network.SendAll(new NetworkChangeClanName(clanId, data.Name, data.InformalName));
+    }
 
-        private void Handle(MessagePayload<ClanNameChanged> obj)
-        {
-            var payload = obj.What;
-            network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
-        }
+    private void Handle_NetworkChangeClanName(MessagePayload<NetworkChangeClanName> obj)
+    {
+        var data = obj.What;
 
-        private void Handle(MessagePayload<NetworkChangeClanName> obj)
+        GameThread.RunSafe(() =>
         {
-            var payload = obj.What;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
 
-            if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
+            ClanNameChangePatch.ChangeClanNameOverride(clan, data.Name, data.InformalName);
+
+            network.SendAll(new NetworkRefreshAfterClanNameChange(data.ClanId, data.Name, data.InformalName));
+        });
+    }
+
+    private void Handle_NetworkRefreshAfterClanNameChange(MessagePayload<NetworkRefreshAfterClanNameChange> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
+
+            using (new AllowedThread())
             {
-                Logger.Error("Unable to find clan ({clanId})", payload.ClanId);
-                return;
+                ClanNameChangePatch.ChangeClanNameOverride(clan, data.Name, data.InformalName);
             }
 
-            // The refresh touches the clan screen UI, which is main-thread only.
-            GameThread.RunSafe(() =>
+            if (ScreenManager.TopScreen is GauntletClanScreen clanScreen && clan == Clan.PlayerClan)
             {
-                ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
-
-                if (ModInformation.IsServer)
-                {
-                    network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
-                }
-
-                if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
-                {
-                    clanScreen._dataSource?.RefreshValues();
-                }
-            });
-        }
+                clanScreen._dataSource?.RefreshValues();
+            }
+        });
     }
 }
