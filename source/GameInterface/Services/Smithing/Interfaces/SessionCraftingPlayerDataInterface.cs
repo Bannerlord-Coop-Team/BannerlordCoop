@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -21,14 +20,12 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SessionCraftingPlayerDataInterface>();
     private ICoopSessionProvider coopSessionProvider;
-    private readonly IPlayerManager playerRegistry;
     private readonly IObjectManager objectManager;
     private CraftingPlayerData CraftingPlayerData => coopSessionProvider.CoopSession.CraftingPlayerData;
 
-    public SessionCraftingPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IPlayerManager playerRegistry, IObjectManager objectManager)
+    public SessionCraftingPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager)
     {
         this.coopSessionProvider = coopSessionProvider;
-        this.playerRegistry = playerRegistry;
         this.objectManager = objectManager;
     }
 
