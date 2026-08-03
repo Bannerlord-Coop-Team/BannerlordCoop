@@ -26,9 +26,15 @@ internal class SiegeReliefMenuPatches
     [HarmonyPostfix]
     private static void AttackBesiegerConditionPostfix(MenuCallbackArgs args, bool __result) => DisableForPlayerSiege(args, __result);
 
-    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "break_in_to_help_defender_side_on_condition")]
-    [HarmonyPostfix]
-    private static void BreakInConditionPostfix(MenuCallbackArgs args, bool __result) => DisableForPlayerSiege(args, __result);
+    // "Break in to help the defenders" is deliberately NOT disabled here. It was, on the same
+    // reasoning as the assault option, but the two are not alike: attack_besiegers really does open a
+    // field battle (game_menu_join_encounter_help_defenders_on_consequence), whereas the break-in's
+    // consequence is only GameMenu.SwitchToMenu("break_in_menu") and the flow that follows creates no
+    // MapEvent at all - it sacrifices troops and walks the party inside. Disabling it left a besieged
+    // player with no way to reinforce their own settlement whenever a player led the besieging camp,
+    // which is the ordinary co-op case. The entry itself is routed through the server by
+    // SiegeEntryFlowPatches.BreakInContinuationPrefix, so re-enabling the option does not let a
+    // client apply its own break-in.
 
     private static void DisableForPlayerSiege(MenuCallbackArgs args, bool __result)
     {
