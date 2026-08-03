@@ -1,9 +1,33 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Messages;
+
+/// <summary>
+/// Why an <see cref="IssueBase.IssueFinalized"/> broadcast is being mirrored - lets a peer applying a
+/// received (or server-replayed) finalize call the exact matching <c>QuestBase.CompleteQuestWithXxx</c>/
+/// <c>IssueBase.CompleteIssueWithXxx</c> instead of the bare, quest-orphaning <c>IssueFinalized()</c> call
+/// the first pass used unconditionally - see <see cref="Patches.IssueFinalizedPatches"/> and
+/// <see cref="Interfaces.VillageNeedsToolsIssueInterface.FinalizeMirror"/>.
+/// </summary>
+public enum VillageIssueFinalizeReason : byte
+{
+    /// <summary>No active <see cref="IssueBase.IssueQuest"/> to cascade through (timed out / stay-alive
+    /// conditions failed / finished by an AI lord, all only reachable while <c>IsOngoingWithoutQuest</c>) -
+    /// a bare <c>IssueFinalized()</c> is exactly what vanilla itself does for these.</summary>
+    IssueOnly = 0,
+    QuestSuccess = 1,
+    QuestCancel = 2,
+    QuestFail = 3,
+    QuestTimeout = 4,
+    QuestBetrayal = 5,
+    /// <summary>Not a genuine vanilla finalize at all - a synthetic instruction telling the losing side of a
+    /// same-issue double-accept race to roll its own already-applied (optimistic) local acceptance back via
+    /// <c>IssueBase.CompleteIssueWithCancel()</c>. See <see cref="Patches.IssueAcceptancePatches"/>.</summary>
+    RejectedAccept = 6,
+}
 
 // --- Local events ---
 
@@ -34,8 +58,39 @@ public readonly struct VillageIssueCreated : IEvent
 public readonly struct VillageIssueFinalizedTriggered : IEvent
 {
     public readonly Hero Owner;
+    public readonly VillageIssueFinalizeReason Reason;
 
-    public VillageIssueFinalizedTriggered(Hero owner)
+    public VillageIssueFinalizedTriggered(Hero owner, VillageIssueFinalizeReason reason)
+    {
+        Owner = owner;
+        Reason = reason;
+    }
+}
+
+/// <summary>
+/// Published from <see cref="Patches.IssueAcceptancePatches"/> whenever <c>IssueManager.StartIssueQuest</c>
+/// genuinely runs (the accepting player's own live conversation, on whichever machine that is - not a
+/// mirrored replay of a received broadcast).
+/// </summary>
+public readonly struct VillageIssueQuestAcceptTriggered : IEvent
+{
+    public readonly Hero Owner;
+
+    public VillageIssueQuestAcceptTriggered(Hero owner)
+    {
+        Owner = owner;
+    }
+}
+
+/// <summary>
+/// Published from <see cref="Patches.IssueAcceptancePatches"/> whenever <c>IssueBase.StartIssueWithAlternativeSolution</c>
+/// genuinely runs.
+/// </summary>
+public readonly struct VillageIssueAlternativeAcceptTriggered : IEvent
+{
+    public readonly Hero Owner;
+
+    public VillageIssueAlternativeAcceptTriggered(Hero owner)
     {
         Owner = owner;
     }
@@ -90,10 +145,13 @@ public readonly struct RequestVillageIssueRemoved : ICommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly VillageIssueFinalizeReason Reason;
 
-    public RequestVillageIssueRemoved(string ownerId)
+    public RequestVillageIssueRemoved(string ownerId, VillageIssueFinalizeReason reason)
     {
         OwnerId = ownerId;
+        Reason = reason;
     }
 }
 
@@ -103,8 +161,90 @@ public readonly struct NetworkVillageIssueRemoved : ICommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly VillageIssueFinalizeReason Reason;
 
-    public NetworkVillageIssueRemoved(string ownerId)
+    public NetworkVillageIssueRemoved(string ownerId, VillageIssueFinalizeReason reason)
+    {
+        OwnerId = ownerId;
+        Reason = reason;
+    }
+}
+
+/// <summary>
+/// Client -> server: "hero X's issue giver just accepted the quest solution in my live conversation." The
+/// requesting client already applied the transition locally (see <see cref="Patches.IssueAcceptancePatches"/>
+/// for why it can't be blocked pending confirmation) - this lets the server arbitrate a same-issue
+/// double-accept race and confirm/reject it.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct RequestVillageIssueAcceptQuest : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+
+    public RequestVillageIssueAcceptQuest(string ownerId)
+    {
+        OwnerId = ownerId;
+    }
+}
+
+/// <summary>Server -> all clients: confirms the quest-solution accept for this hero's issue; every other
+/// peer mirrors it via <c>VillageNeedsToolsIssueInterface.MirrorQuestAccepted</c>.</summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkVillageIssueQuestAccepted : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+
+    public NetworkVillageIssueQuestAccepted(string ownerId)
+    {
+        OwnerId = ownerId;
+    }
+}
+
+/// <summary>Client -> server equivalent of <see cref="RequestVillageIssueAcceptQuest"/> for the
+/// alternative-solution accept option.</summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct RequestVillageIssueAcceptAlternative : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+
+    public RequestVillageIssueAcceptAlternative(string ownerId)
+    {
+        OwnerId = ownerId;
+    }
+}
+
+/// <summary>Server -> all clients equivalent of <see cref="NetworkVillageIssueQuestAccepted"/> for the
+/// alternative-solution accept option.</summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkVillageIssueAlternativeAccepted : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+
+    public NetworkVillageIssueAlternativeAccepted(string ownerId)
+    {
+        OwnerId = ownerId;
+    }
+}
+
+/// <summary>
+/// Server -> the one losing requester of a same-issue double-accept race: someone else's accept was
+/// confirmed first, so roll this peer's own already-applied local acceptance back (see
+/// <see cref="Interfaces.VillageNeedsToolsIssueInterface.RejectAcceptance"/>). Deliberately a single message
+/// shared by both accept paths - the rollback (<c>IssueBase.CompleteIssueWithCancel()</c>) is the same call
+/// either way.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkVillageIssueAcceptRejected : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+
+    public NetworkVillageIssueAcceptRejected(string ownerId)
     {
         OwnerId = ownerId;
     }

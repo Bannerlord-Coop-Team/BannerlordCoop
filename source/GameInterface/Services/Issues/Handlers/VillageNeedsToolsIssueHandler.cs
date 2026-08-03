@@ -1,24 +1,38 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Handlers;
 
 /// <summary>
-/// Server-authoritative Village Needs Tools issue replication. Creation: the server captures the terms an
-/// already-vetted-server-side <c>IssueManager.CreateNewIssue</c> call rolled and broadcasts them, so every
-/// client builds a byte-identical instance instead of independently re-deriving one (see
-/// IssueManagerCreateNewIssuePatches / VillageNeedsToolsIssueInterface). Removal: whichever machine reaches
-/// a genuine (non-mirrored) <c>IssueFinalized</c> - the server for an ambient-tick timeout, or the one
-/// client in the quest-turn-in conversation for a success - routes it through the server so every other
-/// peer mirrors the same teardown (see IssueFinalizedPatches).
+/// Server-authoritative Village Needs Tools issue replication.
+///
+/// Creation: the server captures the terms an already-vetted-server-side <c>IssueManager.CreateNewIssue</c>
+/// call rolled and broadcasts them, so every client builds a byte-identical instance instead of
+/// independently re-deriving one (see IssueManagerCreateNewIssuePatches / VillageNeedsToolsIssueInterface).
+///
+/// Acceptance: whichever machine's own live conversation accepts (quest solution or alternative solution)
+/// already applied that transition locally for real (see IssueAcceptancePatches for why it can't be
+/// blocked pending confirmation). That genuine trigger is routed through the server, which arbitrates a
+/// same-issue double-accept race (first valid request wins) and either confirms it to every other peer
+/// (who then mirror the same transition) or rejects it back to the one losing requester (who rolls their
+/// own already-applied local copy back) - see Finding 1 in the review this fixes.
+///
+/// Removal: whichever machine reaches a genuine (non-mirrored) <c>IssueFinalized</c> - the server for an
+/// ambient-tick timeout, or the one client in the quest-turn-in conversation for a success - routes it
+/// through the server so every other peer mirrors the same teardown, using the correct
+/// <c>QuestBase.CompleteQuestWithXxx</c>/<c>IssueBase.CompleteIssueWithXxx</c> for the captured reason
+/// instead of a bare <c>IssueFinalized()</c> that would orphan an active mirrored quest (see
+/// IssueFinalizedPatches).
 /// </summary>
 internal class VillageNeedsToolsIssueHandler : IHandler
 {
@@ -43,6 +57,16 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         messageBroker.Subscribe<VillageIssueCreated>(Handle_VillageIssueCreated);
         messageBroker.Subscribe<NetworkVillageIssueCreated>(Handle_NetworkVillageIssueCreated);
 
+        messageBroker.Subscribe<VillageIssueQuestAcceptTriggered>(Handle_VillageIssueQuestAcceptTriggered);
+        messageBroker.Subscribe<RequestVillageIssueAcceptQuest>(Handle_RequestVillageIssueAcceptQuest);
+        messageBroker.Subscribe<NetworkVillageIssueQuestAccepted>(Handle_NetworkVillageIssueQuestAccepted);
+
+        messageBroker.Subscribe<VillageIssueAlternativeAcceptTriggered>(Handle_VillageIssueAlternativeAcceptTriggered);
+        messageBroker.Subscribe<RequestVillageIssueAcceptAlternative>(Handle_RequestVillageIssueAcceptAlternative);
+        messageBroker.Subscribe<NetworkVillageIssueAlternativeAccepted>(Handle_NetworkVillageIssueAlternativeAccepted);
+
+        messageBroker.Subscribe<NetworkVillageIssueAcceptRejected>(Handle_NetworkVillageIssueAcceptRejected);
+
         messageBroker.Subscribe<VillageIssueFinalizedTriggered>(Handle_VillageIssueFinalizedTriggered);
         messageBroker.Subscribe<RequestVillageIssueRemoved>(Handle_RequestVillageIssueRemoved);
         messageBroker.Subscribe<NetworkVillageIssueRemoved>(Handle_NetworkVillageIssueRemoved);
@@ -52,6 +76,16 @@ internal class VillageNeedsToolsIssueHandler : IHandler
     {
         messageBroker.Unsubscribe<VillageIssueCreated>(Handle_VillageIssueCreated);
         messageBroker.Unsubscribe<NetworkVillageIssueCreated>(Handle_NetworkVillageIssueCreated);
+
+        messageBroker.Unsubscribe<VillageIssueQuestAcceptTriggered>(Handle_VillageIssueQuestAcceptTriggered);
+        messageBroker.Unsubscribe<RequestVillageIssueAcceptQuest>(Handle_RequestVillageIssueAcceptQuest);
+        messageBroker.Unsubscribe<NetworkVillageIssueQuestAccepted>(Handle_NetworkVillageIssueQuestAccepted);
+
+        messageBroker.Unsubscribe<VillageIssueAlternativeAcceptTriggered>(Handle_VillageIssueAlternativeAcceptTriggered);
+        messageBroker.Unsubscribe<RequestVillageIssueAcceptAlternative>(Handle_RequestVillageIssueAcceptAlternative);
+        messageBroker.Unsubscribe<NetworkVillageIssueAlternativeAccepted>(Handle_NetworkVillageIssueAlternativeAccepted);
+
+        messageBroker.Unsubscribe<NetworkVillageIssueAcceptRejected>(Handle_NetworkVillageIssueAcceptRejected);
 
         messageBroker.Unsubscribe<VillageIssueFinalizedTriggered>(Handle_VillageIssueFinalizedTriggered);
         messageBroker.Unsubscribe<RequestVillageIssueRemoved>(Handle_RequestVillageIssueRemoved);
@@ -111,22 +145,138 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         });
     }
 
-    // --- Removal: whichever machine genuinely finalizes routes through the server so every peer mirrors it ---
+    // --- Acceptance (Finding 1): the accepting machine already applied it locally for real; the server
+    // arbitrates a same-issue double-accept race and confirms/rejects it. ---
 
-    private void Handle_VillageIssueFinalizedTriggered(MessagePayload<VillageIssueFinalizedTriggered> payload)
+    private void Handle_VillageIssueQuestAcceptTriggered(MessagePayload<VillageIssueQuestAcceptTriggered> payload)
     {
         var owner = payload.What.Owner;
         if (owner == null || !objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
 
         if (ModInformation.IsServer)
         {
-            network.SendAll(new NetworkVillageIssueRemoved(ownerId));
+            // The host's own live conversation just accepted - already authoritative, confirm directly.
+            network.SendAll(new NetworkVillageIssueQuestAccepted(ownerId));
+        }
+        else
+        {
+            // A client's own live conversation already applied this locally (see IssueAcceptancePatches) -
+            // tell the server so it can arbitrate a same-issue double-accept race.
+            network.SendAll(new RequestVillageIssueAcceptQuest(ownerId));
+        }
+    }
+
+    private void Handle_RequestVillageIssueAcceptQuest(MessagePayload<RequestVillageIssueAcceptQuest> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var ownerId = payload.What.OwnerId;
+        var requester = payload.Who as NetPeer;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+
+            if (owner.Issue is VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue && owner.Issue.IsOngoingWithoutQuest)
+            {
+                // First valid request wins the race - replay on the server's own authoritative copy, then
+                // confirm to everyone (including the requester, harmlessly idempotent for them since they
+                // already applied it locally).
+                issueInterface.MirrorQuestAccepted(owner);
+                network.SendAll(new NetworkVillageIssueQuestAccepted(ownerId));
+            }
+            else if (requester != null)
+            {
+                // Someone else already won the race (or the issue is gone) - tell just this requester to
+                // roll their own already-applied local copy back.
+                network.Send(requester, new NetworkVillageIssueAcceptRejected(ownerId));
+            }
+        });
+    }
+
+    private void Handle_NetworkVillageIssueQuestAccepted(MessagePayload<NetworkVillageIssueQuestAccepted> payload)
+    {
+        var ownerId = payload.What.OwnerId;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+            issueInterface.MirrorQuestAccepted(owner);
+        });
+    }
+
+    private void Handle_VillageIssueAlternativeAcceptTriggered(MessagePayload<VillageIssueAlternativeAcceptTriggered> payload)
+    {
+        var owner = payload.What.Owner;
+        if (owner == null || !objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
+
+        if (ModInformation.IsServer)
+        {
+            network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId));
+        }
+        else
+        {
+            network.SendAll(new RequestVillageIssueAcceptAlternative(ownerId));
+        }
+    }
+
+    private void Handle_RequestVillageIssueAcceptAlternative(MessagePayload<RequestVillageIssueAcceptAlternative> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var ownerId = payload.What.OwnerId;
+        var requester = payload.Who as NetPeer;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+
+            if (owner.Issue is VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue && owner.Issue.IsOngoingWithoutQuest)
+            {
+                issueInterface.MirrorAlternativeAccepted(owner);
+                network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId));
+            }
+            else if (requester != null)
+            {
+                network.Send(requester, new NetworkVillageIssueAcceptRejected(ownerId));
+            }
+        });
+    }
+
+    private void Handle_NetworkVillageIssueAlternativeAccepted(MessagePayload<NetworkVillageIssueAlternativeAccepted> payload)
+    {
+        var ownerId = payload.What.OwnerId;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+            issueInterface.MirrorAlternativeAccepted(owner);
+        });
+    }
+
+    private void Handle_NetworkVillageIssueAcceptRejected(MessagePayload<NetworkVillageIssueAcceptRejected> payload)
+    {
+        var ownerId = payload.What.OwnerId;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+            issueInterface.RejectAcceptance(owner);
+        });
+    }
+
+    // --- Removal: whichever machine genuinely finalizes routes through the server so every peer mirrors it ---
+
+    private void Handle_VillageIssueFinalizedTriggered(MessagePayload<VillageIssueFinalizedTriggered> payload)
+    {
+        var owner = payload.What.Owner;
+        var reason = payload.What.Reason;
+        if (owner == null || !objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
+
+        if (ModInformation.IsServer)
+        {
+            network.SendAll(new NetworkVillageIssueRemoved(ownerId, reason));
         }
         else
         {
             // A client's SendAll only reaches its one connection - the server - which replays the finalize
             // on its own copy (Handle_RequestVillageIssueRemoved) and broadcasts the real removal from there.
-            network.SendAll(new RequestVillageIssueRemoved(ownerId));
+            network.SendAll(new RequestVillageIssueRemoved(ownerId, reason));
         }
     }
 
@@ -135,26 +285,27 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var ownerId = payload.What.OwnerId;
+        var reason = payload.What.Reason;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
 
-            // Mirrors the requesting client's finalize on the server's own copy. IssueFinalized only tears
-            // down bookkeeping (dictionary removal, hero.Issue backref) - it never re-applies rewards - so
-            // replaying it here is safe, and a no-op if it was already finalized server-side first.
-            issueInterface.FinalizeMirror(owner);
+            // Mirrors the requesting client's finalize on the server's own copy - a no-op if it was already
+            // finalized server-side first.
+            issueInterface.FinalizeMirror(owner, reason);
 
-            network.SendAll(new NetworkVillageIssueRemoved(ownerId));
+            network.SendAll(new NetworkVillageIssueRemoved(ownerId, reason));
         });
     }
 
     private void Handle_NetworkVillageIssueRemoved(MessagePayload<NetworkVillageIssueRemoved> payload)
     {
         var ownerId = payload.What.OwnerId;
+        var reason = payload.What.Reason;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
-            issueInterface.FinalizeMirror(owner);
+            issueInterface.FinalizeMirror(owner, reason);
         });
     }
 }
