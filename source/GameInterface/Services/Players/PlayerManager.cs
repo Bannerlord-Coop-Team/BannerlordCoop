@@ -21,7 +21,9 @@ public interface IPlayerManager
     IReadOnlyCollection<Player> Players { get; }
 
     /// <summary>
-    /// Adds a player to the registry
+    /// Adds a player to the registry. A controller id maps to exactly one player, so a
+    /// registration for a controller that already has one is refused; deregister the old one
+    /// first (<see cref="RemovePlayer"/>) when replacing it.
     /// </summary>
     /// <param name="player">The player to be added to the registry</param>
     /// <returns>if the player was added to the registry</returns>
@@ -105,11 +107,18 @@ public class PlayerManager : IPlayerManager
         {
             lock (registrySync)
             {
-                return _players.ToArray();
+                return _players.Values.ToArray();
             }
         }
     }
-    private readonly HashSet<Player> _players = new HashSet<Player>();
+
+    // Keyed by controller id so a controller can only ever resolve to one player. Player has no
+    // value equality, so a set of instances happily accepted a second registration for a
+    // controller that already had one: a registration whose hero no longer existed sent its owner
+    // back through character creation, the created character registered the same controller
+    // again, and every later lookup for it threw inside a message handler — killing the join with
+    // no reply and leaving that client on the validation screen until its deadline expired.
+    private readonly Dictionary<string, Player> _players = new Dictionary<string, Player>();
 
     public PlayerManager(ILogger logger, IObjectManager objectManager, IControllerIdProvider controllerIdProvider)
     {
@@ -121,9 +130,32 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.AddPlayer(Player)"/>
     public bool AddPlayer(Player player)
     {
+        if (player == null) return false;
+
+        if (string.IsNullOrEmpty(player.ControllerId))
+        {
+            logger.Error("Refusing to register a player with no controller id (hero {HeroId})", player.HeroId);
+            return false;
+        }
+
         lock (registrySync)
         {
-            if (!_players.Add(player)) return false;
+            if (_players.TryGetValue(player.ControllerId, out var registered))
+            {
+                // Keep the existing registration rather than replacing it silently: the caller
+                // owns that decision, and the join flow already deregisters a dead registration
+                // before creating a replacement. Reaching this means an unexpected double-add, or
+                // a save written before this fix that carries two entries for one controller.
+                if (!ReferenceEquals(registered, player))
+                    logger.Error(
+                        "Controller {ControllerId} is already registered to hero {RegisteredHeroId}; " +
+                        "refusing to also register hero {HeroId}",
+                        player.ControllerId, registered.HeroId, player.HeroId);
+
+                return false;
+            }
+
+            _players.Add(player.ControllerId, player);
         }
 
         // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
@@ -168,12 +200,14 @@ public class PlayerManager : IPlayerManager
 
     public bool TryGetPlayer(string controllerId, out Player player)
     {
+        player = null;
+
+        if (string.IsNullOrEmpty(controllerId)) return false;
+
         lock (registrySync)
         {
-            player = _players.SingleOrDefault(player => player.ControllerId == controllerId);
+            return _players.TryGetValue(controllerId, out player);
         }
-
-        return player != null;
     }
 
     /// <inheritdoc cref="IPlayerManager.Contains(object)"/>
@@ -224,12 +258,17 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.RemovePlayer(Player)"/>
     public bool RemovePlayer(Player player)
     {
-        if (player == null) return false;
+        if (player == null || string.IsNullOrEmpty(player.ControllerId)) return false;
 
         lock (registrySync)
         {
-            if (!_players.Remove(player)) return false;
+            // Match the instance, not just the controller id: a caller holding a superseded
+            // Player must not deregister whoever currently holds that controller.
+            if (!_players.TryGetValue(player.ControllerId, out var registered) ||
+                !ReferenceEquals(registered, player))
+                return false;
 
+            _players.Remove(player.ControllerId);
             controllerToPeer.Remove(player.ControllerId);
 
             // A rejoin adds a fresh peer link without clearing the old one, so sweep every peer
