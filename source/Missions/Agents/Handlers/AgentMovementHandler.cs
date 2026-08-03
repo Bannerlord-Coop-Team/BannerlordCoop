@@ -12,7 +12,6 @@ using Missions.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using AgentControllerType = TaleWorlds.Core.AgentControllerType;
@@ -63,11 +62,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly IAgentVisualActionAccessor visualActionAccessor;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
-    private readonly CancellationTokenSource movementReceiveCancellation = new CancellationTokenSource();
-    private readonly CancellationToken movementReceiveLifetime;
-    private readonly Func<ReceivedMovement, ReceivedMovementKey> selectMovementKey;
-    private readonly Action<IReadOnlyList<ReceivedMovement>> applyMovement;
-
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
     // (this handler is transient), so it can't leak across missions.
@@ -178,45 +172,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
-    private readonly struct ReceivedMovementKey : IEquatable<ReceivedMovementKey>
-    {
-        private readonly string identityScopeId;
-        private readonly ushort compactId;
-        private readonly Guid canonicalId;
-        private readonly bool usesCompactId;
-
-        public ReceivedMovementKey(ReceivedMovement movement)
-        {
-            identityScopeId = movement.IdentityScopeId;
-            compactId = movement.CompactId;
-            canonicalId = movement.CanonicalId;
-            usesCompactId = movement.UsesCompactId;
-        }
-
-        public bool Equals(ReceivedMovementKey other)
-        {
-            return usesCompactId == other.usesCompactId &&
-                   (usesCompactId
-                       ? compactId == other.compactId && string.Equals(
-                           identityScopeId,
-                           other.identityScopeId,
-                           StringComparison.Ordinal)
-                       : canonicalId == other.canonicalId);
-        }
-
-        public override bool Equals(object obj) =>
-            obj is ReceivedMovementKey other && Equals(other);
-
-        public override int GetHashCode()
-        {
-            if (!usesCompactId) return canonicalId.GetHashCode();
-            unchecked
-            {
-                return ((identityScopeId?.GetHashCode() ?? 0) * 397) ^ compactId;
-            }
-        }
-    }
-
     private readonly Dictionary<Guid, LastSentMovementState> _lastSentMovement =
         new Dictionary<Guid, LastSentMovementState>();
     private readonly Dictionary<Guid, float> movementPendingSince =
@@ -261,10 +216,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.movementBatchSender = movementBatchSender;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
         this.visualActionAccessor = visualActionAccessor;
-        movementReceiveLifetime = movementReceiveCancellation.Token;
-        selectMovementKey = movement => new ReceivedMovementKey(movement);
-        applyMovement = ApplyMovement;
-
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
         this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -298,9 +249,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     {
         if (_disposed) return;
         _disposed = true;
-        movementReceiveCancellation.Cancel();
-        movementReceiveCancellation.Dispose();
-
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         _interpolator.Clear();
@@ -1075,13 +1023,10 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     private void QueueReceivedMovement(ReceivedMovement[] snapshots)
     {
-        // Adjacent rider and masterless-mount packets retain only each agent's latest state in one queue entry.
-        // Reliable spawn, deployment, and authority actions remain ordinary FIFO barriers.
-        GameThread.RunSafeCoalesced(
-            snapshots,
-            selectMovementKey,
-            applyMovement,
-            movementReceiveLifetime,
+        // Resolve and apply each received packet in one game-thread action so it remains FIFO-ordered
+        // with spawn, deployment, and authority work queued by earlier messages.
+        GameThread.RunSafe(
+            () => ApplyMovement(snapshots),
             context: nameof(HandlePacket));
     }
 

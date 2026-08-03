@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
 using Common;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -2062,73 +2061,6 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             Assert.Equal(0, horseMirror.SetTargetPositionAndDirectionCalls);
             Assert.Equal(1, horseMirror.TeleportToPositionCalls);
-        });
-    }
-
-    [Fact]
-    public void AdjacentRiderAndMasterlessMountPackets_ShareOneLatestStateQueueAction()
-    {
-        using var fixture = new MissionEngineFixture();
-        var peer = Clients.First();
-        SetControllerId(peer, "peer");
-
-        peer.Call(() =>
-        {
-            var mock = fixture.CreateMission(peer);
-            var registry = peer.Resolve<INetworkAgentRegistry>();
-            var component = peer.Resolve<ICoopMissionComponent>();
-            var riderId = Guid.NewGuid();
-            var horseId = Guid.NewGuid();
-            Agent rider = SpawnRider(mock);
-            Agent horse = mock.SpawnMount();
-            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
-            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
-            Assert.True(registry.TryRegisterAgent("owner", riderId, rider));
-            Assert.True(registry.TryRegisterAgent("owner", horseId, horse));
-
-            Agent sourceHorse = mock.SpawnMount();
-            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
-            sourceHorseMirror.MovementDirection = new Vec2(1f, 0f);
-            var firstMountData = new AgentMountData(sourceHorse, horseId);
-            sourceHorseMirror.MovementDirection = new Vec2(0f, 1f);
-            var latestMountData = new AgentMountData(sourceHorse, horseId);
-            AgentData firstRiderData = CreateAgentData(
-                Vec3.Zero, new Vec2(1f, 0f), 1f, mountData: null!);
-            AgentData latestRiderData = CreateAgentData(
-                Vec3.Zero, new Vec2(0f, 1f), 1f, mountData: null!);
-
-            Exception failure = null!;
-            var thread = new Thread(() =>
-            {
-                try
-                {
-                    component.AgentMovementHandler.HandlePacket(
-                        null,
-                        new MovementPacket(new[] { riderId }, new[] { firstRiderData }));
-                    component.AgentMovementHandler.MountMovementApplier.HandlePacket(
-                        null,
-                        new MountMovementPacket(new[] { horseId }, new[] { firstMountData }));
-                    component.AgentMovementHandler.HandlePacket(
-                        null,
-                        new MovementPacket(new[] { riderId }, new[] { latestRiderData }));
-                    component.AgentMovementHandler.MountMovementApplier.HandlePacket(
-                        null,
-                        new MountMovementPacket(new[] { horseId }, new[] { latestMountData }));
-                }
-                catch (Exception exception)
-                {
-                    failure = exception;
-                }
-            });
-            thread.Start();
-            thread.Join();
-            if (failure != null) throw failure;
-
-            Assert.Equal(1, GameThread.Instance.QueueLength);
-            GameThread.Instance.Update(TimeSpan.Zero);
-
-            Assert.Equal(new Vec2(0f, 1f), riderMirror.MovementDirection);
-            Assert.Equal(new Vec2(0f, 1f), horseMirror.MovementDirection);
         });
     }
 
