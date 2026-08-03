@@ -21,6 +21,8 @@ concurrency:
 
 env:
   R2_PRIVATE_BUCKET: bannerlordcoop-build-inputs
+  R2_PUBLIC_BUCKET: bannerlordcoop-nightly-releases
+  R2_PUBLIC_BASE_URL: https://pub-bf6bfe4b880e4d1b83f4b09b10419f78.r2.dev
 
 jobs:
   build:
@@ -223,6 +225,37 @@ jobs:
           remote_bytes=$(rclone lsl "r2:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | awk '{print $1}')
           test "$remote_bytes" = "$archive_bytes"
           rclone copyto artifact/manifest.json "r2:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+
+      - name: Publish latest client to public R2
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_PUBLIC_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_PUBLIC_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          RELEASE_DATE: ${{ steps.release.outputs.release_date }}
+          FILE_NAME: ${{ steps.release.outputs.file_name }}
+          HEAD_SHA: ${{ steps.release.outputs.head_sha }}
+        run: |
+          set -eu
+          test -n "$R2_ACCOUNT_ID"
+          test -n "$R2_PUBLIC_BUCKET"
+          export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          archive="artifact/$FILE_NAME"
+          archive_bytes=$(stat -c %s "$archive")
+          archive_sha256=$(sha256sum "$archive" | cut -d' ' -f1)
+          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          printf '{"version":1,"releaseDate":"%s","headSha":"%s","builtAt":"%s","client":{"fileName":"%s","bytes":%s,"sha256":"%s","publicUrl":"%s/nightly/Coop.7z"}}\n' \
+            "$RELEASE_DATE" "$HEAD_SHA" "$built_at" "$FILE_NAME" "$archive_bytes" \
+            "$archive_sha256" "$R2_PUBLIC_BASE_URL" > artifact/client-release.json
+
+          rclone copyto "$archive" "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" \
+            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          remote_bytes=$(rclone lsl "r2:$R2_PUBLIC_BUCKET/nightly/Coop.7z" | awk '{print $1}')
+          test "$remote_bytes" = "$archive_bytes"
+          # Publish the manifest last so installers never observe incomplete client bytes.
+          rclone copyto artifact/client-release.json "r2:$R2_PUBLIC_BUCKET/nightly/client.json" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
       - name: Upload nightly artifact
