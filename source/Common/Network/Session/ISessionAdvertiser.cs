@@ -35,11 +35,3 @@ public interface ISessionAdvertiser : IDisposable
     /// </summary>
     bool InviteFriends();
 }
-
-#if DEBUG
-/// <summary>Exposes the active advertisement identity to DEBUG-only live-test commands.</summary>
-public interface ISessionAdvertisementDebugInfo
-{
-    ulong LobbyId { get; }
-}
-#endif

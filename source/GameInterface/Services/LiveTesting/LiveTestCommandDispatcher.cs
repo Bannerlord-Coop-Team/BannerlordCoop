@@ -17,7 +17,7 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 {
     private const string AllowedCommandPrefix = "coop.debug.";
 
-    private static int collectedAssemblyCount = -1;
+    private static bool functionsCollected;
 
     public bool EnsureReady()
     {
@@ -73,11 +73,10 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 
     private static void EnsureFunctionsCollected()
     {
-        int loadedAssemblyCount = AppDomain.CurrentDomain.GetAssemblies().Length;
-        if (collectedAssemblyCount == loadedAssemblyCount) return;
+        if (functionsCollected) return;
 
         CommandLineFunctionality.CollectCommandLineFunctions();
-        collectedAssemblyCount = loadedAssemblyCount;
+        functionsCollected = true;
     }
 }
 

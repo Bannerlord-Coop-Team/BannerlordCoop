@@ -2,14 +2,6 @@
 using Common.Network;
 using Common.Network.Session;
 using Common.Network.Session.Messages;
-#if DEBUG
-using Newtonsoft.Json;
-using System.Linq;
-using TaleWorlds.Core;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.MountAndBlade.View;
-using TaleWorlds.ScreenSystem;
-#endif
 using System.Collections.Generic;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -24,90 +16,6 @@ namespace GameInterface.Services.UI.Commands;
 /// </summary>
 public class SteamDebugCommand
 {
-#if DEBUG
-    [CommandLineArgumentFunction("open_lobbies", "coop.debug.steam")]
-    public static string OpenLobbies(List<string> args)
-    {
-        if (!(GameStateManager.Current?.ActiveState is InitialState))
-            return "Steam lobby browser requires the main menu";
-
-        if (!(ScreenManager.TopScreen is CoopConnectionUI))
-        {
-            ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
-        }
-
-        if (!(ScreenManager.TopScreen is CoopConnectionUI screen))
-            return "Could not open the Steam lobby browser";
-
-        screen.DebugSelectSteamLobbies();
-        return BrowserStatus(args);
-    }
-
-    [CommandLineArgumentFunction("refresh_lobbies", "coop.debug.steam")]
-    public static string RefreshLobbies(List<string> args)
-    {
-        if (!TryGetLobbyBrowser(out var viewModel, out var error)) return error;
-
-        viewModel.ActionRefreshSteamLobbies();
-        return BrowserStatus(args);
-    }
-
-    [CommandLineArgumentFunction("filter_lobbies", "coop.debug.steam")]
-    public static string FilterLobbies(List<string> args)
-    {
-        if (!TryGetLobbyBrowser(out var viewModel, out var error)) return error;
-
-        viewModel.SteamLobbyHostSearchText = string.Join(" ", args);
-        return BrowserStatus(args);
-    }
-
-    [CommandLineArgumentFunction("browser_status", "coop.debug.steam")]
-    public static string BrowserStatus(List<string> args)
-    {
-        if (!TryGetLobbyBrowser(out var viewModel, out var error))
-        {
-            return JsonConvert.SerializeObject(new
-            {
-                open = false,
-                error,
-            });
-        }
-
-        return JsonConvert.SerializeObject(new
-        {
-            open = true,
-            selectedTab = viewModel.SelectedTab?.Id,
-            refreshing = viewModel.IsRefreshingSteamLobbies,
-            status = viewModel.SteamLobbyStatusText,
-            search = viewModel.SteamLobbyHostSearchText,
-            total = viewModel.DebugDiscoveredSteamLobbies.Count,
-            all = viewModel.DebugDiscoveredSteamLobbies.Select(lobby => new
-            {
-                lobbyId = lobby.LobbyId.ToString(),
-                host = lobby.HostText,
-                players = lobby.ConnectedPlayers,
-                compatible = lobby.IsCompatible,
-            }).ToArray(),
-            visible = viewModel.SteamLobbies.Select(lobby => new
-            {
-                lobbyId = lobby.LobbyId.ToString(),
-                host = lobby.HostText,
-                players = lobby.ConnectedPlayers,
-                compatible = lobby.IsCompatible,
-            }).ToArray(),
-        });
-    }
-
-    private static bool TryGetLobbyBrowser(out CoopConnectMenuVM viewModel, out string error)
-    {
-        viewModel = (ScreenManager.TopScreen as CoopConnectionUI)?.DebugDataSource;
-        error = viewModel == null
-            ? "Steam lobby browser is not open"
-            : null;
-        return viewModel != null;
-    }
-#endif
-
     [CommandLineArgumentFunction("status", "coop.debug.steam")]
     public static string Status(List<string> args)
     {
@@ -115,21 +23,13 @@ public class SteamDebugCommand
         if (!ContainerProvider.TryGetContainer(out _)) return "Steam integration active; no co-op session running";
         if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return "Steam integration active; this process has no session advertiser (server process?)";
 
-#if DEBUG
-        var lobbyStatus = advertiser is ISessionAdvertisementDebugInfo debugInfo
-            ? $"; lobbyId={debugInfo.LobbyId}"
-            : string.Empty;
-#else
-        const string lobbyStatus = "";
-#endif
-
         if (ContainerProvider.TryResolve<ISessionTunnelHost>(out var tunnelHost))
         {
-            return $"Steam integration active; advertising={advertiser.IsAdvertising}{lobbyStatus}; " +
+            return $"Steam integration active; advertising={advertiser.IsAdvertising}; " +
                 $"tunnelListening={tunnelHost.IsListening}; tunnelPeers={tunnelHost.PeerCount}";
         }
 
-        return $"Steam integration active; advertising={advertiser.IsAdvertising}{lobbyStatus}";
+        return $"Steam integration active; advertising={advertiser.IsAdvertising}";
     }
 
     [CommandLineArgumentFunction("host_lobby", "coop.debug.steam")]

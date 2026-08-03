@@ -76,9 +76,6 @@ namespace Coop
 
         private bool isServer = false;
         private bool isAutoConnect = false;
-#if DEBUG
-        private bool deferClientAutoConnect = false;
-#endif
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
@@ -97,10 +94,6 @@ namespace Coop
             }
 
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
-#if DEBUG
-            deferClientAutoConnect = !isServer && args.Any(
-                a => a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase));
-#endif
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
@@ -594,9 +587,6 @@ namespace Coop
         {
             // The auto-load-save start path owns this process's startup.
             if (ManagedServerConfig.HasAutoLoadSave) return;
-#if DEBUG
-            if (deferClientAutoConnect) return;
-#endif
 
             if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
             {

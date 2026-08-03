@@ -110,10 +110,6 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     [DataSourceProperty]
     public MBBindingList<SteamLobbyListItemVM> SteamLobbies { get; }
 
-#if DEBUG
-    internal IReadOnlyList<SteamLobbyListItemVM> DebugDiscoveredSteamLobbies => discoveredSteamLobbies;
-#endif
-
     [DataSourceProperty]
     public string SteamLobbyHostSearchText
     {

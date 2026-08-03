@@ -1,7 +1,4 @@
-﻿#if DEBUG
-using System.Linq;
-#endif
-using TaleWorlds.Engine.GauntletUI;
+﻿using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.ScreenSystem;
 
@@ -15,16 +12,6 @@ public class CoopConnectionUI : ScreenBase
     private GauntletLayer _gauntletLayer;
     private GauntletMovieIdentifier _gauntletMovie;
     private bool _focusSteamLobbyHostSearchOnNextFrame;
-
-#if DEBUG
-    internal CoopConnectMenuVM DebugDataSource => _dataSource;
-
-    internal void DebugSelectSteamLobbies()
-    {
-        _dataSource?.Tabs.FirstOrDefault(tab => tab.Id == CoopConnectMenuVM.SteamLobbiesTabId)?
-            .ExecuteSelection();
-    }
-#endif
 
     protected override void OnInitialize()
     {
