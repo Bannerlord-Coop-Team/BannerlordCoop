@@ -222,28 +222,6 @@ internal static class LordBarterPatch
         return true;
     }
 
-    private static bool IsPendingContextActive()
-    {
-        if (authorizedBarter == null) return false;
-        if (pendingContext == PeaceConversationContext.Location)
-        {
-            var mission = CampaignMission.Current;
-            return mission?.Location != null && mission.Mode == MissionMode.Barter &&
-                   ContainerProvider.TryResolve<IObjectManager>(out var manager) &&
-                   manager.TryGetId(mission.Location, out var locationId) && locationId == pendingContextId;
-        }
-
-        if (pendingContext == PeaceConversationContext.Settlement)
-        {
-            var settlement = authorizedBarter.OffererParty?.MobileParty?.CurrentSettlement;
-            return settlement != null && authorizedBarter.OtherHero?.CurrentSettlement == settlement &&
-                   ContainerProvider.TryResolve<IObjectManager>(out var settlementManager) &&
-                   settlementManager.TryGetId(settlement, out var settlementId) && settlementId == pendingContextId;
-        }
-
-        return PlayerEncounter.Current != null && authorizedBarter.OtherParty == MobileParty.ConversationParty?.Party;
-    }
-
     private static bool TryAuthorize(BarterData barterData, LordBarterKind kind)
     {
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||

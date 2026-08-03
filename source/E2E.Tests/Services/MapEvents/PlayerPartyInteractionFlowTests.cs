@@ -1551,9 +1551,11 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
     public void NpcPeaceBarter_StationarySettlementConversation_ReturnsAcceptedAfterMutation(
+        bool failDuringPeaceDispatch,
         bool failAfterMutation)
     {
         const int initialPlayerGold = 1_000_000;
@@ -1600,7 +1602,17 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, targetHero.MapFaction));
         });
 
-        if (failAfterMutation)
+        if (failDuringPeaceDispatch)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(CampaignEventDispatcher),
+                    nameof(CampaignEventDispatcher.OnMakePeace)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowDuringMakePeaceDispatch)));
+        }
+        else if (failAfterMutation)
         {
             harmony.Patch(
                 AccessTools.Method(
@@ -1634,13 +1646,19 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>());
             Assert.True(result.Accepted, result.Reason);
             Assert.Equal(requestId, result.RequestId);
-            Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
+            var expectedPlayerGold = failDuringPeaceDispatch
+                ? initialPlayerGold
+                : initialPlayerGold - offeredGold;
+            var expectedTargetGold = failDuringPeaceDispatch
+                ? initialTargetGold
+                : initialTargetGold + offeredGold;
+            Assert.Equal(expectedPlayerGold, result.PlayerGold);
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
-                Assert.Equal(initialPlayerGold - offeredGold, playerHero.Gold);
-                Assert.Equal(initialTargetGold + offeredGold, targetHero.Gold);
+                Assert.Equal(expectedPlayerGold, playerHero.Gold);
+                Assert.Equal(expectedTargetGold, targetHero.Gold);
             });
             AssertPeaceMade(Server, playerClanId, targetClanId);
         }
@@ -2043,8 +2061,11 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
-    [Fact]
-    public void BanditSafePassage_PostApplyFailure_ReturnsAcceptedResult()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BanditSafePassage_FailureAfterPayment_AcceptsOnlyAfterSafePassageIsInstalled(
+        bool failBeforeSafePassageIsInstalled)
     {
         const int initialPlayerGold = 1000;
         const int initialBanditGold = 40;
@@ -2080,13 +2101,26 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
         TestEnvironment.FlushCoalescer();
 
-        harmony.Patch(
-            AccessTools.Method(
-                typeof(ConversationPartyHold),
-                nameof(ConversationPartyHold.EndEngagement)),
-            prefix: new HarmonyMethod(
-                typeof(PlayerPartyInteractionFlowTests),
-                nameof(ThrowAfterBanditBarterMutation)));
+        if (failBeforeSafePassageIsInstalled)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(DefaultMobilePartyAIModelPatches),
+                    nameof(DefaultMobilePartyAIModelPatches.PreventAttacksUntil)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowBeforeBanditSafePassageMutation)));
+        }
+        else
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(ConversationPartyHold),
+                    nameof(ConversationPartyHold.EndEngagement)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowAfterBanditBarterMutation)));
+        }
 
         try
         {
@@ -2100,7 +2134,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             TestEnvironment.FlushCoalescer();
 
             var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBanditBarterResult>());
-            Assert.True(result.Accepted, result.Reason);
+            Assert.Equal(!failBeforeSafePassageIsInstalled, result.Accepted);
             Assert.Equal(requestId, result.RequestId);
             Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
             AssertBanditBarterGold(
@@ -2657,6 +2691,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
     private static void ThrowAfterBarterAccepted()
         => throw new InvalidOperationException("Post-acceptance barter work failed.");
+
+    private static void ThrowDuringMakePeaceDispatch()
+        => throw new InvalidOperationException("Peace event dispatch failed after the factions became neutral.");
+
+    private static void ThrowBeforeBanditSafePassageMutation()
+        => throw new InvalidOperationException("Bandit safe-passage installation failed.");
 
     private static void ThrowAfterBanditBarterMutation()
         => throw new InvalidOperationException("Post-apply bandit barter work failed.");

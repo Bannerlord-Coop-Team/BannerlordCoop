@@ -118,7 +118,6 @@ internal sealed class BanditBarterHandler : IHandler
             }
 
             ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
-            mutationApplied = true;
 
             var protectionUntil = CampaignTime.HoursFromNow(32);
             foreach (var protectedParty in offer.EnemyParties)
@@ -136,6 +135,7 @@ internal sealed class BanditBarterHandler : IHandler
                 player.HeroId,
                 request.BanditPartyId,
                 BanditInteractionsCampaignBehavior.PlayerInteraction.PaidOffParty);
+            mutationApplied = true;
 
             ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
             FlushHeroGold(playerHero);

@@ -137,9 +137,16 @@ internal sealed class PeaceBarterHandler : IHandler
                 return;
             }
 
-            MakePeaceAction.Apply(playerHero.MapFaction, targetHero.MapFaction);
-            if (playerHero.MapFaction.FactionsAtWarWith?.Contains(targetHero.MapFaction) == true ||
-                targetHero.MapFaction.FactionsAtWarWith?.Contains(playerHero.MapFaction) == true)
+            try
+            {
+                MakePeaceAction.Apply(playerHero.MapFaction, targetHero.MapFaction);
+            }
+            finally
+            {
+                mutationApplied = IsPeaceApplied(playerHero, targetHero);
+            }
+
+            if (!mutationApplied)
             {
                 Reject(peer, request, playerHero.Gold, "The peace agreement could not be completed.");
                 return;
@@ -150,7 +157,6 @@ internal sealed class PeaceBarterHandler : IHandler
                 if (!(barterable is PeaceBarterable))
                     barterable.Apply();
             }
-            mutationApplied = true;
             CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offeredBarterables);
             ApplyOverpayRelationBonus(playerHero, targetHero, MathF.Max(0f, offerValue));
 
@@ -290,6 +296,14 @@ internal sealed class PeaceBarterHandler : IHandler
         }
 
         return true;
+    }
+
+    private static bool IsPeaceApplied(Hero playerHero, Hero targetHero)
+    {
+        var playerFaction = playerHero?.MapFaction;
+        var targetFaction = targetHero?.MapFaction;
+        return playerFaction?.FactionsAtWarWith?.Contains(targetFaction) == false &&
+               targetFaction?.FactionsAtWarWith?.Contains(playerFaction) == false;
     }
 
     private bool TryBuildPeaceBarter(
