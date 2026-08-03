@@ -43,6 +43,29 @@ public sealed class BattleAgentSpawnBatchCodecTests
     }
 
     [Fact]
+    public void EncodedBatch_RoundTripsOuterMessageThroughProtobuf()
+    {
+        var codec = new BattleAgentSpawnBatchCodec();
+        NetworkSpawnBattleAgents encoded = codec
+            .Encode(CreateRecords(32), SpawnBatchPurpose.CatchUp)
+            .Single();
+
+        NetworkSpawnBattleAgents wire = ProtoBuf.Serializer.DeepClone(encoded);
+
+        Assert.Equal(encoded.Payload, wire.Payload);
+        Assert.Equal(encoded.UncompressedLength, wire.UncompressedLength);
+        Assert.Equal(encoded.RecordCount, wire.RecordCount);
+        Assert.Equal(encoded.IsCompressed, wire.IsCompressed);
+        Assert.Equal(encoded.TransferId, wire.TransferId);
+        Assert.Equal(encoded.BatchIndex, wire.BatchIndex);
+        Assert.Equal(encoded.BatchCount, wire.BatchCount);
+        Assert.Equal(encoded.Purpose, wire.Purpose);
+        Assert.Equal(encoded.PayloadSha256, wire.PayloadSha256);
+        Assert.True(codec.TryDecode(wire, out BattleAgentSpawnData[] decoded));
+        Assert.Equal(encoded.RecordCount, decoded.Length);
+    }
+
+    [Fact]
     public void TryDecode_RejectsCorruptCompressedPayload()
     {
         var codec = new BattleAgentSpawnBatchCodec();

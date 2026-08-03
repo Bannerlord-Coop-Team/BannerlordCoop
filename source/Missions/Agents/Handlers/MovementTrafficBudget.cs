@@ -18,6 +18,7 @@ public sealed class MovementTrafficBudget : IMovementTrafficBudget
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MovementTrafficBudget>();
 
+    // SendAll is charged once, so these defaults assume two-player battles; actual egress scales with peers.
     internal const int DefaultBytesPerSecond = 1024 * 1024;
     internal const int DefaultBurstBytes = 128 * 1024;
     private const float ReportIntervalSeconds = 1f;

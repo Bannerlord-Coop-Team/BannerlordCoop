@@ -395,12 +395,23 @@ public class CoopBattleController : CoopMissionController
             }
         }
 
-        // An active battle needs a barrier so later reliable sends cannot pass its replay. During mission
-        // loading the game-thread queue does not drain yet, so the ordinary pre-activation handshake defers.
-        GameThread.RunSafe(
-            ReplayJoinState,
-            blocking: Deployment.IsActivated,
-            context: nameof(SendJoinInfo));
+        // Only an active battle waits and guarantees replay before activation. Before activation an inline
+        // commit broadcast may overtake this queued replay; that is safe while activation remains idempotent
+        // and puppets spawn unpaused, and avoids blocking while the load-time game-thread queue cannot drain.
+        try
+        {
+            GameThread.RunSafe(
+                ReplayJoinState,
+                blocking: Deployment.IsActivated,
+                context: nameof(SendJoinInfo));
+        }
+        catch (Exception e) when (e is TimeoutException || e is OperationCanceledException)
+        {
+            Logger.Warning(
+                e,
+                "[BattleSync] Join replay barrier for {Controller} was abandoned; the replay stays queued",
+                controllerId);
+        }
     }
 
     protected override void HandleJoinInfo(NetPeer peer, NetworkMissionJoinInfo joinInfo)

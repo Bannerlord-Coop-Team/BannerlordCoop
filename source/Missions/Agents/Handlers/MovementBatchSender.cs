@@ -28,20 +28,17 @@ public readonly struct MovementSendResult
 {
     public int SentCount { get; }
     public int DeferredCount { get; }
-    public int SentBytes { get; }
 
-    public MovementSendResult(int sentCount, int deferredCount, int sentBytes)
+    public MovementSendResult(int sentCount, int deferredCount)
     {
         SentCount = sentCount;
         DeferredCount = deferredCount;
-        SentBytes = sentBytes;
     }
 
     public MovementSendResult Add(MovementSendResult other) =>
         new MovementSendResult(
             SentCount + other.SentCount,
-            DeferredCount + other.DeferredCount,
-            SentBytes + other.SentBytes);
+            DeferredCount + other.DeferredCount);
 }
 
 public sealed class MovementBatch<T>
@@ -154,7 +151,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         if (maxPayloadBytes <= 0)
         {
             LogMissingPayloadBudget(batch);
-            return new MovementSendResult(0, batch.Data.Count, 0);
+            return new MovementSendResult(0, batch.Data.Count);
         }
 
         var fairnessKey = (typeof(T), batch.IdentityScopeId, batch.IsPriority);
@@ -170,7 +167,6 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 : MovementIdFormat.Compact;
         bool probeForGrowth = true;
         int sentCount = 0;
-        int sentBytes = 0;
 
         for (int start = 0; start < orderedBatch.Data.Count;)
         {
@@ -255,7 +251,6 @@ public sealed class MovementBatchSender : IMovementBatchSender
             if (availablePayloadBytes == maxPayloadBytes)
                 RememberPreferredBatchSize(preferenceKey, candidate.Count, remaining);
             sentCount += candidate.Count;
-            sentBytes += candidate.Payload.Length;
             start += candidate.Count;
             probeForGrowth = false;
         }
@@ -265,8 +260,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
         return new MovementSendResult(
             sentCount,
-            Math.Max(0, batch.Data.Count - sentCount),
-            sentBytes);
+            Math.Max(0, batch.Data.Count - sentCount));
     }
 
     private static MovementBatch<T> Rotate<T>(MovementBatch<T> batch, int offset)

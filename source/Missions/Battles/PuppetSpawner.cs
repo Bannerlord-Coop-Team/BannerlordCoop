@@ -136,7 +136,15 @@ public class PuppetSpawner : IPuppetSpawner
         NetworkSpawnBattleAgents message,
         BattleAgentSpawnData[] agents)
     {
-        if (Mission.Current == null) return;
+        if (Mission.Current == null)
+        {
+            Logger.Warning(
+                "[BattleTraffic] Dropping spawn transfer {TransferId} batch {BatchIndex}/{BatchCount}: mission ended",
+                message.TransferId,
+                message.BatchIndex + 1,
+                Math.Max(1, message.BatchCount));
+            return;
+        }
 
         int slotsAvailable = agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current));
         foreach (BattleAgentSpawnData data in agents)
@@ -416,7 +424,8 @@ public class PuppetSpawner : IPuppetSpawner
         {
             if (pendingPuppets.Count == 0) return;
             int count = Math.Min(MaxBufferedSpawnsPerTick, pendingPuppets.Count);
-            pending = pendingPuppets.GetRange(0, count).ToArray();
+            pending = new BattleAgentSpawnData[count];
+            pendingPuppets.CopyTo(0, pending, 0, count);
             pendingPuppets.RemoveRange(0, count);
         }
 
