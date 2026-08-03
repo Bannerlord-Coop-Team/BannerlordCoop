@@ -108,42 +108,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
             clientDiplomaticSnapshot.OriginalFingerprint;
     }
 
-    [CommandLineArgumentFunction("observe_player_diplomacy", "coop.debug.player_captivity")]
-    public static string ObservePlayerDiplomacy(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.player_captivity.observe_player_diplomacy <otherHeroId>";
-        var context = new CommandContext("observe_player_diplomacy", usage, args);
-
-        if (!ModInformation.IsClient) return "observe_player_diplomacy must be run on a client.";
-        if (!context.RequireArgCount(1, out var error)) return error;
-        if (!TryGetPlayerFactions(args[0], out var playerHero, out var otherHero, out error))
-            return "Failed to observe player diplomacy: " + error;
-
-        var output = new StringBuilder();
-        output.AppendLine("PlayerHeroId=" + playerHero.StringId);
-        output.AppendLine("OtherHeroId=" + otherHero.StringId);
-        output.AppendLine("AtWar=" + playerHero.MapFaction.IsAtWarWith(otherHero.MapFaction));
-        output.Append("DiplomaticStateFingerprint=" + GetDiplomaticStateFingerprint(playerHero.MapFaction, otherHero.MapFaction));
-        return output.ToString();
-    }
-
-    [CommandLineArgumentFunction("snapshot_player_diplomacy_fixture", "coop.debug.player_captivity")]
-    public static string SnapshotPlayerDiplomacyFixture(List<string> args)
-    {
-        const string usage = "Usage: coop.debug.player_captivity.snapshot_player_diplomacy_fixture <otherHeroId>";
-        var context = new CommandContext("snapshot_player_diplomacy_fixture", usage, args);
-
-        if (!ModInformation.IsClient) return "snapshot_player_diplomacy_fixture must be run on a client.";
-        if (!context.RequireArgCount(1, out var error)) return error;
-        if (clientDiplomaticSnapshot != null) return "A client AI-lord diplomatic fixture is already active.";
-        if (!TryGetPlayerFactions(args[0], out var playerHero, out var otherHero, out error))
-            return "Failed to snapshot player diplomacy: " + error;
-
-        clientDiplomaticSnapshot = StanceLinkSnapshot.Capture(playerHero.MapFaction, otherHero.MapFaction);
-        return "Client player diplomatic fixture captured.\nOriginalDiplomaticStateFingerprint=" +
-            clientDiplomaticSnapshot.OriginalFingerprint;
-    }
-
     [CommandLineArgumentFunction("restore_ai_lord_diplomacy_fixture", "coop.debug.player_captivity")]
     public static string RestoreAiLordDiplomacyFixture(List<string> args)
     {
@@ -472,31 +436,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
         return true;
     }
 
-    private static bool TryGetPlayerFactions(
-        string otherHeroId,
-        out Hero playerHero,
-        out Hero otherHero,
-        out string error)
-    {
-        playerHero = Hero.MainHero;
-        otherHero = null;
-        if (playerHero?.MapFaction == null)
-        {
-            error = "the client player hero has no map faction.";
-            return false;
-        }
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return false;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, otherHeroId, out otherHero, out error)) return false;
-        if (otherHero.MapFaction == null || playerHero.MapFaction == otherHero.MapFaction)
-        {
-            error = "the player and other hero need distinct map factions.";
-            return false;
-        }
-
-        error = null;
-        return true;
-    }
-
     private static string FormatPosition(CampaignVec2 position) =>
         position.X.ToString("R", CultureInfo.InvariantCulture) + "," +
         position.Y.ToString("R", CultureInfo.InvariantCulture) + "," +
@@ -558,7 +497,7 @@ internal static class AiLordPeaceReleaseFixtureCommands
         }
     }
 
-    internal sealed class StanceLinkSnapshot
+    private sealed class StanceLinkSnapshot
     {
         private readonly IFaction faction1;
         private readonly IFaction faction2;
@@ -650,15 +589,6 @@ internal static class AiLordPeaceReleaseFixtureCommands
             faction2.UpdateFactionsAtWarWith();
             if (publishStanceChange && WasAtWar && stanceChanged)
                 MessageBroker.Instance.Publish(faction1, new FactionWarDeclared(faction1, faction2, (int)DeclareWarAction.DeclareWarDetail.Default));
-            else if (publishStanceChange && !WasAtWar && stanceChanged)
-                MessageBroker.Instance.Publish(
-                    faction1,
-                    new FactionPeaceMade(
-                        faction1,
-                        faction2,
-                        dailyTributeFrom1To2,
-                        dailyTributeInstallments,
-                        (int)MakePeaceAction.MakePeaceDetail.Default));
         }
 
         public string VerifyRestored()
