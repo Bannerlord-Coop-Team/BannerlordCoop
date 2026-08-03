@@ -31,16 +31,18 @@ internal class IssueManagerQuestCompletedReasonCapture
     // FinalizeMirror calls the real QuestBase.CompleteQuestWithXxx under AllowedThread) - harmless either way,
     // since a replay's own IssueFinalized postfix below no-ops on CallOriginalPolicy.IsOriginalAllowed().
     //
-    // Widened (was hardcoded to VillageNeedsToolsIssueQuest only) to also recognize
-    // VillageNeedsCraftingMaterialsIssueQuest - this is a shared single choke point (one PendingReasons
-    // dictionary) feeding any allowlisted quest type's mirroring handler, not something to duplicate per type.
+    // Widened (was a hand-maintained "is VillageNeedsToolsIssueQuest or VillageNeedsCraftingMaterialsIssueQuest"
+    // pattern match) to check DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted against the quest's parent
+    // Issue instead - a shared single choke point (one PendingReasons dictionary) feeding any allowlisted
+    // quest type's mirroring handler, and one that no longer needs a new "or TypeXQuest" clause added here
+    // every time a new issue type joins the allowlist. QuestGiver.Issue is still the live parent Issue at this
+    // point (OnQuestCompleted runs before the IssueFinalized cascade that eventually nulls Hero.Issue).
     [HarmonyPatch(nameof(IssueManager.OnQuestCompleted))]
     [HarmonyPrefix]
     private static void Prefix(QuestBase quest, QuestBase.QuestCompleteDetails detail)
     {
-        if (quest is not (VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest or
-            VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest)) return;
-        if (quest.QuestGiver == null) return;
+        if (quest?.QuestGiver == null) return;
+        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(quest.QuestGiver.Issue)) return;
 
         PendingReasons[quest.QuestGiver] = detail switch
         {
@@ -97,12 +99,13 @@ internal class IssueFinalizedPatches
         // Skip a mirrored replay (Interfaces.VillageNeedsToolsIssueInterface.FinalizeMirror runs under
         // AllowedThread) so applying a received broadcast never re-triggers another broadcast.
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-        // Widened (was hardcoded to VillageNeedsToolsIssue only) to also recognize
-        // VillageNeedsCraftingMaterialsIssue - this is the shared single choke point every allowlisted issue
-        // type's finalize broadcast funnels through (see VillageNeedsCraftingMaterialsIssueHandler's doc
-        // comment for why that handler deliberately does NOT add its own parallel subscription here).
-        if (__instance is not (VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue or
-            VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue)) return;
+        // Widened (was a hand-maintained "is VillageNeedsToolsIssue or VillageNeedsCraftingMaterialsIssue"
+        // pattern match) to DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted - the shared single choke
+        // point every allowlisted issue type's finalize broadcast funnels through (see
+        // VillageNeedsCraftingMaterialsIssueHandler's doc comment for why per-type handlers deliberately do
+        // NOT add their own parallel subscription here), now without needing a new "or TypeX" clause added
+        // here every time a new issue type joins the allowlist.
+        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;
 
         MessageBroker.Instance.Publish(__instance, new VillageIssueFinalizedTriggered(owner, reason));
     }

@@ -47,12 +47,39 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
     /// <summary>
     /// Issue-type behaviors vetted and allowed to actually generate/offer their issue in co-op. Extend this
     /// as more issue types get the same sync + audit treatment as VillageNeedsToolsIssueBehavior.
+    ///
+    /// Made internal (was private) and read via <see cref="IsAllowlisted"/> so the other shared choke points
+    /// (<see cref="IssueFinalizedPatches"/>, <see cref="IssueManagerQuestCompletedReasonCapture"/>) can check
+    /// "is this a synced issue type at all" generically against ISSUE (not behavior) types, instead of each
+    /// growing its own hand-maintained <c>is (A or B or C or ...)</c> pattern match every time a new type is
+    /// added here.
     /// </summary>
-    private static readonly HashSet<Type> Allowlist = new HashSet<Type>
+    internal static readonly HashSet<Type> Allowlist = new HashSet<Type>
     {
         typeof(VillageNeedsToolsIssueBehavior),
         typeof(VillageNeedsCraftingMaterialsIssueBehavior),
+        typeof(LordNeedsHorsesIssueBehavior),
+        typeof(CapturedByBountyHuntersIssueBehavior),
+        typeof(ArmyNeedsSuppliesIssueBehavior),
+        typeof(LandlordTrainingForRetainersIssueBehavior),
+        typeof(GangLeaderNeedsRecruitsIssueBehavior),
+        typeof(LadysKnightOutIssueBehavior),
+        typeof(ScoutEnemyGarrisonsIssueBehavior),
     };
+
+    /// <summary>
+    /// True if <paramref name="issue"/>'s concrete type is the nested Issue type of one of the
+    /// <see cref="Allowlist"/> behaviors. Used by <see cref="IssueFinalizedPatches"/> and
+    /// <see cref="IssueManagerQuestCompletedReasonCapture"/> to recognize any currently-synced issue type
+    /// generically - safe because <see cref="Allowlist"/> already guarantees no OTHER issue type can ever be
+    /// created in the first place (see this type's own doc comment), so any <see cref="IssueBase"/> that
+    /// exists at all is either one of these, or an untouched pre-existing one from an old save (harmlessly
+    /// excluded here the same way it always was).
+    /// </summary>
+    internal static bool IsAllowlisted(IssueBase issue)
+    {
+        return issue != null && issue.GetType().DeclaringType is Type declaringType && Allowlist.Contains(declaringType);
+    }
 
     private static bool applied;
 

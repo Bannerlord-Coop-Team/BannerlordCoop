@@ -275,7 +275,9 @@ public class VillageNeedsToolsIssueInterface : IVillageNeedsToolsIssueInterface
 
     public void MirrorQuestAccepted(Hero owner)
     {
-        if (owner?.Issue is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue || !owner.Issue.IsOngoingWithoutQuest) return;
+        // Widened (was hardcoded to VillageNeedsToolsIssue only) - see GenericAcceptMirrorIssueTypes's doc
+        // comment for which other issue types this bare, uncorrected replay is safe/correct for.
+        if (!GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(owner?.Issue) || !owner.Issue.IsOngoingWithoutQuest) return;
 
         using (new AllowedThread())
         {
@@ -285,7 +287,9 @@ public class VillageNeedsToolsIssueInterface : IVillageNeedsToolsIssueInterface
 
     public void MirrorAlternativeAccepted(Hero owner)
     {
-        if (owner?.Issue is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue issue || !issue.IsOngoingWithoutQuest) return;
+        if (!GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner?.Issue) || !owner.Issue.IsOngoingWithoutQuest) return;
+
+        var issue = owner.Issue;
 
         using (new AllowedThread())
         {

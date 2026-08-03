@@ -1,6 +1,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -42,7 +43,12 @@ internal class IssueQuestAcceptancePatch
         // under AllowedThread - skip re-publishing so it doesn't loop back through the network again.
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!__result) return;
-        if (issueOwner?.Issue is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue) return;
+        // Widened (was hardcoded to VillageNeedsToolsIssue only) to every issue type whose Quest fields are
+        // all already frozen at creation time - see GenericAcceptMirrorIssueTypes's doc comment. Types that
+        // need their own accept-time force-write (VillageNeedsCraftingMaterialsIssue and others) capture this
+        // same moment via their own independent postfix on this same method instead (Harmony runs multiple
+        // postfixes on one method without conflict) - see e.g. VillageNeedsCraftingMaterialsQuestAcceptancePatch.
+        if (!GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(issueOwner?.Issue)) return;
 
         // Real ownership fix: capture this accepting machine's own ControllerId at the moment of the
         // genuine accept - see VillageNeedsToolsIssueOwnership.
@@ -72,9 +78,11 @@ internal class IssueWithAlternativeSolutionAcceptancePatch
     private static void Postfix(IssueBase __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-        if (__instance is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue villageIssue) return;
+        // Widened (was hardcoded to VillageNeedsToolsIssue only) - see GenericAcceptMirrorIssueTypes's doc
+        // comment for which types this covers and why.
+        if (!GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(__instance)) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        MessageBroker.Instance.Publish(villageIssue, new VillageIssueAlternativeAcceptTriggered(villageIssue.IssueOwner, controllerIdProvider?.ControllerId));
+        MessageBroker.Instance.Publish(__instance, new VillageIssueAlternativeAcceptTriggered(__instance.IssueOwner, controllerIdProvider?.ControllerId));
     }
 }
