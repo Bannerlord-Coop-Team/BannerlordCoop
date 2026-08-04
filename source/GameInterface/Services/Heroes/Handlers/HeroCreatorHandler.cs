@@ -7,6 +7,7 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -42,11 +43,15 @@ internal class HeroCreatorHandler : IHandler
         var data = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.Hero.BattleEquipment, out var battleEquipmentId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.Hero.CivilianEquipment, out var civilianEquipmentId)) return;
 
         var message = new NetworkInitializeNewHero(
             heroId,
             data.Hero.FirstName,
             data.Hero.Name,
+            battleEquipmentId,
+            civilianEquipmentId,
             data.Hero.CivilianEquipment,
             data.Hero.BattleEquipment);
         network.SendAll(message);
@@ -59,12 +64,16 @@ internal class HeroCreatorHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Equipment>(data.BattleEquipmentId, out var battleEquipment)) return;
+            if (!objectManager.TryGetObjectWithLogging<Equipment>(data.CivilianEquipmentId, out var civilianEquipment)) return;
 
             using (new AllowedThread())
             {
                 hero.SetName(data.Name, data.FirstName);
-                hero._civilianEquipment = data.CivilianEquipment;
-                hero._battleEquipment = data.BattleEquipment;
+                battleEquipment = data.BattleEquipment;
+                civilianEquipment = data.CivilianEquipment;
+                hero._battleEquipment = battleEquipment;
+                hero._civilianEquipment = civilianEquipment;
             }
         });
     }

@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -19,21 +18,31 @@ public readonly struct NetworkInitializeNewHero : IEvent
     public readonly TextObject Name;
 
     [ProtoMember(4)]
-    public readonly Equipment CivilianEquipment;
+    public readonly string CivilianEquipmentId;
 
     [ProtoMember(5)]
+    public readonly string BattleEquipmentId;
+
+    [ProtoMember(6)]
+    public readonly Equipment CivilianEquipment;
+
+    [ProtoMember(7)]
     public readonly Equipment BattleEquipment;
 
     public NetworkInitializeNewHero(
         string heroId,
         TextObject firstName,
         TextObject name,
+        string civilianEquipmentId,
+        string battleEquipmentId,
         Equipment civilianEquipment,
         Equipment battleEquipment)
     {
         HeroId = heroId;
         FirstName = firstName;
         Name = name;
+        CivilianEquipmentId = civilianEquipmentId;
+        BattleEquipmentId = battleEquipmentId;
         CivilianEquipment = civilianEquipment;
         BattleEquipment = battleEquipment;
     }
