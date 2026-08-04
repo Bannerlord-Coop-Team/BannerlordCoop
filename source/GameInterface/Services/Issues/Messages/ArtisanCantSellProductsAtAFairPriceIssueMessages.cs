@@ -24,6 +24,10 @@ public readonly struct ArtisanCantSellProductsAtAFairPriceIssueCreated : IEvent
     }
 }
 
+/// <summary>Server -> all clients: the four server-picked creation-time fields (second-location target
+/// settlement/hero, the raw materials item to be delivered, and the counter-offer hero) for a newly created
+/// Artisan Can't Sell Products At A Fair Price issue, so every peer constructs a byte-identical mirror instead
+/// of independently re-rolling any of them.</summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkArtisanCantSellProductsAtAFairPriceIssueCreated : ICommand
 {

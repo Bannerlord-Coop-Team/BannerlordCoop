@@ -30,6 +30,10 @@ public readonly struct GangLeaderStolenGoodsIssueCreated : IEvent
     }
 }
 
+/// <summary>Server -> all clients: the authoritatively-picked hideout, the server's own
+/// <c>_randomForStolenTradeGood</c> roll, and the <c>AfterIssueCreation</c>-derived counter-offer hero for a
+/// newly created Gang Leader Needs to Offload Stolen Goods issue, so every peer constructs a byte-identical
+/// mirror instead of independently re-rolling or re-deriving any of the three.</summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkGangLeaderStolenGoodsIssueCreated : ICommand
 {

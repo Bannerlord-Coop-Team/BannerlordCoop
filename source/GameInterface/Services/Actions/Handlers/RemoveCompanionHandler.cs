@@ -11,6 +11,14 @@ using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Actions.Handlers;
 
+/// <summary>
+/// Server-side counterpart to <see cref="Patches.RemoveCompanionActionPatches"/>'s client-side forward: turns
+/// a locally-published <see cref="CompanionRemovalAttempted"/> (a non-host client's blocked direct call to
+/// <c>RemoveCompanionAction.ApplyInternal</c>) into a <see cref="NetworkCompanionRemovalAttempted"/> broadcast,
+/// then applies the real <c>RemoveCompanionAction.ApplyInternal</c> only once that message reaches the server.
+/// Clients observe the resulting Hero/roster mutation through the existing AutoSync patches rather than
+/// through this handler.
+/// </summary>
 internal class RemoveCompanionHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<RemoveCompanionHandler>();
