@@ -50,18 +50,25 @@ internal struct TextObjectSurrogate
 
     public static implicit operator TextObject(TextObjectSurrogate surrogate)
     {
+        // Keep null attributes instead of initializing an empty dictionary
         if (surrogate.TextObjectAttributes == null && surrogate.IntAttributes == null)
             return new TextObject(surrogate.Text);
 
         var attributes = new Dictionary<string, object>();
-        foreach (var textObjectAttribute in surrogate.TextObjectAttributes)
+        if (surrogate.TextObjectAttributes != null)
         {
-            TextObject converted = textObjectAttribute.Value;
-            attributes[textObjectAttribute.Key] = converted;
+            foreach (var textObjectAttribute in surrogate.TextObjectAttributes)
+            {
+                TextObject converted = textObjectAttribute.Value;
+                attributes[textObjectAttribute.Key] = converted;
+            }
         }
-        foreach (var integerAttribute in surrogate.IntAttributes)
+        if (surrogate.IntAttributes != null)
         {
-            attributes[integerAttribute.Key] = integerAttribute.Value;
+            foreach (var integerAttribute in surrogate.IntAttributes)
+            {
+                attributes[integerAttribute.Key] = integerAttribute.Value;
+            }
         }
 
         return new TextObject(surrogate.Text, attributes);

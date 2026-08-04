@@ -17,7 +17,7 @@ internal class MBCharacterSkillsRegistry : AutoRegistryBase<MBCharacterSkills>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MBCharacterSkills));
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

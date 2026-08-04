@@ -17,7 +17,7 @@ internal class MBEquipmentRosterRegistry : AutoRegistryBase<MBEquipmentRoster>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MBEquipmentRoster));
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

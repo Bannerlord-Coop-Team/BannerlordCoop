@@ -79,14 +79,14 @@ internal class CompanionsCommands
     /// <summary>
     /// Clear the wanderers from the map to roll new ones
     /// </summary>
-    [CommandLineArgumentFunction("clearwanderers", "coop.debug.companions")]
+    [CommandLineArgumentFunction("clear_wanderers", "coop.debug.companions")]
     public static string ClearWanderersCommand(List<string> strings)
     {
         if (ModInformation.IsClient) return "This command can only be run on the server.";
 
         foreach (var hero in Hero.AllAliveHeroes.ToList())
         {
-            if (hero.IsWanderer)
+            if (hero.IsWanderer && hero.CompanionOf == null)
             {
                 KillCharacterAction.ApplyByRemove(hero, false, true);
             }
