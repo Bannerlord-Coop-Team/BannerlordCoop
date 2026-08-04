@@ -2,20 +2,24 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.BesiegerCamps.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.SiegeEvents.Handlers;
 
@@ -33,19 +37,22 @@ internal class ServerSiegeEntryHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly ISettlementInterface settlementInterface;
 
     public ServerSiegeEntryHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IPlayerManager playerManager,
-        ISiegeEventInterface siegeEventInterface)
+        ISiegeEventInterface siegeEventInterface,
+        ISettlementInterface settlementInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.siegeEventInterface = siegeEventInterface;
+        this.settlementInterface = settlementInterface;
         messageBroker.Subscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
         messageBroker.Subscribe<NetworkRequestJoinSiegeCamp>(HandleJoin);
         messageBroker.Subscribe<NetworkRequestBreakSiege>(HandleBreak);
@@ -54,6 +61,110 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Subscribe<SiegePreparationStarted>(HandlePreparationStarted);
         messageBroker.Subscribe<SiegeEndedWithoutBattle>(HandleSiegeEnded);
         messageBroker.Subscribe<SiegeCampPositionRolled>(HandleCampPosition);
+        messageBroker.Subscribe<NetworkRequestBreakInContinuation>(HandleBreakInContinuation);
+    }
+
+    private void HandleBreakInContinuation(MessagePayload<NetworkRequestBreakInContinuation> payload)
+    {
+        var obj = payload.What;
+        if (!(payload.Who is NetPeer peer))
+        {
+            Logger.Error("Received {Message} with no originating peer", nameof(NetworkRequestBreakInContinuation));
+            return;
+        }
+
+        GameThread.RunSafe(() =>
+        {
+            bool approved;
+            try
+            {
+                approved = TryApplyBreakInContinuation(peer, obj);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to apply break-in continuation request {RequestId}", obj.RequestId);
+                approved = false;
+            }
+
+            SendBreakInContinuationResult(peer, obj, approved);
+        }, context: nameof(HandleBreakInContinuation));
+    }
+
+    private bool TryApplyBreakInContinuation(
+        NetPeer peer,
+        NetworkRequestBreakInContinuation request)
+    {
+        if (!DoesPeerControlParty(peer, request)) return false;
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(request.PartyId, out var party) ||
+            !objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement))
+            return false;
+
+        var alreadyEntered = ReferenceEquals(party.CurrentSettlement, settlement);
+        if (!CanApplyBreakInContinuation(party, settlement, alreadyEntered))
+        {
+            Logger.Warning("Rejecting break-in request {RequestId} for party {PartyId} and settlement {SettlementId}",
+                request.RequestId, request.PartyId, request.SettlementId);
+            return false;
+        }
+
+        if (alreadyEntered)
+        {
+            network.Send(peer, new NetworkPartyEnterSettlement(
+                Compact(request.SettlementId, typeof(Settlement)),
+                Compact(request.PartyId, typeof(MobileParty))));
+        }
+        else
+        {
+            settlementInterface.PartyEnterSettlement(party, settlement);
+        }
+
+        return ReferenceEquals(party.CurrentSettlement, settlement);
+    }
+
+    private bool DoesPeerControlParty(
+        NetPeer peer,
+        NetworkRequestBreakInContinuation request)
+    {
+        if (playerManager.TryGetPlayer(peer, out var player) &&
+            player.MobilePartyId == request.PartyId)
+            return true;
+
+        Logger.Warning("Rejecting break-in request {RequestId} from a peer that does not control party {PartyId}",
+            request.RequestId, request.PartyId);
+        return false;
+    }
+
+    private static bool CanApplyBreakInContinuation(
+        MobileParty party,
+        Settlement settlement,
+        bool alreadyEntered)
+    {
+        if (!party.IsActive) return false;
+        if (party.CurrentSettlement != null && !alreadyEntered) return false;
+        if (party.BesiegerCamp != null) return false;
+
+        var partyBase = party.Party;
+        var mapEventSide = partyBase.MapEventSide;
+        var validEnteredMapEvent = alreadyEntered &&
+            ReferenceEquals(party.MapEvent, settlement.Party?.MapEvent) &&
+            partyBase.Side == BattleSideEnum.Defender;
+        if (mapEventSide != null && !validEnteredMapEvent) return false;
+
+        var siegeEvent = settlement.SiegeEvent;
+        return siegeEvent != null &&
+            siegeEvent.CanPartyJoinSide(partyBase, BattleSideEnum.Defender);
+    }
+
+    private void SendBreakInContinuationResult(
+        NetPeer peer,
+        NetworkRequestBreakInContinuation request,
+        bool approved)
+    {
+        network.Send(peer, new NetworkBreakInContinuationApproved(
+            request.RequestId,
+            request.SettlementId,
+            approved));
     }
 
     // Runs on the game thread already; joins defenders with patches live before broadcasting the prompts.
@@ -249,5 +360,6 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<SiegePreparationStarted>(HandlePreparationStarted);
         messageBroker.Unsubscribe<SiegeEndedWithoutBattle>(HandleSiegeEnded);
         messageBroker.Unsubscribe<SiegeCampPositionRolled>(HandleCampPosition);
+        messageBroker.Unsubscribe<NetworkRequestBreakInContinuation>(HandleBreakInContinuation);
     }
 }
