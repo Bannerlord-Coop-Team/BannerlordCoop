@@ -82,6 +82,21 @@ internal static class GenericAcceptMirrorIssueTypes
         // later by the dialogue-triggered QuestAcceptedConsequences, not by this replay - is handled entirely
         // separately by SmugglersPartySpawnGatePatch, not by this generic accept mirror.
         typeof(SmugglersIssueBehavior.SmugglersIssue),
+        // Tier 2 Group B (continued): Artisan Overpriced Goods - GenerateIssueQuest(questId) forwards
+        // IssueOwner/CampaignTime.DaysFromNow(30f)/_requestedTradeGood/RewardGold/RequestedTradeGoodAmount/
+        // CounterOfferHero. The Issue ctor takes _requestedTradeGood/CounterOfferHero DIRECTLY (both picked
+        // server-side in ConditionsHold/GetAntagonistMerchant before CreateNewIssue ever runs - see
+        // IArtisanOverpricedGoodsIssueInterface's doc comment), and RewardGold/RequestedTradeGoodAmount are
+        // pure functions of _requestedTradeGood.Value and the same deterministic IssueDifficultyMultiplier
+        // every other type here already relies on (CalculateTradeGoodsAmountAndReward, run unconditionally
+        // inside the ctor) - so once creation is captured/forced, a bare replay of IssueManager.StartIssueQuest
+        // lands on a byte-identical ArtisanOverpricedGoodsIssueQuest on every peer. Contrary to this task's
+        // initial assumption (verified against the decompiled source rather than trusted, per this session's
+        // established pattern), this type does NOT need its own bespoke accept-time capture for these scalar
+        // fields - the one genuinely bespoke mechanic it needs (the AntagonistHero/CounterOfferHero identity
+        // fix) is a pure, local, network-message-free Harmony patch entirely orthogonal to accept-time mirror
+        // eligibility - see Patches.ArtisanOverpricedGoodsAntagonistIdentityPatches.
+        typeof(ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -144,6 +159,11 @@ internal static class GenericAcceptMirrorIssueTypes
         // same generic trigger (see NewIssueTypesAlternativeSolutionCompletionPatches' doc comment). Needs its
         // matching HourlyTick registration too - see that file's SmugglersIssueBehavior entry.
         typeof(SmugglersIssueBehavior.SmugglersIssue),
+        // Artisan Overpriced Goods - IsThereAlternativeSolution == true, AlternativeSolutionScaleFlags is
+        // Duration only (confirmed against the decompiled source - no FailureRisk/Casualties), so
+        // MirrorAlternativeAccepted's generic force-write (issue state + IsTriedToSolveBefore + due time) is
+        // all any other peer's mirror copy needs.
+        typeof(ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>

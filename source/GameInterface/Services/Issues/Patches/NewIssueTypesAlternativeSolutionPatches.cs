@@ -160,6 +160,17 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void SmugglersRegisterEventsPostfix(SmugglersIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Tier 2 Group B (continued) - Artisan Overpriced Goods. AlternativeSolutionScaleFlags is Duration only
+    // (confirmed against the decompiled source - not overridden beyond the base Duration flag), so it always
+    // succeeds deterministically, same as ArtisanCantSellProductsAtAFairPrice above. Registered in the SAME
+    // commit as the AlternativeSolutionMirrorEligible entry (see GenericAcceptMirrorIssueTypes's own
+    // lesson-learned comment on Deliver the Herd, where the two were split across commits and this
+    // registration was initially missed).
+    [HarmonyPatch(typeof(ArtisanOverpricedGoodsIssueBehavior), nameof(ArtisanOverpricedGoodsIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void ArtisanOverpricedGoodsRegisterEventsPostfix(ArtisanOverpricedGoodsIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;

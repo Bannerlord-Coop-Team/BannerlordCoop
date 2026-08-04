@@ -129,6 +129,23 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // path (SmugglersQuestOwnershipGatePatch) - the accept-quest/alternative-solution flows themselves
         // ride the fully generic GenericAcceptMirrorIssueTypes mechanism unchanged.
         typeof(SmugglersIssueBehavior),
+        // Tier 2 Group B (continued) - Artisan Overpriced Goods, TaleWorlds.CampaignSystem.dll. Confirmed the
+        // "safest quest in the whole roadmap" claim, but this pass independently found a real, pre-existing,
+        // vanilla-adjacent bug: ArtisanOverpricedGoodsIssueQuest's ctor receives counterOfferHero but never
+        // stores it - every access point instead re-derives a private AntagonistHero property live via an
+        // order-dependent Notables.FirstOrDefault missing the CanHaveCampaignIssues() filter the Issue's own
+        // GetAntagonistMerchant applies at creation time (can silently resolve to a DIFFERENT hero, or null -
+        // AcceptCounterOffer has zero null-guard). Fixed via a getter-redirect Harmony patch - see
+        // Patches.ArtisanOverpricedGoodsAntagonistIdentityPatches's doc comment for the full derivation, the
+        // same "intercept a property getter" precedent GangLeaderNeedsToOffloadStolenGoodsPriceFreezePatches
+        // established. Also independently found (beyond what the design critique flagged) a turn-in ownership
+        // gap on BOTH the delivery dialogue (live on every mirror peer via SetDialogs(), called from the ctor
+        // itself) AND a chained-external-Consequence gap where gating DeliverItemsFullyOnConsequence alone is
+        // not enough to stop QuestBase.CompleteQuestWithSuccess from still firing - see
+        // Patches.ArtisanOverpricedGoodsOwnershipGatePatches's doc comment. No orphaned standalone disable
+        // patch was found for this type (grepped the whole tree - zero hits, same as Smugglers), so this
+        // allowlist entry is Step 0's only structural change.
+        typeof(ArtisanOverpricedGoodsIssueBehavior),
     };
 
     /// <summary>
