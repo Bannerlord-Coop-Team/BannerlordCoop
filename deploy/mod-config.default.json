@@ -110,5 +110,15 @@
     // "NeverExpire": a refusal blocks that lord for the rest of the session.
     // "AlwaysRetry": a refusal never blocks; you can ask the same lord again straight away.
     "lordDefectionRetries": "Vanilla",
+
+    // Whether a besieged town's militia join the garrison when it sallies out.
+    // Vanilla keeps militia on the walls during a sally-out. That also keeps them out of the
+    // strength comparison the AI uses to decide whether to sortie at all, so a town holding
+    // thousands of militia behind a small garrison never sorties - which reads as the AI being
+    // broken even though it is faithful to singleplayer.
+    // (Default) true:  militia fight alongside the garrison, so a well-defended town actually sorties.
+    // false: vanilla - militia stay on the walls and are ignored by the sortie decision.
+    // Rebellious towns hold their militia back either way, exactly as vanilla does.
+    "militiaJoinsSallyOut": true,
   }
 }
