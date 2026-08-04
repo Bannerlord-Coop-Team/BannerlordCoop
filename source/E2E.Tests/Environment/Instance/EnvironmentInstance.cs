@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -60,9 +60,10 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source of the message</param>
     /// <param name="message">Received Message</param>
-    public void SimulateMessage<T>(object source, T message) where T : IMessage
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulateMessage<T>(object source, T message, bool markGameThread = true) where T : IMessage
     {
-        using (new StaticScope(this))
+        using (new StaticScope(this, markGameThread))
         {
             messageBroker.Publish(source, message);
         }
@@ -73,9 +74,10 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source Peer</param>
     /// <param name="packet">Received Packet</param>
-    public void SimulatePacket(NetPeer source, IPacket packet)
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulatePacket(NetPeer source, IPacket packet, bool markGameThread = true)
     {
-        using (new StaticScope(this))
+        using (new StaticScope(this, markGameThread))
         {
             EnsureSerializable(packet);
             mockNetwork.ReceiveFromNetwork(source, packet);
@@ -152,7 +154,7 @@ public abstract class EnvironmentInstance : IDisposable
         private readonly TestMessageBroker previousMessageBroker;
         private readonly bool wasServer;
 
-        public StaticScope(EnvironmentInstance instance)
+        public StaticScope(EnvironmentInstance instance, bool markGameThread = true)
         {
             Monitor.Enter(GameInstance.@lock);
             bool restorePreviousStatics = false;
@@ -162,6 +164,12 @@ public abstract class EnvironmentInstance : IDisposable
             // recycled) thread forever and every later scope or GameInstance build deadlocks.
             try
             {
+                if (markGameThread)
+                {
+                    // xUnit can move a test from its fixture-constructor thread before the next scoped call.
+                    GameThread.Instance.MarkGameThread();
+                }
+
                 // Save previous static values
                 wasServer = ModInformation.IsServer;
                 previousObjectManager = MBObjectManager.Instance;
