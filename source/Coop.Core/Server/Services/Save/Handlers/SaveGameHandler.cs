@@ -137,6 +137,8 @@ internal class SaveGameHandler : IHandler
                     "that controller is already registered",
                     player?.ControllerId, player?.HeroId);
         }
+
+        messageBroker.Publish(this, new SavedPlayerRegistrationsRestored());
     }
 
     /// <summary>
