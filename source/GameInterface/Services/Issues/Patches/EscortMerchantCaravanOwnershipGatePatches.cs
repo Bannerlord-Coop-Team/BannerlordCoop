@@ -108,21 +108,34 @@ internal class EscortMerchantCaravanOwnershipGatePatches
 /// every dangerous read of <c>_questCaravanMobileParty</c> is already blocked by
 /// <see cref="EscortMerchantCaravanOwnershipGatePatches"/> regardless of whether this field ever resolves on
 /// their mirror, so running the resolution there would be harmless but pointless work.
+///
+/// Bug fix (found by independent review, 2026-08-04): the genuine-failure branch specified by the design doc
+/// (§3.5 - "if <c>_questCaravanMobileParty</c> is null, CompleteQuestWithCancel(); return;") was missing
+/// entirely. The shipped code only ever handled the resolution-succeeds case, silently leaving the field null
+/// on failure and letting the original <c>InitializeQuestOnGameLoad()</c> body run anyway (its own decompiled
+/// body - see §2.4 - unconditionally calls <c>SetDialogs()</c> regardless of whether the field resolved). Since
+/// the ownership gate above only checks peer identity, not field null-ness, the owner-gated <c>HourlyTick()</c>
+/// would then dereference the still-null field on its very next hourly tick and crash with an uncaught NRE.
+/// Returning <see langword="false"/> here to skip the original method is safe: the vanilla body's only other
+/// effect (a conditional <c>CompleteQuestWithCancel()</c> guarded by <c>questCaravanMobileParty != null</c>)
+/// can never fire when the field is still null, so skipping it loses nothing - it's strictly equivalent to the
+/// design doc's own early-<c>return</c> shape, just implemented as a Harmony Prefix short-circuit instead of an
+/// in-place edit of the decompiled method body.
 /// </summary>
 [HarmonyPatch(typeof(EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssueQuest), "InitializeQuestOnGameLoad")]
 internal class EscortMerchantCaravanGameLoadCaravanPartyFallbackPatch
 {
     [HarmonyPrefix]
-    private static void Prefix(EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssueQuest __instance)
+    private static bool Prefix(EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssueQuest __instance)
     {
-        if (!VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(__instance.QuestGiver)) return;
+        if (!VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(__instance.QuestGiver)) return true;
 
         var questCaravanMobilePartyField = AccessTools.Field(__instance.GetType(), "_questCaravanMobileParty");
-        if (questCaravanMobilePartyField.GetValue(__instance) != null) return;
-        if (!__instance.IsOngoing) return;
+        if (questCaravanMobilePartyField.GetValue(__instance) != null) return true;
+        if (!__instance.IsOngoing) return true;
 
         var questGiver = __instance.QuestGiver;
-        if (questGiver == null) return;
+        if (questGiver == null) return true;
 
         var resolved = MobileParty.All.FirstOrDefault(mp =>
             mp.PartyComponent is CustomPartyComponent cpc &&
@@ -132,6 +145,14 @@ internal class EscortMerchantCaravanGameLoadCaravanPartyFallbackPatch
         if (resolved != null)
         {
             questCaravanMobilePartyField.SetValue(__instance, resolved);
+            return true;
         }
+
+        // Resolution genuinely failed: no real MobileParty anywhere matches this quest by component. Per
+        // design doc §3.5, fail safe instead of leaving _questCaravanMobileParty null for the owner-gated
+        // HourlyTick() (and other live listeners) to crash on. Skip the original method (which would otherwise
+        // unconditionally call SetDialogs() regardless) by returning false.
+        __instance.CompleteQuestWithCancel();
+        return false;
     }
 }

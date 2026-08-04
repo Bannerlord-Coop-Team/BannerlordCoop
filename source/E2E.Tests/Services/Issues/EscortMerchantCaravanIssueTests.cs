@@ -533,6 +533,79 @@ public class EscortMerchantCaravanIssueTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// Bug fix regression test (found by independent review, 2026-08-04 - see
+    /// <see cref="Patches.EscortMerchantCaravanGameLoadCaravanPartyFallbackPatch"/>'s own doc comment): the
+    /// genuine-resolution-FAILS branch (design doc §3.5 - no real party anywhere matches this quest by
+    /// component) had NO coverage at all before this test - both sibling tests above only exercise the
+    /// resolution-SUCCEEDS and non-owner branches. Deliberately creates NO matching
+    /// <see cref="MobileParty"/> anywhere (unlike the sibling owner test, which creates one via
+    /// <see cref="CreateRealCaravanPartyOnServer"/>), so the component-match query is guaranteed to come back
+    /// empty - this is what makes the test genuinely exercise the failure path rather than vacuously pass.
+    /// Proves the fix: the Prefix returns <see langword="false"/> (skipping the original method, which would
+    /// otherwise unconditionally call <c>SetDialogs()</c> even with a still-null field - the exact shape of the
+    /// bug), <c>CompleteQuestWithCancel()</c> runs for real, and the quest ends up cleanly finalized (not
+    /// ongoing, no dangling <see cref="Hero.Issue"/>) rather than left half-alive with a null field for the
+    /// owner-gated <c>HourlyTick()</c> to NRE on next tick.
+    /// </summary>
+    [Fact]
+    public void GameLoadFallback_OwnerWithNullCaravanPartyAndNoMatchingPartyAnywhere_CancelsQuestCleanly()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Resolve<IControllerIdProvider>().SetControllerId("host-controller");
+        var quest = AcceptOnInstance(Server, fixture.HeroId);
+
+        Server.Call(() =>
+        {
+            // Same join-mid-quest simulation as the sibling owner test (direct StartQuest(), not the full
+            // QuestAcceptedConsequences() - see that test's own comment for why): the quest is genuinely
+            // ongoing but _questCaravanMobileParty never resolved from the save graph.
+            quest.StartQuest();
+            Assert.True(quest.IsOngoing);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+
+            // The deserialized field failed to resolve, and - unlike the sibling owner test - no real party
+            // exists anywhere to resolve it by component either. This is the genuine-failure case §3.5 defends
+            // against.
+            Assert.Null(QuestCaravanMobilePartyField.GetValue(quest));
+            Assert.DoesNotContain(MobileParty.All, mp => mp.PartyComponent is CustomPartyComponent);
+
+            var fallbackPrefix = AccessTools.Method(
+                typeof(GameInterface.Services.Issues.Patches.EscortMerchantCaravanGameLoadCaravanPartyFallbackPatch), "Prefix");
+
+            object prefixResult = null;
+            var thrown = Record.Exception(() =>
+            {
+                using (new AllowedThread())
+                {
+                    prefixResult = fallbackPrefix.Invoke(null, new object[] { quest });
+                }
+            });
+
+            // Cleanly cancelled - not an uncaught exception reaching the caller.
+            Assert.Null(thrown);
+
+            // The Prefix skips the original InitializeQuestOnGameLoad() body on this path (returns false),
+            // instead of letting it fall through to an unconditional SetDialogs() with a still-null field.
+            Assert.False(Assert.IsType<bool>(prefixResult));
+
+            // Resolution genuinely failed - the field is still null, not force-set to some wrong value.
+            Assert.Null(QuestCaravanMobilePartyField.GetValue(quest));
+
+            // CompleteQuestWithCancel() ran for real: the quest is no longer ongoing and the owner's Issue is
+            // gone - cleanly finalized, not left half-alive for the owner-gated HourlyTick() to crash on.
+            Assert.False(quest.IsOngoing);
+            Assert.Null(owner.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+        });
+    }
+
     // --- 7. Party-spawn gate: request/broadcast/force-write convergence ---
 
     [Fact]
