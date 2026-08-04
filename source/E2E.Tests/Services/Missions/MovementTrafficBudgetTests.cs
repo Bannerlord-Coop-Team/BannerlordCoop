@@ -120,6 +120,236 @@ public sealed class MovementTrafficBudgetTests
         Assert.Equal(new[] { firstId, secondId }, sentIds);
     }
 
+    [Fact]
+    public void Sender_ReusesLearnedTargetUntilGrowthCadenceExpires()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var sentCounts = new List<int>();
+        network.Setup(x => x.SendAll(It.IsAny<IPacket>(), It.IsAny<byte[]>()))
+            .Callback<IPacket, byte[]>((packet, _) =>
+                sentCounts.Add(((SizedPacket)packet).Count));
+        var compressor = new SizedPacketCompressor();
+        var sender = new MovementBatchSender(
+            network.Object,
+            compressor,
+            new ControllableTrafficBudget(10000));
+        Guid[] ids = CreateIds(12);
+
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 0) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        compressor.BytesPerSnapshot = 5;
+        compressor.Reset();
+        sentCounts.Clear();
+        sender.BeginFrame(0.5f);
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 100) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        Assert.Equal(new[] { 5, 5, 2 }, sentCounts);
+        Assert.Equal(sentCounts.Count, compressor.SerializeCalls);
+
+        compressor.Reset();
+        sentCounts.Clear();
+        sender.BeginFrame(0.5f);
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 200) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        Assert.Equal(new[] { 10, 2 }, sentCounts);
+        Assert.True(compressor.SerializeCalls > sentCounts.Count);
+    }
+
+    [Fact]
+    public void Sender_ShrinksLearnedTargetImmediatelyWhenItNoLongerFits()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var sentCounts = new List<int>();
+        network.Setup(x => x.SendAll(It.IsAny<IPacket>(), It.IsAny<byte[]>()))
+            .Callback<IPacket, byte[]>((packet, _) =>
+                sentCounts.Add(((SizedPacket)packet).Count));
+        var compressor = new SizedPacketCompressor();
+        var sender = new MovementBatchSender(
+            network.Object,
+            compressor,
+            new ControllableTrafficBudget(10000));
+        Guid[] ids = CreateIds(12);
+
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 0) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        compressor.BytesPerSnapshot = 20;
+        compressor.Reset();
+        sentCounts.Clear();
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 100) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        Assert.Equal(new[] { 2, 2, 2, 2, 2, 2 }, sentCounts);
+        Assert.True(compressor.SerializeCalls > sentCounts.Count);
+    }
+
+    [Fact]
+    public void Sender_ConstrainedBudgetDoesNotPostponeDueGrowthProbe()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var sentCounts = new List<int>();
+        network.Setup(x => x.SendAll(It.IsAny<IPacket>(), It.IsAny<byte[]>()))
+            .Callback<IPacket, byte[]>((packet, _) =>
+                sentCounts.Add(((SizedPacket)packet).Count));
+        var compressor = new SizedPacketCompressor();
+        var budget = new ControllableTrafficBudget(50);
+        var sender = new MovementBatchSender(network.Object, compressor, budget);
+        Guid[] ids = CreateIds(12);
+
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 0) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        compressor.BytesPerSnapshot = 5;
+        budget.AvailableBytes = 30;
+        sentCounts.Clear();
+        sender.BeginFrame(1f);
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 100) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+        Assert.Equal(new[] { 5, 1 }, sentCounts);
+
+        budget.AvailableBytes = 50;
+        sentCounts.Clear();
+        sender.BeginFrame(0.1f);
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 200) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        Assert.Equal(new[] { 10 }, sentCounts);
+    }
+
+    [Fact]
+    public void Sender_GrowthCadenceIsIsolatedByScopeAndIdFormat()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var sentCounts = new List<int>();
+        network.Setup(x => x.SendAll(It.IsAny<IPacket>(), It.IsAny<byte[]>()))
+            .Callback<IPacket, byte[]>((packet, _) =>
+                sentCounts.Add(((SizedPacket)packet).Count));
+        var compressor = new SizedPacketCompressor();
+        var sender = new MovementBatchSender(
+            network.Object,
+            compressor,
+            new ControllableTrafficBudget(10000));
+        Guid[] ids = CreateIds(12);
+
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 0) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+        sender.Send(
+            new[] { CreateCompactBatch("scope", ids, valueOffset: 0) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        compressor.BytesPerSnapshot = 5;
+        sender.BeginFrame(1f);
+        sentCounts.Clear();
+        sender.Send(
+            new[] { CreateBatch(ids, valueOffset: 100) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+        Assert.Equal(10, sentCounts[0]);
+
+        sentCounts.Clear();
+        sender.Send(
+            new[] { CreateCompactBatch("scope", ids, valueOffset: 100) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        Assert.Equal(10, sentCounts[0]);
+    }
+
+    [Fact]
+    public void Sender_PriorityBatchDoesNotConsumeNormalGrowthCadence()
+    {
+        var network = new Mock<IBattleNetwork>();
+        var sentCounts = new List<int>();
+        network.Setup(x => x.SendAll(It.IsAny<IPacket>(), It.IsAny<byte[]>()))
+            .Callback<IPacket, byte[]>((packet, _) =>
+                sentCounts.Add(((SizedPacket)packet).Count));
+        var compressor = new SizedPacketCompressor();
+        var sender = new MovementBatchSender(
+            network.Object,
+            compressor,
+            new ControllableTrafficBudget(10000));
+        Guid[] ids = CreateIds(12);
+
+        sender.Send(
+            new[] { CreateCompactBatch("scope", ids[0..1], valueOffset: 0, isPriority: true) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+        sentCounts.Clear();
+        sender.Send(
+            new[] { CreateCompactBatch("scope", ids, valueOffset: 0) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+        Assert.Equal(5, sentCounts[0]);
+
+        compressor.BytesPerSnapshot = 5;
+        sender.BeginFrame(1f);
+        sender.Send(
+            new[] { CreateCompactBatch("scope", ids[0..1], valueOffset: 100, isPriority: true) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+        sentCounts.Clear();
+        sender.Send(
+            new[] { CreateCompactBatch("scope", ids, valueOffset: 100) },
+            legacyBatch: null,
+            maxPayloadBytes: 50,
+            CreatePacket,
+            onSent: null);
+
+        Assert.Equal(10, sentCounts[0]);
+    }
+
     private static Guid[] CreateIds(int count)
     {
         var ids = new Guid[count];
@@ -150,6 +380,22 @@ public sealed class MovementTrafficBudgetTests
         return batch;
     }
 
+    private static MovementBatch<int> CreateCompactBatch(
+        string scopeId,
+        Guid[] ids,
+        int valueOffset,
+        bool isPriority = false)
+    {
+        var batch = new MovementBatch<int>(scopeId, isPriority);
+        for (int i = 0; i < ids.Length; i++)
+        {
+            batch.CanonicalIds.Add(ids[i]);
+            batch.CompactIds.Add((ushort)(i + 1));
+            batch.Data.Add(valueOffset + i);
+        }
+        return batch;
+    }
+
     private static IPacket CreatePacket(
         string identityScopeId,
         ushort[] compactIds,
@@ -158,13 +404,61 @@ public sealed class MovementTrafficBudgetTests
 
     private sealed class SizedPacketCompressor : IMovementPacketCompressor
     {
+        public int BytesPerSnapshot { get; set; } = 10;
+        public int SerializeCalls { get; private set; }
+
         public byte[] Serialize(IPacket packet) =>
-            new byte[((SizedPacket)packet).Count * 10];
+            new byte[RecordSerialization((SizedPacket)packet)];
 
         public bool TryRestore(IPacket packet, out IPacket restored)
         {
             restored = packet;
             return true;
+        }
+
+        public void Reset()
+        {
+            SerializeCalls = 0;
+        }
+
+        private int RecordSerialization(SizedPacket packet)
+        {
+            SerializeCalls++;
+            return packet.Count * BytesPerSnapshot;
+        }
+    }
+
+    private sealed class ControllableTrafficBudget : IMovementTrafficBudget
+    {
+        private readonly int initialBytes;
+
+        public int AvailableBytes { get; set; }
+
+        public ControllableTrafficBudget(int availableBytes)
+        {
+            initialBytes = availableBytes;
+            AvailableBytes = availableBytes;
+        }
+
+        public void Advance(float elapsedSeconds)
+        {
+        }
+
+        public bool TrySpend(int bytes)
+        {
+            if (bytes <= 0 || bytes > AvailableBytes) return false;
+
+            AvailableBytes -= bytes;
+            return true;
+        }
+
+        public void ReportFrame(int deferredSnapshots, float maximumDeferredAgeSeconds)
+        {
+        }
+
+        public void Clear()
+        {
+            AvailableBytes = initialBytes;
         }
     }
 

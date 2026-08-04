@@ -296,7 +296,7 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PollMovement_ProbesForBatchGrowthOnlyOncePerScopeAndTick()
+    public void PollMovement_ReusesLearnedBatchSizeBeforeGrowthCadence()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -357,10 +357,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 .GetPackets<MovementPacket>()
                 .ToArray();
             Assert.True(packets.Length > 1);
-            Assert.InRange(
-                compressor.SerializeCalls,
-                packets.Length,
-                packets.Length + 1);
+            Assert.Equal(packets.Length, compressor.SerializeCalls);
             AssertSerializedBatchesFitRelay(serializer, network);
         });
     }

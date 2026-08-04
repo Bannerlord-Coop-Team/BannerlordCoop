@@ -69,19 +69,40 @@ public sealed class MovementBatchSender : IMovementBatchSender
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MovementBatchSender>();
     private const int InitialBatchSize = 3;
+    private const double GrowthProbeIntervalSeconds = 1d;
 
     private readonly IBattleNetwork client;
     private readonly IMovementPacketCompressor packetCompressor;
     private readonly IMovementTrafficBudget trafficBudget;
-    private readonly Dictionary<(Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat), int>
+    private readonly Dictionary<(
+        Type SnapshotType,
+        string IdentityScopeId,
+        MovementIdFormat IdFormat,
+        bool IsPriority), int>
         preferredBatchSizes =
-            new Dictionary<(Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat), int>();
+            new Dictionary<(
+                Type SnapshotType,
+                string IdentityScopeId,
+                MovementIdFormat IdFormat,
+                bool IsPriority), int>();
+    private readonly Dictionary<(
+        Type SnapshotType,
+        string IdentityScopeId,
+        MovementIdFormat IdFormat,
+        bool IsPriority), double>
+        nextGrowthProbeTimes =
+            new Dictionary<(
+                Type SnapshotType,
+                string IdentityScopeId,
+                MovementIdFormat IdFormat,
+                bool IsPriority), double>();
     private readonly HashSet<(Type SnapshotType, string IdentityScopeId)> canonicalIdFallbacks =
         new HashSet<(Type SnapshotType, string IdentityScopeId)>();
     private readonly Dictionary<(Type SnapshotType, string IdentityScopeId, bool IsPriority), int> sendOffsets =
         new Dictionary<(Type SnapshotType, string IdentityScopeId, bool IsPriority), int>();
     private readonly Dictionary<(Type SnapshotType, bool IsPriority), int> batchOffsets =
         new Dictionary<(Type SnapshotType, bool IsPriority), int>();
+    private double growthProbeClockSeconds;
 
     public MovementBatchSender(
         IBattleNetwork client,
@@ -93,7 +114,12 @@ public sealed class MovementBatchSender : IMovementBatchSender
         this.trafficBudget = trafficBudget ?? new MovementTrafficBudget();
     }
 
-    public void BeginFrame(float elapsedSeconds) => trafficBudget.Advance(elapsedSeconds);
+    public void BeginFrame(float elapsedSeconds)
+    {
+        if (elapsedSeconds > 0f)
+            growthProbeClockSeconds += elapsedSeconds;
+        trafficBudget.Advance(elapsedSeconds);
+    }
 
     public MovementSendResult Send<T>(
         IEnumerable<MovementBatch<T>> scopedBatches,
@@ -134,9 +160,11 @@ public sealed class MovementBatchSender : IMovementBatchSender
     public void Clear()
     {
         preferredBatchSizes.Clear();
+        nextGrowthProbeTimes.Clear();
         canonicalIdFallbacks.Clear();
         sendOffsets.Clear();
         batchOffsets.Clear();
+        growthProbeClockSeconds = 0d;
         trafficBudget.Clear();
     }
 
@@ -165,7 +193,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
             batch.IdentityScopeId == null || canonicalIdFallbacks.Contains(fallbackKey)
                 ? MovementIdFormat.Canonical
                 : MovementIdFormat.Compact;
-        bool probeForGrowth = true;
+        bool allowGrowthProbe = true;
         int sentCount = 0;
 
         for (int start = 0; start < orderedBatch.Data.Count;)
@@ -174,11 +202,19 @@ public sealed class MovementBatchSender : IMovementBatchSender
             if (availablePayloadBytes <= 0) break;
 
             int remaining = orderedBatch.Data.Count - start;
-            var preferenceKey = (typeof(T), batch.IdentityScopeId, idFormat);
+            var preferenceKey = (
+                typeof(T),
+                batch.IdentityScopeId,
+                idFormat,
+                batch.IsPriority);
             int preferredCount = preferredBatchSizes.TryGetValue(
                 preferenceKey, out int previousSafeCount)
                 ? previousSafeCount
                 : InitialBatchSize;
+            bool probeForGrowth = allowGrowthProbe && ShouldProbeForGrowth(
+                preferenceKey,
+                availablePayloadBytes,
+                maxPayloadBytes);
 
             SerializedMovementBatch candidate = FindLargestFittingBatch(
                 orderedBatch,
@@ -198,11 +234,20 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
             if (!candidate.Fits(availablePayloadBytes) && idFormat == MovementIdFormat.Compact)
             {
+                var canonicalPreferenceKey = (
+                    typeof(T),
+                    batch.IdentityScopeId,
+                    MovementIdFormat.Canonical,
+                    batch.IsPriority);
+                bool probeCanonicalForGrowth = allowGrowthProbe && ShouldProbeForGrowth(
+                    canonicalPreferenceKey,
+                    availablePayloadBytes,
+                    maxPayloadBytes);
                 SerializedMovementBatch canonicalCandidate = FindLargestFittingBatch(
                     orderedBatch,
                     start,
                     preferredCount,
-                    probeForGrowth,
+                    probeCanonicalForGrowth,
                     availablePayloadBytes,
                     MovementIdFormat.Canonical,
                     createPacket);
@@ -216,7 +261,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 {
                     idFormat = MovementIdFormat.Canonical;
                     canonicalIdFallbacks.Add(fallbackKey);
-                    preferenceKey = (typeof(T), batch.IdentityScopeId, idFormat);
+                    preferenceKey = canonicalPreferenceKey;
+                    probeForGrowth = probeCanonicalForGrowth;
                     candidate = canonicalCandidate;
                 }
                 else
@@ -249,10 +295,21 @@ public sealed class MovementBatchSender : IMovementBatchSender
                     orderedBatch.Data[start + i]);
 
             if (availablePayloadBytes == maxPayloadBytes)
-                RememberPreferredBatchSize(preferenceKey, candidate.Count, remaining);
+            {
+                bool preferenceChanged = RememberPreferredBatchSize(
+                    preferenceKey,
+                    candidate.Count,
+                    remaining);
+                if (probeForGrowth || preferenceChanged ||
+                    !nextGrowthProbeTimes.ContainsKey(preferenceKey))
+                {
+                    nextGrowthProbeTimes[preferenceKey] =
+                        growthProbeClockSeconds + GrowthProbeIntervalSeconds;
+                }
+            }
             sentCount += candidate.Count;
             start += candidate.Count;
-            probeForGrowth = false;
+            allowGrowthProbe = false;
         }
 
         if (batch.Data.Count > 0)
@@ -319,17 +376,33 @@ public sealed class MovementBatchSender : IMovementBatchSender
             maxPayloadBytes);
     }
 
-    private void RememberPreferredBatchSize(
-        (Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat) preferenceKey,
+    private bool ShouldProbeForGrowth(
+        (Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat, bool IsPriority)
+            preferenceKey,
+        int availablePayloadBytes,
+        int maxPayloadBytes)
+    {
+        if (!preferredBatchSizes.ContainsKey(preferenceKey)) return true;
+        if (availablePayloadBytes != maxPayloadBytes) return false;
+
+        return !nextGrowthProbeTimes.TryGetValue(preferenceKey, out double nextProbeTime) ||
+               growthProbeClockSeconds >= nextProbeTime;
+    }
+
+    private bool RememberPreferredBatchSize(
+        (Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat, bool IsPriority)
+            preferenceKey,
         int safeCount,
         int remaining)
     {
-        if (safeCount < remaining ||
-            !preferredBatchSizes.TryGetValue(preferenceKey, out int previousSafeCount) ||
-            safeCount > previousSafeCount)
-        {
-            preferredBatchSizes[preferenceKey] = safeCount;
-        }
+        bool hadPrevious = preferredBatchSizes.TryGetValue(
+            preferenceKey,
+            out int previousSafeCount);
+        if (safeCount >= remaining && hadPrevious && safeCount <= previousSafeCount)
+            return false;
+
+        preferredBatchSizes[preferenceKey] = safeCount;
+        return !hadPrevious || safeCount != previousSafeCount;
     }
 
     private SerializedMovementBatch FindLargestFittingBatch<T>(
