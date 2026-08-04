@@ -146,6 +146,21 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // patch was found for this type (grepped the whole tree - zero hits, same as Smugglers), so this
         // allowlist entry is Step 0's only structural change.
         typeof(ArtisanOverpricedGoodsIssueBehavior),
+        // Tier 2 Group B (continued) - Revenue Farming, TaleWorlds.CampaignSystem.dll. No spawned MobileParty
+        // anywhere in this behavior at all (grepped the whole decompiled source for party-creation APIs - zero
+        // hits). Independently confirmed a turn-in ownership gap on BOTH real turn-in surfaces
+        // (DiscussDialogFlow's inline delegate AND the steward game-menu option, both funneling into the same
+        // two private QuestCompletedWithSuccess/QuestCompletedWithBetray leaf methods, with NO
+        // chained-external-Consequence gap unlike Artisan Overpriced Goods - see
+        // Patches.RevenueFarmingOwnershipGatePatches's doc comment for the full per-listener trace), plus a
+        // genuinely bespoke accept-time mechanic: _revenueVillages/_totalRequestedDenars are re-derived LIVE
+        // from _targetSettlement.BoundVillages at accept time (per-client-divergent if raid timing differs),
+        // and _totalRequestedDenars is a genuinely different number than the Issue-level preview property due
+        // to integer-division-on-differing-groupings - see Interfaces.IRevenueFarmingIssueInterface's doc
+        // comment. No orphaned standalone disable patch was found for this type (a 19-file dead-code sweep
+        // earlier this session already removed DisableRevenueFarmingIssueBehavior.cs - confirmed absent again
+        // here), so this allowlist entry is Step 0's only structural change.
+        typeof(RevenueFarmingIssueBehavior),
     };
 
     /// <summary>
