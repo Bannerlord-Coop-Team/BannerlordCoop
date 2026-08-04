@@ -1,6 +1,7 @@
 using Common.Logging;
 using Common.Network;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Inventory.TradeSkills.Data;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -12,27 +13,27 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using static TaleWorlds.CampaignSystem.CampaignBehaviors.TradeSkillCampaignBehavior;
 
 namespace GameInterface.Services.Inventory.TradeSkills.Interfaces;
 
-public interface ITradeSkillCampaignBehaviorInterface : IGameAbstraction
+public interface ISessionTradePlayerDataInterface : IGameAbstraction
 {
     void UpdatePlayerInventory(Hero playerHero, List<ValueTuple<ItemRosterElement, int>> purchasedItems, List<ValueTuple<ItemRosterElement, int>> soldItems, bool isTrading);
+    void UpdatePlayerTradeRumors(string playerHeroId, List<TradeRumorData> tradeRumorsData, Dictionary<string, long> enteredSettlements);
     bool TryGetTradeSkillBehavior(out TradeSkillCampaignBehavior tradeSkillBehavior);
     void AddPlayerKeys(string playerHeroId);
 }
 
-public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorInterface
+public class SessionTradePlayerDataInterface : ISessionTradePlayerDataInterface
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<TradeSkillCampaignBehaviorInterface>();
+    private static readonly ILogger Logger = LogManager.GetLogger<SessionTradePlayerDataInterface>();
 
     private ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private TradePlayerData TradePlayerData => coopSessionProvider.CoopSession.TradePlayerData;
 
-    public TradeSkillCampaignBehaviorInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, INetwork network)
+    public SessionTradePlayerDataInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, INetwork network)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
@@ -72,11 +73,24 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
         network.SendAll(new NetworkUpdateTradeData(playerHeroId, purchasedItems, soldItems, isTrading));
     }
 
+    public void UpdatePlayerTradeRumors(string playerHeroId, List<TradeRumorData> tradeRumorsData, Dictionary<string, long> enteredSettlements)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        if (!TradePlayerData.PlayerTradeRumors.ContainsKey(playerHeroId)
+            || !TradePlayerData.PlayerEnteredSettlements.ContainsKey(playerHeroId)) return;
+
+        TradePlayerData.PlayerTradeRumors[playerHeroId] = tradeRumorsData;
+        TradePlayerData.PlayerEnteredSettlements[playerHeroId] = enteredSettlements;
+    }
+
     /// <summary>
     /// Re-implement TradeSkillCampaignBehavior.ProcessPurchases to instead save in CoopSession on server
     /// </summary>
     private void ProcessPurchases(string playerHeroId, ItemRosterElement itemRosterElement, int totalPrice)
     {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
         if (itemRosterElement.EquipmentElement.ItemModifier != null) return;
         if (!objectManager.TryGetIdWithLogging(itemRosterElement.EquipmentElement.Item, out var itemId)) return;
 
@@ -94,6 +108,8 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
     /// </summary>
     private int ProcessSales(string playerHeroId, MobileParty playerParty, ItemRosterElement itemRosterElement, int totalPrice, bool isTrading)
     {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return 0;
+
         if (itemRosterElement.EquipmentElement.ItemModifier != null) return 0;
         if (!objectManager.TryGetIdWithLogging(itemRosterElement.EquipmentElement.Item, out var itemId)) return 0;
 
@@ -158,5 +174,18 @@ public class TradeSkillCampaignBehaviorInterface : ITradeSkillCampaignBehaviorIn
         {
             TradePlayerData.PlayerItemsTradeData[playerHeroId] = new Dictionary<string, Tuple<float, int>>();
         }
+        if (!TradePlayerData.PlayerTradeRumors.ContainsKey(playerHeroId))
+        {
+            TradePlayerData.PlayerTradeRumors[playerHeroId] = new List<TradeRumorData>();
+        }
+        if (!TradePlayerData.PlayerEnteredSettlements.ContainsKey(playerHeroId))
+        {
+            TradePlayerData.PlayerEnteredSettlements[playerHeroId] = new Dictionary<string, long>();
+        }
+    }
+
+    private bool IsPlayerHeroIdValid(string playerHeroId)
+    {
+        return objectManager.TryGetObjectWithLogging(playerHeroId, out Hero _);
     }
 }

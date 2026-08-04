@@ -44,11 +44,11 @@ namespace GameInterface.Services.Inventory.Interfaces
     {
         static readonly ILogger logger = LogManager.GetLogger<InventoryLogicInterface>();
 
-        private readonly ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface;
+        private readonly ISessionTradePlayerDataInterface sessionTradePlayerDataInterface;
 
-        public InventoryLogicInterface(ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface)
+        public InventoryLogicInterface(ISessionTradePlayerDataInterface sessionTradePlayerDataInterface)
         {
-            this.tradeSkillCampaignBehaviorInterface = tradeSkillCampaignBehaviorInterface;
+            this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
         }
 
         public void ApplyDoneLogic(
@@ -150,7 +150,7 @@ namespace GameInterface.Services.Inventory.Interfaces
                 }
             }
 
-            tradeSkillCampaignBehaviorInterface.UpdatePlayerInventory(ownerHero, boughtItems, soldItems, isTrading);
+            sessionTradePlayerDataInterface.UpdatePlayerInventory(ownerHero, boughtItems, soldItems, isTrading);
             if (currentSettlementComponent != null && isTrading)
             {
                 // Sets the gold of the other party
