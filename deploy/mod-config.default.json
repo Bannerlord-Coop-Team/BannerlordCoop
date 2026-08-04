@@ -120,5 +120,16 @@
     // false: vanilla - militia stay on the walls and are ignored by the sortie decision.
     // Rebellious towns hold their militia back either way, exactly as vanilla does.
     "militiaJoinsSallyOut": true,
+
+    // Whether a siege survives a battle that ended only because the enemy ran away.
+    // Vanilla scores a retreat as a decision, which is costly during a siege: a sally-out the
+    // besieger "wins" hands the settlement over even when the garrison merely fled back inside,
+    // and a relief force that breaks off ends the siege it never actually broke - leaving its
+    // troops standing in the open instead of back behind their own walls.
+    // (Default) true:  a retreat settles nothing. The siege carries on and the routed parties
+    //                  return to the settlement they came from.
+    // false: vanilla - a retreat decides the battle, and the siege ends with it.
+    // If the BESIEGER is the side that retreats, the siege is lifted either way.
+    "resumeSiegeWhenEnemyRetreats": true,
   }
 }

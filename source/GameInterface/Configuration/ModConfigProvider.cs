@@ -48,6 +48,9 @@ public readonly struct ModOptions
     public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
     [ProtoMember(14)]
     public readonly float MaximumLootersMultiplier { get; } = 1f;
+    [ProtoMember(17)]
+    public readonly bool ResumeSiegeWhenEnemyRetreats { get; } = true;
+
     [ProtoMember(16)]
     public readonly bool MilitiaJoinsSallyOut { get; } = true;
 
@@ -72,5 +75,6 @@ public readonly struct ModOptions
         MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;
         LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;
         MilitiaJoinsSallyOut = modOptionsData.MilitiaJoinsSallyOut ?? MilitiaJoinsSallyOut;
+        ResumeSiegeWhenEnemyRetreats = modOptionsData.ResumeSiegeWhenEnemyRetreats ?? ResumeSiegeWhenEnemyRetreats;
     }
 }
