@@ -5,12 +5,14 @@ using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using LiteNetLib;
 using Serilog;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -135,6 +137,14 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         var peer = (NetPeer)obj.Who;
 
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
+
+            LeaveHideoutMapEvent(mobileParty);
+            settlementInterface.PartyLeaveSettlement(mobileParty);
+        }, blocking: true, context: nameof(NetworkRequestEndSettlementEncounter));
+
         // The sending client is currently in a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
         network.Send(
@@ -145,13 +155,18 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
             Compact(payload.PartyId, typeof(MobileParty))));
+    }
 
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
+    private void LeaveHideoutMapEvent(MobileParty mobileParty)
+    {
+        var party = mobileParty?.Party;
+        var mapEvent = party?.MapEvent;
+        if (mapEvent?.EventType != MapEvent.BattleTypes.Hideout) return;
 
-            settlementInterface.PartyLeaveSettlement(mobileParty);
-        });
+        if (party.MapEventSide?.LeaderParty == party)
+            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        else
+            messageBroker.Publish(this, new PlayerLeaveBattleAttempted(party));
     }
 
     private void Handle(MessagePayload<PartyEnterSettlementAttempted> obj)
