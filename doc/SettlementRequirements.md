@@ -4,63 +4,74 @@ Requirements for host-owned settlement-mission NPCs (town center, tavern, lord's
 courtyard, village interiors). Mirrors the numbering style of [BattleRequirements.md](BattleRequirements.md);
 the mesh/instance layer itself is documented in [LocationMeshNetwork.md](LocationMeshNetwork.md).
 
-Status: **v1.0 DRAFT** — requirements authored alongside the implementation; each SR gets a status
-(PLANNED / IMPLEMENTED / VERIFIED-LIVE) as phases land.
+Status: **v1.0** — Phases 0–5 implemented on `claude/settlement-npc-host-ownership-2941a6`
+(groundwork 11b20616a, election 7b0287ebd, spawning 77941fb33, migration 8527d781e,
+despawn/death 1cff08154, conversation hold in the Phase 5 commit). Each SR carries a status
+(PLANNED / IMPLEMENTED / VERIFIED-LIVE); every "live verification outstanding" item rolls up into
+the 2–3 client live checklist below.
+
+**Live checklist (v1 acceptance):** 2-client town center — identical crowd (host native, peer
+puppets), zero native spawns on the non-host, mirrored walking, animals present on both; lord
+arrives mid-mission → appears on both; NPC exits via a passage on the host → fades everywhere;
+10-minute idle → crowds stay mirrored through churn; late joiner sees the exact current population;
+3-client host alt-F4 AND graceful leave → crowd resumes wandering under the new host, no duplicate
+crowd; ex-host rejoin lands as successor; non-host talks to a notable → NPC halts (hold) and
+resumes on end, contested notable denied; battle entered/exited mid-session → no gate cross-talk.
 
 ## 1. Hosting and authority
 
 - **SR-010 (Initial host).** The first player whose mission-ready request the server processes for a
   location instance (`"{settlementId}|{locationId}"`, ObjectManager ids) becomes the **location
-  host**. Later entrants append to a successor line in arrival order. PLANNED
+  host**. Later entrants append to a successor line in arrival order. IMPLEMENTED (live verification outstanding)
 - **SR-011 (Host authority).** Only the host runs native settlement population spawning (roster
   characters, ambient crowd, animals). The host owns every non-player agent in the mission and
-  replicates it to peers as a puppet. PLANNED
+  replicates it to peers as a puppet. IMPLEMENTED (live verification outstanding)
 - **SR-012 (Non-host suppression).** Non-hosts spawn **zero** native population agents. Any native
   spawn observed on a non-host while suppression is active is a defect (a diagnostic log guards
-  this). PLANNED
+  this). IMPLEMENTED (live verification outstanding)
 - **SR-013 (Election timing).** Suppression is unconditional until a host assignment arrives (host
   unknown during mission load). When the assignment names the local client, it runs the population
-  pass explicitly on the game thread. PLANNED
+  pass explicitly on the game thread. IMPLEMENTED (live verification outstanding)
 - **SR-014 (Migration).** When the host leaves or disconnects, the server promotes the first
   successor still in the instance and re-broadcasts the assignment with a bumped epoch. The promoted
   client **adopts NPCs in place**: authority transfer, interpolator forget, settlement-AI re-creation
   (see SR-030). Non-promoted clients keep their puppets untouched — movement ids survive the
-  transfer. PLANNED
+  transfer. IMPLEMENTED (live verification outstanding)
 - **SR-015 (Departure fork).** A departing player's own agent despawns on every remaining client
   (existing generic path); host-owned NPC puppets never despawn on host departure — they await
-  adoption. PLANNED
+  adoption. IMPLEMENTED (live verification outstanding)
 - **SR-016 (Empty instance).** When the last player leaves, the server clears the host assignment.
-  The epoch watermark survives so a re-entered settlement cannot reuse an old epoch. PLANNED
+  The epoch watermark survives so a re-entered settlement cannot reuse an old epoch. IMPLEMENTED (live verification outstanding)
 - **SR-017 (Rejoin).** A player re-entering the settlement gets a fresh mission, requests the host,
   and (if the instance is live) receives a catch-up replay of the host's current agents; a former
-  host lands at the tail of the successor line. PLANNED
+  host lands at the tail of the successor line. IMPLEMENTED (live verification outstanding)
 
 ## 2. Population replication
 
 - **SR-020 (Scope).** All non-player agents replicate: roster characters (notables, companions,
   prisoners), ambient crowd, and animals (horses via `sp_horse` scene points, sheep/cows/hogs/
   geese/chickens, day-gated exactly as native). The player agent and other players' puppets are
-  excluded from capture. PLANNED
+  excluded from capture. IMPLEMENTED (live verification outstanding)
 - **SR-021 (Capture).** Host-side capture is a postfix on `Mission.SpawnAgent(AgentBuildData, bool)`
   plus a second postfix on `Mission.SpawnMonster(EquipmentElement, EquipmentElement, in Vec3, in
-  Vec2, int)` (animals bypass `SpawnAgent(AgentBuildData)` — see V3). PLANNED
+  Vec2, int)` (animals bypass `SpawnAgent(AgentBuildData)` — see V3). IMPLEMENTED (live verification outstanding)
 - **SR-022 (Roster binding).** Every human NPC spawn record carries its `LocationCharacter` roster
   identity. Non-hosts bind the puppet to a **local** roster entry — an existing server-synced entry
   for heroes, a reconstructed entry (from embedded `LocationCharacterData`) for ambient — and build
   the puppet with that entry's `AgentOrigin`. This makes puppets first-class citizens of native
   bookkeeping (`IsAlreadySpawned`, `Location.GetLocationCharacter(agent.Origin)`, passage guards)
-  on every client, and makes adoption re-binding exact (see V4). PLANNED
+  on every client, and makes adoption re-binding exact (see V4). IMPLEMENTED (live verification outstanding)
 - **SR-023 (Visual fidelity).** Spawn records ship the rolled `Equipment`, body properties, clothing
-  colors and gender so puppets match the host's visuals regardless of local RNG state. PLANNED
+  colors and gender so puppets match the host's visuals regardless of local RNG state. IMPLEMENTED (live verification outstanding)
 - **SR-024 (Movement).** NPC puppets ride the existing mission-generic movement pipeline with
   compact ushort ids under a per-mission minted movement scope. Free horses ride the existing
-  mount-movement path; herd animals ride the standard packet (see V9). PLANNED
+  mount-movement path; herd animals ride the standard packet (see V9). IMPLEMENTED (live verification outstanding)
 - **SR-025 (Catch-up).** A mid-mission joiner receives the host's full current population as a
-  reliable-ordered chunked batch, excluding despawned/dead agents. PLANNED
+  reliable-ordered chunked batch, excluding despawned/dead agents. IMPLEMENTED (live verification outstanding)
 - **SR-026 (Mid-mission churn).** Host-side roster adds (lords walking in, passage traffic) spawn
   natively on the host, are captured, and replicate; host-side fade-outs/removals replicate as
   despawns. The 30-second passage-usage tick runs **only on the host** (it mutates the roster with
-  local RNG — see R2). PLANNED
+  local RNG — see R2). IMPLEMENTED (live verification outstanding)
 
 ## 3. Adoption (migration mechanics)
 
@@ -68,9 +79,9 @@ Status: **v1.0 DRAFT** — requirements authored alongside the implementation; e
   local `LocationCharacter` (via the origin binding of SR-022), then
   `GetComponent<CampaignAgentComponent>().CreateAgentNavigator(locationCharacter)` +
   `locationCharacter.AddBehaviors(agent)` + `Controller = AI` (verified native sequence, V5).
-  Animals get `Controller = AI` only. No battle `AgentAiWaker.Wake` (would set Alarmed). PLANNED
+  Animals get `Controller = AI` only. No battle `AgentAiWaker.Wake` (would set Alarmed). IMPLEMENTED (live verification outstanding)
 - **SR-031 (Graceful fallback).** An adopted puppet whose roster entry cannot be resolved converts
-  to a stationary AI agent with a warning log — never a crash. PLANNED
+  to a stationary AI agent with a warning log — never a crash. IMPLEMENTED (live verification outstanding)
 - **SR-032 (No duplicates).** After migration, the new host's native systems must not re-spawn
   adopted NPCs. Guaranteed structurally by SR-022: native `IsAlreadySpawned` matches by
   `agent.Origin == locationCharacter.AgentOrigin`, and adopted puppets carry the local entry's
@@ -81,7 +92,7 @@ Status: **v1.0 DRAFT** — requirements authored alongside the implementation; e
 - **SR-040 (Conversations).** Hero-NPC conversations keep the existing server lock. On lock grant
   the host pauses the NPC (`SetIsAIPaused`) so the remote conversation anchors to a stationary
   agent; released on conversation end. Ambient conversations stay local and unheld (accepted jank).
-  PLANNED
+  IMPLEMENTED (live verification outstanding)
 - **SR-041 (Damage).** v1: non-hosts cannot damage NPC puppets (`LocationPvpBlockPatch` drops blows
   to `Controller == None` humans). Host-side NPC deaths replicate as reasoned despawns
   (`LocationDespawnReason.Died`) — peers fade the body out rather than replaying the killing blow.
@@ -91,7 +102,7 @@ Status: **v1.0 DRAFT** — requirements authored alongside the implementation; e
   IMPLEMENTED (v1 fade)
 - **SR-042 (Passages/doors).** Players use passages locally, unaffected. NPC puppets never use
   passages themselves (no navigator); host-side passage traffic arrives as spawn/despawn records
-  (SR-026). PLANNED
+  (SR-026). IMPLEMENTED (live verification outstanding)
 
 ---
 
