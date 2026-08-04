@@ -97,9 +97,6 @@ public abstract class EnvironmentInstance : IDisposable
 
         lock (_lock)
         {
-            // xUnit can move a test from its constructor thread before the next instance call.
-            GameThread.Instance.MarkGameThread();
-
             using (new PatchScope(disabledMethods))
             {
                 using (new StaticScope(this))
