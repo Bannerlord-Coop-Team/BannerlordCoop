@@ -97,6 +97,38 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         npcPuppetSpawner.DrainPendingPuppets();
     }
 
+    // SR-026/SR-041 (V8): the engine's removal virtuals are the host-side despawn capture — no
+    // Harmony needed. OnAgentRemoved fires for deaths/knock-outs, OnAgentDeleted when a faded-out
+    // agent is deleted (passage exits, churn). NotifyAgentRemoved ignores anything that is not a
+    // replicated NPC we own, and the teardown guard keeps a local mission end from broadcasting the
+    // whole crowd as despawns (peers handle our departure via mission membership instead).
+    public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
+    {
+        base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, blow);
+        if (IsMissionEnding()) return;
+
+        var reason = agentState == AgentState.Killed || agentState == AgentState.Unconscious
+            ? LocationDespawnReason.Died
+            : LocationDespawnReason.Removed;
+        npcReplicator.NotifyAgentRemoved(affectedAgent, reason);
+    }
+
+    public override void OnAgentDeleted(Agent affectedAgent)
+    {
+        base.OnAgentDeleted(affectedAgent);
+        if (IsMissionEnding()) return;
+
+        npcReplicator.NotifyAgentRemoved(affectedAgent, LocationDespawnReason.Removed);
+    }
+
+    private bool IsMissionEnding()
+    {
+        var mission = Mission.Current;
+        return mission == null
+            || mission.CurrentState == Mission.State.EndingNextFrame
+            || mission.CurrentState == Mission.State.Over;
+    }
+
     // Read on the network thread (HandleJoinInfo gate) and written on the main thread
     // (TryRegisterLocalAgent), so volatile to ensure the gate sees the flip promptly.
     private volatile bool _localAgentRegistered;

@@ -83,8 +83,12 @@ Status: **v1.0 DRAFT** — requirements authored alongside the implementation; e
   agent; released on conversation end. Ambient conversations stay local and unheld (accepted jank).
   PLANNED
 - **SR-041 (Damage).** v1: non-hosts cannot damage NPC puppets (`LocationPvpBlockPatch` drops blows
-  to `Controller == None` humans). Host-side NPC deaths replicate via the real Blow replayed inside
-  a replicated-death scope exempt from the PvP block. PLANNED
+  to `Controller == None` humans). Host-side NPC deaths replicate as reasoned despawns
+  (`LocationDespawnReason.Died`) — peers fade the body out rather than replaying the killing blow.
+  Full blow-replay fidelity (ragdoll on peers, PvP-block exemption via a replicated-death scope) is
+  a follow-up; the wire already carries the reason so it needs no format change. Settlement NPC
+  death is an edge case in coop (no NPC damage from non-hosts; alley/quest fights disabled).
+  IMPLEMENTED (v1 fade)
 - **SR-042 (Passages/doors).** Players use passages locally, unaffected. NPC puppets never use
   passages themselves (no navigator); host-side passage traffic arrives as spawn/despawn records
   (SR-026). PLANNED

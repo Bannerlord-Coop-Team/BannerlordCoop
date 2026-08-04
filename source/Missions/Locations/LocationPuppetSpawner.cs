@@ -51,6 +51,11 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     private readonly object withdrawnControllerLock = new object();
     private readonly HashSet<string> withdrawnControllers = new HashSet<string>();
 
+    // Despawned ids (SR-026): a despawn can cross a still-buffered spawn record (or a catch-up
+    // replay), so a tombstoned id must never (re)spawn. Per-mission lifetime bounds the set.
+    private readonly object tombstoneLock = new object();
+    private readonly HashSet<Guid> despawnedAgentIds = new HashSet<Guid>();
+
     public LocationPuppetSpawner(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
@@ -71,6 +76,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         this.spawnBatchCodec = spawnBatchCodec;
 
         messageBroker.Subscribe<NetworkSpawnLocationAgents>(Handle_NetworkSpawnLocationAgents);
+        messageBroker.Subscribe<NetworkDespawnLocationAgents>(Handle_NetworkDespawnLocationAgents);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -79,9 +85,53 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSpawnLocationAgents>(Handle_NetworkSpawnLocationAgents);
+        messageBroker.Unsubscribe<NetworkDespawnLocationAgents>(Handle_NetworkDespawnLocationAgents);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
+    }
+
+    // [Peer] The host's native systems removed NPCs (passage exit, churn, death): fade our puppets
+    // out and tombstone the ids so a still-buffered spawn record cannot resurrect them (SR-026).
+    private void Handle_NetworkDespawnLocationAgents(MessagePayload<NetworkDespawnLocationAgents> payload)
+    {
+        var ids = payload.What.AgentIds;
+        if (ids == null || ids.Length == 0) return;
+
+        lock (tombstoneLock)
+        {
+            foreach (var id in ids)
+                despawnedAgentIds.Add(id);
+        }
+        lock (pendingPuppetLock)
+        {
+            pendingPuppets.RemoveAll(data => System.Array.IndexOf(ids, data.AgentId) >= 0);
+        }
+
+        GameThread.RunSafe(() =>
+        {
+            var registry = coopMissionComponent.AgentRegistry;
+            int removed = 0;
+            foreach (var id in ids)
+            {
+                if (!registry.TryGetAgentInfo(id, out var info)) continue;
+
+                var agent = info.Agent;
+                if (agent != null && agent.IsActive() && agent.Health > 0)
+                {
+                    bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
+                    agent.FadeOut(false, hideMount);
+                }
+
+                coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+                registry.RemoveAgent(id);
+                bindingMap.Forget(id);
+                removed++;
+            }
+
+            if (removed > 0)
+                Logger.Information("[LocationSync] Despawned {Count} NPC puppet(s) on the host's broadcast", removed);
+        }, context: nameof(Handle_NetworkDespawnLocationAgents));
     }
 
     private void Handle_NetworkSpawnLocationAgents(MessagePayload<NetworkSpawnLocationAgents> payload)
@@ -147,6 +197,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
 
         if (Mission.Current == null) return false;                      // still loading — buffer
         if (IsWithdrawn(data.OwnerControllerId)) return true;           // stale record after leave/drop — drop
+        if (IsTombstoned(data.AgentId)) return true;                    // already despawned by the host — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned (incl. our own natives) — dedupe
 
         int slotsNeeded = 1;
@@ -366,6 +417,14 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         lock (withdrawnControllerLock)
         {
             return withdrawnControllers.Contains(controllerId);
+        }
+    }
+
+    private bool IsTombstoned(Guid agentId)
+    {
+        lock (tombstoneLock)
+        {
+            return despawnedAgentIds.Contains(agentId);
         }
     }
 }

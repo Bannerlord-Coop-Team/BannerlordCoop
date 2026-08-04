@@ -31,6 +31,14 @@ public interface ILocationOwnedAgentReplicator : IDisposable
 
     /// <summary>[Host, game thread] Send newly captured agents as bounded batches once per mission tick.</summary>
     void FlushPendingSpawns();
+
+    /// <summary>
+    /// [Game thread] One of our replicated NPCs left the mission (native removal/fade or death,
+    /// SR-026/SR-041): deregister it and queue the despawn broadcast for the next flush. No-op for
+    /// agents we do not own or never replicated, so the mission-behavior removal hooks can forward
+    /// every agent unconditionally.
+    /// </summary>
+    void NotifyAgentRemoved(Agent agent, LocationDespawnReason reason);
 }
 
 /// <inheritdoc cref="ILocationOwnedAgentReplicator"/>
@@ -47,6 +55,8 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
     private readonly ILocationPuppetRosterBinder rosterBinder;
     private readonly ILocationAgentSpawnBatchCodec spawnBatchCodec;
     private readonly List<LocationAgentSpawnData> pendingSpawns = new List<LocationAgentSpawnData>();
+    private readonly List<(Guid agentId, LocationDespawnReason reason)> pendingDespawns
+        = new List<(Guid, LocationDespawnReason)>();
 
     private readonly string movementScopeId;
     private ushort nextMovementId = 1;
@@ -105,17 +115,50 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
 
     public void FlushPendingSpawns()
     {
-        if (pendingSpawns.Count == 0) return;
+        if (pendingSpawns.Count > 0)
+        {
+            IReadOnlyList<NetworkSpawnLocationAgents> batches =
+                spawnBatchCodec.Encode(pendingSpawns, SpawnBatchPurpose.Initial);
+            int recordCount = pendingSpawns.Count;
+            pendingSpawns.Clear();
 
-        IReadOnlyList<NetworkSpawnLocationAgents> batches =
-            spawnBatchCodec.Encode(pendingSpawns, SpawnBatchPurpose.Initial);
-        int recordCount = pendingSpawns.Count;
-        pendingSpawns.Clear();
+            foreach (NetworkSpawnLocationAgents batch in batches)
+                network.SendAll(batch);
 
-        foreach (NetworkSpawnLocationAgents batch in batches)
-            network.SendAll(batch);
+            LogBatchSend("Broadcast", recordCount, batches, null);
+        }
 
-        LogBatchSend("Broadcast", recordCount, batches, null);
+        // Despawns flush AFTER spawns: a spawn+despawn pair captured in the same tick then applies in
+        // capture order on the shared reliable-ordered stream.
+        if (pendingDespawns.Count > 0)
+        {
+            var ids = new Guid[pendingDespawns.Count];
+            var reasons = new byte[pendingDespawns.Count];
+            for (int i = 0; i < pendingDespawns.Count; i++)
+            {
+                ids[i] = pendingDespawns[i].agentId;
+                reasons[i] = (byte)pendingDespawns[i].reason;
+            }
+            pendingDespawns.Clear();
+
+            network.SendAll(new NetworkDespawnLocationAgents(ids, reasons));
+            Logger.Information("[LocationSync] Broadcast {Count} NPC despawn(s)", ids.Length);
+        }
+    }
+
+    public void NotifyAgentRemoved(Agent agent, LocationDespawnReason reason)
+    {
+        if (agent == null) return;
+
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(agent, out var info)) return;
+        if (info.CurrentAuthority != session.OwnControllerId) return;   // not ours to despawn — its owner reports it
+        if (!bindingMap.TryGet(info.AgentId, out _)) return;            // not a replicated NPC (e.g. a player agent)
+
+        registry.RemoveAgent(info.AgentId);
+        bindingMap.Forget(info.AgentId);
+        pendingDespawns.Add((info.AgentId, reason));
+        Logger.Debug("[LocationSync] Queued despawn of NPC {AgentId} ({Reason})", info.AgentId, reason);
     }
 
     // [Game thread] Build catch-up records for the settlement agents WE currently own, at their
