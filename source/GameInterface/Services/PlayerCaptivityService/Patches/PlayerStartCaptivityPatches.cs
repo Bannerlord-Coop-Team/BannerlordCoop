@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
@@ -7,6 +7,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Serilog;
 using System.Linq;
@@ -46,7 +47,16 @@ internal class PlayerStartCaptivityPatches
     [HarmonyPostfix]
     private static void Postfix_PartyBelongedToAsPrisoner(Hero __instance, PartyBase value, PartyBase __state)
     {
-        if (ModInformation.IsServer) return;
+        if (ModInformation.IsServer)
+        {
+            // Server backstop: this setter fires on EVERY capture path, whereas the PrisonerTaken message the
+            // captivity handler keys on is only published when TakePrisonerAction's prefix saw a live player
+            // PartyBelongedTo - so a hero captured with that already null, or a re-capture, would leak the hold.
+            // A leaked ConversationPartyHold is unrecoverable (DisableAi sets _enableAgainAtHour = Never and
+            // the flag is AutoSynced AND save-persisted), so it is worth releasing from both signals.
+            if (__state != value && value != null) ReleaseHoldHeldByCapturedHero(__instance);
+            return;
+        }
 
         // Did not change
         if (__state == value) return;
@@ -219,4 +229,24 @@ internal class PlayerStartCaptivityPatches
         playerHero = playerHero ?? playerParty.LeaderHero;
         return playerHero != null;
     }
+
+    /// <summary>
+    /// [Server] Releases the AI party the newly captured hero was holding through a conversation engagement.
+    /// </summary>
+    /// <remarks>
+    /// Scoped to this hero's own party, so capturing one player never frees a lord another player is engaged
+    /// with. Safe to run twice - EndEngagement is a no-op once the engagement is gone.
+    /// </remarks>
+    private static void ReleaseHoldHeldByCapturedHero(Hero hero)
+    {
+        var party = hero?.PartyBelongedTo;
+        if (party?.Party == null) return;
+
+        var tracker = ConversationPartyTracker.Instance;
+        if (tracker?.ObjectManager == null) return;
+        if (!tracker.ObjectManager.TryGetId(party.Party, out var engagerPartyId)) return;
+
+        ConversationPartyHold.EndEngagementForEngagerParty(tracker, engagerPartyId);
+    }
+
 }

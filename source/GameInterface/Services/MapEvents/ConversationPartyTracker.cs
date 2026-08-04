@@ -233,6 +233,24 @@ internal sealed class ConversationPartyTracker : IHandler
         }
     }
 
+    /// <summary>
+    /// Finds the engagement whose ENGAGER is the given party, i.e. the hold that party is keeping on an AI
+    /// party. Used to release that hold when the engager can no longer end the conversation itself - most
+    /// importantly when it is captured, since its PlayerEncounter is then never finished.
+    /// </summary>
+    public bool TryGetEngagementByEngagerParty(string engagerPartyId, out Engagement engagement)
+    {
+        engagement = default;
+
+        if (engagerPartyId == null) return false;
+
+        lock (stateLock)
+        {
+            engagement = engagements.Values.FirstOrDefault(x => x.EngagerPartyId == engagerPartyId);
+            return engagement.PartyId != null;
+        }
+    }
+
     public bool IsEngagerParty(string partyId, string engagerPartyId)
     {
         if (partyId == null || engagerPartyId == null) return false;
