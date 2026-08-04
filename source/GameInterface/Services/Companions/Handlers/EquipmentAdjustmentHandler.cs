@@ -7,6 +7,7 @@ using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Companions.Handlers;
 
@@ -42,9 +43,13 @@ internal class EquipmentAdjustmentHandler : IHandler
         var data = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(data.CompanionHero, out var companionHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.CompanionHero.BattleEquipment, out var battleEquipmentId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.CompanionHero.CivilianEquipment, out var civilianEquipmentId)) return;
 
         var message = new NetworkAdjustCompanionsEquipment(
             companionHeroId,
+            battleEquipmentId,
+            civilianEquipmentId,
             data.CompanionHero.BattleEquipment,
             data.CompanionHero.CivilianEquipment
         );
@@ -59,11 +64,15 @@ internal class EquipmentAdjustmentHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.CompanionHeroId, out var companionHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Equipment>(data.BattleEquipmentId, out var battleEquipment)) return;
+            if (!objectManager.TryGetObjectWithLogging<Equipment>(data.BattleEquipmentId, out var civilianEquipment)) return;
 
             using (new AllowedThread())
             {
-                companionHero._battleEquipment = data.BattleEquipment;
-                companionHero._civilianEquipment = data.CivilianEquipment;
+                battleEquipment = data.BattleEquipment;
+                civilianEquipment = data.CivilianEquipment;
+                companionHero._battleEquipment = battleEquipment;
+                companionHero._civilianEquipment = civilianEquipment;
             }
         });
     }

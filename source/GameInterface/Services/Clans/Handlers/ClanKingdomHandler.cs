@@ -79,7 +79,7 @@ internal class ClanKingdomHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(data.Clan, out var clanId)) return;
 
-        network.SendAll(new NetworkClanEntersKingdom(clanId));
+        network.SendAll(new NetworkClanLeavesKingdom(clanId));
     }
 
     private void Handle_NetworkClanLeavesKingdom(MessagePayload<NetworkClanLeavesKingdom> obj)

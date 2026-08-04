@@ -11,17 +11,27 @@ internal readonly struct NetworkAdjustCompanionsEquipment : ICommand
     public readonly string CompanionHeroId;
 
     [ProtoMember(2)]
-    public readonly Equipment BattleEquipment;
+    public readonly string BattleEquipmentId;
 
     [ProtoMember(3)]
+    public readonly string CivilianEquipmentId;
+
+    [ProtoMember(4)]
+    public readonly Equipment BattleEquipment;
+
+    [ProtoMember(5)]
     public readonly Equipment CivilianEquipment;
 
     public NetworkAdjustCompanionsEquipment(
         string companionHeroId,
+        string battleEquipmentId,
+        string civilianEquipmentId,
         Equipment battleEquipment,
         Equipment civilianEquipment)
     {
         CompanionHeroId = companionHeroId;
+        BattleEquipmentId = battleEquipmentId;
+        CivilianEquipmentId = civilianEquipmentId;
         BattleEquipment = battleEquipment;
         CivilianEquipment = civilianEquipment;
     }
