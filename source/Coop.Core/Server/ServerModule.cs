@@ -102,9 +102,20 @@ public class ServerModule : CommonModule
             .As<ISteamLobbyApi>()
             .As<ISteamPublicLobbyApi>()
             .InstancePerLifetimeScope();
-        builder.Register(context => new SteamPublicLobbyAdvertiser(
-                context.Resolve<ISteamPublicLobbyApi>(),
-                context.Resolve<SessionAdvertisementConfig>().Visibility))
+        // Debug servers remain joinable through steam but are excluded from the public discovery
+        // Release builds continue to use the configured visibility.
+        builder.Register(context =>
+            {
+                var visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
+
+#if DEBUG
+                visibility = ServerVisibility.None;
+#endif
+
+                return new SteamPublicLobbyAdvertiser(
+                    context.Resolve<ISteamPublicLobbyApi>(),
+                    visibility);
+            })
             .As<ISessionAdvertiser>()
             .As<ISteamLobbyOwner>()
             .InstancePerLifetimeScope();

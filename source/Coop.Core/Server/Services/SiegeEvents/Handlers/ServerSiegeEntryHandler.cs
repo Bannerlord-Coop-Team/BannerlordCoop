@@ -17,6 +17,7 @@ using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -219,7 +220,7 @@ internal class ServerSiegeEntryHandler : IHandler
         network.SendAll(new NetworkPromptSiegePreparation(attackerPartyId, settlementId));
     }
 
-    // Runs on the game thread already — published from the FinalizeSiegeEvent postfix, behind the
+    // Runs on the game thread already — published from the FinalizeSiegeEvent finalizer, behind the
     // replicated siege teardown.
     private void HandleSiegeEnded(MessagePayload<SiegeEndedWithoutBattle> payload)
     {
@@ -227,7 +228,30 @@ internal class ServerSiegeEntryHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
 
-        network.SendAll(new NetworkPromptSiegeEnded(settlementId, obj.BesiegerDefeated));
+        string leaderPartyId = null;
+        if (obj.LeaderParty != null && playerManager.Contains(obj.LeaderParty))
+            objectManager.TryGetIdWithLogging(obj.LeaderParty, out leaderPartyId);
+
+        network.SendAll(new NetworkPromptSiegeEnded(
+            settlementId,
+            obj.BesiegerDefeated,
+            leaderPartyId,
+            GetPlayerPartyIds(obj.AttackerParties),
+            GetPlayerPartyIds(obj.DefenderParties),
+            obj.InterruptedActiveAssault));
+    }
+
+    private string[] GetPlayerPartyIds(IEnumerable<MobileParty> parties)
+    {
+        var ids = new List<string>();
+        foreach (var party in parties)
+        {
+            if (party == null || !playerManager.Contains(party)) continue;
+            if (objectManager.TryGetIdWithLogging(party, out var partyId))
+                ids.Add(partyId);
+        }
+
+        return ids.ToArray();
     }
 
     private void HandleAssault(MessagePayload<NetworkRequestSiegeAssault> payload)
@@ -473,23 +497,33 @@ internal class ServerSiegeEntryHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var party)) return;
 
+            if (party.MapEvent?.IsSiegeAssault == true &&
+                party.Party.Side == BattleSideEnum.Attacker)
+            {
+                messageBroker.Publish(
+                    party,
+                    new PlayerLeaveBattleAttempted(party.Party, obj.FinishLocalMenus));
+                network.Send(peer, new NetworkBreakSiegeApproved(
+                    SiegeBreakOutcome.Applied,
+                    obj.FinishLocalMenus,
+                    battleLeaveApplied: true));
+                return;
+            }
+
             if (party.BesiegerCamp == null)
             {
-                if (party.MapEvent?.IsSiegeAssault == true && party.Party.Side == BattleSideEnum.Attacker)
-                {
-                    messageBroker.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
-                    network.Send(peer, new NetworkBreakSiegeApproved(true, true, obj.FinishLocalMenus));
-                    return;
-                }
-
-                Logger.Error("Party {PartyId} tried to leave a siege camp it is not in", obj.PartyId);
-                network.Send(peer, new NetworkBreakSiegeApproved(false, false, obj.FinishLocalMenus));
+                Logger.Information("Party {PartyId} already left its siege camp", obj.PartyId);
+                network.Send(peer, new NetworkBreakSiegeApproved(
+                    SiegeBreakOutcome.AlreadyLeft,
+                    obj.FinishLocalMenus));
                 return;
             }
 
             siegeEventInterface.BreakSiege(party);
 
-            network.Send(peer, new NetworkBreakSiegeApproved(true, false, obj.FinishLocalMenus));
+            network.Send(peer, new NetworkBreakSiegeApproved(
+                SiegeBreakOutcome.Applied,
+                obj.FinishLocalMenus));
         });
     }
 
