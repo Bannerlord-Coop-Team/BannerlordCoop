@@ -42,15 +42,18 @@ internal class ArmyDialogPatches
     [HarmonyPrefix]
     private static bool Prefixgame_menu_encounter_abandon_on_consequence(EncounterGameMenuBehavior __instance)
     {
+        var mainParty = MobileParty.MainParty;
         ((PlayerEncounter.Battle != null) ? PlayerEncounter.Battle : PlayerEncounter.EncounteredBattle).BeginWait();
-        MobileParty.MainParty.SetMoveModeHold();
-        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
+        mainParty.SetMoveModeHold();
+        var message = new MobilePartyInArmyRemoved(mainParty.Army, mainParty, mainParty);
         MessageBroker.Instance.Publish(__instance, message);
-        ArmyPatches.RemoveMobilePartyInArmy(MobileParty.MainParty, MobileParty.MainParty.Army, MobileParty.MainParty);
+        ArmyPatches.RemoveMobilePartyInArmy(mainParty, mainParty.Army, mainParty);
         PlayerEncounter.Finish(true);
-        if (MobileParty.MainParty.BesiegerCamp != null)
+        if (mainParty.BesiegerCamp != null)
         {
-            MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty));
+            MessageBroker.Instance.Publish(
+                null,
+                new BreakSiegeAttempted(mainParty, finishLocalMenus: false));
         }
         return false;
     }
