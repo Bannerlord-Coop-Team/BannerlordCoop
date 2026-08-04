@@ -10,13 +10,18 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Helpers;
 using Moq;
 using SandBox.Issues;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
@@ -844,6 +849,304 @@ public class RivalGangMovingInIssueTests : IDisposable
 
             // Real, private OnFinalize() - tolerated to succeed or throw (see this test's own doc comment).
             Record.Exception(() => InvokePrivate(quest, "OnFinalize"));
+        });
+    }
+
+    // --- 11. CreateReplicatedParties: the real, unmocked party/hero-creation logic (closes the coverage gap
+    // this file's own type doc comment/scope note (§0) documents - every test above this section drives
+    // everything AROUND this method for real but mocks the method itself; the tests below drive the method's
+    // own real body instead, including the settlement-based hideout substitution the design doc's §9 item 4
+    // specifically asked for coverage of) ---
+
+    private static readonly FieldInfo IssueDifficultyField =
+        AccessTools.Field(typeof(RivalGangMovingInIssueBehavior.RivalGangMovingInIssueQuest), "_issueDifficulty");
+    private static readonly FieldInfo HideoutsField = AccessTools.Field(typeof(Campaign), "_hideouts");
+    private static readonly PropertyInfo MapDistanceModelProperty =
+        AccessTools.Property(typeof(GameModels), nameof(GameModels.MapDistanceModel));
+
+    /// <summary>
+    /// <c>CreateReplicatedParties</c>'s own real body has three hardcoded, real-game-database lookups that
+    /// don't exist in this bare harness by default (the same "harness never provides the real game database"
+    /// limitation <see cref="CaravanAmbushIssueTests"/>/<see cref="MerchantArmyOfPoachersIssueTests"/>/
+    /// <see cref="SmugglersIssueTests"/>/<see cref="GangLeaderNeedsWeaponsIssueTests"/> each independently
+    /// document for their own equivalent lookups): <c>GetTroopTypeTemplateForDifficulty</c>'s own
+    /// <c>CharacterObject.All.FirstOrDefault(StringId == "looter"/"mercenary_N")</c> walk, and the two direct
+    /// <c>MBObjectManager.Instance.GetObject&lt;CharacterObject&gt;("gangster_3"/"gangster_2")</c> henchman-
+    /// template lookups. Registered here as real, usable <see cref="CharacterObject"/>s under their exact real
+    /// StringIds (built the same already-proven-safe way this harness's own <c>TestEnvironment</c> builds
+    /// <c>Game.Current.PlayerTroop</c>/every <c>Hero</c>'s underlying template - see
+    /// <see cref="ObjectBuilders.HeroBuilder"/>'s own "StealthEquipment Temporary fix"), so the real production
+    /// lookups genuinely resolve and <c>HeroCreator.CreateSpecialHero</c> genuinely succeeds, instead of NREing
+    /// or throwing <c>InvalidOperationException</c> on an empty sequence.
+    /// </summary>
+    private static void RegisterRealCharacterTemplate(string stringId)
+    {
+        if (MBObjectManager.Instance.GetObject<CharacterObject>(stringId) != null) return;
+
+        var template = Util.GameObjectCreator.CreateInitializedObject<CharacterObject>();
+        template.Culture.DefaultBattleEquipmentRoster = Util.GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+        template.Culture.DefaultStealthEquipmentRoster = Util.GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+        template.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = Util.GameObjectCreator.CreateInitializedObject<ItemObject>();
+        template.StringId = stringId;
+        MBObjectManager.Instance.RegisterObject(template);
+    }
+
+    /// <summary>
+    /// Builds a heavier, dedicated fixture (unlike the shared, minimal <see cref="SetupIssueOwner"/> every
+    /// other test in this file uses) with everything <see cref="IRivalGangMovingInIssueInterface.CreateReplicatedParties"/>'s
+    /// own real body genuinely needs to run end-to-end without mocking around any of it: a quest-giver settlement
+    /// with a real <see cref="Town"/> component (<c>EnterSettlementAction.ApplyForParty</c>'s own
+    /// <c>settlement.SettlementComponent.OnPartyEntered</c> call NREs on a bare <see cref="Settlement"/>), a
+    /// SEPARATE settlement wearing a real <see cref="Hideout"/> component registered directly into
+    /// <c>Campaign.Current</c>'s own private <c>_hideouts</c> list (never populated by this harness's lightweight
+    /// bootstrap - the same <c>Hideout.All</c> gap this file's own type doc comment documents - so the real,
+    /// unmocked <c>SettlementHelper.FindNearestHideoutToSettlement</c> walk genuinely finds it), the same
+    /// <see cref="StubMapDistanceModel"/>/<c>Campaign.MapDiagonal</c> technique
+    /// <see cref="ArtisanCantSellProductsAtAFairPriceIssueTests"/> uses for its own real
+    /// <c>SettlementHelper</c> walk (the REAL <c>DefaultMapDistanceModel</c> needs actual navmesh/pathing data
+    /// this harness's bare <c>MapScene()</c> never provides), and the three real <see cref="CharacterObject"/>
+    /// templates <see cref="RegisterRealCharacterTemplate"/> registers.
+    ///
+    /// Deliberate, documented simplification (out of scope for the same reason as every sibling file's own
+    /// equivalent scope note): <c>Clan.BanditFactions</c> - <c>Campaign.Current.Clans</c> - is left empty, so
+    /// the real <c>Clan.BanditFactions.FirstOrDefault(t =&gt; t.Culture == nearestHideout.Settlement.Culture)</c>
+    /// clan-by-hideout-culture pick resolves to <c>null</c> rather than a genuinely matched bandit clan (real
+    /// production code already tolerates a <c>null</c> clan on <c>CreateCustomPartyWithTroopRoster</c> fine).
+    /// What IS fully, genuinely exercised: the settlement-based <c>Hideout.All</c> walk/distance math itself
+    /// (<c>nearestHideout == null</c> would make the method return <c>false</c> before ever reaching the party-
+    /// creation code below - the tests using this fixture assert <c>true</c>, so the walk genuinely succeeded),
+    /// and both henchman Heroes' own real <c>Culture</c> assignment (<c>rivalGangLeader.Culture</c>/
+    /// <c>owner.Culture</c> directly, independent of the hideout pick).
+    /// </summary>
+    private RivalGangMovingInFixture SetupCreateReplicatedPartiesFixture()
+    {
+        var ownerId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var rivalGangLeaderId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var ownerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        var hideoutSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(rivalGangLeaderId, out var rivalGangLeader));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Town>(townId, out var town));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideoutSettlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
+
+            using (new AllowedThread())
+            {
+                settlement.SetSettlementComponent(town);
+                town.OwnerClan = clan;
+                owner.StayingInSettlement = settlement; // InitializeQuestSettlement reads QuestGiver.CurrentSettlement
+                Campaign.Current.MainParty = ownerParty;
+
+                hideoutSettlement.SetSettlementComponent(hideout);
+
+                var hideouts = (MBList<Hideout>)HideoutsField.GetValue(Campaign.Current);
+                if (!hideouts.Contains(hideout))
+                {
+                    hideouts.Add(hideout);
+                }
+
+                if (Campaign.Current.Models.MapDistanceModel is not StubMapDistanceModel)
+                {
+                    MapDistanceModelProperty.SetValue(Campaign.Current.Models, new StubMapDistanceModel());
+                }
+                if (Campaign.MapDiagonal <= 0f)
+                {
+                    Campaign.MapDiagonal = 1000f;
+                    Campaign.MapDiagonalSquared = 1000f * 1000f;
+                }
+
+                // Forced low so GetTroopTypeTemplateForDifficulty's real difficultyRange==1 branch
+                // deterministically resolves to the single registered "looter" template below - see
+                // CreateAndAcceptOnServerForCreateReplicatedParties's own doc comment for why this can't be
+                // forced any earlier (before the real ctor roll).
+                RegisterRealCharacterTemplate("looter");
+                RegisterRealCharacterTemplate("gangster_3");
+                RegisterRealCharacterTemplate("gangster_2");
+
+                Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            }
+        });
+
+        return new RivalGangMovingInFixture(ownerId, rivalGangLeaderId);
+    }
+
+    /// <summary>Same real <see cref="CreateIssueOnServer"/>/<c>IssueManager.StartIssueQuest</c> creation path
+    /// every other test in this file uses, plus one addition: <c>IssueBase.StartIssueWithQuest</c> rolls (and
+    /// immediately consumes, in the same call, before <see cref="GenerateIssueQuest"/> even runs) its own
+    /// <c>_issueDifficultyMultiplier</c> via <c>Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier()</c>
+    /// - there's no earlier point to force a deterministic value. Forced directly on the QUEST's OWN copy
+    /// (<c>_issueDifficulty</c>, a plain ctor-parameter copy) immediately afterward instead - harmless, since
+    /// nothing reads it before <c>CreateReplicatedParties</c>' own reflective <c>GetTroopTypeTemplateForDifficulty</c>
+    /// call does.</summary>
+    private RivalGangMovingInIssueBehavior.RivalGangMovingInIssueQuest CreateAndAcceptOnServerForCreateReplicatedParties(
+        RivalGangMovingInFixture fixture)
+    {
+        CreateIssueOnServer(fixture);
+        var quest = AcceptOnInstance(Server, fixture.OwnerId);
+
+        Server.Call(() => IssueDifficultyField.SetValue(quest, 0.05f));
+
+        return quest;
+    }
+
+    /// <summary>
+    /// The normal case (a real <c>MobileParty.MainParty</c> exists): drives the real, unmocked
+    /// <see cref="IRivalGangMovingInIssueInterface.CreateReplicatedParties"/> end-to-end (no reflection into
+    /// private quest methods, no mocked interface) and confirms both parties AND both henchman Heroes come out
+    /// correctly - troop counts (template count + 1 henchman each), henchman culture copied from the correct
+    /// source (<c>RivalGangLeader</c> vs quest giver), and the method's own tail call
+    /// (<see cref="RivalGangMovingInIssueInterface.ForceRivalGangParties"/>) genuinely force-wrote all 4 results
+    /// onto the real quest, matching vanilla's own <c>CreateRivalGangLeaderParty</c>/<c>CreateAllyGangLeaderParty</c>
+    /// field assignments.
+    ///
+    /// The call itself is wrapped in <see cref="AllowedThread"/> - real production reaches
+    /// <c>CreateReplicatedParties</c> from <c>Handle_NetworkRequestCreateRivalGangParties</c>'s own server-side
+    /// network-message dispatch, which establishes this same allowance while processing the incoming request;
+    /// calling the interface method directly here (bypassing the coordinator/message broker) needs to establish
+    /// it explicitly too, or the AutoRegistry creation patches take their "not yet authoritative" branch and
+    /// leave the new Hero/CharacterObject half-initialized (surfaces as an unrelated-looking NRE deep inside
+    /// <c>HeroCreator</c>, not a real product bug).
+    /// </summary>
+    [Fact]
+    public void CreateReplicatedParties_NormalCase_WithRealMainParty_CreatesBothPartiesAndBothHenchmenHeroesCorrectly()
+    {
+        var fixture = SetupCreateReplicatedPartiesFixture();
+        var quest = CreateAndAcceptOnServerForCreateReplicatedParties(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.OwnerId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.RivalGangLeaderId, out var rivalGangLeader));
+            Assert.NotNull(MobileParty.MainParty); // sanity: this is the non-headless case
+
+            bool result;
+            MobileParty rivalParty, allyParty;
+            Hero rivalHenchman, allyHenchman;
+            using (new AllowedThread())
+            {
+                result = Server.Resolve<IRivalGangMovingInIssueInterface>().CreateReplicatedParties(
+                    owner, out rivalParty, out rivalHenchman, out allyParty, out allyHenchman);
+            }
+
+            Assert.True(result);
+
+            Assert.NotNull(rivalParty);
+            Assert.True(rivalParty.IsActive);
+            Assert.Equal(16, rivalParty.MemberRoster.TotalManCount); // 15 troop-template + 1 henchman
+
+            Assert.NotNull(allyParty);
+            Assert.True(allyParty.IsActive);
+            Assert.Equal(21, allyParty.MemberRoster.TotalManCount); // 20 troop-template + 1 henchman
+
+            Assert.NotNull(rivalHenchman);
+            Assert.True(rivalHenchman.IsAlive);
+            Assert.True(rivalHenchman.HiddenInEncyclopedia);
+            Assert.Equal(rivalGangLeader.Culture, rivalHenchman.Culture);
+
+            Assert.NotNull(allyHenchman);
+            Assert.True(allyHenchman.IsAlive);
+            Assert.True(allyHenchman.HiddenInEncyclopedia);
+            Assert.Equal(owner.Culture, allyHenchman.Culture);
+
+            // The method's own tail call (ForceRivalGangParties) - genuinely ran, not just returned true.
+            Assert.Same(rivalParty, quest._rivalGangLeaderParty);
+            Assert.Same(rivalHenchman, quest._rivalGangLeaderHenchmanHero);
+            Assert.Same(allyParty, quest._allyGangLeaderParty);
+            Assert.Same(allyHenchman, quest._allyGangLeaderHenchmanHero);
+        });
+    }
+
+    /// <summary>
+    /// This file's other highest-value test, and the one this whole section exists for: the dedicated-
+    /// headless-server condition (<c>MobileParty.MainParty == null</c>, no local player at all) - the exact gap
+    /// the design doc's §9 item 4 asked for coverage of. First proves what vanilla's OWN
+    /// <c>MobileParty.MainParty</c>-based lookup would have done here - genuinely throws a real
+    /// <see cref="NullReferenceException"/>, the real bug §5.2 of the design doc identifies - then proves the
+    /// real, unmocked <see cref="IRivalGangMovingInIssueInterface.CreateReplicatedParties"/> does NOT: its own
+    /// settlement-based <c>SettlementHelper.FindNearestHideoutToSettlement</c> substitution never reads
+    /// <c>MobileParty.MainParty</c> at all, so it completes cleanly, creates both real parties and both real
+    /// henchman Heroes, and force-writes all 4 onto the quest - identically to the normal case above, just with
+    /// no local player anywhere on this peer.
+    /// </summary>
+    [Fact]
+    public void CreateReplicatedParties_HeadlessServerCase_WithNullMainParty_SucceedsWithNoNRE_ViaSettlementBasedHideoutSubstitution()
+    {
+        var fixture = SetupCreateReplicatedPartiesFixture();
+        var quest = CreateAndAcceptOnServerForCreateReplicatedParties(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.OwnerId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.RivalGangLeaderId, out var rivalGangLeader));
+
+            // The dedicated-headless-server condition this coverage gap exists for.
+            Campaign.Current.MainParty = null;
+            Assert.Null(MobileParty.MainParty);
+
+            // What vanilla's own MobileParty.MainParty-based lookup (CreateRivalGangLeaderParty/
+            // CreateAllyGangLeaderParty's real SettlementHelper.FindNearestHideoutToMobileParty(MobileParty.
+            // MainParty, ...) call) would have done here - genuinely NREs, since Hideout.All has a real entry
+            // (this fixture's own registered Hideout) so the null-MainParty dereference is actually reached,
+            // not short-circuited by an empty walk.
+            Assert.Throws<NullReferenceException>(() =>
+                SettlementHelper.FindNearestHideoutToMobileParty(MobileParty.MainParty, MobileParty.NavigationType.All, x => x.IsActive));
+
+            MobileParty rivalParty = null;
+            Hero rivalHenchman = null;
+            MobileParty allyParty = null;
+            Hero allyHenchman = null;
+            bool result = false;
+
+            // Matches the real production call path: CreateReplicatedParties is normally reached from
+            // Handle_NetworkRequestCreateRivalGangParties's own server-side network-message dispatch, which
+            // establishes this same allowance while processing the incoming request - calling the interface
+            // method directly (bypassing the coordinator/message broker) needs to establish it explicitly too,
+            // or the AutoRegistry creation patches take their "not yet authoritative" branch and leave the new
+            // Hero/CharacterObject half-initialized (surfacing as an unrelated-looking NRE deep inside
+            // HeroCreator, not a real product bug - same requirement <see cref="SetupCreateReplicatedPartiesFixture"/>'s
+            // own fixture-building code already has).
+            var exception = Record.Exception(() =>
+            {
+                using (new AllowedThread())
+                {
+                    result = Server.Resolve<IRivalGangMovingInIssueInterface>().CreateReplicatedParties(
+                        owner, out rivalParty, out rivalHenchman, out allyParty, out allyHenchman);
+                }
+            });
+
+            Assert.Null(exception);
+            Assert.True(result);
+
+            Assert.NotNull(rivalParty);
+            Assert.True(rivalParty.IsActive);
+            Assert.NotNull(allyParty);
+            Assert.True(allyParty.IsActive);
+
+            Assert.NotNull(rivalHenchman);
+            Assert.True(rivalHenchman.IsAlive);
+            Assert.Equal(rivalGangLeader.Culture, rivalHenchman.Culture);
+
+            Assert.NotNull(allyHenchman);
+            Assert.True(allyHenchman.IsAlive);
+            Assert.Equal(owner.Culture, allyHenchman.Culture);
+
+            Assert.Same(rivalParty, quest._rivalGangLeaderParty);
+            Assert.Same(rivalHenchman, quest._rivalGangLeaderHenchmanHero);
+            Assert.Same(allyParty, quest._allyGangLeaderParty);
+            Assert.Same(allyHenchman, quest._allyGangLeaderHenchmanHero);
         });
     }
 }
