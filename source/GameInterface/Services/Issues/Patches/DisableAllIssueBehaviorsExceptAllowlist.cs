@@ -329,6 +329,36 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // are both false (confirmed by decompile), so no alternative-solution or lord-solution infrastructure is
         // needed.
         typeof(TheConquestOfSettlementIssueBehavior),
+        // Tier 3 - Raid an Enemy Territory, TaleWorlds.CampaignSystem.dll. Purely reactive, same shape as The
+        // Conquest of a Settlement: no DeclareWarAction/ChangeOwnerOfSettlementAction/MakePeaceAction/
+        // ChangeKingdomAction call anywhere in its own type (confirmed by decompile) - it only needs to
+        // correctly recognize a village raid the player's own party genuinely completed, not originate any
+        // war/ownership change itself. The task's own standing "re-verify, don't trust the prior classification"
+        // lesson paid off again here: this type's own OnRaidCompleted has the EXACT same root-cause shape as The
+        // Conquest of a Settlement's OnSiegeCompleted bug - MapEvent.FinalizeEventAux() (RaidCompletedEvent's own
+        // trigger, via RaidEventComponent.OnBeforeFinalize) only ever runs its real body on the coop server's own
+        // process, RegisterEvents() is only ever wired on the genuine accepter's own machine (same
+        // StartIssueWithQuest-never-calls-StartQuest gap), and even when reachable the check itself
+        // (mapEvent.IsPlayerMapEvent/mapEvent.PlayerSide, both MobileParty.MainParty-derived, confirmed by
+        // decompile) reads the wrong process's own local avatar. Fixed the same way - neutered vanilla's
+        // per-instance listener, replaced with one server-side, ownership-resolving module-level listener - see
+        // Patches.RaidAnEnemyTerritoryRaidCompletionPatches's doc comment. Unlike Conquest, the mutation is a
+        // mid-quest progress COUNTER with no generic sync mechanism to ride, so this type also needed its own
+        // bespoke NetworkRaidAnEnemyTerritoryVillageRaided broadcast (see
+        // Handlers.RaidAnEnemyTerritoryIssueHandler). Independently also found (beyond what the prior
+        // classification flagged) a turn-in ownership gap on the DiscussDialogFlow success option AND a
+        // reload/join reachability gap on the remaining CampaignEvents listeners/DailyTick/OnTimedOut, both
+        // closed by Patches.RaidAnEnemyTerritoryOwnershipGatePatches - see that file's own doc comment. Creation
+        // needed its own bespoke capture (unlike Conquest's direct-ctor-argument settlement pick, this Issue's
+        // real ctor takes only the owner Hero and rolls _enemyKingdom internally, needing a reflective
+        // force-write - see Interfaces.IRaidAnEnemyTerritoryIssueInterface's doc comment). No orphaned standalone
+        // disable patch was found for this type (grepped the whole tree - zero hits, same as every other type
+        // built this session), so the allowlist entry plus this type's own bespoke
+        // Interfaces/Messages/Handlers/Patches set (source/GameInterface/Services/Issues/*/RaidAnEnemyTerritory*.cs)
+        // is the whole of this type's Step 0 + gap-closing work. IsThereAlternativeSolution/IsThereLordSolution
+        // are both false (confirmed by decompile), so no alternative-solution or lord-solution infrastructure is
+        // needed.
+        typeof(RaidAnEnemyTerritoryIssueBehavior),
     };
 
     /// <summary>

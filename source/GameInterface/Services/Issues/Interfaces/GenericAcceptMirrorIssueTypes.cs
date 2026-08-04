@@ -180,6 +180,15 @@ internal static class GenericAcceptMirrorIssueTypes
         // Patches.TheConquestOfSettlementSiegeCompletionPatches/TheConquestOfSettlementSettlementOwnerChangedPatch
         // for the two real (non-accept-time) bugs this type needed fixing.
         typeof(TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue),
+        // Tier 3: Raid an Enemy Territory - GenerateIssueQuest(questId) forwards IssueOwner/a fixed 60-day due
+        // time/the already-replicated _enemyKingdom (captured/broadcast at creation time via a reflective
+        // force-write - see IRaidAnEnemyTerritoryIssueInterface's doc comment for why this type needs reflection
+        // where Conquest's own _targetSettlement capture didn't). All already frozen/deterministic by accept
+        // time, so a bare replay of IssueManager.StartIssueQuest lands on a byte-identical
+        // RaidAnEnemyTerritoryIssueQuest on every peer. This quest is purely reactive (no spawned MobileParty) -
+        // see Patches.RaidAnEnemyTerritoryRaidCompletionPatches/RaidAnEnemyTerritoryOwnershipGatePatches for the
+        // real bugs this type needed fixing.
+        typeof(RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
