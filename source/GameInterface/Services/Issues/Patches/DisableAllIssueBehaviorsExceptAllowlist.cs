@@ -264,6 +264,46 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // Patches.LandLordCompanyOfTroubleInstanceResolutionPatch, keyed off ownership rather than the design
         // doc's own more speculative "transient flag" proposal.
         typeof(LandLordCompanyOfTroubleIssueBehavior),
+        // Tier 2 Group A (see doc/GroupA_HostileMobilePartySync_Design_v3.md) - Escort Merchant Caravan, step 6
+        // (last) of the group's build order. Own dedicated design (doc/EscortMerchantCaravan_Design_v2.md,
+        // superseding a v1 attempt whose core premise - a new gate on the quest's own tick/listener code for
+        // EVERY non-owner mirror - was wrong, since non-owner mirrors are already inert by construction, same as
+        // every other Group A type). Two real bugs this type actually has: (1) SetDialogs() registers 5 global
+        // dialogue flows at CONSTRUCTION time (every peer, unconditionally, before ownership is even knowable) -
+        // 3 of them share one condition delegate, caravan_talk_on_condition, that dereferences the (permanently
+        // null on a non-owner) _questCaravanMobileParty with no null check - fixed by a narrow null-guard on
+        // just that method (Patches.EscortMerchantCaravanCaravanTalkConditionNullGuardPatch), not a broad
+        // suppression of all 5 flows. (2) QuestManager.OnGameLoaded -> InitializeQuestOnLoadWithQuestManager IS
+        // a second, genuinely-live path (the owner's own reconnect, or a client joining mid-quest via a full
+        // save transfer) that DOES call RegisterEvents() for real - closed by
+        // Patches.EscortMerchantCaravanOwnershipGatePatches, gating all 7 CampaignEvents listeners plus
+        // HourlyTick/DailyTick/OnTimedOut to the recorded owner, plus a defensive component-based
+        // _questCaravanMobileParty re-resolution fallback
+        // (Patches.EscortMerchantCaravanGameLoadCaravanPartyFallbackPatch) for a join-mid-quest edge case not
+        // yet proven reachable by a live test. SpawnCaravan() (a separate, individually-patchable private
+        // method, unlike Caravan Ambush's fully-inline OnQuestAccepted()) hits the same
+        // CustomPartyComponentLifetimePatches client-authority gap as Smugglers/Merchant Army of Poachers/Gang
+        // Leader Needs Weapons' guards party, closed by Patches.EscortMerchantCaravanPartySpawnGatePatch - but
+        // uniquely in this family needs NO captured/forwarded accepter-derived value at all (verified: its whole
+        // call graph reads only QuestGiver-derived state, never MobileParty.MainParty), so
+        // Interfaces.IEscortMerchantCaravanIssueInterface.SpawnCaravanOnServer is a bare reflective invoke of the
+        // real method, not a hand-reimplementation. The Issue ctor's _companionRewardRandom creation-time roll
+        // is captured/forced the same way as LordNeedsHorsesIssue's own creation-time roll
+        // (Patches.EscortMerchantCaravanIssueCreationPatch) - independently re-verified (per this task's own
+        // standing lesson) to be narrower than the design doc claimed: it feeds ONLY IssueBase.RewardGold,
+        // consumed at exactly one call site (AlternativeSolutionEndWithSuccess's gold payout, already gated via
+        // this type's AlternativeSolutionMirrorEligible/NewIssueTypesAlternativeSolutionPatches registration),
+        // NOT the Quest's own (fully separate, fully deterministic) RewardGold/TotalRewardGold used by the main
+        // quest-success payout. No orphaned standalone disable patch was found for this type (grepped the whole
+        // tree - zero hits, same as every other Group A type), so the allowlist entry plus this type's own
+        // bespoke Interfaces/Messages/Handlers/Patches set (source/GameInterface/Services/Issues/*/EscortMerchantCaravan*.cs)
+        // is the whole of this type's Step 0 + gap-closing work. The design doc's own two flagged-open items are
+        // both resolved: the "accept handler + persistence" prerequisite (§7 item 1) turned out to already be
+        // fully solved generically - this type needs no bespoke accept handler at all, just adding it to the two
+        // existing GenericAcceptMirrorIssueTypes sets (which rides the existing, already-persisted
+        // VillageNeedsToolsIssueOwnership/VillageNeedsToolsIssueHandler choke point unchanged); the §3.5 fallback
+        // (§7 item 2) is implemented as designed, tightened to only run for the recorded owner.
+        typeof(EscortMerchantCaravanIssueBehavior),
     };
 
     /// <summary>

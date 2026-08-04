@@ -157,6 +157,19 @@ internal static class GenericAcceptMirrorIssueTypes
         // AlternativeSolutionMirrorEligible below - LandLordCompanyOfTroubleIssue.IsThereAlternativeSolution is
         // false (confirmed by decompile), so this quest has no alternative-solution path at all.
         typeof(LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssue),
+        // Tier 2 Group A: Escort Merchant Caravan - GenerateIssueQuest(questId) forwards IssueOwner/a fixed
+        // 30-day due time/IssueDifficultyMultiplier/DailyQuestRewardGold - DailyQuestRewardGold is a pure
+        // function of IssueDifficultyMultiplier (NOT of _companionRewardRandom - see
+        // IEscortMerchantCaravanIssueInterface's type doc comment for the correction vs the design doc's own
+        // claim here), the same deterministic, shared value every other type here already relies on. A bare
+        // replay of IssueManager.StartIssueQuest lands on a byte-identical EscortMerchantCaravanIssueQuest on
+        // every peer once _companionRewardRandom itself is captured/forced at creation time (see
+        // Patches.EscortMerchantCaravanIssueCreationPatch) - not because the Quest reads it (it doesn't), but
+        // because the ISSUE's own RewardGold override (consumed by AlternativeSolutionEndWithSuccess) must
+        // match. The one genuinely per-client-divergent piece of this quest - _questCaravanMobileParty, only
+        // ever set later by the dialogue-triggered SpawnCaravan() - is handled entirely separately by
+        // Patches.EscortMerchantCaravanPartySpawnGatePatch, not by this generic accept mirror.
+        typeof(EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -242,6 +255,13 @@ internal static class GenericAcceptMirrorIssueTypes
         // safe to route through this generic, ownership-self-limiting trigger. Needs its matching HourlyTick
         // registration too - see that file's MerchantArmyOfPoachersIssueBehavior entry.
         typeof(MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue),
+        // Tier 2 Group A: Escort Merchant Caravan. AlternativeSolutionScaleFlags is Casualties | FailureRisk
+        // (confirmed against the decompiled source), the same shape as Smugglers/Caravan Ambush/Merchant Army of
+        // Poachers above - genuinely can fail, still safe to route through this generic, ownership-self-limiting
+        // trigger. Needs its matching HourlyTick registration too - see NewIssueTypesAlternativeSolutionPatches'
+        // EscortMerchantCaravanIssueBehavior entry. LandLordCompanyOfTrouble is NOT here (IsThereAlternativeSolution
+        // is false) but this type's IS true (confirmed against the decompiled source).
+        typeof(EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>
