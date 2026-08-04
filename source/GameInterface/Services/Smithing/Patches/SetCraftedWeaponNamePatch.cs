@@ -8,26 +8,25 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
-namespace GameInterface.Services.Smithing.Patches
+namespace GameInterface.Services.Smithing.Patches;
+
+[HarmonyPatch(typeof(CraftingCampaignBehavior))]
+internal class SetCraftedWeaponNamePatch
 {
-    [HarmonyPatch(typeof(CraftingCampaignBehavior))]
-    internal class SetCraftedWeaponNamePatch
+    private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
+
+    [HarmonyPatch(nameof(CraftingCampaignBehavior.SetCraftedWeaponName))]
+    [HarmonyPrefix]
+    public static bool SetCraftedWeaponName(ref CraftingCampaignBehavior __instance, ItemObject craftedWeaponItem, TextObject name)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        [HarmonyPatch("SetCraftedWeaponName")]
-        [HarmonyPrefix]
-        public static bool SetCraftedWeaponName(ref CraftingCampaignBehavior __instance, ItemObject craftedWeaponItem, TextObject name)
-        {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        // Publish message with data
+        var message = new SetBehaviorCraftedWeaponName(craftedWeaponItem.StringId, name);
+        MessageBroker.Instance.Publish(__instance, message);
 
-            // Publish message with data
-            var message = new BehaviorCraftedWeaponNameSet(__instance, craftedWeaponItem.StringId, name);
-            MessageBroker.Instance.Publish(__instance, message);
-
-            // Skip original to override original client saving
-            return false;
-        }
+        // Skip original to override original client saving
+        return false;
     }
 }

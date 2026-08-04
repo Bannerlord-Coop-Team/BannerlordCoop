@@ -21,6 +21,8 @@ public class TestNetwork : INetwork
     public readonly Dictionary<int, List<IPacket>> SentPackets = new Dictionary<int, List<IPacket>>();
     public readonly Dictionary<int, List<object>> SentPayloads = new Dictionary<int, List<object>>();
     public readonly List<NetPeer> Peers = new List<NetPeer>();
+    public int FlushPendingMessagesCalls { get; private set; }
+    public Exception? FlushPendingMessagesException { get; set; }
 
     private static int NewPeerId => Interlocked.Increment(ref _peerId);
     private static int _peerId = 0;
@@ -107,6 +109,13 @@ public class TestNetwork : INetwork
         }
     }
 
+    public void FlushPendingMessages()
+    {
+        FlushPendingMessagesCalls++;
+        if (FlushPendingMessagesException != null)
+            throw FlushPendingMessagesException;
+    }
+
     public void Start()
     {
     }
@@ -124,6 +133,8 @@ public class TestNetwork : INetwork
         SentNetworkMessages.Clear();
         SentPackets.Clear();
         SentPayloads.Clear();
+        FlushPendingMessagesCalls = 0;
+        FlushPendingMessagesException = null;
     }
 
     private void RecordPayload(NetPeer netPeer, object payload)

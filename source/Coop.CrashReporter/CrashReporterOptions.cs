@@ -8,7 +8,7 @@ namespace Coop.CrashReporter
     {
         private const string BannerlordDirectoryName = "Mount and Blade II Bannerlord";
 
-        private CrashReporterOptions(
+        internal CrashReporterOptions(
             int processId,
             long processStartUtcTicks,
             string coopLogPath,

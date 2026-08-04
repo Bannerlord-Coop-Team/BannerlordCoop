@@ -107,6 +107,33 @@ internal class HeroDeveloperCommands
         else return $"Unable to find hero with name or id of {strings[0]}";
     }
 
+    /// <summary>
+    /// Reset all skills of a hero and give focus/attribute points back based on level.
+    /// Example:
+    /// coop.debug.herodeveloper.resetskills
+    /// </summary>
+    [CommandLineArgumentFunction("resetskills", "coop.debug.herodeveloper")]
+    public static string ResetSkillsCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+
+        if (strings.Count != 1) return "Usage: resetskills heroName";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var hero in Hero.AllAliveHeroes)
+        {
+            if (hero.Name.ToString() == strings[0] || hero.StringId == strings[0])
+            {
+                hero.HeroDeveloper.ResetCharacterStats();
+
+                stringBuilder.AppendLine($"{strings[0]}'s skills were reset.");
+            }
+        }
+
+        if (stringBuilder.Length > 0) return stringBuilder.ToString();
+        else return $"Unable to find hero with name or id of {strings[0]}";
+    }
+
     private static SkillObject GetSkillByName(string skillName)
     {
         var property = typeof(DefaultSkills).GetProperty(skillName, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase);

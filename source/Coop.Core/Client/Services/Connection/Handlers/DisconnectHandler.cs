@@ -27,8 +27,8 @@ internal class DisconnectHandler : IHandler
 
     private void Handle(MessagePayload<NetworkDisconnected> obj)
     {
-        coopFinalizer.Finalize(GetDisconnectMessage(obj.What.DisconnectInfo.Reason));
         gameStateInterface.GoToMainMenu();
+        coopFinalizer.Finalize(GetDisconnectMessage(obj.What.DisconnectInfo.Reason));
     }
 
     private static string GetDisconnectMessage(DisconnectReason reason)

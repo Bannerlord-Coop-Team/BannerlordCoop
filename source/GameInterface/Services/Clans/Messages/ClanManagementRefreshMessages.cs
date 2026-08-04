@@ -22,3 +22,15 @@ internal readonly struct RefreshWorkshopsList : ICommand { }
 
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct RefreshClanMembersList : ICommand { }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct RefreshAfterRoleAssignment : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string MobilePartyId;
+
+    public RefreshAfterRoleAssignment(string mobilePartyId)
+    {
+        MobilePartyId = mobilePartyId;
+    }
+}

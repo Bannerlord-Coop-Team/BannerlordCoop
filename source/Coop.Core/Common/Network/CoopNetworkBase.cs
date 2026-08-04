@@ -274,10 +274,10 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     }
 
     /// <summary>
-    /// Sends every peer's buffered messages and prunes buffers of disconnected peers. Called from the
-    /// subclasses' network <c>Update</c>, so a sub-budget trickle waits at most one poll interval.
+    /// Sends every peer's buffered messages and prunes buffers of disconnected peers. Normally called
+    /// from the network update; the join-save path also calls it while the poll thread is blocked.
     /// </summary>
-    protected void FlushPendingMessages()
+    public void FlushPendingMessages()
     {
         foreach (var entry in pendingMessages)
         {

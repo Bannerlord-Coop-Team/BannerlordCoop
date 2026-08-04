@@ -58,13 +58,20 @@ internal static class ConversationPartyHold
         string engagerPartyId,
         MobileParty party,
         string partyId,
-        bool engagerIsDefender)
+        bool engagerIsDefender,
+        string requestId = null)
     {
         if (tracker == null || party == null) return false;
 
         var wasAiDisabled = party.Ai?.IsDisabled != false;
 
-        if (!tracker.TryBeginEngagement(engagerKey, engagerPartyId, partyId, wasAiDisabled, engagerIsDefender))
+        if (!tracker.TryBeginEngagement(
+                engagerKey,
+                engagerPartyId,
+                partyId,
+                wasAiDisabled,
+                engagerIsDefender,
+                requestId))
             return false;
 
         if (!wasAiDisabled)
@@ -84,10 +91,24 @@ internal static class ConversationPartyHold
 
     /// <summary>Ends the given player's engagement and releases the held party, if any.</summary>
     public static void EndEngagement(ConversationPartyTracker tracker, object engagerKey)
+        => EndEngagement(tracker, engagerKey, requestId: null, requireRequestIdMatch: false);
+
+    /// <summary>Ends an engagement only when it is still owned by the supplied conversation request.</summary>
+    public static void EndEngagement(
+        ConversationPartyTracker tracker,
+        object engagerKey,
+        string requestId,
+        bool requireRequestIdMatch)
     {
         if (tracker == null) return;
 
-        if (!tracker.TryEndEngagement(engagerKey, out var partyId, out var engagement, out var shouldReleaseParty))
+        if (!tracker.TryEndEngagement(
+                engagerKey,
+                out var partyId,
+                out var engagement,
+                out var shouldReleaseParty,
+                requestId,
+                requireRequestIdMatch))
             return;
 
         if (shouldReleaseParty)

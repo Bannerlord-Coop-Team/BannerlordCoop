@@ -6,6 +6,9 @@ using GameInterface.Services.MapEvents;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Battles;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
@@ -259,6 +262,25 @@ public class GuardReactionHandler : IGuardReactionHandler
 
         using (new AllowedThread())
         {
+#if DEBUG
+            if (MissionActionDiagnostics.AnimationTraceEnabled)
+            {
+                Guid diagnosticAgentId =
+                    agentRegistry.TryGetAgentInfo(
+                        agent,
+                        out CoopAgentInfo diagnosticInfo)
+                        ? diagnosticInfo.AgentId
+                        : Guid.Empty;
+                MissionActionDiagnostics.RecordExternalActionCommand(
+                    diagnosticAgentId,
+                    agent,
+                    channel,
+                    reactionAction.Index,
+                    startProgress: 0f,
+                    animationFlags,
+                    "synthetic-guard-reaction");
+            }
+#endif
             return agent.SetActionChannel(
                 channel,
                 in reactionAction,
@@ -426,6 +448,16 @@ public class GuardReactionHandler : IGuardReactionHandler
         bool applied;
         using (new AllowedThread())
         {
+#if DEBUG
+            MissionActionDiagnostics.RecordExternalActionCommand(
+                message.AgentId,
+                agent,
+                message.ReactionChannel,
+                reactionAction.Index,
+                message.Progress,
+                (AnimFlags)message.AnimationFlags,
+                "remote-guard-reaction");
+#endif
             applied = agent.SetActionChannel(
                 message.ReactionChannel,
                 in reactionAction,
