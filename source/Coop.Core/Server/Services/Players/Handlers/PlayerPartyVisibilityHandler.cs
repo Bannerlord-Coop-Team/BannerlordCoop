@@ -198,6 +198,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             party.StringId);
         siegeEventInterface.BreakSiegeForPartyOnly(party);
     }
+
     /// <summary>
     /// Removes the party's map figure and tells every client to do the same, mirroring
     /// PartyVisualLifetimeHandler's NetworkDestroyPartyVisual path exactly, but triggered by us

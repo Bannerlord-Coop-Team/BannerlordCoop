@@ -277,12 +277,12 @@ internal class ClientSiegeEntryHandler : IHandler
         var pending = pendingInterruptedAssault;
         if (pending == null) return;
 
+        pendingInterruptedAssault = null;
         siegeEventInterface.PromptSiegeEnded(
             pending.Settlement,
             pending.BesiegerDefeated,
             pending.Role,
             interruptedActiveAssault: true);
-        pendingInterruptedAssault = null;
     }
 
     internal static SiegeTerminationRole ResolveTerminationRole(

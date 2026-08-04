@@ -1,8 +1,10 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +26,7 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch]
 internal class SiegePreparationPromptPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegePreparationPromptPatches>();
     private static readonly HashSet<SiegeEvent> FinalizingSieges = new();
 
     private sealed class SiegeTerminationState
@@ -75,36 +78,44 @@ internal class SiegePreparationPromptPatches
         if (ModInformation.IsClient) return;
         if (!FinalizingSieges.Add(__instance)) return;
 
-        var settlement = __instance.BesiegedSettlement;
-        var mapEvent = settlement?.Party?.MapEvent;
-        bool interruptedActiveAssault = IsInterruptedActiveAssault(mapEvent);
-        if (settlement?.Party == null || (mapEvent != null && !interruptedActiveAssault))
+        try
+        {
+            var settlement = __instance.BesiegedSettlement;
+            var mapEvent = settlement?.Party?.MapEvent;
+            bool interruptedActiveAssault = IsInterruptedActiveAssault(mapEvent);
+            if (settlement?.Party == null || (mapEvent != null && !interruptedActiveAssault))
+            {
+                __state = new SiegeTerminationState();
+                return;
+            }
+
+            var camp = __instance.BesiegerCamp;
+            var leaderParty = camp?.LeaderParty;
+            var attackerParties = GetMobileParties(camp?.GetInvolvedPartiesForEventType());
+            var defenderParties = interruptedActiveAssault
+                ? GetMapEventParties(mapEvent.DefenderSide)
+                : GetDefenderParties(settlement);
+            if (interruptedActiveAssault)
+            {
+                leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty ?? leaderParty;
+                attackerParties = attackerParties
+                    .Concat(GetMapEventParties(mapEvent.AttackerSide))
+                    .Distinct()
+                    .ToArray();
+            }
+
+            __state = new SiegeTerminationState(
+                settlement,
+                leaderParty,
+                attackerParties,
+                defenderParties,
+                interruptedActiveAssault);
+        }
+        catch (Exception e)
         {
             __state = new SiegeTerminationState();
-            return;
+            Logger.Error(e, "Failed to capture siege termination state; continuing native teardown");
         }
-
-        var camp = __instance.BesiegerCamp;
-        var leaderParty = camp?.LeaderParty;
-        var attackerParties = GetMobileParties(camp?.GetInvolvedPartiesForEventType());
-        var defenderParties = interruptedActiveAssault
-            ? GetMapEventParties(mapEvent.DefenderSide)
-            : GetDefenderParties(settlement);
-        if (interruptedActiveAssault)
-        {
-            leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty ?? leaderParty;
-            attackerParties = attackerParties
-                .Concat(GetMapEventParties(mapEvent.AttackerSide))
-                .Distinct()
-                .ToArray();
-        }
-
-        __state = new SiegeTerminationState(
-            settlement,
-            leaderParty,
-            attackerParties,
-            defenderParties,
-            interruptedActiveAssault);
     }
 
     // Vanilla assumes a local player exists while selecting its player-only end menu. Skip that

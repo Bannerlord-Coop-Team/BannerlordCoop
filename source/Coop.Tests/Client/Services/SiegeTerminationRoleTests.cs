@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Network;
 using Common.Tests.Utils;
+using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Handlers;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
@@ -9,6 +10,8 @@ using Moq;
 using ProtoBuf;
 using System;
 using System.IO;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 
 namespace Coop.Tests.Client.Services;
@@ -149,6 +152,61 @@ public class SiegeTerminationRoleTests
         Assert.Equal(SiegeBreakOutcome.Applied, message.Outcome);
         Assert.False(message.FinishLocalMenus);
         Assert.True(message.BattleLeaveApplied);
+    }
+
+    [Fact]
+    public void InterruptedActiveAssaultPrompt_WhenPromptThrows_IsNotRetried()
+    {
+        var broker = new TestMessageBroker();
+        var siegeEventInterface = new Mock<ISiegeEventInterface>();
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var expectedException = new InvalidOperationException();
+        siegeEventInterface
+            .Setup(value => value.PromptSiegeEnded(
+                settlement,
+                false,
+                SiegeTerminationRole.AttackerLeader,
+                true))
+            .Throws(expectedException);
+        using var handler = new ClientSiegeEntryHandler(
+            broker,
+            Mock.Of<INetwork>(),
+            Mock.Of<INetworkConfig>(),
+            Mock.Of<IObjectManager>(),
+            siegeEventInterface.Object);
+
+        var pendingType = typeof(ClientSiegeEntryHandler).GetNestedType(
+            "PendingInterruptedAssault",
+            BindingFlags.NonPublic)!;
+        var pending = Activator.CreateInstance(
+            pendingType,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            args: new object[]
+            {
+                settlement,
+                false,
+                SiegeTerminationRole.AttackerLeader,
+            },
+            culture: null);
+        var pendingField = typeof(ClientSiegeEntryHandler).GetField(
+            "pendingInterruptedAssault",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        pendingField.SetValue(handler, pending);
+        var finish = typeof(ClientSiegeEntryHandler).GetMethod(
+            "FinishPendingInterruptedAssault",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        var exception = Assert.Throws<TargetInvocationException>(() => finish.Invoke(handler, null));
+
+        Assert.Same(expectedException, exception.InnerException);
+        Assert.Null(pendingField.GetValue(handler));
+        finish.Invoke(handler, null);
+        siegeEventInterface.Verify(value => value.PromptSiegeEnded(
+            settlement,
+            false,
+            SiegeTerminationRole.AttackerLeader,
+            true), Times.Once);
     }
 
     private static T RoundTrip<T>(T message)

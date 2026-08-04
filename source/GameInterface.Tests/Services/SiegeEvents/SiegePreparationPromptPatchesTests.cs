@@ -1,6 +1,11 @@
-﻿using Common.Util;
+﻿using Common;
+using Common.Util;
 using GameInterface.Services.SiegeEvents.Patches;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -28,4 +33,40 @@ public class SiegePreparationPromptPatchesTests
             SiegePreparationPromptPatches.IsInterruptedActiveAssault(mapEvent));
     }
 
+    [Fact]
+    public void FinalizePrefix_WhenParticipantCaptureThrows_AllowsRetryAfterFinalizer()
+    {
+        var wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+        try
+        {
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            settlement.Party = ObjectHelper.SkipConstructor<PartyBase>();
+            var siegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
+            AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent.BesiegedSettlement))
+                .SetValue(siegeEvent, settlement);
+            AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent.BesiegerCamp))
+                .SetValue(siegeEvent, ObjectHelper.SkipConstructor<BesiegerCamp>());
+            var prefix = AccessTools.Method(
+                typeof(SiegePreparationPromptPatches),
+                "FinalizeSiegeEventPrefix");
+            var finalizer = AccessTools.Method(
+                typeof(SiegePreparationPromptPatches),
+                "FinalizeSiegeEventFinalizer");
+
+            var firstCapture = new object[] { siegeEvent, null };
+            prefix.Invoke(null, firstCapture);
+            Assert.NotNull(firstCapture[1]);
+            Assert.Null(finalizer.Invoke(null, new[] { siegeEvent, firstCapture[1], null }));
+
+            var retryCapture = new object[] { siegeEvent, null };
+            prefix.Invoke(null, retryCapture);
+            Assert.NotNull(retryCapture[1]);
+            Assert.Null(finalizer.Invoke(null, new[] { siegeEvent, retryCapture[1], null }));
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
 }
