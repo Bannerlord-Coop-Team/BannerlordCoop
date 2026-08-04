@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -21,7 +22,7 @@ internal class TownDefenderPartiesPatches
     [HarmonyPrefix]
     private static bool Prefix(Town __instance, MapEvent.BattleTypes battleType, ref IEnumerable<PartyBase> __result)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer && !MilitiaOptInApplies(battleType)) return true;
 
         __result = GetDefenderPartiesSafe(__instance, battleType);
         return false;
@@ -31,7 +32,7 @@ internal class TownDefenderPartiesPatches
     [HarmonyPrefix]
     private static bool GetNextPrefix(Town __instance, ref int partyIndex, MapEvent.BattleTypes battleType, ref PartyBase __result)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer && !MilitiaOptInApplies(battleType)) return true;
 
         __result = GetNextDefenderPartySafe(__instance, ref partyIndex, battleType);
         return false;
@@ -50,7 +51,7 @@ internal class TownDefenderPartiesPatches
             var party = town.Settlement.Parties[i];
             if (party.MapFaction?.IsAtWarWith(besiegerFaction) == true
                 && party.IsActive && !party.IsVillager && !party.IsCaravan
-                && (!party.IsMilitia || (!town.InRebelliousState && battleType != MapEvent.BattleTypes.SallyOut)))
+                && MilitiaMayFight(town, party, battleType))
             {
                 partyIndex = i + 1;
                 return party.Party;
@@ -71,10 +72,35 @@ internal class TownDefenderPartiesPatches
         {
             if (party.MapFaction?.IsAtWarWith(besiegerFaction) == true
                 && party.IsActive && !party.IsVillager && !party.IsCaravan
-                && (!party.IsMilitia || (!town.InRebelliousState && battleType != MapEvent.BattleTypes.SallyOut)))
+                && MilitiaMayFight(town, party, battleType))
             {
                 yield return party.Party;
             }
         }
     }
+
+    /// <summary>
+    /// Vanilla keeps militia off a sally-out - they hold the walls while the garrison sorties - which also
+    /// keeps them out of the strength comparison that decides whether to sortie at all. A town with thousands
+    /// of militia and a small garrison therefore never sorties, which reads as broken even though it is
+    /// faithful. <see cref="ModConfigProvider.ModOptions.MilitiaJoinsSallyOut"/> opts into letting them join.
+    /// Rebellious towns still hold their militia back, exactly as vanilla does.
+    /// </summary>
+    /// <summary>
+    /// True when the militia opt-in would change who defends, which is the only reason the server takes
+    /// over these methods - the sortie decision (CheckSallyOut) runs server-side and reads the same roster,
+    /// so a client-only patch could never affect it.
+    /// </summary>
+    private static bool MilitiaOptInApplies(MapEvent.BattleTypes battleType)
+        => battleType == MapEvent.BattleTypes.SallyOut && ModConfigProvider.ModOptions.MilitiaJoinsSallyOut;
+
+    private static bool MilitiaMayFight(Town town, MobileParty party, MapEvent.BattleTypes battleType)
+    {
+        if (!party.IsMilitia) return true;
+        if (town.InRebelliousState) return false;
+        if (battleType != MapEvent.BattleTypes.SallyOut) return true;
+
+        return ModConfigProvider.ModOptions.MilitiaJoinsSallyOut;
+    }
+
 }

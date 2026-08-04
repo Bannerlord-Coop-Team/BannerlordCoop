@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 
@@ -94,6 +94,11 @@ public sealed class ModOptionsData
     public float? SmithingStaminaRecoveryMultiplier { get; set; }
 
     public float? MaximumLootersMultiplier { get; set; }
+
+    /// <summary>
+    /// Whether town militia join a garrison's sally-out. Vanilla keeps them on the walls.
+    /// </summary>
+    public bool? MilitiaJoinsSallyOut { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }

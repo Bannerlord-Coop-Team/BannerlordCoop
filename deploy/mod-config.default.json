@@ -1,4 +1,4 @@
-{
+﻿{
   // Bannerlord Coop gameplay configuration — owned by the Coop mod itself and
   // applied wherever the coop server runs (dedicated server or player-hosted
   // session). Settings for how a dedicated server PROCESS runs (save name,
@@ -101,5 +101,15 @@
     // WARNING: Setting this value too high will cause performance issues.
     // The default is 1, which is equivalent to the vanilla spawn limit.
     "maximumLootersMultiplier": 1.0,
+
+    // Whether a besieged town's militia join the garrison when it sallies out.
+    // Vanilla keeps militia on the walls during a sally-out. That also keeps them out of the
+    // strength comparison the AI uses to decide whether to sortie at all, so a town holding
+    // thousands of militia behind a small garrison never sorties - which reads as the AI being
+    // broken even though it is faithful to singleplayer.
+    // (Default) true:  militia fight alongside the garrison, so a well-defended town actually sorties.
+    // false: vanilla - militia stay on the walls and are ignored by the sortie decision.
+    // Rebellious towns hold their militia back either way, exactly as vanilla does.
+    "militiaJoinsSallyOut": true,
   }
 }
