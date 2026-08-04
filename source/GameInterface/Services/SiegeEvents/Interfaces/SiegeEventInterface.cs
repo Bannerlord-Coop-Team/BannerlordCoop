@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Util;
+using Common.Messaging;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
 using Serilog;
@@ -299,6 +301,17 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         PlayerSiege.StartSiegePreparation();
     }
 
+    /// <summary>
+    /// Closes the local siege menus after the server approves a siege break.
+    /// </summary>
+    /// <remarks>
+    /// This runs inside the break approval's AllowedThread, where every co-op interception stands down. With a
+    /// map event still attached, PlayerEncounter.Finish -> FinalizeBattle -> LeaveBattle either nulls
+    /// MainParty.MapEventSide - dropping this party from the shared battle on this machine only - or calls
+    /// mapEvent.FinalizeEvent(), which the finalize prefix lets through unpublished, destroying the
+    /// server-owned event locally and silently. Route the removal instead; the returning NetworkPartyLeftBattle
+    /// runs the local teardown. Unchanged when no map event is attached, which is the ordinary siege-menu leave.
+    /// </remarks>
     public void FinishLocalPlayerSiegeLeave()
         => FinishLocalPlayerSiegeLeave(null, forcePlayerOutFromSettlement: true);
 
@@ -310,6 +323,19 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         bool forcePlayerOutFromSettlement)
     {
         var party = MobileParty.MainParty;
+
+        // A live map event has to leave through the server. Falling through to PlayerEncounter.Finish
+        // below would drop this party from the shared battle on this machine only, or destroy the
+        // server-owned event locally and unpublished - see the remarks above. The returning
+        // NetworkPartyLeftBattle runs the local teardown, including the camp clearing below.
+        if (party?.Party?.MapEventSide != null)
+        {
+            MessageBroker.Instance.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
+            return;
+        }
+
+        // The ordinary siege-menu leave: resolve the settlement, drop the camp, and deactivate the
+        // local siege unless native teardown will do it.
         bool nativeDeactivationExpected =
             party?.BesiegerCamp?.SiegeEvent != null;
         if (settlement == null)
@@ -686,13 +712,12 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
             }
 
             // The server holds this defender inside the settlement; reconcile the local copy (which the assault
-            // may have left outside) so siege_attacker_defeated's "Return to {SETTLEMENT}" resolves. AllowedThread
-            // keeps the enter local, not round-tripped.
+            // may have left outside) so siege_attacker_defeated's "Return to {SETTLEMENT}" resolves.
             if (MobileParty.MainParty.CurrentSettlement != settlement)
             {
                 EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
             }
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            StartLocalSettlementEncounter(settlement);
 
             if (Campaign.Current?.CurrentMenuContext != null)
             {
@@ -824,12 +849,11 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
                 PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
             }
 
-            // AllowedThread stands the co-op EncounterManager patch down so this runs locally, not round-tripped.
             if (MobileParty.MainParty.CurrentSettlement != settlement)
             {
                 EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
             }
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            StartLocalSettlementEncounter(settlement);
 
             if (Campaign.Current?.CurrentMenuContext != null)
             {
@@ -842,13 +866,62 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         }
     }
 
+    /// <summary>
+    /// Opens MainParty's settlement encounter locally, while still letting the round trip replicate the entry.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="EncounterManagerPatches"/>'s StartSettlementEncounter prefix is the one EncounterManager
+    /// prefix that never consults <c>CallOriginalPolicy.IsOriginalAllowed()</c>, so calling
+    /// <see cref="EncounterManager.StartSettlementEncounter"/> inside an <c>AllowedThread</c> is NOT stood
+    /// down on a client - it is swallowed into an async StartSettlementEncounterAttempted round trip. The
+    /// capture menu then opened with <c>PlayerEncounter.Current == null</c>, and the server's later approval
+    /// re-ran Init and replaced the capture menu with the plain arrival menu, stranding the player.
+    ///
+    /// The publish is load-bearing and must stay: EnterSettlementActionPatches returns before publishing
+    /// when the original is allowed, so the AllowedThread-scoped EnterSettlementAction above never
+    /// replicates, and this round trip is what makes the server apply the authoritative settlement entry.
+    /// So keep the call for its side effect and build the encounter here too - the same shape vanilla's
+    /// EncounterManager.StartSettlementEncounter uses for MainParty, and what SettlementInterface already does.
+    /// </remarks>
+    private static void StartLocalSettlementEncounter(Settlement settlement)
+    {
+        // Publishes the request on a client; runs vanilla (and creates the encounter) on the server.
+        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+
+        if (PlayerEncounter.Current != null) return;
+
+        var settlementParty = settlement?.Party;
+        if (settlementParty == null)
+        {
+            // Settlement.Name dereferences Party, which is exactly what is null here - log the id instead.
+            Logger.Error("Settlement {settlementId} had no party; cannot open the capture encounter",
+                settlement?.StringId);
+            return;
+        }
+
+        PlayerEncounter.Start();
+        PlayerEncounter.Current.Init(MobileParty.MainParty.Party, settlementParty, settlement);
+    }
+
     public void RouteCapturedSettlementToAftermathMenu(Settlement settlement)
     {
         if (settlement == null) return;
 
-        // Backstop for a HOST attacker: the aftermath-prompt transition parks in the gated retry (the host is
-        // still in its own mission when the prompt arrives) and can miss. This runs off the observable stuck
-        // encounter menu instead, so it lands regardless of why the prompt path failed.
+        // Backstop for an attacker whose aftermath-prompt transition missed (a host still in its own mission
+        // when the prompt arrives parks in the gated retry, and the deferred re-run can miss). This runs off
+        // the observable stuck encounter menu instead, so it lands regardless of why the prompt path failed.
+        //
+        // It must only recover a client that ALREADY OWNS the choice. The server prompts exactly one capture
+        // leader, and PromptLocalAftermathChoice is what records that ownership here. Without this gate every
+        // besieging client that reached the stuck menu would claim the capture for itself - two players in the
+        // same clan would each open the Devastate/Pillage menu and each answer it.
+        if (localAftermathChoiceSettlement != settlement && !SiegeCaptureMenuHoldPatch.IsHeld(settlement))
+        {
+            Logger.Debug("RouteCapturedSettlementToAftermathMenu: {Settlement} is not this client's choice; ignoring",
+                settlement.StringId);
+            return;
+        }
+
         localAftermathChoiceSettlement = settlement;
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
         SwitchLocalPartyToSettlementTaken(settlement);
