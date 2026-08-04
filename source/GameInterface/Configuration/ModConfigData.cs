@@ -100,6 +100,11 @@ public sealed class ModOptionsData
     /// </summary>
     public bool? MilitiaJoinsSallyOut { get; set; }
 
+    /// <summary>
+    /// Whether a siege survives a battle that ended only because the enemy retreated.
+    /// </summary>
+    public bool? ResumeSiegeWhenEnemyRetreats { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
@@ -27,6 +28,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -253,6 +255,10 @@ internal class BattleFinalizeHandler : IHandler
                 mapEvent._keepSiegeEvent = true;
                 mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
             }
+            else if (ShouldResumeSiegeAfterEnemyRetreat(mapEvent))
+            {
+                ResumeSiegeAfterEnemyRetreat(mapEvent);
+            }
 
             // Vanilla silently re-crowns AttackerSide.LeaderParty to whichever party is first in the
             // list if the leader's party ever left and rejoined the event; capture and the aftermath
@@ -275,6 +281,92 @@ internal class BattleFinalizeHandler : IHandler
         }, blocking: true, context: nameof(FinalizeAndCollectPlayers));
         return playerPartyIds ?? Array.Empty<string>();
     }
+
+
+    /// <summary>
+    /// True when the besieger is left standing only because the other side ran, and
+    /// <see cref="ModConfigProvider.ModOptions.ResumeSiegeWhenEnemyRetreats"/> says to treat that as an
+    /// unfinished fight rather than a decision.
+    /// </summary>
+    /// <remarks>
+    /// Vanilla scores a retreat as a decisive result, and for a siege that is expensive: KingdomManager's
+    /// SiegeCompleted hands the settlement over outright for a won SallyOut, and FinalizeEventAux's teardown
+    /// lifts the camp for a SiegeOutside battle. So a garrison that turns and runs back through its own gate
+    /// loses the town on the spot, and a relief force that breaks off ends the siege it failed to break -
+    /// with its troops left standing in the open rather than back behind the walls they came from.
+    /// </remarks>
+    private static bool ShouldResumeSiegeAfterEnemyRetreat(MapEvent mapEvent)
+    {
+        if (!ModConfigProvider.ModOptions.ResumeSiegeWhenEnemyRetreats) return false;
+        if (!mapEvent.EndedByRetreat) return false;
+
+        // A retreat from a field battle has no siege to resume. Assaults are handled by the branch above,
+        // which already matches vanilla.
+        if (!mapEvent.IsSallyOut && !mapEvent.IsSiegeOutside && !mapEvent.IsBlockadeSallyOut) return false;
+
+        var camp = mapEvent.MapEventSettlement?.SiegeEvent?.BesiegerCamp;
+        if (camp == null) return false;
+
+        var retreatingSide = mapEvent.GetMapEventSide(mapEvent.RetreatingSide);
+        if (retreatingSide == null) return false;
+
+        // If the besieging side is what retreated, the siege really is over and vanilla's lift is correct.
+        return !SideContainsBesieger(retreatingSide, camp);
+    }
+
+    private static bool SideContainsBesieger(MapEventSide side, BesiegerCamp camp)
+    {
+        foreach (var mapEventParty in side.Parties)
+        {
+            if (mapEventParty?.Party?.MobileParty?.BesiegerCamp == camp) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Keeps the siege standing and sends the routed parties home. Server-only, like the rest of finalize -
+    /// clients receive the surviving SiegeEvent and the movement orders through normal replication.
+    /// </summary>
+    private void ResumeSiegeAfterEnemyRetreat(MapEvent mapEvent)
+    {
+        mapEvent._keepSiegeEvent = true;
+
+        var settlement = mapEvent.MapEventSettlement;
+        var retreatingSide = mapEvent.GetMapEventSide(mapEvent.RetreatingSide);
+
+        // Finalize mutates the side's party list, so walk a copy.
+        foreach (var mapEventParty in retreatingSide.Parties.ToArray())
+        {
+            var party = mapEventParty?.Party?.MobileParty;
+            if (party == null || !party.IsActive || party.CurrentSettlement != null) continue;
+
+            // Vanilla parks a retreating party on Hold wherever the battle happened. Troops that just ran
+            // from their own gate have an obvious place to be, and leaving them milling about outside the
+            // walls they fled is exactly what reads as 500 men evaporating.
+            if (settlement != null && BelongsToBesiegedSettlement(party, settlement))
+            {
+                var navigationType = party.IsCurrentlyAtSea
+                    ? MobileParty.NavigationType.Naval
+                    : MobileParty.NavigationType.Default;
+                party.SetMoveGoToSettlement(settlement, navigationType, isTargetingThePort: false);
+            }
+            else
+            {
+                party.RecalculateShortTermBehavior();
+            }
+        }
+
+        Logger.Debug(
+            "Siege of {SettlementId} resumes: the {RetreatingSide} side retreated, so the camp stands",
+            settlement?.StringId ?? "<none>", mapEvent.RetreatingSide);
+    }
+
+    /// <summary>A garrison or militia belongs to the settlement it defends; anyone else was only visiting.</summary>
+    private static bool BelongsToBesiegedSettlement(MobileParty party, Settlement settlement)
+        => party.IsGarrison || party.IsMilitia
+            ? settlement.Town?.GarrisonParty == party || party.HomeSettlement == settlement
+            : party.HomeSettlement == settlement;
 
     private bool TryMarkFinalized(MapEvent mapEvent)
     {
