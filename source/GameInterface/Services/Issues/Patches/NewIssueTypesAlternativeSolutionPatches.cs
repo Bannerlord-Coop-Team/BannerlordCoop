@@ -187,6 +187,14 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void GangLeaderNeedsWeaponsRegisterEventsPostfix(GangLeaderNeedsWeaponsIssueQuestBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Tier 2 Group A - Merchant Army of Poachers. AlternativeSolutionScaleFlags is Casualties | FailureRisk
+    // (confirmed against the decompiled source), the same shape as Smugglers/Caravan Ambush above - genuinely
+    // can fail, still safe to route through this generic, ownership-self-limiting trigger.
+    [HarmonyPatch(typeof(MerchantArmyOfPoachersIssueBehavior), nameof(MerchantArmyOfPoachersIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void MerchantArmyOfPoachersRegisterEventsPostfix(MerchantArmyOfPoachersIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;

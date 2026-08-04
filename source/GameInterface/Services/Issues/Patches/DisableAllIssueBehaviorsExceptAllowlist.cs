@@ -216,6 +216,34 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // so the allowlist entry plus this type's own bespoke Interfaces/Messages/Patches/Handler set
         // (source/GameInterface/Services/Issues/*/GangLeaderNeedsWeapons*.cs) is the whole of Step 0 + gap work.
         typeof(GangLeaderNeedsWeaponsIssueQuestBehavior),
+        // Tier 2 Group A (see doc/GroupA_HostileMobilePartySync_Design_v3.md) - Merchant Army of Poachers, step
+        // 4 of the group's build order. The task's own decisive, confirmed bug: vanilla creates _poachersParty
+        // lazily inside the army_of_poachers_village game-menu's on_init callback (whichever peer's own client
+        // first happens to open that locally-gated menu creates the world-visible party) instead of at any
+        // authoritative trigger - fixed by moving the spawn call itself off the menu callback entirely, onto
+        // the accept-time flow, gated by Patches.MerchantArmyOfPoachersPartySpawnGatePatch (block-and-forward-
+        // as-request on a client-owner, allow on server/host-owner). Unlike Gang Leader Needs Weapons'
+        // CreateGuardsParty(), this quest's CreatePoachersParty() reads BOTH MobileParty.MainParty (a low-impact,
+        // documented, cosmetic-only bandit-culture pick - same accepted precedent as Caravan Ambush's own
+        // bandit-hideout pick) AND Settlement.CurrentSettlement (a real, load-bearing correctness issue
+        // independent of multiplayer sync, since EnterSettlementAction.ApplyForParty null-derefs on a null
+        // settlement, and accept-time is no longer guaranteed to be "while physically standing in the target
+        // village" the way vanilla's own menu-driven trigger point always was) - see
+        // Interfaces.IMerchantArmyOfPoachersIssueInterface's type doc comment for why
+        // CreatePoachersPartyOnServer is a faithful, documented reimplementation (substituting
+        // _questVillage.Settlement for Settlement.CurrentSettlement) rather than a bare reflective invoke of
+        // vanilla's own private method. Also needed: a creation-time capture/broadcast of the RNG-picked
+        // _questVillage (Village.GetRandomElementWithPredicate, genuinely per-client-divergent - unlike Caravan
+        // Ambush's deterministic MinBy pick), a battle-start-approval mechanism matching Gang Leader Needs
+        // Weapons' pattern (Patches.MerchantArmyOfPoachersBattleStartApprovalPatches, gating the named,
+        // Harmony-patchable StartQuestBattle() directly), and an independently-confirmed ownership gap on the
+        // poachers-party-leader dialogue's two convergent completion/turn-in leaves
+        // (Patches.MerchantArmyOfPoachersOwnershipGatePatches) - see that file's own doc comment. No orphaned
+        // standalone disable patch was found for this type (grepped the whole tree - zero hits, same as
+        // Smugglers/Caravan Ambush/Gang Leader Needs Weapons), so the allowlist entry plus this type's own
+        // bespoke Interfaces/Messages/Patches/Handler set (source/GameInterface/Services/Issues/*/MerchantArmyOfPoachers*.cs)
+        // is the whole of Step 0 + gap work.
+        typeof(MerchantArmyOfPoachersIssueBehavior),
     };
 
     /// <summary>

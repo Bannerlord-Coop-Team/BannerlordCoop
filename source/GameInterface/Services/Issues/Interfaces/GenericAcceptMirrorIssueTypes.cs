@@ -134,6 +134,17 @@ internal static class GenericAcceptMirrorIssueTypes
         // quest - _guardsParty, only ever set later by a RegisterEvents()-wired OnSettlementEnter listener, NOT
         // by this replay - is handled entirely separately by GangLeaderNeedsWeaponsGuardsPartySpawnGatePatch.
         typeof(GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue),
+        // Tier 2 Group A: Merchant Army of Poachers - GenerateIssueQuest(questId) forwards IssueOwner/a fixed
+        // 20-day due time/_questVillage/IssueDifficultyMultiplier/RewardGold - all pure functions of the now-
+        // correctly-replicated Issue-level state, once _questVillage itself is captured/broadcast at creation
+        // time (see IMerchantArmyOfPoachersIssueInterface's doc comment - the village is a genuinely
+        // RNG-dependent pick, Village.GetRandomElementWithPredicate, unlike Caravan Ambush's deterministic
+        // MinBy). A bare replay of IssueManager.StartIssueQuest lands on a byte-identical
+        // MerchantArmyOfPoachersIssueQuest on every peer. The one genuinely per-client-divergent piece of this
+        // quest - _poachersParty, only ever set later by the (now accept-time-triggered) party-spawn gate - is
+        // handled entirely separately by MerchantArmyOfPoachersPartySpawnGatePatch, not by this generic accept
+        // mirror.
+        typeof(MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -213,6 +224,12 @@ internal static class GenericAcceptMirrorIssueTypes
         // IsTriedToSolveBefore + due time) is all any other peer's mirror copy needs. Needs its matching
         // HourlyTick registration too - see that file's GangLeaderNeedsWeaponsIssueQuestBehavior entry.
         typeof(GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue),
+        // Tier 2 Group A: Merchant Army of Poachers - IsThereAlternativeSolution == true,
+        // AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed against the decompiled source),
+        // the same shape as Smugglers/Caravan Ambush/CapturedByBountyHunters above - genuinely can fail, still
+        // safe to route through this generic, ownership-self-limiting trigger. Needs its matching HourlyTick
+        // registration too - see that file's MerchantArmyOfPoachersIssueBehavior entry.
+        typeof(MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>
