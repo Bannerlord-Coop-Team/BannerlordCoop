@@ -9,7 +9,7 @@ namespace GameInterface.Services.Modules.Handlers;
 /// Detects active modules that are unsupported by COOP and prepare
 /// a one-time informational warning for the client.
 /// </summary>
-public class AdditionalModuleWarningHandler
+public class UnsupportedModuleWarningHandler
 {
     public const string PromptTitle = "Additional Modules Detected";
 
@@ -22,7 +22,7 @@ public class AdditionalModuleWarningHandler
     private bool promptShown;
     private string[] unsupportedModuleIds = Array.Empty<string>();
     
-    public AdditionalModuleWarningHandler(
+    public UnsupportedModuleWarningHandler(
         IModuleInfoProvider moduleInfoProvider)
     {
         this.moduleInfoProvider = moduleInfoProvider ?? throw new ArgumentNullException(nameof(moduleInfoProvider));
