@@ -137,6 +137,10 @@ internal sealed class PeaceBarterHandler : IHandler
                 return;
             }
 
+            // Once the war is over on the authoritative server, a later failure must not be reported as a
+            // rejection, or the client rolls back a change that really happened. The flag is set in a
+            // finally and read back from the world rather than assumed, so it stays true to what actually
+            // took effect even if Apply throws part-way.
             try
             {
                 MakePeaceAction.Apply(playerHero.MapFaction, targetHero.MapFaction);
@@ -152,23 +156,13 @@ internal sealed class PeaceBarterHandler : IHandler
                 return;
             }
 
-            foreach (var barterable in offeredBarterables)
-            {
-                if (!(barterable is PeaceBarterable))
-                    barterable.Apply();
-            }
-            CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offeredBarterables);
-            ApplyOverpayRelationBonus(playerHero, targetHero, MathF.Max(0f, offerValue));
-
-            if ((PeaceConversationContext)request.Context == PeaceConversationContext.MapParty)
-                ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
-            FlushHeroGold(playerHero);
-            FlushHeroGold(targetHero);
+            ApplyAcceptedPeace(peer, request, playerHero, targetHero, offeredBarterables, offerValue);
             Accept(peer, request, playerHero.Gold);
         }
         catch (Exception exception)
         {
             Logger.Error(exception, "Failed to apply an authoritative peace barter");
+
             if (mutationApplied)
             {
                 // Peace is already made server-side; reporting failure would be the desync.
@@ -182,6 +176,35 @@ internal sealed class PeaceBarterHandler : IHandler
         {
             playerContext?.Dispose();
         }
+    }
+
+    private static bool StillAtWar(Hero playerHero, Hero targetHero) =>
+        playerHero.MapFaction.FactionsAtWarWith?.Contains(targetHero.MapFaction) == true ||
+        targetHero.MapFaction.FactionsAtWarWith?.Contains(playerHero.MapFaction) == true;
+
+    private void ApplyAcceptedPeace(
+        NetPeer peer,
+        NetworkRequestPeaceBarter request,
+        Hero playerHero,
+        Hero targetHero,
+        List<Barterable> offeredBarterables,
+        float offerValue)
+    {
+        foreach (var barterable in offeredBarterables)
+        {
+            // The peace itself was already applied by MakePeaceAction; applying its barterable
+            // again would double it.
+            if (!(barterable is PeaceBarterable)) barterable.Apply();
+        }
+
+        CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offeredBarterables);
+        ApplyOverpayRelationBonus(playerHero, targetHero, MathF.Max(0f, offerValue));
+
+        if ((PeaceConversationContext)request.Context == PeaceConversationContext.MapParty)
+            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
+
+        FlushHeroGold(playerHero);
+        FlushHeroGold(targetHero);
     }
 
     private bool TryResolveContext(
@@ -199,12 +222,7 @@ internal sealed class PeaceBarterHandler : IHandler
         targetParty = null;
         reason = null;
 
-        if (string.IsNullOrEmpty(request.RequestId) ||
-            !Enum.IsDefined(typeof(PeaceConversationContext), request.Context) ||
-            !playerManager.TryGetPlayer(peer, out Player player) ||
-            !objectManager.TryGetObject(player.HeroId, out playerHero) ||
-            !objectManager.TryGetObject(player.MobilePartyId, out MobileParty playerMobileParty) ||
-            !objectManager.TryGetObject(request.TargetHeroId, out targetHero))
+        if (!TryResolveParticipants(peer, request, out playerHero, out var playerMobileParty, out targetHero))
         {
             reason = "The server could not identify the peace participants.";
             return false;
@@ -212,64 +230,103 @@ internal sealed class PeaceBarterHandler : IHandler
 
         playerParty = playerMobileParty.Party;
         targetParty = targetHero.PartyBelongedTo?.Party;
-        if (playerMobileParty?.IsActive != true ||
-            playerMobileParty.LeaderHero != playerHero)
+
+        if (playerMobileParty.IsActive != true || playerMobileParty.LeaderHero != playerHero)
         {
             reason = "The encounter state changed before the peace barter completed.";
             return false;
         }
 
-        var context = (PeaceConversationContext)request.Context;
-        if (context == PeaceConversationContext.MapParty)
+        if (!ConversationIsStillLive(peer, request, playerParty, playerMobileParty, targetHero, ref targetParty, out reason))
+            return false;
+
+        return CanNegotiatePeace(playerHero, targetHero, out reason);
+    }
+
+    private bool TryResolveParticipants(
+        NetPeer peer, NetworkRequestPeaceBarter request,
+        out Hero playerHero, out MobileParty playerMobileParty, out Hero targetHero)
+    {
+        playerHero = null;
+        playerMobileParty = null;
+        targetHero = null;
+
+        return !string.IsNullOrEmpty(request.RequestId)
+            && Enum.IsDefined(typeof(PeaceConversationContext), request.Context)
+            && playerManager.TryGetPlayer(peer, out Player player)
+            && objectManager.TryGetObject(player.HeroId, out playerHero)
+            && objectManager.TryGetObject(player.MobilePartyId, out playerMobileParty)
+            && objectManager.TryGetObject(request.TargetHeroId, out targetHero);
+    }
+
+    private bool ConversationIsStillLive(
+        NetPeer peer, NetworkRequestPeaceBarter request, PartyBase playerParty,
+        MobileParty playerMobileParty, Hero targetHero, ref PartyBase targetParty, out string reason)
+    {
+        reason = null;
+
+        switch ((PeaceConversationContext)request.Context)
         {
-            if (!objectManager.TryGetObject(request.ContextId, out PartyBase targetPartyBase) ||
-                targetPartyBase.MobileParty?.IsActive != true ||
-                targetPartyBase.LeaderHero != targetHero ||
-                playerMobileParty.MapEvent != null ||
-                targetPartyBase.MobileParty.MapEvent != null ||
-                !objectManager.TryGetId(playerParty, out var playerPartyId) ||
-                !conversationPartyTracker.TryGetEngagement(peer, out var engagement) ||
-                engagement.PartyId != request.ContextId ||
-                engagement.EngagerPartyId != playerPartyId)
-            {
+            case PeaceConversationContext.MapParty:
+                if (TryResolveMapPartyConversation(peer, request, playerParty, playerMobileParty, targetHero, out var resolved))
+                {
+                    targetParty = resolved;
+                    return true;
+                }
                 reason = "The peace encounter is no longer active.";
                 return false;
-            }
 
-            targetParty = targetPartyBase;
-        }
-        else if (context == PeaceConversationContext.Location)
-        {
-            if (targetHero.CharacterObject == null ||
-                !objectManager.TryGetId(targetHero.CharacterObject, out var characterId) ||
-                !locationConversationTracker.TryGetEngagement(peer, out var npcKey) ||
-                npcKey != LocationConversationTracker.ComposeKey(request.ContextId, characterId))
-            {
-                reason = "The peace conversation is no longer active.";
-                return false;
-            }
-        }
-        else if (context == PeaceConversationContext.Settlement)
-        {
-            if (!objectManager.TryGetObject(request.ContextId, out Settlement settlement) ||
-                playerMobileParty.CurrentSettlement != settlement ||
-                targetHero.CurrentSettlement != settlement)
-            {
+            case PeaceConversationContext.Settlement:
+                if (SettlementConversationIsLive(request, playerMobileParty, targetHero)) return true;
                 reason = "The peace settlement conversation is no longer active.";
                 return false;
-            }
-        }
-        else
-        {
-            reason = "The peace conversation context is not supported.";
-            return false;
-        }
 
-        if (!CanNegotiatePeace(playerHero, targetHero, out reason))
-            return false;
+            case PeaceConversationContext.Location:
+                if (LocationConversationIsLive(peer, request, targetHero)) return true;
+                reason = "The peace conversation is no longer active.";
+                return false;
 
-        return true;
+            default:
+                // An unrecognised context is refused rather than treated as a Location conversation:
+                // accepting one we do not understand is how an unvalidated barter gets through.
+                reason = "The peace conversation context is not supported.";
+                return false;
+        }
     }
+
+    private bool TryResolveMapPartyConversation(
+        NetPeer peer, NetworkRequestPeaceBarter request, PartyBase playerParty,
+        MobileParty playerMobileParty, Hero targetHero, out PartyBase targetPartyBase)
+    {
+        targetPartyBase = null;
+
+        if (!objectManager.TryGetObject(request.ContextId, out targetPartyBase)) return false;
+        if (targetPartyBase.MobileParty?.IsActive != true) return false;
+        if (targetPartyBase.LeaderHero != targetHero) return false;
+        if (playerMobileParty.MapEvent != null || targetPartyBase.MobileParty.MapEvent != null) return false;
+        if (!objectManager.TryGetId(playerParty, out var playerPartyId)) return false;
+        if (!conversationPartyTracker.TryGetEngagement(peer, out var engagement)) return false;
+
+        return engagement.PartyId == request.ContextId && engagement.EngagerPartyId == playerPartyId;
+    }
+
+    /// <summary>
+    /// A settlement-menu conversation holds no engagement (no agent, no location mission), so authority comes
+    /// from both sides actually being in the settlement named by the request. Without this branch such a
+    /// conversation fell into the Location check, found no lock, and every peace barter from a castle or town
+    /// menu was refused.
+    /// </summary>
+    private bool SettlementConversationIsLive(
+        NetworkRequestPeaceBarter request, MobileParty playerMobileParty, Hero targetHero)
+        => objectManager.TryGetObject(request.ContextId, out Settlement conversationSettlement)
+            && playerMobileParty.CurrentSettlement == conversationSettlement
+            && targetHero.CurrentSettlement == conversationSettlement;
+
+    private bool LocationConversationIsLive(NetPeer peer, NetworkRequestPeaceBarter request, Hero targetHero)
+        => targetHero.CharacterObject != null
+            && objectManager.TryGetId(targetHero.CharacterObject, out var characterId)
+            && locationConversationTracker.TryGetEngagement(peer, out var npcKey)
+            && npcKey == LocationConversationTracker.ComposeKey(request.ContextId, characterId);
 
     private static bool CanNegotiatePeace(Hero playerHero, Hero targetHero, out string reason)
     {

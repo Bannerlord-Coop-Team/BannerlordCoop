@@ -282,7 +282,6 @@ internal class BattleFinalizeHandler : IHandler
         return playerPartyIds ?? Array.Empty<string>();
     }
 
-
     /// <summary>
     /// True when the besieger is left standing only because the other side ran, and
     /// <see cref="ModConfigProvider.ModOptions.ResumeSiegeWhenEnemyRetreats"/> says to treat that as an

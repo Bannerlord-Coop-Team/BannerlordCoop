@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -155,84 +155,14 @@ internal sealed class MarriageBarterHandler : IHandler
         var mutationApplied = false;
         try
         {
-            if (!TryConsumeAuthorization(peer, request))
-            {
-                Reject(peer, request, playerHero.Gold, "The marriage barter is no longer authorized.");
-                return;
-            }
+            if (!TryPrepareMarriage(peer, player, playerHero, request, out var prepared)) return;
 
-            if (!TryResolveMarriageContext(
-                    peer,
-                    player,
-                    playerHero,
-                    request.CounterpartyHeroId,
-                    request.Context,
-                    request.ContextId,
-                    request.HeroBeingProposedToId,
-                    request.ProposingHeroId,
-                    requireActiveConversation: false,
-                    out var counterpartyHero,
-                    out var heroBeingProposedTo,
-                    out var proposingHero,
-                    out var reason))
-            {
-                Reject(peer, request, playerHero.Gold, reason);
-                return;
-            }
-
-            if (!TryBuildMarriageBarter(
-                    player,
-                    playerHero,
-                    counterpartyHero,
-                    heroBeingProposedTo,
-                    proposingHero,
-                    request.Terms,
-                    out var barterData,
-                    out reason))
-            {
-                Reject(peer, request, playerHero.Gold, reason);
-                return;
-            }
-
-            var barterManager = BarterManager.Instance;
-            if (barterManager == null)
-            {
-                Reject(peer, request, playerHero.Gold, "The marriage offer is not acceptable.");
-                return;
-            }
-
-            var offerValue = barterManager.GetOfferValueForFaction(barterData, counterpartyHero.Clan);
-            if (offerValue < -0.01f)
-            {
-                Reject(peer, request, playerHero.Gold, "The marriage offer is not acceptable.");
-                return;
-            }
-
-            var offeredBarterables = barterData.GetOfferedBarterables();
-            foreach (var barterable in offeredBarterables)
-                barterable.Apply();
-            // Past this point the marriage and any gold have already moved on the authoritative
-            // server. Anything that fails from here must NOT be reported as a rejection, or the
-            // client rolls its UI back and the two sides disagree about a change that really
-            // happened.
-            mutationApplied = true;
-            CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, barterData.OtherHero, offeredBarterables);
-            ApplyOverpayRelationBonus(playerHero, barterData.OtherHero, MathF.Max(0f, offerValue));
-            if (heroBeingProposedTo.Spouse != proposingHero || proposingHero.Spouse != heroBeingProposedTo)
-            {
-                Reject(peer, request, playerHero.Gold, "The marriage could not be completed.");
-                return;
-            }
-
-            FlushHeroGold(playerHero);
-            FlushHeroGold(barterData.OtherHero);
-            FlushHeroGold(heroBeingProposedTo);
-            FlushHeroGold(proposingHero);
-            Accept(peer, request, playerHero.Gold);
+            ApplyMarriage(peer, request, playerHero, prepared, ref mutationApplied);
         }
         catch (Exception exception)
         {
             Logger.Error(exception, "Failed to apply an authoritative marriage barter");
+
             if (mutationApplied)
             {
                 // The marriage is already done server-side; telling the client it failed would be
@@ -247,6 +177,118 @@ internal sealed class MarriageBarterHandler : IHandler
                 playerHero.Gold,
                 "The server could not process the marriage offer.");
         }
+    }
+
+    /// <summary>The validated, priced offer - everything the apply step needs and nothing it has to re-derive.</summary>
+    private readonly struct PreparedMarriage
+    {
+        public readonly BarterData BarterData;
+        public readonly Hero HeroBeingProposedTo;
+        public readonly Hero ProposingHero;
+        public readonly float OfferValue;
+
+        public PreparedMarriage(BarterData barterData, Hero heroBeingProposedTo, Hero proposingHero, float offerValue)
+        {
+            BarterData = barterData;
+            HeroBeingProposedTo = heroBeingProposedTo;
+            ProposingHero = proposingHero;
+            OfferValue = offerValue;
+        }
+    }
+
+    /// <summary>
+    /// Authorizes, resolves and prices the offer. Every failure rejects the request itself, so a false return
+    /// means the caller is done - there is nothing left to report.
+    /// </summary>
+    private bool TryPrepareMarriage(
+        NetPeer peer, Player player, Hero playerHero, NetworkRequestMarriageBarter request, out PreparedMarriage prepared)
+    {
+        prepared = default;
+
+        if (!TryConsumeAuthorization(peer, request))
+        {
+            Reject(peer, request, playerHero.Gold, "The marriage barter is no longer authorized.");
+            return false;
+        }
+
+        if (!TryResolveMarriageContext(
+                peer,
+                player,
+                playerHero,
+                request.CounterpartyHeroId,
+                request.Context,
+                request.ContextId,
+                request.HeroBeingProposedToId,
+                request.ProposingHeroId,
+                requireActiveConversation: false,
+                out var counterpartyHero,
+                out var heroBeingProposedTo,
+                out var proposingHero,
+                out var reason))
+        {
+            Reject(peer, request, playerHero.Gold, reason);
+            return false;
+        }
+
+        if (!TryBuildMarriageBarter(
+                player,
+                playerHero,
+                counterpartyHero,
+                heroBeingProposedTo,
+                proposingHero,
+                request.Terms,
+                out var barterData,
+                out reason))
+        {
+            Reject(peer, request, playerHero.Gold, reason);
+            return false;
+        }
+
+        var barterManager = BarterManager.Instance;
+        var offerValue = barterManager?.GetOfferValueForFaction(barterData, counterpartyHero.Clan);
+        if (offerValue == null || offerValue < -0.01f)
+        {
+            Reject(peer, request, playerHero.Gold, "The marriage offer is not acceptable.");
+            return false;
+        }
+
+        prepared = new PreparedMarriage(barterData, heroBeingProposedTo, proposingHero, offerValue.Value);
+        return true;
+    }
+
+    private void ApplyMarriage(
+        NetPeer peer, NetworkRequestMarriageBarter request, Hero playerHero,
+        in PreparedMarriage prepared, ref bool mutationApplied)
+    {
+        var offeredBarterables = prepared.BarterData.GetOfferedBarterables();
+        foreach (var barterable in offeredBarterables)
+            barterable.Apply();
+
+        // Past this point the marriage and any gold have already moved on the authoritative
+        // server. Anything that fails from here must NOT be reported as a rejection, or the
+        // client rolls its UI back and the two sides disagree about a change that really
+        // happened.
+        mutationApplied = true;
+
+        CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, prepared.BarterData.OtherHero, offeredBarterables);
+        ApplyOverpayRelationBonus(playerHero, prepared.BarterData.OtherHero, MathF.Max(0f, prepared.OfferValue));
+
+        if (!AreMarried(prepared.HeroBeingProposedTo, prepared.ProposingHero))
+        {
+            Reject(peer, request, playerHero.Gold, "The marriage could not be completed.");
+            return;
+        }
+
+        FlushMarriageGold(playerHero, prepared.BarterData.OtherHero, prepared.HeroBeingProposedTo, prepared.ProposingHero);
+        Accept(peer, request, playerHero.Gold);
+    }
+
+    private static bool AreMarried(Hero heroBeingProposedTo, Hero proposingHero) =>
+        heroBeingProposedTo.Spouse == proposingHero && proposingHero.Spouse == heroBeingProposedTo;
+
+    private void FlushMarriageGold(params Hero[] heroes)
+    {
+        foreach (var hero in heroes) FlushHeroGold(hero);
     }
 
     private void ProcessAuthorization(NetPeer peer, NetworkAuthorizeMarriageBarter request)

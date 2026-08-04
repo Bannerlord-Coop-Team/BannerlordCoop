@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Network;
 using Common.Util;
 using GameInterface.Policies;
@@ -151,7 +151,8 @@ internal static class LordBarterPatch
         var barter = authorizedBarter;
         var context = pendingContext;
         var kind = pendingKind;
-        var shouldCompleteUi = pendingUiActive;
+        var shouldCompleteUi = pendingUiActive && IsPendingContextActive();
+
         if (!result.Accepted)
         {
             requestPending = false;
@@ -161,51 +162,16 @@ internal static class LordBarterPatch
         }
 
         ClearPendingRequest();
-        if (shouldCompleteUi && BarterManager.Instance != null)
-        {
-            BarterManager.Instance.LastBarterIsAccepted = true;
-            BarterManager.Instance.Close();
-        }
+        CloseBarterUi(shouldCompleteUi);
 
         try
         {
             presentation.SynchronizeMainHeroGold(result.PlayerGold);
             if (shouldCompleteUi && BarterManager.Instance != null)
                 BarterManager.Instance.HandleHeroCooldown(barter.OtherHero);
-            if (shouldCompleteUi && kind == LordBarterKind.SafePassage &&
-                context == PeaceConversationContext.MapParty &&
-                PlayerEncounter.Current != null &&
-                barter.OtherParty == MobileParty.ConversationParty?.Party)
-            {
-                var siegeEvent = barter.OtherParty?.SiegeEvent;
-                var mainParty = MobileParty.MainParty;
-                using (new AllowedThread())
-                {
-                    var faction = barter.OtherParty.MapFaction;
-                    if (faction != null)
-                        faction.NotAttackableByPlayerUntilTime = CampaignTime.DaysFromNow(5f);
-                }
-                if (siegeEvent != null &&
-                    siegeEvent.BesiegerCamp.HasInvolvedPartyForEventType(barter.OtherParty) &&
-                    siegeEvent.BesiegedSettlement.HasInvolvedPartyForEventType(PartyBase.MainParty))
-                {
-                    using (new AllowedThread())
-                    {
-                        Campaign.Current.GameMenuManager.SetNextMenu("menu_siege_safe_passage_accepted");
-                        PlayerSiege.FinalizePlayerSiege();
-                    }
-                }
-                else
-                {
-                    PlayerEncounter.LeaveEncounter = true;
-                    if (mainParty.SiegeEvent != null &&
-                        mainParty.SiegeEvent.BesiegerCamp
-                            .HasInvolvedPartyForEventType(PartyBase.MainParty))
-                    {
-                        mainParty.BesiegerCamp = null;
-                    }
-                }
-            }
+
+            if (IsSafePassageOnTheMap(shouldCompleteUi, kind, context, barter))
+                ApplySafePassageOutcome(barter);
         }
         catch
         {
@@ -213,20 +179,78 @@ internal static class LordBarterPatch
         }
 
         if (shouldCompleteUi)
-            TrySetConclusionLine(kind);
-
-        if (shouldCompleteUi && Campaign.Current?.ConversationManager?.IsConversationInProgress == true)
         {
-            try
-            {
-                Campaign.Current.ConversationManager.ContinueConversation();
-            }
-            catch
-            {
-                // The authoritative result has already closed the barter UI.
-            }
+            TrySetConclusionLine(kind);
+            ResumeConversation();
         }
+
         MBInformationManager.AddQuickInformation(GameTexts.FindText("str_offer_accepted"));
+    }
+
+    private static void CloseBarterUi(bool shouldCompleteUi)
+    {
+        if (!shouldCompleteUi || BarterManager.Instance == null) return;
+
+        BarterManager.Instance.LastBarterIsAccepted = true;
+        BarterManager.Instance.Close();
+    }
+
+    private static bool IsSafePassageOnTheMap(
+        bool shouldCompleteUi, LordBarterKind kind, PeaceConversationContext context, BarterData barter)
+        => shouldCompleteUi
+            && kind == LordBarterKind.SafePassage
+            && context == PeaceConversationContext.MapParty
+            && PlayerEncounter.Current != null
+            && barter.OtherParty == MobileParty.ConversationParty?.Party;
+
+    /// <summary>
+    /// Safe passage bought out of a siege leaves the camp behind; bought anywhere else it just ends the
+    /// encounter. Either way the faction is off-limits for five days.
+    /// </summary>
+    private static void ApplySafePassageOutcome(BarterData barter)
+    {
+        var siegeEvent = barter.OtherParty?.SiegeEvent;
+        var mainParty = MobileParty.MainParty;
+
+        using (new AllowedThread())
+        {
+            var faction = barter.OtherParty.MapFaction;
+            if (faction != null)
+                faction.NotAttackableByPlayerUntilTime = CampaignTime.DaysFromNow(5f);
+        }
+
+        if (siegeEvent != null &&
+            siegeEvent.BesiegerCamp.HasInvolvedPartyForEventType(barter.OtherParty) &&
+            siegeEvent.BesiegedSettlement.HasInvolvedPartyForEventType(PartyBase.MainParty))
+        {
+            using (new AllowedThread())
+            {
+                Campaign.Current.GameMenuManager.SetNextMenu("menu_siege_safe_passage_accepted");
+                PlayerSiege.FinalizePlayerSiege();
+            }
+            return;
+        }
+
+        PlayerEncounter.LeaveEncounter = true;
+        if (mainParty.SiegeEvent != null &&
+            mainParty.SiegeEvent.BesiegerCamp.HasInvolvedPartyForEventType(PartyBase.MainParty))
+        {
+            mainParty.BesiegerCamp = null;
+        }
+    }
+
+    private static void ResumeConversation()
+    {
+        if (Campaign.Current?.ConversationManager?.IsConversationInProgress != true) return;
+
+        try
+        {
+            Campaign.Current.ConversationManager.ContinueConversation();
+        }
+        catch
+        {
+            // The authoritative result has already closed the barter UI.
+        }
     }
 
     internal static void ClearPendingRequest()
@@ -260,6 +284,19 @@ internal static class LordBarterPatch
         else
             kind = LordBarterKind.Generic;
         return true;
+    }
+
+    private static bool IsPendingContextActive()
+    {
+        if (authorizedBarter == null) return false;
+        if (pendingContext == PeaceConversationContext.Location)
+        {
+            var mission = CampaignMission.Current;
+            return mission?.Location != null && mission.Mode == MissionMode.Barter &&
+                   ContainerProvider.TryResolve<IObjectManager>(out var manager) &&
+                   manager.TryGetId(mission.Location, out var locationId) && locationId == pendingContextId;
+        }
+        return PlayerEncounter.Current != null && authorizedBarter.OtherParty == MobileParty.ConversationParty?.Party;
     }
 
     private static bool TryAuthorize(BarterData barterData, LordBarterKind kind)
@@ -370,34 +407,67 @@ internal static class LordBarterPatch
             if (barterable == null || barterable.CurrentAmount <= 0 || !manager.TryGetId(barterable.OriginalOwner, out var ownerId))
                 return false;
 
-            PeaceBarterTerm term;
-            switch (barterable)
-            {
-                case GoldBarterable:
-                    term = new PeaceBarterTerm(PeaceBarterTermType.Gold, ownerId, null, null, true, barterable.CurrentAmount);
-                    break;
-                case ItemBarterable item:
-                    var equipment = item.ItemRosterElement.EquipmentElement;
-                    if (equipment.Item == null || !manager.TryGetId(equipment.Item, out var itemId)) return false;
-                    string modifierId = null;
-                    if (equipment.ItemModifier != null && !manager.TryGetId(equipment.ItemModifier, out modifierId)) return false;
-                    term = new PeaceBarterTerm(PeaceBarterTermType.Item, ownerId, itemId, modifierId, equipment.ItemModifier == null, barterable.CurrentAmount);
-                    break;
-                case FiefBarterable fief when manager.TryGetId(fief.TargetSettlement, out var settlementId):
-                    term = new PeaceBarterTerm(PeaceBarterTermType.Fief, ownerId, settlementId, null, true, barterable.CurrentAmount);
-                    break;
-                case TransferPrisonerBarterable transfer when transfer._prisonerCharacter?.CharacterObject != null && manager.TryGetId(transfer._prisonerCharacter.CharacterObject, out var transferPrisonerId):
-                    term = new PeaceBarterTerm(PeaceBarterTermType.TransferPrisoner, ownerId, transferPrisonerId, null, true, barterable.CurrentAmount);
-                    break;
-                case SetPrisonerFreeBarterable release when release._prisonerCharacter?.CharacterObject != null && manager.TryGetId(release._prisonerCharacter.CharacterObject, out var releasePrisonerId):
-                    term = new PeaceBarterTerm(PeaceBarterTermType.ReleasePrisoner, ownerId, releasePrisonerId, null, true, barterable.CurrentAmount);
-                    break;
-                default:
-                    return false;
-            }
+            if (!TryCreateTerm(barterable, ownerId, manager, out var term)) return false;
+
             terms.Add(term);
         }
         return true;
+    }
+
+    private static bool TryCreateTerm(
+        Barterable barterable, string ownerId, IObjectManager manager, out PeaceBarterTerm term)
+    {
+        term = default;
+        var amount = barterable.CurrentAmount;
+
+        switch (barterable)
+        {
+            case GoldBarterable:
+                term = new PeaceBarterTerm(PeaceBarterTermType.Gold, ownerId, null, null, true, amount);
+                return true;
+
+            case ItemBarterable item:
+                return TryCreateItemTerm(item, ownerId, manager, amount, out term);
+
+            case FiefBarterable fief when manager.TryGetId(fief.TargetSettlement, out var settlementId):
+                term = new PeaceBarterTerm(PeaceBarterTermType.Fief, ownerId, settlementId, null, true, amount);
+                return true;
+
+            case TransferPrisonerBarterable transfer
+                when TryGetPrisonerId(transfer._prisonerCharacter, manager, out var transferPrisonerId):
+                term = new PeaceBarterTerm(PeaceBarterTermType.TransferPrisoner, ownerId, transferPrisonerId, null, true, amount);
+                return true;
+
+            case SetPrisonerFreeBarterable release
+                when TryGetPrisonerId(release._prisonerCharacter, manager, out var releasePrisonerId):
+                term = new PeaceBarterTerm(PeaceBarterTermType.ReleasePrisoner, ownerId, releasePrisonerId, null, true, amount);
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryCreateItemTerm(
+        ItemBarterable item, string ownerId, IObjectManager manager, int amount, out PeaceBarterTerm term)
+    {
+        term = default;
+        var equipment = item.ItemRosterElement.EquipmentElement;
+
+        if (equipment.Item == null || !manager.TryGetId(equipment.Item, out var itemId)) return false;
+
+        string modifierId = null;
+        if (equipment.ItemModifier != null && !manager.TryGetId(equipment.ItemModifier, out modifierId)) return false;
+
+        term = new PeaceBarterTerm(
+            PeaceBarterTermType.Item, ownerId, itemId, modifierId, equipment.ItemModifier == null, amount);
+        return true;
+    }
+
+    private static bool TryGetPrisonerId(Hero prisoner, IObjectManager manager, out string prisonerId)
+    {
+        prisonerId = null;
+        return prisoner?.CharacterObject != null && manager.TryGetId(prisoner.CharacterObject, out prisonerId);
     }
 
     private static void ShowMessage(string message) => InformationManager.DisplayMessage(new InformationMessage(message));

@@ -50,6 +50,11 @@ internal class ClientBattleRetreatHandler : IHandler
         network.SendAll(new NetworkRequestBattleRetreat(partyId, mapEventId));
     }
 
+    /// <summary>
+    /// A resolved retreat lands on every client, but means two different things depending on who you are:
+    /// the party that asked leaves the encounter, and anyone whose siege camp that retreat dissolved has to
+    /// drop their own PlayerSiege.
+    /// </summary>
     private void HandleResolved(MessagePayload<NetworkBattleRetreatResolved> payload)
     {
         var obj = payload.What;
@@ -58,35 +63,39 @@ internal class ClientBattleRetreatHandler : IHandler
         {
             if (!objectManager.TryGetObject<MobileParty>(obj.PartyId, out var party)) return;
 
-            // Branch 1: this client is the retreater.
-            if (party.IsControlledByThisInstance())
-            {
-                if (!obj.Approved)
-                {
-                    Logger.Information("Server refused the retreat; staying in the encounter");
-                    return;
-                }
-
-                using (new AllowedThread())
-                {
-                    if (PlayerEncounter.Current != null) PlayerEncounter.Finish(true);
-                    else GameMenu.ExitToLast();
-                }
-                return;
-            }
-
-            // Branch 2: someone else's retreat dissolved a siege camp this client was part of.
-            if (!obj.Approved || obj.CampClearedPartyIds == null) return;
-
-            var mine = MobileParty.MainParty;
-            if (mine == null || !objectManager.TryGetId(mine, out var myId)) return;
-            if (!obj.CampClearedPartyIds.Contains(myId)) return;
-
-            using (new AllowedThread())
-            {
-                if (PlayerSiege.PlayerSiegeEvent != null) PlayerSiege.FinalizePlayerSiege();
-            }
+            if (party.IsControlledByThisInstance()) LeaveEncounter(obj);
+            else DropSiegeIfCampCleared(obj);
         });
+    }
+
+    private static void LeaveEncounter(NetworkBattleRetreatResolved obj)
+    {
+        if (!obj.Approved)
+        {
+            Logger.Information("Server refused the retreat; staying in the encounter");
+            return;
+        }
+
+        using (new AllowedThread())
+        {
+            if (PlayerEncounter.Current != null) PlayerEncounter.Finish(true);
+            else GameMenu.ExitToLast();
+        }
+    }
+
+    /// <summary>Someone else's retreat dissolved a siege camp this client was part of.</summary>
+    private void DropSiegeIfCampCleared(NetworkBattleRetreatResolved obj)
+    {
+        if (!obj.Approved || obj.CampClearedPartyIds == null) return;
+
+        var mine = MobileParty.MainParty;
+        if (mine == null || !objectManager.TryGetId(mine, out var myId)) return;
+        if (!obj.CampClearedPartyIds.Contains(myId)) return;
+
+        using (new AllowedThread())
+        {
+            if (PlayerSiege.PlayerSiegeEvent != null) PlayerSiege.FinalizePlayerSiege();
+        }
     }
 
     private void HandleBreakInCasualties(MessagePayload<BreakInCasualtiesAttempted> payload)

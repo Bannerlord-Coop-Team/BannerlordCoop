@@ -248,5 +248,4 @@ internal class PlayerStartCaptivityPatches
 
         ConversationPartyHold.EndEngagementForEngagerParty(tracker, engagerPartyId);
     }
-
 }

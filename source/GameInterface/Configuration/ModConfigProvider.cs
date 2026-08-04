@@ -48,36 +48,42 @@ public readonly struct ModOptions
     public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
     [ProtoMember(14)]
     public readonly float MaximumLootersMultiplier { get; } = 1f;
+    [ProtoMember(15)]
+    public readonly LordDefectionRetryMode LordDefectionRetries { get; } = LordDefectionRetryMode.Vanilla;
+    [ProtoMember(16)]
+    public readonly bool MilitiaJoinsSallyOut { get; } = true;
     [ProtoMember(17)]
     public readonly bool ResumeSiegeWhenEnemyRetreats { get; } = true;
     [ProtoMember(18)]
     public readonly bool GarrisonJoinsSiegeRelief { get; } = true;
 
-    [ProtoMember(16)]
-    public readonly bool MilitiaJoinsSallyOut { get; } = true;
-
-    [ProtoMember(15)]
-    public readonly LordDefectionRetryMode LordDefectionRetries { get; } = LordDefectionRetryMode.Vanilla;
+    /// <summary>
+    /// Takes the configured value, or keeps the option's declared default when the config leaves it out.
+    /// Spelled as a call rather than <c>??</c> so the constructor reads as one straight line per option:
+    /// seventeen null-coalesces in a row look like seventeen branches, both to an analyzer and to anyone
+    /// skimming for the single option they care about.
+    /// </summary>
+    private static T Or<T>(T? configured, T declaredDefault) where T : struct => configured ?? declaredDefault;
 
     public ModOptions(ModOptionsData modOptionsData)
     {
-        FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
-        AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;
-        ClientsCanUseCheats = modOptionsData.ClientsCanUseCheats ?? ClientsCanUseCheats;
-        GoldFoodInfluenceChangeInSettlements = modOptionsData.GoldFoodInfluenceChangeInSettlements ?? GoldFoodInfluenceChangeInSettlements;
-        GoldFoodInfluenceChangeInBattles = modOptionsData.GoldFoodInfluenceChangeInBattles ?? GoldFoodInfluenceChangeInBattles;
-        GoldFoodInfluenceChangeForDisconnectedPlayers = modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers ?? GoldFoodInfluenceChangeForDisconnectedPlayers;
-        PlayerBattleAiJoinWindowHours = modOptionsData.PlayerBattleAiJoinWindowHours ?? PlayerBattleAiJoinWindowHours;
-        SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
-        WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
-        WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
-        PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
-        SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
-        SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
-        MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;
-        LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;
-        MilitiaJoinsSallyOut = modOptionsData.MilitiaJoinsSallyOut ?? MilitiaJoinsSallyOut;
-        ResumeSiegeWhenEnemyRetreats = modOptionsData.ResumeSiegeWhenEnemyRetreats ?? ResumeSiegeWhenEnemyRetreats;
-        GarrisonJoinsSiegeRelief = modOptionsData.GarrisonJoinsSiegeRelief ?? GarrisonJoinsSiegeRelief;
+        FastForwardEnabled = Or(modOptionsData.FastForwardEnabled, FastForwardEnabled);
+        AutoPauseEnabled = Or(modOptionsData.AutoPauseEnabled, AutoPauseEnabled);
+        ClientsCanUseCheats = Or(modOptionsData.ClientsCanUseCheats, ClientsCanUseCheats);
+        GoldFoodInfluenceChangeInSettlements = Or(modOptionsData.GoldFoodInfluenceChangeInSettlements, GoldFoodInfluenceChangeInSettlements);
+        GoldFoodInfluenceChangeInBattles = Or(modOptionsData.GoldFoodInfluenceChangeInBattles, GoldFoodInfluenceChangeInBattles);
+        GoldFoodInfluenceChangeForDisconnectedPlayers = Or(modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers, GoldFoodInfluenceChangeForDisconnectedPlayers);
+        PlayerBattleAiJoinWindowHours = Or(modOptionsData.PlayerBattleAiJoinWindowHours, PlayerBattleAiJoinWindowHours);
+        SpeedLimitWhilePlayersInBattle = Or(modOptionsData.SpeedLimitWhilePlayersInBattle, SpeedLimitWhilePlayersInBattle);
+        WandererLimit = Or(modOptionsData.WandererLimit, WandererLimit);
+        WandererLimitScalesWithPlayers = Or(modOptionsData.WandererLimitScalesWithPlayers, WandererLimitScalesWithPlayers);
+        PlayerKingdomClanTierRequired = Or(modOptionsData.PlayerKingdomClanTierRequired, PlayerKingdomClanTierRequired);
+        SmithingStaminaRecoveryOutsideSettlements = Or(modOptionsData.SmithingStaminaRecoveryOutsideSettlements, SmithingStaminaRecoveryOutsideSettlements);
+        SmithingStaminaRecoveryMultiplier = Or(modOptionsData.SmithingStaminaRecoveryMultiplier, SmithingStaminaRecoveryMultiplier);
+        MaximumLootersMultiplier = Or(modOptionsData.MaximumLootersMultiplier, MaximumLootersMultiplier);
+        LordDefectionRetries = Or(modOptionsData.LordDefectionRetries, LordDefectionRetries);
+        MilitiaJoinsSallyOut = Or(modOptionsData.MilitiaJoinsSallyOut, MilitiaJoinsSallyOut);
+        ResumeSiegeWhenEnemyRetreats = Or(modOptionsData.ResumeSiegeWhenEnemyRetreats, ResumeSiegeWhenEnemyRetreats);
+        GarrisonJoinsSiegeRelief = Or(modOptionsData.GarrisonJoinsSiegeRelief, GarrisonJoinsSiegeRelief);
     }
 }

@@ -102,5 +102,4 @@ internal class TownDefenderPartiesPatches
 
         return ModConfigProvider.ModOptions.MilitiaJoinsSallyOut;
     }
-
 }

@@ -160,7 +160,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         // party sitting in the wrong place on its own screen. Push the snapshot so all three converge.
         PublishCapturedPartyPosition(playerParty);
 
-
         DisbandArmyOfCapturedPlayer(playerParty, hero);
 
         // BR-061: surviving companion heroes riding in the surrendered party become prisoners of the
@@ -239,8 +238,6 @@ internal class PlayerCaptivityServerHandler : IHandler
             TakePrisonerAction.Apply(captor, companion);
         }
     }
-
-
 
     /// <summary>
     /// Replicates a captured party's authoritative position to every client, including its owner.

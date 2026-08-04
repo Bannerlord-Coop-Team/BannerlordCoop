@@ -209,7 +209,6 @@ internal class ServerSiegeEntryHandler : IHandler
         }
     }
 
-
     // Runs on the game thread already - published from the StartBattleAction postfix inside the sortie's own
     // creation, so the seat lands before anything else observes the event.
     private void HandleSallyOutStarted(MessagePayload<SallyOutStarted> payload)
@@ -570,7 +569,6 @@ internal class ServerSiegeEntryHandler : IHandler
         Besiege,
         Join,
     }
-
 
     private void HandleBreak(MessagePayload<NetworkRequestBreakSiege> payload)
     {

@@ -252,7 +252,6 @@ internal class SiegeEntryFlowPatches
         return false;
     }
 
-
     // A besieger defeated in a real-time mission unwinds through the native defeat state machine
     // (PlayerEncounter.Update still sees a live PlayerMapEvent; the coop battle-results path only forces
     // the encounter state once the server's commit replicates), and DoPlayerDefeat clears the camp

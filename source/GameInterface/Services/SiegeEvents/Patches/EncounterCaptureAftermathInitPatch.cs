@@ -64,16 +64,7 @@ internal class EncounterCaptureAftermathInitPatch
     internal static bool IsStrandedCaptureEncounter(
         MapEvent battle, Settlement settlement, Clan playerClan, MobileParty mainParty)
     {
-        if (settlement == null || !settlement.IsFortification) return false;
-        if (playerClan == null || mainParty == null) return false;
-
-        // We are outside it: the besieger, not the inside defender.
-        if (mainParty.CurrentSettlement == settlement) return false;
-
-        // The capture ended the siege (KingdomManager.SiegeCompleted -> RemoveAllSiegeParties), so a live
-        // siege means this is not a capture aftermath. This supplies the specificity the old IsSiegeAssault
-        // gate used to, and keeps the patch off every live-siege menu.
-        if (settlement.SiegeEvent != null || mainParty.BesiegerCamp != null) return false;
+        if (!IsBesiegerOutsideAFallenFortification(settlement, playerClan, mainParty)) return false;
 
         // A sally-out capture tears its map event down before this menu opens, so PlayerEncounter.Battle
         // (== Current._mapEvent) is null by then - the live capture of the stuck state showed exactly that.
@@ -81,16 +72,39 @@ internal class EncounterCaptureAftermathInitPatch
         // fall back to the pending aftermath choice, which the server does prompt for a sortie capture.
         if (SiegeCaptureMenuHoldPatch.IsHeld(settlement)) return true;
 
-        if (battle == null) return false;
-
-        // TODO: IsBlockadeSallyOut is included for completeness but is untested - the naval sally-out only
-        // occurs with the War Sails DLC, which this mod does not support (see README, "Do not enable the
-        // War Sails DLC"). Revisit alongside blockade support.
-        if (!battle.IsSiegeAssault && !battle.IsSallyOut && !battle.IsBlockadeSallyOut) return false;
-
-        // ChangeOwnerOfSettlementAction.ApplyBySiege gives OwnerClan to the KINGDOM LEADER and records the
-        // actual capturer in Town.LastCapturedBy, so an OwnerClan-only test fails any capturer who is not
-        // their own ruler.
-        return settlement.OwnerClan == playerClan || settlement.Town?.LastCapturedBy == playerClan;
+        return IsCaptureBattle(battle) && WasCapturedBy(settlement, playerClan);
     }
+
+    /// <summary>
+    /// The shape a stranded capturer is in: outside a fortification that is no longer under siege. The
+    /// capture ended the siege (KingdomManager.SiegeCompleted -> RemoveAllSiegeParties), so a live siege
+    /// means this is not a capture aftermath. That supplies the specificity the old IsSiegeAssault gate
+    /// used to, and keeps the patch off every live-siege menu.
+    /// </summary>
+    private static bool IsBesiegerOutsideAFallenFortification(Settlement settlement, Clan playerClan, MobileParty mainParty)
+    {
+        if (settlement == null || !settlement.IsFortification) return false;
+        if (playerClan == null || mainParty == null) return false;
+
+        // We are outside it: the besieger, not the inside defender.
+        if (mainParty.CurrentSettlement == settlement) return false;
+
+        return settlement.SiegeEvent == null && mainParty.BesiegerCamp == null;
+    }
+
+    /// <remarks>
+    /// TODO: IsBlockadeSallyOut is included for completeness but is untested - the naval sally-out only
+    /// occurs with the War Sails DLC, which this mod does not support (see README, "Do not enable the
+    /// War Sails DLC"). Revisit alongside blockade support.
+    /// </remarks>
+    private static bool IsCaptureBattle(MapEvent battle)
+        => battle != null && (battle.IsSiegeAssault || battle.IsSallyOut || battle.IsBlockadeSallyOut);
+
+    /// <summary>
+    /// ChangeOwnerOfSettlementAction.ApplyBySiege gives OwnerClan to the KINGDOM LEADER and records the
+    /// actual capturer in Town.LastCapturedBy, so an OwnerClan-only test fails any capturer who is not
+    /// their own ruler.
+    /// </summary>
+    private static bool WasCapturedBy(Settlement settlement, Clan playerClan)
+        => settlement.OwnerClan == playerClan || settlement.Town?.LastCapturedBy == playerClan;
 }

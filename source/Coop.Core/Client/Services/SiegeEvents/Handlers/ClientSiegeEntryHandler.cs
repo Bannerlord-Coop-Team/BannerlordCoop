@@ -432,7 +432,6 @@ internal class ClientSiegeEntryHandler : IHandler
         });
     }
 
-
     public void Dispose()
     {
         var pending = pendingBreakInContinuation;

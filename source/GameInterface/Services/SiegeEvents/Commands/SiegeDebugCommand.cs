@@ -890,41 +890,78 @@ public class SiegeDebugCommand
     {
         if (ModInformation.IsClient) return "Run this command on the server.";
         if (args.Count != 1) return "Usage: coop.debug.siege.sally_state <settlementId>";
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return "Unable to resolve ObjectManager.";
-        if (!objectManager.TryGetObject(args[0], out Settlement settlement))
-        {
-            settlement = Settlement.All?.FirstOrDefault(x => x.StringId == args[0]);
-            if (settlement == null) return $"Settlement '{args[0]}' not found";
-        }
+        if (!TryResolveSettlement(args[0], out var settlement)) return $"Settlement '{args[0]}' not found";
 
         var sb = new StringBuilder();
         sb.AppendLine($"--- sally-out decision for {settlement.Name} ({settlement.StringId})");
 
+        AppendSortiePreconditions(sb, settlement);
+        if (settlement.SiegeEvent == null) return sb.ToString();
+
+        AppendSortieTiming(sb, settlement, out var busyOutside);
+        AppendSortieStrengthGate(sb, settlement, busyOutside);
+
+        return sb.ToString();
+    }
+
+    /// <summary>Accepts either a network id or the settlement's own StringId, since both get typed at the console.</summary>
+    private static bool TryResolveSettlement(string id, out Settlement settlement)
+    {
+        settlement = null;
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+            objectManager.TryGetObject(id, out settlement))
+        {
+            return true;
+        }
+
+        settlement = Settlement.All?.FirstOrDefault(x => x.StringId == id);
+        return settlement != null;
+    }
+
+    /// <summary>The guards CheckForSettlementSallyOut applies before it will even consider a sortie.</summary>
+    private static void AppendSortiePreconditions(StringBuilder sb, Settlement settlement)
+    {
+        var garrison = settlement.Town?.GarrisonParty;
+
         sb.AppendLine($"IsFortification            : {settlement.IsFortification}");
         sb.AppendLine($"SiegeEvent                 : {(settlement.SiegeEvent != null ? "present" : "NULL -> no sortie")}");
         sb.AppendLine($"settlement.Party.MapEvent  : {(settlement.Party?.MapEvent != null ? "PRESENT -> blocks" : "null")}");
-
-        var garrison = settlement.Town?.GarrisonParty;
         sb.AppendLine($"GarrisonParty              : {(garrison == null ? "NULL -> blocks" : garrison.StringId)}");
         sb.AppendLine($"Garrison.MapEvent          : {(garrison?.MapEvent != null ? "PRESENT -> blocks" : "null")}");
+    }
 
-        if (settlement.SiegeEvent == null) return sb.ToString();
-
+    /// <summary>
+    /// The four-hour boundary and the defence leader. A sortie is only considered on the boundary unless the
+    /// besieger is already tied up in a fight outside, and a player leading the defence from inside blocks the
+    /// automatic check entirely - that decision is theirs to make.
+    /// </summary>
+    private static void AppendSortieTiming(StringBuilder sb, Settlement settlement, out bool busyOutside)
+    {
         var besieger = settlement.SiegeEvent.BesiegerCamp?.LeaderParty;
         var besiegerMapEvent = besieger?.MapEvent;
-        var busyOutside = besiegerMapEvent != null && (besiegerMapEvent.IsSiegeOutside || besiegerMapEvent.IsBlockade);
-        var hour = MathF.Floor(CampaignTime.Now.ToHours);
+        busyOutside = besiegerMapEvent != null && (besiegerMapEvent.IsSiegeOutside || besiegerMapEvent.IsBlockade);
+
         sb.AppendLine($"BesiegerCamp.LeaderParty   : {besieger?.StringId ?? "<none>"}");
         sb.AppendLine($"besiegerBusyOutside        : {busyOutside}");
-        sb.AppendLine($"hour % 4                   : {hour % 4}  (must be 0 unless besiegerBusyOutside)");
+        sb.AppendLine($"hour % 4                   : {MathF.Floor(CampaignTime.Now.ToHours) % 4}  (must be 0 unless besiegerBusyOutside)");
 
-        var defenseLeader = Campaign.Current?.Models?.EncounterModel?.GetLeaderOfSiegeEvent(
+        var defenceLeader = Campaign.Current?.Models?.EncounterModel?.GetLeaderOfSiegeEvent(
             settlement.SiegeEvent, BattleSideEnum.Defender);
-        sb.AppendLine($"defenceLeader              : {defenseLeader?.StringId ?? "<none>"}"
-            + (defenseLeader != null && defenseLeader.IsPlayerHero() && defenseLeader.CurrentSettlement == settlement
-                ? "  <- a player leads the defence from inside -> blocks" : ""));
+        var playerLeadsFromInside = defenceLeader != null
+            && defenceLeader.IsPlayerHero()
+            && defenceLeader.CurrentSettlement == settlement;
 
-        // The gate itself, from CheckSallyOut.
+        sb.AppendLine($"defenceLeader              : {defenceLeader?.StringId ?? "<none>"}"
+            + (playerLeadsFromInside ? "  <- a player leads the defence from inside -> blocks" : ""));
+    }
+
+    /// <summary>
+    /// The gate itself, from CheckSallyOut. It compares STRENGTH, not head count, so the per-party breakdown
+    /// matters: elite troops carry far more strength per head than militia, and a numerically lopsided siege
+    /// can still refuse to sortie.
+    /// </summary>
+    private static void AppendSortieStrengthGate(StringBuilder sb, Settlement settlement, bool busyOutside)
+    {
         float defenderStrength = 0f;
         foreach (var party in settlement.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.SallyOut))
         {
@@ -937,21 +974,19 @@ public class SiegeDebugCommand
 
         // Vanilla scans hostile parties around the besieger leader; the camp is what that finds in practice.
         float besiegerStrength = 0f;
-        var camp = settlement.SiegeEvent.BesiegerCamp;
-        if (camp != null)
-        {
-            foreach (var party in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.SallyOut))
-                besiegerStrength += party.GetCustomStrength(BattleSideEnum.Defender, MapEvent.PowerCalculationContext.PlainBattle);
-        }
+        foreach (var party in SortieBesiegerParties(settlement))
+            besiegerStrength += party.GetCustomStrength(BattleSideEnum.Defender, MapEvent.PowerCalculationContext.PlainBattle);
 
         var ratio = busyOutside ? 1.5f : 2.0f;
         sb.AppendLine($"defenderStrength           : {defenderStrength:F1}");
         sb.AppendLine($"besiegerStrength (camp)    : {besiegerStrength:F1}");
         sb.AppendLine($"required                   : defenders > besiegers * {ratio} = {besiegerStrength * ratio:F1}");
         sb.AppendLine($"STRENGTH GATE              : {(defenderStrength > besiegerStrength * ratio ? "PASSES" : "FAILS -> no sortie")}");
-
-        return sb.ToString();
     }
+
+    private static IEnumerable<PartyBase> SortieBesiegerParties(Settlement settlement)
+        => settlement.SiegeEvent.BesiegerCamp?.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.SallyOut)
+            ?? Enumerable.Empty<PartyBase>();
 
     [CommandLineArgumentFunction("list", "coop.debug.siege")]
     public static string ListSieges(List<string> args)
