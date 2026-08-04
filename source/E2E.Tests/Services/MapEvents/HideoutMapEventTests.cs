@@ -58,6 +58,45 @@ public class HideoutMapEventTests : MapEventTestBase
     }
 
     [Fact]
+    public void HideoutSendTroops_ClientReceivesSendTroopsMode()
+    {
+        var (_, playerPartyId) = CreatePlayerHeroParty("hideout-send-troops");
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            settlement.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Hideout>());
+
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = MockMapEventVisual();
+            mapEvent.Initialize(
+                playerParty.Party,
+                settlement.Party,
+                new HideoutEventComponent(mapEvent, isSendTroops: true),
+                MapEvent.BattleTypes.Hideout);
+            mapEvent.MapEventVisual = null;
+
+            if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
+                Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+                var component = Assert.IsType<HideoutEventComponent>(mapEvent.Component);
+                Assert.True(component.IsSendTroops);
+            }, MapEventDisabledMethods);
+        }
+    }
+
+    [Fact]
     public void PlayerLeavesHideout_ServerClearsSettlementAndMapEvent()
     {
         var (_, playerPartyId) = CreatePlayerHeroParty("hideout-leaver");

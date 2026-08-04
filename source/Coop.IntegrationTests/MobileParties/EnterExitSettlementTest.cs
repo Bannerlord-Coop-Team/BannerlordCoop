@@ -6,6 +6,8 @@ using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Settlements.Interfaces;
 using Moq;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -369,6 +371,66 @@ namespace Coop.IntegrationTests.MobileParties
                 .Verify(s => s.PartyEnterSettlement(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
             Assert.Equal(1, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkStartSettlementEncounter>());
             Assert.Equal(0, TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkPartyEnterSettlement>());
+        }
+
+        [Fact]
+        public void EnterHideout_OnlyOnePlayerCanBeInsideUntilFirstPlayerLeaves()
+        {
+            var clients = TestEnvironment.Clients.ToArray();
+            var firstClient = clients[0];
+            var secondClient = clients[1];
+            var firstParty = ObjectHelper.SkipConstructor<MobileParty>();
+            var secondParty = ObjectHelper.SkipConstructor<MobileParty>();
+            var hideout = ObjectHelper.SkipConstructor<Settlement>();
+            hideout.Hideout = ObjectHelper.SkipConstructor<Hideout>();
+            TestEnvironment.RegisterObjectInNetwork(firstParty, "party1");
+            TestEnvironment.RegisterObjectInNetwork(secondParty, "party2");
+            TestEnvironment.RegisterObjectInNetwork(hideout, "hideout1");
+
+            var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
+            playerManager.AddPlayer(new Player("player1", "", "party1", "", ""));
+            playerManager.AddPlayer(new Player("player2", "", "party2", "", ""));
+
+            var settlementInterface = TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>();
+            settlementInterface
+                .Setup(service => service.PartyEnterSettlement(firstParty, hideout))
+                .Callback(() => firstParty._currentSettlement = hideout);
+            settlementInterface
+                .Setup(service => service.PartyEnterSettlement(secondParty, hideout))
+                .Callback(() => secondParty._currentSettlement = hideout);
+            settlementInterface
+                .Setup(service => service.PartyLeaveSettlement(firstParty))
+                .Callback(() => firstParty._currentSettlement = null);
+
+            GameThreadTestRunner.Run(() =>
+                firstClient.SimulateMessage(
+                    this,
+                    new StartSettlementEncounterAttempted(firstParty, hideout)));
+
+            Assert.Same(hideout, firstParty.CurrentSettlement);
+
+            GameThreadTestRunner.Run(() =>
+                secondClient.SimulateMessage(
+                    this,
+                    new StartSettlementEncounterAttempted(secondParty, hideout)));
+
+            Assert.Null(secondParty.CurrentSettlement);
+            Assert.Equal(
+                1,
+                TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkSettlementEncounterRejected>());
+
+            GameThreadTestRunner.Run(() =>
+                firstClient.SimulateMessage(this, new EndSettlementEncounterAttempted(firstParty)));
+            GameThreadTestRunner.Run(() =>
+                secondClient.SimulateMessage(
+                    this,
+                    new StartSettlementEncounterAttempted(secondParty, hideout)));
+
+            Assert.Null(firstParty.CurrentSettlement);
+            Assert.Same(hideout, secondParty.CurrentSettlement);
+            Assert.Equal(
+                2,
+                secondClient.NetworkSentMessages.GetMessageCount<NetworkRequestStartSettlementEncounter>());
         }
 
         /// <summary>

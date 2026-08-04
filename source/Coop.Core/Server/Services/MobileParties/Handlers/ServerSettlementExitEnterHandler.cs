@@ -8,6 +8,7 @@ using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using LiteNetLib;
@@ -26,6 +27,7 @@ public class ServerSettlementExitEnterHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
     private readonly ISettlementInterface settlementInterface;
     private readonly IKingdomCreationSettlementTracker settlementTracker;
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
@@ -34,12 +36,14 @@ public class ServerSettlementExitEnterHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
+        IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
         IKingdomCreationSettlementTracker settlementTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
         this.settlementInterface = settlementInterface;
         this.settlementTracker = settlementTracker;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
@@ -104,6 +108,16 @@ public class ServerSettlementExitEnterHandler : IHandler
                 return;
             }
 
+            if (IsHideoutOccupiedByAnotherPlayer(mobileParty, settlement))
+            {
+                Logger.Warning(
+                    "Rejecting hideout entry for party {PartyId} because hideout {SettlementId} already contains another player party",
+                    payload.PartyId,
+                    payload.SettlementId);
+                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
+                return;
+            }
+
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
 
             // Vanilla starts under-siege and under-raid encounters outside the settlement.
@@ -115,6 +129,20 @@ public class ServerSettlementExitEnterHandler : IHandler
 
             settlementInterface.PartyEnterSettlement(mobileParty, settlement);
         }, context: nameof(NetworkRequestStartSettlementEncounter));
+    }
+
+    private bool IsHideoutOccupiedByAnotherPlayer(MobileParty enteringParty, Settlement settlement)
+    {
+        if (!settlement.IsHideout) return false;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty)) continue;
+            if (ReferenceEquals(playerParty, enteringParty)) continue;
+            if (ReferenceEquals(playerParty.CurrentSettlement, settlement)) return true;
+        }
+
+        return false;
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
