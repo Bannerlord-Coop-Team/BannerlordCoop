@@ -117,6 +117,18 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // DisableGangLeaderNeedsToOffloadStolenGoodsIssueBehavior patch (predating this allowlist) was found
         // blocking this type's RegisterEvents entirely and has been deleted, same bug shape as above.
         typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior),
+        // Tier 2 Group A (see doc/GroupA_HostileMobilePartySync_Design_v3.md) - Smugglers, step 1 of the
+        // group's build order (simplest: single hostile MobileParty, no scripted-battle-pipeline gap, no
+        // bespoke capture-once redirect complexity - see the design doc's own §8 reasoning). No orphaned
+        // standalone disable patch was ever found for this type (grepped the whole tree - zero hits, and
+        // confirmed again here), so this is the only Step 0 change it needs. Its own bespoke
+        // Interfaces/Messages/Patches/Handler set (source/GameInterface/Services/Issues/*/Smugglers*.cs)
+        // covers creation-time target/origin-settlement capture, a party-spawn gate (a real, independently-
+        // verified client-authority gap in CustomPartyComponent.CreateCustomPartyWithTroopRoster - see
+        // SmugglersPartySpawnGatePatch's doc comment), and an ownership gate on the bribe/persuasion turn-in
+        // path (SmugglersQuestOwnershipGatePatch) - the accept-quest/alternative-solution flows themselves
+        // ride the fully generic GenericAcceptMirrorIssueTypes mechanism unchanged.
+        typeof(SmugglersIssueBehavior),
     };
 
     /// <summary>

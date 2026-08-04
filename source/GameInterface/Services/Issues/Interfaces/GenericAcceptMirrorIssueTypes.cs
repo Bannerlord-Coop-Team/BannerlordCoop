@@ -70,6 +70,18 @@ internal static class GenericAcceptMirrorIssueTypes
         // IssueDifficultyMultiplier at accept time, both genuinely per-client-divergent - needs its own bespoke
         // capture instead (see IGangLeaderNeedsToOffloadStolenGoodsIssueInterface's doc comment).
         typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue),
+        // Tier 2 Group A: Smugglers - GenerateIssueQuest(questId) forwards IssueOwner/_targetSettlement/
+        // _originSettlement/base.IssueDifficultyMultiplier/CampaignTime.DaysFromNow(20f)/RewardGold. The two
+        // settlements are frozen (and forced) at creation time - see ISmugglersIssueInterface's doc comment -
+        // and RewardGold/IssueDifficultyMultiplier are the same deterministic Campaign.Current.PlayerProgress-
+        // derived value every other type here already relies on (confirmed against the decompiled
+        // DefaultIssueModel.GetIssueDifficultyMultiplier - a pure function of a single shared Campaign-level
+        // value, not Hero/party-relative, so every peer's own independent replay lands on the same number). A
+        // bare replay of IssueManager.StartIssueQuest lands on a byte-identical SmugglersIssueQuest on every
+        // peer. The one genuinely per-client-divergent piece of this quest - _smugglerParty, only ever set
+        // later by the dialogue-triggered QuestAcceptedConsequences, not by this replay - is handled entirely
+        // separately by SmugglersPartySpawnGatePatch, not by this generic accept mirror.
+        typeof(SmugglersIssueBehavior.SmugglersIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -126,6 +138,12 @@ internal static class GenericAcceptMirrorIssueTypes
         // decompiled source, not overridden), so no FailureRisk either.
         typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue),
         typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue),
+        // Tier 2 Group A: Smugglers - IsThereAlternativeSolution == true, AlternativeSolutionScaleFlags is
+        // Casualties | FailureRisk (confirmed against the decompiled source) - the same shape as
+        // CapturedByBountyHuntersIssue above, which genuinely can fail and is still safe to route through this
+        // same generic trigger (see NewIssueTypesAlternativeSolutionCompletionPatches' doc comment). Needs its
+        // matching HourlyTick registration too - see that file's SmugglersIssueBehavior entry.
+        typeof(SmugglersIssueBehavior.SmugglersIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>

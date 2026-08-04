@@ -152,6 +152,14 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void GangLeaderNeedsToOffloadStolenGoodsRegisterEventsPostfix(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Tier 2 Group A - Smugglers. AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed against
+    // the decompiled source), the same shape as CapturedByBountyHunters above - genuinely can fail, still safe
+    // to route through this generic, ownership-self-limiting trigger.
+    [HarmonyPatch(typeof(SmugglersIssueBehavior), nameof(SmugglersIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void SmugglersRegisterEventsPostfix(SmugglersIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;
