@@ -17,6 +17,7 @@ using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
