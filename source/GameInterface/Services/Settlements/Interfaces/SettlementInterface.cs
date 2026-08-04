@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Locations;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -6,6 +6,8 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+
+using GameInterface.Services.SiegeEvents.Patches;
 
 namespace GameInterface.Services.Settlements.Interfaces;
 
@@ -81,6 +83,17 @@ internal class SettlementInterface : ISettlementInterface
     {
         // Same invariant as PartyEnterSettlement: no settlement encounter for a party besieging this settlement.
         if (party.BesiegedSettlement == settlement) return;
+
+        // A capture choice is still open for this settlement, so its aftermath menu owns the UI. Building an
+        // encounter here would re-run PlayerEncounter.Init, whose tail calls ActivateGameMenu(GetEncounterMenu(..))
+        // and replaces menu_settlement_taken with a plain encounter menu offering only a "Leave..." the player
+        // has no reason to be looking at. The capture flow already built its own encounter synchronously.
+        if (SiegeCaptureMenuHoldPatch.IsHeld(settlement))
+        {
+            Logger.Debug("Skipping settlement encounter for {SettlementId}: its capture menu is still open",
+                settlement.StringId);
+            return;
+        }
 
         var settlementParty = settlement.Party;
         if (settlementParty == null)

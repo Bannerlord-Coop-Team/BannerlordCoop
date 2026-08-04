@@ -28,9 +28,18 @@ internal static class SiegeCaptureMenuHoldPatch
         if (settlement != null) pendingChoice.Remove(settlement);
     }
 
+    internal static bool IsHeld(Settlement settlement)
+        => settlement != null && pendingChoice.Contains(settlement);
+
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_town_outside_on_init")]
     [HarmonyPrefix]
     private static bool TownOutsideInitPrefix() => RedirectIfHeld();
+
+    // GetEncounterMenu returns castle_outside for a captured castle on the same fall-through that gives a
+    // town town_outside, so a castle capture escaped the hold entirely.
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "game_menu_castle_outside_on_init")]
+    [HarmonyPrefix]
+    private static bool CastleOutsideInitPrefix() => RedirectIfHeld();
 
     private static bool RedirectIfHeld()
     {
