@@ -97,6 +97,17 @@ internal static class GenericAcceptMirrorIssueTypes
         // fix) is a pure, local, network-message-free Harmony patch entirely orthogonal to accept-time mirror
         // eligibility - see Patches.ArtisanOverpricedGoodsAntagonistIdentityPatches.
         typeof(ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue),
+        // Lord Needs a Tutor - GenerateIssueQuest(questId) forwards IssueOwner/a fixed 200-day duration/
+        // _youngHero - all already frozen at creation (_youngHero is captured/forced the same "direct ctor arg"
+        // way as ArtisanOverpricedGoodsIssue/RevenueFarmingIssue - see ILordsNeedsTutorIssueInterface's doc
+        // comment). The Quest ctor itself DOES roll one fresh value, _randomForQuestReward = MBRandom.RandomInt
+        // (2, 5) - genuinely per-client-divergent if bare-replayed - but this is safe: it's read in exactly one
+        // place (QuestCompletedWithSuccessAfterConversation, the jewelry-reward count), and that method is
+        // gated to the recorded owner only (see Patches.LordsNeedsTutorOwnershipGatePatches), so no other
+        // peer's own independently-rolled copy is ever consulted or acted upon, and it never surfaces in any
+        // Title/Description/journal text (confirmed against the decompiled source) - see
+        // ILordsNeedsTutorIssueInterface's doc comment for the full derivation.
+        typeof(LordsNeedsTutorIssueBehavior.LordsNeedsTutorIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>

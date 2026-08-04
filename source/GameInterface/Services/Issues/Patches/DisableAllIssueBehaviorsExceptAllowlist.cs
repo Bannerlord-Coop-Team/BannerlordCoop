@@ -161,6 +161,21 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // earlier this session already removed DisableRevenueFarmingIssueBehavior.cs - confirmed absent again
         // here), so this allowlist entry is Step 0's only structural change.
         typeof(RevenueFarmingIssueBehavior),
+        // Lord Needs a Tutor - TaleWorlds.CampaignSystem.dll. No spawned MobileParty anywhere in this behavior
+        // (the young hero joins the ACCEPTER's own MobileParty.MainParty via MemberRoster.AddToCounts, the same
+        // "no redirect needed" shape already established for other companion-adding quests). Its own quest ctor
+        // rolls one fresh value (_randomForQuestReward) at accept time, but this is safe to leave as a bare,
+        // uncorrected GenericAcceptMirrorIssueTypes replay - see Interfaces.ILordsNeedsTutorIssueInterface's doc
+        // comment for why. The real, independently-found bug (beyond what the design critique flagged): two
+        // never-reset, non-[SaveableField] booleans (_doNotForceYoungHeroOutFromClan/_showQuestFailedConversation)
+        // have no sync/persistence mechanism at all, fixed via a dedicated shadow-table
+        // (Interfaces.LordsNeedsTutorQuestFlags) - see that type's own doc comment for the full derivation, and
+        // Patches.LordsNeedsTutorOwnershipGatePatches for the completion/turn-in-path ownership-gate coverage
+        // (this quest's own turn-in conversation is with a COMPANION in the owner's own party, not a walkable
+        // settlement Notable - see that file's own doc comment for why that changes the reachability analysis).
+        // No orphaned standalone disable patch was ever found for this type (grepped the whole tree - zero
+        // hits), so this allowlist entry is Step 0's only structural change.
+        typeof(LordsNeedsTutorIssueBehavior),
     };
 
     /// <summary>
