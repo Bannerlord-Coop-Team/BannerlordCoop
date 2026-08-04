@@ -90,11 +90,12 @@ public class MissionModule : Module
             .As<ILocationMissionBehavior>()
             .InstancePerDependency();
 
-        // Per-mission location NPC host context (mirrors IBattleSession). Transient so each
-        // CoopLocationsController gets a fresh session whose TryBegin latch resets with the mission.
-        builder.RegisterType<LocationSession>()
-            .As<ILocationSession>()
-            .InstancePerDependency();
+        // Location NPC spawn-batch codec (stateless). The per-mission session/binding map/components
+        // are constructed by CoopLocationsController itself (composition-root style, mirroring
+        // CoopBattleController) so they share one session instance.
+        builder.RegisterType<LocationAgentSpawnBatchCodec>()
+            .As<ILocationAgentSpawnBatchCodec>()
+            .InstancePerLifetimeScope();
 
         // BR-102 host-epoch receiver policy. InstancePerDependency so each CoopBattleController (one per
         // battle) is injected a FRESH policy whose accepted-epoch watermark starts clean and never leaks

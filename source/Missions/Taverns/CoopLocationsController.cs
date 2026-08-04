@@ -5,7 +5,9 @@ using Common.Network;
 using Missions.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Data;
@@ -28,6 +30,10 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private readonly INetwork relayNetwork;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ILocationSession session;
+    private readonly ILocationHostRegistry hostRegistry;
+    private readonly ILocationOwnedAgentReplicator npcReplicator;
+    private readonly ILocationPuppetSpawner npcPuppetSpawner;
+    private readonly ILocationPopulationDirector populationDirector;
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -36,7 +42,10 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         INetwork relayNetwork,
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
-        ILocationSession session,
+        ILocationHostRegistry hostRegistry,
+        ILocationPuppetRosterBinder rosterBinder,
+        IBattleAgentBudget agentBudget,
+        ILocationAgentSpawnBatchCodec spawnBatchCodec,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent)
@@ -44,8 +53,20 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     {
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;
-        this.session = session;
+        this.hostRegistry = hostRegistry;
         //this.boardGameManager = boardGameManager;
+
+        // Composition-root style (mirrors CoopBattleController): the per-mission session and NPC
+        // binding map are SHARED state, so the components are constructed here around single
+        // instances instead of DI-resolving them (transient injection would give each its own).
+        session = new LocationSession(controllerIdProvider, hostRegistry);
+        var bindingMap = new LocationAgentBindingMap();
+
+        npcReplicator = new LocationOwnedAgentReplicator(
+            network, messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, spawnBatchCodec);
+        npcPuppetSpawner = new LocationPuppetSpawner(
+            messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, agentBudget, spawnBatchCodec);
+        populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap);
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
     }
@@ -54,7 +75,20 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     {
         messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
 
+        npcReplicator.Dispose();
+        npcPuppetSpawner.Dispose();
+        populationDirector.Dispose();
+
         base.Dispose();
+    }
+
+    public override void OnMissionTick(float dt)
+    {
+        // Host: flush captured spawns as batches BEFORE polling movement, so a puppet exists on the
+        // receiver before its first movement packet; then drain any buffered puppets.
+        npcReplicator.FlushPendingSpawns();
+        base.OnMissionTick(dt);
+        npcPuppetSpawner.DrainPendingPuppets();
     }
 
     // Read on the network thread (HandleJoinInfo gate) and written on the main thread
@@ -149,6 +183,11 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         instanceId = derivedInstanceId;
         session.TryBegin(instanceId);
 
+        // A fresh mission has no host yet: drop any assignment left from a PREVIOUS visit to this
+        // settlement (the server clears only its own entry when an instance empties), or a stale
+        // host would read as "previous host" and fake a migration when the new election lands.
+        hostRegistry.Remove(instanceId);
+
         // Engage the NPC gate: native population spawning is suppressed on every client until the
         // server's host assignment confirms who runs it (SR-013).
         LocationNpcGate.BeginMission(instanceId);
@@ -200,6 +239,10 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         network.Send(controllerId, request);
         Logger.Information("Sent Join Request for {PlayerID} to {Controller}", request.ControllerId, controllerId);
+
+        // Catch the joiner up on the settlement NPCs we own (SR-025) — only the host owns any, so
+        // this is a no-op everywhere else.
+        npcReplicator.ReplicateCurrentAgentsTo(controllerId);
     }
 
     protected override void OnLeaving()
@@ -321,7 +364,17 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
                 agentBuildData.ClothingColor1(character.HeroObject.MapFaction.Color);
                 agentBuildData.ClothingColor2(character.HeroObject.MapFaction.Color2);
 
-                agent = Mission.Current.SpawnAgent(agentBuildData);
+                // A remote PLAYER puppet is not a host-owned NPC — a promoted host's capture patch
+                // must not re-capture and re-broadcast it.
+                LocationNpcGate.SuppressCapture = true;
+                try
+                {
+                    agent = Mission.Current.SpawnAgent(agentBuildData);
+                }
+                finally
+                {
+                    LocationNpcGate.SuppressCapture = false;
+                }
                 agent.FadeIn();
             }
             catch (Exception ex)
