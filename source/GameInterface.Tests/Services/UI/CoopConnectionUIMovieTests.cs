@@ -60,6 +60,30 @@ public class CoopConnectionUIMovieTests
             .Attribute("SuggestedHeight")?.Value);
     }
 
+    [Fact]
+    public void SteamLobbyFilters_BindPasswordAndMinimumPlayerControls()
+    {
+        var document = XDocument.Load(FindMoviePath());
+
+        var controls = FindById(document, "LobbyFilterControls");
+        Assert.Equal("HorizontalLeftToRight",
+            controls.Attribute("StackLayout.LayoutMethod")?.Value);
+
+        var passwordButton = FindById(document, "PasswordFilterButton");
+        Assert.Equal("ActionCycleSteamLobbyPasswordFilter",
+            passwordButton.Attribute("Command.Click")?.Value);
+        Assert.Equal("@PasswordFilterButtonText",
+            passwordButton.Attribute("Parameter.Text")?.Value);
+        Assert.Equal("@IsSearchSteamLobbiesDisabled",
+            passwordButton.Attribute("IsDisabled")?.Value);
+
+        var minimumPlayersInput = FindById(document, "MinimumPlayersFilterInput");
+        Assert.Equal("@MinimumSteamLobbyPlayers",
+            minimumPlayersInput.Attribute("IntText")?.Value);
+        Assert.Equal("0", minimumPlayersInput.Attribute("MinInt")?.Value);
+        Assert.Equal("true", minimumPlayersInput.Attribute("EnableClamp")?.Value);
+    }
+    
     private static XElement FindById(XDocument document, string id)
     {
         return Assert.Single(document.Descendants(),
