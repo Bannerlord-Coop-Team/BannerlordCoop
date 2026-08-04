@@ -23,9 +23,24 @@ internal class SiegeAssaultPromptPatches
     private static void ApplyInternalPostfix(PartyBase attackerParty, Settlement subject, MapEvent.BattleTypes battleType)
     {
         if (ModInformation.IsClient) return;
-        if (battleType != MapEvent.BattleTypes.Siege || subject == null) return;
         if (attackerParty?.MobileParty == null) return;
 
-        MessageBroker.Instance.Publish(null, new SiegeAssaultStarted(attackerParty.MobileParty, subject));
+        if (battleType == MapEvent.BattleTypes.Siege && subject != null)
+        {
+            MessageBroker.Instance.Publish(null, new SiegeAssaultStarted(attackerParty.MobileParty, subject));
+            return;
+        }
+
+        // A sortie inverts the sides: the garrison is the attacker and the besiegers are the defenders. Only
+        // BesiegerCamp.LeaderParty is passed to StartPartyEncounter, and MapEvent.Initialize's camp sweep skips
+        // army members that are not their army's leader, so co-besieging players need seating explicitly.
+        // The garrison never leaves the settlement during a sortie, so CurrentSettlement is the besieged one.
+        if (battleType == MapEvent.BattleTypes.SallyOut)
+        {
+            var besieged = subject ?? attackerParty.MobileParty.CurrentSettlement;
+            if (besieged == null) return;
+
+            MessageBroker.Instance.Publish(null, new SallyOutStarted(attackerParty.MobileParty, besieged));
+        }
     }
 }

@@ -16,6 +16,9 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
+using GameInterface.Services.MobileParties.Extensions;
+using TaleWorlds.CampaignSystem.Actions;
+
 namespace Coop.Core.Client.Services.SiegeEvents.Handlers;
 
 /// <summary>
@@ -428,6 +431,7 @@ internal class ClientSiegeEntryHandler : IHandler
             }
         });
     }
+
 
     public void Dispose()
     {
