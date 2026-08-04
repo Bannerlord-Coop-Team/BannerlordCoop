@@ -145,6 +145,18 @@ internal static class GenericAcceptMirrorIssueTypes
         // handled entirely separately by MerchantArmyOfPoachersPartySpawnGatePatch, not by this generic accept
         // mirror.
         typeof(MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue),
+        // Tier 2 Group A: LandLord Company of Trouble - GenerateIssueQuest(questId) forwards IssueOwner/
+        // CampaignTime.Never/CompanyTroopCount - CompanyTroopCount is a pure function of IssueDifficultyMultiplier
+        // (5 + (int)(IssueDifficultyMultiplier * 30f)), the same deterministic, shared value every other type
+        // here already relies on. A bare replay of IssueManager.StartIssueQuest lands on a byte-identical
+        // LandLordCompanyOfTroubleIssueQuest on every peer. The one genuinely per-client-divergent piece of this
+        // quest - _companyOfTroubleParty, only ever set later by the dialogue-triggered CreateCompanyEnemyParty,
+        // itself reading TRIGGER-TIME (not accept-time) owner state - is handled entirely separately by
+        // LandLordCompanyOfTroubleEnemyPartySpawnGatePatch, not by this generic accept mirror - see
+        // Interfaces.ILandLordCompanyOfTroubleIssueInterface's type doc comment for the full derivation. NOT in
+        // AlternativeSolutionMirrorEligible below - LandLordCompanyOfTroubleIssue.IsThereAlternativeSolution is
+        // false (confirmed by decompile), so this quest has no alternative-solution path at all.
+        typeof(LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>

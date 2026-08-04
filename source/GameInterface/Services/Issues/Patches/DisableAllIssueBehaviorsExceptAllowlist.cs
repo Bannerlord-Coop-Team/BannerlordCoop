@@ -244,6 +244,26 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // bespoke Interfaces/Messages/Patches/Handler set (source/GameInterface/Services/Issues/*/MerchantArmyOfPoachers*.cs)
         // is the whole of Step 0 + gap work.
         typeof(MerchantArmyOfPoachersIssueBehavior),
+        // Tier 2 Group A (see doc/GroupA_HostileMobilePartySync_Design_v3.md) - Landlord: Company of Trouble,
+        // step 5 of the group's build order (the hardest type: for most of the quest's life the "mercs" are
+        // just troops embedded directly in the OWNER'S OWN MobileParty.MainParty.MemberRoster, not a separate
+        // MobileParty at all - only CreateCompanyEnemyParty()'s hostile-turn dialogue branch spins one up, with
+        // BOTH its position and troop count read from the owner's own live state at that exact TRIGGER moment,
+        // not at accept time - see Interfaces.ILandLordCompanyOfTroubleIssueInterface's type doc comment for the
+        // full trigger-time-vs-creation-time capture derivation). No orphaned standalone disable patch was found
+        // for this type (grepped the whole tree - zero hits, same as Smugglers/Caravan Ambush/Gang Leader Needs
+        // Weapons/Merchant Army of Poachers), so the allowlist entry plus this type's own bespoke
+        // Interfaces/Messages/Patches/Handler set (source/GameInterface/Services/Issues/*/LandLordCompanyOfTrouble*.cs)
+        // is the whole of Step 0 + gap work. Two independently-found ownership gaps on this quest's completion/
+        // turn-in surfaces (OnMapEventEnded's "all embedded troops died in an unrelated fight" auto-success, and
+        // the "sell the mercenaries to another lord" persuasion-completion path) are fixed by
+        // Patches.LandLordCompanyOfTroubleOwnershipGatePatches - see that file's own doc comment; both are
+        // reachable specifically BECAUSE a non-owner's own mirror always sees zero embedded troops, which is
+        // each method's own SUCCESS condition, not a harmless no-op. A campaign-wide single-slot Instance-cache
+        // ambiguity (two concurrently-owned quests of this type on the same local player) is fixed by
+        // Patches.LandLordCompanyOfTroubleInstanceResolutionPatch, keyed off ownership rather than the design
+        // doc's own more speculative "transient flag" proposal.
+        typeof(LandLordCompanyOfTroubleIssueBehavior),
     };
 
     /// <summary>
