@@ -84,6 +84,22 @@ public class PlayerArmyWaitBehaviorPatchesTests
     }
 
     [Fact]
+    public void GetAttachedArmySiegeState_ForeignSiegeAtTarget_IsNotSiegeTransition()
+    {
+        var fixture = CreateAttachedArmy();
+        AttachSiege(fixture);
+        fixture.MainParty._besiegerCamp = null;
+        fixture.LeaderParty._besiegerCamp = null;
+
+        var state = PlayerArmyWaitBehaviorPatches.GetAttachedArmySiegeState(
+            fixture.MainParty,
+            out var settlement);
+
+        Assert.Equal(AttachedArmySiegeState.None, state);
+        Assert.Null(settlement);
+    }
+
+    [Fact]
     public void IsStableArmyWait_PartialMembership_IsFalse()
     {
         var fixture = CreateAttachedArmy();

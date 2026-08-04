@@ -14,6 +14,9 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Armies.Patches;
 
+/// <summary>
+/// Describes whether an attached player's army siege graph is absent, incomplete, or ready.
+/// </summary>
 internal enum AttachedArmySiegeState
 {
     None,
@@ -22,7 +25,7 @@ internal enum AttachedArmySiegeState
 }
 
 /// <summary>
-/// Patch that sends the removal of the party to the server.
+/// Recovers client army-wait siege transitions and relays player leave or abandon actions.
 /// </summary>
 [HarmonyPatch]
 internal class PlayerArmyWaitBehaviorPatches
@@ -93,8 +96,11 @@ internal class PlayerArmyWaitBehaviorPatches
 
     private static void StartAttachedArmySiege(Settlement settlement)
     {
-        PlayerSiege.StartPlayerSiege(BattleSideEnum.Attacker, isSimulation: false, settlement);
-        PlayerSiege.StartSiegePreparation();
+        using (new AllowedThread())
+        {
+            PlayerSiege.StartPlayerSiege(BattleSideEnum.Attacker, isSimulation: false, settlement);
+            PlayerSiege.StartSiegePreparation();
+        }
     }
 
     internal static AttachedArmySiegeState GetAttachedArmySiegeState(
@@ -142,6 +148,9 @@ internal class PlayerArmyWaitBehaviorPatches
         }
 
         var liveCamp = siegeEvent.BesiegerCamp;
+        if (mainPartyCamp == null && leaderCamp == null)
+            return AttachedArmySiegeState.None;
+
         if (liveCamp == null ||
             mainPartyCamp != liveCamp ||
             leaderCamp != liveCamp ||
