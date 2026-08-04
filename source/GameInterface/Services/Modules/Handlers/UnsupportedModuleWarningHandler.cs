@@ -94,9 +94,9 @@ public class UnsupportedModuleWarningHandler
 
     private static string BuildPromptText(string[] moduleIds)
     {
-        return "Bannerlord Coop may be unstable when used with additional modules." +
-               "The following active modules aree not supported:\n\n" +
+        return "Bannerlord Coop may be unstable when used with additional modules. " +
+               "The following active modules are not supported:\n\n" +
                string.Join("\n", moduleIds.Select(id => "- " + id)) +
-               "\n\nContinue at your own risk";
+               "\n\nContinue at your own risk.";
     }
 }
