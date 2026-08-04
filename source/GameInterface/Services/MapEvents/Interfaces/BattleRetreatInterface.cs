@@ -1,0 +1,225 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using Serilog;
+using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+
+namespace GameInterface.Services.MapEvents.Interfaces;
+
+/// <summary>
+/// Applies a "Try to get away." retreat authoritatively, for a named party rather than "the" player.
+/// </summary>
+public interface IBattleRetreatInterface : IGameAbstraction
+{
+    /// <summary>
+    /// [Server, game thread] Validates and applies the retreat. Returns false if the request is not
+    /// legitimate, in which case nothing was mutated.
+    /// </summary>
+    bool TryApplyRetreat(MobileParty requester, MapEvent battle, out string[] campClearedPartyIds);
+
+    /// <summary>
+    /// [Server, game thread] Applies the troop loss for a party that broke into a besieged settlement.
+    /// </summary>
+    void ApplyBreakInCasualties(MobileParty requester, Settlement settlement);
+}
+
+internal class BattleRetreatInterface : IBattleRetreatInterface
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<BattleRetreatInterface>();
+
+    public bool TryApplyRetreat(MobileParty requester, MapEvent battle, out string[] campClearedPartyIds)
+    {
+        campClearedPartyIds = System.Array.Empty<string>();
+
+        if (requester == null || battle == null) return false;
+        if (battle.HasWinner) return false;
+
+        // Vanilla only offers "Try to get away." to the battle's defender-side leader, so anything else is
+        // either a stale click or a forged request.
+        if (requester.Party?.MapEventSide == null) return false;
+        if (battle.DefenderSide?.LeaderParty != requester.Party) return false;
+
+        var sacrificed = GetTroopsSacrificed(battle);
+        var commanded = CollectCommandedParties(requester);
+
+        ApplyTroopSacrifice(requester, commanded, sacrificed);
+        RemoveGoods(requester);
+
+        campClearedPartyIds = ClearBesiegerCamps(requester, commanded);
+
+        requester.TeleportPartyToOutSideOfEncounterRadius();
+        requester.IgnoreByOtherPartiesTill(CampaignTime.HoursFromNow(1f));
+
+        // MobileParty.Position is not AutoSynced, so the teleport only exists on the server until the
+        // behaviour snapshot carries it. IgnoreByOtherPartiesTill needs no replication - only server AI reads it.
+        PublishPosition(requester);
+
+        Logger.Debug("Applied retreat for {PartyId}: {Sacrificed} troops, {Cleared} camps cleared",
+            requester.StringId, sacrificed, campClearedPartyIds.Length);
+
+        return true;
+    }
+
+    private static void PublishPosition(MobileParty party)
+    {
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var snapshot)) return;
+        if (!snapshot.TryCreate(party, out PartyBehaviorUpdateData data)) return;
+
+        data.ForcePosition = true;
+        data.ResetMovementToHold = true;
+        MessageBroker.Instance.Publish(null, new PartyBehaviorUpdated(ref data));
+    }
+
+    /// <summary>
+    /// Runs vanilla's own break-in loss against the requester, by making it the acting party for the call.
+    /// </summary>
+    /// <remarks>
+    /// Vanilla's BreakInOutBesiegedSettlementAction mutates MobileParty.MainParty directly, which the
+    /// headless host does not have, so the action itself cannot be reused here. The loss it applies is a
+    /// simple proportion of the party's regular troops, so it is reproduced with the same shape - and
+    /// crucially against the REQUESTING party, so one player breaking in never costs another player troops.
+    /// </remarks>
+    public void ApplyBreakInCasualties(MobileParty requester, Settlement settlement)
+    {
+        if (requester?.Party == null) return;
+
+        var siegeEvent = settlement?.SiegeEvent;
+        if (siegeEvent == null) return;
+
+        var model = Campaign.Current?.Models?.TroopSacrificeModel;
+        if (model == null) return;
+
+        // Same model call vanilla's ApplyInternal makes, but for the requesting party rather than MainParty.
+        var lost = model.GetLostTroopCountForBreakingInBesiegedSettlement(requester, siegeEvent)
+            .RoundedResultNumber;
+        if (lost <= 0) return;
+
+        var total = requester.Party.NumberOfRegularMembers;
+        if (total <= 0) return;
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<EncounterGameMenuBehavior>();
+        if (behavior == null) return;
+
+        // Vanilla removes `lost` troops one at a time with its own MBRandom draw; SacrificeTroopsWithRatio is
+        // the same selection expressed as a proportion, and is the one helper that takes an explicit party.
+        // The roll happens here once and reaches every client as ordinary roster deltas.
+        behavior.SacrificeTroopsWithRatio(requester, MathF.Min(lost, total) / (float)total);
+
+        Logger.Debug("Applied break-in losses for {PartyId} entering {SettlementId}: {Lost} of {Total}",
+            requester.StringId, settlement.StringId, lost, total);
+    }
+
+    /// <summary>
+    /// Vanilla's count, from the same model the client's menu used. Negative means "no cost".
+    /// </summary>
+    private static int GetTroopsSacrificed(MapEvent battle)
+    {
+        var model = Campaign.Current?.Models?.TroopSacrificeModel;
+        if (model == null) return 0;
+
+        var count = model.GetNumberOfTroopsSacrificedForTryingToGetAway(BattleSideEnum.Defender, battle);
+        return count > 0 ? count : 0;
+    }
+
+    /// <summary>
+    /// The parties this retreat may spend troops from: the requester, plus followers attached to it when it
+    /// leads the army - but never another CONNECTED player's party. Vanilla's RemoveTroopsForTryToGetAway
+    /// spreads the loss across the army leader's AttachedParties, which in co-op would let one player delete
+    /// another player's troops.
+    /// </summary>
+    private static List<MobileParty> CollectCommandedParties(MobileParty requester)
+    {
+        var commanded = new List<MobileParty>();
+
+        var army = requester.Army;
+        if (army?.LeaderParty != requester) return commanded;
+
+        var attached = requester.AttachedParties?.ToArray();
+        if (attached == null) return commanded;
+
+        foreach (var party in attached)
+        {
+            if (party == null || party == requester) continue;
+            if (party.IsPlayerParty()) continue;
+            commanded.Add(party);
+        }
+
+        return commanded;
+    }
+
+    private static void ApplyTroopSacrifice(MobileParty requester, List<MobileParty> commanded, int numberOfTroops)
+    {
+        if (numberOfTroops <= 0) return;
+
+        var total = requester.Party.NumberOfRegularMembers;
+        foreach (var party in commanded) total += party.Party.NumberOfRegularMembers;
+        if (total <= 0) return;
+
+        // Clamp the model's count to what actually exists, then apply vanilla's own per-party ratio.
+        var ratio = MathF.Min(numberOfTroops, total) / (float)total;
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<EncounterGameMenuBehavior>();
+        if (behavior == null) return;
+
+        // SacrificeTroopsWithRatio is fully party-parameterised in vanilla (no MainParty in its body), so the
+        // server can run vanilla's own selection - including its MBRandom draw - against the requester's party.
+        // The roll happens here, once, and reaches every client as ordinary TroopRoster deltas.
+        behavior.SacrificeTroopsWithRatio(requester, ratio);
+        foreach (var party in commanded) behavior.SacrificeTroopsWithRatio(party, ratio);
+    }
+
+    /// <summary>
+    /// Vanilla's CalculateAndRemoveItemsForTryToGetAway, against the requester instead of MainParty:
+    /// 15% off every merchandise stack, banner items exempt. Deterministic, so no roll is involved.
+    /// </summary>
+    private static void RemoveGoods(MobileParty requester)
+    {
+        var roster = requester.Party?.ItemRoster;
+        if (roster == null) return;
+
+        foreach (var element in new ItemRoster(roster))
+        {
+            var item = element.EquipmentElement.Item;
+            if (item == null || item.NotMerchandise || item.IsBannerItem) continue;
+
+            var lost = (int)MathF.Floor(element.Amount * 0.15f);
+            if (lost > 0) roster.AddToCounts(element.EquipmentElement, -lost);
+        }
+    }
+
+    /// <summary>
+    /// Clears the retreating party's siege camp, and those of the followers it commands. Vanilla clears the
+    /// camp of EVERY party on the defender side, which in co-op would end another player's siege for them.
+    /// </summary>
+    private static string[] ClearBesiegerCamps(MobileParty requester, List<MobileParty> commanded)
+    {
+        var cleared = new List<string>();
+
+        if (requester.BesiegerCamp != null)
+        {
+            requester.BesiegerCamp = null;
+            cleared.Add(requester.StringId);
+        }
+
+        foreach (var party in commanded)
+        {
+            if (party.BesiegerCamp == null) continue;
+            party.BesiegerCamp = null;
+            cleared.Add(party.StringId);
+        }
+
+        return cleared.ToArray();
+    }
+}
