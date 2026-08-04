@@ -196,6 +196,26 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // Interfaces/Messages/Patches/Handler set (source/GameInterface/Services/Issues/*/CaravanAmbush*.cs) is
         // the whole of this type's Step 0 + gap-closing work.
         typeof(CaravanAmbushIssueBehavior),
+        // Tier 2 Group A (see doc/GroupA_HostileMobilePartySync_Design_v3.md) - Gang Leader Needs Weapons, step
+        // 3 of the group's build order. Its own creation is the simplest in this whole family - the Issue ctor
+        // takes ONLY the owner Hero, since both fields it internally rolls are fully deterministic given shared
+        // state (a single-element WeaponClass array + a pure function of every town's shared ItemRoster) - see
+        // Interfaces.IGangLeaderNeedsWeaponsIssueInterface's type doc comment. The standing-lesson re-check
+        // (this task's own seeded nuance) confirmed a real gap the design doc never covered at all for this
+        // type: _guardsParty is populated by CreateGuardsParty(), called only from a RegisterEvents()-wired
+        // OnSettlementEnter listener rather than an accept-time dialogue Consequence - and unlike every other
+        // Category-A listener in this family, its own gating condition (party == MobileParty.MainParty) is
+        // trivially satisfiable by ANY peer's own local settlement-entry, not just the genuine owner's, so it
+        // needed BOTH a non-owner block AND a client-owner spawn-authority gate - see
+        // Patches.GangLeaderNeedsWeaponsGuardsPartySpawnGatePatch's doc comment. A confirmed weapon-delivery
+        // ownership gap (Patches.GangLeaderNeedsWeaponsQuestOwnershipGatePatch) plus three more independently-
+        // found ones on the shared guard dialogue's convergent leaves are also fixed there. The scripted-battle
+        // "whichever peer's menu opens first" race (task item 4) is closed by
+        // Patches.GangLeaderNeedsWeaponsBattleStartApprovalPatches. No orphaned standalone disable patch was
+        // found for this type (grepped the whole tree - zero hits, same as Smugglers/Artisan Overpriced Goods),
+        // so the allowlist entry plus this type's own bespoke Interfaces/Messages/Patches/Handler set
+        // (source/GameInterface/Services/Issues/*/GangLeaderNeedsWeapons*.cs) is the whole of Step 0 + gap work.
+        typeof(GangLeaderNeedsWeaponsIssueQuestBehavior),
     };
 
     /// <summary>

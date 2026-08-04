@@ -122,6 +122,18 @@ internal static class GenericAcceptMirrorIssueTypes
         // ever set later by the dialogue-triggered OnQuestAccepted - are handled entirely separately by
         // CaravanAmbushPartySpawnGatePatch, not by this generic accept mirror.
         typeof(CaravanAmbushIssueBehavior.CaravanAmbushIssue),
+        // Tier 2 Group A: Gang Leader Needs Weapons - GenerateIssueQuest(questId) forwards IssueOwner/a fixed
+        // 25-day due time/RewardGold/_requiredWeaponClassIndex/RequestedWeaponAmount/IssueDifficultyMultiplier/
+        // _averagePriceForItem. _requiredWeaponClassIndex/_averagePriceForItem are frozen at creation time (the
+        // Issue ctor takes ONLY the owner Hero - both fields it internally rolls are fully deterministic given
+        // shared state, see IGangLeaderNeedsWeaponsIssueInterface's doc comment), and RewardGold/
+        // RequestedWeaponAmount/IssueDifficultyMultiplier are pure functions of those frozen fields plus the
+        // same deterministic Campaign.Current.PlayerProgress-derived value every other type here already relies
+        // on. A bare replay of IssueManager.StartIssueQuest lands on a byte-identical
+        // GangLeaderNeedsWeaponsIssueQuest on every peer. The one genuinely per-client-divergent piece of this
+        // quest - _guardsParty, only ever set later by a RegisterEvents()-wired OnSettlementEnter listener, NOT
+        // by this replay - is handled entirely separately by GangLeaderNeedsWeaponsGuardsPartySpawnGatePatch.
+        typeof(GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -195,6 +207,12 @@ internal static class GenericAcceptMirrorIssueTypes
         // this same generic trigger. Needs its matching HourlyTick registration too - see that file's
         // CaravanAmbushIssueBehavior entry.
         typeof(CaravanAmbushIssueBehavior.CaravanAmbushIssue),
+        // Tier 2 Group A: Gang Leader Needs Weapons - IsThereAlternativeSolution == true,
+        // AlternativeSolutionScaleFlags is Duration only (confirmed against the decompiled source - no
+        // FailureRisk/Casualties), so MirrorAlternativeAccepted's generic force-write (issue state +
+        // IsTriedToSolveBefore + due time) is all any other peer's mirror copy needs. Needs its matching
+        // HourlyTick registration too - see that file's GangLeaderNeedsWeaponsIssueQuestBehavior entry.
+        typeof(GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>

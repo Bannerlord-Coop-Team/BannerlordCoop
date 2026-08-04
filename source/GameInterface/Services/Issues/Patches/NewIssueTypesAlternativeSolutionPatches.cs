@@ -179,6 +179,14 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void CaravanAmbushRegisterEventsPostfix(CaravanAmbushIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Tier 2 Group A - Gang Leader Needs Weapons. AlternativeSolutionScaleFlags is Duration only (confirmed
+    // against the decompiled source - no FailureRisk/Casualties), so it always succeeds deterministically, same
+    // as ArtisanCantSellProductsAtAFairPrice/ArtisanOverpricedGoods above.
+    [HarmonyPatch(typeof(GangLeaderNeedsWeaponsIssueQuestBehavior), nameof(GangLeaderNeedsWeaponsIssueQuestBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void GangLeaderNeedsWeaponsRegisterEventsPostfix(GangLeaderNeedsWeaponsIssueQuestBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;
