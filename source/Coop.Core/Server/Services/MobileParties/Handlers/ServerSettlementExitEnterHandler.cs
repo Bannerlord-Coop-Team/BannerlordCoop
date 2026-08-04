@@ -4,15 +4,16 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using Coop.Core.Server.Services.Settlements;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using LiteNetLib;
 using Serilog;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -26,22 +27,28 @@ public class ServerSettlementExitEnterHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
     private readonly ISettlementInterface settlementInterface;
     private readonly IKingdomCreationSettlementTracker settlementTracker;
+    private readonly ISettlementEncounterDistanceValidator distanceValidator;
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
 
     public ServerSettlementExitEnterHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
+        IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
-        IKingdomCreationSettlementTracker settlementTracker)
+        IKingdomCreationSettlementTracker settlementTracker,
+        ISettlementEncounterDistanceValidator distanceValidator)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
         this.settlementInterface = settlementInterface;
         this.settlementTracker = settlementTracker;
+        this.distanceValidator = distanceValidator;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
@@ -65,6 +72,12 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!DoesPeerControlParty(peer, payload.PartyId))
+            {
+                RejectSettlementEncounter(peer, payload, "your party is not controlled by you");
+                return;
+            }
+
             if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty))
             {
                 RejectSettlementEncounter(peer, payload, "your party is no longer available");
@@ -107,26 +120,15 @@ public class ServerSettlementExitEnterHandler : IHandler
                 return;
             }
 
-            var encounterModel = Campaign.Current?.Models?.EncounterModel;
-            if (encounterModel != null)
+            if (!distanceValidator.TryValidate(mobileParty, settlement, out var rejectionReason))
             {
-                bool usePort = mobileParty.IsTargetingPort && settlement.HasPort;
-                float maximumDistance = usePort && settlement.SiegeEvent?.IsBlockadeActive == true
-                    ? encounterModel.NeededMaximumDistanceForEncounteringBlockade
-                    : settlement.IsTown
-                        ? encounterModel.NeededMaximumDistanceForEncounteringTown
-                        : encounterModel.NeededMaximumDistanceForEncounteringVillage;
-                var targetPosition = usePort ? settlement.PortPosition : settlement.GatePosition;
-
-                if (mobileParty.Position.Distance(targetPosition) > maximumDistance + 0.5f)
-                {
-                    Logger.Warning(
-                        "Rejecting settlement entry for party {PartyId} because it is too far from settlement {SettlementId}",
-                        payload.PartyId,
-                        payload.SettlementId);
-                    RejectSettlementEncounter(peer, payload, "your party is too far from the settlement");
-                    return;
-                }
+                Logger.Warning(
+                    "Rejecting settlement entry for party {PartyId} at {SettlementId}: {Reason}",
+                    payload.PartyId,
+                    payload.SettlementId,
+                    rejectionReason);
+                RejectSettlementEncounter(peer, payload, rejectionReason);
+                return;
             }
 
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
@@ -156,40 +158,72 @@ public class ServerSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
     {
         var payload = obj.What;
-
-        objectManager.TryGetObject<MobileParty>(payload.PartyId, out var mobileParty);
-        if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
-        {
-            if (obj.Who is NetPeer suppressedPeer)
-            {
-                network.Send(
-                    suppressedPeer,
-                    new NetworkSettlementEncounterLeaveResult(
-                        payload.PartyId,
-                        SettlementEncounterLeaveOutcome.Suppressed));
-            }
-            return;
-        }
-
         var peer = (NetPeer)obj.Who;
-
-        // The sending client is currently in a settlement encounter, this is handled
-        // slightly differently from ai or other clients parties
-        network.Send(
-            peer,
-            new NetworkSettlementEncounterLeaveResult(
-                payload.PartyId,
-                SettlementEncounterLeaveOutcome.Applied));
-
-        network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
-            Compact(payload.PartyId, typeof(MobileParty))));
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging(payload.PartyId, out MobileParty mobileParty)) return;
+            if (!DoesPeerControlParty(peer, payload.PartyId))
+            {
+                RejectSettlementEncounterLeave(peer, payload.PartyId, "your party is not controlled by you");
+                return;
+            }
+
+            bool partyAvailable = objectManager.TryGetObjectWithLogging(
+                payload.PartyId,
+                out MobileParty mobileParty);
+            if (settlementTracker.TryConsumeLeave(mobileParty, payload.PartyId))
+            {
+                network.Send(
+                    peer,
+                    new NetworkSettlementEncounterLeaveResult(
+                        payload.PartyId,
+                        SettlementEncounterLeaveOutcome.Suppressed));
+                return;
+            }
+
+            if (!partyAvailable)
+            {
+                RejectSettlementEncounterLeave(peer, payload.PartyId, "your party is no longer available");
+                return;
+            }
+
+            // The sending client is currently in a settlement encounter, this is handled
+            // slightly differently from ai or other clients parties
+            network.Send(
+                peer,
+                new NetworkSettlementEncounterLeaveResult(
+                    payload.PartyId,
+                    SettlementEncounterLeaveOutcome.Applied));
+
+            network.SendAllBut(peer, new NetworkPartyLeaveSettlement(
+                Compact(payload.PartyId, typeof(MobileParty))));
 
             settlementInterface.PartyLeaveSettlement(mobileParty);
-        });
+        }, context: nameof(NetworkRequestEndSettlementEncounter));
+    }
+
+    private bool DoesPeerControlParty(NetPeer peer, string partyId)
+    {
+        if (playerManager.TryGetPlayer(peer, out var player) &&
+            player.MobilePartyId == partyId)
+            return true;
+
+        Logger.Warning(
+            "Rejecting settlement encounter request from a peer that does not control party {PartyId}",
+            partyId);
+        return false;
+    }
+
+    private void RejectSettlementEncounterLeave(NetPeer peer, string partyId, string reason)
+    {
+        network.Send(
+            peer,
+            new NetworkSettlementEncounterLeaveResult(
+                partyId,
+                SettlementEncounterLeaveOutcome.Suppressed));
+        network.Send(
+            peer,
+            new SendInformationMessage($"Unable to leave the settlement: {reason}."));
     }
 
     private void Handle(MessagePayload<PartyEnterSettlementAttempted> obj)

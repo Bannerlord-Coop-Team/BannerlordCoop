@@ -101,6 +101,83 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void SettlementEncounterRequest_ForPartyControlledByAnotherPeer_IsRejected()
+    {
+        var owner = Clients.First();
+        var requester = Clients.Skip(1).First();
+        var context = CreateEntryContext(owner);
+        ConnectAdditionalPlayer(requester, "PlayerTwo");
+
+        requester.Call(() => requester.Resolve<INetwork>().SendAll(
+            new NetworkRequestStartSettlementEncounter(
+                context.PartyId,
+                context.SettlementId)));
+
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterRejected>());
+        AssertInformationMessage(
+            requester,
+            "Unable to enter the settlement: your party is not controlled by you.");
+        Assert.Empty(
+            Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+        Assert.Empty(
+            Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.Null(party.CurrentSettlement);
+        });
+    }
+
+    [Fact]
+    public void EndSettlementEncounterRequest_ForPartyControlledByAnotherPeer_IsRejected()
+    {
+        var owner = Clients.First();
+        var requester = Clients.Skip(1).First();
+        var context = CreateEntryContext(owner);
+        ConnectAdditionalPlayer(requester, "PlayerTwo");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                context.SettlementId,
+                out var settlement));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+            }
+        });
+        ClearMessages();
+
+        requester.Call(() => requester.Resolve<INetwork>().SendAll(
+            new NetworkRequestEndSettlementEncounter(context.PartyId)));
+
+        var result = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>());
+        Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, result.Outcome);
+        AssertInformationMessage(
+            requester,
+            "Unable to leave the settlement: your party is not controlled by you.");
+        Assert.Empty(
+            Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                context.SettlementId,
+                out var settlement));
+            Assert.Same(settlement, party.CurrentSettlement);
+        });
+    }
+
+    [Fact]
     public void BesiegeRequest_WhenPartyIsFarFromSettlement_IsRejected()
     {
         var client = Clients.First();
@@ -166,6 +243,45 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         Assert.True(GetBesiegeApproval().Approved);
         AssertSiegeStarted(context);
+    }
+
+    [Fact]
+    public void BesiegeRequest_WhenPartyAlreadyBesiegesTarget_IsApproved()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        IgnoreEntryResults(client);
+
+        SendBesiegeRequest(client, context, SiegeCreationDisabledMethods);
+
+        SiegeEvent? originalSiege = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                context.SettlementId,
+                out var settlement));
+            originalSiege = settlement.SiegeEvent;
+            Assert.NotNull(originalSiege);
+        });
+        ClearMessages();
+
+        SendBesiegeRequest(client, context);
+
+        Assert.True(GetBesiegeApproval().Approved);
+        Assert.Empty(client.InternalMessages.GetMessages<SendInformationMessage>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
+                context.PartyId,
+                out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
+                context.SettlementId,
+                out var settlement));
+            var currentSiege = settlement.SiegeEvent;
+            Assert.NotNull(currentSiege);
+            Assert.Same(originalSiege, currentSiege);
+            Assert.Same(currentSiege.BesiegerCamp, party.BesiegerCamp);
+        });
     }
 
     [Fact]
@@ -329,6 +445,23 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         }, SiegeCreationDisabledMethods);
         Server.NetworkSentMessages.Clear();
         return context;
+    }
+
+    private void ConnectAdditionalPlayer(EnvironmentInstance client, string controllerId)
+    {
+        CreatePlayerHeroParty(controllerId);
+        TestEnvironment.ConnectRegisteredPlayer(client, controllerId);
+        ClearMessages();
+    }
+
+    private void ClearMessages()
+    {
+        Server.NetworkSentMessages.Clear();
+        foreach (var client in Clients)
+        {
+            client.NetworkSentMessages.Clear();
+            client.InternalMessages.Clear();
+        }
     }
 
     private void SendBesiegeRequest(

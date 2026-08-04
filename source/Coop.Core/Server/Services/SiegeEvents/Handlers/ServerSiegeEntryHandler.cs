@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.BesiegerCamps.Messages;
 using GameInterface.Services.GameDebug.Messages;
@@ -16,7 +17,6 @@ using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -38,6 +38,7 @@ internal class ServerSiegeEntryHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly ISettlementEncounterDistanceValidator distanceValidator;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISettlementInterface settlementInterface;
 
@@ -46,6 +47,7 @@ internal class ServerSiegeEntryHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IPlayerManager playerManager,
+        ISettlementEncounterDistanceValidator distanceValidator,
         ISiegeEventInterface siegeEventInterface,
         ISettlementInterface settlementInterface)
     {
@@ -53,6 +55,7 @@ internal class ServerSiegeEntryHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.distanceValidator = distanceValidator;
         this.siegeEventInterface = siegeEventInterface;
         this.settlementInterface = settlementInterface;
         messageBroker.Subscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
@@ -332,8 +335,7 @@ internal class ServerSiegeEntryHandler : IHandler
         try
         {
             var targetCamp = settlement.SiegeEvent?.BesiegerCamp;
-            if (action == SiegeEntryAction.Join &&
-                targetCamp != null &&
+            if (targetCamp != null &&
                 ReferenceEquals(party.BesiegerCamp, targetCamp))
             {
                 SendEntryResult(peer, settlementId, action, approved: true);
@@ -370,7 +372,7 @@ internal class ServerSiegeEntryHandler : IHandler
         SendEntryResult(peer, settlementId, action, approved: true);
     }
 
-    private static bool TryValidateEntry(
+    private bool TryValidateEntry(
         MobileParty party,
         Settlement settlement,
         SiegeEntryAction action,
@@ -388,8 +390,8 @@ internal class ServerSiegeEntryHandler : IHandler
             rejectionReason = "your party is inside another settlement";
         else if (party.BesiegerCamp != null)
             rejectionReason = "your party is already in another siege camp";
-        else if (!IsWithinInteractionDistance(party, settlement))
-            rejectionReason = "your party is too far from the settlement";
+        else if (!distanceValidator.TryValidate(party, settlement, out var distanceRejectionReason))
+            rejectionReason = distanceRejectionReason;
         else if ((party.ActualClan != null && party.ActualClan == settlement.OwnerClan) ||
             (party.MapFaction != null && party.MapFaction == settlement.MapFaction))
             rejectionReason = "your party belongs to the defending faction";
@@ -406,26 +408,6 @@ internal class ServerSiegeEntryHandler : IHandler
             rejectionReason = "your party cannot join the attacking side";
 
         return rejectionReason == null;
-    }
-
-    private static bool IsWithinInteractionDistance(MobileParty party, Settlement settlement)
-    {
-        if (party.CurrentSettlement == settlement)
-            return true;
-
-        var encounterModel = Campaign.Current?.Models?.EncounterModel;
-        if (encounterModel == null)
-            return false;
-
-        bool usePort = party.IsTargetingPort && settlement.HasPort;
-        float maximumDistance = usePort && settlement.SiegeEvent?.IsBlockadeActive == true
-            ? encounterModel.NeededMaximumDistanceForEncounteringBlockade
-            : settlement.IsTown
-                ? encounterModel.NeededMaximumDistanceForEncounteringTown
-                : encounterModel.NeededMaximumDistanceForEncounteringVillage;
-        var targetPosition = usePort ? settlement.PortPosition : settlement.GatePosition;
-
-        return party.Position.Distance(targetPosition) <= maximumDistance + 0.5f;
     }
 
     private void RejectEntry(
