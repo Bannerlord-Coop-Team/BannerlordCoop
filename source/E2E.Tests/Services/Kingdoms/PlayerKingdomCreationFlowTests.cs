@@ -1769,11 +1769,13 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     {
         var player = CreateSyncedPlayerContext();
         var settlementId = CreateSyncedSettlement();
+        var client = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(client, ControllerId);
 
         Server.SimulateMessage(
-            this,
+            client.NetPeer,
             new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
-        Server.SimulateMessage(this, new NetworkRequestEndSettlementEncounter(player.PartyId));
+        Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(player.PartyId));
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
 
         Assert.DoesNotContain(
