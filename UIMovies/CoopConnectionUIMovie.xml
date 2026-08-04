@@ -161,7 +161,7 @@
                                          Command.Click="ActionSearchSteamLobbies" Parameter.Text="@SearchButtonText"/>
                       </Children>
                     </ListPanel>
-                    <!-- test -->
+                    <!-- Filter Buttons -->
                     <ListPanel Id="LobbyFilterControls"
                                WidthSizePolicy="StretchToParent"
                                HeightSizePolicy="Fixed"
@@ -216,7 +216,7 @@
                                                 EnableClamp="true"/>
                       </Children>
                     </ListPanel>
-                    <!-- test -->
+                    <!-- End of Filter Buttons -->
                     <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52"
                                 IsVisible="@IsSteamLobbyStatusVisible" Brush="Clan.TabControl.Text"
                                 Brush.FontSize="24" Brush.FontColor="#B8B8B8FF"
