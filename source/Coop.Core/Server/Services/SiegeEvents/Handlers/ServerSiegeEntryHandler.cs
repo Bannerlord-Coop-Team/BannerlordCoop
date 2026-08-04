@@ -65,6 +65,7 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Subscribe<NetworkRequestBreakSiege>(HandleBreak);
         messageBroker.Subscribe<NetworkRequestSiegeAssault>(HandleAssault);
         messageBroker.Subscribe<SiegeAssaultStarted>(HandleAssaultStarted);
+        messageBroker.Subscribe<SallyOutStarted>(HandleSallyOutStarted);
         messageBroker.Subscribe<SiegePreparationStarted>(HandlePreparationStarted);
         messageBroker.Subscribe<SiegeEndedWithoutBattle>(HandleSiegeEnded);
         messageBroker.Subscribe<SiegeCampPositionRolled>(HandleCampPosition);
@@ -180,6 +181,7 @@ internal class ServerSiegeEntryHandler : IHandler
         var obj = payload.What;
 
         JoinConnectedSettlementDefenders(obj.AttackerParty, obj.Settlement);
+        JoinConnectedBesiegerAttackers(obj.AttackerParty, obj.Settlement);
 
         if (!objectManager.TryGetIdWithLogging(obj.AttackerParty, out var attackerPartyId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
@@ -204,6 +206,87 @@ internal class ServerSiegeEntryHandler : IHandler
             if (!mapEvent.CanPartyJoinBattle(party.Party, BattleSideEnum.Defender)) continue;
 
             party.Party.MapEventSide = defenderSide;
+        }
+    }
+
+
+    // Runs on the game thread already - published from the StartBattleAction postfix inside the sortie's own
+    // creation, so the seat lands before anything else observes the event.
+    private void HandleSallyOutStarted(MessagePayload<SallyOutStarted> payload)
+    {
+        var obj = payload.What;
+        JoinConnectedBesiegersToSortie(obj.GarrisonParty, obj.Settlement);
+    }
+
+    /// <summary>
+    /// Seats connected besieging players on a sally-out's DEFENDER side.
+    /// </summary>
+    /// <remarks>
+    /// A sortie inverts the siege sides - CheckSallyOut passes the garrison as the attacker and only
+    /// BesiegerCamp.LeaderParty as the defender - and MapEvent.Initialize's camp sweep skips any camp party
+    /// that is in an army without leading it. A co-besieging player is therefore routinely left off the
+    /// event: its MapEvent stays null, so it gets no encounter and simply watches the sortie happen.
+    /// No-op for anyone vanilla already seated, so it only adds the parties vanilla skipped.
+    /// </remarks>
+    private void JoinConnectedBesiegersToSortie(MobileParty garrisonParty, Settlement settlement)
+    {
+        var mapEvent = garrisonParty?.MapEvent;
+        var defenderSide = mapEvent?.DefenderSide;
+        if (defenderSide == null) return;
+
+        var besiegerCamp = settlement?.SiegeEvent?.BesiegerCamp;
+        if (besiegerCamp == null) return;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!playerManager.IsConnected(player)) continue;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) continue;
+            if (party.Party.MapEventSide != null) continue;
+            if (party.BesiegerCamp != besiegerCamp) continue;
+            if (!mapEvent.CanPartyJoinBattle(party.Party, BattleSideEnum.Defender)) continue;
+
+            Logger.Debug("Seating besieging player party {PartyId} on the sortie defender side", party.StringId);
+            party.Party.MapEventSide = defenderSide;
+        }
+    }
+
+    /// <summary>
+    /// Seats connected besieging players on the assault's attacker side.
+    /// </summary>
+    /// <remarks>
+    /// Vanilla's MapEvent.Initialize sweeps the besieger camp but deliberately SKIPS any camp party that is
+    /// in an army and is not that army's leader; those members are expected to arrive through the leader's
+    /// AttachedParties cascade in PartyBase.set_MapEventSide, which needs member.AttachedTo == the leader.
+    /// Vanilla produces that through Army.Tick + AiArmyMemberBehavior's escort behaviour, neither of which
+    /// runs for a co-op player party (Army.Tick is server-only and the AI think is skipped for player
+    /// parties). Such a member is therefore never seated: its MapEvent stays null, the assault prompt is
+    /// dropped by the MainParty.MapEvent == null guard, and "Send troops."/"Attack!" stay hidden because
+    /// both menu conditions test MapEvent.PlayerMapEvent.
+    ///
+    /// This runs before the prompt broadcasts on purpose: the seat replicates through the map-event side
+    /// messages on the same reliable-ordered channel, so it lands ahead of NetworkPromptSiegeAssault.
+    /// It is a no-op for every party vanilla already seated (MapEventSide != null), so it only ever adds
+    /// the members vanilla skipped - it never re-sides anyone.
+    /// </remarks>
+    private void JoinConnectedBesiegerAttackers(MobileParty attackerParty, Settlement settlement)
+    {
+        var mapEvent = attackerParty?.MapEvent;
+        var attackerSide = mapEvent?.AttackerSide;
+        if (attackerSide == null) return;
+
+        var besiegerCamp = settlement?.SiegeEvent?.BesiegerCamp;
+        if (besiegerCamp == null) return;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!playerManager.IsConnected(player)) continue;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) continue;
+            if (party.Party.MapEventSide != null) continue;
+            if (party.BesiegerCamp != besiegerCamp) continue;
+            if (!mapEvent.CanPartyJoinBattle(party.Party, BattleSideEnum.Attacker)) continue;
+
+            Logger.Debug("Seating besieging player party {PartyId} on the assault attacker side", party.StringId);
+            party.Party.MapEventSide = attackerSide;
         }
     }
 
@@ -488,6 +571,7 @@ internal class ServerSiegeEntryHandler : IHandler
         Join,
     }
 
+
     private void HandleBreak(MessagePayload<NetworkRequestBreakSiege> payload)
     {
         var obj = payload.What;
@@ -534,6 +618,7 @@ internal class ServerSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestBreakSiege>(HandleBreak);
         messageBroker.Unsubscribe<NetworkRequestSiegeAssault>(HandleAssault);
         messageBroker.Unsubscribe<SiegeAssaultStarted>(HandleAssaultStarted);
+        messageBroker.Unsubscribe<SallyOutStarted>(HandleSallyOutStarted);
         messageBroker.Unsubscribe<SiegePreparationStarted>(HandlePreparationStarted);
         messageBroker.Unsubscribe<SiegeEndedWithoutBattle>(HandleSiegeEnded);
         messageBroker.Unsubscribe<SiegeCampPositionRolled>(HandleCampPosition);

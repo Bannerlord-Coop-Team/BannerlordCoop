@@ -82,6 +82,13 @@ internal class EncounterManagerPatches
         if (attackerParty?.MapEvent != null || defenderParty?.MapEvent != null)
             return false;
 
+        // A garrison sortieing against the party besieging it is a battle, not a conversation.
+        // SallyOutsCampaignBehavior.CheckSallyOut starts the sortie by calling StartPartyEncounter, so
+        // diverting it here means StartBattleAction.Apply never runs and the sally-out map event is
+        // never created - the AI simply never sallies out against a player-led siege.
+        if (IsGarrisonSortie(attackerParty, defenderParty))
+            return false;
+
         var attackerIsPlayer = attackerParty?.MobileParty?.IsPlayerParty() == true;
         var defenderIsPlayer = defenderParty?.MobileParty?.IsPlayerParty() == true;
         if (attackerIsPlayer == defenderIsPlayer)
@@ -95,6 +102,21 @@ internal class EncounterManagerPatches
             ConversationRestartSource.EncounterManager,
             armyTalkEncounter: true));
         return true;
+    }
+
+    /// <summary>
+    /// True when this is a besieged settlement's garrison attacking the party besieging it, which is the
+    /// shape vanilla uses for a sally-out: CheckSallyOut passes settlement.Town.GarrisonParty.Party as the
+    /// attacker and BesiegerCamp.LeaderParty.Party as the defender.
+    /// </summary>
+    private static bool IsGarrisonSortie(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        var garrison = attackerParty?.MobileParty;
+        var besieger = defenderParty?.MobileParty;
+        if (garrison?.IsGarrison != true || besieger == null) return false;
+
+        var besieged = besieger.BesiegerCamp?.SiegeEvent?.BesiegedSettlement;
+        return besieged != null && besieged.Town?.GarrisonParty == garrison;
     }
 
     [HarmonyPrefix]
