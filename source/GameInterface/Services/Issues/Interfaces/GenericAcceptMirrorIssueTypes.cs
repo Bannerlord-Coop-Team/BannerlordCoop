@@ -189,6 +189,21 @@ internal static class GenericAcceptMirrorIssueTypes
         // see Patches.RaidAnEnemyTerritoryRaidCompletionPatches/RaidAnEnemyTerritoryOwnershipGatePatches for the
         // real bugs this type needed fixing.
         typeof(RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryIssue),
+        // Rival Gang Moving In - GenerateIssueQuest(questId) forwards IssueOwner/RivalGangLeader (captured/
+        // forced at creation time - see Interfaces.IRivalGangMovingInIssueInterface's doc comment)/a fixed
+        // 8-day duration/RewardGold/IssueDifficultyMultiplier - RewardGold is a pure function of
+        // IssueDifficultyMultiplier, the same deterministic, shared value every other type here already relies
+        // on. All already frozen/deterministic by accept time, so a bare replay of IssueManager.StartIssueQuest
+        // lands on a byte-identical RivalGangMovingInIssueQuest on every peer - and, since this quest's
+        // GenerateIssueQuest reads only already-frozen fields, it rides the EXISTING generic accept-time
+        // ownership plumbing (Patches.IssueAcceptancePatches/Handlers.VillageNeedsToolsIssueHandler) unchanged
+        // too - no bespoke accept handler needed, unlike Betting Fraud (see
+        // Handlers.RivalGangMovingInIssueHandler's own doc comment for why that earlier design assumption was
+        // wrong). The two genuinely per-client-divergent pieces of this quest - _rivalGangLeaderParty/
+        // _allyGangLeaderParty (+ their henchman Heroes), only ever set later by the dialogue-triggered
+        // StartAlleyBattle() - are handled entirely separately by
+        // Patches.RivalGangMovingInPartySpawnGatePatch, not by this generic accept mirror.
+        typeof(SandBox.Issues.RivalGangMovingInIssueBehavior.RivalGangMovingInIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -281,6 +296,12 @@ internal static class GenericAcceptMirrorIssueTypes
         // EscortMerchantCaravanIssueBehavior entry. LandLordCompanyOfTrouble is NOT here (IsThereAlternativeSolution
         // is false) but this type's IS true (confirmed against the decompiled source).
         typeof(EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssue),
+        // Rival Gang Moving In - AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed against
+        // the decompiled source), the same shape as Smugglers/Caravan Ambush/Merchant Army of Poachers/Escort
+        // Merchant Caravan above - genuinely can fail, still safe to route through this generic, ownership-
+        // self-limiting trigger. Needs its matching HourlyTick registration too - see
+        // NewIssueTypesAlternativeSolutionPatches' RivalGangMovingInIssueBehavior entry.
+        typeof(SandBox.Issues.RivalGangMovingInIssueBehavior.RivalGangMovingInIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>

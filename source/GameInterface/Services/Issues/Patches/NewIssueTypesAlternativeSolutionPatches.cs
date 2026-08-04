@@ -204,6 +204,15 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void EscortMerchantCaravanRegisterEventsPostfix(EscortMerchantCaravanIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Rival Gang Moving In - SandBox.dll. AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed
+    // against the decompiled source), the same shape as Smugglers/Caravan Ambush/Merchant Army of Poachers/
+    // Escort Merchant Caravan above - genuinely can fail, still safe to route through this generic,
+    // ownership-self-limiting trigger.
+    [HarmonyPatch(typeof(SandBox.Issues.RivalGangMovingInIssueBehavior), nameof(SandBox.Issues.RivalGangMovingInIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void RivalGangMovingInRegisterEventsPostfix(SandBox.Issues.RivalGangMovingInIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;

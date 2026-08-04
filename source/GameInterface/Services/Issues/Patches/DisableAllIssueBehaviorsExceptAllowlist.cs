@@ -359,6 +359,37 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // are both false (confirmed by decompile), so no alternative-solution or lord-solution infrastructure is
         // needed.
         typeof(RaidAnEnemyTerritoryIssueBehavior),
+        // Rival Gang Moving In - SandBox.dll (see doc/RivalGangMovingIn_Design_v2.md, verdict GO). 2 spawned
+        // hostile parties + 2 throwaway henchman Heroes, needing its own creation/party-spawn/alley-fight
+        // infrastructure. Two findings from an earlier, superseded design pass were disproven and replaced with
+        // narrower real fixes: (1) ordinary concurrent play can't collide two owners' quests (non-owner mirrors
+        // are inert by construction, same as every other type here), but campaign save/reload genuinely CAN
+        // leave two owners' quests both IsOngoing on one peer (QuestManager._quests is restored raw from save
+        // data, bypassing StartQuest()'s normal gate) - fixed by the standard BettingFraudInstanceResolutionPatch-
+        // style ownership-filtered rescan on this quest's own Instance getter -
+        // see Patches.RivalGangMovingInInstanceResolutionPatch. (2) the alley-fight trigger's own server-side-
+        // replay premise was also disproven (StartAlleyBattle() only ever runs on the genuine owner's own
+        // process); the real gap is a missing wait between RestartPlayerEncounter (fire-and-forget on a client)
+        // and the very next line's PlayerEncounter.StartBattle() - an unguarded NRE race, fixed by
+        // Patches.RivalGangMovingInAlleyBattlePatch (reuses MapEventCreationCoordinator's own
+        // GameThread.WaitWhilePumping idiom, no new network protocol needed). A real client-authority
+        // party-spawn gate for BOTH spawned parties (the same Smugglers-shaped
+        // CustomPartyComponentLifetimePatches gap, confirmed present for both methods here) is closed by
+        // Patches.RivalGangMovingInPartySpawnGatePatch + Handlers.RivalGangMovingInPartyCreationCoordinator - a
+        // single BLOCKING round trip (unlike every other fire-and-forget party-spawn gate in this family),
+        // since StartAlleyBattle() immediately dereferences the created party a few lines later. The party-
+        // creation code's own MobileParty.MainParty dependency (a cosmetic hideout/culture pick only) is
+        // replaced with a settlement-based lookup (already precedented in SmugglersIssueInterface.cs),
+        // closing a dedicated-headless-server null-MainParty gap for free. Creation-capture
+        // (Patches.RivalGangMovingInIssueCreationPatch/Handlers.RivalGangMovingInIssueHandler) broadcasts the
+        // creation-time RivalGangLeader pick even though GetRivalGangLeader's own walk has no RNG in it
+        // (verify-per-type, don't assume). No orphaned standalone disable patch was found for this type (the
+        // 19-file dead-code sweep already deleted DisableRivalGangMovingInIssueBehavior.cs - re-verified absent
+        // again here), so the allowlist entry plus this type's own bespoke
+        // Interfaces/Messages/Handlers/Patches set (source/GameInterface/Services/Issues/*/RivalGangMovingIn*.cs)
+        // is the whole of this type's Step 0 + gap-closing work. 2 cheap defense-in-depth ownership gates on the
+        // save/reload leak's REWARD-bearing paths are added by Patches.RivalGangMovingInOwnershipGatePatches.
+        typeof(SandBox.Issues.RivalGangMovingInIssueBehavior),
     };
 
     /// <summary>
