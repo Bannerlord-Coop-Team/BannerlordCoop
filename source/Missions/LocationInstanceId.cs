@@ -23,4 +23,21 @@ public static class LocationInstanceId
         instanceId = $"{settlementId}|{locationId}";
         return true;
     }
+
+    /// <summary>
+    /// Extract the settlement's ObjectManager id back out of an instance id. Used by the server-side
+    /// host election to validate that a requester's party is actually in the instance's settlement —
+    /// the server never opens location missions, so the id string is all it has.
+    /// </summary>
+    public static bool TryGetSettlementId(string instanceId, out string settlementId)
+    {
+        settlementId = null;
+        if (string.IsNullOrEmpty(instanceId)) return false;
+
+        var separatorIndex = instanceId.IndexOf('|');
+        if (separatorIndex <= 0) return false;
+
+        settlementId = instanceId.Substring(0, separatorIndex);
+        return true;
+    }
 }

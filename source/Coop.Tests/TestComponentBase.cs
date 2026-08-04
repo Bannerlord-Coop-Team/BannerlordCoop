@@ -9,6 +9,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.Heroes.Interaces;
@@ -117,6 +118,8 @@ internal abstract class TestComponentBase
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
+        // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
+        RegisterMock<ILocationHostRegistry>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);

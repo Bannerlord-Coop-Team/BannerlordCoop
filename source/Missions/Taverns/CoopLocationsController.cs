@@ -9,6 +9,7 @@ using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Data;
+using Missions.Locations;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -26,6 +27,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private static readonly ILogger Logger = LogManager.GetLogger<CoopLocationsController>();
     private readonly INetwork relayNetwork;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly ILocationSession session;
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -34,6 +36,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         INetwork relayNetwork,
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
+        ILocationSession session,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent)
@@ -41,6 +44,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     {
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;
+        this.session = session;
         //this.boardGameManager = boardGameManager;
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
@@ -101,6 +105,11 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         // The mission is now set up (player agent + teams exist). Spawn any join info that arrived
         // before we were ready.
         DrainPendingJoinInfos();
+
+        // Mission-ready (SR-010): the local player agent exists, so the mission has provably finished
+        // loading — ask the server to elect (or report) this instance's NPC host.
+        if (instanceId != null)
+            messageBroker.Publish(this, new LocationMissionReady(instanceId));
     }
 
     private void DrainPendingJoinInfos()
@@ -138,6 +147,11 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         network.Start();
 
         instanceId = derivedInstanceId;
+        session.TryBegin(instanceId);
+
+        // Engage the NPC gate: native population spawning is suppressed on every client until the
+        // server's host assignment confirms who runs it (SR-013).
+        LocationNpcGate.BeginMission(instanceId);
 
         network.ConnectToInstance(instanceId);
         coopMissionComponent.AgentRegistry.Clear();
@@ -190,6 +204,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
     protected override void OnLeaving()
     {
+        LocationNpcGate.EndMission();
         relayNetwork.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, instanceId));
         messageBroker.Publish(this, new PlayerLeftLocation());
         network.Stop();

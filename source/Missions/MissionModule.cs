@@ -9,6 +9,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
 using Missions.Agents.Voice;
 using Missions.Battles;
+using Missions.Locations;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Patches;
 using Missions.Services.Network;
@@ -89,6 +90,12 @@ public class MissionModule : Module
             .As<ILocationMissionBehavior>()
             .InstancePerDependency();
 
+        // Per-mission location NPC host context (mirrors IBattleSession). Transient so each
+        // CoopLocationsController gets a fresh session whose TryBegin latch resets with the mission.
+        builder.RegisterType<LocationSession>()
+            .As<ILocationSession>()
+            .InstancePerDependency();
+
         // BR-102 host-epoch receiver policy. InstancePerDependency so each CoopBattleController (one per
         // battle) is injected a FRESH policy whose accepted-epoch watermark starts clean and never leaks
         // across battles — the controller's per-battle lifetime is the watermark's natural reset. The
@@ -144,6 +151,15 @@ public class MissionModule : Module
         // subscribes up front on both. The assignment store itself (IBattleHostRegistry) is registered by
         // GameInterfaceModule — its handlers gate finalizes/conclusions on it too.
         builder.RegisterType<BattleHostHandler>()
+            .AsSelf()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
+
+        // Location NPC host election: elects on the server, stores the broadcast on clients, AutoActivated
+        // so it subscribes up front on both. The assignment store itself (ILocationHostRegistry) is
+        // registered by GameInterfaceModule. Deliberately separate from BattleHostHandler — each ignores
+        // departures for instance ids its own registry does not hold.
+        builder.RegisterType<LocationHostHandler>()
             .AsSelf()
             .InstancePerLifetimeScope()
             .AutoActivate();
