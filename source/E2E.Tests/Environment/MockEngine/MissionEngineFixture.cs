@@ -33,6 +33,7 @@ public sealed class MissionEngineFixture : IDisposable
         // Mission statics / members
         Prefix(typeof(Mission), "get_Current", nameof(Mission_get_Current));
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
+        Prefix(typeof(Mission), "get_DamageToPlayerMultiplier", nameof(Mission_get_DamageToPlayerMultiplier));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
         Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
@@ -147,6 +148,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
         Prefix(typeof(Agent), nameof(Agent.SetCurrentActionProgress), nameof(Agent_SetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetCurrentActionSpeed), nameof(Agent_SetCurrentActionSpeed));
         Prefix(typeof(Agent), nameof(Agent.SetActionChannel), nameof(Agent_SetActionChannel));
         Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
         Prefix(typeof(Agent), "set_MovementFlags", nameof(Agent_set_MovementFlags));
@@ -214,6 +216,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!MockMission.ForShell(__instance, out _)) return true;
         __result = 0f;
+        return false;
+    }
+
+    private static bool Mission_get_DamageToPlayerMultiplier(Mission __instance, ref float __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DamageToPlayerMultiplier;
         return false;
     }
 
@@ -869,12 +878,27 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_SetCurrentActionSpeed(
+        Agent __instance,
+        int channelNo,
+        float speed)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            m.Action0Speed = speed;
+            m.SetCurrentActionSpeedCalls++;
+        }
+        return false;
+    }
+
     private static bool Agent_SetActionChannel(
         Agent __instance,
         int channelNo,
         ref ActionIndexCache actionIndexCache,
         bool ignorePriority,
         AnimFlags additionalFlags,
+        float actionSpeed,
         float blendInPeriod,
         float startProgress,
         bool forceFaceMorphRestart,
@@ -916,6 +940,7 @@ public sealed class MissionEngineFixture : IDisposable
             m.Action0Index = actionIndexCache.Index;
             m.Action0Flags = additionalFlags;
             m.Action0Progress = startProgress;
+            m.Action0Speed = actionSpeed;
             if (m.HasVisualSkeleton)
             {
                 m.SkeletonAction0Index = actionIndexCache.Index;

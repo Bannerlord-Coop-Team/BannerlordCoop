@@ -95,6 +95,7 @@ public class SiegeTerminationRoleTests
         using var handler = new ClientSiegeEntryHandler(
             broker,
             Mock.Of<INetwork>(),
+            Mock.Of<INetworkConfig>(),
             Mock.Of<IObjectManager>(),
             siegeEventInterface.Object);
 
@@ -122,6 +123,7 @@ public class SiegeTerminationRoleTests
         using var handler = new ClientSiegeEntryHandler(
             broker,
             Mock.Of<INetwork>(),
+            Mock.Of<INetworkConfig>(),
             Mock.Of<IObjectManager>(),
             siegeEventInterface.Object);
 

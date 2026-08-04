@@ -98,6 +98,16 @@ public interface ISiegeEventInterface : IGameAbstraction
         bool forcePlayerOutFromSettlement);
 
     /// <summary>
+    /// Creates the local location encounter before a break-in settlement entry is applied.
+    /// </summary>
+    void PrepareLocalPlayerBreakIn(Settlement settlement);
+
+    /// <summary>
+    /// Resumes the local break-in debrief after the server-authoritative settlement entry reached this client.
+    /// </summary>
+    void ContinueLocalPlayerBreakIn(Settlement settlement);
+
+    /// <summary>
     /// Applies a player's parked siege aftermath choice. Server side.
     /// </summary>
     void ApplySiegeAftermathChoice(MobileParty party, Settlement settlement, int aftermathType);
@@ -326,6 +336,31 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
             if (Campaign.Current.CurrentMenuContext == null)
                 Campaign.Current.MapStateData.GameMenuId = null;
         }
+    }
+
+    public void PrepareLocalPlayerBreakIn(Settlement settlement)
+    {
+        PlayerEncounter.CreateLocationEncounter(settlement);
+    }
+
+    public void ContinueLocalPlayerBreakIn(Settlement settlement)
+    {
+        if (MobileParty.MainParty?.CurrentSettlement != settlement)
+        {
+            Logger.Error("Cannot continue the local break-in before the party enters {Settlement}", settlement?.StringId);
+            return;
+        }
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<EncounterGameMenuBehavior>();
+        if (behavior == null)
+        {
+            Logger.Error("Cannot continue the local break-in because the encounter menu behavior is unavailable");
+            return;
+        }
+
+        // Keep patches live so the nested encounter restart still waits for server approval.
+        SiegeEntryFlowPatches.RunApprovedBreakInContinuation(
+            () => behavior.break_in_debrief_continue_on_consequence(null));
     }
 
     public void ApplySiegeAftermathChoice(MobileParty party, Settlement settlement, int aftermathType)

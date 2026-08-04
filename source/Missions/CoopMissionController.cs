@@ -3,6 +3,9 @@ using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Battles;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using Missions.Messages;
 using Serilog;
 using System; 
@@ -74,9 +77,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // flags without restarting the guard command so native animation keeps its own timeline.
         coopMissionComponent.AgentActionHandler.RefreshRemoteGuardStatesAfterMovement();
 
-        // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action
-        // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
-        // polled with movement.
+        // Capture the main player's raw defend input before native Agent processing can rewrite it.
         coopMissionComponent.AgentActionHandler.PollActions();
 
         coopMissionComponent.AgentVoiceHandler.PollVoices();
@@ -92,12 +93,20 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.AgentMovementHandler.Interpolator
             .ReplayLookDirections();
 
-        // The prior native Agent tick can realize an action after OnMissionTick sampled its input.
-        // Diff again here so peers receive that exact action instead of retaining the earlier pose.
+        // Native Agent processing realizes authoritative AI and player actions after the input boundary.
+        // Diff them here so peers receive the displayed action instead of retaining an earlier pose.
+        // A headless mission participant would need an equivalent non-display boundary for AI action sync.
         coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick();
+
+        coopMissionComponent.AgentMovementHandler
+            .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
 
         // Keep short remote guard reactions visible for this frame without driving held guard actions.
         coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
+#if DEBUG
+        MissionActionDiagnostics.SampleAnimations(
+            coopMissionComponent.AgentRegistry);
+#endif
     }
 
     public virtual void Dispose()

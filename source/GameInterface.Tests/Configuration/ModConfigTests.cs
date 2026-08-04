@@ -84,6 +84,59 @@ public class ModConfigTests : IDisposable
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
     }
 
+    /// <summary>
+    /// The options a session runs on BEFORE any config is loaded (server) or received (client) must
+    /// already be the documented defaults. <see cref="ModOptions"/> is a struct declaring no
+    /// parameterless constructor, so a plain <c>new ModOptions()</c> is just <c>default</c>: the
+    /// property initializers never run and every option silently reads back false/0 (no auto-pause,
+    /// no AI joining player battles, no looters, no smithing stamina, no clan-tier requirement for a
+    /// kingdom). The un-loaded default must therefore be built through the real constructor from an
+    /// all-absent config.
+    /// </summary>
+    [Fact]
+    public void UnloadedModOptions_AreTheDocumentedDefaults_NotAZeroedStruct()
+    {
+        var options = ModConfigProvider.ModOptions;
+
+        Assert.True(options.FastForwardEnabled);
+        Assert.True(options.AutoPauseEnabled);
+        Assert.False(options.ClientsCanUseCheats);
+        Assert.True(options.GoldFoodInfluenceChangeInSettlements);
+        Assert.Equal(GoldFoodChangeMode.OneDayMax, options.GoldFoodInfluenceChangeInBattles);
+        Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
+        Assert.Equal(24, options.PlayerBattleAiJoinWindowHours);
+        Assert.True(options.SpeedLimitWhilePlayersInBattle);
+        Assert.Equal(32, options.WandererLimit);
+        Assert.False(options.WandererLimitScalesWithPlayers);
+        Assert.Equal(4, options.PlayerKingdomClanTierRequired);
+        Assert.True(options.SmithingStaminaRecoveryOutsideSettlements);
+        Assert.Equal(0.1f, options.SmithingStaminaRecoveryMultiplier);
+        Assert.Equal(1f, options.MaximumLootersMultiplier);
+    }
+
+    /// <summary>
+    /// Unlike the difficulty block, the template's modOptions keys ship LIVE — so each one has to
+    /// name a real schema property (a typo just lands in the overflow and the option silently never
+    /// applies, however carefully the operator edits it), and the values it ships have to be the same
+    /// defaults a session runs on with no file at all.
+    /// </summary>
+    [Fact]
+    public void ShippedTemplate_ModOptions_AllBind_AndAreTheDefaults()
+    {
+        File.Copy(ShippedTemplatePath, ConfigPath);
+
+        var config = NewModConfig().Data;
+
+        Assert.True(config.ModOptions.UnknownKeys == null || config.ModOptions.UnknownKeys.Count == 0,
+            "every modOptions key in the template must name a schema property, but these did not: " +
+            string.Join(", ", config.ModOptions.UnknownKeys?.Keys ?? Array.Empty<string>()));
+
+        // Read back a value rather than only the overflow: an unparsed block would leave every
+        // property null, which the defaults comparison below would accept as a vacuous pass.
+        Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
+        Assert.Equal(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
+    }
+
     [Fact]
     public void ConfiguredValues_Read_WithCommentsTrailingCommasAndAnyCase()
     {
@@ -160,7 +213,9 @@ public class ModConfigTests : IDisposable
     [Fact]
     public void NoDiscoverableLocation_RunsDefaults_WritesNothing()
     {
+        string savedData = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
         string savedEnv = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+        Environment.SetEnvironmentVariable("COOP_DATA_DIR", null);
         Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", null);
         try
         {
@@ -169,7 +224,7 @@ public class ModConfigTests : IDisposable
             // there. Fail loudly instead of writing outside the test sandbox.
             Assert.Null(TaleWorlds.Library.Common.PlatformFileHelper);
 
-            // Production constructor: no override, no env var, no platform helper
+            // Production constructor: no override, no env vars, no platform helper
             // — every rung comes up empty.
             var config = new ModConfig().Data;
 
@@ -178,6 +233,31 @@ public class ModConfigTests : IDisposable
         }
         finally
         {
+            Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
+            Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
+        }
+    }
+
+    [Fact]
+    public void CoopDataDirRung_WinsOverUserDirRung()
+    {
+        string savedData = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
+        string savedEnv = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+        string decoy = Path.Combine(tempDir, "decoy-user-dir");
+        Directory.CreateDirectory(decoy);
+        Environment.SetEnvironmentVariable("COOP_DATA_DIR", tempDir);
+        Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", decoy);
+        try
+        {
+            _ = new ModConfig().Data;
+
+            Assert.True(File.Exists(ConfigPath), "COOP_DATA_DIR should win the discovery");
+            Assert.False(File.Exists(Path.Combine(decoy, "mod-config.json")),
+                "BANNERLORD_USER_DIR must not be consulted when COOP_DATA_DIR is set");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
             Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
         }
     }
@@ -185,7 +265,9 @@ public class ModConfigTests : IDisposable
     [Fact]
     public void EnvVarRung_WinsWhenNoOverride()
     {
+        string savedData = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
         string savedEnv = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+        Environment.SetEnvironmentVariable("COOP_DATA_DIR", null);
         Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", tempDir);
         try
         {
@@ -195,6 +277,7 @@ public class ModConfigTests : IDisposable
         }
         finally
         {
+            Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
             Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
         }
     }

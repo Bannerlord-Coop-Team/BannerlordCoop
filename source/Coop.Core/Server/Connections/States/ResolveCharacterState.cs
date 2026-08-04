@@ -96,22 +96,61 @@ public class ResolveCharacterState : ConnectionStateBase
         var peer = obj.Who as NetPeer;
         if (peer != ConnectionLogic.Peer) return;
 
-        if (playerManager.TryGetPlayer(obj.What.PlayerId, out var player) &&
-            objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _)) // If new save, player hero will not exist
+        try
         {
-            // This peer is a new NetPeer for an already registered player, so the
-            // peer-Player link must be established here
-            playerManager.SetPeer(obj.What.PlayerId, peer);
-            network.SendImmediate(peer, new NetworkClientValidated(true, player));
-            ConnectionLogic.TransferSave();
+            ResolveCharacter(peer, obj.What.PlayerId);
+        }
+        catch (Exception e)
+        {
+            // Same reasoning as Handle_ModuleVersionsValidate: a throw here dies in the network
+            // poller with no answer sent, so the joiner sits on the loading screen until its
+            // validation deadline expires. NetworkClientValidated carries no reason, and
+            // answering "no hero" would push the player into creating a second character, so
+            // drop the connection instead — the client surfaces a disconnect immediately.
+            Logger.Error(e, "Resolving the character for peer {Peer} failed; disconnecting the joiner", peer?.Id);
 
-            existingPlayerSender.SendExistingPlayers(peer, obj.What.PlayerId);
+            // Nothing may escape into the poller, including the teardown itself.
+            try
+            {
+                peer?.Disconnect();
+            }
+            catch (Exception disconnectFailure)
+            {
+                Logger.Error(disconnectFailure, "Disconnecting peer {Peer} failed", peer?.Id);
+            }
         }
-        else
+    }
+
+    private void ResolveCharacter(NetPeer peer, string controllerId)
+    {
+        if (playerManager.TryGetPlayer(controllerId, out var player))
         {
-            network.SendImmediate(peer, new NetworkClientValidated(false, null));
-            ConnectionLogic.CreateCharacter();
+            if (objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _)) // If new save, player hero will not exist
+            {
+                // This peer is a new NetPeer for an already registered player, so the
+                // peer-Player link must be established here
+                playerManager.SetPeer(controllerId, peer);
+                network.SendImmediate(peer, new NetworkClientValidated(true, player));
+                ConnectionLogic.TransferSave();
+
+                existingPlayerSender.SendExistingPlayers(peer, controllerId);
+                return;
+            }
+
+            // Registered, but the hero it names is not in the campaign — a registration that
+            // outlived its objects. Deregister it before routing to character creation: the
+            // character created next registers this same controller id, and leaving the dead
+            // entry behind would make the controller ambiguous for the rest of the session.
+            Logger.Warning(
+                "Controller {ControllerId} is registered to hero {HeroId}, which no longer exists; " +
+                "dropping the stale registration and creating a new character",
+                controllerId, player.HeroId);
+
+            playerManager.RemovePlayer(player);
         }
+
+        network.SendImmediate(peer, new NetworkClientValidated(false, null));
+        ConnectionLogic.CreateCharacter();
     }
 
     public override void CreateCharacter()

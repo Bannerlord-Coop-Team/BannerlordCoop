@@ -1,22 +1,34 @@
 using Common.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using TaleWorlds.Library;
 
 namespace GameInterface.Configuration;
 
 /// <summary>
-/// Loads mod-config.json from %BANNERLORD_USER_DIR%, else the engine's user
-/// directory; seeds it from the module's template when absent, and falls back to
-/// defaults if it cannot be read. Never touches the dedicated server's
-/// server-config.json — the two configs are independent by design.
+/// Loads mod-config.json from the mod's shared CoopData folder — ONE gameplay
+/// config however the world is hosted: %COOP_DATA_DIR% when a dedicated server
+/// set it (it points at &lt;game user data&gt;\CoopData, or at the server's own data
+/// dir for deployments that keep the file there), else %BANNERLORD_USER_DIR%
+/// (older DS builds, containers), else &lt;engine user directory&gt;\CoopData — for a
+/// client-hosted session that is Documents\Mount and Blade II
+/// Bannerlord\CoopData, beside the mod's CoopMapData. Seeds it from the
+/// module's template when absent, and falls back to defaults if it cannot be
+/// read. Never touches the dedicated server's server-config.json — the two
+/// configs are independent by design.
 /// </summary>
 internal sealed class ModConfig : IModConfig
 {
     private const string FileName = "mod-config.json";
+
+    /// <summary>The mod's folder under the game's user data; the DS nests its own
+    /// DedicatedServer home inside the same folder.</summary>
+    private const string CoopDataFolderName = "CoopData";
 
     /// <summary>Ships in the module root — the only copy of the defaults.</summary>
     private const string TemplateFileName = "mod-config.default.json";
@@ -60,7 +72,7 @@ internal sealed class ModConfig : IModConfig
             var loaded = JsonConvert.DeserializeObject<ModConfigData>(File.ReadAllText(path), MakeSettings())
                 ?? new ModConfigData();
             Logger.Information("mod-config.json loaded ({Path})", path);
-            WarnUnknownKeys(loaded);
+            WarnAllUnknownKeys(loaded);
             return loaded;
         }
         catch (Exception ex)
@@ -78,8 +90,16 @@ internal sealed class ModConfig : IModConfig
             return directoryOverride;
         }
 
-        // Headless hosts set this just before building the container; reading
-        // any earlier silently misses the file.
+        // Headless hosts set these just before building the container; reading
+        // any earlier silently misses the file. COOP_DATA_DIR is the current DS
+        // contract (the shared CoopData folder, or the server's own data dir when
+        // an established deployment keeps the file there); BANNERLORD_USER_DIR is
+        // kept as the fallback for DS builds that predate it.
+        var coopDataDir = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
+        if (string.IsNullOrEmpty(coopDataDir) == false)
+        {
+            return coopDataDir;
+        }
         var userDir = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
         if (string.IsNullOrEmpty(userDir) == false)
         {
@@ -88,6 +108,9 @@ internal sealed class ModConfig : IModConfig
 
         // Via the interface, so a host running its own helper (the dedicated
         // server redirects PlatformFileType.User) resolves to ITS user root.
+        // Client-hosted sessions land in the game's own user directory; the
+        // mod's files live in a CoopData folder there (beside CoopMapData),
+        // shared with a dedicated server running on the same account.
         var helper = TaleWorlds.Library.Common.PlatformFileHelper;
         if (helper != null)
         {
@@ -95,7 +118,7 @@ internal sealed class ModConfig : IModConfig
             string probe = helper.GetFileFullPath(new PlatformFilePath(userRoot, FileName));
             if (string.IsNullOrEmpty(probe) == false)
             {
-                return Path.GetDirectoryName(probe);
+                return Path.Combine(Path.GetDirectoryName(probe), CoopDataFolderName);
             }
         }
 
@@ -122,21 +145,18 @@ internal sealed class ModConfig : IModConfig
         };
     }
 
-    private static void WarnUnknownKeys(ModConfigData data)
+    private static void WarnAllUnknownKeys(ModConfigData data)
     {
-        if (data.UnknownKeys != null)
+        if (data.UnknownKeys != null) WarnUnknownKeys(data.UnknownKeys);
+        if (data.Difficulty?.UnknownKeys != null) WarnUnknownKeys(data.Difficulty.UnknownKeys, "difficulty ");
+        if (data.ModOptions?.UnknownKeys != null) WarnUnknownKeys(data.ModOptions.UnknownKeys, "mod option ");
+    }
+
+    private static void WarnUnknownKeys(IDictionary<string, JToken> unknownKeys, string keyType = "")
+    {
+        foreach (var key in unknownKeys.Keys)
         {
-            foreach (var key in data.UnknownKeys.Keys)
-            {
-                Logger.Warning("mod-config.json: unknown key '{Key}' ignored", key);
-            }
-        }
-        if (data.Difficulty?.UnknownKeys != null)
-        {
-            foreach (var key in data.Difficulty.UnknownKeys.Keys)
-            {
-                Logger.Warning("mod-config.json: unknown difficulty key '{Key}' ignored", key);
-            }
+            Logger.Warning("mod-config.json: unknown {keyType}key '{Key}' ignored", keyType, key);
         }
     }
 

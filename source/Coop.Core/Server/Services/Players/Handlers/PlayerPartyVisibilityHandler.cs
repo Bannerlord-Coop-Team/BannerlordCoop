@@ -21,6 +21,7 @@ using SandBox.View.Map.Managers;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -144,6 +145,18 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (party.IsActive)
             {
                 return; // fresh join, never parked, nothing to restore
+            }
+
+            // Retrieves the player and outs it to the Hero Object
+            // Checks if the player is prisoner or if they belong there
+            // If they do, the Debug message appears.
+            if (objectManager.TryGetObject(player.HeroId, out Hero hero) &&
+                (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null))
+            {
+                Logger.Debug("Keeping captive party {PartyId} parked for peer {Peer}",
+                    party.StringId,
+                    peer.Id);
+                return;
             }
 
             party.IsActive = true;

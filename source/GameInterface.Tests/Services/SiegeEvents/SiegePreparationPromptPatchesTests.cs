@@ -27,4 +27,5 @@ public class SiegePreparationPromptPatchesTests
             expected,
             SiegePreparationPromptPatches.IsInterruptedActiveAssault(mapEvent));
     }
+
 }

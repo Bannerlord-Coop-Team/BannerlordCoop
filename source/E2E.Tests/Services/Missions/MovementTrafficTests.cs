@@ -1,5 +1,7 @@
-using System;
+﻿using System;
+using System.Collections;
 using System.Linq;
+using System.Reflection;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
@@ -205,6 +207,44 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_RemovesDeferredNeverSentAgentStateAfterAgentBecomesInactive()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var handler = Assert.IsType<AgentMovementHandler>(component.AgentMovementHandler);
+            Agent agent = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, agent));
+            network.MaxUnreliablePayloadBytes = 0;
+
+            handler.PollMovement(0f);
+
+            var pending = Assert.IsAssignableFrom<IDictionary>(typeof(AgentMovementHandler)
+                .GetField("movementPendingSince", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.GetValue(handler));
+            var equipment = Assert.IsAssignableFrom<IDictionary>(typeof(AgentMovementHandler)
+                .GetField("lastEquipment", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.GetValue(handler));
+            Assert.Single(pending.Keys);
+            Assert.Single(equipment.Keys);
+
+            mirror.IsActive = false;
+            handler.PollMovement(0.025f);
+
+            Assert.Empty(pending.Keys);
+            Assert.Empty(equipment.Keys);
+        });
+    }
+
+    [Fact]
     public void PollMovement_BatchesMountedSnapshotsByActualWireSize()
     {
         using var fixture = new MissionEngineFixture();
@@ -280,7 +320,8 @@ public class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IControllerIdProvider>(),
                 peer.Resolve<IAgentEquipmentApplier>(),
                 new MovementBatchSender(network, compressor),
-                peer.Resolve<IPuppetMountStateRepairer>());
+                peer.Resolve<IPuppetMountStateRepairer>(),
+                peer.Resolve<IAgentVisualActionAccessor>());
             network.MaxUnreliablePayloadBytes = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
                 serializer,
                 "MapEvent_Created_0000",

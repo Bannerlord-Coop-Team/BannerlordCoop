@@ -6,6 +6,9 @@ using GameInterface.Services.Entity;
 using LiteNetLib;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using Missions.Messages;
 using System;
 using System.Collections.Generic;
@@ -17,7 +20,7 @@ namespace Missions.Agents.Handlers;
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
     /// <summary>
-    /// [Game thread] Detect discrete action and defend-input changes on owned agents after the player-input boundary.
+    /// [Game thread] Detect discrete action and defend-input changes on the locally authoritative main player.
     /// </summary>
     void PollActions();
 
@@ -132,243 +135,50 @@ public class AgentActionHandler : IAgentActionHandler
 
     private void PollActions(bool afterNativeTick)
     {
-        if (Mission.Current == null) return;
+#if DEBUG
+        using ActionPollMeasurement pollMeasurement =
+            MissionActionDiagnostics.MeasurePoll(afterNativeTick);
+#endif
+        Mission mission = Mission.Current;
+        if (mission == null) return;
 
         List<Guid> ids = null;
         List<AgentActionData> actions = null;
         List<long> sequences = null;
 
-        foreach (var info in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
+        if (afterNativeTick)
         {
-            Agent agent = info.Agent;
-            remoteActionProcessor.ClearForLocalAgent(info.AgentId, agent);
-            if (agent == null || agent.Mission == null || !agent.IsActive() || agent.Health <= 0)
-                continue;
-
-            // Registered MOUNTS are not action-synced: a ridden horse's channel-1 action already rides in its
-            // rider's MountData (a second stream would fight it), and a masterless one isn't movement-synced
-            // either — its registry entry exists for damage routing and death sync only.
-            if (agent.IsMount)
-                continue;
-
-            int action0 = agent.GetCurrentAction(0).Index;
-            int action1 = agent.GetCurrentAction(1).Index;
-            _localAgentStates.TryGetValue(info.AgentId, out var state);
-            bool hadState = state.HasObservation;
-            bool isPlayerControlled =
-                agent.Controller == AgentControllerType.Player;
-            bool retainInputBoundary =
-                afterNativeTick
-                && isPlayerControlled
-                && state.HasInputBoundaryObservation;
-            Agent.GuardMode actionGuardMode =
-                AgentActionData.GetGuardModeFromDefendingAction(agent);
-            Agent.MovementControlFlag defendFlags;
-            Agent.GuardMode guardMode;
-            if (!afterNativeTick && isPlayerControlled)
+            foreach (CoopAgentInfo info in agentRegistry.GetAgents(
+                controllerIdProvider.ControllerId))
             {
-                defendFlags = AgentActionData.GetDefendMovementFlags(
-                    agent.MovementFlags);
-                guardMode = GetPlayerInputGuardMode(
-                    agent,
-                    defendFlags,
-                    actionGuardMode,
-                    hadState
-                        ? state.GuardMode
-                        : Agent.GuardMode.None);
+                PollAgentAction(
+                    info,
+                    afterNativeTick: true,
+                    ref ids,
+                    ref actions,
+                    ref sequences);
             }
-            else if (retainInputBoundary)
+        }
+        else
+        {
+            remoteActionProcessor.ClearLocalAgentStates();
+            Agent mainAgent = mission.MainAgent;
+            if (mainAgent == null
+                || mainAgent.Controller != AgentControllerType.Player
+                || !agentRegistry.TryGetAgentInfo(
+                    mainAgent,
+                    out CoopAgentInfo mainAgentInfo)
+                || !agentRegistry.IsLocallyControlled(mainAgentInfo.AgentId))
             {
-                defendFlags = state.InputBoundaryDefendFlags;
-                guardMode = state.InputBoundaryGuardMode;
-            }
-            else
-            {
-                defendFlags =
-                    AgentActionData.GetEffectiveDefendMovementFlags(agent);
-                guardMode = GetEffectiveGuardMode(
-                    info.AgentId,
-                    agent,
-                    defendFlags,
-                    actionGuardMode);
-            }
-            if (!afterNativeTick && isPlayerControlled)
-            {
-                state.HasInputBoundaryObservation = true;
-                state.InputBoundaryDefendFlags = defendFlags;
-                state.InputBoundaryGuardMode = guardMode;
-            }
-            else if (!isPlayerControlled)
-            {
-                state.HasInputBoundaryObservation = false;
-                state.InputBoundaryDefendFlags =
-                    Agent.MovementControlFlag.None;
-                state.InputBoundaryGuardMode = Agent.GuardMode.None;
-            }
-            bool defendChanged;
-            if (hadState)
-            {
-                defendChanged = agent.HasMount
-                    ? HasDefendStateChanged(
-                        state.DefendFlags,
-                        defendFlags,
-                        state.GuardMode,
-                        guardMode)
-                    : state.DefendFlags != defendFlags;
-            }
-            else
-            {
-                defendChanged = defendFlags != Agent.MovementControlFlag.None;
+                return;
             }
 
-            bool guardChanged;
-            if (hadState)
-            {
-                guardChanged = state.GuardMode != guardMode;
-            }
-            else
-            {
-                guardChanged = AgentActionData.IsGuardMode(guardMode);
-            }
-
-            bool guardedMountStateChanged =
-                hadState
-                && state.IsMounted != agent.HasMount
-                && (defendFlags != Agent.MovementControlFlag.None
-                    || AgentActionData.IsGuardMode(guardMode)
-                    || state.DefendFlags != Agent.MovementControlFlag.None
-                    || AgentActionData.IsGuardMode(state.GuardMode));
-            bool guardedControllerRoleChanged =
-                hadState
-                && state.IsPlayerControlled
-                    != (agent.Controller == AgentControllerType.Player)
-                && (defendFlags != Agent.MovementControlFlag.None
-                    || AgentActionData.IsGuardMode(guardMode)
-                    || state.DefendFlags != Agent.MovementControlFlag.None
-                    || AgentActionData.IsGuardMode(state.GuardMode));
-            bool action0Changed = !hadState || state.Action0 != action0;
-            bool action1Changed = !hadState || state.Action1 != action1;
-            if (!action0Changed && !action1Changed
-                && !defendChanged && !guardChanged
-                && !guardedMountStateChanged
-                && !guardedControllerRoleChanged)
-            {
-                if (hadState)
-                {
-                    state.DefendFlags = defendFlags;
-                    state.ActionGuardMode = actionGuardMode;
-                    _localAgentStates[info.AgentId] = state;
-                }
-                continue;
-            }
-
-            bool action0Discrete =
-                IsDiscreteAction(agent.GetCurrentActionType(0));
-            bool action1Discrete =
-                IsDiscreteAction(agent.GetCurrentActionType(1));
-            bool action0Defending = AgentActionData.IsDefendingAction(
-                agent.GetCurrentActionType(0));
-            bool action1Defending = AgentActionData.IsDefendingAction(
-                agent.GetCurrentActionType(1));
-            int guardReactionChannel = GetGuardReactionChannel(
-                agent,
-                hadState,
-                state);
-
-            // Native command actions are untyped, so recognize the main agent's order gesture by action name.
-            if (agent == Mission.Current.MainAgent)
-            {
-                action0Discrete |= IsOrderGesture(
-                    AgentActionData.GetActionNameWithCode(action0));
-                action1Discrete |= IsOrderGesture(
-                    AgentActionData.GetActionNameWithCode(action1));
-            }
-
-            bool heldMountedGuardUnchanged =
-                agent.HasMount
-                && hadState
-                && !defendChanged
-                && !guardChanged
-                && (defendFlags != Agent.MovementControlFlag.None
-                    || AgentActionData.IsGuardMode(guardMode));
-            bool action0GuardLocomotionChurn =
-                IsMountedGuardLocomotionChurn(
-                    heldMountedGuardUnchanged,
-                    action0Changed,
-                    action0,
-                    action0Discrete,
-                    action0Defending,
-                    state.Action0WasDefending,
-                    state.HasAction0DefendingAction,
-                    state.Action0DefendingAction);
-            bool action1GuardLocomotionChurn =
-                IsMountedGuardLocomotionChurn(
-                    heldMountedGuardUnchanged,
-                    action1Changed,
-                    action1,
-                    action1Discrete,
-                    action1Defending,
-                    state.Action1WasDefending,
-                    state.HasAction1DefendingAction,
-                    state.Action1DefendingAction);
-
-            // Defend input and realized guard state can change before the animation index, so send them explicitly too.
-            bool discreteActionChanged =
-                (action0Changed
-                    && !action0GuardLocomotionChurn
-                    && (action0Discrete
-                        || (hadState && state.Action0WasDiscrete)))
-                || (action1Changed
-                    && !action1GuardLocomotionChurn
-                    && (action1Discrete
-                        || (hadState && state.Action1WasDiscrete)));
-            bool broadcast =
-                defendChanged
-                || guardChanged
-                || guardedMountStateChanged
-                || guardedControllerRoleChanged
-                || discreteActionChanged;
-            state.HasObservation = true;
-            state.Action0 = action0;
-            state.Action1 = action1;
-            state.DefendFlags = defendFlags;
-            state.GuardMode = guardMode;
-            state.ActionGuardMode = actionGuardMode;
-            state.Action0WasDiscrete = action0Discrete;
-            state.Action1WasDiscrete = action1Discrete;
-            state.Action0WasDefending = action0Defending;
-            state.Action1WasDefending = action1Defending;
-            state.IsMounted = agent.HasMount;
-            state.IsPlayerControlled = isPlayerControlled;
-            UpdateDefendingAction(
-                action0,
-                agent.GetCurrentActionType(0),
-                ref state.HasAction0DefendingAction,
-                ref state.Action0DefendingAction);
-            UpdateDefendingAction(
-                action1,
-                agent.GetCurrentActionType(1),
-                ref state.HasAction1DefendingAction,
-                ref state.Action1DefendingAction);
-            if (defendFlags == Agent.MovementControlFlag.None
-                && !AgentActionData.IsGuardMode(guardMode))
-            {
-                state.HasAction0DefendingAction = false;
-                state.HasAction1DefendingAction = false;
-            }
-            _localAgentStates[info.AgentId] = state;
-            if (!broadcast)
-                continue;
-
-            long sequence = NextActionSequence(info.AgentId);
-            var actionData = new AgentActionData(
-                agent,
-                defendFlags,
-                guardMode,
-                guardReactionChannel);
-            (ids ??= new List<Guid>()).Add(info.AgentId);
-            (actions ??= new List<AgentActionData>()).Add(actionData);
-            (sequences ??= new List<long>()).Add(sequence);
+            PollAgentAction(
+                mainAgentInfo,
+                afterNativeTick: false,
+                ref ids,
+                ref actions,
+                ref sequences);
         }
 
         if (ids == null) return;
@@ -379,6 +189,257 @@ public class AgentActionHandler : IAgentActionHandler
             actions,
             sequences,
             packet => client.SendAll(packet));
+    }
+
+    private void PollAgentAction(
+        CoopAgentInfo info,
+        bool afterNativeTick,
+        ref List<Guid> ids,
+        ref List<AgentActionData> actions,
+        ref List<long> sequences)
+    {
+        Agent agent = info.Agent;
+        remoteActionProcessor.ClearForLocalAgent(info.AgentId, agent);
+        // Registered mounts are not action-synced; the rider's MountData owns their presentation.
+        bool actionSyncedAgent =
+            agent != null
+            && agent.Mission != null
+            && agent.IsActive()
+            && agent.Health > 0
+            && !agent.IsMount;
+#if DEBUG
+        MissionActionDiagnostics.RecordPolledAgent(
+            agent,
+            actionSyncedAgent);
+#endif
+        if (!actionSyncedAgent) return;
+
+        int action0 = agent.GetCurrentAction(0).Index;
+        int action1 = agent.GetCurrentAction(1).Index;
+        _localAgentStates.TryGetValue(info.AgentId, out var state);
+        bool hadState = state.HasObservation;
+        bool isPlayerControlled =
+            agent.Controller == AgentControllerType.Player;
+        bool retainInputBoundary =
+            afterNativeTick
+            && isPlayerControlled
+            && agent == Mission.Current.MainAgent
+            && state.HasInputBoundaryObservation;
+        Agent.GuardMode actionGuardMode =
+            AgentActionData.GetGuardModeFromDefendingAction(agent);
+        Agent.MovementControlFlag defendFlags;
+        Agent.GuardMode guardMode;
+        if (!afterNativeTick && isPlayerControlled)
+        {
+            defendFlags = AgentActionData.GetDefendMovementFlags(
+                agent.MovementFlags);
+            guardMode = GetPlayerInputGuardMode(
+                agent,
+                defendFlags,
+                actionGuardMode,
+                hadState
+                    ? state.GuardMode
+                    : Agent.GuardMode.None);
+        }
+        else if (retainInputBoundary)
+        {
+            defendFlags = state.InputBoundaryDefendFlags;
+            guardMode = state.InputBoundaryGuardMode;
+        }
+        else
+        {
+            defendFlags =
+                AgentActionData.GetEffectiveDefendMovementFlags(agent);
+            guardMode = GetEffectiveGuardMode(
+                info.AgentId,
+                agent,
+                defendFlags,
+                actionGuardMode);
+        }
+        if (!afterNativeTick && isPlayerControlled)
+        {
+            state.HasInputBoundaryObservation = true;
+            state.InputBoundaryDefendFlags = defendFlags;
+            state.InputBoundaryGuardMode = guardMode;
+        }
+        else if (!isPlayerControlled
+            || agent != Mission.Current.MainAgent)
+        {
+            state.HasInputBoundaryObservation = false;
+            state.InputBoundaryDefendFlags =
+                Agent.MovementControlFlag.None;
+            state.InputBoundaryGuardMode = Agent.GuardMode.None;
+        }
+        bool defendChanged;
+        if (hadState)
+        {
+            defendChanged = agent.HasMount
+                ? HasDefendStateChanged(
+                    state.DefendFlags,
+                    defendFlags,
+                    state.GuardMode,
+                    guardMode)
+                : state.DefendFlags != defendFlags;
+        }
+        else
+        {
+            defendChanged = defendFlags != Agent.MovementControlFlag.None;
+        }
+
+        bool guardChanged;
+        if (hadState)
+        {
+            guardChanged = state.GuardMode != guardMode;
+        }
+        else
+        {
+            guardChanged = AgentActionData.IsGuardMode(guardMode);
+        }
+
+        bool guardedMountStateChanged =
+            hadState
+            && state.IsMounted != agent.HasMount
+            && (defendFlags != Agent.MovementControlFlag.None
+                || AgentActionData.IsGuardMode(guardMode)
+                || state.DefendFlags != Agent.MovementControlFlag.None
+                || AgentActionData.IsGuardMode(state.GuardMode));
+        bool guardedControllerRoleChanged =
+            hadState
+            && state.IsPlayerControlled
+                != (agent.Controller == AgentControllerType.Player)
+            && (defendFlags != Agent.MovementControlFlag.None
+                || AgentActionData.IsGuardMode(guardMode)
+                || state.DefendFlags != Agent.MovementControlFlag.None
+                || AgentActionData.IsGuardMode(state.GuardMode));
+        bool action0Changed = !hadState || state.Action0 != action0;
+        bool action1Changed = !hadState || state.Action1 != action1;
+        if (!action0Changed && !action1Changed
+            && !defendChanged && !guardChanged
+            && !guardedMountStateChanged
+            && !guardedControllerRoleChanged)
+        {
+            if (hadState)
+            {
+                state.DefendFlags = defendFlags;
+                state.ActionGuardMode = actionGuardMode;
+                _localAgentStates[info.AgentId] = state;
+            }
+            return;
+        }
+
+        bool action0Discrete =
+            IsDiscreteAction(agent.GetCurrentActionType(0));
+        bool action1Discrete =
+            IsDiscreteAction(agent.GetCurrentActionType(1));
+        bool action0Defending = AgentActionData.IsDefendingAction(
+            agent.GetCurrentActionType(0));
+        bool action1Defending = AgentActionData.IsDefendingAction(
+            agent.GetCurrentActionType(1));
+        int guardReactionChannel = GetGuardReactionChannel(
+            agent,
+            hadState,
+            state);
+
+        // Native command actions are untyped, so recognize the main agent's order gesture by action name.
+        if (agent == Mission.Current.MainAgent)
+        {
+            action0Discrete |= IsOrderGesture(
+                AgentActionData.GetActionNameWithCode(action0));
+            action1Discrete |= IsOrderGesture(
+                AgentActionData.GetActionNameWithCode(action1));
+        }
+
+        bool heldMountedGuardUnchanged =
+            agent.HasMount
+            && hadState
+            && !defendChanged
+            && !guardChanged
+            && (defendFlags != Agent.MovementControlFlag.None
+                || AgentActionData.IsGuardMode(guardMode));
+        bool action0GuardLocomotionChurn =
+            IsMountedGuardLocomotionChurn(
+                heldMountedGuardUnchanged,
+                action0Changed,
+                action0,
+                action0Discrete,
+                action0Defending,
+                state.Action0WasDefending,
+                state.HasAction0DefendingAction,
+                state.Action0DefendingAction);
+        bool action1GuardLocomotionChurn =
+            IsMountedGuardLocomotionChurn(
+                heldMountedGuardUnchanged,
+                action1Changed,
+                action1,
+                action1Discrete,
+                action1Defending,
+                state.Action1WasDefending,
+                state.HasAction1DefendingAction,
+                state.Action1DefendingAction);
+
+        // Defend input and realized guard state can change before the animation index, so send them explicitly too.
+        bool discreteActionChanged =
+            (action0Changed
+                && !action0GuardLocomotionChurn
+                && (action0Discrete
+                    || (hadState && state.Action0WasDiscrete)))
+            || (action1Changed
+                && !action1GuardLocomotionChurn
+                && (action1Discrete
+                    || (hadState && state.Action1WasDiscrete)));
+        bool broadcast =
+            defendChanged
+            || guardChanged
+            || guardedMountStateChanged
+            || guardedControllerRoleChanged
+            || discreteActionChanged;
+        state.HasObservation = true;
+        state.Action0 = action0;
+        state.Action1 = action1;
+        state.DefendFlags = defendFlags;
+        state.GuardMode = guardMode;
+        state.ActionGuardMode = actionGuardMode;
+        state.Action0WasDiscrete = action0Discrete;
+        state.Action1WasDiscrete = action1Discrete;
+        state.Action0WasDefending = action0Defending;
+        state.Action1WasDefending = action1Defending;
+        state.IsMounted = agent.HasMount;
+        state.IsPlayerControlled = isPlayerControlled;
+        UpdateDefendingAction(
+            action0,
+            agent.GetCurrentActionType(0),
+            ref state.HasAction0DefendingAction,
+            ref state.Action0DefendingAction);
+        UpdateDefendingAction(
+            action1,
+            agent.GetCurrentActionType(1),
+            ref state.HasAction1DefendingAction,
+            ref state.Action1DefendingAction);
+        if (defendFlags == Agent.MovementControlFlag.None
+            && !AgentActionData.IsGuardMode(guardMode))
+        {
+            state.HasAction0DefendingAction = false;
+            state.HasAction1DefendingAction = false;
+        }
+        _localAgentStates[info.AgentId] = state;
+        if (!broadcast)
+            return;
+
+#if DEBUG
+        MissionActionDiagnostics.RecordActionUpdate();
+#endif
+        long sequence = NextActionSequence(info.AgentId);
+        var actionData = new AgentActionData(
+            agent,
+            defendFlags,
+            guardMode,
+            guardReactionChannel);
+#if DEBUG
+        MissionActionDiagnostics.RecordOutboundAction();
+#endif
+        (ids ??= new List<Guid>()).Add(info.AgentId);
+        (actions ??= new List<AgentActionData>()).Add(actionData);
+        (sequences ??= new List<long>()).Add(sequence);
     }
 
     public void CatchUpJoiner(string controllerId)
