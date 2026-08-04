@@ -252,26 +252,6 @@ internal class SiegeEntryFlowPatches
         return false;
     }
 
-    // Try-to-get-away accept: the camp write sits between the troop/item sacrifice and the debrief menu,
-    // all of which must keep running locally, so the native body cannot be suppressed. Route the camp
-    // removal and clear it locally up front under AllowedThread (applied without forwarding or the
-    // client-write error log); the native guarded write then sees null and skips itself. The approval
-    // must not touch the menus — the native flow continues into the debrief on its own.
-    [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_encounter_leave_your_soldiers_behind_accept_on_consequence))]
-    [HarmonyPrefix]
-    private static bool LeaveSoldiersBehindAcceptPrefix()
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (ModInformation.IsServer) return true;
-        if (MobileParty.MainParty.BesiegerCamp == null) return true;
-
-        MessageBroker.Instance.Publish(null, new BreakSiegeAttempted(MobileParty.MainParty, finishLocalMenus: false));
-        using (new AllowedThread())
-        {
-            MobileParty.MainParty.BesiegerCamp = null;
-        }
-        return true;
-    }
 
     // A besieger defeated in a real-time mission unwinds through the native defeat state machine
     // (PlayerEncounter.Update still sees a live PlayerMapEvent; the coop battle-results path only forces

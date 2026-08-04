@@ -108,6 +108,7 @@ internal abstract class TestComponentBase
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
         RegisterMock<ISiegeEventInterface>(builder);
+        RegisterMock<IBattleRetreatInterface>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
