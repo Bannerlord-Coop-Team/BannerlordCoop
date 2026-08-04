@@ -108,6 +108,20 @@ internal static class GenericAcceptMirrorIssueTypes
         // Title/Description/journal text (confirmed against the decompiled source) - see
         // ILordsNeedsTutorIssueInterface's doc comment for the full derivation.
         typeof(LordsNeedsTutorIssueBehavior.LordsNeedsTutorIssue),
+        // Tier 2 Group A: Caravan Ambush - GenerateIssueQuest(questId) forwards "caravan_ambush_quest_" + a
+        // timestamp string/IssueOwner/_targetSettlement/CampaignTime.DaysFromNow(20f)/RewardGold/
+        // IssueDifficultyMultiplier. _targetSettlement is frozen (and forced) at creation time - see
+        // ICaravanAmbushIssueInterface's doc comment - and RewardGold/IssueDifficultyMultiplier are the same
+        // deterministic Campaign.Current.PlayerProgress-derived value every other type here already relies on.
+        // The questId's own timestamp component (CampaignTime.Now.ElapsedSecondsUntilNow) is purely a string
+        // identifier, never read back by any game logic, and not itself a source of divergence risk since
+        // QuestBase's own StringId assignment (via IssueManager.StartIssueQuest's shared bookkeeping) is what
+        // actually needs to match across peers - confirmed unaffected. A bare replay of
+        // IssueManager.StartIssueQuest lands on a byte-identical CaravanAmbushIssueQuest on every peer. The two
+        // genuinely per-client-divergent pieces of this quest - _caravanParty/_banditParty/_rewardItems, only
+        // ever set later by the dialogue-triggered OnQuestAccepted - are handled entirely separately by
+        // CaravanAmbushPartySpawnGatePatch, not by this generic accept mirror.
+        typeof(CaravanAmbushIssueBehavior.CaravanAmbushIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
@@ -175,6 +189,12 @@ internal static class GenericAcceptMirrorIssueTypes
         // MirrorAlternativeAccepted's generic force-write (issue state + IsTriedToSolveBefore + due time) is
         // all any other peer's mirror copy needs.
         typeof(ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue),
+        // Tier 2 Group A: Caravan Ambush - IsThereAlternativeSolution == true, AlternativeSolutionScaleFlags is
+        // Casualties | FailureRisk (confirmed against the decompiled source) - the same shape as
+        // CapturedByBountyHuntersIssue/SmugglersIssue above, genuinely can fail and still safe to route through
+        // this same generic trigger. Needs its matching HourlyTick registration too - see that file's
+        // CaravanAmbushIssueBehavior entry.
+        typeof(CaravanAmbushIssueBehavior.CaravanAmbushIssue),
     };
 
     internal static bool IsQuestSolutionMirrorEligible(IssueBase issue) =>

@@ -171,6 +171,14 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void ArtisanOverpricedGoodsRegisterEventsPostfix(ArtisanOverpricedGoodsIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
+    // Tier 2 Group A - Caravan Ambush. AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed
+    // against the decompiled source), the same shape as Smugglers/CapturedByBountyHunters above - genuinely
+    // can fail, still safe to route through this generic, ownership-self-limiting trigger.
+    [HarmonyPatch(typeof(CaravanAmbushIssueBehavior), nameof(CaravanAmbushIssueBehavior.RegisterEvents))]
+    [HarmonyPostfix]
+    private static void CaravanAmbushRegisterEventsPostfix(CaravanAmbushIssueBehavior __instance) =>
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
+
     private static void OnHourlyTick()
     {
         if (Campaign.Current?.IssueManager == null) return;

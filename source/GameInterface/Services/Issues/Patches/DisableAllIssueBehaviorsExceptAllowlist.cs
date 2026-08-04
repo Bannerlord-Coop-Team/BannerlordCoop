@@ -176,6 +176,26 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // No orphaned standalone disable patch was ever found for this type (grepped the whole tree - zero
         // hits), so this allowlist entry is Step 0's only structural change.
         typeof(LordsNeedsTutorIssueBehavior),
+        // Tier 2 Group A (see doc/GroupA_HostileMobilePartySync_Design_v3.md) - Caravan Ambush, step 2 of the
+        // group's build order. The design doc's "clean, no gate needed" classification for this type was
+        // independently re-verified this pass and found WRONG on two counts (per the task's own standing
+        // lesson): (1) BOTH _caravanParty (CaravanPartyComponent) and _banditParty (BanditPartyComponent) hit
+        // the same client-authority construction gap Smugglers needed, not just one - see
+        // Patches.CaravanAmbushPartySpawnGatePatch's doc comment. (2) the caravaneer's own gratitude dialogue
+        // (dynamically registered from the ctor, live on every mirror peer) has no ownership check on its
+        // completion path, the same shape found in 5+ other quest types this session - see
+        // Patches.CaravanAmbushQuestOwnershipGatePatch's doc comment, which gates BOTH of this quest's
+        // convergent completion methods (the fight-win/protect-caravan path AND the "recruit the bandits
+        // outright" alternate success path). A third, independently-found, pre-existing vanilla-adjacent bug
+        // (a null-deref in that same dialogue's Condition, reachable via ANY unrelated conversation on a
+        // mirror peer while _caravanParty is still null) is fixed by
+        // Patches.CaravanAmbushCaravaneerDialogNullGuardPatch. The orphaned standalone
+        // source/GameInterface/Services/Caravans/Patches/DisableCaravanAmbushIssueBehavior.cs the design doc
+        // flagged is CONFIRMED GONE (the earlier 19-file dead-code sweep already deleted it - re-verified by
+        // direct directory read this pass, zero hits), so the allowlist entry plus this quest's own bespoke
+        // Interfaces/Messages/Patches/Handler set (source/GameInterface/Services/Issues/*/CaravanAmbush*.cs) is
+        // the whole of this type's Step 0 + gap-closing work.
+        typeof(CaravanAmbushIssueBehavior),
     };
 
     /// <summary>
