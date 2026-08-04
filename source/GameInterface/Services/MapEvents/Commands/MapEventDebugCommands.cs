@@ -1631,11 +1631,44 @@ public class MapEventDebugCommands
 
         if (args.Count != 1)
         {
-            return "Usage: coop.debug.mapevent.conversation_hold_state <partyBaseId>";
+            return "Usage: coop.debug.mapevent.conversation_hold_state <partyId | partyBaseId | party StringId>";
         }
 
-        var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
-        return $"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.";
+        var tracker = ConversationPartyTracker.Instance;
+        if (tracker?.ObjectManager == null) return "Conversation tracker is unavailable.";
+
+        // Resolve whatever the caller passed to the PartyBase registry id the tracker actually keys on.
+        // The PartyBase and MobileParty counters are SEPARATE and diverge, so hand-concatenating
+        // "PartyBase_" + a MobileParty id silently yields a different object - which previously reported a
+        // confident "released" for an id that was never registered, and sent an investigation down the wrong path.
+        var resolvedId = args[0];
+        var resolved = tracker.ObjectManager.TryGetObject<PartyBase>(args[0], out _);
+
+        if (!resolved && tracker.ObjectManager.TryGetObject<MobileParty>(args[0], out var byCoopId)
+            && byCoopId?.Party != null && tracker.ObjectManager.TryGetId(byCoopId.Party, out var fromCoopId))
+        {
+            resolvedId = fromCoopId;
+            resolved = true;
+        }
+
+        if (!resolved)
+        {
+            var byStringId = MobileParty.All?.FirstOrDefault(x => x.StringId == args[0]);
+            if (byStringId?.Party != null && tracker.ObjectManager.TryGetId(byStringId.Party, out var fromStringId))
+            {
+                resolvedId = fromStringId;
+                resolved = true;
+            }
+        }
+
+        if (!resolved)
+            return $"UNKNOWN ID '{args[0]}' - not registered on this instance. This is NOT the same as 'released'.";
+
+        if (!tracker.TryGetEngagement(resolvedId, out var engagement))
+            return $"Conversation hold for {resolvedId}: released (no engagement registered).";
+
+        return $"Conversation hold for {resolvedId}: HELD by engagerParty={engagement.EngagerPartyId} " +
+               $"wasAiDisabled={engagement.WasAiDisabled} requestId={engagement.RequestId ?? "<none>"}.";
     }
 
     // coop.debug.mapevent.late_join_mode_fixture PlayerOne PlayerTwo
