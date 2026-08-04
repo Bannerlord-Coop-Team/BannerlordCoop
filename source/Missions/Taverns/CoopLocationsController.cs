@@ -43,13 +43,11 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         this.controllerIdProvider = controllerIdProvider;
         //this.boardGameManager = boardGameManager;
 
-        messageBroker.Subscribe<NetworkMissionLeft>(Handle_LeaveMission);
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
     }
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkMissionLeft>(Handle_LeaveMission);
         messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
 
         base.Dispose();
@@ -127,30 +125,19 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         var data = payload.What;
 
-        if (data.Settlement == null)
+        if (LocationInstanceId.TryDerive(objectManager, data.Settlement, data.Location, out var derivedInstanceId) == false)
         {
-            Logger.Warning("[LocationSync] PlayerEnteredLocation with no settlement — skipping instance request");
-            return;
-        }
-
-        if (objectManager.TryGetIdWithLogging(data.Settlement, out var settlementId) == false)
-        {
-            Logger.Warning("[LocationSync] Could not resolve settlement id for '{Settlement}' — skipping instance request", data.Settlement.StringId);
-            return;
-        }
-
-        if (objectManager.TryGetIdWithLogging(data.Location, out var locationId) == false)
-        {
-            Logger.Warning("[LocationSync] Could not resolve location id for '{Location}' — skipping instance request", data.Location.StringId);
+            Logger.Warning("[LocationSync] Could not derive instance id for settlement '{Settlement}' location '{Location}' — skipping instance request",
+                data.Settlement?.StringId ?? "<null>", data.Location?.StringId ?? "<null>");
             return;
         }
 
         _instanceRequested = true;
-        Logger.Information("[LocationSync] Requesting P2P instance settlement={SettlementId} location={LocationId}", settlementId, locationId);
+        Logger.Information("[LocationSync] Requesting P2P instance {InstanceId}", derivedInstanceId);
 
         network.Start();
 
-        instanceId = $"{settlementId}|{locationId}";
+        instanceId = derivedInstanceId;
 
         network.ConnectToInstance(instanceId);
         coopMissionComponent.AgentRegistry.Clear();
@@ -206,40 +193,6 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         relayNetwork.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, instanceId));
         messageBroker.Publish(this, new PlayerLeftLocation());
         network.Stop();
-    }
-
-    private void Handle_LeaveMission(MessagePayload<NetworkMissionLeft> payload)
-    {
-        string leftControllerId = payload.What.ControllerId;
-
-        // Our own broadcast echoed back by a peer — ignore.
-        if (leftControllerId == controllerIdProvider.ControllerId) return;
-
-        var agentRegistry = coopMissionComponent.AgentRegistry;
-
-        int removedCount = 0;
-        foreach (var agentInfo in agentRegistry.GetAgents(leftControllerId))
-        {
-            if (agentRegistry.TryGetAgentInfo(agentInfo.AgentId, out var info) == false) continue;
-
-            Agent agent = info.Agent;
-            GameThread.Run(() =>
-            {
-                if (agent != null && agent.IsActive() && agent.Health > 0)
-                {
-                    bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
-                    agent.FadeOut(false, hideMount);
-                }
-            });
-
-            agentRegistry.RemoveAgent(agentInfo.AgentId);
-            removedCount++;
-        }
-
-        Logger.Information("[LocationSync] LeaveMission from {ControllerId} — removing {AgentCount} agents", leftControllerId, removedCount);
-
-        network.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, instanceId));
-        Logger.Information("[Relay] Announced MissionLeft for instance {Instance}", instanceId);
     }
 
     protected override void HandleJoinInfo(NetPeer netPeer, NetworkMissionJoinInfo joinInfo)

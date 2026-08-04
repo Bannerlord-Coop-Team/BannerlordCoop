@@ -20,8 +20,7 @@ public static class LocationInstanceId
         if (objectManager.TryGetIdWithLogging(settlement, out var settlementId) == false) return false;
         if (objectManager.TryGetIdWithLogging(location, out var locationId) == false) return false;
 
-        // Cannot use '%', used as a delimiter
-        instanceId = $"{settlementId}+{locationId}";
+        instanceId = $"{settlementId}|{locationId}";
         return true;
     }
 }
