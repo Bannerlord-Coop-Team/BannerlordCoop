@@ -60,8 +60,14 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source of the message</param>
     /// <param name="message">Received Message</param>
-    public void SimulateMessage<T>(object source, T message) where T : IMessage
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulateMessage<T>(object source, T message, bool markGameThread = true) where T : IMessage
     {
+        if (markGameThread)
+        {
+            GameThread.Instance.MarkGameThread();
+        }
+
         using (new StaticScope(this))
         {
             messageBroker.Publish(source, message);
@@ -73,8 +79,14 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source Peer</param>
     /// <param name="packet">Received Packet</param>
-    public void SimulatePacket(NetPeer source, IPacket packet)
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulatePacket(NetPeer source, IPacket packet, bool markGameThread = true)
     {
+        if (markGameThread)
+        {
+            GameThread.Instance.MarkGameThread();
+        }
+
         using (new StaticScope(this))
         {
             EnsureSerializable(packet);
