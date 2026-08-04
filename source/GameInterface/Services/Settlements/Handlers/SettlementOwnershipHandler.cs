@@ -92,8 +92,39 @@ namespace GameInterface.Services.Settlements.Handlers
             // ApplyByGift re-enters ChangeOwnerOfSettlementPatch on the server, which publishes
             // SettlementOwnershipChanged and replicates to every client.
             GameThread.RunSafe(
-                () => ChangeOwnerOfSettlementAction.ApplyByGift(settlement, newOwner),
+                () =>
+                {
+                    ApplyGiftRelationBonus(settlement, newOwner);
+                    ChangeOwnerOfSettlementAction.ApplyByGift(settlement, newOwner);
+                },
                 context: nameof(NetworkRequestSettlementOwnership));
+        }
+
+        /// <summary>
+        /// Applies the relation bonus vanilla grants for gifting a fief, which ApplyByGift alone does not.
+        /// </summary>
+        /// <remarks>
+        /// Vanilla routes a player gift through <c>KingdomManager.GiftSettlementOwnership</c>, which first
+        /// calls <c>ChangeRelationAction.ApplyRelationChangeBetweenHeroes(settlement.OwnerClan.Leader,
+        /// receiver.Leader, bonus, true)</c> with DiplomacyModel's GiftingTownRelationshipBonus for a town or
+        /// GiftingCastleRelationshipBonus otherwise, and only then transfers ownership. Co-op calls
+        /// ChangeOwnerOfSettlementAction.ApplyByGift directly, so the granting player got the fief cost with
+        /// none of the goodwill. Runs on the server with patches live, so the relation change replicates.
+        /// </remarks>
+        private static void ApplyGiftRelationBonus(Settlement settlement, Hero newOwner)
+        {
+            var giver = settlement?.OwnerClan?.Leader;
+            var receiver = newOwner?.Clan?.Leader;
+            if (giver == null || receiver == null || giver == receiver) return;
+
+            var diplomacy = Campaign.Current?.Models?.DiplomacyModel;
+            if (diplomacy == null) return;
+
+            var bonus = settlement.IsTown
+                ? diplomacy.GiftingTownRelationshipBonus
+                : diplomacy.GiftingCastleRelationshipBonus;
+
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(giver, receiver, bonus, true);
         }
 
         private static bool CanGift(Hero requestingHero, Settlement settlement, Hero newOwner, out string reason)
