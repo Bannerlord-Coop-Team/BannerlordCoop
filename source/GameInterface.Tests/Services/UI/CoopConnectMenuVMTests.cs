@@ -207,6 +207,10 @@ public class CoopConnectMenuVMTests
         Assert.Equal("Type a host name...", viewModel.HostSearchPlaceholderText);
         Assert.Equal("Host Name", viewModel.HostColumnText);
         Assert.Equal("Connected Players", viewModel.ConnectedPlayersColumnText);
+        Assert.Equal("Password", viewModel.PasswordFilterLabelText);
+        Assert.Equal("Minimum Players", viewModel.MinimumPlayersFilterLabelText);
+        Assert.Equal("Any Password", viewModel.PasswordFilterButtonText);
+        Assert.Equal(0, viewModel.MinimumSteamLobbyPlayers);
     }
 
     [Fact]
