@@ -224,6 +224,22 @@ internal class PlayerEncounterPatches
 
         // Preserve vanilla's local pending state so a delayed server response cannot enqueue duplicate surrender requests.
         if (__instance._playerSurrender) return false;
+
+        // Only latch once a usable request can actually be formed. The pre-battle encounter menu offers
+        // Surrender before any MapEvent exists (PlayerEncounter.Current._mapEvent is still null there), and
+        // publishing that produced a request the server could not resolve - while the latch above then made
+        // every later click a silent no-op, leaving Surrender permanently dead for the whole encounter.
+        // Fall back to MainParty's map event, and if there is genuinely none, leave the latch clear so the
+        // player can try again once the battle exists.
+        var mapEvent = __instance._mapEvent ?? MobileParty.MainParty?.MapEvent;
+        if (mapEvent == null)
+        {
+            Logger.Warning(
+                "Surrender clicked with no map event on the encounter; not latching so it stays retryable (party={PartyId})",
+                MobileParty.MainParty?.StringId);
+            return false;
+        }
+
         __instance._playerSurrender = true;
 
         Logger.Information(
@@ -233,7 +249,7 @@ internal class PlayerEncounterPatches
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
             PlayerEncounter.Current != null);
 
-        var message = new PlayerSurrendered(PlayerEncounter.Current._mapEvent, MobileParty.MainParty);
+        var message = new PlayerSurrendered(mapEvent, MobileParty.MainParty);
 
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -328,6 +344,17 @@ internal class PlayerEncounterPatches
     private static void EncounterLeaveConditionPostfix(MenuCallbackArgs args, ref bool __result)
     {
         if (__result) return;
+
+        // Only suppress for the party that actually has vanilla's replacement exit. Vanilla offers
+        // "Try to get away." to the battle's defender-side LEADER (game_menu_encounter_leave_your_soldiers
+        // _behind_on_condition reads PlayerEncounter.Battle.DefenderSide.LeaderParty), so re-opening the
+        // co-op "Leave..." for that party would let it skip the troop sacrifice, the item loss, the teleport
+        // and the ignore timer.
+        //
+        // Every OTHER besieger has no such alternative: blanket-suppressing on BesiegerCamp != null left a
+        // non-leader besieger, and an army member on an assault's attacker side, with no exit at all.
+        if (PlayerEncounter.Battle?.DefenderSide?.LeaderParty == PartyBase.MainParty) return;
+
         if (!IsBattleJoiner()) return;
 
         args.optionLeaveType = GameMenuOption.LeaveType.Leave;
