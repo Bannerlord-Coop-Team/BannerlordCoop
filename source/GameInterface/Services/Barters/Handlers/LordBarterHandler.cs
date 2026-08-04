@@ -89,14 +89,16 @@ internal sealed partial class LordBarterHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnected>(HandlePlayerDisconnected);
 
         // Every other access to these dictionaries happens on the game thread (handlers are drained
-        // there), so clearing them from the disposing thread is a data race. Marshal, as
-        // ConversationPartyTracker.Dispose does.
+        // there), so clearing them from the disposing thread would be a data race - marshal instead.
+        // NOT blocking: Dispose runs during container teardown, when the game loop may already have
+        // stopped pumping, and a blocking wait there just times out after 30s and fails the teardown.
+        // If the queued clear never runs, the handler is being discarded anyway.
         GameThread.RunSafe(() =>
         {
             authorizations.Clear();
             completedResults.Clear();
         },
-            blocking: true,
+            blocking: false,
             context: nameof(LordBarterHandler));
 
         LordBarterPatch.ClearPendingRequest();
