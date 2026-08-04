@@ -5,7 +5,6 @@ using Common.Util;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
@@ -25,16 +24,12 @@ namespace GameInterface.Services.Heroes.Handlers
             this.network = network;
             messageBroker.Subscribe<HeroRelationChanged>(Handle);
             messageBroker.Subscribe<NetworkHeroRelationChanged>(Handle);
-            messageBroker.Subscribe<ChangeRelationBetweenHeroes>(HandleChangeRelationBetweenHeroes);
-            messageBroker.Subscribe<NetworkChangeRelationBetweenHeroes>(HandleNetworkChangeRelationBetweenHeroes);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<HeroRelationChanged>(Handle);
             messageBroker.Unsubscribe<NetworkHeroRelationChanged>(Handle);
-            messageBroker.Unsubscribe<ChangeRelationBetweenHeroes>(HandleChangeRelationBetweenHeroes);
-            messageBroker.Unsubscribe<NetworkChangeRelationBetweenHeroes>(HandleNetworkChangeRelationBetweenHeroes);
         }
 
         private void Handle(MessagePayload<HeroRelationChanged> obj)
@@ -64,24 +59,6 @@ namespace GameInterface.Services.Heroes.Handlers
                     CharacterRelationManager.SetHeroRelation(hero1, hero2, payload.Value);
                 }
             }, context: $"apply hero relation {payload.Hero1Id}<->{payload.Hero2Id}");
-        }
-        private void HandleChangeRelationBetweenHeroes(MessagePayload<ChangeRelationBetweenHeroes> payload)
-        {
-            if (!objectManager.TryGetIdWithLogging(payload.What.Hero1, out var hero1)) return;
-            if (!objectManager.TryGetIdWithLogging(payload.What.Hero2, out var hero2)) return;
-
-            network.SendAll(new NetworkChangeRelationBetweenHeroes(hero1, hero2, payload.What.Relation));
-        }
-        private void HandleNetworkChangeRelationBetweenHeroes(MessagePayload<NetworkChangeRelationBetweenHeroes> obj)
-        {
-            var payload = obj.What;
-            GameThread.RunSafe(() =>
-            {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(payload.Hero1Id, out var hero1)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(payload.Hero2Id, out var hero2)) return;
-
-                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(hero1, hero2, payload.Relation, true);
-            });
         }
     }
 }

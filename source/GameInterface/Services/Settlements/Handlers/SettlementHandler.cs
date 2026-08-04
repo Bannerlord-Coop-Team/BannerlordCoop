@@ -290,7 +290,7 @@ public class SettlementHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement)) return;
-
+            if (settlement.Town.GarrisonParty != null) return;
             settlement.AddGarrisonParty();
         });
     }

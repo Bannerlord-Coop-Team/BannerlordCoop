@@ -1,9 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Clans.Messages;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -67,12 +65,7 @@ namespace GameInterface.Services.Clans.Patches
             int influenceCostOfSupportingClan = diplomacyModel.GetInfluenceCostOfSupportingClan();
             if (supporterClan.Influence >= (float)influenceCostOfSupportingClan)
             {
-                int influenceValueOfSupportingClan = diplomacyModel.GetInfluenceValueOfSupportingClan();
-                int relationValueOfSupportingClan = diplomacyModel.GetRelationValueOfSupportingClan();
-
-                MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(supporterClan, (int)(float)(float)influenceCostOfSupportingClan));
-                MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(__instance, -((int)(float)influenceValueOfSupportingClan)));
-                MessageBroker.Instance.Publish(__instance, new ChangeRelationBetweenHeroes(supporterClan.Leader, __instance.Leader, relationValueOfSupportingClan));
+                MessageBroker.Instance.Publish(__instance, new OnClanSupported(supporterClan, __instance));
             }
             return false;
         }
