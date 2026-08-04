@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Notifications.Messages;
 using Helpers;
@@ -10,6 +11,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -24,15 +26,18 @@ internal class OtherNotificationsHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IFactionInterface factionInterface;
 
     public OtherNotificationsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IFactionInterface factionInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.factionInterface = factionInterface;
 
         messageBroker.Subscribe<NotifyAnimalsSlaughteredToEat>(Handle_NotifyAnimalsSlaughteredToEat);
         messageBroker.Subscribe<NetworkNotifyAnimalsSlaughteredToEat>(Handle_NetworkNotifyAnimalsSlaughteredToEat);
@@ -63,6 +68,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Subscribe<NotifyHeroJoinedParty>(Handle_NotifyHeroJoinedParty);
         messageBroker.Subscribe<NetworkNotifyHeroJoinedParty>(Handle_NetworkNotifyHeroJoinedParty);
+
+        messageBroker.Subscribe<NotifyTributePaymentEnded>(Handle_NotifyTributePaymentEnded);
+        messageBroker.Subscribe<NetworkNotifyTributePaymentEnded>(Handle_NetworkNotifyTributePaymentEnded);
 
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -98,6 +106,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyHeroJoinedParty>(Handle_NotifyHeroJoinedParty);
         messageBroker.Unsubscribe<NetworkNotifyHeroJoinedParty>(Handle_NetworkNotifyHeroJoinedParty);
+
+        messageBroker.Subscribe<NotifyTributePaymentEnded>(Handle_NotifyTributePaymentEnded);
+        messageBroker.Subscribe<NetworkNotifyTributePaymentEnded>(Handle_NetworkNotifyTributePaymentEnded);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -379,6 +390,35 @@ internal class OtherNotificationsHandler : IHandler
             TextObject textObject = GameTexts.FindText("str_companion_added", null);
             StringHelpers.SetCharacterProperties("COMPANION", companion.CharacterObject, textObject, false);
             MBInformationManager.AddQuickInformation(textObject, 0, null, null, "");
+        });
+    }
+
+    private void Handle_NotifyTributePaymentEnded(MessagePayload<NotifyTributePaymentEnded> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.PayerFaction, out var payerFactionId)) return;
+
+            network.SendAll(new NetworkNotifyTributePaymentEnded(clanId, payerFactionId));
+        });
+    }
+
+    private void Handle_NetworkNotifyTributePaymentEnded(MessagePayload<NetworkNotifyTributePaymentEnded> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+            if (!factionInterface.TryGetFaction(obj.What.PayerFactionId, out var payerFaction)) return;
+
+            // Don't update for clients that aren't involved with the tribute payments
+            if (clan != Clan.PlayerClan && payerFaction != Clan.PlayerClan.MapFaction) return;
+
+            bool flag = payerFaction == Clan.PlayerClan.MapFaction;
+            TextObject textObject = flag ? new TextObject("{=LJFXfmpn}The tribute your kingdom owed to {ENEMY_FACTION} is now complete.", null) : new TextObject("{=aod7KVc8}The tribute {ENEMY_FACTION} owed to your kingdom is now complete.", null);
+            IFaction faction = flag ? clan.MapFaction : payerFaction;
+            textObject.SetTextVariable("ENEMY_FACTION", faction.Name);
+            Campaign.Current.CampaignInformationManager.NewMapNoticeAdded(new TributeFinishedMapNotification(textObject, faction));
         });
     }
 
