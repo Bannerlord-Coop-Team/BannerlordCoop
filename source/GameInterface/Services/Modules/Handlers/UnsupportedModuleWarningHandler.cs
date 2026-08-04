@@ -14,7 +14,7 @@ public class UnsupportedModuleWarningHandler
     public const string PromptTitle = "Additional Modules Detected";
 
     private const string CoopModuleId = "Coop";
-    private const string DedicatedServerModulePrefix = "DedicatedServer";
+    private const string DedicatedServerModulePrefix = "DedicatedServer.";
     
     private readonly IModuleInfoProvider moduleInfoProvider;
 
