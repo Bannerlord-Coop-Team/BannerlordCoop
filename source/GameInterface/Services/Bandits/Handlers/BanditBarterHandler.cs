@@ -134,12 +134,11 @@ internal sealed class BanditBarterHandler : IHandler
                 request.BanditPartyId,
                 BanditInteractionsCampaignBehavior.PlayerInteraction.PaidOffParty);
 
-            // Keep payment after safe-passage setup so a rejected setup failure cannot charge the player.
-            ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
+            // Safe passage is now authoritative, so later failures must not leave the request retryable.
             mutationApplied = true;
+            ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
 
-            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
-            FlushHeroGold(playerHero);
+            CompleteAcceptedRequest(peer, playerHero);
             Accept(peer, request, playerHero.Gold);
         }
         catch (Exception exception)
@@ -147,6 +146,7 @@ internal sealed class BanditBarterHandler : IHandler
             Logger.Error(exception, "Failed to apply an authoritative bandit safe-passage barter");
             if (mutationApplied)
             {
+                CompleteAcceptedRequest(peer, playerHero);
                 Accept(peer, request, playerHero?.Gold ?? 0);
                 return;
             }
@@ -491,6 +491,27 @@ internal sealed class BanditBarterHandler : IHandler
         if (sendCoalescer == null || !objectManager.TryGetId(hero, out var heroId)) return;
 
         sendCoalescer.FlushInstance(heroId, network);
+    }
+
+    private void CompleteAcceptedRequest(NetPeer peer, Hero playerHero)
+    {
+        try
+        {
+            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Failed to end an accepted bandit barter engagement");
+        }
+
+        try
+        {
+            FlushHeroGold(playerHero);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Failed to flush player gold after an accepted bandit barter");
+        }
     }
 
     private void Accept(NetPeer peer, NetworkRequestBanditBarter request, int playerGold)

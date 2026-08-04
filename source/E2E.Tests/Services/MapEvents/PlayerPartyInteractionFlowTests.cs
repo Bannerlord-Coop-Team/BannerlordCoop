@@ -2062,10 +2062,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void BanditSafePassage_Failure_ChargesOnlyAfterSafePassageIsInstalled(
-        bool failBeforeSafePassageIsInstalled)
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void BanditSafePassage_Failure_CommitsAfterSafePassageIsInstalled(
+        bool failBeforeSafePassageIsInstalled,
+        bool failDuringGoldDispatch)
     {
         const int initialPlayerGold = 1000;
         const int initialBanditGold = 40;
@@ -2111,6 +2113,16 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     typeof(PlayerPartyInteractionFlowTests),
                     nameof(ThrowBeforeBanditSafePassageMutation)));
         }
+        else if (failDuringGoldDispatch)
+        {
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(CampaignEventDispatcher),
+                    nameof(CampaignEventDispatcher.OnHeroOrPartyTradedGold)),
+                prefix: new HarmonyMethod(
+                    typeof(PlayerPartyInteractionFlowTests),
+                    nameof(ThrowDuringBanditGoldDispatch)));
+        }
         else
         {
             harmony.Patch(
@@ -2131,7 +2143,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 Array.Empty<ItemRosterElementData>(),
                 Array.Empty<TroopRosterElementData>(),
                 requestId)));
-            TestEnvironment.FlushCoalescer();
+            if (!failDuringGoldDispatch)
+                TestEnvironment.FlushCoalescer();
 
             var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBanditBarterResult>());
             Assert.Equal(!failBeforeSafePassageIsInstalled, result.Accepted);
@@ -2149,6 +2162,25 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 banditMobilePartyId,
                 expectedPlayerGold,
                 expectedBanditGold);
+
+            if (failDuringGoldDispatch)
+            {
+                foreach (var environmentClient in Clients)
+                {
+                    environmentClient.Call(() =>
+                    {
+                        Assert.True(environmentClient.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                        Assert.Equal(expectedPlayerGold, playerHero.Gold);
+                    });
+                }
+
+                Server.Call(() =>
+                {
+                    Assert.False(Server.Resolve<ConversationPartyTracker>().TryGetEngagement(client.NetPeer, out _));
+                    Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(banditMobilePartyId, out var banditParty));
+                    Assert.False(banditParty.Ai.IsDisabled);
+                });
+            }
         }
         finally
         {
@@ -2703,6 +2735,9 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
     private static void ThrowBeforeBanditSafePassageMutation()
         => throw new InvalidOperationException("Bandit safe-passage installation failed.");
+
+    private static void ThrowDuringBanditGoldDispatch()
+        => throw new InvalidOperationException("Bandit gold dispatch failed after payment.");
 
     private static void ThrowAfterBanditBarterMutation()
         => throw new InvalidOperationException("Post-apply bandit barter work failed.");
