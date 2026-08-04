@@ -166,7 +166,7 @@ public class CoopConnectMenuVMTests
 
         Assert.Empty(viewModel.SteamLobbies);
         Assert.Equal("Hosted Steam Servers (0 servers; 0 players)", viewModel.SteamLobbiesHeaderText);
-        Assert.Equal("No hosts match 'missing'.", viewModel.SteamLobbyStatusText);
+        Assert.Equal("No hosted Steam lobbies match the current filters.", viewModel.SteamLobbyStatusText);
 
         viewModel.SteamLobbyHostSearchText = "  ";
         viewModel.ActionSearchSteamLobbies();
@@ -223,6 +223,80 @@ public class CoopConnectMenuVMTests
 
         Assert.Equal(1, activationCount);
     }
+    [Fact]
+    public void SteamLobbyPasswordFilter_CyclesThroughAllModes()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(
+            CreateLobby(1, "Open Host", passwordRequired: false),
+            CreateLobby(2, "Protected Host", passwordRequired: true));
+        
+        Assert.Equal(new[] {"Open Host", "Protected Host"}, VisibleHosts(viewModel));
+        Assert.Equal("Any Password", viewModel.PasswordFilterButtonText);
+        
+        viewModel.ActionCycleSteamLobbyPasswordFilter();
+        
+        Assert.Equal("No Password", viewModel.PasswordFilterButtonText);
+        Assert.Equal("Open Host", Assert.Single(viewModel.SteamLobbies).HostText);
+        
+        viewModel.ActionCycleSteamLobbyPasswordFilter();
+        
+        Assert.Equal("Password Required", viewModel.PasswordFilterButtonText);
+        Assert.Equal("Protected Host", Assert.Single(viewModel.SteamLobbies).HostText);
+        
+        viewModel.ActionCycleSteamLobbyPasswordFilter();
+        
+        Assert.Equal("Any Password", viewModel.PasswordFilterButtonText);
+        Assert.Equal(2, viewModel.SteamLobbies.Count);
+    }
+    [Fact]
+    public void MinimumSteamLobbyPlayers_FiltersLobbiesAndClampsNegativeValues()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(
+            CreateLobby(1, "Solo Host", connectedPlayers: 1),
+            CreateLobby(2, "Busy Host", connectedPlayers: 4),
+            CreateLobby(3, "Full Host", connectedPlayers: 8));
+
+        viewModel.MinimumSteamLobbyPlayers = 4;
+        
+        Assert.Equal(new[] {"Busy Host", "Full Host"}, VisibleHosts(viewModel));
+        Assert.Equal("Hosted Steam Servers (2 servers; 12 players)", viewModel.SteamLobbiesHeaderText);
+        
+        viewModel.MinimumSteamLobbyPlayers = -1;
+        
+        Assert.Equal(0, viewModel.MinimumSteamLobbyPlayers);
+        Assert.Equal(3, viewModel.SteamLobbies.Count);
+    }
+    [Fact]
+    public void SteamLobbyFilters_CombineBeforePagination()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+        
+        SelectSteamLobbiesTab(viewModel);
+        browser.Complete(
+            CreateLobby(1, "Alpha Open", connectedPlayers: 4),
+            CreateLobby(2, "Alpha Protected", connectedPlayers: 5, passwordRequired: true),
+            CreateLobby(3, "Other Open", connectedPlayers: 6),
+            CreateLobby(4, "Alpha Small", connectedPlayers: 1));
+
+        viewModel.SteamLobbyHostSearchText = "Alpha";
+        viewModel.MinimumSteamLobbyPlayers = 3;
+        viewModel.ActionCycleSteamLobbyPasswordFilter();
+        
+        Assert.Equal("Alpha Open", Assert.Single(viewModel.SteamLobbies).HostText);
+        Assert.Equal("Hosted Steam Servers (1 servers; 4 players)", viewModel.SteamLobbiesHeaderText);
+    }
 
     private static void SelectSteamLobbiesTab(CoopConnectMenuVM viewModel)
     {
@@ -230,13 +304,14 @@ public class CoopConnectMenuVMTests
         viewModel.Tabs[1].ExecuteSelection();
     }
 
-    private static SteamLobbySummary CreateLobby(ulong lobbyId, string ownerName, int connectedPlayers = 0)
+    private static SteamLobbySummary CreateLobby(ulong lobbyId, string ownerName, int connectedPlayers = 0, bool passwordRequired = false)
     {
         return new SteamLobbySummary
         {
             LobbyId = lobbyId,
             OwnerName = ownerName,
             ConnectedPlayers = connectedPlayers,
+            PasswordRequired = passwordRequired,
             ProtocolVersion = SessionJoinInfo.CurrentVersion,
             ModVersion = ModInformation.BuildVersion,
         };
