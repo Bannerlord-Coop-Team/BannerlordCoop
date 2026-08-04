@@ -1613,6 +1613,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var client = Clients.First();
         var settlementId = CreateSyncedSettlement();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        TestEnvironment.ConnectRegisteredPlayer(client, ControllerId);
 
         client.Call(() =>
         {
