@@ -4,6 +4,8 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -139,6 +141,28 @@ internal class PlayerCaptivityServerHandler : IHandler
         // the captivity-end flow reactivates the party.
         playerParty.IsActive = false;
 
+        // Vanilla ends captivity setup with the army block at the tail of
+        // PlayerCaptivity.StartCaptivityInternal (IL_0089-IL_00C5): if the captured player's party is in an
+        // army, disband it when the player LED it, then drop the membership. That block is unreachable in
+        // coop - native TakePrisonerAction.ApplyInternal gates its whole captivity branch on
+        // `prisonerCharacter == Hero.MainHero` (IL_0062) and a captured CLIENT hero never is, while
+        // MobileParty.Army is excluded from AutoSync (MobilePartySync.cs:37). Run it here, AFTER the park:
+        // Army.DisperseInternal skips repositioning parties with IsActive == false, which is exactly why
+        // vanilla deactivates the party first (StartCaptivityInternal IL_0039).
+        // The captured player can no longer finish its own PlayerEncounter, and that Finish is the ONLY
+        // production trigger that releases a ConversationPartyHold. TryEngage disabled the captor's AI with
+        // DisableAi(), which sets _enableAgainAtHour = CampaignTime.Never - so without this the captor sits
+        // frozen ("Holding.", never walking the prisoner to a dungeon) for the entire captivity, and resumes
+        // only when captivity ends and the client finally calls Finish. Release it here instead.
+        ReleaseConversationHoldHeldBy(playerParty);
+        // MobileParty.Position is not AutoSynced, so the owning client keeps its stale pre-battle position
+        // while the server and every OTHER client have the authoritative one - measured live as the captured
+        // party sitting in the wrong place on its own screen. Push the snapshot so all three converge.
+        PublishCapturedPartyPosition(playerParty);
+
+
+        DisbandArmyOfCapturedPlayer(playerParty, hero);
+
         // BR-061: surviving companion heroes riding in the surrendered party become prisoners of the
         // captor through the same TakePrisonerAction that captured the leader, BEFORE the rosters are
         // emptied below (which would silently discard them). Each capture runs with patches live, so its
@@ -214,6 +238,75 @@ internal class PlayerCaptivityServerHandler : IHandler
                 companion.StringId, captor.MobileParty?.StringId);
             TakePrisonerAction.Apply(captor, companion);
         }
+    }
+
+
+
+    /// <summary>
+    /// Replicates a captured party's authoritative position to every client, including its owner.
+    /// </summary>
+    private void PublishCapturedPartyPosition(MobileParty playerParty)
+    {
+        if (playerParty == null) return;
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var snapshot)) return;
+        if (!snapshot.TryCreate(playerParty, out PartyBehaviorUpdateData data)) return;
+
+        data.ForcePosition = true;
+        data.ResetMovementToHold = true;
+        messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+    }
+
+    /// <summary>
+    /// Releases any AI party this captured player was holding through a conversation engagement.
+    /// </summary>
+    /// <remarks>
+    /// Acts on the specific captured party's own engagement, never on "the" player, so one capture cannot
+    /// free a lord another player is still talking to.
+    /// </remarks>
+    private void ReleaseConversationHoldHeldBy(MobileParty playerParty)
+    {
+        var tracker = ConversationPartyTracker.Instance;
+        if (tracker == null || playerParty?.Party == null) return;
+        if (!objectManager.TryGetId(playerParty.Party, out var engagerPartyId)) return;
+
+        ConversationPartyHold.EndEngagementForEngagerParty(tracker, engagerPartyId);
+    }
+
+    /// <summary>
+    /// Server-side stand-in for the army half of native <c>PlayerCaptivity.StartCaptivityInternal</c>
+    /// (IL_0089-IL_00C5). Native gates that block on the captured hero being <see cref="Hero.MainHero"/>; the
+    /// coop equivalent is "the hero registered to the player that owns this party", so a companion captured
+    /// alongside its leader - which re-enters <see cref="Handle_PrisonerTaken"/> through the TakePrisonerAction
+    /// postfix - cannot disband the army a second time.
+    /// </summary>
+    /// <remarks>
+    /// The disband must PRECEDE the membership drop. <c>MobileParty.set_Army</c> calls
+    /// <c>Army.OnRemovePartyInternal</c>, which disbands a leaderless army itself through
+    /// <c>DisbandArmyAction.ApplyByLeaderPartyRemoved</c> - the wrong dispersion reason. Vanilla's order keeps
+    /// the reason PlayerTakenPrisoner.
+    ///
+    /// Both writes run with patches live, so each party removal replicates on its own: ArmyPatches publishes
+    /// MobilePartyInArmyRemoved and lets native run, ArmyHandler broadcasts NetworkRemovePartyInArmy, and the
+    /// clients apply it.
+    /// </remarks>
+    private void DisbandArmyOfCapturedPlayer(MobileParty playerParty, Hero capturedHero)
+    {
+        var army = playerParty?.Army;
+        if (army == null) return;
+
+        if (!TryGetPlayerHeroOfParty(playerParty, out var owningPlayerHero) || owningPlayerHero != capturedHero)
+            return;
+
+        PlayerCaptivityLogger.Debug(
+            "DisbandArmyOfCapturedPlayer: party={PartyId} army={ArmyName} playerLedIt={PlayerLedIt}",
+            playerParty.StringId, army.Name?.ToString(), army.LeaderParty == playerParty);
+
+        if (army.LeaderParty == playerParty)
+        {
+            DisbandArmyAction.ApplyByPlayerTakenPrisoner(army);
+        }
+
+        playerParty.Army = null;
     }
 
     /// <summary>

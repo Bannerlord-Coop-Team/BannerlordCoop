@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using Serilog;
+using Common.Logging;
+using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -18,6 +20,8 @@ namespace GameInterface.Services.MapEvents;
 /// </remarks>
 internal static class ConversationPartyHold
 {
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(ConversationPartyHold));
+
     private static readonly TimeSpan BlockedMessageCooldown = TimeSpan.FromSeconds(5);
 
     private static DateTime lastInteractionBlockedMessageUtc = DateTime.MinValue;
@@ -93,6 +97,25 @@ internal static class ConversationPartyHold
     public static void EndEngagement(ConversationPartyTracker tracker, object engagerKey)
         => EndEngagement(tracker, engagerKey, requestId: null, requireRequestIdMatch: false);
 
+    /// <summary>
+    /// Releases the AI party held by <paramref name="engagerPartyId"/>, for cases where that engager can no
+    /// longer end the conversation itself.
+    /// </summary>
+    /// <remarks>
+    /// TryEngage calls MobilePartyAi.DisableAi(), which sets _enableAgainAtHour = CampaignTime.Never, so the
+    /// held party's TickInternal returns early forever and it can NEVER recover on its own - only an explicit
+    /// EnableAi() frees it. The sole production release is the engager's PlayerEncounter.Finish. When the
+    /// encounter escalates into a battle and the engager is taken prisoner, that Finish does not happen until
+    /// captivity ends, so the captor sits frozen for the whole imprisonment. Releasing here breaks that tie.
+    /// </remarks>
+    public static void EndEngagementForEngagerParty(ConversationPartyTracker tracker, string engagerPartyId)
+    {
+        if (tracker == null || engagerPartyId == null) return;
+        if (!tracker.TryGetEngagementByEngagerParty(engagerPartyId, out var engagement)) return;
+
+        EndEngagement(tracker, engagement.EngagerKey);
+    }
+
     /// <summary>Ends an engagement only when it is still owned by the supplied conversation request.</summary>
     public static void EndEngagement(
         ConversationPartyTracker tracker,
@@ -166,14 +189,38 @@ internal static class ConversationPartyHold
     /// </summary>
     public static void ReleaseParty(IObjectManager objectManager, string partyId, bool wasAiDisabled)
     {
-        if (wasAiDisabled) return;
-        if (objectManager == null) return;
+        // Every one of these early returns leaves the party held with no trace in the log, which is exactly
+        // how a leaked hold went unnoticed for a whole captivity. A leak is unrecoverable - DisableAi sets
+        // _enableAgainAtHour = CampaignTime.Never and the flag is AutoSynced and save-persisted - so make each
+        // skip visible.
+        if (wasAiDisabled)
+        {
+            Logger.Warning(
+                "ReleaseParty skipped for {PartyId}: its AI was already disabled when engaged, so the hold " +
+                "did not disable it and will not re-enable it. If this party is stuck, the disable came from elsewhere.",
+                partyId);
+            return;
+        }
+
+        if (objectManager == null)
+        {
+            Logger.Warning("ReleaseParty skipped for {PartyId}: no object manager", partyId);
+            return;
+        }
 
         // The party may no longer resolve, e.g. it was destroyed in a battle the conversation escalated into.
-        if (!objectManager.TryGetObject(partyId, out PartyBase partyBase)) return;
+        if (!objectManager.TryGetObject(partyId, out PartyBase partyBase))
+        {
+            Logger.Warning("ReleaseParty skipped for {PartyId}: id no longer resolves", partyId);
+            return;
+        }
 
         var ai = partyBase.MobileParty?.Ai;
-        if (ai == null) return;
+        if (ai == null)
+        {
+            Logger.Warning("ReleaseParty skipped for {PartyId}: party has no AI", partyId);
+            return;
+        }
 
         ai.EnableAi();
         ai.DoNotMakeNewDecisions = false;
