@@ -544,6 +544,35 @@ internal class PartyCommands
     /// can march to and win a siege for testing without starving. Server only; the troop and item adds replicate
     /// via the roster sync. Get the party id from coop.debug.mobileparty.whoami on the client that owns the party.
     /// </summary>
+    // coop.debug.mobileparty.set_troops
+    /// <summary>
+    /// Replaces a party's rank and file with an exact number of one troop type, leaving heroes in place.
+    /// Unlike siege_buff, which fills to 2000, this is for scenarios that need a SMALL force - the sally-out
+    /// check only fires when the defenders out-ratio the besiegers 2:1, so a buffed besieger silently
+    /// suppresses the very behaviour under test.
+    /// </summary>
+    [CommandLineArgumentFunction("set_troops", "coop.debug.mobileparty")]
+    public static string SetTroopsCommand(List<string> strings)
+    {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+        if (strings.Count != 3) return "Usage: coop.debug.mobileparty.set_troops <partyId> <troopId> <count> (i.e. Player123 battania_fian_champion 300)";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party)) return $"Party with id {strings[0]} not found";
+        if (!objectManager.TryGetObject(strings[1], out CharacterObject troop)) return $"Troop with id {strings[1]} not found";
+        if (!int.TryParse(strings[2], out var count) || count < 0) return $"'{strings[2]}' is not a troop count";
+
+        // Snapshot first: removing entries mutates the roster we would otherwise be iterating.
+        var existing = party.MemberRoster.GetTroopRoster()
+            .Where(element => element.Character?.IsHero == false)
+            .ToList();
+        foreach (var element in existing)
+            party.MemberRoster.AddToCounts(element.Character, -element.Number);
+
+        if (count > 0) party.MemberRoster.AddToCounts(troop, count);
+
+        return $"{party.Name} ({party.StringId}) now has {count}x {troop.Name} plus its heroes; {party.MemberRoster.TotalManCount} total";
+    }
+
     [CommandLineArgumentFunction("siege_buff", "coop.debug.mobileparty")]
     public static string SiegeBuffCommand(List<string> strings)
     {
