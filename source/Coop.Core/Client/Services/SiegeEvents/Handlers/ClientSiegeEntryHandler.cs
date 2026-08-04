@@ -8,6 +8,9 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using System;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -25,13 +28,22 @@ internal class ClientSiegeEntryHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private PendingBreakInContinuation pendingBreakInContinuation;
 
-    public ClientSiegeEntryHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface)
+    internal TimeSpan BreakInContinuationTimeout { get; set; }
+
+    public ClientSiegeEntryHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        INetworkConfig configuration,
+        IObjectManager objectManager,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.siegeEventInterface = siegeEventInterface;
+        BreakInContinuationTimeout = configuration.ObjectCreationTimeout;
         messageBroker.Subscribe<BesiegeSettlementAttempted>(HandleBesiegeAttempt);
         messageBroker.Subscribe<JoinSiegeCampAttempted>(HandleJoinAttempt);
         messageBroker.Subscribe<BreakSiegeAttempted>(HandleBreakAttempt);
@@ -44,6 +56,123 @@ internal class ClientSiegeEntryHandler : IHandler
         messageBroker.Subscribe<AssaultSiegeAttempted>(HandleAssaultAttempt);
         messageBroker.Subscribe<NetworkPromptSiegeAssault>(HandleAssaultPrompt);
         messageBroker.Subscribe<NetworkSnapSiegeCampPartyPosition>(HandleCampPositionSnap);
+        messageBroker.Subscribe<BreakInContinuationAttempted>(HandleBreakInContinuationAttempt);
+        messageBroker.Subscribe<NetworkBreakInContinuationApproved>(HandleBreakInContinuationApproved);
+    }
+
+    private void HandleBreakInContinuationAttempt(MessagePayload<BreakInContinuationAttempted> payload)
+    {
+        var now = DateTime.UtcNow;
+        var pending = pendingBreakInContinuation;
+        if (pending != null)
+        {
+            if (pending.ExpiresAtUtc > now)
+            {
+                Logger.Information(
+                    "Ignoring break-in continuation attempt while request {RequestId} is pending",
+                    pending.RequestId);
+                return;
+            }
+
+            Logger.Warning(
+                "Retrying break-in continuation after request {RequestId} timed out",
+                pending.RequestId);
+            ClearPendingBreakInContinuation(pending, restoreLocationEncounter: true);
+        }
+
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.Party, out var partyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var requestId = Guid.NewGuid().ToString();
+        var previousLocationEncounter = PlayerEncounter.LocationEncounter;
+        siegeEventInterface.PrepareLocalPlayerBreakIn(obj.Settlement);
+        var stagedLocationEncounter = PlayerEncounter.LocationEncounter;
+        pendingBreakInContinuation = new PendingBreakInContinuation(
+            requestId,
+            settlementId,
+            PlayerEncounter.Current,
+            Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
+            previousLocationEncounter,
+            stagedLocationEncounter,
+            now + BreakInContinuationTimeout);
+
+        network.SendAll(new NetworkRequestBreakInContinuation(requestId, partyId, settlementId));
+    }
+
+    private void HandleBreakInContinuationApproved(MessagePayload<NetworkBreakInContinuationApproved> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            var pending = pendingBreakInContinuation;
+            if (pending == null ||
+                pending.RequestId != obj.RequestId ||
+                pending.SettlementId != obj.SettlementId)
+                return;
+
+            if (!obj.Approved)
+            {
+                var rejectionMenuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
+                var shouldRecoverFromDebrief =
+                    ReferenceEquals(PlayerEncounter.Current, pending.Encounter) &&
+                    rejectionMenuId == pending.MenuId;
+                ClearPendingBreakInContinuation(pending, restoreLocationEncounter: true);
+                if (shouldRecoverFromDebrief)
+                {
+                    siegeEventInterface.FinishLocalPlayerSiegeLeave();
+                    Logger.Information("Server rejected the break-in continuation; returning to the campaign map");
+                }
+                else
+                {
+                    Logger.Information("Server rejected the break-in continuation after the encounter changed");
+                }
+                return;
+            }
+
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement))
+            {
+                ClearPendingBreakInContinuation(pending, restoreLocationEncounter: true);
+                return;
+            }
+
+            var currentMenuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
+            if (!ReferenceEquals(PlayerEncounter.Current, pending.Encounter) ||
+                !ReferenceEquals(PlayerEncounter.EncounterSettlement, settlement) ||
+                currentMenuId != pending.MenuId)
+            {
+                ClearPendingBreakInContinuation(pending, restoreLocationEncounter: false);
+                Logger.Warning("Ignoring break-in approval because the encounter or menu changed");
+                return;
+            }
+
+            if (!ReferenceEquals(MobileParty.MainParty?.CurrentSettlement, settlement))
+            {
+                ClearPendingBreakInContinuation(pending, restoreLocationEncounter: true);
+                Logger.Error("Ignoring break-in approval because the settlement entry was not applied");
+                return;
+            }
+
+            ClearPendingBreakInContinuation(pending, restoreLocationEncounter: false);
+            siegeEventInterface.ContinueLocalPlayerBreakIn(settlement);
+        }, context: nameof(HandleBreakInContinuationApproved));
+    }
+
+    private void ClearPendingBreakInContinuation(
+        PendingBreakInContinuation pending,
+        bool restoreLocationEncounter)
+    {
+        if (!ReferenceEquals(pendingBreakInContinuation, pending))
+            return;
+
+        pendingBreakInContinuation = null;
+        if (restoreLocationEncounter &&
+            Campaign.Current != null &&
+            ReferenceEquals(PlayerEncounter.LocationEncounter, pending.StagedLocationEncounter))
+        {
+            PlayerEncounter.LocationEncounter = pending.PreviousLocationEncounter;
+        }
     }
 
     private void HandleCampPositionSnap(MessagePayload<NetworkSnapSiegeCampPartyPosition> payload)
@@ -155,7 +284,7 @@ internal class ClientSiegeEntryHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.Party, out var partyId)) return;
 
-        network.SendAll(new NetworkRequestBreakSiege(partyId));
+        network.SendAll(new NetworkRequestBreakSiege(partyId, obj.FinishLocalMenus));
     }
 
     private void HandleBesiegeApproved(MessagePayload<NetworkBesiegeSettlementApproved> payload)
@@ -204,8 +333,14 @@ internal class ClientSiegeEntryHandler : IHandler
             return;
         }
 
+        // The server routed a battle leave instead of a camp break; the returning battle-leave
+        // reply owns the menu continuation.
         if (payload.What.BattleLeaveApplied)
             return;
+
+        // Embedded camp writes (try-to-get-away, the defeat path, safe-passage barter) already ran
+        // their native menu continuation; finishing here would tear down the menu they landed on.
+        if (!payload.What.FinishLocalMenus) return;
 
         GameThread.RunSafe(() =>
         {
@@ -218,6 +353,10 @@ internal class ClientSiegeEntryHandler : IHandler
 
     public void Dispose()
     {
+        var pending = pendingBreakInContinuation;
+        if (pending != null)
+            ClearPendingBreakInContinuation(pending, restoreLocationEncounter: true);
+
         messageBroker.Unsubscribe<BesiegeSettlementAttempted>(HandleBesiegeAttempt);
         messageBroker.Unsubscribe<JoinSiegeCampAttempted>(HandleJoinAttempt);
         messageBroker.Unsubscribe<BreakSiegeAttempted>(HandleBreakAttempt);
@@ -230,5 +369,36 @@ internal class ClientSiegeEntryHandler : IHandler
         messageBroker.Unsubscribe<AssaultSiegeAttempted>(HandleAssaultAttempt);
         messageBroker.Unsubscribe<NetworkPromptSiegeAssault>(HandleAssaultPrompt);
         messageBroker.Unsubscribe<NetworkSnapSiegeCampPartyPosition>(HandleCampPositionSnap);
+        messageBroker.Unsubscribe<BreakInContinuationAttempted>(HandleBreakInContinuationAttempt);
+        messageBroker.Unsubscribe<NetworkBreakInContinuationApproved>(HandleBreakInContinuationApproved);
+    }
+
+    private sealed class PendingBreakInContinuation
+    {
+        public readonly string RequestId;
+        public readonly string SettlementId;
+        public readonly PlayerEncounter Encounter;
+        public readonly string MenuId;
+        public readonly LocationEncounter PreviousLocationEncounter;
+        public readonly LocationEncounter StagedLocationEncounter;
+        public readonly DateTime ExpiresAtUtc;
+
+        public PendingBreakInContinuation(
+            string requestId,
+            string settlementId,
+            PlayerEncounter encounter,
+            string menuId,
+            LocationEncounter previousLocationEncounter,
+            LocationEncounter stagedLocationEncounter,
+            DateTime expiresAtUtc)
+        {
+            RequestId = requestId;
+            SettlementId = settlementId;
+            Encounter = encounter;
+            MenuId = menuId;
+            PreviousLocationEncounter = previousLocationEncounter;
+            StagedLocationEncounter = stagedLocationEncounter;
+            ExpiresAtUtc = expiresAtUtc;
+        }
     }
 }

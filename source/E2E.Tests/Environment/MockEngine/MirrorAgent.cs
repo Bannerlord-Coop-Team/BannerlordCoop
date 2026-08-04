@@ -87,6 +87,8 @@ public sealed class MirrorAgent
     public float LastSetActionBlendInPeriod { get; set; }
     public float LastSetActionStartProgress { get; set; }
     public bool LastSetActionForceFaceMorphRestart { get; set; }
+    public float Action0Speed { get; set; } = 1f;
+    public int SetCurrentActionSpeedCalls { get; set; }
     public bool HasVisualSkeleton { get; set; }
     public int SkeletonAction0Index { get; set; } = -1;
     public int SkeletonAction1Index { get; set; } = -1;
@@ -100,6 +102,7 @@ public sealed class MirrorAgent
     public int AdvanceExistingRawVisualActionCalls { get; set; }
     public int InstallRawVisualActionCalls { get; set; }
     public int InstallAgentVisualActionCalls { get; set; }
+    public float LastAgentVisualActionBlendPeriodOverride { get; set; }
     public Agent.MovementControlFlag DefendMovementFlag { get; set; }
     public int SetWeaponGuardCalls { get; set; }
     public Agent.UsageDirection LastSetWeaponGuardDirection { get; set; } =

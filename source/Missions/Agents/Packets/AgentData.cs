@@ -17,18 +17,25 @@ namespace Missions.Agents.Packets
             Agent agent,
             Agent.MovementControlFlag movementFlags)
         {
+            Agent.MovementControlFlag currentMovementFlags = agent.MovementFlags;
             Agent.MovementControlFlag currentFlags =
-                agent.MovementFlags & ~Agent.MovementControlFlag.MoveMask;
-            agent.MovementFlags =
+                currentMovementFlags & ~Agent.MovementControlFlag.MoveMask;
+            Agent.MovementControlFlag desiredMovementFlags =
                 currentFlags |
                 GetLocomotionMovementFlags(movementFlags);
+            if (currentMovementFlags != desiredMovementFlags)
+                agent.MovementFlags = desiredMovementFlags;
         }
 
         public AgentData(
             Agent agent,
             ushort mountMovementId = 0,
             string mountIdentityScopeId = null,
-            System.Guid mountAgentId = default)
+            System.Guid mountAgentId = default,
+            int? mountAction0TurnDirection = null,
+            int? mountAction0TurnActionIndex = null,
+            float? mountAction0TurnProgress = null,
+            bool? mountAction0IsSyntheticTurn = null)
         {
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
@@ -46,7 +53,14 @@ namespace Missions.Agents.Packets
             if (mount != null && mount.IsActive())
             {
                 MountData = new AgentMountData(
-                    mount, mountMovementId, mountIdentityScopeId, mountAgentId);
+                    mount,
+                    mountMovementId,
+                    mountIdentityScopeId,
+                    mountAgentId,
+                    mountAction0TurnDirection: mountAction0TurnDirection,
+                    mountAction0TurnActionIndex: mountAction0TurnActionIndex,
+                    mountAction0TurnProgress: mountAction0TurnProgress,
+                    mountAction0IsSyntheticTurn: mountAction0IsSyntheticTurn);
             }
             else
             {

@@ -107,13 +107,23 @@ internal sealed class ConversationPartyTracker : IHandler
         /// <summary>Whether the party's AI was already disabled before the hold, so release preserves that state.</summary>
         public readonly bool WasAiDisabled;
 
-        public Engagement(object engagerKey, string engagerPartyId, string partyId, bool engagerIsDefender, bool wasAiDisabled)
+        /// <summary>Conversation request that currently owns this engagement.</summary>
+        public readonly string RequestId;
+
+        public Engagement(
+            object engagerKey,
+            string engagerPartyId,
+            string partyId,
+            bool engagerIsDefender,
+            bool wasAiDisabled,
+            string requestId)
         {
             EngagerKey = engagerKey;
             EngagerPartyId = engagerPartyId;
             PartyId = partyId;
             EngagerIsDefender = engagerIsDefender;
             WasAiDisabled = wasAiDisabled;
+            RequestId = requestId;
         }
     }
 
@@ -126,7 +136,8 @@ internal sealed class ConversationPartyTracker : IHandler
         string engagerPartyId,
         string partyId,
         bool wasAiDisabled,
-        bool engagerIsDefender = false)
+        bool engagerIsDefender = false,
+        string requestId = null)
     {
         if (engagerKey == null || partyId == null) return false;
 
@@ -142,7 +153,8 @@ internal sealed class ConversationPartyTracker : IHandler
                     engagerPartyId,
                     partyId,
                     current.EngagerIsDefender || engagerIsDefender,
-                    current.WasAiDisabled);
+                    current.WasAiDisabled,
+                    requestId);
                 return true;
             }
 
@@ -154,7 +166,8 @@ internal sealed class ConversationPartyTracker : IHandler
                 engagerPartyId,
                 partyId,
                 engagerIsDefender,
-                wasAiDisabled));
+                wasAiDisabled,
+                requestId));
             isEmpty = false;
             return true;
         }
@@ -177,7 +190,9 @@ internal sealed class ConversationPartyTracker : IHandler
         object engagerKey,
         out string partyId,
         out Engagement engagement,
-        out bool shouldReleaseParty)
+        out bool shouldReleaseParty,
+        string expectedRequestId = null,
+        bool requireRequestIdMatch = false)
     {
         partyId = null;
         engagement = default;
@@ -188,6 +203,7 @@ internal sealed class ConversationPartyTracker : IHandler
         lock (stateLock)
         {
             if (!engagements.TryGetValue(engagerKey, out engagement)) return false;
+            if (requireRequestIdMatch && engagement.RequestId != expectedRequestId) return false;
             var endedPartyId = partyId = engagement.PartyId;
             engagements.Remove(engagerKey);
             shouldReleaseParty = !engagements.Values.Any(x => x.PartyId == endedPartyId);

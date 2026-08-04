@@ -522,6 +522,9 @@ public class BattleDamageRouter : IBattleDamageRouter
             blow.OwnerId = -1;
         }
 
+        // The source calculated this blow against a puppet, so vanilla could not apply its main-agent multiplier.
+        ApplyPlayerReceivedDamageMultiplier(victim, ref blow, ref collisionData);
+
         bool wasMissile = IsMissileDamage(damage);
         // The victim owner relays blood so a fatal effect stays ordered before its death broadcast.
         coopMissionComponent.CombatHitPresentationHandler.PresentRoutedMeleeBlood(
@@ -546,5 +549,19 @@ public class BattleDamageRouter : IBattleDamageRouter
         {
             hero.HitPoints = Math.Max(1, (int)victim.Health);
         }
+    }
+
+    private static void ApplyPlayerReceivedDamageMultiplier(
+        Agent victim,
+        ref Blow blow,
+        ref AttackCollisionData collisionData)
+    {
+        if (!victim.IsMainAgent)
+            return;
+
+        int scaledDamage = TaleWorlds.Library.MathF.Round(
+            blow.InflictedDamage * Mission.Current.DamageToPlayerMultiplier);
+        blow.InflictedDamage = scaledDamage;
+        collisionData.InflictedDamage = scaledDamage;
     }
 }

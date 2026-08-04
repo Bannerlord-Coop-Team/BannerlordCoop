@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Roster;
@@ -19,11 +20,16 @@ internal class UpdateItemRosterHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<UpdateItemRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
 
-    public UpdateItemRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public UpdateItemRosterHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        IPartyScreenRosterRefresher partyScreenRosterRefresher)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.partyScreenRosterRefresher = partyScreenRosterRefresher;
 
         messageBroker.Subscribe<UpdateItemRoster>(Handle);
     }
@@ -59,7 +65,13 @@ internal class UpdateItemRosterHandler : IHandler
                     return;
                 }
 
-                ItemRosterPatch.AddToCountsOverride(itemRoster, new EquipmentElement(item, modifier), msg.Amount);
+                var element = new EquipmentElement(item, modifier);
+                if (!partyScreenRosterRefresher.TryApply(
+                    itemRoster,
+                    roster => ItemRosterPatch.AddToCountsOverride(roster, element, msg.Amount)))
+                {
+                    ItemRosterPatch.AddToCountsOverride(itemRoster, element, msg.Amount);
+                }
             }
             catch (Exception e)
             {

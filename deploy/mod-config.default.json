@@ -1,0 +1,105 @@
+{
+  // Bannerlord Coop gameplay configuration — owned by the Coop mod itself and
+  // applied wherever the coop server runs (dedicated server or player-hosted
+  // session). Settings for how a dedicated server PROCESS runs (save name,
+  // password, ports, autosaves) live in server-config.json instead, next to
+  // the server executable. Comments and trailing commas are allowed here.
+
+  // Campaign difficulty, applied by the HOSTING side at every boot; joining
+  // players inherit the values with the save transfer. A commented-out key
+  // keeps the save's own setting. Levels: "VeryEasy" | "Easy" | "Realistic".
+  "difficulty": {
+    // Damage players take. Left unset on a HEADLESS server (dedicated/container)
+    // this defaults to Realistic — the headless profile would otherwise push
+    // quarter damage to every joining player. On a player-hosted session the
+    // host's own game setting stays in charge unless set here.
+    // "playerReceivedDamage": "Realistic",
+
+    // "playerTroopsReceivedDamage": "VeryEasy",
+    // "combatAIDifficulty": "VeryEasy",
+    // "recruitmentDifficulty": "VeryEasy",
+    // "playerMapMovementSpeed": "VeryEasy",
+    // "stealthAndDisguiseDifficulty": "VeryEasy",
+    // "persuasionSuccessChance": "VeryEasy",
+    // "clanMemberDeathChance": "VeryEasy",
+    // "battleDeath": "VeryEasy",
+
+    // "birthAndDeath": true,                 // aging, births, natural deaths
+    // "autoAllocateClanMemberPerks": false,
+  },
+  "modOptions": {
+    // Toggle fast forward (2x speed) being enabled
+    // (Default) true: Fast forward is allowed.
+    // false: Fast forward is completely disabled.
+    "fastForwardEnabled": true,
+
+    // Toggle auto pausing
+    // (Default) true: Pause when all players are occupied (in a battle or a settlement).
+    // false: Auto pause is disabled. The game will still automatically pause for clients catching up and when there are no players online.
+    "autoPauseEnabled": true,
+
+    // Toggle clients being able to use cheats
+    // Vanilla bannerlord commands are always disabled on clients but this disables cheating in troops, equipment, teleporting etc.
+    // Default is false.
+    "clientsCanUseCheats": false,
+
+    // Toggle Gold & food change while in settlements. THIS INCLUDES INCOME
+    // false: Gold & food will remain the same while being in a settlement, including walking around the settlement, participating in tournaments etc.
+    // (Default) true: Gold & food will change the same in settlements as on the campaign map.
+    "goldFoodInfluenceChangeInSettlements": true,
+
+    // Set gold & food change mode for battles. THIS INCLUDES INCOME
+    // Disabled: No gold or food will change while in battles.
+    // (Default) OneDayMax: Gold and food change can happen at most once during a battle. e.g. Only paying for troops once during a 15 day siege.
+    // Enabled: Gold and food change happen regardless of whether a player is in a battle or not.
+    "goldFoodInfluenceChangeInBattles": "OneDayMax",
+
+    // Set gold, food & influence change for disconnected players. THIS INCLUDES INCOME
+    // (Default) false: Disconnected players won't have any gold or food change.
+    // true: Disconnected players have gold and food change.
+    "goldFoodInfluenceChangeForDisconnectedPlayers": false,
+
+    // Set grace period (hours) for AI parties to be able to join battles involving players.
+    // Default is 24, meaning AI parties can only join a player battle within a day of it starting.
+    // If set to 0, AI parties will not join in player battles.
+    "playerBattleAiJoinWindowHours": 24,
+
+    // Toggle speed limit when players are in a battle.
+    // Default is true, meaning the game will be locked at 1x speed when any player is in a battle.
+    "speedLimitWhilePlayersInBattle": true,
+
+    // Number of wanderers/companions that can exist at a time.
+    // Vanilla/default limit is numberOfTowns * 0.6 ≈ 32.
+    "wandererLimit": 32,
+
+    // Toggle scaling the wanderer/companion limit with the number of players on the campaign map.
+    // (Default) false: Use above setting "wandererLimit" to set the cap of wanderers/companions that can exist.
+    // true: Override "wandererLimit" to use a scaling cap with the number of players (including offline players).
+    // This option starts at the vanilla limit of 32 and increases depending on the player count.
+    // Each player's clan contributes to the total cap based on tier: 0, 0, 5, 5, 5, 10, 10
+    // e.g. With 3 players: 1 at tier 0 adds 0, 1 at tier 2 adds 5, 1 at tier 5 adds 10. This results in 32 + 0 + 5 + 10 = 47.
+    "wandererLimitScalesWithPlayers": false,
+
+    // Set a custom clan tier required to form a player kingdom.
+    // Vanilla/default allows players to start kingdoms from clan tier 4 onwards.
+    "playerKingdomClanTierRequired": 4,
+
+    // Toggle recovering stamina outside of settlements.
+    // In vanilla players have to wait in settlements to regenerate smithing stamina.
+    // false: More like vanilla, players have to wait in settlements to get their smithing stamina back.
+    // (Default) true: Players recovery stamina when moving around the world map as well in settlements.
+    "smithingStaminaRecoveryOutsideSettlements": true,
+
+    // Set a multiplier for increasing/decreasing smithing stamina recovery speed.
+    // The vanilla rate is 1. The default for this mod is 0.1 as stamina regenerates in the smithing screen.
+    // Setting any lower than this won't decrease speed more.
+    // Stamina is stored as an integer and ticks are rounded up to ensure heroes always recover some stamina.
+    "smithingStaminaRecoveryMultiplier": 0.1,
+
+    // Set a multiplier for increasing/decreasing the number of looter parties.
+    // The higher the multiplier, the more looter parties can exist on the map at a time.
+    // WARNING: Setting this value too high will cause performance issues.
+    // The default is 1, which is equivalent to the vanilla spawn limit.
+    "maximumLootersMultiplier": 1.0,
+  }
+}

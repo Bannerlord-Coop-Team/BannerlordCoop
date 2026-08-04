@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace GameInterface.Services.MapEvents.Messages.Conversation;
@@ -21,13 +21,22 @@ internal readonly struct NetworkRequestConversation : ICommand
     public readonly ConversationRestartSource Source;
     [ProtoMember(5)]
     public readonly bool ArmyTalkEncounter;
+    [ProtoMember(6)]
+    public readonly string RequestId;
 
-    public NetworkRequestConversation(string defenderId, string attackerId, bool forcePlayerOutFromSettlement, ConversationRestartSource source, bool armyTalkEncounter)
+    public NetworkRequestConversation(
+        string defenderId,
+        string attackerId,
+        bool forcePlayerOutFromSettlement,
+        ConversationRestartSource source,
+        bool armyTalkEncounter,
+        string requestId = null)
     {
         DefenderId = defenderId;
         AttackerId = attackerId;
         ForcePlayerOutFromSettlement = forcePlayerOutFromSettlement;
         Source = source;
         ArmyTalkEncounter = armyTalkEncounter;
+        RequestId = requestId;
     }
 }

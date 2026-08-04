@@ -17,7 +17,9 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Helpers;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -46,15 +48,23 @@ internal class CompanionsCommands
     /// <summary>
     /// View a list of all wanderers in the game
     /// </summary>
-    [CommandLineArgumentFunction("listwanderers", "coop.debug.companions")]
+    [CommandLineArgumentFunction("list_wanderers", "coop.debug.companions")]
     public static string ListWanderersCommand(List<string> strings)
     {
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in Hero.AllAliveHeroes)
         {
             if (hero.IsWanderer)
             {
-                stringBuilder.AppendLine(hero.CurrentSettlement + " (" + hero.Name.ToString() + ")");
+                if (!objectManager.TryGetIdWithLogging(hero, out var heroId))
+                {
+                    stringBuilder.AppendLine($"Failed to resolve hero id for wanderer with name {hero.Name}");
+                    continue;
+                }
+
+                stringBuilder.AppendLine($"{hero.Name} (ID: {heroId}) Current Settlement: {hero.CurrentSettlement}");
             }
         }
 
@@ -339,6 +349,20 @@ internal class CompanionsCommands
 
         PartyScreenHelper.CloseScreen(true, true);
         return "PARTY_SCREEN_CLOSED";
+    }
+
+    [CommandLineArgumentFunction("commit_party_screen", "coop.debug.companions")]
+    public static string CommitPartyScreenCommand(List<string> args)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (args.Count != 0) return "Usage: coop.debug.companions.commit_party_screen";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState))
+            return "No active party screen.";
+
+        PartyScreenHelper.CloseScreen(false);
+        return Game.Current?.GameStateManager?.ActiveState is PartyState
+            ? "PARTY_SCREEN_COMMIT_REJECTED"
+            : "PARTY_SCREEN_COMMITTED";
     }
 
     private static Hero CreateFixtureCompanion(Hero template,

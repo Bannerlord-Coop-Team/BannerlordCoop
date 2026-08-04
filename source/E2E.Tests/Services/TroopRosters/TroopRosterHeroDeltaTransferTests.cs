@@ -13,7 +13,7 @@ using static GameInterface.Services.ObjectManager.ObjectManager;
 namespace E2E.Tests.Services.TroopRosters;
 
 /// <summary>
-/// Exercises the delta apply path (<see cref="ITroopRosterInterface.ApplyTroopRosterDeltas"/>) for the two
+/// Exercises the delta apply path (<see cref="ITroopRosterInterface.TryApplyTroopRosterDeltas"/>) for the two
 /// cases where a roster element is a <see cref="Hero"/> and therefore carries party linkage that AddToCounts
 /// mutates as a side effect: a companion (member roster) and a prisoner (prison roster).
 ///
@@ -32,8 +32,8 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
-    private static TroopRosterData Delta(string characterId, int number)
-        => new TroopRosterData(new[] { new TroopRosterElementData(characterId, number, 0, 0) });
+    private static TroopRosterData Delta(string characterId, int number, int xp = 0)
+        => new TroopRosterData(new[] { new TroopRosterElementData(characterId, number, 0, xp) });
 
     [Fact]
     public void CompanionTransfer_MainToOtherParty_ViaDelta_SyncsRostersAndPartyBelongedTo()
@@ -68,11 +68,11 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(rightPartyId, out var rightParty));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leftPartyId, out var leftParty));
 
-            troopRosterInterface.ApplyTroopRosterDeltas(new[]
+            Assert.True(troopRosterInterface.TryApplyTroopRosterDeltas(new[]
             {
                 (leftParty.MemberRoster, Delta(companionCharacterId, 1)),
                 (rightParty.MemberRoster, Delta(companionCharacterId, -1)),
-            });
+            }));
         });
         TestEnvironment.FlushCoalescer();
 
@@ -121,11 +121,11 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(rightPartyId, out var rightParty));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leftPartyId, out var leftParty));
 
-            troopRosterInterface.ApplyTroopRosterDeltas(new[]
+            Assert.True(troopRosterInterface.TryApplyTroopRosterDeltas(new[]
             {
                 (leftParty.Party.PrisonRoster, Delta(prisonerCharacterId, 1)),
                 (rightParty.Party.PrisonRoster, Delta(prisonerCharacterId, -1)),
-            });
+            }));
         });
         TestEnvironment.FlushCoalescer();
 
@@ -139,6 +139,62 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.Equal(0, rightParty.Party.PrisonRoster.GetTroopCount(prisoner.CharacterObject));
             Assert.Equal(1, leftParty.Party.PrisonRoster.GetTroopCount(prisoner.CharacterObject));
             Assert.Same(leftParty.Party, prisoner.PartyBelongedToAsPrisoner);
+        }
+    }
+
+    [Fact]
+    public void FullStackTransferAfterConcurrentXpChange_IsRejectedAtomically()
+    {
+        string rightPartyId = null;
+        string leftPartyId = null;
+        string characterId = null;
+
+        Server.Call(() =>
+        {
+            var rightParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var leftParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var character = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+
+            int index = rightParty.MemberRoster.AddToCounts(character, 3);
+            rightParty.MemberRoster.data[index].Xp = 65;
+
+            Assert.True(Server.ObjectManager.TryGetId(rightParty, out rightPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(leftParty, out leftPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(character, out characterId));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Server.Call(() =>
+        {
+            var troopRosterInterface = Server.Resolve<ITroopRosterInterface>();
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(rightPartyId, out var rightParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leftPartyId, out var leftParty));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            Assert.Equal(65, rightParty.MemberRoster.GetElementXp(
+                rightParty.MemberRoster.FindIndexOfTroop(character)));
+
+            var applied = troopRosterInterface.TryApplyTroopRosterDeltas(new[]
+            {
+                (leftParty.MemberRoster, Delta(characterId, 3, 60)),
+                (rightParty.MemberRoster, Delta(characterId, -3, -60)),
+            });
+
+            Assert.False(applied);
+            Assert.Equal(3, rightParty.MemberRoster.GetTroopCount(character));
+            Assert.Equal(65, rightParty.MemberRoster.GetElementXp(
+                rightParty.MemberRoster.FindIndexOfTroop(character)));
+            Assert.Equal(0, leftParty.MemberRoster.GetTroopCount(character));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(rightPartyId, out var rightParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(leftPartyId, out var leftParty));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+
+            Assert.Equal(3, rightParty.MemberRoster.GetTroopCount(character));
+            Assert.Equal(0, leftParty.MemberRoster.GetTroopCount(character));
         }
     }
 

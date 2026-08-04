@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
@@ -29,6 +30,9 @@ namespace GameInterface.Services.Party.Handlers;
 
 internal class PartyDoneLogicHandler : IHandler
 {
+    private const string PartyChangedMessage =
+        "The party changed before these edits were applied. Reopen the party screen and try again.";
+
     private static readonly ILogger logger = LogManager.GetLogger<PartyDoneLogicHandler>();
 
     private readonly IMessageBroker messageBroker;
@@ -133,6 +137,7 @@ internal class PartyDoneLogicHandler : IHandler
     private void Handle_CompletePartyDoneLogic(MessagePayload<NetworkCompleteDoneLogic> obj)
     {
         var message = obj.What;
+        var requester = obj.Who as NetPeer;
         
         GameThread.RunSafe(() =>
         {
@@ -196,7 +201,18 @@ internal class PartyDoneLogicHandler : IHandler
             // Only apply deltas if not ransoming. SellPrisonersAction already changes troop rosters
             if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
             {
-                troopRosterInterface.ApplyTroopRosterDeltas(rosterDeltas);
+                if (!troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
+                {
+                    logger.Warning(
+                        "Rejected party changes for {MainHeroId}: {Reason}",
+                        message.MainHeroId,
+                        PartyChangedMessage);
+                    if (requester != null)
+                    {
+                        network.Send(requester, new SendInformationMessage(PartyChangedMessage));
+                    }
+                    return;
+                }
             }
             PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
             ApplyRightOwnerPartyItemRoster(mainHero, message);
@@ -252,7 +268,7 @@ internal class PartyDoneLogicHandler : IHandler
         TroopRosterData leftPrisonerRosterData,
         TroopRosterData rightPrisonerRosterData)
     {
-        // Collect every roster delta and apply them together: ApplyTroopRosterDeltas removes before it
+        // Collect every roster delta and apply them together: TryApplyTroopRosterDeltas removes before it
         // adds across all rosters, so a hero/prisoner moved between parties keeps its party linkage
         // (the destination addition is the last AddToCounts on that hero).
         var rosterDeltas = new List<(TroopRoster roster, TroopRosterData delta)>();

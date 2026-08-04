@@ -12,6 +12,9 @@ using HarmonyLib;
 using LiteNetLib;
 using ProtoBuf.Meta;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Environment.Instance;
 
@@ -142,11 +145,17 @@ public abstract class EnvironmentInstance : IDisposable
     private class StaticScope : IDisposable
     {
         private readonly ILifetimeScope previousContainer;
+        private readonly MBObjectManager previousObjectManager;
+        private readonly Campaign previousCampaign;
+        private readonly Game previousGame;
+        private readonly TaleWorlds.MountAndBlade.Module previousModule;
+        private readonly TestMessageBroker previousMessageBroker;
         private readonly bool wasServer;
 
         public StaticScope(EnvironmentInstance instance)
         {
             Monitor.Enter(GameInstance.@lock);
+            bool restorePreviousStatics = false;
 
             // The lock must be released even when the body throws (resolving from an instance a
             // concurrent test already disposed), otherwise it stays owned by this (possibly
@@ -155,22 +164,39 @@ public abstract class EnvironmentInstance : IDisposable
             {
                 // Save previous static values
                 wasServer = ModInformation.IsServer;
+                previousObjectManager = MBObjectManager.Instance;
+                previousCampaign = Campaign.Current;
+                previousGame = Game.Current;
+                previousModule = TaleWorlds.MountAndBlade.Module.CurrentModule;
                 if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
                 {
                     // If no previous container is set, set it to the current container
                     previousContainer = instance.Container;
                 }
+                previousMessageBroker = previousContainer.Resolve<TestMessageBroker>();
+                var instanceMessageBroker = instance.Container.Resolve<TestMessageBroker>();
 
                 // Set new static values
+                restorePreviousStatics = true;
                 instance.GameInstance.SetStatics();
 
                 ModInformation.IsServer = instance is ServerInstance;
-                instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
+                instanceMessageBroker.SetStaticInstance();
                 GameInterface.ContainerProvider.SetContainer(instance.Container);
             }
             catch
             {
-                Monitor.Exit(GameInstance.@lock);
+                try
+                {
+                    if (restorePreviousStatics)
+                    {
+                        RestorePreviousStatics();
+                    }
+                }
+                finally
+                {
+                    Monitor.Exit(GameInstance.@lock);
+                }
                 throw;
             }
         }
@@ -179,15 +205,23 @@ public abstract class EnvironmentInstance : IDisposable
         {
             try
             {
-                // Restore previous static values
-                ModInformation.IsServer = wasServer;
-                GameInterface.ContainerProvider.SetContainer(previousContainer);
-                previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
+                RestorePreviousStatics();
             }
             finally
             {
                 Monitor.Exit(GameInstance.@lock);
             }
+        }
+
+        private void RestorePreviousStatics()
+        {
+            MBObjectManager.Instance = previousObjectManager;
+            Campaign.Current = previousCampaign;
+            Game.Current = previousGame;
+            TaleWorlds.MountAndBlade.Module.CurrentModule = previousModule;
+            ModInformation.IsServer = wasServer;
+            GameInterface.ContainerProvider.SetContainer(previousContainer);
+            previousMessageBroker.SetStaticInstance();
         }
     }
 
@@ -202,8 +236,14 @@ public abstract class EnvironmentInstance : IDisposable
         {
             var disableMethod = AccessTools.Method(typeof(PatchScope), nameof(Disable));
             methods = disableMethods.ToArray();
+            // Priority.Last, not First: an explicit priority keeps the disable's position deterministic
+            // across container rebuilds (same-priority prefixes run in patch-insertion order, which varies),
+            // but it must sort AFTER the mod's own prefixes — a bool prefix returning false skips every
+            // later bool prefix, and tests drive real patched natives expecting their routing prefixes
+            // (e.g. SiegeEntryFlowPatches' publish-and-pre-null shapes) to still fire while only the
+            // native body is suppressed.
             patches = methods
-                .Select(_ => new HarmonyMethod(disableMethod) { priority = Priority.First })
+                .Select(_ => new HarmonyMethod(disableMethod) { priority = Priority.Last })
                 .ToArray();
 
             for (int i = 0; i < methods.Length; i++)

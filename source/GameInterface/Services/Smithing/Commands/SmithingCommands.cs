@@ -203,6 +203,31 @@ internal class SmithingCommands
     }
 
     /// <summary>
+    /// View crafting stamina of all heroes in party on client and all heroes on server
+    /// </summary>
+    [CommandLineArgumentFunction("stamina", "coop.debug.crafting")]
+    public static string ViewCraftingStaminaCommand(List<string> strings)
+    {
+        StringBuilder stringBuilder = new StringBuilder();
+        CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+
+        foreach (var heroCraftingRecord in craftingCampaignBehavior._heroCraftingRecords)
+        {
+            if (ModInformation.IsServer || heroCraftingRecord.Key.PartyBelongedTo == Hero.MainHero.PartyBelongedTo)
+            {
+                stringBuilder.AppendLine($"{heroCraftingRecord.Key.Name} ({heroCraftingRecord.Key.StringId}): {heroCraftingRecord.Value.CraftingStamina}");
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "No hero crafting stamina data was found.";
+    }
+
+    /// <summary>
     /// View crafted item history, showing all players on server and current player on client
     /// </summary>
     [CommandLineArgumentFunction("crafteditemhistory", "coop.debug.crafting")]

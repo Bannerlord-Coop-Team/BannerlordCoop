@@ -719,6 +719,11 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
     {
         Agent agent = SpawnAgent(context, controllerType, out mirror);
         Assert.True(context.Registry.TryRegisterAgent(controllerId, agentId, agent));
+        if (controllerType == AgentControllerType.Player
+            && context.Registry.IsLocallyControlled(agent))
+        {
+            context.Mock.MainAgent = agent;
+        }
         return agent;
     }
     private void RunScenario(

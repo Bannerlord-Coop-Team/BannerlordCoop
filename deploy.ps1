@@ -231,6 +231,11 @@ Get-ChildItem -LiteralPath $TargetDir -Filter "*.dll" -Recurse -ErrorAction Igno
     Where-Object { $_.PSIsContainer -eq $false } |
     Copy-Item -Force -Destination $BinDir
 
+$crashReporterPath = Join-Path $TargetDir "Coop.CrashReporter.exe"
+if (Test-Path -LiteralPath $crashReporterPath -PathType Leaf) {
+    Copy-Item -Force -LiteralPath $crashReporterPath -Destination $BinDir
+}
+
 # Write SubModule.xml to mod folder
 Write-Output "Writing SubModule.xml..."
 

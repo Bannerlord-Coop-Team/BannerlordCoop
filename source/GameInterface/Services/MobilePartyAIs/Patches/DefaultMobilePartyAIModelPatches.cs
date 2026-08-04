@@ -15,6 +15,8 @@ internal class DefaultMobilePartyAIModelPatches
 {
     public static readonly ConditionalWeakTable<MobilePartyAi, Dictionary<MobileParty, CampaignTime>> DisablePlayerAttackTimes = new ConditionalWeakTable<MobilePartyAi, Dictionary<MobileParty, CampaignTime>>();
     private static readonly Dictionary<MobileParty, Dictionary<MobileParty, CampaignTime>> PersistedDisablePlayerAttackTimes = new Dictionary<MobileParty, Dictionary<MobileParty, CampaignTime>>();
+    private static readonly Dictionary<MobileParty, Dictionary<IFaction, CampaignTime>> DisabledFactionAttackTimes =
+        new Dictionary<MobileParty, Dictionary<IFaction, CampaignTime>>();
 
     internal static void PreventAttacksUntil(MobileParty attackerParty, MobileParty targetParty, CampaignTime disabledUntil)
     {
@@ -31,6 +33,21 @@ internal class DefaultMobilePartyAIModelPatches
         disableTimes[targetParty] = disabledUntil;
     }
 
+    internal static void PreventFactionAttacksUntil(
+        MobileParty attackerParty,
+        IFaction targetFaction,
+        CampaignTime disabledUntil)
+    {
+        if (attackerParty == null || targetFaction == null) return;
+        if (!DisabledFactionAttackTimes.TryGetValue(attackerParty, out var disableTimes))
+        {
+            disableTimes = new Dictionary<IFaction, CampaignTime>();
+            DisabledFactionAttackTimes[attackerParty] = disableTimes;
+        }
+
+        disableTimes[targetFaction] = disabledUntil;
+    }
+
     internal static IEnumerable<(MobileParty AttackerParty, MobileParty TargetParty, CampaignTime DisabledUntil)> GetPersistedAttackProtections()
     {
         foreach (var attackerEntry in PersistedDisablePlayerAttackTimes)
@@ -38,6 +55,17 @@ internal class DefaultMobilePartyAIModelPatches
             foreach (var targetEntry in attackerEntry.Value)
             {
                 yield return (attackerEntry.Key, targetEntry.Key, targetEntry.Value);
+            }
+        }
+    }
+
+    internal static IEnumerable<(MobileParty AttackerParty, IFaction TargetFaction, CampaignTime DisabledUntil)> GetPersistedFactionAttackProtections()
+    {
+        foreach (var attackerEntry in DisabledFactionAttackTimes)
+        {
+            foreach (var factionEntry in attackerEntry.Value)
+            {
+                yield return (attackerEntry.Key, factionEntry.Key, factionEntry.Value);
             }
         }
     }
@@ -51,6 +79,7 @@ internal class DefaultMobilePartyAIModelPatches
         }
 
         PersistedDisablePlayerAttackTimes.Clear();
+        DisabledFactionAttackTimes.Clear();
     }
 
     internal static void PrunePersistedAttackProtections(CampaignTime currentTime)
@@ -63,6 +92,17 @@ internal class DefaultMobilePartyAIModelPatches
 
         foreach (var protection in staleProtections)
             RemoveAttackProtection(protection.AttackerParty, protection.TargetParty);
+
+        foreach (var attackerEntry in DisabledFactionAttackTimes.ToArray())
+        {
+            foreach (var factionEntry in attackerEntry.Value
+                         .Where(entry => entry.Key == null || currentTime > entry.Value)
+                         .ToArray())
+                attackerEntry.Value.Remove(factionEntry.Key);
+
+            if (attackerEntry.Key?.IsActive != true || attackerEntry.Value.Count == 0)
+                DisabledFactionAttackTimes.Remove(attackerEntry.Key);
+        }
     }
 
     internal static void RemoveAttackProtectionsForParty(MobileParty party)
@@ -75,6 +115,8 @@ internal class DefaultMobilePartyAIModelPatches
 
         foreach (var protection in staleProtections)
             RemoveAttackProtection(protection.AttackerParty, protection.TargetParty);
+
+        DisabledFactionAttackTimes.Remove(party);
     }
 
     private static void RemoveAttackProtection(MobileParty attackerParty, MobileParty targetParty)
@@ -131,23 +173,37 @@ internal class DefaultMobilePartyAIModelPatches
             return false;
         }
     }
+    internal static bool IsAttackPrevented(MobileParty party, MobileParty targetParty)
+        => !CanAttackTargetParty(party, targetParty);
+
     private static bool CanAttackTargetParty(MobileParty party, MobileParty targetParty)
     {
-        if (party?.Ai == null || targetParty == null)
+        if (party == null || targetParty == null)
             return true;
 
-        if (!DisablePlayerAttackTimes.TryGetValue(party.Ai, out var disableTimes))
-            return true;
-
-        if (!disableTimes.TryGetValue(targetParty, out var disableTime))
-            return true;
-
-        if (disableTime.IsPast)
+        if (party.Ai != null &&
+            DisablePlayerAttackTimes.TryGetValue(party.Ai, out var disableTimes) &&
+            disableTimes.TryGetValue(targetParty, out var disableTime))
         {
+            if (!disableTime.IsPast)
+                return false;
+
             RemoveAttackProtection(party, targetParty);
+        }
+
+        if (!DisabledFactionAttackTimes.TryGetValue(party, out var factionDisableTimes) ||
+            targetParty.MapFaction == null ||
+            !factionDisableTimes.TryGetValue(targetParty.MapFaction, out var factionDisableTime))
+        {
             return true;
         }
 
-        return false;
+        if (!factionDisableTime.IsPast)
+            return false;
+
+        factionDisableTimes.Remove(targetParty.MapFaction);
+        if (factionDisableTimes.Count == 0)
+            DisabledFactionAttackTimes.Remove(party);
+        return true;
     }
 }

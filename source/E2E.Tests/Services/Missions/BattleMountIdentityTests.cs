@@ -207,9 +207,10 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
             // What BattleAgentSpawnedPatch publishes when WE spawn a troop into the battle.
             owner.Resolve<IMessageBroker>().Publish(this, new AgentSpawnedInBattle(rider));
+            controller.OnMissionTick(0f);
 
-            // Rider AND horse registered under us, and the broadcast record carries the horse's id so peers
-            // register their puppet's horse under the same identity.
+            // The next tick flushes the bounded spawn batch. Rider AND horse are registered under us, and the
+            // record carries the horse's id so peers register their copy under the same identity.
             Assert.True(registry.TryGetAgentInfo(rider, out var riderInfo));
             Assert.True(registry.TryGetAgentInfo(horse, out var horseInfo));
             Assert.Equal("owner", horseInfo.CurrentAuthority);
@@ -598,6 +599,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             remoteMirror.LookDirection = new Vec3(0f, 1f, 0f);
             remoteMirror.MovementDirection = new Vec2(0.6f, 0.8f);
             remoteMirror.InputVector = new Vec2(0.3f, 0.7f);
+            remoteMirror.RealGlobalVelocity = new Vec3(3f, 4f, 0f);
 
             var packet = new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(remoteHorse) });
             component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);

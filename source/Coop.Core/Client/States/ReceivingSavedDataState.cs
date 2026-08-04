@@ -2,6 +2,7 @@
 using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
+using System.Globalization;
 
 namespace Coop.Core.Client.States;
 
@@ -41,7 +42,9 @@ public class ReceivingSavedDataState : ClientStateBase
     {
         int remaining = obj.What.PacketsRemaining;
         string description = remaining > 0
-            ? $"Waiting for host save data... {remaining:N0} save packets remaining"
+            ? "Waiting for host save data... " +
+              remaining.ToString("N0", CultureInfo.InvariantCulture) +
+              " save packets remaining"
             : "Host save data received.";
 
         loadingInterface.SetLoadingMessage(
