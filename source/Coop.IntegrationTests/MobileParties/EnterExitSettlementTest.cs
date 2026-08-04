@@ -7,6 +7,8 @@ using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Settlements.Interfaces;
 using Moq;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -43,7 +45,7 @@ namespace Coop.IntegrationTests.MobileParties
             // request resolves end-to-end and the receiving clients can apply the entry.
             var party = ObjectHelper.SkipConstructor<MobileParty>();
             var settlement = ObjectHelper.SkipConstructor<Settlement>();
-            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            RegisterPartyForClient(client1, party, "party1");
             TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
 
             // Act
@@ -309,7 +311,7 @@ namespace Coop.IntegrationTests.MobileParties
             party.Party.MobileParty = party;
             party.Party._mapEventSide = ObjectHelper.SkipConstructor<MapEventSide>();
             var settlement = ObjectHelper.SkipConstructor<Settlement>();
-            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            RegisterPartyForClient(client1, party, "party1");
             TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
             TestEnvironment.Server.NetworkSentMessages.Clear();
 
@@ -337,7 +339,7 @@ namespace Coop.IntegrationTests.MobileParties
             var currentSettlement = ObjectHelper.SkipConstructor<Settlement>();
             var requestedSettlement = ObjectHelper.SkipConstructor<Settlement>();
             party._currentSettlement = currentSettlement;
-            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            RegisterPartyForClient(client1, party, "party1");
             TestEnvironment.RegisterObjectInNetwork(currentSettlement, "settlement1");
             TestEnvironment.RegisterObjectInNetwork(requestedSettlement, "settlement2");
             TestEnvironment.Server.NetworkSentMessages.Clear();
@@ -367,7 +369,7 @@ namespace Coop.IntegrationTests.MobileParties
             var party = ObjectHelper.SkipConstructor<MobileParty>();
             var settlement = ObjectHelper.SkipConstructor<Settlement>();
             party._currentSettlement = settlement;
-            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            RegisterPartyForClient(client1, party, "party1");
             TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
             TestEnvironment.Server.NetworkSentMessages.Clear();
 
@@ -393,7 +395,7 @@ namespace Coop.IntegrationTests.MobileParties
             var party = ObjectHelper.SkipConstructor<MobileParty>();
             var settlement = ObjectHelper.SkipConstructor<Settlement>();
             settlement.SiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
-            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            RegisterPartyForClient(client1, party, "party1");
             TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
 
             GameThreadTestRunner.Run(() =>
@@ -421,7 +423,7 @@ namespace Coop.IntegrationTests.MobileParties
             var client1 = TestEnvironment.Clients.First();
 
             var party = ObjectHelper.SkipConstructor<MobileParty>();
-            TestEnvironment.RegisterObjectInNetwork(party, "party1");
+            RegisterPartyForClient(client1, party, "party1");
 
             // Act
             GameThreadTestRunner.Run(() =>
@@ -433,6 +435,28 @@ namespace Coop.IntegrationTests.MobileParties
                 client.Resolve<Mock<ISettlementInterface>>()
                     .Verify(s => s.PartyLeaveSettlement(party), Times.Once);
             }
+        }
+
+        private void RegisterPartyForClient(
+            EnvironmentInstance client,
+            MobileParty party,
+            string partyId)
+        {
+            const string controllerId = "player1";
+
+            TestEnvironment.RegisterObjectInNetwork(party, partyId);
+            TestEnvironment.Server.Call(() =>
+            {
+                var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
+                Assert.True(playerManager.AddPlayer(
+                    new Player(
+                        controllerId,
+                        string.Empty,
+                        partyId,
+                        string.Empty,
+                        string.Empty)));
+                playerManager.SetPeer(controllerId, client.NetPeer);
+            });
         }
     }
 }
