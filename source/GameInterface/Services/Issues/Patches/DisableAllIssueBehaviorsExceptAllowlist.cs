@@ -304,6 +304,31 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
         // VillageNeedsToolsIssueOwnership/VillageNeedsToolsIssueHandler choke point unchanged); the §3.5 fallback
         // (§7 item 2) is implemented as designed, tightened to only run for the recorded owner.
         typeof(EscortMerchantCaravanIssueBehavior),
+        // Tier 3 (see doc/GroupA_HostileMobilePartySync_Design_v3.md §0/§8, which excluded this type from
+        // Group A pending its own dedicated review) - The Conquest of a Settlement, TaleWorlds.CampaignSystem.dll.
+        // Purely reactive: no DeclareWarAction/ChangeOwnerOfSettlementAction/MakePeaceAction/ChangeKingdomAction
+        // call anywhere in its own type (confirmed by decompile) - it only needs to correctly recognize when
+        // those things happen elsewhere and resolve the quest accordingly, not originate any of them itself.
+        // Two confirmed, root-caused bugs, same root cause (ambient MobileParty.MainParty/Hero.MainHero reads
+        // instead of the quest's real recorded owner): (1) OnSiegeCompleted's trigger, MapEvent.FinalizeEventAux,
+        // only ever runs its real body on the coop server's own process, and RegisterEvents() is only ever wired
+        // on the genuine accepter's own machine (ctor doesn't call it; the generic accept-mirror replay only
+        // constructs the Quest object, never calls StartQuest()) - so this listener silently never fires at all
+        // unless the accepter happens to be the server operator, and even then compares against the wrong
+        // reference point. Fixed by neutering the vanilla per-instance listener and replacing it with one
+        // server-side, ownership-resolving module-level listener - see
+        // Patches.TheConquestOfSettlementSiegeCompletionPatches's doc comment for the full derivation. (2)
+        // OnSettlementOwnerChanged's ByBarter success branch compares newOwner == Hero.MainHero instead of the
+        // quest's real recorded owner, reachable via SettlementOwnershipHandler's existing broadcast+redispatch -
+        // fixed by Patches.TheConquestOfSettlementSettlementOwnerChangedPatch. No orphaned standalone disable
+        // patch was found for this type (grepped the whole tree - zero hits; the design doc's own citation of
+        // one at source/GameInterface/Services/MobileParties/Patches/Disable/DisableTheConquestOfSettlementIssueBehavior.cs
+        // is confirmed absent from the current tree), so the allowlist entry plus this type's own bespoke
+        // Interfaces/Messages/Handlers/Patches set (source/GameInterface/Services/Issues/*/TheConquestOfSettlement*.cs)
+        // is the whole of this type's Step 0 + gap-closing work. IsThereAlternativeSolution/IsThereLordSolution
+        // are both false (confirmed by decompile), so no alternative-solution or lord-solution infrastructure is
+        // needed.
+        typeof(TheConquestOfSettlementIssueBehavior),
     };
 
     /// <summary>

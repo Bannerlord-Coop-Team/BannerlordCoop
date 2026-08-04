@@ -170,6 +170,16 @@ internal static class GenericAcceptMirrorIssueTypes
         // ever set later by the dialogue-triggered SpawnCaravan() - is handled entirely separately by
         // Patches.EscortMerchantCaravanPartySpawnGatePatch, not by this generic accept mirror.
         typeof(EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssue),
+        // Tier 3: The Conquest of a Settlement - GenerateIssueQuest(questId) forwards IssueOwner/the
+        // already-replicated _targetSettlement (captured/broadcast at creation time, same shape as Caravan
+        // Ambush's own target settlement - see ITheConquestOfSettlementIssueInterface's doc comment)/a fixed
+        // 60-day due time/RewardGold (a plain const 20000, not even IssueDifficultyMultiplier-dependent -
+        // confirmed by decompile). All already frozen/deterministic by accept time, so a bare replay of
+        // IssueManager.StartIssueQuest lands on a byte-identical TheConquestOfSettlementIssueQuest on every
+        // peer. This quest is purely reactive (no spawned MobileParty, no bespoke accept-time roll) - see
+        // Patches.TheConquestOfSettlementSiegeCompletionPatches/TheConquestOfSettlementSettlementOwnerChangedPatch
+        // for the two real (non-accept-time) bugs this type needed fixing.
+        typeof(TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue),
     };
 
     internal static readonly HashSet<Type> AlternativeSolutionMirrorEligible = new HashSet<Type>
