@@ -12,6 +12,7 @@ using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Locations;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -34,6 +35,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private readonly ILocationOwnedAgentReplicator npcReplicator;
     private readonly ILocationPuppetSpawner npcPuppetSpawner;
     private readonly ILocationPopulationDirector populationDirector;
+    private readonly ILocationAuthorityMigrator authorityMigrator;
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -46,6 +48,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         ILocationPuppetRosterBinder rosterBinder,
         IBattleAgentBudget agentBudget,
         ILocationAgentSpawnBatchCodec spawnBatchCodec,
+        IMissionContext missionContext,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent)
@@ -67,6 +70,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         npcPuppetSpawner = new LocationPuppetSpawner(
             messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, agentBudget, spawnBatchCodec);
         populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap);
+        authorityMigrator = new LocationAuthorityMigrator(
+            messageBroker, coopMissionComponent, session, bindingMap, missionContext);
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
     }
@@ -78,6 +83,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         npcReplicator.Dispose();
         npcPuppetSpawner.Dispose();
         populationDirector.Dispose();
+        authorityMigrator.Dispose();
 
         base.Dispose();
     }

@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents;
@@ -1284,6 +1285,11 @@ public class AgentMovementHandler : IAgentMovementHandler
         // BattleAuthorityMigrator owns battle withdrawal because it can distinguish the player's party from
         // NPC forces the departed host was running. Skip this location-style all-controller cleanup.
         if (BattleSpawnGate.IsCoopBattleActive) return;
+
+        // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
+        // controller's PLAYER agent — its host-owned NPC puppets must survive for adopt-in-place migration,
+        // so this all-agents sweep would fade the whole crowd out with its host.
+        if (LocationNpcGate.IsCoopLocationMissionActive) return;
 
         bool sceneActive = Mission.Current != null;
 
