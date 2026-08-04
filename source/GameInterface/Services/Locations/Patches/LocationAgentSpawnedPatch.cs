@@ -1,7 +1,9 @@
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -52,6 +54,8 @@ internal class LocationAgentSpawnedPatch
     new[] { ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Ref, ArgumentType.Ref, ArgumentType.Normal })]
 internal class LocationMonsterSpawnedPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(LocationMonsterSpawnedPatch));
+
     [HarmonyPostfix]
     private static void Postfix(Agent __result, EquipmentElement equipmentElement, EquipmentElement harnessRosterElement)
     {
@@ -73,7 +77,9 @@ internal class LocationMonsterSpawnedPatch
         if (itemId == null)
         {
             // Without the item the receiver cannot re-spawn the monster; keep it host-local rather
-            // than ship a broken record.
+            // than ship a broken record — but say so, or a peer's missing animal has nothing to grep.
+            Logger.Warning("[LocationNpc] Animal '{Item}' has no object id — spawned host-local only, not replicated",
+                equipmentElement.Item?.StringId ?? "<null>");
             return;
         }
 

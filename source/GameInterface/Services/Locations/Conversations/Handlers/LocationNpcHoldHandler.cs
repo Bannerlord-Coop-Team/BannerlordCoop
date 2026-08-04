@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Locations.Messages.Conversation;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.MountAndBlade;
@@ -63,7 +64,7 @@ internal class LocationNpcHoldHandler : IHandler
             if (!objectManager.TryGetObject<Location>(locationId, out var location) || location == null) return;
             if (!objectManager.TryGetObject<CharacterObject>(characterId, out var character) || character == null) return;
 
-            foreach (var entry in location.GetCharacterList())
+            foreach (var entry in location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
             {
                 if (entry?.Character != character) continue;
 

@@ -193,10 +193,14 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     // back to plain engine AI — stationary for humans (SR-031), native idle wandering for animals.
     private bool ReviveSettlementAi(Agent agent)
     {
+        // An adopted MOUNT (scene horses) only changes authority — it is not a simulated combatant
+        // and must not get an engine AI controller, mirroring battle mount adoption.
+        if (agent.IsMount) return true;
+
         agent.Controller = AgentControllerType.AI;
         agent.SetIsAIPaused(false);
 
-        if (!agent.IsHuman) return true; // animals need no navigator
+        if (!agent.IsHuman) return true; // non-mount animals need no navigator
 
         var entry = CampaignMission.Current?.Location?.GetLocationCharacter(agent.Origin);
         if (entry == null)

@@ -251,7 +251,9 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         string actionSetCode;
         if (entry != null)
         {
-            buildData = entry.GetAgentBuildData();
+            // NoHorses mirrors every native settlement spawn (the equipment override below already
+            // carries no horse, since the host's agent spawned horseless — this is the belt).
+            buildData = entry.GetAgentBuildData().NoHorses(noHorses: true);
             actionSetCode = entry.ActionSetCode;
         }
         else
