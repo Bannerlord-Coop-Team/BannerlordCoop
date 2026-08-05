@@ -33,10 +33,6 @@ internal class CoopEmptyTeamDeploymentPatch
     // stand down here. Game-thread only; ThreadStatic is belt-and-suspenders.
     [ThreadStatic] private static bool _inMakeTeamPlans;
 
-    // TEMP diagnostic: log each distinct team we treat as planned, once, so a live run confirms this build is active
-    // and the override is firing on the foreign (puppet) team. Remove once the non-host spawn is confirmed solid.
-    private static readonly HashSet<Team> _loggedOverrides = new HashSet<Team>();
-
     [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
     [HarmonyPrefix]
     private static void MakeTeamPlans_Prefix() => _inMakeTeamPlans = true;
@@ -55,9 +51,6 @@ internal class CoopEmptyTeamDeploymentPatch
             && IsForeignTeam(team))
         {
             __result = true;
-            if (_loggedOverrides.Add(team))
-                Logger.Information("[BattleDiag] Treating foreign team side={Side} (activeAgents={Count}) as deployment-planned so it doesn't stall the local spawn gate",
-                    team.Side, team.ActiveAgents.Count);
         }
     }
 
