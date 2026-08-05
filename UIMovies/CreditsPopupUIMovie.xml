@@ -44,6 +44,26 @@
                                 <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                                             MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="32"
                                             Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@SponsorsHeaderText"/>
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="24" Brush="Clan.TabControl.Text" Brush.FontSize="23"
+                                            Brush.FontColor="#B8B8B8FF"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@SponsorsText"/>
+
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="32"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@SupportersHeaderText"/>
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="24" Brush="Clan.TabControl.Text" Brush.FontSize="23"
+                                            Brush.FontColor="#B8B8B8FF"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                                            Text="@SupportersText"/>
+
+                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                            MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="32"
+                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
                                             Text="@ContributorsHeaderText"/>
                                 <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                                             MarginBottom="24" Brush="Clan.TabControl.Text" Brush.FontSize="23"
@@ -56,20 +76,10 @@
                                             Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
                                             Text="@CommunityHeaderText"/>
                                 <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-                                            MarginBottom="24" Brush="Clan.TabControl.Text" Brush.FontSize="23"
-                                            Brush.FontColor="#B8B8B8FF"
-                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                            Text="@CommunityText"/>
-
-                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-                                            MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="32"
-                                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                            Text="@SupportersHeaderText"/>
-                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                                             MarginBottom="8" Brush="Clan.TabControl.Text" Brush.FontSize="23"
                                             Brush.FontColor="#B8B8B8FF"
                                             Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                                            Text="@SupportersText"/>
+                                            Text="@CommunityText"/>
                               </Children>
                             </ListPanel>
                           </Children>

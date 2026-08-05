@@ -44,7 +44,7 @@ namespace E2E.Tests.Services.Settlements
             TestEnvironment.AssertReferenceField<Settlement, Town>(nameof(Settlement.Town));
             TestEnvironment.AssertReferenceField<Settlement, Village>(nameof(Settlement.Village));
             TestEnvironment.AssertReferenceField<Settlement, MobileParty>(nameof(Settlement._lastAttackerParty));
-            TestEnvironment.AssertField<Settlement, TextObject>(nameof(Settlement._name), new TextObject("test text"));
+            TestEnvironment.AssertField<Settlement, TextObject>(nameof(Settlement._name), new TextObject("test text", new()));
             TestEnvironment.AssertReferenceField<Settlement, Settlement>(nameof(Settlement._nextLocatable));
             TestEnvironment.AssertField<Settlement, CampaignVec2>(nameof(Settlement._position), new CampaignVec2(new Vec2(1,2), false), defaultValue: settlement._position);
             TestEnvironment.AssertField<Settlement, float>(nameof(Settlement._readyMilitia), 5f);
