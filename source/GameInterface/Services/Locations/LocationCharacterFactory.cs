@@ -55,7 +55,9 @@ internal static class LocationCharacterFactory
         string behaviorsMethodName,
         int characterRelation,
         bool fixedLocation,
-        bool useCivilianEquipment)
+        bool useCivilianEquipment,
+        int[] prefabBones = null,
+        string[] prefabNames = null)
     {
         IAgentOriginBase origin = originParty != null
             ? new PartyAgentOrigin(originParty.Party, character)
@@ -65,7 +67,7 @@ internal static class LocationCharacterFactory
             .Monster(FaceGen.GetMonsterWithSuffix(character.Race, "_settlement"))
             .NoHorses(noHorses: true);
 
-        return new LocationCharacter(
+        var locationCharacter = new LocationCharacter(
             agentData,
             ResolveBehaviors(behaviorsMethodName, originParty != null),
             spawnTag,
@@ -77,6 +79,16 @@ internal static class LocationCharacterFactory
             // machines whose player is not inside the settlement.
             isFixedCharacter: false,
             specialItem);
+
+        // Bone-attached carry props (baskets, pitchers, carried goods). Restored so a promoted host's
+        // CreateAgentNavigator re-attaches them exactly as a native spawn would.
+        if (prefabBones != null && prefabNames != null && prefabBones.Length == prefabNames.Length)
+        {
+            for (int i = 0; i < prefabBones.Length; i++)
+                locationCharacter.PrefabNamesForBones[(sbyte)prefabBones[i]] = prefabNames[i];
+        }
+
+        return locationCharacter;
     }
 
     /// <summary>
@@ -125,6 +137,24 @@ internal static class LocationCharacterFactory
             objectManager.TryGetId(locationCharacter.SpecialItem, out specialItemId);
         }
 
+        // Bone-attached carry props: without these on the wire, a puppet plays its carry action set
+        // with empty hands (the basket/pitcher is an AgentNavigator prefab, not equipment).
+        int[] prefabBones = null;
+        string[] prefabNames = null;
+        var prefabsForBones = locationCharacter.PrefabNamesForBones;
+        if (prefabsForBones != null && prefabsForBones.Count > 0)
+        {
+            prefabBones = new int[prefabsForBones.Count];
+            prefabNames = new string[prefabsForBones.Count];
+            int i = 0;
+            foreach (var pair in prefabsForBones)
+            {
+                prefabBones[i] = pair.Key;
+                prefabNames[i] = pair.Value;
+                i++;
+            }
+        }
+
         data = new LocationCharacterData(
             locationId,
             characterId,
@@ -135,7 +165,9 @@ internal static class LocationCharacterFactory
             ExtractBehaviorsMethodName(locationCharacter),
             (int)locationCharacter.CharacterRelation,
             locationCharacter.FixedLocation,
-            locationCharacter.UseCivilianEquipment);
+            locationCharacter.UseCivilianEquipment,
+            prefabBones,
+            prefabNames);
 
         return true;
     }

@@ -56,7 +56,8 @@ public sealed class LocationAgentSpawnBatchCodecTests
             rosterEntry: new LocationCharacterData(
                 "settlement1_center", "townswoman_empire", null, null,
                 "npc_common", "as_human_villager", "SandBox.AI.BehaviorSets.AddOutdoorWandererBehaviors",
-                characterRelation: 0, fixedLocation: false, useCivilianEquipment: true));
+                characterRelation: 0, fixedLocation: false, useCivilianEquipment: true,
+                prefabBones: new[] { 22 }, prefabNames: new[] { "carry_bd_basket_a" }));
         var animal = new LocationAgentSpawnData(
             Guid.NewGuid(), characterId: null, new Vec3(5, 6, 0), new Vec2(1, 0), 50f, "host",
             spawnEquipment: null, bodyProperties: default, clothingColor1: 0, clothingColor2: 0,
@@ -76,6 +77,8 @@ public sealed class LocationAgentSpawnBatchCodecTests
         Assert.Equal("npc_common", decodedHuman.RosterEntry.SpawnTag);
         Assert.Equal("SandBox.AI.BehaviorSets.AddOutdoorWandererBehaviors", decodedHuman.RosterEntry.BehaviorsMethodName);
         Assert.True(decodedHuman.RosterEntry.UseCivilianEquipment);
+        Assert.Equal(new[] { 22 }, decodedHuman.RosterEntry.PrefabBones);
+        Assert.Equal(new[] { "carry_bd_basket_a" }, decodedHuman.RosterEntry.PrefabNames);
         Assert.Equal(0xAABBCCDD, decodedHuman.ClothingColor1);
         Assert.Equal("host:scope", decodedHuman.MovementScopeId);
         Assert.Equal(7, decodedHuman.MovementId);

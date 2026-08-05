@@ -108,7 +108,9 @@ internal class LocationPuppetRosterBinder : ILocationPuppetRosterBinder
             rosterData.BehaviorsMethodName,
             rosterData.CharacterRelation,
             rosterData.FixedLocation,
-            rosterData.UseCivilianEquipment);
+            rosterData.UseCivilianEquipment,
+            rosterData.PrefabBones,
+            rosterData.PrefabNames);
 
         location._characterList ??= new List<LocationCharacter>();
         location._characterList.Add(entry);

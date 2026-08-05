@@ -271,8 +271,14 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         if (data.Kind == LocationAgentKind.Human && data.HasCurrentEquipment)
             data.CurrentEquipment.Apply(agent);
 
-        bindingMap.Record(data.AgentId, new LocationAgentBinding(
-            data.Kind, data.RosterEntry, data.ItemId, data.HarnessItemId));
+        var binding = new LocationAgentBinding(data.Kind, data.RosterEntry, data.ItemId, data.HarnessItemId);
+        bindingMap.Record(data.AgentId, binding);
+
+        // Carry props (baskets, pitchers, carried goods) are navigator-attached prefabs natively —
+        // puppets have no navigator, so attach them straight from the roster data or every carrier
+        // plays its carry action set with empty hands (SR-023).
+        if (data.Kind == LocationAgentKind.Human)
+            AttachCarryPrefabs(agent, data.RosterEntry, binding);
 
         // A retained record of a departed host applied AFTER our promotion: the bulk adoption ran
         // already, so hand this late arrival straight to the migrator (transfer + AI revive) instead
@@ -383,6 +389,27 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         {
             LocationNpcGate.SuppressCapture = false;
         }
+    }
+
+    // Mirror of AgentNavigator.SetItemsVisibility(true): one synched prefab component per
+    // (bone, prefab) pair. The component indices are kept on the binding so a promoted host can
+    // HIDE them before CreateAgentNavigator re-attaches the same prefabs through native bookkeeping
+    // (no engine remove API exists; a second visible attach would stack a second basket).
+    private static void AttachCarryPrefabs(Agent agent, GameInterface.Services.Locations.Messages.LocationCharacterData rosterEntry, LocationAgentBinding binding)
+    {
+        var bones = rosterEntry?.PrefabBones;
+        var names = rosterEntry?.PrefabNames;
+        if (bones == null || names == null || bones.Length != names.Length || bones.Length == 0) return;
+
+        var components = new List<int>(bones.Length);
+        for (int i = 0; i < bones.Length; i++)
+        {
+            if (string.IsNullOrEmpty(names[i])) continue;
+            components.Add(agent.AddSynchedPrefabComponentToBone(names[i], (sbyte)bones[i]));
+        }
+
+        if (components.Count > 0)
+            binding.AttachedPrefabComponents = components;
     }
 
     // Native teams a settlement NPC by its roster entry's relation (MissionAgentHandler): Neutral →

@@ -189,7 +189,7 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
                 // stale interpolation target overrides the AI and pins the agent in place.
                 interpolator.Forget(agent);
 
-                if (ReviveSettlementAi(agent)) revived++;
+                if (ReviveSettlementAi(agent, info.AgentId)) revived++;
                 else stationary++;
 
                 ReapplyConversationHold(agent, info.AgentId);
@@ -207,7 +207,7 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         var registry = coopMissionComponent.AgentRegistry;
         registry.TryTransferAuthority(session.OwnControllerId, agentId);
         coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
-        ReviveSettlementAi(agent);
+        ReviveSettlementAi(agent, agentId);
         ReapplyConversationHold(agent, agentId);
         Logger.Information("[LocationSync] Late-adopted NPC {AgentId} spawned after the migration", agentId);
     }
@@ -230,7 +230,7 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     // [Game thread] Turn an inert puppet into a locally simulated settlement NPC. Humans get the
     // native AI stack re-created from their roster entry; an unresolvable entry (or an animal) falls
     // back to plain engine AI — stationary for humans (SR-031), native idle wandering for animals.
-    private bool ReviveSettlementAi(Agent agent)
+    private bool ReviveSettlementAi(Agent agent, System.Guid agentId)
     {
         // An adopted MOUNT (scene horses) only changes authority — it is not a simulated combatant
         // and must not get an engine AI controller, mirroring battle mount adoption.
@@ -248,6 +248,11 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
             return false;
         }
 
+        // The puppet spawner attached carry props directly (no navigator existed). The navigator we
+        // create below re-attaches the same prefabs through native bookkeeping, so HIDE ours first —
+        // there is no engine remove API, and two visible attaches stack a second basket.
+        HideManuallyAttachedPrefabs(agent, agentId);
+
         // V5: the exact native spawn tail. Every campaign-mission agent gets a CampaignAgentComponent
         // at creation (CampaignMissionComponent.OnAgentCreated), but guard anyway.
         var component = agent.GetComponent<CampaignAgentComponent>();
@@ -261,5 +266,16 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
             component.CreateAgentNavigator(entry);
         entry.AddBehaviors(agent);
         return true;
+    }
+
+    private void HideManuallyAttachedPrefabs(Agent agent, System.Guid agentId)
+    {
+        if (!bindingMap.TryGet(agentId, out var binding)) return;
+        var components = binding.AttachedPrefabComponents;
+        if (components == null) return;
+
+        foreach (var componentIndex in components)
+            agent.SetSynchedPrefabComponentVisibility(componentIndex, visibility: false);
+        binding.AttachedPrefabComponents = null;
     }
 }

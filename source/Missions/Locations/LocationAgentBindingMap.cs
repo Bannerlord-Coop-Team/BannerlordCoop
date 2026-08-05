@@ -35,6 +35,14 @@ public sealed class LocationAgentBinding
     public string ItemId { get; }
     public string HarnessItemId { get; }
 
+    /// <summary>
+    /// Runtime-only (never serialized): the synched-prefab component indices the PUPPET spawner
+    /// attached for carry props (baskets, pitchers). A promoted host hides these before
+    /// <c>CreateAgentNavigator</c> re-attaches the same prefabs through the native bookkeeping —
+    /// there is no engine remove API, and two visible attaches would stack a second basket.
+    /// </summary>
+    public List<int> AttachedPrefabComponents { get; set; }
+
     public LocationAgentBinding(LocationAgentKind kind, LocationCharacterData rosterEntry, string itemId = null, string harnessItemId = null)
     {
         Kind = kind;
