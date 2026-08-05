@@ -313,12 +313,16 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             // sizing exists to prevent: CheckDeployment skips a side whose reservation falls short of
             // InitialSpawnNumber, and it skips that side's plan-making too, so NOBODY on the side spawns.
             //
-            // The overshoot is real and bounded. With N human-owned parties on a side, only those whose
-            // interval floors to zero top up, so the side fields at most N-1 more than the allocation, and only
-            // while the allocation is smaller than N - against any ordinary wave every player's interval
-            // already covers a troop and nothing tops up at all. Making it exact would need each owner to know
-            // the others' shares, so a wire field and a migration path, to save a handful of troops in the
-            // first wave of a battle that has more players on a side than troops to field.
+            // The overshoot is bounded by the number of human owners whose interval floors to zero: each adds
+            // one, so the side fields at most N-1 more than the allocation for N human-owned parties. It is
+            // NOT bounded by "allocation smaller than N", which an earlier version of this comment claimed -
+            // uneven ownership breaks that. An owner holding 1 troop of a 1000-strong side scales to zero for
+            // an allocation of 100, tops itself up to one, and the other owners still supply all 100.
+            //
+            // Exactness and "every player gets an agent" cannot both hold locally: the owner that would have
+            // to give up a troop is a different client, and nothing here knows the others' shares. Closing it
+            // would need the server to apportion centrally and send each owner its number - a wire field and a
+            // migration path - to save at most one troop per player-owned party in a wave.
             //
             // Restricted to a party that still HAS troops, so an exhausted player party stops topping up
             // rather than conjuring one troop per wave for the rest of the battle.
