@@ -387,6 +387,42 @@ public class GameThread : IUpdateable
     }
 
     /// <summary>
+    /// The currently registered game-loop thread id (0 when unmarked). Pair with
+    /// <see cref="RestoreGameThread"/> so a scope that re-marks the game thread (e.g. a test harness
+    /// running a call on a worker thread) can put the previous registration back instead of leaving
+    /// the mark on a thread that may never pump the queue again.
+    /// </summary>
+    public int GameThreadId => m_GameLoopThreadId;
+
+    /// <summary>
+    /// Restores a registration previously read from <see cref="GameThreadId"/>.
+    /// </summary>
+    public void RestoreGameThread(int threadId)
+    {
+        m_GameLoopThreadId = threadId;
+    }
+
+    /// <summary>
+    /// Discards every queued action without running it, releasing any blocked callers waiting on
+    /// them. For test harnesses at environment boundaries: an action queued by a previous test
+    /// would otherwise execute inside a later environment's pump against a torn-down container.
+    /// </summary>
+    public void DiscardQueuedActions()
+    {
+        List<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> discarded;
+        lock (m_QueueLock)
+        {
+            discarded = new List<(Action, EventWaitHandle, string, CancellationToken)>(m_Queue);
+            m_Queue.Clear();
+        }
+
+        foreach (var task in discarded)
+        {
+            task.Wait?.Set();
+        }
+    }
+
+    /// <summary>
     /// Clears the game-loop thread registration. A thread that was marked via
     /// <see cref="MarkGameThread"/> must call this before it exits: .NET recycles managed thread
     /// ids, so a registration left behind by a dead thread can silently promote an unrelated

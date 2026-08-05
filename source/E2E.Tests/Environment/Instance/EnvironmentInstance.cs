@@ -43,8 +43,6 @@ public abstract class EnvironmentInstance : IDisposable
     private readonly MockNetworkBase mockNetwork;
     private readonly ILifetimeScope container;
 
-    private readonly static object _lock = new object();
-
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
         MockNetworkBase mockNetwork,
@@ -95,11 +93,14 @@ public abstract class EnvironmentInstance : IDisposable
             disabledMethods = Array.Empty<MethodBase>();
         }
 
-        lock (_lock)
+        // The same lock StaticScope takes, so PatchScope's patch/unpatch cannot interleave with
+        // another thread executing patched game code inside a SimulateMessage/SimulatePacket —
+        // those only enter GameInstance.@lock (via StaticScope), and the previous separate _lock
+        // left the Harmony rewrites unguarded against them. Monitor is reentrant per thread, which
+        // routed sends rely on: a Call's handler chain synchronously delivers into another
+        // instance's Simulate*, nesting scopes on the same thread.
+        lock (GameInstance.@lock)
         {
-            // xUnit can move a test from its constructor thread before the next instance call.
-            GameThread.Instance.MarkGameThread();
-
             using (new PatchScope(disabledMethods))
             {
                 using (new StaticScope(this))
@@ -156,6 +157,8 @@ public abstract class EnvironmentInstance : IDisposable
         private readonly TaleWorlds.MountAndBlade.Module previousModule;
         private readonly TestMessageBroker previousMessageBroker;
         private readonly bool wasServer;
+        private readonly bool markedGameThread;
+        private readonly int previousGameThreadId;
 
         public StaticScope(EnvironmentInstance instance, bool markGameThread = true)
         {
@@ -170,6 +173,12 @@ public abstract class EnvironmentInstance : IDisposable
                 if (markGameThread)
                 {
                     // xUnit can move a test from its fixture-constructor thread before the next scoped call.
+                    // Save-and-restore rather than bare-mark: a scope entered on a worker thread (e.g.
+                    // Task.Run(() => Server.Call(...))) must not leave the game-thread mark on that thread —
+                    // every later GameThread.RunSafe from the real test thread would silently enqueue onto
+                    // a queue nobody pumps instead of running inline.
+                    markedGameThread = true;
+                    previousGameThreadId = GameThread.Instance.GameThreadId;
                     GameThread.Instance.MarkGameThread();
                 }
 
@@ -203,6 +212,12 @@ public abstract class EnvironmentInstance : IDisposable
                     {
                         RestorePreviousStatics();
                     }
+                    else if (markedGameThread)
+                    {
+                        // The mark is set before the statics are saved, so a throw in between must
+                        // still put it back (RestorePreviousStatics is not reachable yet here).
+                        GameThread.Instance.RestoreGameThread(previousGameThreadId);
+                    }
                 }
                 finally
                 {
@@ -233,6 +248,10 @@ public abstract class EnvironmentInstance : IDisposable
             ModInformation.IsServer = wasServer;
             GameInterface.ContainerProvider.SetContainer(previousContainer);
             previousMessageBroker.SetStaticInstance();
+            if (markedGameThread)
+            {
+                GameThread.Instance.RestoreGameThread(previousGameThreadId);
+            }
         }
     }
 
