@@ -100,6 +100,15 @@ public class TransferSaveState : ConnectionStateBase
                 connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
                 snapshotCreated = true;
             }
+            catch (Exception ex)
+            {
+                // The drain guard would otherwise swallow this and leave the peer parked in this state
+                // forever: no chunks are sent, its queue was never opened, and LiteNetLib will not time
+                // out a peer that keeps answering keepalives. Treat it exactly like the !Success branch
+                // above and drop the joiner so it falls back to the main menu.
+                Logger.Error(ex, "Join save snapshot threw for peer {PeerId}; disconnecting", connectionLogic.Peer.Id);
+                connectionLogic.Peer.Disconnect();
+            }
             finally
             {
                 try

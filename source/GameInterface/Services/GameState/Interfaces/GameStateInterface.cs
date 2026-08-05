@@ -20,7 +20,13 @@ public interface IGameStateInterface : IGameAbstraction
 {
     void GoToMainMenu();
     void StartNewGame();
-    void LoadSaveData(byte[] saveData);
+
+    /// <summary>
+    /// Loads a campaign from the host's save bytes. Returns false when the load failed, so the caller can
+    /// abort the join instead of waiting on a campaign that will never become ready.
+    /// </summary>
+    bool LoadSaveData(byte[] saveData);
+
     void LoadGame(string saveName);
     void EndGame();
 }
@@ -51,10 +57,20 @@ internal class GameStateInterface : IGameStateInterface
         EndGame();
     }
 
-    public void LoadSaveData(byte[] saveData)
+    public bool LoadSaveData(byte[] saveData)
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        GameThread.Run(() => InteralLoadSaveGame(saveData), blocking: true);
+
+        // The drain logs and swallows a failing action, so this flag is how the caller learns whether the
+        // campaign actually loaded — the same captured-local pattern other blocking marshals here use.
+        bool loaded = false;
+        GameThread.Run(() =>
+        {
+            InteralLoadSaveGame(saveData);
+            loaded = true;
+        }, blocking: true);
+
+        return loaded;
     }
 
     private void InteralLoadSaveGame(byte[] saveData)

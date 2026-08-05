@@ -70,6 +70,7 @@ namespace Coop.Tests.Client.States
             // Arrange
             var currentState = clientLogic.SetState<ReceivingSavedDataState>();
             var gameSaveData = new byte[16];
+            gameStateMock.Setup(x => x.LoadSaveData(gameSaveData)).Returns(true);
 
             // Act
             currentState.Handle_NetworkGameSaveDataReceived(
@@ -85,6 +86,23 @@ namespace Coop.Tests.Client.States
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Loading Host Campaign",
                 "Loading host save data..."), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkGameSaveDataReceived_WhenLoadingFails_AbortsToMainMenu()
+        {
+            // Arrange — the load reports failure, which is what a rejected or corrupt host save produces
+            // now that the drain swallows the exception instead of taking the process down.
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
+            var gameSaveData = new byte[16];
+            gameStateMock.Setup(x => x.LoadSaveData(gameSaveData)).Returns(false);
+
+            // Act
+            currentState.Handle_NetworkGameSaveDataReceived(
+                new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(gameSaveData, "12345")));
+
+            // Assert — entering LoadingState would wait forever on a campaign that never loaded.
+            Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]

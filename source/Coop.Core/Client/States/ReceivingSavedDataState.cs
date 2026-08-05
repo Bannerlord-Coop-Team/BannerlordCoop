@@ -1,7 +1,9 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
+using Serilog;
 using System.Globalization;
 
 namespace Coop.Core.Client.States;
@@ -11,6 +13,8 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class ReceivingSavedDataState : ClientStateBase
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ReceivingSavedDataState>();
+
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
     private readonly IGameStateInterface gameStateInterface;
@@ -69,7 +73,14 @@ public class ReceivingSavedDataState : ClientStateBase
             "Loading Host Campaign",
             "Loading host save data...");
 
-        gameStateInterface.LoadSaveData(saveData);
+        if (!gameStateInterface.LoadSaveData(saveData))
+        {
+            // Entering LoadingState now would wait on a CampaignReady that cannot arrive, leaving the
+            // joiner on the loading screen with no error. Fall back to the main menu instead.
+            Logger.Error("Loading the host save failed; aborting the join");
+            Disconnect();
+            return;
+        }
 
         Logic.LoadSavedData();
     }
