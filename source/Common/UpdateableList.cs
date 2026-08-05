@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Common.Logging;
+using Common.Util;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,7 +12,13 @@ namespace Common
     /// </summary>
     public class UpdateableList
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<UpdateableList>();
+
         private List<IUpdateable> m_UpdateablesSorted = new List<IUpdateable>();
+
+        // A faulting entry stays in the list, so without throttling a permanent fault would log a
+        // stack trace every frame. Same reasoning as Poller's loop.
+        private readonly FaultLogThrottle faultThrottle = new FaultLogThrottle();
 
         /// <summary>
         ///     Updates the whole list.
@@ -25,7 +34,26 @@ namespace Common
 
             foreach (IUpdateable updateable in iterationCopy)
             {
-                updateable.Update(frameTime);
+                // The engine's tick drives this list, so an escaping exception ends the process and skips
+                // the entries behind it.
+                try
+                {
+                    updateable.Update(frameTime);
+                }
+                catch (Exception e)
+                {
+                    string name = updateable.GetType().Name;
+                    switch (faultThrottle.Classify(e, out long repeats))
+                    {
+                        case FaultLogAction.Full:
+                            Logger.Error(e, "{Updateable} threw during update and was suppressed", name);
+                            break;
+                        case FaultLogAction.Summary:
+                            Logger.Error("{Updateable} still throwing the same exception ({RepeatCount}x): {Message}",
+                                name, repeats, e.Message);
+                            break;
+                    }
+                }
             }
         }
 
