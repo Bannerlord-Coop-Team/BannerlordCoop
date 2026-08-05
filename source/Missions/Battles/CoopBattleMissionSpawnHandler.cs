@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using System;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents;
@@ -65,7 +66,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
             if (sizing.SizeNow && HasLocalPlayerOrigin())
             {
                 // On-time (common): both reserves present, so size before the first tick.
-                RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
+                RunJointInit(sizing);
                 _sized = true;
                 Logger.Information("[BattleSync] Coop spawn sized on start: Defender={Def}, Attacker={Atk}", sizing.DefenderOwned, sizing.AttackerOwned);
                 return;
@@ -107,7 +108,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         // Ready, or the deadline expired with a partial/missing reserve. At least one combatant exists here,
         // so the joint Init cannot hit its invalid 0/0 split.
-        RunJointInit(sizing.DefenderOwned, sizing.AttackerOwned);
+        RunJointInit(sizing);
         LogSizingCompleted(sizing);
         _sized = true;
     }
@@ -188,19 +189,68 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     // Re-run the engine's Init with the real totals (initial == total; Init applies the joint cap, wave split and
     // agent counts). Clear the placeholder phases first — InitWithSinglePhase appends, so a leftover held phase
     // would leave two active phases. Nothing spawned while held, so no double-spawn.
-    private void RunJointInit(int defenderOwned, int attackerOwned)
+    private void RunJointInit(SideSizing sizing)
     {
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Defender].Clear();
         _missionAgentSpawnLogic._phases[(int)BattleSideEnum.Attacker].Clear();
 
         var settings = CreateSandBoxBattleWaveSpawnSettings();
-        _missionAgentSpawnLogic.InitWithSinglePhase(defenderOwned, attackerOwned, defenderOwned, attackerOwned, spawnDefenders: true, spawnAttackers: true, in settings);
+        _missionAgentSpawnLogic.InitWithSinglePhase(sizing.DefenderOwned, sizing.AttackerOwned,
+            sizing.DefenderOwned, sizing.AttackerOwned, spawnDefenders: true, spawnAttackers: true, in settings);
+
+        ClampPhasesToOwnedShare(BattleSideEnum.Defender, _defenderSupplier);
+        ClampPhasesToOwnedShare(BattleSideEnum.Attacker, _attackerSupplier);
 
         // Init leaves both sides spawn-active; the native path clears them after Init but nothing does here, so
         // restore it — else SetupTeams's first side spawns both at once and the per-side freeze misses one.
         _missionAgentSpawnLogic.SetSpawnTroops(BattleSideEnum.Defender, spawnTroops: false);
         _missionAgentSpawnLogic.SetSpawnTroops(BattleSideEnum.Attacker, spawnTroops: false);
     }
+
+    /// <summary>
+    /// Rewrites a side's spawn numbers from what the SIDE fields to what THIS client will actually be handed.
+    /// </summary>
+    /// <remarks>
+    /// Init is deliberately given the side totals so the engine's battle-size split stays in proportion to the
+    /// two sides' real strength (see <see cref="ReadSizing"/>). The resulting InitialSpawnNumber is therefore the
+    /// whole side's opening wave - but the engine then treats it as a target THIS client must fill before the
+    /// side may deploy. <c>CheckDeployment</c> is explicit about it:
+    ///
+    ///     deficit = phase.InitialSpawnNumber - ctx.ReservedTroopsCount;
+    ///     ctx.ReserveTroops(deficit);
+    ///     if (ctx.ReservedTroopsCount &lt; phase.InitialSpawnNumber) continue;   // skips the ENTIRE side
+    ///
+    /// and "continue" skips the side's plan-making as well as its spawn. So a side split between players cannot
+    /// converge: the engine asks for the side's full deficit, <see cref="CoopTroopSupplier.OwnedShareOf"/> hands
+    /// back only this client's fraction of it, and the gap closes geometrically without ever reaching zero.
+    /// Observed live on a client owning 382 of a 955-strong side, against a 163-troop wave: reservations of
+    /// 65, 39, 23, 14, 8, 5, 3, 2, 1, 1, 1 ... stalling at 162 of 163 - each one 40% of the remaining gap, which
+    /// is exactly this client's ownership share. The side is skipped every tick, so its teams are never planned,
+    /// so <c>IsPlanMade(PlayerTeam)</c> stays false, so nothing spawns and the player has no agent.
+    ///
+    /// Asking the supplier what it would return for the number makes the target reachable in one pass, and keeps
+    /// every owner's slice adding up to the side's wave rather than each owner trying to field all of it. A side
+    /// filled by replicated puppets owns nothing, resolves to zero, and correctly spawns nothing locally.
+    /// </remarks>
+    private void ClampPhasesToOwnedShare(BattleSideEnum side, CoopTroopSupplier supplier)
+    {
+        foreach (var phase in _missionAgentSpawnLogic._phases[(int)side])
+        {
+            phase.TotalSpawnNumber = ReachableSpawnNumber(phase.TotalSpawnNumber, supplier);
+            phase.InitialSpawnNumber = ReachableSpawnNumber(phase.InitialSpawnNumber, supplier);
+            phase.RemainingSpawnNumber = ReachableSpawnNumber(phase.RemainingSpawnNumber, supplier);
+        }
+    }
+
+    private static int ReachableSpawnNumber(int sideNumber, CoopTroopSupplier supplier)
+        => ReachableSpawnNumber(sideNumber, supplier.OwnedShareOf(sideNumber));
+
+    /// <summary>
+    /// The largest spawn target this client can actually reach: never more than the side needs, and never more
+    /// than the supplier will hand over when asked for that many.
+    /// </summary>
+    internal static int ReachableSpawnNumber(int sideNumber, int ownedShareOfSideNumber)
+        => Math.Min(sideNumber, ownedShareOfSideNumber);
 
     // Zero phases so the first tick has active phases to read (else DefenderActivePhase NREs), without feeding Init
     // a 0/0 total: its float battle-size split yields NaN, which Mono casts to int.MinValue (desktop .NET gives 0).

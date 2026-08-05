@@ -27,6 +27,27 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         Assert.True(sizing.HasAnyOwnedTroops);
     }
 
+    // A side divided between players is SIZED from the whole side's strength (so the engine's battle-size split
+    // stays proportional) but can only ever be SUPPLIED with this client's share of it. CheckDeployment treats
+    // the sized number as a target this client must fill and SKIPS THE WHOLE SIDE - plan-making included - until
+    // it does, so a target the supplier will never return leaves the side unplanned and unspawned forever.
+    [Fact]
+    public void SpawnTargetIsWhatTheSupplierWouldActuallyReturn()
+    {
+        // The live wedge: a 163-troop wave on a side of 955, of which this client owns 382. Asked for 163 the
+        // supplier hands back its share, 65 - so 163 is unreachable and 65 is the honest target.
+        Assert.Equal(65, CoopBattleMissionSpawnHandler.ReachableSpawnNumber(163, 65));
+
+        // Sole owner of the side: it supplies the whole wave, so the engine's number stands.
+        Assert.Equal(163, CoopBattleMissionSpawnHandler.ReachableSpawnNumber(163, 163));
+
+        // Owns nothing on that side (its troops arrive as replicated puppets): spawn nothing locally.
+        Assert.Equal(0, CoopBattleMissionSpawnHandler.ReachableSpawnNumber(163, 0));
+
+        // A share can never exceed what the side actually needs.
+        Assert.Equal(163, CoopBattleMissionSpawnHandler.ReachableSpawnNumber(163, 400));
+    }
+
     [Fact]
     public void NeitherPopulated_NotReady()
     {

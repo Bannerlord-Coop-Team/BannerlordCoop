@@ -308,11 +308,21 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                 share += end - start;
             }
 
-            // The local player's own party is the exception the floor existed for: a share of zero on the
-            // side holding it reads as "origin missing" to CoopBattleMissionSpawnHandler and aborts the
-            // battle outright. Only that owner is topped up, so a small wave still fields the player
-            // without every other owner also adding one.
-            if (share <= 0 && OwnsReceiverPlayerParty()) share = 1;
+            // Exact up to here, and deliberately not exact past it. A share of zero on the side holding this
+            // client's own player party means that player fields nothing, which is the deployment wedge this
+            // sizing exists to prevent: CheckDeployment skips a side whose reservation falls short of
+            // InitialSpawnNumber, and it skips that side's plan-making too, so NOBODY on the side spawns.
+            //
+            // The overshoot is real and bounded. With N human-owned parties on a side, only those whose
+            // interval floors to zero top up, so the side fields at most N-1 more than the allocation, and only
+            // while the allocation is smaller than N - against any ordinary wave every player's interval
+            // already covers a troop and nothing tops up at all. Making it exact would need each owner to know
+            // the others' shares, so a wire field and a migration path, to save a handful of troops in the
+            // first wave of a battle that has more players on a side than troops to field.
+            //
+            // Restricted to a party that still HAS troops, so an exhausted player party stops topping up
+            // rather than conjuring one troop per wave for the rest of the battle.
+            if (share <= 0 && ReceiverPlayerPartyHasTroops()) share = 1;
 
             return Math.Min(share, sideAllocation);
         }
@@ -326,8 +336,26 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private static int ScaleToAllocation(int position, int total, int allocation)
         => (int)((long)position * allocation / total);
 
-    /// <summary>Whether one of this client's parties is the receiver's own party in this battle.</summary>
-    private bool OwnsReceiverPlayerParty() => playerPartyId != null;
+    /// <summary>
+    /// Whether this client owns the receiver's own party in this battle AND that party still has troops left
+    /// to field. Callers already hold <see cref="gate"/>; Monitor is reentrant, so this is safe either way.
+    /// </summary>
+    private bool ReceiverPlayerPartyHasTroops()
+    {
+        if (playerPartyId == null) return false;
+
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != playerPartyId) continue;
+
+                return party.Supplied < party.Entries.Length;
+            }
+        }
+
+        return false;
+    }
 
     public int NumTroopsNotSupplied
     {
@@ -361,10 +389,17 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     public IEnumerable<IAgentOriginBase> SupplyTroops(int numberToAllocate)
     {
-        // The engine asks every client for the WHOLE side's allocation, because each one now sizes from the
-        // same side totals. Serving all of it from our own pool would field the side once per owner, so take
-        // only our share; the other owners' agents arrive replicated (OwnedAgentReplicator/PuppetSpawner).
-        numberToAllocate = OwnedShareOf(numberToAllocate);
+        // No apportionment here: the number arriving is ALREADY this client's share. Init is given the side
+        // totals so every client computes the same battle-size split, and CoopBattleMissionSpawnHandler then
+        // rewrites the phase numbers through OwnedShareOf once - so every request the engine derives from a
+        // phase is this client's slice, and the other owners' agents arrive replicated as before
+        // (OwnedAgentReplicator/PuppetSpawner).
+        //
+        // Taking the share again here would apply it twice, and the engine cannot tolerate being short-changed:
+        // CheckDeployment reserves InitialSpawnNumber - ReservedTroopsCount and SKIPS THE WHOLE SIDE (its
+        // plan-making included) while the count falls short. Returning a fraction of each request makes the gap
+        // close geometrically and never reach zero - live, a 65-troop target stalled at 64 with the side never
+        // planned, so the player's team never spawned and the player had no agent on the field.
         if (numberToAllocate <= 0) return Array.Empty<IAgentOriginBase>();
 
         // BR-110: allocate no more troops than the engine has RENDER-SLOT capacity for — a mounted troop needs
