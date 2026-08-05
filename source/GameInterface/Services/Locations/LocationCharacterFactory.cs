@@ -2,6 +2,7 @@
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using SandBox.AI;
 using SandBox.Missions.AgentBehaviors;
 using Serilog;
 using System;
@@ -175,9 +176,39 @@ internal static class LocationCharacterFactory
     public static string ExtractBehaviorsMethodName(LocationCharacter locationCharacter)
     {
         var method = locationCharacter.AddBehaviors?.Method;
-        if (method == null || !method.IsStatic || method.DeclaringType == null) return null;
+        if (method == null || method.DeclaringType == null) return null;
 
-        return $"{method.DeclaringType.FullName}.{method.Name}";
+        if (method.IsStatic)
+            return $"{method.DeclaringType.FullName}.{method.Name}";
+
+        // Native ambient entries carry INSTANCE delegates: every townsfolk/villager/tavern creator
+        // passes SandBoxManager.Instance.AgentBehaviorManager.Add*Behaviors, whose methods wrap the
+        // static BehaviorSets 1:1 (mostly as explicit interface implementations, so method.Name is
+        // interface-qualified). Map them to their static counterpart — losing the name here made
+        // every reconstructed wanderer fall back to fixed-character behaviors, and a promoted host's
+        // adopted crowd stood still.
+        if (locationCharacter.AddBehaviors.Target is AgentBehaviorManager)
+        {
+            var name = method.Name;
+            var lastDot = name.LastIndexOf('.');
+            if (lastDot >= 0) name = name.Substring(lastDot + 1);
+
+            if (AccessTools.Method(typeof(BehaviorSets), name) == null)
+            {
+                // One irregular wrapper: AddStealthAgentBehaviors -> BehaviorSets.StealthAgentBehaviors.
+                var trimmed = name.StartsWith("Add") ? name.Substring(3) : name;
+                if (AccessTools.Method(typeof(BehaviorSets), trimmed) == null)
+                {
+                    Logger.Warning("Behaviors method {method} has no static BehaviorSets counterpart — the entry will rebuild with default behaviors", name);
+                    return null;
+                }
+                name = trimmed;
+            }
+
+            return $"{typeof(BehaviorSets).FullName}.{name}";
+        }
+
+        return null;
     }
 
     private static LocationCharacter.AddBehaviorsDelegate ResolveBehaviors(string behaviorsMethodName, bool isCompanion)
