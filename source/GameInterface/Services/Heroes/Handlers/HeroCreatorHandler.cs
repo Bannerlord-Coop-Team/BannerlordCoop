@@ -50,8 +50,8 @@ internal class HeroCreatorHandler : IHandler
             heroId,
             data.Hero.FirstName,
             data.Hero.Name,
-            battleEquipmentId,
             civilianEquipmentId,
+            battleEquipmentId,
             data.Hero.CivilianEquipment,
             data.Hero.BattleEquipment);
         network.SendAll(message);
@@ -70,8 +70,10 @@ internal class HeroCreatorHandler : IHandler
             using (new AllowedThread())
             {
                 hero.SetName(data.Name, data.FirstName);
-                battleEquipment = data.BattleEquipment;
-                civilianEquipment = data.CivilianEquipment;
+
+                battleEquipment.FillFrom(data.BattleEquipment);
+                civilianEquipment.FillFrom(data.CivilianEquipment);
+
                 hero._battleEquipment = battleEquipment;
                 hero._civilianEquipment = civilianEquipment;
             }
