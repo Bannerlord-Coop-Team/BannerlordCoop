@@ -394,13 +394,9 @@ namespace Coop.IntegrationTests.MobileParties
             var secondParty = ObjectHelper.SkipConstructor<MobileParty>();
             var hideout = ObjectHelper.SkipConstructor<Settlement>();
             hideout.Hideout = ObjectHelper.SkipConstructor<Hideout>();
-            TestEnvironment.RegisterObjectInNetwork(firstParty, "party1");
-            TestEnvironment.RegisterObjectInNetwork(secondParty, "party2");
+            RegisterPartyForClient(firstClient, firstParty, "party1", "player1");
+            RegisterPartyForClient(secondClient, secondParty, "party2", "player2");
             TestEnvironment.RegisterObjectInNetwork(hideout, "hideout1");
-
-            var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
-            playerManager.AddPlayer(new Player("player1", "", "party1", "", ""));
-            playerManager.AddPlayer(new Player("player2", "", "party2", "", ""));
 
             var settlementInterface = TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>();
             settlementInterface
@@ -500,10 +496,9 @@ namespace Coop.IntegrationTests.MobileParties
         private void RegisterPartyForClient(
             EnvironmentInstance client,
             MobileParty party,
-            string partyId)
+            string partyId,
+            string controllerId = "player1")
         {
-            const string controllerId = "player1";
-
             TestEnvironment.RegisterObjectInNetwork(party, partyId);
             TestEnvironment.Server.Call(() =>
             {

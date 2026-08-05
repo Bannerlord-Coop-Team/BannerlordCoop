@@ -112,7 +112,7 @@ internal static class PeaceBarterPatch
 
         var completedBarter = pendingBarter;
         var completedContext = pendingContext;
-        var shouldCompleteUi = pendingUiActive && IsPendingContextActive();
+        var shouldCompleteUi = pendingUiActive;
         ClearPendingRequest();
         if (!result.Accepted)
         {
@@ -122,22 +122,41 @@ internal static class PeaceBarterPatch
             return;
         }
 
-        barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
         var encounterIsActive = shouldCompleteUi && completedContext == PeaceConversationContext.MapParty &&
             PlayerEncounter.Current != null &&
             completedBarter.OtherParty == MobileParty.ConversationParty?.Party;
-        if (encounterIsActive)
-            PlayerEncounter.LeaveEncounter = true;
 
         if (shouldCompleteUi && BarterManager.Instance != null)
         {
-            BarterManager.Instance.HandleHeroCooldown(completedBarter.OtherHero);
             BarterManager.Instance.LastBarterIsAccepted = true;
             BarterManager.Instance.Close();
         }
 
+        try
+        {
+            barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
+            if (shouldCompleteUi && BarterManager.Instance != null)
+                BarterManager.Instance.HandleHeroCooldown(completedBarter.OtherHero);
+        }
+        catch
+        {
+            // The authoritative result has already closed the barter UI.
+        }
+
+        if (encounterIsActive)
+            PlayerEncounter.LeaveEncounter = true;
+
         if (shouldCompleteUi && Campaign.Current?.ConversationManager?.IsConversationInProgress == true)
-            Campaign.Current.ConversationManager.ContinueConversation();
+        {
+            try
+            {
+                Campaign.Current.ConversationManager.ContinueConversation();
+            }
+            catch
+            {
+                // The authoritative result has already closed the barter UI.
+            }
+        }
 
         MBInformationManager.AddQuickInformation(GameTexts.FindText("str_offer_accepted"));
     }
@@ -165,11 +184,20 @@ internal static class PeaceBarterPatch
                    locationId == pendingContextId;
         }
 
+        if (pendingContext == PeaceConversationContext.Settlement)
+        {
+            var settlement = pendingBarter.OffererParty?.MobileParty?.CurrentSettlement;
+            return settlement != null && pendingBarter.OtherHero?.CurrentSettlement == settlement &&
+                   ContainerProvider.TryResolve<IObjectManager>(out var settlementObjectManager) &&
+                   settlementObjectManager.TryGetId(settlement, out var settlementId) &&
+                   settlementId == pendingContextId;
+        }
+
         return PlayerEncounter.Current != null &&
                pendingBarter.OtherParty == MobileParty.ConversationParty?.Party;
     }
 
-    private static bool TryGetConversationContext(
+    internal static bool TryGetConversationContext(
         BarterData barterData,
         IObjectManager objectManager,
         out PeaceConversationContext context,
@@ -179,6 +207,14 @@ internal static class PeaceBarterPatch
         if (location != null && objectManager.TryGetId(location, out contextId))
         {
             context = PeaceConversationContext.Location;
+            return true;
+        }
+
+        var settlement = barterData.OffererParty?.MobileParty?.CurrentSettlement;
+        if (settlement != null && barterData.OtherHero?.CurrentSettlement == settlement &&
+            objectManager.TryGetId(settlement, out contextId))
+        {
+            context = PeaceConversationContext.Settlement;
             return true;
         }
 

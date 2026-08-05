@@ -111,7 +111,7 @@ internal static class LordBarterPatch
         var barter = authorizedBarter;
         var context = pendingContext;
         var kind = pendingKind;
-        var shouldCompleteUi = pendingUiActive && IsPendingContextActive();
+        var shouldCompleteUi = pendingUiActive;
         if (!result.Accepted)
         {
             requestPending = false;
@@ -222,19 +222,6 @@ internal static class LordBarterPatch
         return true;
     }
 
-    private static bool IsPendingContextActive()
-    {
-        if (authorizedBarter == null) return false;
-        if (pendingContext == PeaceConversationContext.Location)
-        {
-            var mission = CampaignMission.Current;
-            return mission?.Location != null && mission.Mode == MissionMode.Barter &&
-                   ContainerProvider.TryResolve<IObjectManager>(out var manager) &&
-                   manager.TryGetId(mission.Location, out var locationId) && locationId == pendingContextId;
-        }
-        return PlayerEncounter.Current != null && authorizedBarter.OtherParty == MobileParty.ConversationParty?.Party;
-    }
-
     private static bool TryAuthorize(BarterData barterData, LordBarterKind kind)
     {
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
@@ -300,7 +287,7 @@ internal static class LordBarterPatch
         }
     }
 
-    private static bool TryGetConversationContext(BarterData barterData, IObjectManager manager, out PeaceConversationContext context, out string contextId)
+    internal static bool TryGetConversationContext(BarterData barterData, IObjectManager manager, out PeaceConversationContext context, out string contextId)
     {
         var location = CampaignMission.Current?.Location;
         if (location != null && manager.TryGetId(location, out contextId))
@@ -308,6 +295,15 @@ internal static class LordBarterPatch
             context = PeaceConversationContext.Location;
             return true;
         }
+
+        var settlement = barterData.OffererParty?.MobileParty?.CurrentSettlement;
+        if (settlement != null && barterData.OtherHero?.CurrentSettlement == settlement &&
+            manager.TryGetId(settlement, out contextId))
+        {
+            context = PeaceConversationContext.Settlement;
+            return true;
+        }
+
         if (barterData.OtherParty?.MobileParty?.IsActive == true && manager.TryGetId(barterData.OtherParty, out contextId))
         {
             context = PeaceConversationContext.MapParty;
