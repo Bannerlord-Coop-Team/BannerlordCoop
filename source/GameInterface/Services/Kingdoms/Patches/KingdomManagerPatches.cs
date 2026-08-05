@@ -34,7 +34,7 @@ internal class KingdomManagerPatches
                     clan = clan2;
                 }
             }
-            ChangeRulingClanAction.Apply(kingdom, clan);
+            MessageBroker.Instance.Publish(__instance, new RulingClanChanged(kingdom, clan));
             kingdom.AddDecision(new KingSelectionKingdomDecision(rulingClan, rulingClan)
             {
                 IsEnforced = true

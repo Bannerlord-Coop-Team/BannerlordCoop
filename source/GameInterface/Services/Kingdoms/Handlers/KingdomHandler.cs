@@ -59,6 +59,7 @@ public class KingdomHandler : IHandler
         messageBroker.Subscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
         messageBroker.Subscribe<NetworkDestroyKingdom>(HandleNetworkDestroyKingdom);
+        messageBroker.Subscribe<NetworkRulingClanChanged>(HandleNetworkRulingClanChanged);
     }
 
     private void HandleCreateKingdom(MessagePayload<CreateKingdom> obj)
@@ -417,6 +418,17 @@ public class KingdomHandler : IHandler
             }
         });
     }
+
+    private void HandleNetworkRulingClanChanged(MessagePayload<NetworkRulingClanChanged> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var kingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+
+            ChangeRulingClanAction.Apply(kingdom, clan);
+        });
+    }
     public void Dispose()
     {
         messageBroker.Unsubscribe<AddDecision>(HandleAddDecision);
@@ -428,5 +440,6 @@ public class KingdomHandler : IHandler
         messageBroker.Unsubscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
         messageBroker.Unsubscribe<NetworkDestroyKingdom>(HandleNetworkDestroyKingdom);
+        messageBroker.Unsubscribe<NetworkRulingClanChanged>(HandleNetworkRulingClanChanged);
     }
 }
