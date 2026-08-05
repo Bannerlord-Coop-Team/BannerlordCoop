@@ -67,6 +67,10 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     // A pose-enforced puppet (seated at a chair, using an animation point) is pinned, not sought —
     // tight tolerance so its root lands exactly on the seat frame the owner reports.
     private const float EnforcedPoseTolerance = 0.05f;
+    // Cosine of ~5°: realign a pinned pose whose facing disagrees with the owner's by more. The pin
+    // often engages off a frame captured mid-walk-to-the-chair; the owner's first post-seat frame
+    // then carries the true seat facing and triggers exactly one realign.
+    private const float EnforcedPoseFacingCosineTolerance = 0.996f;
 
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
@@ -77,6 +81,10 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     // corrections — every further direction/look write would retrigger the native turn-in-place the
     // enforced loop can never complete (the seated-NPC spin).
     private readonly HashSet<Agent> _pinnedPoseAgents = new HashSet<Agent>();
+    // The facing each pinned pose was last aligned to, so a materially different owner facing (the
+    // real seat direction arriving after a mid-walk entry frame) triggers a realign — a frame snap +
+    // action re-issue, never turn-controller feeding.
+    private readonly Dictionary<Agent, Vec2> _pinnedPoseFacings = new Dictionary<Agent, Vec2>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
@@ -166,6 +174,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         _mountedGuardProcessedSequences.Remove(agent);
         _enforcedPoseProcessedSequences.Remove(agent);
         _pinnedPoseAgents.Remove(agent);
+        _pinnedPoseFacings.Remove(agent);
     }
 
     public bool TryGetTargetMovementFlags(
@@ -219,6 +228,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         _mountedGuardProcessedSequences.Clear();
         _enforcedPoseProcessedSequences.Clear();
         _pinnedPoseAgents.Clear();
+        _pinnedPoseFacings.Clear();
     }
 
     private long GetNextUpdateSequence()
@@ -300,7 +310,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 PinEnforcedPose(agent, pair.Value);
                 continue;
             }
-            _pinnedPoseAgents.Remove(agent); // enforce dropped (stood up) — normal seek resumes
+            if (_pinnedPoseAgents.Remove(agent)) // enforce dropped (stood up) — normal seek resumes
+                _pinnedPoseFacings.Remove(agent);
 
             // A mount tolerates more slack before we snap; an on-foot rider is held tighter.
             float snapDistance = agent.IsMount ? MountSnapDistance : RiderSnapDistance;
@@ -319,23 +330,27 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 _mountedGuardProcessedSequences.Remove(agent);
                 _enforcedPoseProcessedSequences.Remove(agent);
                 _pinnedPoseAgents.Remove(agent);
+                _pinnedPoseFacings.Remove(agent);
             }
             _evict.Clear();
         }
     }
 
-    // Entry: one full alignment to the owner's frame (seat position + facing), then freeze — the
-    // enforced animation owns the pose. Steady state: position-only drift correction, once per owner
-    // frame, with NO direction or look writes (each would retrigger the never-completing native
-    // turn-in-place).
+    // Entry: cancel the walk-phase native seek (its retained target kept tugging the sitter — the
+    // positional slide), zero input, and align to the owner's frame. Steady state: once per owner
+    // frame, realign ONLY when the owner's position or facing materially disagrees — an alignment is
+    // a frame snap plus an action re-issue, never turn-controller feeding, so it cannot spin.
     private void PinEnforcedPose(Agent agent, TargetFrame target)
     {
+        Vec2 targetFacing = target.AgentState.MovementDirection;
+        if (targetFacing.LengthSquared <= 0.0001f)
+            targetFacing = target.AgentState.LookDirection.AsVec2;
+
         if (_pinnedPoseAgents.Add(agent))
         {
+            agent.ClearTargetFrame();
             agent.MovementInputVector = Vec2.Zero;
-            agent.SetMovementDirection(target.AgentState.MovementDirection);
-            agent.LookDirection = target.AgentState.LookDirection;
-            agent.TeleportToPosition(target.Position);
+            AlignPinnedPose(agent, target.Position, targetFacing);
             _enforcedPoseProcessedSequences[agent] = target.UpdateSequence;
             return;
         }
@@ -347,8 +362,43 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         }
         _enforcedPoseProcessedSequences[agent] = target.UpdateSequence;
 
-        if (agent.Position.Distance(target.Position) > EnforcedPoseTolerance)
-            agent.TeleportToPosition(target.Position);
+        bool positionDrifted = agent.Position.Distance(target.Position) > EnforcedPoseTolerance;
+        bool facingDrifted = targetFacing.LengthSquared > 0.0001f
+            && _pinnedPoseFacings.TryGetValue(agent, out Vec2 appliedFacing)
+            && appliedFacing.LengthSquared > 0.0001f
+            && Vec2.DotProduct(appliedFacing, targetFacing.Normalized())
+                < EnforcedPoseFacingCosineTolerance;
+        if (positionDrifted || facingDrifted)
+            AlignPinnedPose(agent, target.Position, targetFacing);
+    }
+
+    // Snap the pinned pose to the owner's frame. The enforced loop locked the body at whatever yaw
+    // the puppet had when the replicated action landed (usually mid-walk) — natively the seat aligns
+    // the frame BEFORE the action starts — so after snapping the directions the CURRENT enforced
+    // action is re-issued at its own progress, re-locking the pose at the corrected facing.
+    private void AlignPinnedPose(Agent agent, Vec3 position, Vec2 facing)
+    {
+        agent.TeleportToPosition(position);
+
+        if (facing.LengthSquared > 0.0001f)
+        {
+            facing.Normalize();
+            agent.SetMovementDirection(facing);
+            agent.LookDirection = new Vec3(facing.X, facing.Y, 0f);
+
+            ActionIndexCache action0 = agent.GetCurrentAction(0);
+            if (action0 != ActionIndexCache.act_none)
+            {
+                agent.SetActionChannel(
+                    0,
+                    action0,
+                    ignorePriority: true,
+                    additionalFlags: agent.GetCurrentAnimationFlag(0),
+                    startProgress: agent.GetCurrentActionProgress(0));
+            }
+        }
+
+        _pinnedPoseFacings[agent] = facing;
     }
 
     private static void MoveTowardTarget(Agent agent, TargetFrame target)
