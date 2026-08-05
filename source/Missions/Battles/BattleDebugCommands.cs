@@ -456,9 +456,6 @@ internal static class BattleDebugCommands
         {
             return "The resolved local player agent is not the locally controlled main agent";
         }
-        if (agent.MountAgent != null)
-            return "The live-test player staging command requires an unmounted main agent";
-
         var lookDirection = new Vec2(lookX, lookY);
         if (lookDirection.LengthSquared <= 0.0001f)
             return "The look direction must be non-zero";
