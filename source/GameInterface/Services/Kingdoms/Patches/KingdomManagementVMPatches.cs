@@ -53,9 +53,9 @@ internal class KingdomManagementVMPatches
     /// <summary>
     /// Intercepts the client rename logic
     /// </summary>
-    [HarmonyPatch("OnChangeKingdomName")]
+    [HarmonyPatch("OnChangeKingdomNameDone")]
     [HarmonyPrefix]
-    private static bool OnChangeKingdomNamePrefix(KingdomManagementVM __instance, string __0)
+    private static bool OnChangeKingdomNameDonePrefix(KingdomManagementVM __instance, string __0)
     {
         if (!ModInformation.IsClient)
         {
