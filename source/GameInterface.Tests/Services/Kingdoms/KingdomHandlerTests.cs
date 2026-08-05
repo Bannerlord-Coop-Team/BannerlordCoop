@@ -115,7 +115,6 @@ public class KingdomHandlerTests
         var clan = ObjectHelper.SkipConstructor<Clan>();
         var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
         
-        
         clan._kingdom = kingdom;
         kingdom._rulingClan = clan;
         
@@ -151,7 +150,6 @@ public class KingdomHandlerTests
         Assert.Equal("kingdom name was empty", reason);
     }
     
-
     private static KingdomHandler CreateHandler(IObjectManager objectManager)
     {
         return new KingdomHandler(
