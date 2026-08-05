@@ -40,13 +40,36 @@ public class PartyReserve
     [ProtoMember(5)]
     public int SideOffset { get; }
 
+    /// <summary>
+    /// This party's position among the PLAYER-owned parties on its side, in the server's enumeration order,
+    /// or -1 when it is not one.
+    /// </summary>
+    /// <remarks>
+    /// Together with <see cref="SideReserve.PlayerOwnedPartyCount"/> this is what lets every owner guarantee
+    /// its player an agent WITHOUT overshooting the allocation. The share is computed as: reserve one troop
+    /// for each of the side's player-owned parties, apportion what remains across the whole side by the same
+    /// cumulative flooring as <see cref="SideOffset"/>, and add the reserved troop back for the party this
+    /// client owns. Those pieces sum to exactly the allocation, because the flooring covers the remainder
+    /// exactly once and there are exactly as many reserved troops as player-owned parties.
+    ///
+    /// The rank matters only when the allocation is smaller than the number of player-owned parties, where
+    /// there is not one troop to go round: the first <c>allocation</c> ranks get the troop and the rest get
+    /// none, which every client agrees on because the ranks come from the server.
+    ///
+    /// Additive with a default of -1, so a reserve from a build that does not send it still deserialises and
+    /// falls back to the older proportional-with-top-up behaviour.
+    /// </remarks>
+    [ProtoMember(6)]
+    public int PlayerOwnedRank { get; }
+
     public PartyReserve(string partyId, int suppliedCount, TroopReserveEntry[] entries,
-        bool isReceiverPlayerParty = false, int sideOffset = 0)
+        bool isReceiverPlayerParty = false, int sideOffset = 0, int playerOwnedRank = -1)
     {
         PartyId = partyId;
         SuppliedCount = suppliedCount;
         Entries = entries ?? Array.Empty<TroopReserveEntry>();
         IsReceiverPlayerParty = isReceiverPlayerParty;
         SideOffset = sideOffset;
+        PlayerOwnedRank = playerOwnedRank;
     }
 }

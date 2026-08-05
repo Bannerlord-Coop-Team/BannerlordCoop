@@ -36,6 +36,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         public int Supplied;
         /// <summary>Where this party starts within its side; see <see cref="PartyReserve.SideOffset"/>.</summary>
         public int SideOffset;
+        /// <summary>Its position among the side's player-owned parties, or -1; see <see cref="PartyReserve.PlayerOwnedRank"/>.</summary>
+        public int PlayerOwnedRank;
     }
 
     private readonly object gate = new object();
@@ -46,6 +48,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private string playerPartyId;
     private bool populated;
     private int sideTotalTroops;
+    private int playerOwnedPartyCount;
     private int reserveRevision;
     private int numWounded, numKilled, numRouted;
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
@@ -79,13 +82,15 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// </para>
     /// </summary>
     public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve,
-        int sideTotal = 0)
+        int sideTotal = 0, int playerOwnedParties = 0)
     {
         var dropped = new List<(string PartyId, int Supplied)>();
         lock (gate)
         {
             // 0 means the server sent no total (older peer): keep the previous value rather than forgetting it.
             if (sideTotal > 0) sideTotalTroops = sideTotal;
+            // Same rule: 0 reads as "not sent" rather than "this side holds no players".
+            if (playerOwnedParties > 0) playerOwnedPartyCount = playerOwnedParties;
 
             // Capture the current per-party pointers before rebuilding. A resend can carry a STALE pointer: the
             // server's ledger lags our local supply by up to one report interval, and on migration it re-sends
@@ -114,6 +119,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                         Entries = entries,
                         Supplied = supplied,
                         SideOffset = party.SideOffset,
+                        PlayerOwnedRank = party.PlayerOwnedRank,
                     };
                     // Allocate this client's own party first. Otherwise an army's AI parties can fill the
                     // render cap before the local hero is reserved, leaving deployment without a player agent.
@@ -289,47 +295,77 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             var total = sideTotalTroops > 0 ? sideTotalTroops : owned;
             if (owned >= total) return sideAllocation;
 
-            // Exact apportionment by cumulative flooring: each party takes the difference between the
-            // allocation scaled to the END of its range and to its START. Because every party on the side
-            // occupies one contiguous, non-overlapping range of [0, total), the slices taken by ALL owners
-            // sum to exactly sideAllocation - no owner needs to know what the others hold.
+            // One troop of the allocation is set aside for each PLAYER-owned party on the side, before any
+            // proportional split happens. That is what makes "every player fields an agent" and "the slices
+            // add up to exactly the allocation" hold at the same time: the reserved troops are taken off the
+            // top, so nobody has to be topped up afterwards at another owner's expense.
             //
-            // This replaces proportional rounding, which could overshoot the allocation, and a floor that
-            // forced every owner with troops to at least one - that floor turned a one-troop wave into one
-            // troop PER OWNER.
-            var share = 0;
-            foreach (var party in parties)
+            // Too small an allocation to give every player one is the only case where somebody misses out,
+            // and the ranks decide it the same way on every client because the server assigns them.
+            if (playerOwnedPartyCount > 0)
             {
-                var count = party.Entries.Length;
-                if (count <= 0) continue;
+                if (sideAllocation < playerOwnedPartyCount)
+                    return ReceiverPlayerRankWithin(sideAllocation) ? 1 : 0;
 
-                var start = ScaleToAllocation(party.SideOffset, total, sideAllocation);
-                var end = ScaleToAllocation(party.SideOffset + count, total, sideAllocation);
-                share += end - start;
+                var remainder = sideAllocation - playerOwnedPartyCount;
+                var reserved = ApportionByInterval(remainder, total);
+                if (OwnsReceiverPlayerParty()) reserved += 1;
+                return Math.Min(reserved, sideAllocation);
             }
 
-            // Exact up to here, and deliberately not exact past it. A share of zero on the side holding this
-            // client's own player party means that player fields nothing, which is the deployment wedge this
-            // sizing exists to prevent: CheckDeployment skips a side whose reservation falls short of
-            // InitialSpawnNumber, and it skips that side's plan-making too, so NOBODY on the side spawns.
-            //
-            // The overshoot is bounded by the number of human owners whose interval floors to zero: each adds
-            // one, so the side fields at most N-1 more than the allocation for N human-owned parties. It is
-            // NOT bounded by "allocation smaller than N", which an earlier version of this comment claimed -
-            // uneven ownership breaks that. An owner holding 1 troop of a 1000-strong side scales to zero for
-            // an allocation of 100, tops itself up to one, and the other owners still supply all 100.
-            //
-            // Exactness and "every player gets an agent" cannot both hold locally: the owner that would have
-            // to give up a troop is a different client, and nothing here knows the others' shares. Closing it
-            // would need the server to apportion centrally and send each owner its number - a wire field and a
-            // migration path - to save at most one troop per player-owned party in a wave.
-            //
-            // Restricted to a party that still HAS troops, so an exhausted player party stops topping up
-            // rather than conjuring one troop per wave for the rest of the battle.
+            // No player-party information: a reserve from a peer that does not send it. Fall back to the older
+            // apportionment plus its inexact top-up rather than silently fielding nobody.
+            var share = ApportionByInterval(sideAllocation, total);
+
+            // Legacy path only, and knowingly inexact: without the ranks there is no way to know how many
+            // other owners are also topping themselves up, so this can exceed the allocation by one per
+            // player-owned party that floors to zero. Kept because the alternative is that player fielding
+            // nobody, which wedges the whole side's deployment.
             if (share <= 0 && ReceiverPlayerPartyHasTroops()) share = 1;
 
             return Math.Min(share, sideAllocation);
         }
+    }
+
+    /// <summary>Cumulative-flooring apportionment of <paramref name="allocation"/> over this client's parties.</summary>
+    /// <remarks>
+    /// Each party takes the difference between the allocation scaled to the END of its range and to its
+    /// START. Because every party on the side occupies one contiguous, non-overlapping range of [0, total),
+    /// the slices taken by ALL owners sum to exactly the allocation - no owner needs to know what the others
+    /// hold. Callers hold <see cref="gate"/>.
+    /// </remarks>
+    private int ApportionByInterval(int allocation, int total)
+    {
+        if (allocation <= 0) return 0;
+
+        var share = 0;
+        foreach (var party in parties)
+        {
+            var count = party.Entries.Length;
+            if (count <= 0) continue;
+
+            var start = ScaleToAllocation(party.SideOffset, total, allocation);
+            var end = ScaleToAllocation(party.SideOffset + count, total, allocation);
+            share += end - start;
+        }
+
+        return share;
+    }
+
+    /// <summary>
+    /// Whether this client's own player party is one of the first <paramref name="allocation"/> player-owned
+    /// parties on the side - the tie-break for a wave too small to give every player a troop.
+    /// </summary>
+    private bool ReceiverPlayerRankWithin(int allocation)
+    {
+        foreach (var party in parties)
+        {
+            if (party.PartyId != playerPartyId) continue;
+
+            return party.PlayerOwnedRank >= 0 && party.PlayerOwnedRank < allocation;
+        }
+
+        return false;
     }
 
     /// <summary>Where a position within the side falls once the side is scaled to the allocation.</summary>
@@ -339,6 +375,9 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// </remarks>
     private static int ScaleToAllocation(int position, int total, int allocation)
         => (int)((long)position * allocation / total);
+
+    /// <summary>Whether this client holds the receiver's own player party in this battle.</summary>
+    private bool OwnsReceiverPlayerParty() => playerPartyId != null;
 
     /// <summary>
     /// Whether this client owns the receiver's own party in this battle AND that party still has troops left

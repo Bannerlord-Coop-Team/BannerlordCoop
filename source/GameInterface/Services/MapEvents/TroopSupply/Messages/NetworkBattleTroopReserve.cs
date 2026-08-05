@@ -50,13 +50,27 @@ public class NetworkBattleTroopReserve : IEvent
     [ProtoMember(5)]
     public readonly int SideTotalTroops;
 
+    /// <summary>
+    /// How many parties on this side belong to a player, across ALL owners. One troop of each wave is set
+    /// aside per player-owned party before the proportional split, so no player can be rounded down to
+    /// nothing while the owners' slices still sum to exactly the allocation - see
+    /// <see cref="PartyReserve.PlayerOwnedRank"/>.
+    /// <para>
+    /// Additive and default 0, which reads as "not sent" and falls back to the older apportionment with its
+    /// inexact per-owner top-up.
+    /// </para>
+    /// </summary>
+    [ProtoMember(6)]
+    public readonly int PlayerOwnedPartyCount;
+
     public NetworkBattleTroopReserve(string mapEventId, int side, PartyReserve[] parties, bool flushRequested = false,
-        int sideTotalTroops = 0)
+        int sideTotalTroops = 0, int playerOwnedPartyCount = 0)
     {
         MapEventId = mapEventId;
         Side = side;
         Parties = parties;
         FlushRequested = flushRequested;
         SideTotalTroops = sideTotalTroops;
+        PlayerOwnedPartyCount = playerOwnedPartyCount;
     }
 }
