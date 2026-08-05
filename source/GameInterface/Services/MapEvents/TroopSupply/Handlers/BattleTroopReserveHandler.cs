@@ -48,7 +48,8 @@ internal class BattleTroopReserveHandler : IHandler
             message.MapEventId,
             (BattleSideEnum)message.Side,
             message.Parties ?? Array.Empty<PartyReserve>(),
-            message.SideTotalTroops);
+            message.SideTotalTroops,
+            message.PlayerOwnedPartyCount);
 
         if (!message.FlushRequested)
             return; // legacy shrink — REPLACE only, no ack (today's behavior)

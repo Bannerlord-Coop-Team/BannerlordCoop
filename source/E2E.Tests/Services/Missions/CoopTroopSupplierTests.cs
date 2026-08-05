@@ -22,8 +22,9 @@ public class CoopTroopSupplierTests
     }
 
     private static PartyReserve Party(string id, int count, int supplied = 0, int seedBase = 500,
-        bool isReceiverPlayerParty = false, int sideOffset = 0)
-        => new PartyReserve(id, supplied, Entries(count, seedBase), isReceiverPlayerParty, sideOffset);
+        bool isReceiverPlayerParty = false, int sideOffset = 0, int playerOwnedRank = -1)
+        => new PartyReserve(id, supplied, Entries(count, seedBase), isReceiverPlayerParty, sideOffset,
+            playerOwnedRank);
 
     private static int SuppliedFor(CoopTroopSupplier supplier, string partyId)
         => supplier.GetSuppliedByParty().First(p => p.partyId == partyId).supplied;
@@ -274,6 +275,80 @@ public class CoopTroopSupplierTests
 
         Assert.Equal(allocation,
             a.OwnedShareOf(allocation) + b.OwnedShareOf(allocation) + c.OwnedShareOf(allocation));
+    }
+
+    // --- exact apportionment with a guaranteed troop per player ---------------------------------------
+    // Reserving one troop per player-owned party BEFORE the proportional split is what lets both invariants
+    // hold at once. The older top-up added its troop AFTER, so each owner that floored to zero raised itself
+    // to one with no idea the others were doing the same, and the side fielded more men than the engine
+    // asked for. The reviewer's case: an owner holding 1 troop of a 1000-strong side floors to zero for an
+    // allocation of 100 and tops up, while the other owners already supply all 100.
+
+    [Fact]
+    public void GuaranteedTroopPerPlayer_KeepsTheAllocationExact_OnLopsidedOwnership()
+    {
+        const int total = 1000;
+        const int allocation = 100;
+        const int playerParties = 2;
+
+        // One troop of 1000 - the share that used to round to zero and then top itself up.
+        var tiny = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        tiny.SetReserve(new[] { Party("TINY", 1, isReceiverPlayerParty: true, sideOffset: 0, playerOwnedRank: 0) },
+            sideTotal: total, playerOwnedParties: playerParties);
+
+        var big = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        big.SetReserve(new[] { Party("BIG", 999, seedBase: 4000, isReceiverPlayerParty: true, sideOffset: 1,
+            playerOwnedRank: 1) }, sideTotal: total, playerOwnedParties: playerParties);
+
+        Assert.Equal(allocation, tiny.OwnedShareOf(allocation) + big.OwnedShareOf(allocation));
+        Assert.True(tiny.OwnedShareOf(allocation) >= 1, "the small owner still fields its player");
+    }
+
+    [Fact]
+    public void GuaranteedTroopPerPlayer_ExactAcrossThreeOwners_IncludingAnAiOwner()
+    {
+        const int total = 1000;
+        const int playerParties = 2;
+
+        var p1 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        p1.SetReserve(new[] { Party("P1", 1, isReceiverPlayerParty: true, sideOffset: 0, playerOwnedRank: 0) },
+            sideTotal: total, playerOwnedParties: playerParties);
+        var p2 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        p2.SetReserve(new[] { Party("P2", 2, seedBase: 3000, isReceiverPlayerParty: true, sideOffset: 1,
+            playerOwnedRank: 1) }, sideTotal: total, playerOwnedParties: playerParties);
+        var ai = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        ai.SetReserve(new[] { Party("AI", 997, seedBase: 7000, sideOffset: 3) },
+            sideTotal: total, playerOwnedParties: playerParties);
+
+        foreach (var allocation in new[] { 2, 3, 7, 50, 100, 337, 999 })
+        {
+            Assert.Equal(allocation,
+                p1.OwnedShareOf(allocation) + p2.OwnedShareOf(allocation) + ai.OwnedShareOf(allocation));
+        }
+    }
+
+    [Fact]
+    public void WaveTooSmallForEveryPlayer_GivesItToTheLowestRanks_AndStaysExact()
+    {
+        const int total = 1000;
+        const int playerParties = 3;
+
+        var r0 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        r0.SetReserve(new[] { Party("R0", 10, isReceiverPlayerParty: true, sideOffset: 0, playerOwnedRank: 0) },
+            sideTotal: total, playerOwnedParties: playerParties);
+        var r1 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        r1.SetReserve(new[] { Party("R1", 10, seedBase: 3000, isReceiverPlayerParty: true, sideOffset: 10,
+            playerOwnedRank: 1) }, sideTotal: total, playerOwnedParties: playerParties);
+        var r2 = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        r2.SetReserve(new[] { Party("R2", 10, seedBase: 6000, isReceiverPlayerParty: true, sideOffset: 20,
+            playerOwnedRank: 2) }, sideTotal: total, playerOwnedParties: playerParties);
+
+        // Two troops, three players: ranks 0 and 1 get them, rank 2 waits for the next wave. Every client
+        // reaches the same answer because the ranks come from the server.
+        Assert.Equal(1, r0.OwnedShareOf(2));
+        Assert.Equal(1, r1.OwnedShareOf(2));
+        Assert.Equal(0, r2.OwnedShareOf(2));
+        Assert.Equal(2, r0.OwnedShareOf(2) + r1.OwnedShareOf(2) + r2.OwnedShareOf(2));
     }
 
     [Fact]

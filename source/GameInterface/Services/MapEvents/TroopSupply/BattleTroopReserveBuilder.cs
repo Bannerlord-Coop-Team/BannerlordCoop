@@ -7,6 +7,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -26,11 +27,20 @@ public readonly struct SideReserve
     /// </summary>
     public readonly int TotalTroops;
 
-    public SideReserve(BattleSideEnum side, PartyReserve[] parties, int totalTroops = 0)
+    /// <summary>
+    /// How many parties on this side belong to a player, counting every owner and not just this receiver.
+    /// One troop of the allocation is reserved for each, so that no player can be rounded down to nothing
+    /// while the total still adds up exactly. See <see cref="PartyReserve.PlayerOwnedRank"/>.
+    /// </summary>
+    public readonly int PlayerOwnedPartyCount;
+
+    public SideReserve(BattleSideEnum side, PartyReserve[] parties, int totalTroops = 0,
+        int playerOwnedPartyCount = 0)
     {
         Side = side;
         Parties = parties;
         TotalTroops = totalTroops;
+        PlayerOwnedPartyCount = playerOwnedPartyCount;
     }
 }
 
@@ -100,6 +110,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         var defender = new List<PartyReserve>();
         int attackerTotal = 0;
         int defenderTotal = 0;
+        int attackerPlayerParties = 0;
+        int defenderPlayerParties = 0;
 
         foreach (var party in EnumerateParties(mapEvent))
         {
@@ -123,6 +135,17 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             if (partySide == BattleSideEnum.Attacker) attackerTotal += entries.Count;
             else defenderTotal += entries.Count;
 
+            // Ranked before ownership is considered, for the same reason the totals are: every client must
+            // agree on how many player-owned parties the side holds and in what order, or their guaranteed
+            // troops do not add up to the same number.
+            var playerOwnedRank = -1;
+            if (IsAnyPlayersOwnParty(party))
+            {
+                playerOwnedRank = partySide == BattleSideEnum.Attacker
+                    ? attackerPlayerParties++
+                    : defenderPlayerParties++;
+            }
+
             TryGetOwningPlayer(party, absentControllers, presentControllers, out var partyOwnerController);
             TryGetArmyLeaderPlayer(party, absentControllers, presentControllers, out var armyLeaderController);
             var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers);
@@ -137,7 +160,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 supplied,
                 entriesArray,
                 isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId),
-                sideOffset: partyOffset);
+                sideOffset: partyOffset,
+                playerOwnedRank: playerOwnedRank);
             if (partySide == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else
@@ -150,8 +174,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         // Return both sides (empty parties = "owns nothing here") so every supplier becomes populated.
         return new[]
         {
-            new SideReserve(BattleSideEnum.Attacker, attacker.ToArray(), attackerTotal),
-            new SideReserve(BattleSideEnum.Defender, defender.ToArray(), defenderTotal),
+            new SideReserve(BattleSideEnum.Attacker, attacker.ToArray(), attackerTotal, attackerPlayerParties),
+            new SideReserve(BattleSideEnum.Defender, defender.ToArray(), defenderTotal, defenderPlayerParties),
         };
     }
 
@@ -334,6 +358,16 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         }
 
         return absentController ?? (presentControllers == null ? registeredController : null);
+    }
+
+    /// <summary>Whether this party is some player's own party — any player, not just the one being served.</summary>
+    private bool IsAnyPlayersOwnParty(MapEventParty party)
+    {
+        var mobileParty = party.Party?.MobileParty;
+        if (mobileParty == null || !objectManager.TryGetId(mobileParty, out var mobilePartyId))
+            return false;
+
+        return playerManager.Players.Any(player => player.MobilePartyId == mobilePartyId);
     }
 
     private bool IsPartyRegisteredToController(MapEventParty party, string controllerId)
