@@ -1,9 +1,13 @@
-using Common;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages.Retreat;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -25,6 +29,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch(typeof(BreakInOutBesiegedSettlementAction))]
 internal class BreakInCasualtiesPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<BreakInCasualtiesPatch>();
+
     [HarmonyPatch(nameof(BreakInOutBesiegedSettlementAction.ApplyBreakIn))]
     [HarmonyPrefix]
     private static bool ApplyBreakInPrefix(ref TroopRoster casualties, ref int armyCasualtiesCount)
@@ -36,10 +42,40 @@ internal class BreakInCasualtiesPatch
         armyCasualtiesCount = 0;
 
         var mainParty = MobileParty.MainParty;
-        var settlement = mainParty?.CurrentSettlement ?? mainParty?.BesiegedSettlement;
-        if (mainParty == null || settlement == null) return false;
+        if (mainParty == null) return false;
+
+        var settlement = ResolveBrokenIntoSettlement(mainParty);
+        if (settlement == null)
+        {
+            // Nothing to ask the server for, and vanilla has already been suppressed above. Say so:
+            // silently returning here is how the break-in ends up costing nobody anything.
+            Logger.Warning(
+                "Break-in casualties skipped for {PartyId}: no settlement could be resolved for the encounter",
+                mainParty.StringId);
+            return false;
+        }
 
         MessageBroker.Instance.Publish(mainParty, new BreakInCasualtiesAttempted(mainParty, settlement));
         return false;
+    }
+
+    /// <summary>
+    /// The settlement being broken into.
+    /// </summary>
+    /// <remarks>
+    /// The encounter comes first because it is the only one that holds during a normal break-in: the party
+    /// is still OUTSIDE the walls and is not the besieger, so CurrentSettlement and BesiegedSettlement are
+    /// both null at this point. Reading only those meant the method suppressed vanilla and then returned
+    /// without ever requesting the loss, so breaking in was free.
+    ///
+    /// The other two stay as fallbacks for the cases where they do hold - breaking OUT from inside, and a
+    /// besieger breaking through its own siege.
+    /// </remarks>
+    private static Settlement ResolveBrokenIntoSettlement(MobileParty mainParty)
+    {
+        return PlayerEncounter.EncounterSettlement
+            ?? mainParty.MapEvent?.MapEventSettlement
+            ?? mainParty.CurrentSettlement
+            ?? mainParty.BesiegedSettlement;
     }
 }
