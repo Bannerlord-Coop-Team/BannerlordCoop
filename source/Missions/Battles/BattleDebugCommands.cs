@@ -2,10 +2,7 @@
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Missions.Agents.Packets;
-using Missions.Services.Network;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
@@ -14,7 +11,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -78,10 +74,6 @@ internal static class BattleDebugCommands
 
         public override void OnRemoveBehavior()
         {
-#if DEBUG
-            if (ReferenceEquals(focusedPlayerPairMission, Mission))
-                ReleasePlayerPairCamera();
-#endif
             if (ReferenceEquals(battleDebugTickBehavior, this))
                 battleDebugTickBehavior = null;
         }
@@ -108,33 +100,6 @@ internal static class BattleDebugCommands
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
     private static bool wieldTestActive;
-    private static Camera playerPairCamera;
-    private static Agent focusedLocalPlayer;
-    private static Agent focusedRemotePlayer;
-    private static Guid focusedLocalPlayerId;
-    private static Guid focusedRemotePlayerId;
-    private static string focusedLocalControllerId;
-    private static string focusedRemoteControllerId;
-    private static Mission focusedPlayerPairMission;
-    private static Vec3 playerPairCameraPosition;
-    private static Vec3 playerPairCameraDirection;
-
-    [CommandLineArgumentFunction("relay_state", "coop.debug.battle")]
-    public static string RelayState(List<string> args)
-    {
-        if (args.Count != 0)
-            return "Usage: coop.debug.battle.relay_state";
-        if (!ContainerProvider.TryResolve<IMissionContext>(out var missionContext))
-            return "Mission relay context is unavailable.";
-
-        string[] controllerIds = missionContext.ControllersInMission
-            .OrderBy(controllerId => controllerId, StringComparer.Ordinal)
-            .ToArray();
-        string controllers = controllerIds.Length == 0
-            ? "none"
-            : string.Join(",", controllerIds);
-        return $"Mission relay state: remoteControllers={controllerIds.Length} controllers={controllers}.";
-    }
 
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)
@@ -306,469 +271,6 @@ internal static class BattleDebugCommands
         return $"WIELD_TEST_RESTORED agent={restoredAgentId:D}";
     }
 
-    [CommandLineArgumentFunction("player_agent_state", "coop.debug.battle")]
-    public static string PlayerAgentState(List<string> args)
-    {
-        if (args.Count != 1)
-            return "Usage: coop.debug.battle.player_agent_state <remoteControllerId>";
-
-        Mission mission = Mission.Current;
-        CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
-        if (mission == null || controller == null)
-            return "No active coop battle mission";
-        if (!TryResolvePlayerServices(
-                out INetworkAgentRegistry registry,
-                out IPlayerManager playerManager,
-                out IObjectManager objectManager,
-                out string serviceError))
-        {
-            return serviceError;
-        }
-
-        string ownControllerId = controller.Session.OwnControllerId;
-        string remoteControllerId = args[0];
-        if (remoteControllerId == ownControllerId)
-            return "The remote controller must differ from the local controller";
-        if (!TryResolvePlayerAgent(
-                ownControllerId,
-                mission,
-                registry,
-                playerManager,
-                objectManager,
-                out string ownHeroId,
-                out CoopAgentInfo ownInfo,
-                out string ownError))
-        {
-            return ownError;
-        }
-        if (!TryResolvePlayerAgent(
-                remoteControllerId,
-                mission,
-                registry,
-                playerManager,
-                objectManager,
-                out string remoteHeroId,
-                out CoopAgentInfo remoteInfo,
-                out string remoteError))
-        {
-            return remoteError;
-        }
-
-        bool targetKnown = controller.DebugAgentInterpolator.TryGetTargetFrame(
-            remoteInfo.Agent,
-            out Vec3 targetPosition,
-            out Vec3 targetLookDirection,
-            out long updateSequence);
-        if (!targetKnown)
-        {
-            targetPosition = Vec3.Invalid;
-            targetLookDirection = Vec3.Invalid;
-            updateSequence = 0;
-        }
-
-        var output = new StringBuilder("kind=PLAYER_AGENT_STATE");
-        output.AppendFormat(
-            CultureInfo.InvariantCulture,
-            "|instance={0}|ownController={1}|ownHero={2}|ownAgent={3:N}" +
-            "|ownAuthority={4}|ownOriginalOwner={5}|ownMain={6}|ownActive={7}|ownVisual={8}" +
-            "|ownX={9:F3}|ownY={10:F3}|ownZ={11:F3}" +
-            "|remoteController={12}|remoteHero={13}|remoteAgent={14:N}" +
-            "|remoteAuthority={15}|remoteOriginalOwner={16}|remoteMain={17}|remoteActive={18}|remoteVisual={19}" +
-            "|remoteX={20:F3}|remoteY={21:F3}|remoteZ={22:F3}" +
-            "|remoteTargetKnown={23}|remoteTargetX={24:F3}|remoteTargetY={25:F3}|remoteTargetZ={26:F3}" +
-            "|remoteTargetLookX={27:F3}|remoteTargetLookY={28:F3}|remoteTargetLookZ={29:F3}" +
-            "|remoteUpdateSequence={30}|distance={31:F3}",
-            controller.Session.InstanceId,
-            ownControllerId,
-            ownHeroId,
-            ownInfo.AgentId,
-            ownInfo.CurrentAuthority,
-            ownInfo.OriginalOwner,
-            ReferenceEquals(ownInfo.Agent, Agent.Main),
-            ownInfo.Agent.IsActive(),
-            HasActiveVisual(ownInfo.Agent),
-            ownInfo.Agent.Position.X,
-            ownInfo.Agent.Position.Y,
-            ownInfo.Agent.Position.Z,
-            remoteControllerId,
-            remoteHeroId,
-            remoteInfo.AgentId,
-            remoteInfo.CurrentAuthority,
-            remoteInfo.OriginalOwner,
-            ReferenceEquals(remoteInfo.Agent, Agent.Main),
-            remoteInfo.Agent.IsActive(),
-            HasActiveVisual(remoteInfo.Agent),
-            remoteInfo.Agent.Position.X,
-            remoteInfo.Agent.Position.Y,
-            remoteInfo.Agent.Position.Z,
-            targetKnown,
-            targetPosition.X,
-            targetPosition.Y,
-            targetPosition.Z,
-            targetLookDirection.X,
-            targetLookDirection.Y,
-            targetLookDirection.Z,
-            updateSequence,
-            ownInfo.Agent.Position.Distance(remoteInfo.Agent.Position));
-        return output.ToString();
-    }
-
-    [CommandLineArgumentFunction("stage_main_agent", "coop.debug.battle")]
-    public static string StageMainAgent(List<string> args)
-    {
-        if (args.Count != 4
-            || !TryParseInvariantFloat(args[0], out float x)
-            || !TryParseInvariantFloat(args[1], out float y)
-            || !TryParseInvariantFloat(args[2], out float lookX)
-            || !TryParseInvariantFloat(args[3], out float lookY))
-        {
-            return "Usage: coop.debug.battle.stage_main_agent <x> <y> <lookX> <lookY>";
-        }
-
-        Mission mission = Mission.Current;
-        CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
-        if (mission == null || controller == null)
-            return "No active coop battle mission";
-        if (!TryResolvePlayerServices(
-                out INetworkAgentRegistry registry,
-                out IPlayerManager playerManager,
-                out IObjectManager objectManager,
-                out string serviceError))
-        {
-            return serviceError;
-        }
-        if (!TryResolvePlayerAgent(
-                controller.Session.OwnControllerId,
-                mission,
-                registry,
-                playerManager,
-                objectManager,
-                out _,
-                out CoopAgentInfo ownInfo,
-                out string ownError))
-        {
-            return ownError;
-        }
-
-        Agent agent = ownInfo.Agent;
-        if (!ReferenceEquals(agent, Agent.Main)
-            || !registry.IsLocallyControlled(ownInfo.AgentId))
-        {
-            return "The resolved local player agent is not the locally controlled main agent";
-        }
-        var lookDirection = new Vec2(lookX, lookY);
-        if (lookDirection.LengthSquared <= 0.0001f)
-            return "The look direction must be non-zero";
-        lookDirection.Normalize();
-
-        var groundProbe = new Vec3(x, y, agent.Position.Z);
-        float groundZ = mission.Scene.GetGroundHeightAtPosition(groundProbe);
-        if (float.IsNaN(groundZ) || float.IsInfinity(groundZ))
-            return "The target position has no finite ground height";
-
-        var targetPosition = new Vec3(x, y, groundZ);
-        agent.TeleportToPosition(targetPosition);
-        agent.SetMovementDirection(lookDirection);
-        agent.LookDirection = new Vec3(lookDirection.X, lookDirection.Y, 0f);
-        agent.MovementInputVector = new Vec2(0f, 0f);
-
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            "STAGED_MAIN_AGENT controller={0} agent={1:N} x={2:F3} y={3:F3} z={4:F3} lookX={5:F3} lookY={6:F3}",
-            controller.Session.OwnControllerId,
-            ownInfo.AgentId,
-            targetPosition.X,
-            targetPosition.Y,
-            targetPosition.Z,
-            lookDirection.X,
-            lookDirection.Y);
-    }
-
-    [CommandLineArgumentFunction("focus_player_pair", "coop.debug.battle")]
-    public static string FocusPlayerPair(List<string> args)
-    {
-        if (args.Count != 1)
-            return "Usage: coop.debug.battle.focus_player_pair <remoteControllerId>";
-
-        Mission mission = Mission.Current;
-        CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
-        if (mission == null || controller == null)
-            return "No active coop battle mission";
-        if (!(ScreenManager.TopScreen is MissionScreen missionScreen)
-            || ReferenceEquals(missionScreen.CombatCamera, null))
-        {
-            return "The mission screen is not active";
-        }
-        if (!TryResolvePlayerServices(
-                out INetworkAgentRegistry registry,
-                out IPlayerManager playerManager,
-                out IObjectManager objectManager,
-                out string serviceError))
-        {
-            return serviceError;
-        }
-
-        string ownControllerId = controller.Session.OwnControllerId;
-        string remoteControllerId = args[0];
-        if (!TryResolvePlayerAgent(
-                ownControllerId,
-                mission,
-                registry,
-                playerManager,
-                objectManager,
-                out _,
-                out CoopAgentInfo ownInfo,
-                out string ownError))
-        {
-            return ownError;
-        }
-        if (!TryResolvePlayerAgent(
-                remoteControllerId,
-                mission,
-                registry,
-                playerManager,
-                objectManager,
-                out _,
-                out CoopAgentInfo remoteInfo,
-                out string remoteError))
-        {
-            return remoteError;
-        }
-        if (ReferenceEquals(ownInfo.Agent, remoteInfo.Agent))
-            return "The local and remote player resolved to the same agent";
-        if (!HasActiveVisual(ownInfo.Agent) || !HasActiveVisual(remoteInfo.Agent))
-            return "Both player agents need active visual entities before camera focus";
-
-        Vec3 pairDirection = remoteInfo.Agent.Position - ownInfo.Agent.Position;
-        pairDirection = new Vec3(pairDirection.X, pairDirection.Y, 0f);
-        if (pairDirection.LengthSquared <= 0.25f)
-            return "The player agents are too close to frame independently";
-        pairDirection.Normalize();
-        var sideOffset = new Vec3(-pairDirection.Y, pairDirection.X, 0f);
-        Vec3 target = ((ownInfo.Agent.Position + remoteInfo.Agent.Position) * 0.5f)
-            + (Vec3.Up * 1.1f);
-        Vec3 position = ownInfo.Agent.Position
-            - (pairDirection * 4.5f)
-            + (sideOffset * 1.25f)
-            + (Vec3.Up * 2.3f);
-        Vec3 direction = target - position;
-        direction.Normalize();
-
-        ObserveMission(mission);
-        EnsureBattleDebugTickBehavior(mission);
-        ReleaseLadderCamera();
-        ReleaseMountCamera();
-        ReleasePlayerPairCamera();
-        playerPairCamera = Camera.CreateCamera();
-        playerPairCamera.FillParametersFrom(missionScreen.CombatCamera);
-        playerPairCamera.LookAt(position, target, Vec3.Up);
-        focusedLocalPlayer = ownInfo.Agent;
-        focusedRemotePlayer = remoteInfo.Agent;
-        focusedLocalPlayerId = ownInfo.AgentId;
-        focusedRemotePlayerId = remoteInfo.AgentId;
-        focusedLocalControllerId = ownControllerId;
-        focusedRemoteControllerId = remoteControllerId;
-        focusedPlayerPairMission = mission;
-        playerPairCameraPosition = position;
-        playerPairCameraDirection = direction;
-        missionScreen.CustomCamera = playerPairCamera;
-
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            "FOCUSED_PLAYER_PAIR instance={0} localController={1} localAgent={2:N} remoteController={3} remoteAgent={4:N} distance={5:F3}",
-            controller.Session.InstanceId,
-            ownControllerId,
-            ownInfo.AgentId,
-            remoteControllerId,
-            remoteInfo.AgentId,
-            ownInfo.Agent.Position.Distance(remoteInfo.Agent.Position));
-    }
-
-    [CommandLineArgumentFunction("player_pair_camera_state", "coop.debug.battle")]
-    public static string PlayerPairCameraState(List<string> args)
-    {
-        if (args.Count != 0)
-            return "Usage: coop.debug.battle.player_pair_camera_state";
-        Mission mission = Mission.Current;
-        if (ReferenceEquals(playerPairCamera, null)
-            || ReferenceEquals(focusedLocalPlayer, null)
-            || ReferenceEquals(focusedRemotePlayer, null)
-            || !ReferenceEquals(focusedPlayerPairMission, mission)
-            || !(ScreenManager.TopScreen is MissionScreen missionScreen)
-            || ReferenceEquals(missionScreen.CombatCamera, null)
-            || !focusedLocalPlayer.IsActive()
-            || !focusedRemotePlayer.IsActive())
-        {
-            return "active=False";
-        }
-
-        bool active = ReferenceEquals(missionScreen.CustomCamera, playerPairCamera);
-        Vec3 renderedPosition = missionScreen.CombatCamera.Position;
-        Vec3 renderedDirection = missionScreen.CombatCamera.Direction;
-        renderedDirection.Normalize();
-        float localDirectionDot = DirectionDot(
-            renderedPosition,
-            renderedDirection,
-            focusedLocalPlayer.Position + Vec3.Up);
-        float remoteDirectionDot = DirectionDot(
-            renderedPosition,
-            renderedDirection,
-            focusedRemotePlayer.Position + Vec3.Up);
-        float expectedDirectionDot = (renderedDirection.X * playerPairCameraDirection.X)
-            + (renderedDirection.Y * playerPairCameraDirection.Y)
-            + (renderedDirection.Z * playerPairCameraDirection.Z);
-
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            "active={0} localController={1} localAgent={2:N} remoteController={3} remoteAgent={4:N} " +
-            "localVisual={5} remoteVisual={6} pairDistance={7:F3} positionDelta={8:F3} " +
-            "directionDot={9:F3} localDirectionDot={10:F3} remoteDirectionDot={11:F3}",
-            active,
-            focusedLocalControllerId,
-            focusedLocalPlayerId,
-            focusedRemoteControllerId,
-            focusedRemotePlayerId,
-            HasActiveVisual(focusedLocalPlayer),
-            HasActiveVisual(focusedRemotePlayer),
-            focusedLocalPlayer.Position.Distance(focusedRemotePlayer.Position),
-            renderedPosition.Distance(playerPairCameraPosition),
-            expectedDirectionDot,
-            localDirectionDot,
-            remoteDirectionDot);
-    }
-
-    [CommandLineArgumentFunction("release_player_pair_camera", "coop.debug.battle")]
-    public static string ReleasePlayerPairCameraCommand(List<string> args)
-    {
-        if (args.Count != 0)
-            return "Usage: coop.debug.battle.release_player_pair_camera";
-
-        bool released = ReleasePlayerPairCamera();
-        return released ? "Released the player-pair camera" : "No player-pair camera was active";
-    }
-
-    private static bool TryResolvePlayerServices(
-        out INetworkAgentRegistry registry,
-        out IPlayerManager playerManager,
-        out IObjectManager objectManager,
-        out string error)
-    {
-        registry = null;
-        playerManager = null;
-        objectManager = null;
-        error = null;
-        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out registry))
-        {
-            error = "Network agent registry is unavailable";
-            return false;
-        }
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out playerManager))
-        {
-            error = "Player manager is unavailable";
-            return false;
-        }
-        if (!ContainerProvider.TryResolve<IObjectManager>(out objectManager))
-        {
-            error = "Object manager is unavailable";
-            return false;
-        }
-        return true;
-    }
-
-    private static bool TryResolvePlayerAgent(
-        string controllerId,
-        Mission mission,
-        INetworkAgentRegistry registry,
-        IPlayerManager playerManager,
-        IObjectManager objectManager,
-        out string heroId,
-        out CoopAgentInfo agentInfo,
-        out string error)
-    {
-        heroId = null;
-        agentInfo = null;
-        error = null;
-        if (!playerManager.TryGetPlayer(controllerId, out var player))
-        {
-            error = $"Player {controllerId} is not registered";
-            return false;
-        }
-        heroId = player.HeroId;
-        if (!objectManager.TryGetObject<Hero>(heroId, out Hero hero))
-        {
-            error = $"Hero {heroId} for player {controllerId} is not registered";
-            return false;
-        }
-
-        CoopAgentInfo[] matches = registry.GetAgents(controllerId)
-            .Where(info => info.OriginalOwner == controllerId
-                && info.Agent != null
-                && !info.Agent.IsMount
-                && info.Agent.IsHuman
-                && info.Agent.IsActive()
-                && info.Agent.Mission == mission
-                && info.Agent.Character is CharacterObject character
-                && character.IsHero
-                && character.HeroObject == hero)
-            .ToArray();
-        if (matches.Length != 1)
-        {
-            error = $"Player {controllerId} resolved {matches.Length} active hero agents";
-            return false;
-        }
-
-        agentInfo = matches[0];
-        return true;
-    }
-
-    private static bool HasActiveVisual(Agent agent)
-    {
-        return agent?.AgentVisuals?.GetEntity() != null;
-    }
-
-    private static bool TryParseInvariantFloat(string value, out float result)
-    {
-        return float.TryParse(
-            value,
-            NumberStyles.Float,
-            CultureInfo.InvariantCulture,
-            out result);
-    }
-
-    private static float DirectionDot(Vec3 origin, Vec3 direction, Vec3 target)
-    {
-        Vec3 toTarget = target - origin;
-        if (toTarget.LengthSquared <= 0.0001f)
-            return 1f;
-        toTarget.Normalize();
-        return (direction.X * toTarget.X)
-            + (direction.Y * toTarget.Y)
-            + (direction.Z * toTarget.Z);
-    }
-
-    private static bool ReleasePlayerPairCamera()
-    {
-        if (ReferenceEquals(playerPairCamera, null)) return false;
-
-        if (ScreenManager.TopScreen is MissionScreen missionScreen
-            && ReferenceEquals(missionScreen.CustomCamera, playerPairCamera))
-        {
-            missionScreen.CustomCamera = null;
-        }
-
-        playerPairCamera.ReleaseCamera();
-        playerPairCamera = null;
-        focusedLocalPlayer = null;
-        focusedRemotePlayer = null;
-        focusedLocalPlayerId = Guid.Empty;
-        focusedRemotePlayerId = Guid.Empty;
-        focusedLocalControllerId = null;
-        focusedRemoteControllerId = null;
-        focusedPlayerPairMission = null;
-        playerPairCameraPosition = Vec3.Invalid;
-        playerPairCameraDirection = Vec3.Invalid;
-        return true;
-    }
 #endif
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
@@ -1306,9 +808,6 @@ internal static class BattleDebugCommands
         MountPoseSamples.Clear();
         ReleaseLadderCamera();
         ReleaseMountCamera();
-#if DEBUG
-        ReleasePlayerPairCamera();
-#endif
         observedMission = mission;
     }
 
@@ -1380,9 +879,6 @@ internal static class BattleDebugCommands
             || ReferenceEquals(missionScreen.CombatCamera, null))
             return "The mission screen is not active";
 
-#if DEBUG
-        ReleasePlayerPairCamera();
-#endif
         ReleaseLadderCamera();
         ObserveMission(mission);
         Agent mount = info.Agent;
@@ -1599,9 +1095,6 @@ internal static class BattleDebugCommands
             return "The mission screen is not active";
         }
 
-#if DEBUG
-        ReleasePlayerPairCamera();
-#endif
         ReleaseMountCamera();
         ReleaseLadderCamera();
         ladderCamera = Camera.CreateCamera();
