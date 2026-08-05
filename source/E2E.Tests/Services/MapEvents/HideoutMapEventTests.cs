@@ -1,7 +1,10 @@
 using Common.Messaging;
+using Common.Util;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Util;
+using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.Players;
@@ -157,6 +160,8 @@ public class HideoutMapEventTests : MapEventTestBase
 
         string? notableId = null;
         string? settlementId = null;
+        string? banditTroopId = null;
+        var banditParties = new List<(string PartyId, int TroopCount)>();
         var initialBanditCount = 0;
         var maximumMissionBandits = 0;
         var expectedNotableRelation = 0;
@@ -187,6 +192,7 @@ public class HideoutMapEventTests : MapEventTestBase
                 1,
                 model.NumberOfMinimumBanditPartiesInAHideoutToInfestIt);
             var banditTroop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            Assert.True(Server.ObjectManager.TryGetId(banditTroop, out banditTroopId));
 
             for (var i = 0; i < requiredBanditParties; i++)
             {
@@ -200,9 +206,10 @@ public class HideoutMapEventTests : MapEventTestBase
                     pt: null,
                     new CampaignVec2(Vec2.Zero, true));
                 banditParty.CurrentSettlement = settlement;
-                banditParty.MemberRoster.AddToCounts(
-                    banditTroop,
-                    i == 0 ? maximumMissionBandits + 5 : 1);
+                var troopCount = i == 0 ? maximumMissionBandits + 5 : 1;
+                banditParty.MemberRoster.AddToCounts(banditTroop, troopCount);
+                Assert.True(Server.ObjectManager.TryGetId(banditParty, out var banditPartyId));
+                banditParties.Add((banditPartyId, troopCount));
             }
 
             Assert.True(hideout.IsInfested);
@@ -224,6 +231,37 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Contains(notable, villageSettlement.Notables);
             Assert.Contains(villageSettlement.Village, Campaign.Current.AllVillages);
             Assert.True(Server.ObjectManager.TryGetId(notable, out notableId));
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId!, out var settlement));
+            Assert.Same(settlement, playerParty.CurrentSettlement);
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(banditTroopId!, out var banditTroop));
+
+            foreach (var (banditPartyId, troopCount) in banditParties)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(banditPartyId, out var banditParty));
+                banditParty.SetCurrentSettlementDirectly(settlement);
+                if (!settlement._partiesCache.Contains(banditParty))
+                    settlement._partiesCache.Add(banditParty);
+                using (new AllowedThread())
+                    banditParty.MemberRoster.AddToCounts(banditTroop, troopCount);
+            }
+
+            int GetBanditCount() => settlement.Parties
+                .Where(party => party.IsBandit)
+                .Sum(party => party.MemberRoster.TotalHealthyCount);
+
+            Assert.True(initialBanditCount > maximumMissionBandits);
+            Assert.Equal(initialBanditCount, GetBanditCount());
+
+            using (new BarterPlayerContext(playerHero, playerParty))
+                new HideoutCampaignBehavior().ArrangeHideoutTroopCountsForMission();
+
+            Assert.Equal(initialBanditCount, GetBanditCount());
         });
 
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(

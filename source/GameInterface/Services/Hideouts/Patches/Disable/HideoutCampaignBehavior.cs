@@ -17,6 +17,13 @@ namespace GameInterface.Services.Hideouts.Patches.Disable;
 [HarmonyPatch(typeof(HideoutCampaignBehavior))]
 internal class HideoutCampaignBehaviorPatch
 {
+    [HarmonyPatch(nameof(HideoutCampaignBehavior.ArrangeHideoutTroopCountsForMission))]
+    [HarmonyPrefix]
+    private static bool ArrangeHideoutTroopCountsForMission()
+    {
+        return ModInformation.IsServer;
+    }
+
     [HarmonyPatch("OnTroopRosterManageDone")]
     [HarmonyPrefix]
     private static void OnTroopRosterManageDone()
