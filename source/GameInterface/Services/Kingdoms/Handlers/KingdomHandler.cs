@@ -178,7 +178,7 @@ public class KingdomHandler : IHandler
     }
 
     // FactionHelper.IsKIngdomNameApplicable relies on Clan.PlayerClan.Kingdom
-    // But Clan.PlayerCla is null on a dedicated server. Applied a new name so others are not confused
+    // But Clan.PlayerClan is null on a dedicated server. Applied a new name so others are not confused
     private static bool IsKingdomNameAvailable(Kingdom kingdom, string requestedName, out string reason)
     {
         var validationErr = FactionHelper.IsFactionNameApplicable(requestedName);
