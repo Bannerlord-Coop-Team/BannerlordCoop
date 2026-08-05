@@ -248,13 +248,10 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
             return false;
         }
 
-        // The puppet spawner attached carry props directly (no navigator existed). The navigator we
-        // create below re-attaches the same prefabs through native bookkeeping, so HIDE ours first —
-        // there is no engine remove API, and two visible attaches stack a second basket.
-        HideManuallyAttachedPrefabs(agent, agentId);
-
-        // V5: the exact native spawn tail. Every campaign-mission agent gets a CampaignAgentComponent
-        // at creation (CampaignMissionComponent.OnAgentCreated), but guard anyway.
+        // V5: the exact native spawn tail. The puppet spawner already created a roster-bound
+        // navigator at spawn (carry prefabs + special item attached there), so the create below is
+        // normally a no-op and only the behavior groups are new; the guards cover agents from before
+        // a mid-mission code path change or a stand-in that somehow reached here.
         var component = agent.GetComponent<CampaignAgentComponent>();
         if (component == null)
         {
@@ -266,16 +263,5 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
             component.CreateAgentNavigator(entry);
         entry.AddBehaviors(agent);
         return true;
-    }
-
-    private void HideManuallyAttachedPrefabs(Agent agent, System.Guid agentId)
-    {
-        if (!bindingMap.TryGet(agentId, out var binding)) return;
-        var components = binding.AttachedPrefabComponents;
-        if (components == null) return;
-
-        foreach (var componentIndex in components)
-            agent.SetSynchedPrefabComponentVisibility(componentIndex, visibility: false);
-        binding.AttachedPrefabComponents = null;
     }
 }

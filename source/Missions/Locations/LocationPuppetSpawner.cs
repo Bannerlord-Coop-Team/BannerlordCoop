@@ -320,9 +320,10 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
             slotsNeeded = agentBudget.SlotsForEquipment(data.SpawnEquipment);
         if (slotsNeeded > slotsAvailable) return false;                 // at capacity — buffer
 
+        LocationCharacter rosterBoundEntry = null;
         Agent agent = data.Kind == LocationAgentKind.Animal
             ? SpawnAnimalPuppet(data)
-            : SpawnHumanPuppet(data);
+            : SpawnHumanPuppet(data, out rosterBoundEntry);
         if (agent == null) return true;                                 // unresolvable — drop (already logged)
 
         agent.FadeIn();
@@ -341,11 +342,14 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         var binding = new LocationAgentBinding(data.Kind, data.RosterEntry, data.ItemId, data.HarnessItemId);
         bindingMap.Record(data.AgentId, binding);
 
-        // Carry props (baskets, pitchers, carried goods) are navigator-attached prefabs natively —
-        // puppets have no navigator, so attach them straight from the roster data or every carrier
-        // plays its carry action set with empty hands (SR-023).
+        // Every human puppet gets a REAL AgentNavigator even though it never ticks
+        // (CampaignAgentComponent.OnTick gates on IsAIControlled, so it is dormant on Controller.None):
+        // scene points dereference it unguarded — AnimationPoint.SetAgentItemVisibility NREs the whole
+        // mission tick for a navigator-less user (SR-043) — and its ctor attaches the roster entry's
+        // carry prefabs and special item through the native bookkeeping (SR-023), which adoption's
+        // CreateAgentNavigator null-guard then reuses instead of stacking a second attach.
         if (data.Kind == LocationAgentKind.Human)
-            AttachCarryPrefabs(agent, data.RosterEntry, binding);
+            EnsurePuppetNavigator(agent, rosterBoundEntry);
 
         // Mid-performance catch-up / a use that beat the spawn: have the puppet use its local point.
         if (data.Kind == LocationAgentKind.Human)
@@ -372,8 +376,9 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         return true;
     }
 
-    private Agent SpawnHumanPuppet(LocationAgentSpawnData data)
+    private Agent SpawnHumanPuppet(LocationAgentSpawnData data, out LocationCharacter entry)
     {
+        entry = null;
         if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
         {
             Logger.Warning("[LocationSync] Puppet skipped: unresolved character {Char} for agent {AgentId}",
@@ -384,7 +389,6 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         // SR-022: bind the puppet to a LOCAL roster entry and build from ITS AgentData — the entry's
         // origin makes the puppet visible to native bookkeeping (IsAlreadySpawned, GetLocationCharacter,
         // passage guards) and is what a promoted host re-binds AI through.
-        LocationCharacter entry = null;
         if (data.RosterEntry != null)
             rosterBinder.TryBindOrReconstruct(data.RosterEntry, out entry);
 
@@ -472,25 +476,22 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         }
     }
 
-    // Mirror of AgentNavigator.SetItemsVisibility(true): one synched prefab component per
-    // (bone, prefab) pair. The component indices are kept on the binding so a promoted host can
-    // HIDE them before CreateAgentNavigator re-attaches the same prefabs through native bookkeeping
-    // (no engine remove API exists; a second visible attach would stack a second basket).
-    private static void AttachCarryPrefabs(Agent agent, GameInterface.Services.Locations.Messages.LocationCharacterData rosterEntry, LocationAgentBinding binding)
+    // The navigator ctor with a roster entry replays the native spawn tail's visual half: carry
+    // prefabs (SetItemsVisibility) and the special item. An unbound stand-in still gets a BARE
+    // navigator — scene points dereference it unguarded, so a navigator-less human user is a
+    // mission-tick NRE waiting for its first point use.
+    private static void EnsurePuppetNavigator(Agent agent, LocationCharacter entry)
     {
-        var bones = rosterEntry?.PrefabBones;
-        var names = rosterEntry?.PrefabNames;
-        if (bones == null || names == null || bones.Length != names.Length || bones.Length == 0) return;
-
-        var components = new List<int>(bones.Length);
-        for (int i = 0; i < bones.Length; i++)
+        var component = agent.GetComponent<CampaignAgentComponent>();
+        if (component == null)
         {
-            if (string.IsNullOrEmpty(names[i])) continue;
-            components.Add(agent.AddSynchedPrefabComponentToBone(names[i], (sbyte)bones[i]));
+            component = new CampaignAgentComponent(agent);
+            agent.AddComponent(component);
         }
+        if (component.AgentNavigator != null) return;
 
-        if (components.Count > 0)
-            binding.AttachedPrefabComponents = components;
+        if (entry != null) component.CreateAgentNavigator(entry);
+        else component.CreateAgentNavigator();
     }
 
     // Native teams a settlement NPC by its roster entry's relation (MissionAgentHandler): Neutral →

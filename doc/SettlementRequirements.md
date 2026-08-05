@@ -67,7 +67,13 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   bookkeeping (`IsAlreadySpawned`, `Location.GetLocationCharacter(agent.Origin)`, passage guards)
   on every client, and makes adoption re-binding exact (see V4). IMPLEMENTED (live verification outstanding)
 - **SR-023 (Visual fidelity).** Spawn records ship the rolled `Equipment`, body properties, clothing
-  colors and gender so puppets match the host's visuals regardless of local RNG state. IMPLEMENTED (live verification outstanding)
+  colors and gender so puppets match the host's visuals regardless of local RNG state. Every human
+  puppet also gets a REAL `AgentNavigator` bound to its roster entry — dormant on `Controller.None`
+  (`CampaignAgentComponent.OnTick` gates on `IsAIControlled`) but load-bearing twice over: its ctor
+  attaches the entry's carry prefabs (baskets, pitchers) and special item through the native
+  bookkeeping, and scene points dereference it unguarded
+  (`AnimationPoint.SetAgentItemVisibility` NREs every mission tick for a navigator-less user).
+  Adoption's `CreateAgentNavigator` null-guard reuses it, so nothing double-attaches. IMPLEMENTED (live verification outstanding)
 - **SR-024 (Movement).** NPC puppets ride the existing mission-generic movement pipeline with
   compact ushort ids under a per-mission minted movement scope. Free horses ride the existing
   mount-movement path; herd animals ride the standard packet (see V9). IMPLEMENTED (live verification outstanding)
@@ -113,8 +119,9 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   death is an edge case in coop (no NPC damage from non-hosts; alley/quest fights disabled).
   IMPLEMENTED (v1 fade)
 - **SR-042 (Passages/doors).** Players use passages locally, unaffected. NPC puppets never use
-  passages themselves (no navigator); host-side passage traffic arrives as spawn/despawn records
-  (SR-026). IMPLEMENTED (live verification outstanding)
+  passages themselves (their navigator exists for visuals/points, SR-023, but never ticks on
+  `Controller.None`); host-side passage traffic arrives as spawn/despawn records (SR-026).
+  IMPLEMENTED (live verification outstanding)
 - **SR-043 (Scene-point performances).** NPC performances driven by scene points (chairs, animation
   points, usable machines — sitting, dancing, work loops) replicate SEMANTICALLY: the host
   broadcasts "NPC X uses point Y" (`NetworkNpcPointUse`, native `MissionObjectId` identity —
