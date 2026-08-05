@@ -168,6 +168,26 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
         }
 
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void NetworkTransferNewHero_MissingPlayerId_DisconnectsBeforeUnpacking(string? playerId)
+        {
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+            var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
+
+            currentState.Handle_NetworkTransferNewHero(new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero(playerId!, Array.Empty<byte>())));
+
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            heroInterfaceMock.Verify(
+                heroInterface => heroInterface.ServerUnpackHero(It.IsAny<byte[]>()),
+                Times.Never);
+            Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+            Assert.IsType<CreateCharacterState>(connectionLogic.State);
+        }
+
         [Fact]
         public void NetworkTransferNewHero_ControllerAlreadyRegistered_DisconnectsWithoutAnnouncing()
         {
@@ -192,6 +212,27 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
             Assert.NotEqual(ConnectionState.ShutdownRequested, differentPeer.ConnectionState);
             playerRegistryMock.Verify(p => p.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()), Times.Never);
+            Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+            Assert.IsType<CreateCharacterState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkTransferNewHero_ConflictingPeerAssociation_RollsBackAndDisconnects()
+        {
+            SetupUnpackedHero();
+            var playerRegistryMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            playerRegistryMock
+                .Setup(p => p.SetPeer("MyId", playerPeer))
+                .Returns(false);
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            currentState.Handle_NetworkTransferNewHero(new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>())));
+
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            playerRegistryMock.Verify(
+                p => p.RemovePlayer(It.Is<Player>(player => player.ControllerId == "MyId")),
+                Times.Once);
             Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
         }
@@ -232,6 +273,9 @@ namespace Coop.Tests.Server.Connections.States
                 .Returns(hero);
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
+                .Returns(true);
+            playerRegistryMock
+                .Setup(p => p.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()))
                 .Returns(true);
         }
     }

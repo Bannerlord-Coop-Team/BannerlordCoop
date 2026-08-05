@@ -39,10 +39,12 @@ public interface IPlayerManager
 
     /// <summary>
     /// Associates a connected peer with the (already registered) player behind
-    /// controllerId. Call once the peer's identity is known: on first character creation and
-    /// on every reconnect, since a rejoin gets a new NetPeer.
+    /// controllerId. Refuses to displace another connected peer or to remap a peer that already
+    /// belongs to a different player. Call once the peer's identity is known: on first character
+    /// creation and on every reconnect, since a rejoin gets a new NetPeer.
     /// </summary>
-    void SetPeer(string controllerId, NetPeer peer);
+    /// <returns>true when the requested association is present after the call</returns>
+    bool SetPeer(string controllerId, NetPeer peer);
 
     /// <summary>
     /// Resolves the currently associated peer for a registered controller.
@@ -132,7 +134,7 @@ public class PlayerManager : IPlayerManager
     {
         if (player == null) return false;
 
-        if (string.IsNullOrEmpty(player.ControllerId))
+        if (string.IsNullOrWhiteSpace(player.ControllerId))
         {
             logger.Error("Refusing to register a player with no controller id (hero {HeroId})", player.HeroId);
             return false;
@@ -202,7 +204,7 @@ public class PlayerManager : IPlayerManager
     {
         player = null;
 
-        if (string.IsNullOrEmpty(controllerId)) return false;
+        if (string.IsNullOrWhiteSpace(controllerId)) return false;
 
         lock (registrySync)
         {
@@ -220,18 +222,60 @@ public class PlayerManager : IPlayerManager
     {
         return PlayerObjects.TryGetValue(obj, out info);
     }
-    public void SetPeer(string controllerId, NetPeer peer)
+    public bool SetPeer(string controllerId, NetPeer peer)
     {
-        if (!TryGetPlayer(controllerId, out var player))
+        if (string.IsNullOrWhiteSpace(controllerId) || peer == null)
         {
-            logger.Error("Cannot associate peer with unregistered controller {ControllerId}", controllerId);
-            return;
+            logger.Error("Cannot associate a peer with an invalid controller id");
+            return false;
         }
 
         lock (registrySync)
         {
+            if (!_players.TryGetValue(controllerId, out var player))
+            {
+                logger.Error("Cannot associate peer with unregistered controller {ControllerId}", controllerId);
+                return false;
+            }
+
+            if (peerToPlayer.TryGetValue(peer, out var peerPlayer) &&
+                !ReferenceEquals(peerPlayer, player))
+            {
+                logger.Warning(
+                    "Refusing to associate peer {PeerId} with controller {ControllerId}; " +
+                    "the peer is already associated with controller {MappedControllerId}",
+                    peer.Id, controllerId, peerPlayer.ControllerId);
+                return false;
+            }
+
+            if (controllerToPeer.TryGetValue(controllerId, out var currentPeer) &&
+                !ReferenceEquals(currentPeer, peer))
+            {
+                if (currentPeer.ConnectionState == ConnectionState.Connected)
+                {
+                    logger.Warning(
+                        "Refusing to associate peer {PeerId} with controller {ControllerId}; " +
+                        "connected peer {MappedPeerId} already owns that controller",
+                        peer.Id, controllerId, currentPeer.Id);
+                    return false;
+                }
+
+                if (peerToPlayer.TryGetValue(currentPeer, out var currentPeerPlayer) &&
+                    !ReferenceEquals(currentPeerPlayer, player))
+                {
+                    logger.Error(
+                        "Refusing to replace inconsistent peer {MappedPeerId} for controller {ControllerId}; " +
+                        "that peer maps to controller {MappedControllerId}",
+                        currentPeer.Id, controllerId, currentPeerPlayer.ControllerId);
+                    return false;
+                }
+
+                peerToPlayer.TryRemove(currentPeer, out _);
+            }
+
             peerToPlayer[peer] = player;
             controllerToPeer[controllerId] = peer;
+            return true;
         }
     }
 
@@ -258,7 +302,7 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.RemovePlayer(Player)"/>
     public bool RemovePlayer(Player player)
     {
-        if (player == null || string.IsNullOrEmpty(player.ControllerId)) return false;
+        if (player == null || string.IsNullOrWhiteSpace(player.ControllerId)) return false;
 
         lock (registrySync)
         {

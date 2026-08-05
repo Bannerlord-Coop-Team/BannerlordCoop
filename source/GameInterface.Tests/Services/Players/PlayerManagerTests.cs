@@ -6,6 +6,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using LiteNetLib;
 using Moq;
 using Serilog;
 using System;
@@ -74,7 +75,8 @@ public class PlayerManagerTests
 
         Assert.True(playerManager.AddPlayer(player));
 
-        playerManager.SetPeer(ControllerId, peer);
+        Assert.True(playerManager.SetPeer(ControllerId, peer));
+        Assert.True(playerManager.SetPeer(ControllerId, peer));
 
         Assert.True(playerManager.TryGetPlayer(peer, out var resolvedPlayer));
         Assert.Same(player, resolvedPlayer);
@@ -90,7 +92,7 @@ public class PlayerManagerTests
         var peer = network.CreatePeer();
 
         // No AddPlayer call, "UnknownController" was never registered.
-        playerManager.SetPeer("UnknownController", peer);
+        Assert.False(playerManager.SetPeer("UnknownController", peer));
 
         Assert.False(playerManager.TryGetPlayer(peer, out _));
     }
@@ -104,7 +106,7 @@ public class PlayerManagerTests
         var peer = network.CreatePeer();
 
         Assert.True(playerManager.AddPlayer(player));
-        playerManager.SetPeer(ControllerId, peer);
+        Assert.True(playerManager.SetPeer(ControllerId, peer));
 
         playerManager.ClearPeer(peer);
 
@@ -113,33 +115,76 @@ public class PlayerManagerTests
     }
 
     [Fact]
-    public void TryGetPlayer_DifferentPeersSameController_ReturnsMostRecentlyAssociatedPeer()
+    public void SetPeer_ConnectedController_DoesNotReplaceLivePeer()
     {
         var playerManager = CreatePlayerManager(out _);
         var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
         var network = new TestNetwork();
         var firstPeer = network.CreatePeer();
         var secondPeer = network.CreatePeer();
+        secondPeer.Port++;
+        SetConnectionState(firstPeer, ConnectionState.Connected);
+        SetConnectionState(secondPeer, ConnectionState.Connected);
 
         Assert.True(playerManager.AddPlayer(player));
 
-        // Simulates a reconnect: same controllerId, new NetPeer.
-        playerManager.SetPeer(ControllerId, firstPeer);
-        playerManager.SetPeer(ControllerId, secondPeer);
+        Assert.True(playerManager.SetPeer(ControllerId, firstPeer));
+        Assert.False(playerManager.SetPeer(ControllerId, secondPeer));
 
+        Assert.True(playerManager.TryGetPlayer(firstPeer, out var resolvedPlayer));
+        Assert.Same(player, resolvedPlayer);
+        Assert.True(playerManager.TryGetPeer(ControllerId, out var resolvedPeer));
+        Assert.Same(firstPeer, resolvedPeer);
+        Assert.False(playerManager.TryGetPlayer(secondPeer, out _));
+    }
+
+    [Fact]
+    public void SetPeer_DisconnectedController_ReplacesStalePeer()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        var network = new TestNetwork();
+        var firstPeer = network.CreatePeer();
+        var secondPeer = network.CreatePeer();
+        secondPeer.Port++;
+        SetConnectionState(firstPeer, ConnectionState.Connected);
+        SetConnectionState(secondPeer, ConnectionState.Connected);
+
+        Assert.True(playerManager.AddPlayer(player));
+        Assert.True(playerManager.SetPeer(ControllerId, firstPeer));
+
+        SetConnectionState(firstPeer, ConnectionState.Disconnected);
+
+        Assert.True(playerManager.SetPeer(ControllerId, secondPeer));
+
+        Assert.False(playerManager.TryGetPlayer(firstPeer, out _));
         Assert.True(playerManager.TryGetPlayer(secondPeer, out var resolvedPlayer));
         Assert.Same(player, resolvedPlayer);
         Assert.True(playerManager.TryGetPeer(ControllerId, out var resolvedPeer));
         Assert.Same(secondPeer, resolvedPeer);
+    }
 
-        // The stale first peer is untouched by re-associating the controller under a new peer,
-        // the reconnect handler is responsible for calling ClearPeer(firstPeer) itself on disconnect.
-        Assert.True(playerManager.TryGetPlayer(firstPeer, out _));
+    [Fact]
+    public void SetPeer_PeerMappedToDifferentController_IsRefused()
+    {
+        const string secondControllerId = "PlayerTwo";
+        var playerManager = CreatePlayerManager(out _);
+        var firstPlayer = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        var secondPlayer = new Player(secondControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        var peer = new TestNetwork().CreatePeer();
+        SetConnectionState(peer, ConnectionState.Connected);
 
-        playerManager.ClearPeer(firstPeer);
+        Assert.True(playerManager.AddPlayer(firstPlayer));
+        Assert.True(playerManager.AddPlayer(secondPlayer));
+        Assert.True(playerManager.SetPeer(ControllerId, peer));
 
-        Assert.True(playerManager.TryGetPeer(ControllerId, out resolvedPeer));
-        Assert.Same(secondPeer, resolvedPeer);
+        Assert.False(playerManager.SetPeer(secondControllerId, peer));
+
+        Assert.True(playerManager.TryGetPlayer(peer, out var resolvedPlayer));
+        Assert.Same(firstPlayer, resolvedPlayer);
+        Assert.True(playerManager.TryGetPeer(ControllerId, out var resolvedPeer));
+        Assert.Same(peer, resolvedPeer);
+        Assert.False(playerManager.TryGetPeer(secondControllerId, out _));
     }
 
     [Fact]
@@ -174,16 +219,18 @@ public class PlayerManagerTests
         Assert.Same(player, Assert.Single(playerManager.Players));
     }
 
-    [Fact]
-    public void AddPlayer_NoControllerId_IsRefused()
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AddPlayer_InvalidControllerId_IsRefused(string controllerId)
     {
         var playerManager = CreatePlayerManager(out _);
 
         Assert.False(playerManager.AddPlayer(
-            new Player(string.Empty, "SomeHero", string.Empty, string.Empty, string.Empty)));
+            new Player(controllerId, "SomeHero", string.Empty, string.Empty, string.Empty)));
 
         Assert.Empty(playerManager.Players);
-        Assert.False(playerManager.TryGetPlayer(string.Empty, out _));
+        Assert.False(playerManager.TryGetPlayer(controllerId, out _));
     }
 
     [Fact]
@@ -227,4 +274,7 @@ public class PlayerManagerTests
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
             .Field(typeof(PlayerManager), "PlayerObjects")
             .GetValue(null)!;
+
+    private static void SetConnectionState(NetPeer peer, ConnectionState state) =>
+        AccessTools.Field(typeof(NetPeer), "_connectionState").SetValue(peer, state);
 }

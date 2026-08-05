@@ -60,6 +60,13 @@ public class CreateCharacterState : ConnectionStateBase
         var controllerId = obj.What.PlayerId;
         var data = obj.What.PlayerHero;
 
+        if (string.IsNullOrWhiteSpace(controllerId))
+        {
+            Logger.Warning("Refusing character creation for peer {Peer}: the supplied controller id is empty", netPeer?.Id);
+            netPeer?.Disconnect();
+            return;
+        }
+
         Logger.Debug("Unpacking hero for {ControllerId}", controllerId);
 
         var hero = heroInterface.ServerUnpackHero(data);
@@ -86,7 +93,17 @@ public class CreateCharacterState : ConnectionStateBase
         }
 
         // First join: associate this peer with the player it just created.
-        playerManager.SetPeer(controllerId, netPeer);
+        if (!playerManager.SetPeer(controllerId, netPeer))
+        {
+            Logger.Error(
+                "Failed to associate peer {Peer} with newly created controller {ControllerId}; " +
+                "removing the registration and disconnecting the joiner",
+                netPeer?.Id, controllerId);
+            playerManager.RemovePlayer(player);
+            netPeer?.Disconnect();
+            return;
+        }
+
         // Send created to all other clients
         var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
         network.SendAllBut(netPeer, message);

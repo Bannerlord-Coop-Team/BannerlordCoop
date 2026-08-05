@@ -110,26 +110,37 @@ public class ResolveCharacterState : ConnectionStateBase
             Logger.Error(e, "Resolving the character for peer {Peer} failed; disconnecting the joiner", peer?.Id);
 
             // Nothing may escape into the poller, including the teardown itself.
-            try
-            {
-                peer?.Disconnect();
-            }
-            catch (Exception disconnectFailure)
-            {
-                Logger.Error(disconnectFailure, "Disconnecting peer {Peer} failed", peer?.Id);
-            }
+            DisconnectPeer(peer);
         }
     }
 
     private void ResolveCharacter(NetPeer peer, string controllerId)
     {
+        if (string.IsNullOrWhiteSpace(controllerId))
+        {
+            Logger.Warning(
+                "Refusing character validation for peer {Peer}: the supplied controller id is empty",
+                peer?.Id);
+            DisconnectPeer(peer);
+            return;
+        }
+
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
             if (objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _)) // If new save, player hero will not exist
             {
                 // This peer is a new NetPeer for an already registered player, so the
                 // peer-Player link must be established here
-                playerManager.SetPeer(controllerId, peer);
+                if (!playerManager.SetPeer(controllerId, peer))
+                {
+                    Logger.Warning(
+                        "Refusing character validation for peer {Peer}: controller {ControllerId} " +
+                        "already has a conflicting live association",
+                        peer?.Id, controllerId);
+                    DisconnectPeer(peer);
+                    return;
+                }
+
                 network.SendImmediate(peer, new NetworkClientValidated(true, player));
                 ConnectionLogic.TransferSave();
 
@@ -151,6 +162,18 @@ public class ResolveCharacterState : ConnectionStateBase
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));
         ConnectionLogic.CreateCharacter();
+    }
+
+    private static void DisconnectPeer(NetPeer peer)
+    {
+        try
+        {
+            peer?.Disconnect();
+        }
+        catch (Exception disconnectFailure)
+        {
+            Logger.Error(disconnectFailure, "Disconnecting peer {Peer} failed", peer?.Id);
+        }
     }
 
     public override void CreateCharacter()

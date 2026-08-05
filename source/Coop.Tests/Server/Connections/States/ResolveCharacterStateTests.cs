@@ -207,6 +207,9 @@ namespace Coop.Tests.Server.Connections.States
                     returnedPlayer = player;
                 })
                 .Returns(true);
+            playerManagerMock
+                .Setup(i => i.SetPeer(player.ControllerId, playerPeer))
+                .Returns(true);
 
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
@@ -226,6 +229,70 @@ namespace Coop.Tests.Server.Connections.States
 
             Assert.True(message.HeroExists);
             Assert.Equal(player, message.Player);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void NetworkClientValidate_MissingPlayerId_DoesNotResolveOrAdvance(string? playerId)
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+
+            // Act
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer, new NetworkClientValidate(playerId!)));
+
+            // Assert
+            playerManagerMock.Verify(
+                i => i.TryGetPlayer(It.IsAny<string>(), out It.Ref<Player>.IsAny),
+                Times.Never);
+            playerManagerMock.Verify(
+                i => i.SetPeer(It.IsAny<string>(), It.IsAny<NetPeer>()),
+                Times.Never);
+
+            var messages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
+            Assert.Empty(messages.OfType<NetworkClientValidated>());
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_ConflictingLiveAssociation_DoesNotAnswerOrAdvance()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MyParty", "MyClan", "MyCharacter");
+            var playerManagerMock = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            playerManagerMock
+                .Setup(i => i.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
+                .Callback((string id, out Player returnedPlayer) =>
+                {
+                    returnedPlayer = player;
+                })
+                .Returns(true);
+            playerManagerMock
+                .Setup(i => i.SetPeer(player.ControllerId, playerPeer))
+                .Returns(false);
+
+            var objectManager = serverComponent.Container.Resolve<IObjectManager>();
+            var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Assert.True(objectManager.AddExisting(player.HeroId, hero));
+
+            // Act
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer, new NetworkClientValidate(player.ControllerId)));
+
+            // Assert
+            playerManagerMock.Verify(i => i.SetPeer(player.ControllerId, playerPeer), Times.Once);
+            var messages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
+            Assert.Empty(messages.OfType<NetworkClientValidated>());
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            Assert.IsType<ResolveCharacterState>(connectionLogic.State);
         }
 
         [Fact]
@@ -294,7 +361,7 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void NetworkClientValidate_InvalidPlayerId()
+        public void NetworkClientValidate_FromDifferentPeer_IsIgnored()
         {
             // Arrange
             var currentState = connectionLogic.SetState<ResolveCharacterState>();
