@@ -96,7 +96,7 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
                 playerCharacter.Culture = null;
             }
             Assert.NotNull(playerHero.Culture);
-            Assert.Null(playerCharacter.Culture);
+            Assert.Null(playerCharacter._culture);
             harmony.Patch(
                 AccessTools.Method(
                     typeof(MBInformationManager),
