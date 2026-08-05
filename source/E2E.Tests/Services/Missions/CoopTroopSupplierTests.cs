@@ -22,8 +22,8 @@ public class CoopTroopSupplierTests
     }
 
     private static PartyReserve Party(string id, int count, int supplied = 0, int seedBase = 500,
-        bool isReceiverPlayerParty = false)
-        => new PartyReserve(id, supplied, Entries(count, seedBase), isReceiverPlayerParty);
+        bool isReceiverPlayerParty = false, int sideOffset = 0)
+        => new PartyReserve(id, supplied, Entries(count, seedBase), isReceiverPlayerParty, sideOffset);
 
     private static int SuppliedFor(CoopTroopSupplier supplier, string partyId)
         => supplier.GetSuppliedByParty().First(p => p.partyId == partyId).supplied;
@@ -248,15 +248,32 @@ public class CoopTroopSupplierTests
         mine.SetReserve(new[] { Party("P1", 382) }, sideTotal: 955);
 
         var theirs = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        theirs.SetReserve(new[] { Party("P2", 573, seedBase: 9000) }, sideTotal: 955);
+        theirs.SetReserve(new[] { Party("P2", 573, seedBase: 9000, sideOffset: 382) }, sideTotal: 955);
 
         const int allocation = 400;
         var combined = mine.OwnedShareOf(allocation) + theirs.OwnedShareOf(allocation);
 
-        // Rounding may move a single troop either way; what must never happen is the side being fielded
-        // once per owner, which is what the bug did.
-        Assert.InRange(combined, allocation - 1, allocation + 1);
-        Assert.True(combined < allocation * 2);
+        // EXACTLY the allocation. The offsets partition the side, so cumulative flooring apportions it
+        // with nothing lost and nothing duplicated - no owner needs to know what the other holds.
+        Assert.Equal(allocation, combined);
+    }
+
+    [Fact]
+    public void ExactApportionment_HoldsForAwkwardSplits()
+    {
+        // Deliberately indivisible: three owners, a total and an allocation that share no clean factor.
+        const int total = 1000;
+        const int allocation = 7;
+
+        var a = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        a.SetReserve(new[] { Party("A", 333, sideOffset: 0) }, sideTotal: total);
+        var b = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        b.SetReserve(new[] { Party("B", 333, seedBase: 4000, sideOffset: 333) }, sideTotal: total);
+        var c = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        c.SetReserve(new[] { Party("C", 334, seedBase: 8000, sideOffset: 666) }, sideTotal: total);
+
+        Assert.Equal(allocation,
+            a.OwnedShareOf(allocation) + b.OwnedShareOf(allocation) + c.OwnedShareOf(allocation));
     }
 
     [Fact]
@@ -269,15 +286,27 @@ public class CoopTroopSupplierTests
     }
 
     [Fact]
-    public void SmallAllocation_NeverRoundsAnOwnerDownToNothing()
+    public void SmallAllocation_StillFieldsTheReceiversOwnParty()
     {
         // A zero share on the side holding the local player's party reads as "origin missing" to the spawn
         // handler, which aborts the battle - the failure this must not reintroduce.
         var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
-        supplier.SetReserve(new[] { Party("P1", 10) }, sideTotal: 1000);
+        supplier.SetReserve(new[] { Party("P1", 10, isReceiverPlayerParty: true) }, sideTotal: 1000);
 
         Assert.Equal(1, supplier.OwnedShareOf(1));
         Assert.True(supplier.OwnedShareOf(5) >= 1);
+    }
+
+    [Fact]
+    public void SmallAllocation_DoesNotFieldOneTroopPerOwner()
+    {
+        // The counterpart to the test above, and the reason the floor is no longer applied to everyone:
+        // an owner without the receiver's party takes its apportioned share even when that is nothing.
+        // Topping every owner up to one turned a one-troop wave into one troop PER OWNER.
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        supplier.SetReserve(new[] { Party("AI", 10, sideOffset: 500) }, sideTotal: 1000);
+
+        Assert.Equal(0, supplier.OwnedShareOf(1));
     }
 
     [Fact]

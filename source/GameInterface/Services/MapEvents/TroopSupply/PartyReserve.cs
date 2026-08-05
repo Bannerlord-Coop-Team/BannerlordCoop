@@ -22,12 +22,31 @@ public class PartyReserve
     [ProtoMember(4)]
     public bool IsReceiverPlayerParty { get; }
 
+    /// <summary>
+    /// Where this party's troops start within its SIDE, counting every party on that side in the order the
+    /// server enumerates them - not just the ones this client owns.
+    /// </summary>
+    /// <remarks>
+    /// This is what lets each owner compute a share that ADDS UP. Given the offset and the side total, an
+    /// owner takes floor(alloc*(offset+count)/total) - floor(alloc*offset/total); because the offsets
+    /// partition the side exactly once, those slices sum to the allocation across all owners with no
+    /// coordination between them. Proportional rounding cannot do that - it overshoots or undershoots by a
+    /// troop per owner - and a "never round down to zero" floor is worse still, spawning one troop per
+    /// owner for a one-troop wave.
+    ///
+    /// Additive with a default of 0, so a reserve from a build that does not send it still deserialises;
+    /// 0 for every party simply reproduces the older proportional behaviour.
+    /// </remarks>
+    [ProtoMember(5)]
+    public int SideOffset { get; }
+
     public PartyReserve(string partyId, int suppliedCount, TroopReserveEntry[] entries,
-        bool isReceiverPlayerParty = false)
+        bool isReceiverPlayerParty = false, int sideOffset = 0)
     {
         PartyId = partyId;
         SuppliedCount = suppliedCount;
         Entries = entries ?? Array.Empty<TroopReserveEntry>();
         IsReceiverPlayerParty = isReceiverPlayerParty;
+        SideOffset = sideOffset;
     }
 }
