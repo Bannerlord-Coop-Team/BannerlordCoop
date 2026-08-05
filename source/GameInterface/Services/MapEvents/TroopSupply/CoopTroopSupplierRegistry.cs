@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
 
@@ -15,7 +15,8 @@ public static class CoopTroopSupplierRegistry
 {
     private static readonly object Gate = new object();
     private static readonly Dictionary<string, CoopTroopSupplier> Suppliers = new Dictionary<string, CoopTroopSupplier>();
-    private static readonly Dictionary<string, PartyReserve[]> Pending = new Dictionary<string, PartyReserve[]>();
+    private static readonly Dictionary<string, (PartyReserve[] Reserve, int SideTotal)> Pending =
+        new Dictionary<string, (PartyReserve[], int)>();
 
     private static string Key(string mapEventId, BattleSideEnum side) => mapEventId + "|" + (int)side;
 
@@ -29,7 +30,7 @@ public static class CoopTroopSupplierRegistry
 
             if (Pending.TryGetValue(key, out var buffered))
             {
-                supplier.SetReserve(buffered);
+                supplier.SetReserve(buffered.Reserve, buffered.SideTotal);
                 Pending.Remove(key);
             }
         }
@@ -39,15 +40,18 @@ public static class CoopTroopSupplierRegistry
     /// exists. Returns the final local pointers of the parties the REPLACE dropped (the BR-033 flush payload;
     /// see <see cref="CoopTroopSupplier.SetReserve"/>) — empty when buffered: with no supplier, nothing was
     /// ever supplied locally, so there is nothing beyond the server's own ledger to flush.</summary>
-    public static IReadOnlyList<(string PartyId, int Supplied)> Feed(string mapEventId, BattleSideEnum side, PartyReserve[] reserve)
+    /// <param name="sideTotalTroops">Every troop on this side across all owners; 0 means the server did not
+    /// send one, in which case the supplier keeps sizing from what it owns.</param>
+    public static IReadOnlyList<(string PartyId, int Supplied)> Feed(string mapEventId, BattleSideEnum side,
+        PartyReserve[] reserve, int sideTotalTroops = 0)
     {
         lock (Gate)
         {
             var key = Key(mapEventId, side);
             if (Suppliers.TryGetValue(key, out var supplier))
-                return supplier.SetReserve(reserve);
+                return supplier.SetReserve(reserve, sideTotalTroops);
 
-            Pending[key] = reserve; // latest wins
+            Pending[key] = (reserve, sideTotalTroops); // latest wins
             return Array.Empty<(string, int)>();
         }
     }

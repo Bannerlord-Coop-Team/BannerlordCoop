@@ -384,7 +384,7 @@ internal class BattleHostHandler : IHandler
         if (receiver == null) return;
         foreach (var sideReserve in reserves)
             network.Send(receiver, new NetworkBattleTroopReserve(
-                mapEventId, (int)sideReserve.Side, sideReserve.Parties, flushRequested));
+                mapEventId, (int)sideReserve.Side, sideReserve.Parties, flushRequested, sideReserve.TotalTroops));
     }
 
     /// <summary>[Server, game thread] Record the current host's live peer for this battle, from one of its
