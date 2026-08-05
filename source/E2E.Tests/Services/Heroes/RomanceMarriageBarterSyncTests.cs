@@ -8,10 +8,18 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications.Messages;
+using HarmonyLib;
+using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
+using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
@@ -20,6 +28,8 @@ namespace E2E.Tests.Services.Heroes;
 
 public class RomanceMarriageBarterSyncTests : MapEventTestBase
 {
+    private static SceneNotificationData? shownMarriageScene;
+
     public RomanceMarriageBarterSyncTests(ITestOutputHelper output) : base(output)
     {
     }
@@ -64,10 +74,155 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         });
     }
 
+    [Fact]
+    public void HeroesMarriedNotification_ForMainHero_RestoresCultureAndShowsMarriageScene()
+    {
+        var client = Clients.First();
+        var playerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var spouseId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var harmony = new Harmony($"e2e.marriage-scene.{Guid.NewGuid():N}");
+        shownMarriageScene = null;
+
+        SetMainHero(playerHeroId);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(spouseId, out var spouse));
+            BasicCharacterObject playerCharacter = playerHero.CharacterObject;
+            using (new AllowedThread())
+            {
+                playerHero.Spouse = spouse;
+                spouse.Spouse = playerHero;
+                playerCharacter.Culture = null;
+            }
+            Assert.NotNull(playerHero.Culture);
+            Assert.Null(playerCharacter._culture);
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(MBInformationManager),
+                    nameof(MBInformationManager.ShowSceneNotification),
+                    new[] { typeof(SceneNotificationData) }),
+                prefix: new HarmonyMethod(
+                    typeof(RomanceMarriageBarterSyncTests),
+                    nameof(CaptureMarriageScene)));
+        });
+
+        try
+        {
+            client.SimulateMessage(
+                Server.NetPeer,
+                new NetworkNotifyHeroesMarried(playerHeroId, spouseId, showNotification: true));
+
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(spouseId, out var spouse));
+                Assert.Same(playerHero.Culture, ((BasicCharacterObject)playerHero.CharacterObject).Culture);
+                Assert.NotNull(spouse.Culture);
+                Assert.NotNull(((BasicCharacterObject)spouse.CharacterObject).Culture);
+                Assert.IsType<MarriageSceneNotificationItem>(shownMarriageScene);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [Fact]
+    public void DefaultCutscenesBehavior_OnServer_DoesNotRegisterMarriageScene()
+    {
+        var playerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var spouseId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var harmony = new Harmony($"e2e.server-marriage-scene.{Guid.NewGuid():N}");
+        shownMarriageScene = null;
+
+        SetMainHero(playerHeroId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(spouseId, out var spouse));
+            using (new AllowedThread())
+            {
+                playerHero.Spouse = spouse;
+                spouse.Spouse = playerHero;
+            }
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(MBInformationManager),
+                    nameof(MBInformationManager.ShowSceneNotification),
+                    new[] { typeof(SceneNotificationData) }),
+                prefix: new HarmonyMethod(
+                    typeof(RomanceMarriageBarterSyncTests),
+                    nameof(CaptureMarriageScene)));
+        });
+
+        try
+        {
+            Server.Call(() =>
+            {
+                new DefaultCutscenesCampaignBehavior().RegisterEvents();
+                CampaignEventDispatcher.Instance.OnBeforeHeroesMarried(
+                    Hero.MainHero,
+                    Hero.MainHero.Spouse,
+                    showNotification: true);
+            });
+
+            Server.Call(() => Assert.Null(shownMarriageScene));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static bool CaptureMarriageScene(SceneNotificationData data)
+    {
+        shownMarriageScene = data;
+        return false;
+    }
+
+    [Fact]
+    public void LordBarterConclusion_OnServer_DoesNotRunConversationPresentation()
+    {
+        var harmony = new Harmony($"e2e.server-barter-conclusion.{Guid.NewGuid():N}");
+        harmony.Patch(
+            AccessTools.Method(
+                typeof(ConversationManager),
+                nameof(ConversationManager.FindMatchingTextOrNull),
+                new[] { typeof(string), typeof(CharacterObject) }),
+            prefix: new HarmonyMethod(
+                typeof(RomanceMarriageBarterSyncTests),
+                nameof(ThrowOnBarterConclusionPresentation)));
+
+        try
+        {
+            Server.Call(() => new LordConversationsCampaignBehavior().OnBarterAccepted(
+                Hero.MainHero,
+                Hero.MainHero,
+                new List<Barterable>()));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static void ThrowOnBarterConclusionPresentation(string id)
+    {
+        if (id == "str_barter_agreed")
+            throw new NullReferenceException("Server conversation presentation was invoked.");
+    }
+
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PersonalMarriageBarter_ActiveMapConversation_AppliesPaymentAndExactSpouses(bool selfArranged)
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    public void PersonalMarriageBarter_ConversationContext_ValidatesPresenceAndAppliesAuthorizedOffer(
+        bool selfArranged,
+        bool settlementConversation,
+        bool counterpartyLeaves)
     {
         const int initialPlayerGold = 1_000_000;
         const int initialCounterpartyGold = 50;
@@ -77,6 +232,9 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         var player = CreatePartyWithRegisteredLeader();
         var counterparty = CreatePartyWithRegisteredLeader();
         var spouseId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = settlementConversation
+            ? TestEnvironment.CreateRegisteredObject<Settlement>()
+            : null;
 
         RegisterPlayer(client, player.HeroId, player.MobilePartyId);
         SetMainHero(player.HeroId);
@@ -88,6 +246,7 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(counterparty.HeroId, out var counterpartyHero));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(spouseId, out var spouse));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(counterparty.MobilePartyId, out var counterpartyParty));
 
             playerHero.SetBirthDay(CampaignTime.YearsFromNow(-30f));
@@ -106,13 +265,24 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
                 $"PlayerAge={playerHero.Age}, SpouseAge={spouse.Age}, " +
                 $"PlayerLeader={playerHero.Clan?.Leader == playerHero}, SpouseLeader={spouse.Clan?.Leader == spouse}, " +
                 $"SameGender={playerHero.IsFemale == spouse.IsFemale}");
-            Assert.True(ConversationPartyHold.TryEngage(
-                Server.Resolve<ConversationPartyTracker>(),
-                client.NetPeer,
-                player.PartyId,
-                counterpartyParty,
-                counterparty.PartyId,
-                engagerIsDefender: true));
+            if (settlementConversation)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                playerParty.CurrentSettlement = settlement;
+                counterpartyHero.PartyBelongedTo = null;
+                counterpartyHero.StayingInSettlement = settlement;
+                Assert.Null(counterpartyHero.PartyBelongedTo);
+            }
+            else
+            {
+                Assert.True(ConversationPartyHold.TryEngage(
+                    Server.Resolve<ConversationPartyTracker>(),
+                    client.NetPeer,
+                    player.PartyId,
+                    counterpartyParty,
+                    counterparty.PartyId,
+                    engagerIsDefender: true));
+            }
         });
         Server.Call(() =>
         {
@@ -133,24 +303,42 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         var heroBeingProposedToId = selfArranged ? player.HeroId : spouseId;
         var proposingHeroId = selfArranged ? spouseId : player.HeroId;
         var requestId = Guid.NewGuid().ToString("N");
+        var conversationContext = settlementConversation
+            ? MarriageConversationContext.Settlement
+            : MarriageConversationContext.MapParty;
+        var conversationContextId = settlementConversation ? settlementId : counterparty.PartyId;
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeMarriageBarter(
             requestId,
             counterparty.HeroId,
-            MarriageConversationContext.MapParty,
-            counterparty.PartyId,
+            conversationContext,
+            conversationContextId,
             heroBeingProposedToId,
             proposingHeroId)));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMarriageBarterResult>());
 
-        Server.Call(() => ConversationPartyHold.EndEngagement(
-            Server.Resolve<ConversationPartyTracker>(),
-            client.NetPeer));
+        if (counterpartyLeaves)
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(
+                    counterparty.HeroId,
+                    out var counterpartyHero));
+                counterpartyHero.StayingInSettlement = null;
+            });
+        }
+
+        if (!settlementConversation)
+        {
+            Server.Call(() => ConversationPartyHold.EndEngagement(
+                Server.Resolve<ConversationPartyTracker>(),
+                client.NetPeer));
+        }
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestMarriageBarter(
             counterparty.HeroId,
-            MarriageConversationContext.MapParty,
-            counterparty.PartyId,
+            conversationContext,
+            conversationContextId,
             heroBeingProposedToId,
             proposingHeroId,
             new[]
@@ -167,6 +355,23 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         TestEnvironment.FlushCoalescer();
 
         var result = Server.NetworkSentMessages.GetMessages<NetworkMarriageBarterResult>().Single();
+        if (counterpartyLeaves)
+        {
+            Assert.False(result.Accepted);
+            Assert.Contains("conversation is no longer active", result.Reason);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(counterparty.HeroId, out var counterpartyHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(spouseId, out var spouse));
+                Assert.Null(playerHero.Spouse);
+                Assert.Null(spouse.Spouse);
+                Assert.Equal(initialPlayerGold, playerHero.Gold);
+                Assert.Equal(initialCounterpartyGold, counterpartyHero.Gold);
+            });
+            return;
+        }
+
         Assert.True(result.Accepted, result.Reason);
         Assert.Equal(heroBeingProposedToId, result.HeroBeingProposedToId);
         Assert.Equal(proposingHeroId, result.ProposingHeroId);

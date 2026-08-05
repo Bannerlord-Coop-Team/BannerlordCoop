@@ -368,6 +368,8 @@ public class HideoutMapEventTests : MapEventTestBase
     public void PlayerLeavesHideout_ServerClearsSettlementAndMapEvent()
     {
         var (_, playerPartyId) = CreatePlayerHeroParty("hideout-leaver");
+        var requester = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(requester, "hideout-leaver");
         string? mapEventId = null;
 
         Server.Call(() =>
@@ -395,7 +397,6 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Same(mapEvent, playerParty.MapEvent);
         }, MapEventDisabledMethods);
 
-        var requester = Clients.First();
         Server.Call(() =>
         {
             Server.Resolve<IMessageBroker>().Publish(
@@ -417,6 +418,8 @@ public class HideoutMapEventTests : MapEventTestBase
     {
         var (_, leaderPartyId) = CreatePlayerHeroParty("hideout-leader");
         var (_, joinedPartyId) = CreatePlayerHeroParty("hideout-joiner");
+        var requester = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(requester, "hideout-joiner");
         string? mapEventId = null;
 
         Server.Call(() =>
@@ -446,7 +449,6 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Same(mapEvent, joinedParty.MapEvent);
         }, MapEventDisabledMethods);
 
-        var requester = Clients.First();
         Server.Call(() =>
         {
             Server.Resolve<IMessageBroker>().Publish(
