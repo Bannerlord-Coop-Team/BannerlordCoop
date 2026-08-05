@@ -102,6 +102,11 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
     {
         var left = new List<PartyBase>();
 
+        // Read BEFORE anything detaches. Clearing the requester's MapEventSide cascades to its attached
+        // parties AND clears the attachment list, so by the time the broadcast is built there is nothing
+        // left to enumerate.
+        var attachedPlayers = CollectAttachedPlayerParties(requester);
+
         foreach (var party in commanded)
         {
             if (Detach(party?.Party)) left.Add(party.Party);
@@ -109,7 +114,41 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
 
         if (Detach(requester.Party)) left.Add(requester.Party);
 
+        // CollectCommandedParties deliberately skips player parties - one player's retreat must not spend
+        // another player's troops or clear their camp. But the cascade removes them from the map event all
+        // the same, so they still need telling; otherwise the one case this broadcast exists for is the one
+        // case it misses, and that player sits in the battle UI with no party in the battle.
+        foreach (var party in attachedPlayers)
+        {
+            if (!left.Contains(party)) left.Add(party);
+        }
+
         BroadcastLeft(left, requester.Party);
+    }
+
+    /// <summary>
+    /// The player-led parties attached to <paramref name="requester"/> that the detach cascade will remove.
+    /// </summary>
+    private static List<PartyBase> CollectAttachedPlayerParties(MobileParty requester)
+    {
+        var attachedPlayers = new List<PartyBase>();
+
+        var army = requester.Army;
+        if (army?.LeaderParty != requester) return attachedPlayers;
+
+        var attached = requester.AttachedParties?.ToArray();
+        if (attached == null) return attachedPlayers;
+
+        foreach (var party in attached)
+        {
+            if (party == null || party == requester) continue;
+            if (!party.IsPlayerParty()) continue;
+            if (party.Party?.MapEventSide == null) continue;
+
+            attachedPlayers.Add(party.Party);
+        }
+
+        return attachedPlayers;
     }
 
     private static bool Detach(PartyBase party)
