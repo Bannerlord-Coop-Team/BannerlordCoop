@@ -18,7 +18,6 @@ internal class SettlementSync : IAutoSync
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.MilitiaPartyComponent)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Town)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._isVisible)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._lastAttackerParty)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));

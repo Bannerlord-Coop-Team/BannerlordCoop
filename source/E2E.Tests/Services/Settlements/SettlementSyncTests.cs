@@ -43,7 +43,6 @@ namespace E2E.Tests.Services.Settlements
             
             TestEnvironment.AssertReferenceField<Settlement, Town>(nameof(Settlement.Town));
             TestEnvironment.AssertReferenceField<Settlement, Village>(nameof(Settlement.Village));
-            TestEnvironment.AssertField<Settlement, bool>(nameof(Settlement._isVisible), false, defaultValue: settlement._isVisible);
             TestEnvironment.AssertReferenceField<Settlement, MobileParty>(nameof(Settlement._lastAttackerParty));
             TestEnvironment.AssertField<Settlement, TextObject>(nameof(Settlement._name), new TextObject("test text"));
             TestEnvironment.AssertReferenceField<Settlement, Settlement>(nameof(Settlement._nextLocatable));

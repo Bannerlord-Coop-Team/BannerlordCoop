@@ -304,12 +304,16 @@ internal class InteractionPatches
     }
 
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleWindows> playerBattleWindows = new();
+    private static readonly ConditionalWeakTable<MapEvent, object> initializingPlayerBattles = new();
 
     /// <summary>True while a player's battle is still within its post-start window for AI parties to join as
-    /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened before
+    /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened after
     /// initialization; only the server ever populates it, so this is a server-side query.</summary>
     public static bool IsWithinAiJoinWindow(MapEvent mapEvent)
         => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.AiJoinWindowExpired;
+
+    internal static bool IsInitializingPlayerBattle(MapEvent mapEvent)
+        => initializingPlayerBattles.TryGetValue(mapEvent, out _);
 
     public static bool IsWithinGoldFoodConsumptionWindow(MapEvent mapEvent)
         => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.GoldFoodConsumptionExpired;
@@ -390,7 +394,7 @@ internal class InteractionPatches
         // A player's battle stays open to AI reinforcements for a campaign day after it begins. While the
         // window is open, AI may keep joining; once it expires —
         // or if no window was opened for this event — no more AI may join a player's battle.
-        if (IsWithinAiJoinWindow(__instance))
+        if (IsInitializingPlayerBattle(__instance) || IsWithinAiJoinWindow(__instance))
             return;
 
         __result = false;
@@ -406,11 +410,7 @@ internal class InteractionPatches
         if (ModInformation.IsClient || !StartsWithPlayerParty(attackerParty, defenderParty))
             return;
 
-        // Initialize adds settlement occupants to the battle before its postfixes run. Open the window now so
-        // the AI-join gate does not reject and eject native hideout defenders during that initialization.
-        playerBattleWindows.GetValue(
-            __instance,
-            _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
+        initializingPlayerBattles.GetValue(__instance, _ => new object());
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
@@ -423,7 +423,18 @@ internal class InteractionPatches
         if (ModInformation.IsClient || !StartsWithPlayerParty(attackerParty, defenderParty))
             return;
 
+        initializingPlayerBattles.Remove(__instance);
+        playerBattleWindows.GetValue(
+            __instance,
+            _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
         MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
+    [HarmonyFinalizer]
+    private static void Finalizer_Initialize(MapEvent __instance)
+    {
+        initializingPlayerBattles.Remove(__instance);
     }
 
     private static bool StartsWithPlayerParty(PartyBase attackerParty, PartyBase defenderParty)
