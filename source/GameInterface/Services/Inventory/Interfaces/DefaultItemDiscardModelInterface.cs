@@ -10,12 +10,12 @@ public interface IDefaultItemDiscardModelInterface : IGameAbstraction
     /// Replace vanilla implementation to include a playerParty argument.
     /// Vanilla just uses the MainParty which doesn't work with multiple players.
     /// </summary>
-    int GetXpBonusForDiscardingItem(MobileParty playerParty, ItemObject item, int amount = 0);
+    int GetXpBonusForDiscardingItem(MobileParty playerParty, ItemObject item, int amount = 1);
 }
 
 public class DefaultItemDiscardModelInterface : IDefaultItemDiscardModelInterface
 {
-    public int GetXpBonusForDiscardingItem(MobileParty playerParty, ItemObject item, int amount = 0)
+    public int GetXpBonusForDiscardingItem(MobileParty playerParty, ItemObject item, int amount = 1)
     {
         if (!PlayerCanDonateItem(playerParty, item)) return 0;
 
