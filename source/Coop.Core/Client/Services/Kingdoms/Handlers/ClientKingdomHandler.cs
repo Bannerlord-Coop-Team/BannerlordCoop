@@ -87,7 +87,7 @@ public class ClientKingdomHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return; 
+        if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return;
 
         var message = new NetworkRequestChangeKingdomName(kingdomId, payload.Name);
         network.SendAll(message);
