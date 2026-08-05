@@ -55,7 +55,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
         messageBroker.Subscribe<NetworkAddDecision>(HandleNetworkAddDecision);
-        messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomeName);
+        messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
     }
 
     private void HandleNetworkRequestCreateKingdom(MessagePayload<NetworkRequestCreateKingdom> obj)
