@@ -32,8 +32,8 @@ public class TradePlayerData
         Dictionary<string, List<TradeRumorData>> playerTradeRumors,
         Dictionary<string, Dictionary<string, long>> playerEnteredSettlements)
     {
-        PlayerItemsTradeData = playerItemsTradeData;
-        PlayerTradeRumors = playerTradeRumors;
-        PlayerEnteredSettlements = playerEnteredSettlements;
+        PlayerItemsTradeData = playerItemsTradeData ?? new();
+        PlayerTradeRumors = playerTradeRumors ?? new();
+        PlayerEnteredSettlements = playerEnteredSettlements ?? new();
     }
 }

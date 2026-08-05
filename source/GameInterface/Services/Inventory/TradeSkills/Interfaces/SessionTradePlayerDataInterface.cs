@@ -77,9 +77,6 @@ public class SessionTradePlayerDataInterface : ISessionTradePlayerDataInterface
     {
         if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
-        if (!TradePlayerData.PlayerTradeRumors.ContainsKey(playerHeroId)
-            || !TradePlayerData.PlayerEnteredSettlements.ContainsKey(playerHeroId)) return;
-
         TradePlayerData.PlayerTradeRumors[playerHeroId] = tradeRumorsData;
         TradePlayerData.PlayerEnteredSettlements[playerHeroId] = enteredSettlements;
     }

@@ -48,25 +48,21 @@ internal class TradeRumorsCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(TradeRumorsCampaignBehavior.OnSettlementEntered))]
     [HarmonyPrefix]
-    public static bool OnSettlementEnteredPrefix()
+    public static bool OnSettlementEnteredPrefix(TradeRumorsCampaignBehavior __instance, Settlement settlement, out long __state)
     {
+        __state = __instance._enteredSettlements.TryGetValue(settlement, out var entered) ? entered._numTicks : -1;
         return !ModInformation.IsServer;
     }
 
     [HarmonyPatch(nameof(TradeRumorsCampaignBehavior.OnSettlementEntered))]
     [HarmonyPostfix]
-    public static void OnSettlementEnteredPostfix(TradeRumorsCampaignBehavior __instance, MobileParty mobileParty, Settlement settlement, Hero hero)
+    public static void OnSettlementEnteredPostfix(TradeRumorsCampaignBehavior __instance, MobileParty mobileParty, Settlement settlement, Hero hero, long __state)
     {
         if (ModInformation.IsServer)
             return;
 
-        if (mobileParty == null
-            || (!mobileParty.IsMainParty
-            && (!mobileParty.IsCaravan
-            || mobileParty.Party.Owner == null
-            || mobileParty.Party.Owner.Clan != Clan.PlayerClan
-            || !Hero.MainHero.GetPerkValue(DefaultPerks.Trade.TravelingRumors)))
-            || !settlement.IsTown) return;
+        if (!__instance._enteredSettlements.TryGetValue(settlement, out var entered)
+            || entered._numTicks == __state) return;
 
         var message = new UpdateTradeRumors(__instance._tradeRumors, __instance._enteredSettlements);
         MessageBroker.Instance.Publish(__instance, message);
