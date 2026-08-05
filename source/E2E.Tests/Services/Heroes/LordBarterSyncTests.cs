@@ -1,19 +1,26 @@
 using Common.Network;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Barters.Handlers;
 using GameInterface.Services.Barters.Messages;
+using GameInterface.Services.Barters.Patches;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
+using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
@@ -27,6 +34,7 @@ public class LordBarterSyncTests : MapEventTestBase
     private static IFaction? safePassagePlayerFaction;
     private static IFaction? safePassageTargetFaction;
     private static IFaction? safePassageNearbyFaction;
+    private static SceneNotificationData? shownJoinKingdomScene;
 
     public LordBarterSyncTests(ITestOutputHelper output) : base(output)
     {
@@ -142,6 +150,139 @@ public class LordBarterSyncTests : MapEventTestBase
             harmony.UnpatchAll(harmony.Id);
             observedBarterAcceptedDispatches = 0;
         }
+    }
+
+    [Fact]
+    public void StationarySettlementConversation_ClientResolversUseSettlementContext()
+    {
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var targetHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        SetMainHero(player.HeroId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            playerParty.CurrentSettlement = settlement;
+            targetHero.StayingInSettlement = settlement;
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.Null(targetHero.PartyBelongedTo);
+
+            var barter = new BarterData(playerHero, targetHero, playerParty.Party, null, null);
+            Assert.True(LordBarterPatch.TryGetConversationContext(
+                barter,
+                client.ObjectManager,
+                out var lordContext,
+                out var lordContextId));
+            Assert.Equal(PeaceConversationContext.Settlement, lordContext);
+            Assert.Equal(settlementId, lordContextId);
+
+            Assert.True(PeaceBarterPatch.TryGetConversationContext(
+                barter,
+                client.ObjectManager,
+                out var peaceContext,
+                out var peaceContextId));
+            Assert.Equal(PeaceConversationContext.Settlement, peaceContext);
+            Assert.Equal(settlementId, peaceContextId);
+
+            Assert.True(MarriageBarterPatch.TryGetConversationContext(
+                barter,
+                client.ObjectManager,
+                out var marriageContext,
+                out var marriageContextId));
+            Assert.Equal(MarriageConversationContext.Settlement, marriageContext);
+            Assert.Equal(settlementId, marriageContextId);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenericLordBarter_StationarySettlementConversation_ValidatesCurrentPresence(bool targetLeaves)
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int initialTargetGold = 50;
+        const int offeredGold = 500_000;
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var targetHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var requestId = Guid.NewGuid().ToString("N");
+
+        RegisterPlayer(client, player.HeroId, player.MobilePartyId);
+        SetMainHero(player.HeroId);
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            playerHero.Gold = initialPlayerGold;
+            targetHero.Gold = initialTargetGold;
+            playerParty.CurrentSettlement = settlement;
+            targetHero.StayingInSettlement = settlement;
+            Assert.Null(targetHero.PartyBelongedTo);
+        });
+        Server.NetworkSentMessages.Clear();
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+            requestId,
+            targetHeroId,
+            PeaceConversationContext.Settlement,
+            settlementId,
+            LordBarterKind.Generic)));
+        if (targetLeaves)
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+                targetHero.StayingInSettlement = null;
+            });
+        }
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+            targetHeroId,
+            PeaceConversationContext.Settlement,
+            settlementId,
+            LordBarterKind.Generic,
+            new[]
+            {
+                new PeaceBarterTerm(
+                    PeaceBarterTermType.Gold,
+                    player.HeroId,
+                    null,
+                    null,
+                    true,
+                    offeredGold),
+            },
+            requestId)));
+        TestEnvironment.FlushCoalescer();
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+        Assert.Equal(!targetLeaves, result.Accepted);
+        if (targetLeaves)
+            Assert.Contains("settlement conversation", result.Reason);
+        else
+            Assert.Equal(initialPlayerGold - offeredGold, result.PlayerGold);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.Equal(targetLeaves ? initialPlayerGold : initialPlayerGold - offeredGold, playerHero.Gold);
+            Assert.Equal(targetLeaves ? initialTargetGold : initialTargetGold + offeredGold, targetHero.Gold);
+        });
     }
 
     [Fact]
@@ -462,6 +603,254 @@ public class LordBarterSyncTests : MapEventTestBase
         {
             Server.Call(DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections);
         }
+    }
+
+    [Fact]
+    public void ClanChangedFactionNotification_ForDefectingClan_RestoresCulturesAndShowsJoinKingdomScene()
+    {
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var harmony = new Harmony($"e2e.join-kingdom-scene.{Guid.NewGuid():N}");
+        string? targetClanId = null;
+        shownJoinKingdomScene = null;
+
+        SetMainHero(player.HeroId);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(client.ObjectManager.TryGetId(targetHero.Clan, out targetClanId));
+            Assert.NotNull(playerHero.Culture);
+            Assert.NotNull(targetHero.Culture);
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
+                playerHero.Clan._kingdom = kingdom;
+                targetHero.Clan._kingdom = kingdom;
+                kingdom._rulingClan = playerHero.Clan;
+                ((BasicCharacterObject)playerHero.CharacterObject).Culture = null;
+                ((BasicCharacterObject)targetHero.CharacterObject).Culture = null;
+            }
+
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(MBInformationManager),
+                    nameof(MBInformationManager.ShowSceneNotification),
+                    new[] { typeof(SceneNotificationData) }),
+                prefix: new HarmonyMethod(
+                    typeof(LordBarterSyncTests),
+                    nameof(CaptureJoinKingdomScene)));
+        });
+
+        try
+        {
+            Assert.NotNull(targetClanId);
+            client.SimulateMessage(
+                Server.NetPeer,
+                new NetworkNotifyClanChangedFaction(
+                    targetClanId,
+                    oldKingdomId: null,
+                    newKingdomId: kingdomId,
+                    detail: ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdomByDefection,
+                    showNotification: true));
+
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+                Assert.Same(playerHero.Culture, ((BasicCharacterObject)playerHero.CharacterObject).Culture);
+                Assert.Same(targetHero.Culture, ((BasicCharacterObject)targetHero.CharacterObject).Culture);
+                var scene = Assert.IsType<JoinKingdomSceneNotificationItem>(shownJoinKingdomScene);
+                Assert.All(
+                    scene.GetSceneNotificationCharacters(),
+                    character => Assert.NotNull(character.Character.Culture));
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [Fact]
+    public void DefaultCutscenesBehavior_OnServer_DoesNotRegisterJoinKingdomScene()
+    {
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var harmony = new Harmony($"e2e.server-join-kingdom-scene.{Guid.NewGuid():N}");
+        shownJoinKingdomScene = null;
+
+        SetMainHero(player.HeroId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            using (new AllowedThread())
+            {
+                Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
+                playerHero.Clan._kingdom = kingdom;
+                targetHero.Clan._kingdom = kingdom;
+                kingdom._rulingClan = playerHero.Clan;
+            }
+
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(MBInformationManager),
+                    nameof(MBInformationManager.ShowSceneNotification),
+                    new[] { typeof(SceneNotificationData) }),
+                prefix: new HarmonyMethod(
+                    typeof(LordBarterSyncTests),
+                    nameof(CaptureJoinKingdomScene)));
+        });
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                new DefaultCutscenesCampaignBehavior().RegisterEvents();
+                CampaignEventDispatcher.Instance.OnClanChangedKingdom(
+                    targetHero.Clan,
+                    oldKingdom: null,
+                    newKingdom: kingdom,
+                    actionDetail: ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdomByDefection,
+                    showNotification: true);
+                Assert.Null(shownJoinKingdomScene);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static bool CaptureJoinKingdomScene(SceneNotificationData data)
+    {
+        shownJoinKingdomScene = data;
+        return false;
+    }
+
+    [Fact]
+    public void JoinKingdomBarter_Accepted_SynchronizesDestinationKingdomClanList()
+    {
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+        var ruler = CreatePartyWithRegisteredLeader();
+        var destinationKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var originalKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var requestId = Guid.NewGuid().ToString("N");
+        var harmony = new Harmony($"e2e.lord-defection-membership.{Guid.NewGuid():N}");
+
+        void ConfigureKingdoms(EnvironmentInstance instance)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ruler.HeroId, out var rulerHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(destinationKingdomId, out var destinationKingdom));
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(originalKingdomId, out var originalKingdom));
+
+                using (new AllowedThread())
+                {
+                    Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
+                    destinationKingdom._rulingClan = rulerHero.Clan;
+                    destinationKingdom._clans.Add(rulerHero.Clan);
+                    destinationKingdom._clans.Add(playerHero.Clan);
+                    rulerHero.Clan._kingdom = destinationKingdom;
+                    playerHero.Clan._kingdom = destinationKingdom;
+
+                    originalKingdom._rulingClan = targetHero.Clan;
+                    originalKingdom._clans.Add(targetHero.Clan);
+                    targetHero.Clan._kingdom = originalKingdom;
+                }
+            });
+        }
+
+        RegisterPlayer(client, player.HeroId, player.MobilePartyId);
+        SetMainHero(player.HeroId);
+        ConfigureKingdoms(Server);
+        foreach (var instance in Clients)
+            ConfigureKingdoms(instance);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
+            Assert.True(ConversationPartyHold.TryEngage(
+                Server.Resolve<ConversationPartyTracker>(),
+                client.NetPeer,
+                player.PartyId,
+                targetParty,
+                target.PartyId,
+                engagerIsDefender: true));
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(BarterManager),
+                    nameof(BarterManager.GetOfferValueForFaction),
+                    new[] { typeof(BarterData), typeof(IFaction) }),
+                prefix: new HarmonyMethod(
+                    typeof(LordBarterSyncTests),
+                    nameof(AcceptLordDefectionOffer)));
+        });
+
+        try
+        {
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+                requestId,
+                target.HeroId,
+                PeaceConversationContext.MapParty,
+                target.PartyId,
+                LordBarterKind.JoinKingdomAsClan,
+                destinationKingdomId)));
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+                target.HeroId,
+                PeaceConversationContext.MapParty,
+                target.PartyId,
+                LordBarterKind.JoinKingdomAsClan,
+                Array.Empty<PeaceBarterTerm>(),
+                requestId)));
+            TestEnvironment.FlushCoalescer();
+
+            var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+            Assert.True(result.Accepted, result.Reason);
+
+            void AssertMembership(EnvironmentInstance instance)
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+                    Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(destinationKingdomId, out var destinationKingdom));
+                    Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(originalKingdomId, out var originalKingdom));
+                    Assert.Same(destinationKingdom, targetHero.Clan.Kingdom);
+                    Assert.Contains(targetHero.Clan, destinationKingdom.Clans);
+                    Assert.DoesNotContain(targetHero.Clan, originalKingdom.Clans);
+                });
+            }
+
+            AssertMembership(Server);
+            foreach (var instance in Clients)
+                AssertMembership(instance);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static bool AcceptLordDefectionOffer(ref float __result)
+    {
+        __result = 0f;
+        return false;
     }
 
     [Fact]

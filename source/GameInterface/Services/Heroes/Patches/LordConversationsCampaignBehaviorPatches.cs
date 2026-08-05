@@ -11,6 +11,13 @@ namespace GameInterface.Services.Heroes.Patches;
 [HarmonyPatch(typeof(LordConversationsCampaignBehavior))]
 internal class LordConversationsCampaignBehaviorPatches
 {
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.OnBarterAccepted))]
+    [HarmonyPrefix]
+    public static bool OnBarterAcceptedPrefix()
+    {
+        return !ModInformation.IsServer;
+    }
+
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_player_liberates_prisoner_on_consequence))]
     [HarmonyPrefix]
     public static bool ConversationPlayerLiberatesPrisonerOnConsequencePrefix()
