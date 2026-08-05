@@ -105,17 +105,17 @@ internal sealed class BanditBarterHandler : IHandler
 
     private void ProcessRequest(NetPeer peer, NetworkRequestBanditBarter request)
     {
+        Hero playerHero = null;
+        var mutationApplied = false;
         try
         {
-            if (!TryResolveParties(peer, request.BanditPartyId, out var player, out var playerHero, out var playerParty, out var banditParty, out var reason) ||
+            if (!TryResolveParties(peer, request.BanditPartyId, out var player, out playerHero, out var playerParty, out var banditParty, out var reason) ||
                 !HasActiveEngagement(peer, playerParty, banditParty, out reason) ||
                 !TryValidateOffer(request, playerHero, playerParty, banditParty, out var offer, out reason))
             {
                 Reject(peer, request, playerHero?.Gold ?? 0, reason);
                 return;
             }
-
-            ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
 
             var protectionUntil = CampaignTime.HoursFromNow(32);
             foreach (var protectedParty in offer.EnemyParties)
@@ -134,18 +134,24 @@ internal sealed class BanditBarterHandler : IHandler
                 request.BanditPartyId,
                 BanditInteractionsCampaignBehavior.PlayerInteraction.PaidOffParty);
 
-            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
-            FlushHeroGold(playerHero);
-            network.Send(peer, new NetworkBanditBarterResult(
-                request.BanditPartyId,
-                true,
-                playerHero.Gold,
-                requestId: request.RequestId));
+            // Safe passage is now authoritative, so later failures must not leave the request retryable.
+            mutationApplied = true;
+            ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
+
+            CompleteAcceptedRequest(peer, playerHero);
+            Accept(peer, request, playerHero.Gold);
         }
         catch (Exception exception)
         {
             Logger.Error(exception, "Failed to apply an authoritative bandit safe-passage barter");
-            Reject(peer, request, 0, "The server could not process the bandit barter.");
+            if (mutationApplied)
+            {
+                CompleteAcceptedRequest(peer, playerHero);
+                Accept(peer, request, playerHero?.Gold ?? 0);
+                return;
+            }
+
+            Reject(peer, request, playerHero?.Gold ?? 0, "The server could not process the bandit barter.");
         }
     }
 
@@ -485,6 +491,36 @@ internal sealed class BanditBarterHandler : IHandler
         if (sendCoalescer == null || !objectManager.TryGetId(hero, out var heroId)) return;
 
         sendCoalescer.FlushInstance(heroId, network);
+    }
+
+    private void CompleteAcceptedRequest(NetPeer peer, Hero playerHero)
+    {
+        try
+        {
+            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Failed to end an accepted bandit barter engagement");
+        }
+
+        try
+        {
+            FlushHeroGold(playerHero);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Failed to flush player gold after an accepted bandit barter");
+        }
+    }
+
+    private void Accept(NetPeer peer, NetworkRequestBanditBarter request, int playerGold)
+    {
+        network.Send(peer, new NetworkBanditBarterResult(
+            request.BanditPartyId,
+            true,
+            playerGold,
+            requestId: request.RequestId));
     }
 
     private void Reject(NetPeer peer, NetworkRequestBanditBarter request, int playerGold, string reason)
