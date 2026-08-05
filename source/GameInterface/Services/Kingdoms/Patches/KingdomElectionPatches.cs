@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Policies;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
@@ -32,5 +33,22 @@ internal class KingdomElectionPatches
         }
 
         return false;
+    }
+    [HarmonyPatch(typeof(KingdomElection), nameof(KingdomElection.ApplySelection))]
+    [HarmonyPrefix]
+    private static bool Prefix(KingdomElection __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
+
+        KingdomDecision decision = __instance?._decision;
+        if (decision == null) return true;
+
+        // already handled via the normal voting UI pipeline elsewhere;
+        // block the native re-apply
+        if (voteManager.HasLocalPlayerSubmittedVote(decision)) return false;
+
+        bool published = voteManager.TryPublishFinalVoteForElection(__instance);
+        return !published; // fall back to native if we couldn't route it
     }
 }
