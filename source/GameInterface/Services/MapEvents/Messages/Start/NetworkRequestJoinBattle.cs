@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.Core;
 
@@ -13,14 +13,17 @@ namespace GameInterface.Services.MapEvents.Messages.Start;
 internal readonly struct NetworkRequestJoinBattle : ICommand
 {
     [ProtoMember(1)]
-    public readonly string MapEventId;
+    public readonly string RequestId;
     [ProtoMember(2)]
-    public readonly string PartyId;
+    public readonly string MapEventId;
     [ProtoMember(3)]
+    public readonly string PartyId;
+    [ProtoMember(4)]
     public readonly BattleSideEnum Side;
 
-    public NetworkRequestJoinBattle(string mapEventId, string partyId, BattleSideEnum side)
+    public NetworkRequestJoinBattle(string requestId, string mapEventId, string partyId, BattleSideEnum side)
     {
+        RequestId = requestId;
         MapEventId = mapEventId;
         PartyId = partyId;
         Side = side;

@@ -1848,6 +1848,7 @@ public class MapEventDebugCommands
         }
 
         messageBroker.Publish(joiningPeer, new NetworkRequestJoinBattle(
+            Guid.NewGuid().ToString(),
             fixture.MapEventId,
             fixture.JoiningPlayerPartyId,
             BattleSideEnum.Attacker));

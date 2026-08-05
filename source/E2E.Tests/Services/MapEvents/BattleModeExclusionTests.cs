@@ -1,7 +1,8 @@
-using Common.Network;
+﻿using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
+using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -75,6 +76,9 @@ public class BattleModeExclusionTests : MapEventTestBase
     {
         var ctx = CreateServerMapEvent();
         var client = Clients.First();
+        var attackerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("attacker", attackerHeroId, ctx.AttackerPartyId);
+        TestEnvironment.ConnectRegisteredPlayer(client, "attacker");
 
         try
         {

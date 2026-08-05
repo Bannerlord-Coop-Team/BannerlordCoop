@@ -142,7 +142,11 @@ public class BattleResultReadyTests : MissionTestEnvironment
         });
 
         clients[1].Call(() => clients[1].Resolve<INetwork>().SendAll(
-            new NetworkRequestJoinBattle(mapEventId, joinerPartyBaseId!, BattleSideEnum.Attacker)));
+            new NetworkRequestJoinBattle(
+                Guid.NewGuid().ToString(),
+                mapEventId,
+                joinerPartyBaseId!,
+                BattleSideEnum.Attacker)));
 
         Assert.True(reservationPrecededJoinCommit);
         SendResult(clients[0], mapEventId, BattleState.AttackerVictory);
@@ -384,7 +388,9 @@ public class BattleResultReadyTests : MissionTestEnvironment
     public void DirectJoinRequest_ConcludedMapEvent_DoesNotAddParty()
     {
         var (mapEventId, _) = SetupCoopBattle("host", "other-player");
+        var joinerHeroId = CreateRegisteredObject<Hero>();
         var joinerId = CreateRegisteredObject<MobileParty>();
+        RegisterAsPlayerParty("joining-player", joinerHeroId, joinerId);
         string? joinerPartyId = null;
 
         Server.Call(() =>
@@ -396,8 +402,13 @@ public class BattleResultReadyTests : MissionTestEnvironment
         });
 
         var client = Clients.First();
+        RegisterPeer(client, "joining-player");
         client.Call(() => client.Resolve<INetwork>().SendAll(
-            new NetworkRequestJoinBattle(mapEventId, joinerPartyId!, BattleSideEnum.Attacker)));
+            new NetworkRequestJoinBattle(
+                Guid.NewGuid().ToString(),
+                mapEventId,
+                joinerPartyId!,
+                BattleSideEnum.Attacker)));
 
         Server.Call(() =>
         {

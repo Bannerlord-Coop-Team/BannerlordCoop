@@ -14,6 +14,7 @@ using Missions.Agents.Packets;
 using Missions.Agents.Patches;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Services.Network;
 using Missions.Tournaments.Messages;
 using Missions.Tournaments.Spectators;
 using SandBox.Tournaments.MissionLogics;
@@ -42,6 +43,7 @@ public class CoopTournamentController : CoopMissionController
     private readonly TournamentAgentSpawner agentSpawner;
     private readonly ITournamentSpectatorAgentManager spectatorAgentManager;
     private readonly TournamentSpawnManifestBuilder manifestBuilder;
+    private readonly IMissionContext missionContext;
     private TournamentSessionSnapshot snapshot;
     private CoopTournamentBehavior tournamentBehavior;
     private CoopTournamentFightMissionController fightController;
@@ -123,12 +125,14 @@ public class CoopTournamentController : CoopMissionController
         ICoopMissionComponent coopMissionComponent,
         INetworkWorldItemRegistry worldItemRegistry,
         ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory,
-        IGuardedHitWindow guardedHitWindow)
+        IGuardedHitWindow guardedHitWindow,
+        IMissionContext missionContext)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         this.relayNetwork = relayNetwork;
         this.worldItemRegistry = worldItemRegistry;
         this.guardedHitWindow = guardedHitWindow;
+        this.missionContext = missionContext;
         spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
         session = new TournamentMissionSession(controllerIdProvider);
         matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
@@ -1991,6 +1995,7 @@ public class CoopTournamentController : CoopMissionController
         missionReadyForManifest = false;
         agentSpawner.Reset();
         network.Stop();
+        missionContext.EndInstance();
         session.Reset();
     }
 

@@ -1,7 +1,9 @@
 ﻿using Common;
 using GameInterface;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.TroopSupply;
 using Missions.Agents.Packets;
+using Missions.Services.Network;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
@@ -99,6 +101,23 @@ internal static class BattleDebugCommands
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
     private static bool wieldTestActive;
+
+    [CommandLineArgumentFunction("relay_state", "coop.debug.battle")]
+    public static string RelayState(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.relay_state";
+        if (!ContainerProvider.TryResolve<IMissionContext>(out var missionContext))
+            return "Mission relay context is unavailable.";
+
+        string[] controllerIds = missionContext.ControllersInMission
+            .OrderBy(controllerId => controllerId, StringComparer.Ordinal)
+            .ToArray();
+        string controllers = controllerIds.Length == 0
+            ? "none"
+            : string.Join(",", controllerIds);
+        return $"Mission relay state: remoteControllers={controllerIds.Length} controllers={controllers}.";
+    }
 
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)
@@ -319,10 +338,17 @@ internal static class BattleDebugCommands
         int activeAgents = mission.Agents.Count(agent => agent.IsActive());
         int enemyFleeing = enemies.Count(agent => agent.IsRunningAway);
         var result = mission.MissionResult;
+        var suppliers = CoopTroopSupplierRegistry.GetSuppliers(controller.Session.InstanceId);
+        var receiverReserves = suppliers
+            .Where(supplier => !string.IsNullOrEmpty(supplier.PlayerPartyId))
+            .Select(supplier => $"{supplier.Side}:{supplier.PlayerPartyId}")
+            .ToArray();
 
         return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
             $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
+            $"reserveSuppliers={suppliers.Count} populatedReserves={suppliers.Count(supplier => supplier.IsPopulated)} " +
+            $"receiverOwnedReserves={receiverReserves.Length} receiverReserve={string.Join(",", receiverReserves)} " +
             $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
             $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyFleeing={enemyFleeing} " +
             $"enemyMovedSinceLast={moved} damageReceivedEvents={ownDamageEvents} " +
