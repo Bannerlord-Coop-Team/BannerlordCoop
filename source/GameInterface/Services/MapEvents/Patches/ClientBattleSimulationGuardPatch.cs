@@ -2,8 +2,10 @@ using Common;
 using Common.Logging;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
+using Helpers;
 using HarmonyLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -30,15 +32,34 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// IndexOutOfRangeException out of the menu consequence, so the encounter never finished and the player was
 /// pinned on the menu with no way off it while everyone else had moved on.
 ///
-/// Scoped tightly: only on a client, only outside an authoritative replay, and only for a map event the
-/// object manager knows - a purely local event (one this client legitimately owns end to end) still
-/// simulates normally. The server's own simulation path is untouched, and it passes null for the roster,
-/// which is the branch that never indexes.
+/// Scoped to the leave consequence ITSELF, via <see cref="inEncounterLeave"/>, and not to client-side
+/// simulation in general. That distinction is the whole patch: "send troops" and every other auto-resolve
+/// draws its battle screen by simulating locally, through these same two methods. Suppressing those as well
+/// skips <c>MakeReadyForSimulation</c> on each side and the <c>_battleState</c> reset, so the player gets no
+/// battle screen and the event is left showing the enemy at zero troops while the player still holds all of
+/// theirs - which is precisely what an earlier, broader version of this guard caused.
+///
+/// Also requires a client, outside an authoritative replay, and a map event the object manager knows - a
+/// purely local event still simulates normally. The server's own path is untouched, and it passes null for
+/// the roster, which is the branch that never indexes.
 /// </remarks>
 [HarmonyPatch]
 internal class ClientBattleSimulationGuardPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ClientBattleSimulationGuardPatch>();
+
+    // True only while MenuHelper.EncounterLeaveConsequence is on the stack. Game-thread only; ThreadStatic is
+    // belt-and-braces, matching CoopEmptyTeamDeploymentPatch's scoping of the same kind of override.
+    [ThreadStatic] private static bool inEncounterLeave;
+
+    [HarmonyPatch(typeof(MenuHelper), nameof(MenuHelper.EncounterLeaveConsequence))]
+    [HarmonyPrefix]
+    private static void EncounterLeavePrefix() => inEncounterLeave = true;
+
+    // Finalizer, not postfix: the method is expected to throw here, and the flag must clear either way.
+    [HarmonyPatch(typeof(MenuHelper), nameof(MenuHelper.EncounterLeaveConsequence))]
+    [HarmonyFinalizer]
+    private static void EncounterLeaveFinalizer() => inEncounterLeave = false;
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.SimulateBattleSetup), new[] { typeof(FlattenedTroopRoster[]) })]
     [HarmonyPrefix]
@@ -52,6 +73,9 @@ internal class ClientBattleSimulationGuardPatch
 
     private static bool SuppressLocalSimulation(MapEvent mapEvent, string step)
     {
+        // The one path that must not simulate. Everything else - auto-resolve, "send troops", any battle the
+        // player watches resolve without a mission - needs these to run.
+        if (!inEncounterLeave) return false;
         if (CallOriginalPolicy.IsOriginalAllowed()) return false;
         if (ModInformation.IsServer) return false;
         if (mapEvent == null) return false;
