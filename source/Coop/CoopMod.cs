@@ -117,7 +117,11 @@ namespace Coop
             if (!isServer)
             {
                 unsupportedModuleWarning = new UnsupportedModuleWarningHandler(
-                    new TaleWorldsModuleInfoProvider());
+                    new TaleWorldsModuleInfoProvider(),
+                    new CoopOptionsStore(),
+                    exception => Logger.Warning(
+                        exception,
+                        "Unsupported module wwarning preference could not be saved"));
             }
 
             if (ManagedServerConfig.IsManagedServer)
