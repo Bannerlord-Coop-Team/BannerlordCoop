@@ -21,15 +21,22 @@ public record LocationMissionReady : IEvent
 /// <summary>
 /// [Client, local] This client became the confirmed NPC host of a location instance — either by the
 /// initial election or by a migration promotion. The population director runs the native spawn pass on
-/// it (SR-011/SR-013).
+/// it (SR-011/SR-013); <see cref="WasMigration"/> is the EXPLICIT promotion signal so the director
+/// never has to infer it from held-puppet state (which is empty when the promoted client had not
+/// applied its catch-up yet).
 /// </summary>
 public record LocationHostAuthorityAcquired : IEvent
 {
     public string InstanceId { get; }
 
-    public LocationHostAuthorityAcquired(string instanceId)
+    /// <summary>True when this authority came from a migration promotion (a previous host existed
+    /// and departed), false for the initial election of a fresh instance.</summary>
+    public bool WasMigration { get; }
+
+    public LocationHostAuthorityAcquired(string instanceId, bool wasMigration = false)
     {
         InstanceId = instanceId;
+        WasMigration = wasMigration;
     }
 }
 

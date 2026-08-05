@@ -25,6 +25,13 @@ namespace Missions.Locations;
 /// </summary>
 public interface ILocationAuthorityMigrator : System.IDisposable
 {
+    /// <summary>
+    /// [Game thread] Adopt a single just-spawned puppet whose owner has already departed: a retained
+    /// old-host record applied AFTER the promotion (buffered by budget or mission load). The bulk
+    /// adoption on <see cref="Missions.Messages.LocationHostMigrated"/> ran before this record
+    /// spawned, so the spawner hands late arrivals over one by one.
+    /// </summary>
+    void AdoptSpawnedPuppet(Agent agent, System.Guid agentId);
 }
 
 /// <inheritdoc cref="ILocationAuthorityMigrator"/>
@@ -37,19 +44,22 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     private readonly ILocationSession session;
     private readonly ILocationAgentBindingMap bindingMap;
     private readonly IMissionContext missionContext;
+    private readonly GameInterface.Services.Locations.Conversations.ILocationNpcHoldRegistry holdRegistry;
 
     public LocationAuthorityMigrator(
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
         ILocationSession session,
         ILocationAgentBindingMap bindingMap,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        GameInterface.Services.Locations.Conversations.ILocationNpcHoldRegistry holdRegistry)
     {
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
         this.bindingMap = bindingMap;
         this.missionContext = missionContext;
+        this.holdRegistry = holdRegistry;
 
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -181,11 +191,40 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
 
                 if (ReviveSettlementAi(agent)) revived++;
                 else stationary++;
+
+                ReapplyConversationHold(agent, info.AgentId);
             }
 
             Logger.Information("[LocationSync] Adopted {Count} NPC(s) from {Controller} ({Reason}): {Revived} revived, {Stationary} stationary fallback",
                 adopted.Count, controllerId, reason, revived, stationary);
         }, context: nameof(AdoptAgentsFrom));
+    }
+
+    public void AdoptSpawnedPuppet(Agent agent, System.Guid agentId)
+    {
+        if (agent == null || agentId == System.Guid.Empty) return;
+
+        var registry = coopMissionComponent.AgentRegistry;
+        registry.TryTransferAuthority(session.OwnControllerId, agentId);
+        coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+        ReviveSettlementAi(agent);
+        ReapplyConversationHold(agent, agentId);
+        Logger.Information("[LocationSync] Late-adopted NPC {AgentId} spawned after the migration", agentId);
+    }
+
+    // [Game thread] An adopted NPC that a remote player currently holds the conversation lock on
+    // must stay paused (SR-040) — the hold broadcast predates our authority, so the registry every
+    // client maintains is the only signal a successor has.
+    private void ReapplyConversationHold(Agent agent, System.Guid agentId)
+    {
+        if (agent == null || !agent.IsHuman) return;
+        if (!bindingMap.TryGet(agentId, out var binding) || binding.RosterEntry == null) return;
+
+        if (holdRegistry.IsHeld(binding.RosterEntry.LocationId, binding.RosterEntry.CharacterId))
+        {
+            agent.SetIsAIPaused(true);
+            Logger.Information("[LocationSync] Adopted NPC {AgentId} is conversation-held — keeping it paused", agentId);
+        }
     }
 
     // [Game thread] Turn an inert puppet into a locally simulated settlement NPC. Humans get the

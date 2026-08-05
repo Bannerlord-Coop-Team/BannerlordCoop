@@ -252,12 +252,15 @@ internal class LocationHostHandler : IHandler
         hostRegistry.Set(message.InstanceId, assignment);
 
         bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
+        bool isMigrationToUs = previousHost != null
+            && previousHost != message.HostControllerId
+            && isLocalHost;
 
         // Drive the static patch gate — it ignores assignments for instances other than the active mission.
         LocationNpcGate.SetLocalHost(message.InstanceId, isLocalHost);
 
         if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))
-            messageBroker.Publish(this, new LocationHostAuthorityAcquired(message.InstanceId));
+            messageBroker.Publish(this, new LocationHostAuthorityAcquired(message.InstanceId, isMigrationToUs));
 
         Logger.Information("[LocationHost] Location {InstanceId} NPC host is {Host}{IsMe} at epoch {Epoch} (successors: {Successors})",
             message.InstanceId,
@@ -269,9 +272,7 @@ internal class LocationHostHandler : IHandler
         // Migration: the host changed and it is now us — adopt the previous host's orphaned NPC puppets
         // so the settlement continues uninterrupted (the migrator does the actual adoption with the live
         // mission).
-        if (previousHost != null
-            && previousHost != message.HostControllerId
-            && isLocalHost)
+        if (isMigrationToUs)
         {
             Logger.Information("[LocationHost] Became NPC host of {InstanceId} via migration from {Old}", message.InstanceId, previousHost);
             messageBroker.Publish(this, new LocationHostMigrated(message.InstanceId, previousHost));

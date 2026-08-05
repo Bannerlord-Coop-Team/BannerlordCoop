@@ -5,6 +5,7 @@ using Common.Network;
 using Missions.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.MapEvents;
@@ -46,6 +47,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         IControllerIdProvider controllerIdProvider,
         ILocationHostRegistry hostRegistry,
         ILocationPuppetRosterBinder rosterBinder,
+        ILocationNpcHoldRegistry npcHoldRegistry,
         IBattleAgentBudget agentBudget,
         ILocationAgentSpawnBatchCodec spawnBatchCodec,
         IMissionContext missionContext,
@@ -67,11 +69,11 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         npcReplicator = new LocationOwnedAgentReplicator(
             network, messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, spawnBatchCodec);
-        npcPuppetSpawner = new LocationPuppetSpawner(
-            messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, agentBudget, spawnBatchCodec);
-        populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap);
         authorityMigrator = new LocationAuthorityMigrator(
-            messageBroker, coopMissionComponent, session, bindingMap, missionContext);
+            messageBroker, coopMissionComponent, session, bindingMap, missionContext, npcHoldRegistry);
+        npcPuppetSpawner = new LocationPuppetSpawner(
+            messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator);
+        populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
     }
@@ -166,6 +168,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         _localAgentRegistered = true;
         Logger.Information("[LocationSync] Registered local agent (hero {AgentId}) for {PlayerID}; broadcasting join info",
             agentId, controllerId);
+
+        // NPC puppet spawns wait on the same readiness as join info: the mission is provably set up now.
+        npcPuppetSpawner.NotifyMissionReady();
 
         if (!objectManager.TryGetIdWithLogging(CharacterObject.PlayerCharacter, out var characterObjectId))
             return;

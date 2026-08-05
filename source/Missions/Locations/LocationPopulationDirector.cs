@@ -36,16 +36,19 @@ public class LocationPopulationDirector : ILocationPopulationDirector
     private readonly IMessageBroker messageBroker;
     private readonly ILocationSession session;
     private readonly ILocationAgentBindingMap bindingMap;
+    private readonly ILocationPuppetSpawner puppetSpawner;
     private bool populated;
 
     public LocationPopulationDirector(
         IMessageBroker messageBroker,
         ILocationSession session,
-        ILocationAgentBindingMap bindingMap)
+        ILocationAgentBindingMap bindingMap,
+        ILocationPuppetSpawner puppetSpawner)
     {
         this.messageBroker = messageBroker;
         this.session = session;
         this.bindingMap = bindingMap;
+        this.puppetSpawner = puppetSpawner;
 
         messageBroker.Subscribe<LocationHostAuthorityAcquired>(Handle_LocationHostAuthorityAcquired);
     }
@@ -58,6 +61,7 @@ public class LocationPopulationDirector : ILocationPopulationDirector
     private void Handle_LocationHostAuthorityAcquired(MessagePayload<LocationHostAuthorityAcquired> payload)
     {
         if (payload.What.InstanceId != session.InstanceId) return;
+        bool wasMigration = payload.What.WasMigration;
 
         // Non-blocking: the assignment arrives on the network thread while the mission may be loading.
         GameThread.RunSafe(() =>
@@ -72,11 +76,14 @@ public class LocationPopulationDirector : ILocationPopulationDirector
                 return;
             }
 
-            if (bindingMap.Count > 0)
+            // A migration promotion is EXPLICIT on the message (SR-014): adopt-in-place owns the
+            // transition whenever any of the previous host's crowd exists here — already-adopted
+            // bindings OR retained records still buffered (a promotion before our catch-up applied
+            // must not roll a duplicate crowd; those records spawn and late-adopt instead). Only
+            // when the departed host provably left NOTHING behind does the promoted host populate —
+            // that is a first crowd, not a duplicate.
+            if (wasMigration && (bindingMap.Count > 0 || puppetSpawner.HasPendingNpcRecords))
             {
-                // We hold puppets we did not capture: this authority is a migration promotion — the
-                // adopt-in-place path owns the transition (SR-014), and re-running the pass would
-                // roll a second ambient roster on top of the reconstructed one.
                 Logger.Information("[LocationNpc] Promoted to NPC host of {InstanceId} — adopt-in-place, skipping population pass",
                     payload.What.InstanceId);
                 populated = true;

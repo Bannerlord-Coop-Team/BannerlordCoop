@@ -10,6 +10,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -55,8 +56,8 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
     private readonly ILocationPuppetRosterBinder rosterBinder;
     private readonly ILocationAgentSpawnBatchCodec spawnBatchCodec;
     private readonly List<LocationAgentSpawnData> pendingSpawns = new List<LocationAgentSpawnData>();
-    private readonly List<(Guid agentId, LocationDespawnReason reason)> pendingDespawns
-        = new List<(Guid, LocationDespawnReason)>();
+    private readonly List<(Guid agentId, LocationDespawnReason reason, string destinationLocationId)> pendingDespawns
+        = new List<(Guid, LocationDespawnReason, string)>();
 
     private readonly string movementScopeId;
     private ushort nextMovementId = 1;
@@ -134,14 +135,16 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
         {
             var ids = new Guid[pendingDespawns.Count];
             var reasons = new byte[pendingDespawns.Count];
+            var destinations = new string[pendingDespawns.Count];
             for (int i = 0; i < pendingDespawns.Count; i++)
             {
                 ids[i] = pendingDespawns[i].agentId;
                 reasons[i] = (byte)pendingDespawns[i].reason;
+                destinations[i] = pendingDespawns[i].destinationLocationId;
             }
             pendingDespawns.Clear();
 
-            network.SendAll(new NetworkDespawnLocationAgents(ids, reasons));
+            network.SendAll(new NetworkDespawnLocationAgents(ids, reasons, destinations));
             Logger.Information("[LocationSync] Broadcast {Count} NPC despawn(s)", ids.Length);
         }
     }
@@ -153,12 +156,46 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
         var registry = coopMissionComponent.AgentRegistry;
         if (!registry.TryGetAgentInfo(agent, out var info)) return;
         if (info.CurrentAuthority != session.OwnControllerId) return;   // not ours to despawn — its owner reports it
-        if (!bindingMap.TryGet(info.AgentId, out _)) return;            // not a replicated NPC (e.g. a player agent)
+        if (!bindingMap.TryGet(info.AgentId, out var binding)) return;  // not a replicated NPC (e.g. a player agent)
+
+        // SR-026: a passage exit already ran vanilla ChangeLocation here (entry moved to the
+        // destination location's list before the fade completed) — find where the entry landed so
+        // receivers can mirror the roster move, or a promoted host's passage rosters go stale.
+        var destinationLocationId = reason == LocationDespawnReason.Removed
+            ? ResolveMovedEntryDestination(agent, binding)
+            : null;
 
         registry.RemoveAgent(info.AgentId);
         bindingMap.Forget(info.AgentId);
-        pendingDespawns.Add((info.AgentId, reason));
-        Logger.Debug("[LocationSync] Queued despawn of NPC {AgentId} ({Reason})", info.AgentId, reason);
+        pendingDespawns.Add((info.AgentId, reason, destinationLocationId));
+        Logger.Debug("[LocationSync] Queued despawn of NPC {AgentId} ({Reason}, moved to {Destination})",
+            info.AgentId, reason, destinationLocationId ?? "<none>");
+    }
+
+    // [Game thread] The location the removed agent's roster entry now lives in, when that differs
+    // from where it spawned — i.e. the destination of a native passage move. Null for a plain
+    // removal (entry gone or unmoved) or an unbound record.
+    private string ResolveMovedEntryDestination(Agent agent, LocationAgentBinding binding)
+    {
+        if (binding.RosterEntry == null || agent.Origin == null) return null;
+
+        var complex = LocationComplex.Current;
+        if (complex == null) return null;
+
+        foreach (var location in complex.GetListOfLocations())
+        {
+            var characters = location?.GetCharacterList();
+            if (characters == null) continue;
+
+            foreach (var entry in characters)
+            {
+                if (entry?.AgentOrigin != agent.Origin) continue;
+
+                if (!objectManager.TryGetId(location, out var locationId)) return null;
+                return locationId == binding.RosterEntry.LocationId ? null : locationId;
+            }
+        }
+        return null;
     }
 
     // [Game thread] Build catch-up records for the settlement agents WE currently own, at their

@@ -29,6 +29,19 @@ public interface ILocationPuppetSpawner : IDisposable
 {
     /// <summary>[Game thread] Retry buffered puppets (mission loading / render budget).</summary>
     void DrainPendingPuppets();
+
+    /// <summary>
+    /// The local mission finished setting up (player agent + teams exist). Until then every incoming
+    /// record is buffered — <c>Mission.Current</c> is non-null while the scene is still LOADING, and
+    /// spawning into a half-initialized mission corrupts team setup (the same reason join info is
+    /// buffered).
+    /// </summary>
+    void NotifyMissionReady();
+
+    /// <summary>True while any NPC spawn record is still buffered. A promoted host uses this together
+    /// with its adopted bindings to tell "crowd exists, adopt it" from "nothing ever spawned,
+    /// populate" (SR-014).</summary>
+    bool HasPendingNpcRecords { get; }
 }
 
 /// <inheritdoc cref="ILocationPuppetSpawner"/>
@@ -45,11 +58,19 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     private readonly ILocationPuppetRosterBinder rosterBinder;
     private readonly IBattleAgentBudget agentBudget;
     private readonly ILocationAgentSpawnBatchCodec spawnBatchCodec;
+    private readonly ILocationAuthorityMigrator authorityMigrator;
 
     private readonly object pendingPuppetLock = new object();
     private readonly List<LocationAgentSpawnData> pendingPuppets = new List<LocationAgentSpawnData>();
     private readonly object withdrawnControllerLock = new object();
     private readonly HashSet<string> withdrawnControllers = new HashSet<string>();
+    // Controllers that were the recorded NPC HOST when they withdrew: their records are the crowd a
+    // successor adopts, so unlike a plain player's they are RETAINED and spawned (then late-adopted
+    // by a promoted local host), never dropped.
+    private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
+
+    // Spawning needs the local mission fully set up; Mission.Current alone is not that signal.
+    private volatile bool missionReady;
 
     // Despawned ids (SR-026): a despawn can cross a still-buffered spawn record (or a catch-up
     // replay), so a tombstoned id must never (re)spawn. Per-mission lifetime bounds the set.
@@ -64,7 +85,8 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         ILocationAgentBindingMap bindingMap,
         ILocationPuppetRosterBinder rosterBinder,
         IBattleAgentBudget agentBudget,
-        ILocationAgentSpawnBatchCodec spawnBatchCodec)
+        ILocationAgentSpawnBatchCodec spawnBatchCodec,
+        ILocationAuthorityMigrator authorityMigrator)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -74,6 +96,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         this.rosterBinder = rosterBinder;
         this.agentBudget = agentBudget;
         this.spawnBatchCodec = spawnBatchCodec;
+        this.authorityMigrator = authorityMigrator;
 
         messageBroker.Subscribe<NetworkSpawnLocationAgents>(Handle_NetworkSpawnLocationAgents);
         messageBroker.Subscribe<NetworkDespawnLocationAgents>(Handle_NetworkDespawnLocationAgents);
@@ -108,15 +131,32 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
             pendingPuppets.RemoveAll(data => System.Array.IndexOf(ids, data.AgentId) >= 0);
         }
 
+        var destinations = payload.What.DestinationLocationIds;
+
         GameThread.RunSafe(() =>
         {
             var registry = coopMissionComponent.AgentRegistry;
             int removed = 0;
-            foreach (var id in ids)
+            for (int i = 0; i < ids.Length; i++)
             {
+                var id = ids[i];
                 if (!registry.TryGetAgentInfo(id, out var info)) continue;
 
                 var agent = info.Agent;
+
+                // SR-026: a passage exit moved the entry between location rosters on the host —
+                // mirror it here (before the binding is forgotten) or a later promoted host holds
+                // stale passage rosters and this NPC can never be selected to wander back.
+                var destinationLocationId = destinations != null && i < destinations.Length
+                    ? destinations[i]
+                    : null;
+                if (!string.IsNullOrEmpty(destinationLocationId)
+                    && bindingMap.TryGet(id, out var binding)
+                    && binding.RosterEntry != null)
+                {
+                    rosterBinder.TryMoveBoundEntry(agent, binding.RosterEntry.LocationId, destinationLocationId);
+                }
+
                 if (agent != null && agent.IsActive() && agent.Health > 0)
                 {
                     bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
@@ -195,8 +235,16 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     {
         var registry = coopMissionComponent.AgentRegistry;
 
-        if (Mission.Current == null) return false;                      // still loading — buffer
-        if (IsWithdrawn(data.OwnerControllerId)) return true;           // stale record after leave/drop — drop
+        // Mission.Current exists while the scene is still LOADING — gate on the same readiness the
+        // join-info path uses, or the crowd spawns before teams/the player agent are initialized.
+        if (!missionReady || Mission.Current == null) return false;     // still loading — buffer
+
+        // A departed plain player's records are stale (its puppet despawns, nothing adopts it). A
+        // departed HOST's records are the crowd itself: retained, spawned, and — when WE are the
+        // promoted host — adopted below, so a partially-applied catch-up never loses NPCs (SR-014).
+        bool ownerIsWithdrawnHost;
+        if (IsWithdrawn(data.OwnerControllerId, out ownerIsWithdrawnHost) && !ownerIsWithdrawnHost)
+            return true;                                                // stale player record — drop
         if (IsTombstoned(data.AgentId)) return true;                    // already despawned by the host — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned (incl. our own natives) — dedupe
 
@@ -225,6 +273,12 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
 
         bindingMap.Record(data.AgentId, new LocationAgentBinding(
             data.Kind, data.RosterEntry, data.ItemId, data.HarnessItemId));
+
+        // A retained record of a departed host applied AFTER our promotion: the bulk adoption ran
+        // already, so hand this late arrival straight to the migrator (transfer + AI revive) instead
+        // of leaving it an orphaned puppet keyed to a controller that no longer answers.
+        if (ownerIsWithdrawnHost && session.IsLocalHost)
+            authorityMigrator.AdoptSpawnedPuppet(agent, data.AgentId);
 
         Logger.Debug("[LocationSync] Spawned {Kind} puppet (agent {AgentId})", data.Kind, data.AgentId);
         slotsAvailable -= slotsNeeded;
@@ -344,9 +398,19 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         };
     }
 
+    public void NotifyMissionReady()
+    {
+        missionReady = true;
+    }
+
+    public bool HasPendingNpcRecords
+    {
+        get { lock (pendingPuppetLock) return pendingPuppets.Count > 0; }
+    }
+
     public void DrainPendingPuppets()
     {
-        if (Mission.Current == null) return;
+        if (!missionReady || Mission.Current == null) return;
 
         LocationAgentSpawnData[] pending;
         lock (pendingPuppetLock)
@@ -382,6 +446,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         lock (withdrawnControllerLock)
         {
             withdrawnControllers.Remove(payload.What.ControllerId);
+            withdrawnHostControllers.Remove(payload.What.ControllerId);
         }
     }
 
@@ -395,29 +460,40 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         MarkControllerWithdrawn(payload.What.ControllerId, payload.What.InstanceId);
     }
 
-    // A departed controller's not-yet-applied records are stale: the NPCs that already spawned are
-    // what a promoted host adopts (SR-014); a record applied AFTER the departure would create a
-    // puppet no adoption sweep has seen.
+    // A departed PLAYER's not-yet-applied records are stale (its puppet despawns, nothing adopts
+    // it) and are pruned. A departed HOST's records are the crowd itself and are RETAINED — the
+    // promoted successor adopts the already-spawned subset via the migration sweep and each retained
+    // record as it spawns (late adoption), so a partially-applied catch-up never loses NPCs and an
+    // empty binding map cannot misread a promotion as a fresh election (SR-014).
     private void MarkControllerWithdrawn(string controllerId, string instanceId)
     {
         if (string.IsNullOrEmpty(controllerId)) return;
         if (instanceId != null && instanceId != session.InstanceId) return;
 
+        // Read the host role BEFORE the promotion broadcast replaces the assignment (the departure
+        // fan-out precedes it on the relay).
+        bool wasHost = session.IsHostController(controllerId);
+
         lock (withdrawnControllerLock)
         {
             withdrawnControllers.Add(controllerId);
+            if (wasHost) withdrawnHostControllers.Add(controllerId);
         }
 
-        lock (pendingPuppetLock)
+        if (!wasHost)
         {
-            pendingPuppets.RemoveAll(data => data.OwnerControllerId == controllerId);
+            lock (pendingPuppetLock)
+            {
+                pendingPuppets.RemoveAll(data => data.OwnerControllerId == controllerId);
+            }
         }
     }
 
-    private bool IsWithdrawn(string controllerId)
+    private bool IsWithdrawn(string controllerId, out bool wasHost)
     {
         lock (withdrawnControllerLock)
         {
+            wasHost = withdrawnHostControllers.Contains(controllerId);
             return withdrawnControllers.Contains(controllerId);
         }
     }

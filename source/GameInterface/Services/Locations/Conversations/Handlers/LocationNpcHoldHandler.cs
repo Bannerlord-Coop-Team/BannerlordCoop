@@ -25,11 +25,16 @@ internal class LocationNpcHoldHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly ILocationNpcHoldRegistry holdRegistry;
 
-    public LocationNpcHoldHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public LocationNpcHoldHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        ILocationNpcHoldRegistry holdRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.holdRegistry = holdRegistry;
 
         messageBroker.Subscribe<NetworkLocationNpcHold>(Handle_NetworkLocationNpcHold);
         messageBroker.Subscribe<NetworkLocationNpcReleased>(Handle_NetworkLocationNpcReleased);
@@ -43,11 +48,15 @@ internal class LocationNpcHoldHandler : IHandler
 
     private void Handle_NetworkLocationNpcHold(MessagePayload<NetworkLocationNpcHold> payload)
     {
+        // Tracked on EVERY client (before the host gate): a successor promoted mid-conversation must
+        // know the adopted NPC is held, or adoption un-pauses it under the remote conversation.
+        holdRegistry.Hold(payload.What.LocationId, payload.What.CharacterId);
         SetNpcPaused(payload.What.LocationId, payload.What.CharacterId, paused: true);
     }
 
     private void Handle_NetworkLocationNpcReleased(MessagePayload<NetworkLocationNpcReleased> payload)
     {
+        holdRegistry.Release(payload.What.LocationId, payload.What.CharacterId);
         SetNpcPaused(payload.What.LocationId, payload.What.CharacterId, paused: false);
     }
 
@@ -61,8 +70,8 @@ internal class LocationNpcHoldHandler : IHandler
             var mission = Mission.Current;
             if (mission == null) return;
 
-            if (!objectManager.TryGetObject<Location>(locationId, out var location) || location == null) return;
-            if (!objectManager.TryGetObject<CharacterObject>(characterId, out var character) || character == null) return;
+            if (!objectManager.TryGetObjectWithLogging<Location>(locationId, out var location) || location == null) return;
+            if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character) || character == null) return;
 
             foreach (var entry in location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
             {

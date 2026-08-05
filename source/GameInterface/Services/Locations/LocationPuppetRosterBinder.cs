@@ -35,6 +35,15 @@ public interface ILocationPuppetRosterBinder : IGameAbstraction
     /// identity finds it). False when the agent has no roster entry (record ships unbound).
     /// </summary>
     bool TryExtractRosterData(Agent agent, out LocationCharacterData rosterData);
+
+    /// <summary>
+    /// [Game thread] Replicate a host-side passage move (SR-026): remove the agent's bound roster
+    /// entry from <paramref name="sourceLocationId"/>'s list and add it to
+    /// <paramref name="destinationLocationId"/>'s — the local mirror of what vanilla
+    /// <c>ChangeLocation</c> did on the host, without its mission notifications. Keeps a later
+    /// promoted host's passage rosters truthful so the NPC can be selected to wander back.
+    /// </summary>
+    bool TryMoveBoundEntry(Agent agent, string sourceLocationId, string destinationLocationId);
 }
 
 /// <inheritdoc cref="ILocationPuppetRosterBinder"/>
@@ -119,6 +128,35 @@ internal class LocationPuppetRosterBinder : ILocationPuppetRosterBinder
         if (!objectManager.TryGetId(location, out var locationId)) return false;
 
         return LocationCharacterFactory.TryCreateData(objectManager, locationId, entry, out rosterData);
+    }
+
+    public bool TryMoveBoundEntry(Agent agent, string sourceLocationId, string destinationLocationId)
+    {
+        if (agent?.Origin == null) return false;
+
+        if (!objectManager.TryGetObjectWithLogging<Location>(sourceLocationId, out var source) || source == null)
+            return false;
+        if (!objectManager.TryGetObjectWithLogging<Location>(destinationLocationId, out var destination) || destination == null)
+            return false;
+
+        LocationCharacter entry = null;
+        foreach (var candidate in source.GetCharacterList() ?? (IEnumerable<LocationCharacter>)new List<LocationCharacter>())
+        {
+            if (candidate?.AgentOrigin != agent.Origin) continue;
+            entry = candidate;
+            break;
+        }
+
+        if (entry == null)
+        {
+            Logger.Debug("[LocationNpc] Passage move: no bound entry for the agent in {Source} — nothing to move", sourceLocationId);
+            return false;
+        }
+
+        source._characterList?.Remove(entry);
+        destination._characterList ??= new List<LocationCharacter>();
+        destination._characterList.Add(entry);
+        return true;
     }
 
     // An entry is bound when a live mission agent carries its origin — the same reference-identity

@@ -36,7 +36,12 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   successor still in the instance and re-broadcasts the assignment with a bumped epoch. The promoted
   client **adopts NPCs in place**: authority transfer, interpolator forget, settlement-AI re-creation
   (see SR-030). Non-promoted clients keep their puppets untouched — movement ids survive the
-  transfer. IMPLEMENTED (live verification outstanding)
+  transfer. Promotion is EXPLICIT on `LocationHostAuthorityAcquired.WasMigration` (never inferred
+  from held-puppet state); a departed HOST's still-buffered spawn records are RETAINED on every
+  client and, on the promoted one, spawned then late-adopted — so a promotion that lands before the
+  catch-up finished applying neither loses NPCs nor rolls a duplicate crowd. The promoted host runs
+  the population pass only when the departed host provably left nothing behind (no bindings, no
+  pending records). IMPLEMENTED (live verification outstanding)
 - **SR-015 (Departure fork).** A departing player's own agent despawns on every remaining client
   (existing generic path); host-owned NPC puppets never despawn on host departure — they await
   adoption. IMPLEMENTED (live verification outstanding)
@@ -70,8 +75,11 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   reliable-ordered chunked batch, excluding despawned/dead agents. IMPLEMENTED (live verification outstanding)
 - **SR-026 (Mid-mission churn).** Host-side roster adds (lords walking in, passage traffic) spawn
   natively on the host, are captured, and replicate; host-side fade-outs/removals replicate as
-  despawns. The 30-second passage-usage tick runs **only on the host** (it mutates the roster with
-  local RNG — see R2). IMPLEMENTED (live verification outstanding)
+  despawns. A passage exit also carries the DESTINATION location id, and receivers mirror the roster
+  move vanilla `ChangeLocation` performed on the host — a later promoted host therefore holds
+  truthful passage rosters and the NPC stays selectable to wander back. The 30-second passage-usage
+  tick runs **only on the host** (it mutates the roster with local RNG — see R2).
+  IMPLEMENTED (live verification outstanding)
 
 ## 3. Adoption (migration mechanics)
 
@@ -91,8 +99,12 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
 
 - **SR-040 (Conversations).** Hero-NPC conversations keep the existing server lock. On lock grant
   the host pauses the NPC (`SetIsAIPaused`) so the remote conversation anchors to a stationary
-  agent; released on conversation end. Ambient conversations stay local and unheld (accepted jank).
-  IMPLEMENTED (live verification outstanding)
+  agent; released on conversation end. Hold state is tracked on EVERY client
+  (`ILocationNpcHoldRegistry`), so a successor promoted mid-conversation re-applies the pause to the
+  adopted NPC instead of un-pausing it under the running conversation. Known residual: a client that
+  joined after the hold broadcast and is promoted within that same conversation has no hold state
+  (a server-side hold replay on assignment change would close it). Ambient conversations stay local
+  and unheld (accepted jank). IMPLEMENTED (live verification outstanding)
 - **SR-041 (Damage).** v1: non-hosts cannot damage NPC puppets (`LocationPvpBlockPatch` drops blows
   to `Controller == None` humans). Host-side NPC deaths replicate as reasoned despawns
   (`LocationDespawnReason.Died`) — peers fade the body out rather than replaying the killing blow.
