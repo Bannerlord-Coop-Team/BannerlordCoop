@@ -1,9 +1,12 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
@@ -87,15 +90,58 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
     /// the side it was on, and cascades to attached parties on its own. Commanded parties are cleared too,
     /// because they left with the requester - leaving them behind would keep the battle alive around
     /// parties that are no longer there.
+    ///
+    /// RemovePartyInternal uses RemoveAt, which bypasses the collection sync, so none of this replicates on
+    /// its own. Without the explicit broadcast below the retreating force disappears on the server while every
+    /// other player still fighting keeps it in their local map event - counted in their battle, and still on
+    /// their side's roster. The ordinary leave path has the same problem and solves it the same way
+    /// (BattleJoinLeaveHandler.RemovePartyFromBattleAndBroadcast), so this reuses that message rather than
+    /// inventing a second removal protocol.
     /// </remarks>
     private static void LeaveBattle(MobileParty requester, List<MobileParty> commanded)
     {
+        var left = new List<PartyBase>();
+
         foreach (var party in commanded)
         {
-            if (party?.Party?.MapEventSide != null) party.Party.MapEventSide = null;
+            if (Detach(party?.Party)) left.Add(party.Party);
         }
 
-        if (requester.Party?.MapEventSide != null) requester.Party.MapEventSide = null;
+        if (Detach(requester.Party)) left.Add(requester.Party);
+
+        BroadcastLeft(left);
+    }
+
+    private static bool Detach(PartyBase party)
+    {
+        if (party?.MapEventSide == null) return false;
+
+        party.MapEventSide = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Tells every client to drop the parties that just retreated from their copy of the battle.
+    /// </summary>
+    /// <remarks>
+    /// FinishLocalMenus is false: the retreating player's own teardown is driven by the
+    /// NetworkBattleRetreatResolved that follows, and finishing menus twice on that client would close a menu
+    /// it has already moved past. LeaveSiege is false for the same reason - the retreat clears its own besieger
+    /// camps and reports them through campClearedPartyIds, so re-running the siege leave here would clear them
+    /// a second time. What is wanted from this message is only the map-event removal.
+    /// </remarks>
+    private static void BroadcastLeft(List<PartyBase> left)
+    {
+        if (left.Count == 0) return;
+        if (!ContainerProvider.TryResolve<INetwork>(out var network)) return;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
+
+        foreach (var party in left)
+        {
+            if (!objectManager.TryGetId(party, out var partyId)) continue;
+
+            network.SendAll(new NetworkPartyLeftBattle(partyId, leaveSiege: false, finishLocalMenus: false));
+        }
     }
 
     private static void PublishPosition(MobileParty party)
