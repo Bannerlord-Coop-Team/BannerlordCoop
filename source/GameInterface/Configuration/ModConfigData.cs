@@ -107,6 +107,11 @@ public sealed class ModOptionsData
     /// </summary>
     public bool? ResumeSiegeWhenEnemyRetreats { get; set; }
 
+    /// <summary>
+    /// Whether a besieged settlement's garrison sorties to join a relief force attacking the besiegers.
+    /// </summary>
+    public bool? GarrisonJoinsSiegeRelief { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
