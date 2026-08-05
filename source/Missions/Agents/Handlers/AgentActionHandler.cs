@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
@@ -377,15 +378,27 @@ public class AgentActionHandler : IAgentActionHandler
                 state.HasAction1DefendingAction,
                 state.Action1DefendingAction);
 
+        // Settlement ambient flavor (dances, cheers, animation-point loops) is CONTINUOUS and
+        // untyped (ActionCodeType.Other), so the discrete filter drops it — correct for battle
+        // locomotion churn, wrong for location NPCs whose whole performance IS the looped action.
+        // For an owned non-player agent in a coop location mission, any action-index change
+        // broadcasts: loops change on behavior transitions only, so this stays low-volume, and the
+        // gate is false in battles so their filtering is untouched.
+        bool locationAmbientAgent =
+            LocationNpcGate.IsCoopLocationMissionActive
+            && !isPlayerControlled;
+
         // Defend input and realized guard state can change before the animation index, so send them explicitly too.
         bool discreteActionChanged =
             (action0Changed
                 && !action0GuardLocomotionChurn
                 && (action0Discrete
+                    || locationAmbientAgent
                     || (hadState && state.Action0WasDiscrete)))
             || (action1Changed
                 && !action1GuardLocomotionChurn
                 && (action1Discrete
+                    || locationAmbientAgent
                     || (hadState && state.Action1WasDiscrete)));
         bool broadcast =
             defendChanged
@@ -483,8 +496,18 @@ public class AgentActionHandler : IAgentActionHandler
                         defendFlags,
                         actionGuardMode);
                 }
+                // Settlement NPCs hold persistent ambient loops (dances, cheers, point animations)
+                // a joiner never saw start — its puppet would idle until the NEXT transition, which
+                // for a dedicated dancer is never. Send their current action too, not only held
+                // defend/guard state.
+                bool locationAmbient =
+                    LocationNpcGate.IsCoopLocationMissionActive
+                    && agent.Controller != AgentControllerType.Player
+                    && (agent.GetCurrentAction(0) != ActionIndexCache.act_none
+                        || agent.GetCurrentAction(1) != ActionIndexCache.act_none);
                 if (defendFlags == Agent.MovementControlFlag.None
-                    && !AgentActionData.IsGuardMode(guardMode))
+                    && !AgentActionData.IsGuardMode(guardMode)
+                    && !locationAmbient)
                     continue;
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);
