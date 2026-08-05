@@ -4,8 +4,10 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.BesiegerCamps.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -15,6 +17,8 @@ using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -36,6 +40,7 @@ internal class ServerSiegeEntryHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly ISettlementEncounterDistanceValidator distanceValidator;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISettlementInterface settlementInterface;
 
@@ -44,6 +49,7 @@ internal class ServerSiegeEntryHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IPlayerManager playerManager,
+        ISettlementEncounterDistanceValidator distanceValidator,
         ISiegeEventInterface siegeEventInterface,
         ISettlementInterface settlementInterface)
     {
@@ -51,6 +57,7 @@ internal class ServerSiegeEntryHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.distanceValidator = distanceValidator;
         this.siegeEventInterface = siegeEventInterface;
         this.settlementInterface = settlementInterface;
         messageBroker.Subscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
@@ -213,7 +220,7 @@ internal class ServerSiegeEntryHandler : IHandler
         network.SendAll(new NetworkPromptSiegePreparation(attackerPartyId, settlementId));
     }
 
-    // Runs on the game thread already — published from the FinalizeSiegeEvent postfix, behind the
+    // Runs on the game thread already — published from the FinalizeSiegeEvent finalizer, behind the
     // replicated siege teardown.
     private void HandleSiegeEnded(MessagePayload<SiegeEndedWithoutBattle> payload)
     {
@@ -221,7 +228,30 @@ internal class ServerSiegeEntryHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
 
-        network.SendAll(new NetworkPromptSiegeEnded(settlementId, obj.BesiegerDefeated));
+        string leaderPartyId = null;
+        if (obj.LeaderParty != null && playerManager.Contains(obj.LeaderParty))
+            objectManager.TryGetIdWithLogging(obj.LeaderParty, out leaderPartyId);
+
+        network.SendAll(new NetworkPromptSiegeEnded(
+            settlementId,
+            obj.BesiegerDefeated,
+            leaderPartyId,
+            GetPlayerPartyIds(obj.AttackerParties),
+            GetPlayerPartyIds(obj.DefenderParties),
+            obj.InterruptedActiveAssault));
+    }
+
+    private string[] GetPlayerPartyIds(IEnumerable<MobileParty> parties)
+    {
+        var ids = new List<string>();
+        foreach (var party in parties)
+        {
+            if (party == null || !playerManager.Contains(party)) continue;
+            if (objectManager.TryGetIdWithLogging(party, out var partyId))
+                ids.Add(partyId);
+        }
+
+        return ids.ToArray();
     }
 
     private void HandleAssault(MessagePayload<NetworkRequestSiegeAssault> payload)
@@ -280,22 +310,13 @@ internal class ServerSiegeEntryHandler : IHandler
         var obj = payload.What;
         var peer = (NetPeer)payload.Who;
 
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var party)) return;
-            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
-
-            if (settlement.SiegeEvent != null)
-            {
-                Logger.Error("Party {PartyId} tried to besiege {SettlementId} which is already under siege", obj.PartyId, obj.SettlementId);
-                network.Send(peer, new NetworkBesiegeSettlementApproved(false));
-                return;
-            }
-
-            siegeEventInterface.StartSiegeEvent(party, settlement);
-
-            network.Send(peer, new NetworkBesiegeSettlementApproved(true));
-        });
+        GameThread.RunSafe(
+            () => HandleEntry(
+                peer,
+                obj.PartyId,
+                obj.SettlementId,
+                SiegeEntryAction.Besiege),
+            context: nameof(NetworkRequestBesiegeSettlement));
     }
 
     private void HandleJoin(MessagePayload<NetworkRequestJoinSiegeCamp> payload)
@@ -303,22 +324,168 @@ internal class ServerSiegeEntryHandler : IHandler
         var obj = payload.What;
         var peer = (NetPeer)payload.Who;
 
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var party)) return;
-            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+        GameThread.RunSafe(
+            () => HandleEntry(
+                peer,
+                obj.PartyId,
+                obj.SettlementId,
+                SiegeEntryAction.Join),
+            context: nameof(NetworkRequestJoinSiegeCamp));
+    }
 
-            if (settlement.SiegeEvent == null || !settlement.SiegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Attacker))
+    private void HandleEntry(
+        NetPeer peer,
+        string partyId,
+        string settlementId,
+        SiegeEntryAction action)
+    {
+        if (!playerManager.TryGetPlayer(peer, out var player) ||
+            player.MobilePartyId != partyId)
+        {
+            RejectEntry(peer, partyId, settlementId, action, "your party is not controlled by you");
+            return;
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party) ||
+            !objectManager.TryGetObjectWithLogging<Settlement>(settlementId, out var settlement))
+        {
+            SendEntryRejection(
+                peer,
+                settlementId,
+                action,
+                "your party or the settlement is no longer available");
+            return;
+        }
+
+        try
+        {
+            var targetCamp = settlement.SiegeEvent?.BesiegerCamp;
+            if (targetCamp != null &&
+                ReferenceEquals(party.BesiegerCamp, targetCamp))
             {
-                Logger.Error("Party {PartyId} cannot join the siege of {SettlementId}", obj.PartyId, obj.SettlementId);
-                network.Send(peer, new NetworkJoinSiegeCampApproved(obj.SettlementId, false));
+                SendEntryResult(peer, settlementId, action, approved: true);
                 return;
             }
 
-            siegeEventInterface.JoinSiegeCamp(party, settlement);
+            if (!TryValidateEntry(party, settlement, action, out var rejectionReason))
+            {
+                RejectEntry(peer, partyId, settlementId, action, rejectionReason);
+                return;
+            }
 
-            network.Send(peer, new NetworkJoinSiegeCampApproved(obj.SettlementId, true));
-        });
+            if (action == SiegeEntryAction.Besiege)
+                siegeEventInterface.StartSiegeEvent(party, settlement);
+            else
+                siegeEventInterface.JoinSiegeCamp(party, settlement);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Failed to apply {Action} entry for party {PartyId} at {SettlementId}",
+                action,
+                partyId,
+                settlementId);
+            SendEntryRejection(
+                peer,
+                settlementId,
+                action,
+                "the server could not apply the request");
+            return;
+        }
+
+        SendEntryResult(peer, settlementId, action, approved: true);
+    }
+
+    private bool TryValidateEntry(
+        MobileParty party,
+        Settlement settlement,
+        SiegeEntryAction action,
+        out string rejectionReason)
+    {
+        rejectionReason = null;
+
+        if (!party.IsActive || party.Party == null)
+            rejectionReason = "your party is inactive";
+        else if (settlement.Party == null || !settlement.IsFortification)
+            rejectionReason = "the target is not a fortification";
+        else if (party.MapEvent != null)
+            rejectionReason = "your party is already in a map event";
+        else if (party.CurrentSettlement != null && party.CurrentSettlement != settlement)
+            rejectionReason = "your party is inside another settlement";
+        else if (party.BesiegerCamp != null)
+            rejectionReason = "your party is already in another siege camp";
+        else if (!distanceValidator.TryValidate(party, settlement, out var distanceRejectionReason))
+            rejectionReason = distanceRejectionReason;
+        else if ((party.ActualClan != null && party.ActualClan == settlement.OwnerClan) ||
+            (party.MapFaction != null && party.MapFaction == settlement.MapFaction))
+            rejectionReason = "your party belongs to the defending faction";
+        else if (party.MapFaction == null ||
+            settlement.MapFaction == null ||
+            !FactionManager.IsAtWarAgainstFaction(party.MapFaction, settlement.MapFaction))
+            rejectionReason = "your party is not at war with the settlement";
+        else if (action == SiegeEntryAction.Besiege &&
+            (settlement.SiegeEvent != null || party.Party.NumberOfHealthyMembers <= 0))
+            rejectionReason = "your party cannot begin this siege";
+        else if (action == SiegeEntryAction.Join &&
+            (settlement.SiegeEvent == null ||
+            !settlement.SiegeEvent.CanPartyJoinSide(party.Party, BattleSideEnum.Attacker)))
+            rejectionReason = "your party cannot join the attacking side";
+
+        return rejectionReason == null;
+    }
+
+    private void RejectEntry(
+        NetPeer peer,
+        string partyId,
+        string settlementId,
+        SiegeEntryAction action,
+        string reason)
+    {
+        Logger.Warning(
+            "Rejected {Action} entry for party {PartyId} at {SettlementId}: {Reason}",
+            action,
+            partyId,
+            settlementId,
+            reason);
+        SendEntryRejection(peer, settlementId, action, reason);
+    }
+
+    private void SendEntryRejection(
+        NetPeer peer,
+        string settlementId,
+        SiegeEntryAction action,
+        string reason)
+    {
+        SendEntryResult(peer, settlementId, action, approved: false);
+
+        var actionText = action == SiegeEntryAction.Besiege
+            ? "begin the siege"
+            : "join the siege";
+        network.Send(
+            peer,
+            new SendInformationMessage($"Unable to {actionText}: {reason}."));
+    }
+
+    private void SendEntryResult(
+        NetPeer peer,
+        string settlementId,
+        SiegeEntryAction action,
+        bool approved)
+    {
+        if (action == SiegeEntryAction.Besiege)
+        {
+            network.Send(peer, new NetworkBesiegeSettlementApproved(approved));
+            return;
+        }
+
+        network.Send(peer, new NetworkJoinSiegeCampApproved(settlementId, approved));
+    }
+
+    private enum SiegeEntryAction
+    {
+        Besiege,
+        Join,
     }
 
     private void HandleBreak(MessagePayload<NetworkRequestBreakSiege> payload)
@@ -330,23 +497,33 @@ internal class ServerSiegeEntryHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var party)) return;
 
+            if (party.MapEvent?.IsSiegeAssault == true &&
+                party.Party.Side == BattleSideEnum.Attacker)
+            {
+                messageBroker.Publish(
+                    party,
+                    new PlayerLeaveBattleAttempted(party.Party, obj.FinishLocalMenus));
+                network.Send(peer, new NetworkBreakSiegeApproved(
+                    SiegeBreakOutcome.Applied,
+                    obj.FinishLocalMenus,
+                    battleLeaveApplied: true));
+                return;
+            }
+
             if (party.BesiegerCamp == null)
             {
-                if (party.MapEvent?.IsSiegeAssault == true && party.Party.Side == BattleSideEnum.Attacker)
-                {
-                    messageBroker.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
-                    network.Send(peer, new NetworkBreakSiegeApproved(true, true, obj.FinishLocalMenus));
-                    return;
-                }
-
-                Logger.Error("Party {PartyId} tried to leave a siege camp it is not in", obj.PartyId);
-                network.Send(peer, new NetworkBreakSiegeApproved(false, false, obj.FinishLocalMenus));
+                Logger.Information("Party {PartyId} already left its siege camp", obj.PartyId);
+                network.Send(peer, new NetworkBreakSiegeApproved(
+                    SiegeBreakOutcome.AlreadyLeft,
+                    obj.FinishLocalMenus));
                 return;
             }
 
             siegeEventInterface.BreakSiege(party);
 
-            network.Send(peer, new NetworkBreakSiegeApproved(true, false, obj.FinishLocalMenus));
+            network.Send(peer, new NetworkBreakSiegeApproved(
+                SiegeBreakOutcome.Applied,
+                obj.FinishLocalMenus));
         });
     }
 
