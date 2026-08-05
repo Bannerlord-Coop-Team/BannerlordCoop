@@ -18,6 +18,8 @@ public sealed class ModConfigData
     /// on the hosting side once the campaign is up.</summary>
     public DifficultyConfigData Difficulty { get; set; } = new DifficultyConfigData();
 
+    public ModOptionsData ModOptions { get; set; } = new ModOptionsData();
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
@@ -61,4 +63,45 @@ public enum DifficultyLevel
     VeryEasy,
     Easy,
     Realistic,
+}
+
+public sealed class ModOptionsData
+{
+    public bool? FastForwardEnabled { get; set; }
+
+    public bool? AutoPauseEnabled { get; set; }
+
+    public bool? ClientsCanUseCheats { get; set; }
+
+    public bool? GoldFoodInfluenceChangeInSettlements { get; set; }
+
+    public GoldFoodChangeMode? GoldFoodInfluenceChangeInBattles { get; set; }
+
+    public bool? GoldFoodInfluenceChangeForDisconnectedPlayers { get; set; }
+
+    public int? PlayerBattleAiJoinWindowHours { get; set; }
+
+    public bool? SpeedLimitWhilePlayersInBattle { get; set; }
+
+    public int? WandererLimit { get; set; }
+
+    public bool? WandererLimitScalesWithPlayers { get; set; }
+
+    public int? PlayerKingdomClanTierRequired { get; set; }
+
+    public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }
+
+    public float? SmithingStaminaRecoveryMultiplier { get; set; }
+
+    public float? MaximumLootersMultiplier { get; set; }
+
+    [JsonExtensionData]
+    public IDictionary<string, JToken> UnknownKeys { get; set; }
+}
+
+public enum GoldFoodChangeMode
+{
+    Disabled,
+    OneDayMax,
+    Enabled
 }

@@ -5,40 +5,36 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.Smithing.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkDoRefinement : ICommand
+public readonly struct NetworkDoRefinement : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly string CraftingHeroId;
 
     [ProtoMember(2)]
-    public string CraftingHeroId;
+    public readonly CraftingMaterials Input1;
 
     [ProtoMember(3)]
-    public CraftingMaterials Input1;
+    public readonly int Input1Count;
 
     [ProtoMember(4)]
-    public int Input1Count;
+    public readonly CraftingMaterials Input2;
 
     [ProtoMember(5)]
-    public CraftingMaterials Input2;
+    public readonly int Input2Count;
 
     [ProtoMember(6)]
-    public int Input2Count;
+    public readonly CraftingMaterials Output1;
 
     [ProtoMember(7)]
-    public CraftingMaterials Output1;
+    public readonly int Output1Count;
 
     [ProtoMember(8)]
-    public int Output1Count;
+    public readonly CraftingMaterials Output2;
 
     [ProtoMember(9)]
-    public CraftingMaterials Output2;
-
-    [ProtoMember(10)]
-    public int Output2Count;
+    public readonly int Output2Count;
 
     public NetworkDoRefinement(
-        string craftingCampaignBehaviorId,
         string craftingHeroId,
         CraftingMaterials input1,
         int input1Count,
@@ -49,7 +45,6 @@ public class NetworkDoRefinement : ICommand
         CraftingMaterials output2,
         int output2Count)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         CraftingHeroId = craftingHeroId;
         Input1 = input1;
         Input1Count = input1Count;
