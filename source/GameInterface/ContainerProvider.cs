@@ -40,10 +40,24 @@ public class ContainerProvider
 
         if (TryGetContainer(out var container) == false) return false;
 
-        if (container.TryResolve(out instance) == false)
+        try
         {
-            var callStack = Environment.StackTrace;
-            Logger.Error("Unable to reslove {name}", typeof(T).Name);
+            if (container.TryResolve(out instance) == false)
+            {
+                Logger.Error("Unable to reslove {name}", typeof(T).Name);
+                return false;
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // A disposed scope is still a non-null reference, so TryGetContainer above cannot tell it from a
+            // live one, and Autofac throws rather than returning false. "The container is gone" is exactly
+            // what this method reports with false, so report it instead of letting the throw escape.
+            //
+            // It escapes into teardown, which is the worst place for it: ConversationPartyTracker.Dispose
+            // releases parties it is still holding, and a party released through DisableAi never re-enables
+            // itself. An exception part-way through that loop leaves the rest frozen for the life of the save.
+            instance = null;
             return false;
         }
 
