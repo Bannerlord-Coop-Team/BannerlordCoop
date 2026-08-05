@@ -86,8 +86,8 @@ public class ValidateModuleState : ClientStateBase
 
         // One-shot deadline covering this state's whole exchange; leaving the state disposes it.
         // The timer thread only marshals — the decision runs on the game thread like every other
-        // state transition. RunSafe (not Run) so a throw during teardown is logged instead of
-        // escaping into the game-loop pump and killing that frame's queue drain.
+        // state transition. RunSafe (not Run) so a throw during teardown is attributed to this state
+        // in the log rather than reported as an anonymous queued-action failure.
         validationTimeoutTimer = new Timer(
             _ => GameThread.RunSafe(TimeoutValidation), null, ValidationTimeout, Timeout.InfiniteTimeSpan);
     }

@@ -117,6 +117,8 @@ public class GameThread : IUpdateable
         long frameStart = Stopwatch.GetTimestamp();
         foreach ((Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task in toBeRun)
         {
+            // RunQueuedTask checks this too; the pre-check exists so a cancelled action stays out of the
+            // per-label attribution below, not for correctness.
             if (task.Cancellation.IsCancellationRequested)
             {
                 task.Wait?.Set();
@@ -124,17 +126,7 @@ public class GameThread : IUpdateable
             }
 
             long actionStart = Stopwatch.GetTimestamp();
-            try
-            {
-                using (ActivateCancellation(task.Cancellation))
-                {
-                    task.Act?.Invoke();
-                }
-            }
-            finally
-            {
-                task.Wait?.Set();
-            }
+            RunQueuedTask(task);
             long actionTicks = Stopwatch.GetTimestamp() - actionStart;
 
             string label = task.Label ?? "(unlabeled)";
@@ -220,6 +212,13 @@ public class GameThread : IUpdateable
     /// <exception cref="TimeoutException">
     /// Thrown for blocking calls when the action was not processed within <see cref="BlockingTimeout"/>.
     /// </exception>
+    /// <remarks>
+    /// Once queued, an exception from <paramref name="action"/> is logged by the drain rather than
+    /// propagated, so it does not reach the engine's tick and a blocking call returns normally after a
+    /// failure — capture the outcome inside the action when the caller needs it. Called on the game-loop
+    /// thread the action runs inline instead, and its exception still propagates to the caller; use
+    /// <see cref="RunSafe"/> when the guard has to hold on both paths.
+    /// </remarks>
     public static void Run(Action action, bool blocking = false, string label = null,
         [CallerFilePath] string callerFile = null,
         [CallerMemberName] string callerMember = null)
@@ -279,10 +278,10 @@ public class GameThread : IUpdateable
 
     /// <summary>
     /// Runs a given action on the game thread, logging any exception the action throws instead of
-    /// letting it propagate. The guard is wrapped around the action itself, so it travels onto the
-    /// game thread and catches the failure where the action actually runs (inside <see cref="Update"/>).
-    /// This keeps a single failing action from killing the pump and deadlocking blocking callers
-    /// waiting on the queue.
+    /// letting it propagate. The guard is wrapped around the action itself, so unlike the drain's own
+    /// guard it travels with the action and also covers the inline path taken when the caller is
+    /// already on the game-loop thread. It additionally attributes the failure to the caller-supplied
+    /// <paramref name="context"/>. Prefer this when a throw must never reach the caller.
     /// </summary>
     /// <param name="action">Action to run on game thread</param>
     /// <param name="blocking">Flag to pause code execution,
@@ -340,10 +339,9 @@ public class GameThread : IUpdateable
             // so suspend any ambient one here to match it.
             using (AllowedThread.Suspend())
             {
-                // A single failing queued action must not abort the wait (which would also leave that action's
-                // own blocking caller waiting out its full timeout); log and keep pumping, mirroring RunSafe.
-                // Without this guard the throw would escape into whatever the waiter is doing — e.g. mid
-                // battle-start construction.
+                // Backstop for Update itself — a failing queued action is already guarded in the drain.
+                // What can still surface here is the wrong-thread assertion or a fault in the drain's own
+                // bookkeeping, and neither must abort the wait.
                 try
                 {
                     Instance.Update(TimeSpan.Zero);
@@ -461,6 +459,13 @@ public class GameThread : IUpdateable
             {
                 task.Act?.Invoke();
             }
+        }
+        catch (Exception e)
+        {
+            // Update runs inside the engine's tick, so an escaping exception kills the process and
+            // abandons the rest of the drain. RunSafe's guard, applied to plain Run callers too.
+            Logger.Error(e, "A queued game-thread action threw and was suppressed: {Label}",
+                task.Label ?? "(unlabeled)");
         }
         finally
         {
