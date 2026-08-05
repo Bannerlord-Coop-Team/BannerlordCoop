@@ -58,6 +58,15 @@ namespace Coop.CrashReporter
         {
             process.WaitForExit();
             int exitCode = process.ExitCode;
+
+            // Walked before anything waits on a dump: the zero exit-code path spends up to
+            // 30 seconds looking for one, and a launcher update inside that window would rewrite
+            // the very files being listed. A clean exit pays for a walk whose result is then
+            // thrown away, but the game's own binaries are still in the file cache it just used
+            // them from, so that is a fraction of a second in a process about to exit anyway.
+            GameBinariesManifest binaries = GameBinariesManifest.Capture(
+                options.GameBinariesDirectory);
+
             string dumpPath = exitCode == 0
                 ? WaitForMatchingDump(CrashDumpDiscoveryTimeout)
                 : null;
@@ -69,14 +78,9 @@ namespace Coop.CrashReporter
             Directory.CreateDirectory(logsDirectory);
             List<string> copiedLogs = CopyLogs(logsDirectory);
 
-            // Written before the dump wait so the listed versions are the ones that were on
-            // disk at the crash, not whatever a launcher update replaced them with meanwhile.
             string manifestPath = Path.Combine(reportDirectory, GameBinariesManifest.FileName);
             bool manifestWritten;
-            string binariesSummary = GameBinariesManifest.Write(
-                manifestPath,
-                options.GameBinariesDirectory,
-                out manifestWritten);
+            string binariesSummary = binaries.Write(manifestPath, out manifestWritten);
 
             if (dumpPath == null)
                 dumpPath = WaitForMatchingDump(CrashDumpDiscoveryTimeout);

@@ -8,12 +8,16 @@ using System.Text;
 namespace Coop.CrashReporter
 {
     /// <summary>
-    /// Writes a JSON manifest of every file in the game binaries directory
-    /// (bin/Win64_Shipping_Client) together with its version, size and last write time.
-    /// A dump does not say which build, which DLC or which mixture of hand-copied game files
-    /// was actually installed, so the manifest is what tells a broken install apart from a real bug.
+    /// A JSON manifest of every file in the game binaries directory (bin/Win64_Shipping_Client)
+    /// together with its version, size and last write time. A dump does not say which build, which
+    /// DLC or which mixture of hand-copied game files was actually installed, so the manifest is
+    /// what tells a broken install apart from a real bug.
+    /// <para>
+    /// Capturing and writing are separate: the walk has to happen the moment the game exits, while
+    /// the report directory it is written to only exists once a crash is confirmed.
+    /// </para>
     /// </summary>
-    internal static class GameBinariesManifest
+    internal sealed class GameBinariesManifest
     {
         internal const string FileName = "game-binaries.json";
 
@@ -24,23 +28,50 @@ namespace Coop.CrashReporter
         internal const int MaximumDirectoryDepth = 2;
 
         // Bounds the manifest if the directory ever contains something unexpected, e.g. an
-        // unpacked asset dump; a full game install lists well under a thousand files.
+        // unpacked asset dump; a full game install lists well under a thousand files and holds
+        // a handful of directories.
         private const int MaximumFileCount = 20000;
+        private const int MaximumDirectoryCount = 5000;
+
+        private readonly string directory;
+        private readonly string failure;
+        private readonly DateTime capturedUtc;
+        private readonly List<FileEntry> files;
+        private readonly int skippedDirectories;
+        private readonly bool truncated;
+
+        private GameBinariesManifest(string failure)
+        {
+            this.failure = failure;
+        }
+
+        private GameBinariesManifest(
+            string directory,
+            DateTime capturedUtc,
+            List<FileEntry> files,
+            int skippedDirectories,
+            bool truncated)
+        {
+            this.directory = directory;
+            this.capturedUtc = capturedUtc;
+            this.files = files;
+            this.skippedDirectories = skippedDirectories;
+            this.truncated = truncated;
+        }
 
         /// <summary>
-        /// Writes the manifest and returns a one-line summary for the report. <paramref name="written"/>
-        /// is true when the manifest file exists on disk afterwards.
+        /// Walks the binaries directory. Call this as soon as the game process exits: everything
+        /// after it - waiting for a dump, copying logs - is time the files can still change in.
         /// </summary>
-        internal static string Write(
-            string manifestPath,
-            string binariesDirectory,
-            out bool written)
+        internal static GameBinariesManifest Capture(string binariesDirectory)
         {
-            written = false;
             if (string.IsNullOrEmpty(binariesDirectory))
-                return "not captured (directory was not resolved)";
+                return new GameBinariesManifest("not captured (directory was not resolved)");
             if (!Directory.Exists(binariesDirectory))
-                return "not captured (directory does not exist: " + binariesDirectory + ")";
+            {
+                return new GameBinariesManifest(
+                    "not captured (directory does not exist: " + binariesDirectory + ")");
+            }
 
             string root = binariesDirectory.TrimEnd(
                 Path.DirectorySeparatorChar,
@@ -48,6 +79,23 @@ namespace Coop.CrashReporter
             int skippedDirectories;
             bool truncated;
             List<FileEntry> files = ReadFiles(root, out skippedDirectories, out truncated);
+            return new GameBinariesManifest(
+                root,
+                DateTime.UtcNow,
+                files,
+                skippedDirectories,
+                truncated);
+        }
+
+        /// <summary>
+        /// Writes the captured manifest and returns a one-line summary for the report.
+        /// <paramref name="written"/> is true when the manifest file exists on disk afterwards.
+        /// </summary>
+        internal string Write(string manifestPath, out bool written)
+        {
+            written = false;
+            if (failure != null)
+                return failure;
 
             try
             {
@@ -58,7 +106,7 @@ namespace Coop.CrashReporter
                     FileShare.Read))
                 using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
                 {
-                    WriteManifest(writer, root, files, skippedDirectories, truncated);
+                    WriteManifest(writer);
                 }
             }
             catch (IOException)
@@ -95,21 +143,29 @@ namespace Coop.CrashReporter
             var entries = new List<FileEntry>();
             var pending = new Stack<PendingDirectory>();
             pending.Push(new PendingDirectory(root, 0));
+            var queuedDirectories = 0;
             skippedDirectories = 0;
             truncated = false;
 
             while (pending.Count > 0 && !truncated)
             {
                 PendingDirectory current = pending.Pop();
-                foreach (string subdirectory in TryGetDirectories(current.Path))
+                foreach (string subdirectory in EnumerateDirectoriesSafely(current.Path))
                 {
-                    if (current.Depth < MaximumDirectoryDepth)
-                        pending.Push(new PendingDirectory(subdirectory, current.Depth + 1));
-                    else
+                    // Queueing is capped for the same reason the file count is: a directory with
+                    // a million children must not grow the queue until the reporter dies.
+                    if (current.Depth >= MaximumDirectoryDepth ||
+                        queuedDirectories >= MaximumDirectoryCount)
+                    {
                         skippedDirectories++;
+                        continue;
+                    }
+
+                    pending.Push(new PendingDirectory(subdirectory, current.Depth + 1));
+                    queuedDirectories++;
                 }
 
-                foreach (string file in TryGetFiles(current.Path))
+                foreach (string file in EnumerateFilesSafely(current.Path))
                 {
                     if (entries.Count >= MaximumFileCount)
                     {
@@ -130,36 +186,61 @@ namespace Coop.CrashReporter
             return entries;
         }
 
-        // An unreadable subdirectory must cost its own contents, not the whole manifest.
-        private static string[] TryGetDirectories(string directory)
+        private static IEnumerable<string> EnumerateDirectoriesSafely(string directory)
         {
-            try
-            {
-                return Directory.GetDirectories(directory);
-            }
-            catch (IOException)
-            {
-                return new string[0];
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return new string[0];
-            }
+            return EnumerateSafely(directory, Directory.EnumerateDirectories);
         }
 
-        private static string[] TryGetFiles(string directory)
+        private static IEnumerable<string> EnumerateFilesSafely(string directory)
         {
+            return EnumerateSafely(directory, Directory.EnumerateFiles);
+        }
+
+        // Lazy on purpose: the materializing GetFiles/GetDirectories allocate every path in a
+        // directory up front, so MaximumFileCount could not stop an unpacked asset dump from
+        // exhausting the reporter before it ever wrote the report. Enumerating also means an
+        // unreadable directory costs its own contents, not the whole manifest.
+        private static IEnumerable<string> EnumerateSafely(
+            string directory,
+            Func<string, IEnumerable<string>> enumerate)
+        {
+            IEnumerator<string> enumerator;
             try
             {
-                return Directory.GetFiles(directory);
+                enumerator = enumerate(directory).GetEnumerator();
             }
             catch (IOException)
             {
-                return new string[0];
+                yield break;
             }
             catch (UnauthorizedAccessException)
             {
-                return new string[0];
+                yield break;
+            }
+
+            using (enumerator)
+            {
+                while (true)
+                {
+                    string current;
+                    try
+                    {
+                        if (!enumerator.MoveNext())
+                            yield break;
+
+                        current = enumerator.Current;
+                    }
+                    catch (IOException)
+                    {
+                        yield break;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        yield break;
+                    }
+
+                    yield return current;
+                }
             }
         }
 
@@ -216,16 +297,11 @@ namespace Coop.CrashReporter
                 .Replace(Path.DirectorySeparatorChar, '/');
         }
 
-        private static void WriteManifest(
-            TextWriter writer,
-            string directory,
-            List<FileEntry> files,
-            int skippedDirectories,
-            bool truncated)
+        private void WriteManifest(TextWriter writer)
         {
             writer.WriteLine("{");
             writer.WriteLine("  \"capturedUtc\": " +
-                Quote(DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)) + ",");
+                Quote(capturedUtc.ToString("O", CultureInfo.InvariantCulture)) + ",");
             writer.WriteLine("  \"directory\": " + Quote(directory) + ",");
             writer.WriteLine("  \"fileCount\": " +
                 files.Count.ToString(CultureInfo.InvariantCulture) + ",");

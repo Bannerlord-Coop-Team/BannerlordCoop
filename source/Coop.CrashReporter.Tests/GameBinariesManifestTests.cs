@@ -23,10 +23,9 @@ namespace Coop.CrashReporter.Tests
 
             bool written;
             string manifestPath = Path.Combine(tempRoot, GameBinariesManifest.FileName);
-            string summary = GameBinariesManifest.Write(
-                manifestPath,
-                binariesDirectory,
-                out written);
+            string summary = GameBinariesManifest
+                .Capture(binariesDirectory)
+                .Write(manifestPath, out written);
 
             Assert.True(written);
             Assert.Equal("2 files listed in " + GameBinariesManifest.FileName, summary);
@@ -36,6 +35,29 @@ namespace Coop.CrashReporter.Tests
             Assert.Contains("\"path\": \"engine_config.txt\", \"bytes\": 3", manifest);
             Assert.Contains("\"path\": \"Sample.dll\"", manifest);
             Assert.Contains("\"fileVersion\": \"" + expectedVersion.Trim() + "\"", manifest);
+        }
+
+        [Fact]
+        public void Capture_SnapshotsTheDirectoryBeforeTheManifestIsWritten()
+        {
+            string binariesDirectory = CreateBinariesDirectory();
+            string replacedPath = Path.Combine(binariesDirectory, "TaleWorlds.Core.dll");
+            File.WriteAllText(replacedPath, "original");
+
+            GameBinariesManifest manifest = GameBinariesManifest.Capture(binariesDirectory);
+
+            // Stands in for a launcher update between the crash and the finished report.
+            File.WriteAllText(replacedPath, "replaced by a launcher update");
+            File.WriteAllText(Path.Combine(binariesDirectory, "Added.dll"), "added later");
+
+            bool written;
+            string manifestPath = Path.Combine(tempRoot, GameBinariesManifest.FileName);
+            manifest.Write(manifestPath, out written);
+
+            Assert.True(written);
+            string json = File.ReadAllText(manifestPath);
+            Assert.Contains("\"path\": \"TaleWorlds.Core.dll\", \"bytes\": 8", json);
+            Assert.DoesNotContain("Added.dll", json);
         }
 
         [Fact]
@@ -49,7 +71,7 @@ namespace Coop.CrashReporter.Tests
 
             bool written;
             string manifestPath = Path.Combine(tempRoot, GameBinariesManifest.FileName);
-            GameBinariesManifest.Write(manifestPath, binariesDirectory, out written);
+            GameBinariesManifest.Capture(binariesDirectory).Write(manifestPath, out written);
 
             Assert.True(written);
             Assert.Contains("\"path\": \"Watchdog/Watchdog.txt\"", File.ReadAllText(manifestPath));
@@ -69,10 +91,9 @@ namespace Coop.CrashReporter.Tests
 
             bool written;
             string manifestPath = Path.Combine(tempRoot, GameBinariesManifest.FileName);
-            string summary = GameBinariesManifest.Write(
-                manifestPath,
-                binariesDirectory,
-                out written);
+            string summary = GameBinariesManifest
+                .Capture(binariesDirectory)
+                .Write(manifestPath, out written);
 
             string manifest = File.ReadAllText(manifestPath);
             Assert.True(written);
@@ -90,7 +111,7 @@ namespace Coop.CrashReporter.Tests
 
             bool written;
             string manifestPath = Path.Combine(tempRoot, GameBinariesManifest.FileName);
-            GameBinariesManifest.Write(manifestPath, binariesDirectory, out written);
+            GameBinariesManifest.Capture(binariesDirectory).Write(manifestPath, out written);
 
             Assert.Contains(
                 "\"directory\": \"" + binariesDirectory.Replace("\\", "\\\\") + "\"",
@@ -105,10 +126,9 @@ namespace Coop.CrashReporter.Tests
 
             bool written;
             string manifestPath = Path.Combine(tempRoot, GameBinariesManifest.FileName);
-            string summary = GameBinariesManifest.Write(
-                manifestPath,
-                missingDirectory,
-                out written);
+            string summary = GameBinariesManifest
+                .Capture(missingDirectory)
+                .Write(manifestPath, out written);
 
             Assert.False(written);
             Assert.False(File.Exists(manifestPath));
@@ -123,7 +143,7 @@ namespace Coop.CrashReporter.Tests
 
             bool written;
             string manifestPath = Path.Combine(tempRoot, GameBinariesManifest.FileName);
-            string summary = GameBinariesManifest.Write(manifestPath, null, out written);
+            string summary = GameBinariesManifest.Capture(null).Write(manifestPath, out written);
 
             Assert.False(written);
             Assert.False(File.Exists(manifestPath));
