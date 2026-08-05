@@ -7,6 +7,7 @@ using Common.Serialization;
 using Common.Util;
 using Coop.Core.Common.Network.Packets;
 using LiteNetLib;
+using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -20,10 +21,17 @@ namespace Coop.Core.Common.Network;
 /// <inheritdoc cref="INetwork"/>
 public abstract class CoopNetworkBase : INetwork, INetEventListener
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopNetworkBase>();
+
     public INetworkConfig Config { get; }
     public abstract int Priority { get; }
 
     protected readonly ICommonSerializer serializer;
+    protected readonly IPacketManager packetManager;
+    protected readonly IMessagePacketHandler messagePacketHandler;
+
+    // Per-endpoint: a peer sending unreadable payloads would otherwise log at packet rate.
+    private readonly FaultLogThrottle receiveFaultThrottle = new FaultLogThrottle();
 
     private readonly Poller poller;
     private readonly CancellationTokenSource sessionCancellation;
@@ -40,10 +48,14 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     protected CoopNetworkBase(
         INetworkConfig configuration,
         ICommonSerializer serializer,
+        IPacketManager packetManager,
+        IMessagePacketHandler messagePacketHandler,
         CancellationTokenSource sessionCancellation)
     {
         Config = configuration;
         this.serializer = serializer;
+        this.packetManager = packetManager;
+        this.messagePacketHandler = messagePacketHandler;
         this.sessionCancellation = sessionCancellation;
 
         netManager = new NetManager(this)
@@ -341,6 +353,55 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     public abstract void OnNetworkError(IPEndPoint endPoint, SocketError socketError);
 
     public abstract void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod);
+
+    /// <summary>
+    /// Dispatches one received payload to its packet or message handler, logging any failure instead of
+    /// letting it propagate. Shared by both endpoints: the receive path is identical for client and
+    /// server, and keeping one copy is what stops a fix landing on only one of them.
+    /// </summary>
+    /// <remarks>
+    /// Runs on the poll thread inside <c>netManager.PollEvents()</c>, so an escaping exception abandons
+    /// the rest of the tick — including <see cref="Update"/>'s flushes — for every player, not just the
+    /// payload that caused it. A payload whose type id is not registered deserializes to <c>null</c> and
+    /// is reported by the final branch; corrupt bytes throw inside the serializer and are caught here.
+    /// Failures are throttled because a peer can produce them at packet rate.
+    /// </remarks>
+    protected void HandleReceivedPayload(NetPeer peer, byte[] payload)
+    {
+        object received = null;
+        try
+        {
+            received = serializer.Deserialize(payload);
+
+            if (received is IPacket packet)
+            {
+                packetManager.HandleReceive(peer, packet);
+            }
+            else if (received is IMessage message)
+            {
+                messagePacketHandler.PublishEvent(peer, message);
+            }
+            else
+            {
+                Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type} from peer {PeerId}",
+                    received?.GetType(), peer?.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            switch (receiveFaultThrottle.Classify(ex, out long repeats))
+            {
+                case FaultLogAction.Full:
+                    Logger.Error(ex, "Failed to process packet of type {Type} from peer {PeerId}",
+                        received?.GetType(), peer?.Id);
+                    break;
+                case FaultLogAction.Summary:
+                    Logger.Error("Still failing to process packets from peer {PeerId} ({RepeatCount}x): {Message}",
+                        peer?.Id, repeats, ex.Message);
+                    break;
+            }
+        }
+    }
 
     public abstract void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType);
 

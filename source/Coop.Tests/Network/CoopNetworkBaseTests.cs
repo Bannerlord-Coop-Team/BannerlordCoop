@@ -24,7 +24,12 @@ public class CoopNetworkBaseTests
         config.SetupGet(value => value.UpdateTime).Returns(TimeSpan.FromMilliseconds(15));
 
         using var sessionCancellation = new CancellationTokenSource();
-        using var network = new TestNetwork(config.Object, Mock.Of<ICommonSerializer>(), sessionCancellation);
+        using var network = new TestNetwork(
+            config.Object,
+            Mock.Of<ICommonSerializer>(),
+            Mock.Of<IPacketManager>(),
+            Mock.Of<IMessagePacketHandler>(),
+            sessionCancellation);
 
         Assert.Equal(60_000, network.AppliedDisconnectTimeout);
     }
@@ -34,8 +39,10 @@ public class CoopNetworkBaseTests
         public TestNetwork(
             INetworkConfig config,
             ICommonSerializer serializer,
+            IPacketManager packetManager,
+            IMessagePacketHandler messagePacketHandler,
             CancellationTokenSource sessionCancellation)
-            : base(config, serializer, sessionCancellation)
+            : base(config, serializer, packetManager, messagePacketHandler, sessionCancellation)
         {
         }
 

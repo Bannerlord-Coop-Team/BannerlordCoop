@@ -40,8 +40,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override int Priority => 0;
 
     private readonly IMessageBroker messageBroker;
-    private readonly IPacketManager packetManager;
-    private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IConnectionMessageQueue connectionMessageQueue;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
@@ -64,12 +62,11 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ISendCoalescer coalescer,
         ICommonSerializer serializer,
-        CancellationTokenSource sessionCancellation) : base(configuration, serializer, sessionCancellation)
+        CancellationTokenSource sessionCancellation)
+        : base(configuration, serializer, packetManager, messagePacketHandler, sessionCancellation)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
-        this.packetManager = packetManager;
-        this.messagePacketHandler = messagePacketHandler;
         this.connectionMessageQueue = connectionMessageQueue;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
@@ -136,20 +133,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        object received = serializer.Deserialize(reader.GetRemainingBytes());
-
-        if (received is IPacket packet)
-        {
-            packetManager.HandleReceive(peer, packet);
-        }
-        else if (received is IMessage message)
-        {
-            messagePacketHandler.PublishEvent(peer, message);
-        }
-        else
-        {
-            Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type}", received?.GetType());
-        }
+        HandleReceivedPayload(peer, reader.GetRemainingBytes());
     }
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
