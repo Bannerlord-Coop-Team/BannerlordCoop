@@ -10,6 +10,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using System;
+using System.Reflection.Metadata;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -56,6 +57,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
         messageBroker.Subscribe<KingdomCreationRequested>(HandleKingdomCreationRequested);
         messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
+        messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
     }
 
     private void HandleKingdomCreationRequested(MessagePayload<KingdomCreationRequested> obj)
@@ -78,6 +80,16 @@ public class ClientKingdomHandler : IHandler
             payload.CultureId,
             partyId,
             settlementId);
+        network.SendAll(message);
+    }
+
+    private void HandleKingdomNameChangeRequested(MessagePayload<KingdomNameChangeRequested> obj)
+    {
+        var payload = obj.What;
+
+        if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return; 
+
+        var message = new NetworkRequestChangeKingdomName(kingdomId, payload.Name);
         network.SendAll(message);
     }
 
@@ -371,6 +383,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
         messageBroker.Unsubscribe<KingdomCreationRequested>(HandleKingdomCreationRequested);
         messageBroker.Unsubscribe<DecisionAdded>(HandleLocalDecisionAdded);
+        messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
     }
 
     private readonly struct PendingSettlementRestore
