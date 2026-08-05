@@ -82,6 +82,7 @@ namespace GameInterface.Services.Settlements.Handlers
                 return;
             }
 
+            // Cheap pre-filter, so an obviously invalid request never reaches the game thread at all.
             if (!CanGift(requestingHero, settlement, newOwner, out var reason))
             {
                 Logger.Warning("Settlement gift of {Settlement} by {Hero} rejected: {Reason}",
@@ -94,6 +95,19 @@ namespace GameInterface.Services.Settlements.Handlers
             GameThread.RunSafe(
                 () =>
                 {
+                    // Re-derived here as well, because the check above ran on the network thread and this
+                    // action only runs once the game thread gets to it. In between, ownership or kingdom
+                    // membership can change - the fief can be captured, sold, or the clan can leave the
+                    // realm - and the queued request would then transfer a settlement the requester is no
+                    // longer entitled to give away. This is the check that actually guards the transfer.
+                    if (!CanGift(requestingHero, settlement, newOwner, out var lateReason))
+                    {
+                        Logger.Warning(
+                            "Settlement gift of {Settlement} by {Hero} rejected on apply: {Reason}",
+                            settlement.StringId, requestingHero.StringId, lateReason);
+                        return;
+                    }
+
                     ApplyGiftRelationBonus(settlement, newOwner);
                     ChangeOwnerOfSettlementAction.ApplyByGift(settlement, newOwner);
                 },
