@@ -1,4 +1,5 @@
-﻿using Missions.Agents.Packets;
+﻿using GameInterface.Services.Locations;
+using Missions.Agents.Packets;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -64,9 +65,14 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float MountedFollowRate = 12f;
     private const float MountedPositionEpsilon = 0.0001f;
     private const float MountedGuardPositionTolerance = 0.15f;
+    // A pose-enforced puppet (seated at a chair, using an animation point) is pinned, not sought —
+    // tight tolerance so its root lands exactly on the seat frame the owner reports.
+    private const float EnforcedPoseTolerance = 0.05f;
 
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
+        new Dictionary<Agent, long>();
+    private readonly Dictionary<Agent, long> _enforcedPoseProcessedSequences =
         new Dictionary<Agent, long>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
@@ -155,6 +161,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
         _targets.Remove(agent);
         _mountedGuardProcessedSequences.Remove(agent);
+        _enforcedPoseProcessedSequences.Remove(agent);
     }
 
     public bool TryGetTargetMovementFlags(
@@ -206,6 +213,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         _targets.Clear();
         _mountedGuardProcessedSequences.Clear();
+        _enforcedPoseProcessedSequences.Clear();
     }
 
     private long GetNextUpdateSequence()
@@ -270,6 +278,18 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
+            // Settlement puppets in a pose-ENFORCED animation (seated at a chair, using an animation
+            // point) must be PINNED, not sought: the native 2D locomotion seek walks them to the
+            // seat's ground position while the enforced loop locks the skeleton — the floating-squat-
+            // beside-the-bench artifact. The owner's reported frame is exact (native seating aligns
+            // the root to the seat), so snap to it in full 3D once per owner frame and leave the
+            // action timeline alone (the mounted-guard path above set the precedent).
+            if (LocationNpcGate.IsCoopLocationMissionActive && HasEnforcedPose(agent))
+            {
+                PinEnforcedPose(agent, pair.Value);
+                continue;
+            }
+
             // A mount tolerates more slack before we snap; an on-foot rider is held tighter.
             float snapDistance = agent.IsMount ? MountSnapDistance : RiderSnapDistance;
             if (agent.Position.Distance(pair.Value.Position) <= snapDistance)
@@ -285,9 +305,39 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             {
                 _targets.Remove(agent);
                 _mountedGuardProcessedSequences.Remove(agent);
+                _enforcedPoseProcessedSequences.Remove(agent);
             }
             _evict.Clear();
         }
+    }
+
+    // The same test native conversation logic uses to recognize a pose the animation system owns.
+    private static bool HasEnforcedPose(Agent agent)
+    {
+        return agent.MountAgent == null
+            && agent.GetCurrentAnimationFlag(0).HasAnyFlag(
+                AnimFlags.anf_enforce_all
+                | AnimFlags.anf_enforce_lowerbody
+                | AnimFlags.anf_enforce_root_rotation);
+    }
+
+    // One semantic correction per owner frame: zero locomotion (nothing may walk the pose), face the
+    // owner's reported directions, and snap the root to the exact reported 3D position when drifted.
+    private void PinEnforcedPose(Agent agent, TargetFrame target)
+    {
+        if (_enforcedPoseProcessedSequences.TryGetValue(agent, out long processedSequence)
+            && processedSequence == target.UpdateSequence)
+        {
+            return;
+        }
+        _enforcedPoseProcessedSequences[agent] = target.UpdateSequence;
+
+        agent.MovementInputVector = Vec2.Zero;
+        agent.SetMovementDirection(target.AgentState.MovementDirection);
+        agent.LookDirection = target.AgentState.LookDirection;
+
+        if (agent.Position.Distance(target.Position) > EnforcedPoseTolerance)
+            agent.TeleportToPosition(target.Position);
     }
 
     private static void MoveTowardTarget(Agent agent, TargetFrame target)
