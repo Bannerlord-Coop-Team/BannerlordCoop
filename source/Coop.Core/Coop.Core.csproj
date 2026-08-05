@@ -106,6 +106,7 @@
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkAddDecision.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkChangeKingdomPolicy.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkRequestChangeKingdomName.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRequestKingdomDecisionVote.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkChangeKingdomDecisionVote.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkKingdomDecisionResolved.cs" />
