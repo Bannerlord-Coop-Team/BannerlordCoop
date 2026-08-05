@@ -17,7 +17,7 @@ namespace E2E.Tests.Services.Hideouts
         [Fact]
         public void Server_Hideout_Fields()
         {
-            TestEnvironment.AssertField<Hideout, bool>(nameof(Hideout._isSpotted), true);
+            TestEnvironment.AssertProperty<Hideout, bool>(nameof(Hideout.IsSpotted), true);
             TestEnvironment.AssertField<Hideout, CampaignTime>(nameof(Hideout._nextPossibleAttackTime), new CampaignTime(5133));
         }
 

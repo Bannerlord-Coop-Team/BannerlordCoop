@@ -396,6 +396,7 @@ public class HideoutMapEventTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         var requester = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(requester, "hideout-leaver");
         Server.Call(() =>
         {
             Server.Resolve<IMessageBroker>().Publish(
@@ -447,6 +448,7 @@ public class HideoutMapEventTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         var requester = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(requester, "hideout-joiner");
         Server.Call(() =>
         {
             Server.Resolve<IMessageBroker>().Publish(

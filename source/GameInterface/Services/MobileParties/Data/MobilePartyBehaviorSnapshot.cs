@@ -21,6 +21,8 @@ public interface IMobilePartyBehaviorSnapshot
     bool CanApply(MobileParty party, PartyBehaviorUpdateData data);
     bool TryCreateJoinState(
         MobileParty party,
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements,
         out MobilePartyJoinState state,
         out string failure);
     bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable);
@@ -120,12 +122,62 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 
     public bool TryCreateJoinState(
         MobileParty party,
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements,
         out MobilePartyJoinState state,
         out string failure)
     {
         state = default;
-        if (!TryCreate(party, out PartyBehaviorUpdateData behavior, out failure))
+        if (liveParties == null || liveSettlements == null)
+            return FailCreation("live campaign objects are unavailable", out failure);
+
+        bool created = TryCreate(party, out PartyBehaviorUpdateData behavior, out failure);
+        if (TryGetInvalidJoinReferences(
+            party,
+            liveParties,
+            liveSettlements,
+            out string invalidReferences))
+        {
+            if (party?.Ai == null || !TryGetCompactId(party, out _))
+                return false;
+
+            try
+            {
+                // Mirror vanilla's removed-target cleanup so behavior and navigation stay coherent.
+                party.SetMoveModeHold();
+                party.SetNavigationModeHold();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to reset stale join references on party {Party}", party.StringId);
+                return FailCreation(
+                    $"failed to reset stale join references ({invalidReferences}): " +
+                    $"{ex.GetType().Name}: {ex.Message}",
+                    out failure);
+            }
+
+            Logger.Warning(
+                "Reset stale join references ({References}) on party {Party} to Hold",
+                invalidReferences,
+                party.StringId);
+
+            if (!TryCreate(party, out behavior, out failure))
+                return false;
+            if (TryGetInvalidJoinReferences(
+                party,
+                liveParties,
+                liveSettlements,
+                out string remainingReferences))
+            {
+                return FailCreation(
+                    $"stale join references remain after reset ({remainingReferences})",
+                    out failure);
+            }
+        }
+        else if (!created)
+        {
             return false;
+        }
 
         state = new MobilePartyJoinState
         {
@@ -142,6 +194,41 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         failure = null;
         return true;
     }
+
+    private bool TryGetInvalidJoinReferences(
+        MobileParty party,
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements,
+        out string references)
+    {
+        references = null;
+        if (party?.Ai == null) return false;
+
+        var invalidReferences = new List<string>();
+        IInteractablePoint interactable = party.Ai.AiBehaviorInteractable;
+        if (interactable != null &&
+            (!TryGetInteractableReference(interactable, out _, out _) ||
+             !IsLiveInteractable(interactable, liveParties, liveSettlements)))
+        {
+            invalidReferences.Add(nameof(MobilePartyAi.AiBehaviorInteractable));
+        }
+        if (IsInvalidJoinReference(party.TargetParty, liveParties))
+            invalidReferences.Add(nameof(MobileParty.TargetParty));
+        if (IsInvalidJoinReference(party.TargetSettlement, liveSettlements))
+            invalidReferences.Add(nameof(MobileParty.TargetSettlement));
+        if (IsInvalidJoinReference(party.MoveTargetParty, liveParties))
+            invalidReferences.Add(nameof(MobileParty.MoveTargetParty));
+
+        if (invalidReferences.Count == 0) return false;
+
+        references = string.Join(", ", invalidReferences);
+        return true;
+    }
+
+    private bool IsInvalidJoinReference<T>(T instance, ISet<T> liveObjects)
+        where T : class =>
+        instance != null &&
+        (!TryGetCompactId(instance, out _) || !liveObjects.Contains(instance));
 
     private static bool FailCreation(string reason, out string failure)
     {
@@ -258,8 +345,8 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 
     private static bool IsLiveInteractable(
         IInteractablePoint interactable,
-        HashSet<MobileParty> liveParties,
-        HashSet<Settlement> liveSettlements)
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements)
     {
         if (interactable == null) return true;
         if (interactable is AnchorPoint anchor)

@@ -1,14 +1,18 @@
 ﻿using Common.Util;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Tests.Services.SiegeEvents;
 using Moq;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MobileParties;
 
+[Collection(nameof(CampaignCurrentCollection))]
 public class MobilePartyBehaviorSnapshotTests
 {
     [Fact]
@@ -54,15 +58,204 @@ public class MobilePartyBehaviorSnapshotTests
     }
 
     [Fact]
+    public void TryCreate_UnregisteredInteractable_DoesNotMutateParty()
+    {
+        var party = CreateParty();
+        var removedTarget = CreatePartyWithPartyBase();
+        party._defaultBehavior = AiBehavior.EngageParty;
+        party.ShortTermBehavior = AiBehavior.EngageParty;
+        party.Ai.AiBehaviorInteractable = removedTarget.Party;
+
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        string missingId = null!;
+        objectManager.Setup(m => m.TryGetId(party, out partyId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(removedTarget.Party, out missingId)).Returns(false);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        Assert.False(snapshot.TryCreate(party, out _));
+        Assert.Same(removedTarget.Party, party.Ai.AiBehaviorInteractable);
+        Assert.Equal(AiBehavior.EngageParty, party.DefaultBehavior);
+        Assert.Equal(AiBehavior.EngageParty, party.ShortTermBehavior);
+    }
+
+    [Fact]
+    public void TryCreateJoinState_ValidReferences_PreservesBehavior()
+    {
+        var party = CreateParty();
+        var target = CreatePartyWithPartyBase();
+        party._defaultBehavior = AiBehavior.EngageParty;
+        party.ShortTermBehavior = AiBehavior.EngageParty;
+        party.Ai.AiBehaviorInteractable = target.Party;
+        party.TargetParty = target;
+        party.MoveTargetParty = target;
+
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        string targetId = "MobileParty_Created_2";
+        string targetPartyBaseId = "PartyBase_Created_2";
+        objectManager.Setup(m => m.TryGetId(party, out partyId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(target, out targetId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(target.Party, out targetPartyBaseId)).Returns(true);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        bool created = snapshot.TryCreateJoinState(
+            party,
+            LiveParties(party, target),
+            LiveSettlements(),
+            out MobilePartyJoinState state,
+            out string failure);
+
+        Assert.True(created, failure);
+        Assert.Null(failure);
+        Assert.Equal(AiBehavior.EngageParty, party.DefaultBehavior);
+        Assert.Same(target.Party, party.Ai.AiBehaviorInteractable);
+        Assert.Same(target, party.TargetParty);
+        Assert.Same(target, party.MoveTargetParty);
+        Assert.Equal(MoveModeType.Party, state.Behavior.PartyMoveMode);
+        Assert.Equal("Created_2", state.Behavior.TargetPartyId);
+        Assert.Equal("Created_2", state.Behavior.MoveTargetPartyId);
+        Assert.Equal("Created_2", state.Behavior.InteractablePointId);
+    }
+
+    [Fact]
+    public void TryCreateJoinState_UnregisteredReferences_ResetsPartyToHold()
+    {
+        var party = CreateParty();
+        var removedTarget = CreatePartyWithPartyBase();
+        SetPartyTargets(party, removedTarget);
+
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        string missingPartyId = null!;
+        string missingPartyBaseId = null!;
+        objectManager.Setup(m => m.TryGetId(party, out partyId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(removedTarget, out missingPartyId)).Returns(false);
+        objectManager.Setup(m => m.TryGetId(removedTarget.Party, out missingPartyBaseId)).Returns(false);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        bool created = TryCreateJoinStateWithCampaign(
+            snapshot,
+            party,
+            LiveParties(party),
+            LiveSettlements(),
+            out MobilePartyJoinState state,
+            out string failure);
+
+        Assert.True(created, failure);
+        Assert.Null(failure);
+        AssertHeldWithoutTargets(party, state);
+    }
+
+    [Fact]
+    public void TryCreateJoinState_RegisteredNonLiveReferences_ResetsPartyToHold()
+    {
+        var party = CreateParty();
+        var removedTarget = CreatePartyWithPartyBase();
+        SetPartyTargets(party, removedTarget);
+
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        string removedTargetId = "MobileParty_Created_2";
+        string removedPartyBaseId = "PartyBase_Created_2";
+        objectManager.Setup(m => m.TryGetId(party, out partyId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(removedTarget, out removedTargetId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(removedTarget.Party, out removedPartyBaseId)).Returns(true);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        bool created = TryCreateJoinStateWithCampaign(
+            snapshot,
+            party,
+            LiveParties(party),
+            LiveSettlements(),
+            out MobilePartyJoinState state,
+            out string failure);
+
+        Assert.True(created, failure);
+        Assert.Null(failure);
+        AssertHeldWithoutTargets(party, state);
+    }
+
+    [Fact]
+    public void TryCreateJoinState_RegisteredNonLiveSettlement_ResetsPartyToHold()
+    {
+        var party = CreateParty();
+        var removedSettlement = ObjectHelper.SkipConstructor<Settlement>();
+        party._defaultBehavior = AiBehavior.GoToSettlement;
+        party.ShortTermBehavior = AiBehavior.GoToSettlement;
+        party._targetSettlement = removedSettlement;
+
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        string removedSettlementId = "Settlement_town_ES1";
+        objectManager.Setup(m => m.TryGetId(party, out partyId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(removedSettlement, out removedSettlementId)).Returns(true);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        bool created = TryCreateJoinStateWithCampaign(
+            snapshot,
+            party,
+            LiveParties(party),
+            LiveSettlements(),
+            out MobilePartyJoinState state,
+            out string failure);
+
+        Assert.True(created, failure);
+        Assert.Null(failure);
+        AssertHeldWithoutTargets(party, state);
+    }
+
+    [Fact]
     public void TryCreateJoinState_MissingAi_ReportsFailure()
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         var snapshot = new MobilePartyBehaviorSnapshot(Mock.Of<IObjectManager>());
 
-        bool created = snapshot.TryCreateJoinState(party, out _, out string failure);
+        bool created = snapshot.TryCreateJoinState(
+            party,
+            LiveParties(party),
+            LiveSettlements(),
+            out _,
+            out string failure);
 
         Assert.False(created);
         Assert.Equal("party AI is unavailable", failure);
+    }
+
+    [Fact]
+    public void TryCreateJoinState_UnregisteredParty_DoesNotRepairReferences()
+    {
+        var party = CreateParty();
+        var removedTarget = CreatePartyWithPartyBase();
+        SetPartyTargets(party, removedTarget);
+
+        var objectManager = new Mock<IObjectManager>();
+        string missingPartyId = null!;
+        string missingTargetId = null!;
+        string missingPartyBaseId = null!;
+        objectManager.Setup(m => m.TryGetId(party, out missingPartyId)).Returns(false);
+        objectManager.Setup(m => m.TryGetId(removedTarget, out missingTargetId)).Returns(false);
+        objectManager.Setup(m => m.TryGetId(removedTarget.Party, out missingPartyBaseId)).Returns(false);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        bool created = snapshot.TryCreateJoinState(
+            party,
+            LiveParties(party),
+            LiveSettlements(),
+            out _,
+            out string failure);
+
+        Assert.False(created);
+        Assert.Equal("party is not registered", failure);
+        Assert.Same(removedTarget.Party, party.Ai.AiBehaviorInteractable);
+        Assert.Same(removedTarget, party.TargetParty);
+        Assert.Same(removedTarget, party.MoveTargetParty);
     }
 
     private static MobileParty CreateParty()
@@ -73,4 +266,68 @@ public class MobilePartyBehaviorSnapshotTests
         party.MoveTargetPoint = new CampaignVec2(new Vec2(10f, 20f), isOnLand: true);
         return party;
     }
+
+    private static MobileParty CreatePartyWithPartyBase()
+    {
+        MobileParty party = CreateParty();
+        party.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        party.Party.MobileParty = party;
+        return party;
+    }
+
+    private static void SetPartyTargets(MobileParty party, MobileParty target)
+    {
+        party._defaultBehavior = AiBehavior.EngageParty;
+        party.ShortTermBehavior = AiBehavior.EngageParty;
+        party.Ai.AiBehaviorInteractable = target.Party;
+        party.TargetParty = target;
+        party.MoveTargetParty = target;
+    }
+
+    private static void AssertHeldWithoutTargets(MobileParty party, MobilePartyJoinState state)
+    {
+        Assert.Equal(AiBehavior.Hold, party.DefaultBehavior);
+        Assert.Equal(AiBehavior.Hold, party.ShortTermBehavior);
+        Assert.Null(party.Ai.AiBehaviorInteractable);
+        Assert.Null(party.TargetParty);
+        Assert.Null(party.TargetSettlement);
+        Assert.Null(party.MoveTargetParty);
+        Assert.Equal(MoveModeType.Hold, party.PartyMoveMode);
+        Assert.Equal(AiBehavior.Hold, state.Behavior.DefaultBehavior);
+        Assert.Equal(AiBehavior.Hold, state.Behavior.NewAiBehavior);
+        Assert.Null(state.Behavior.InteractablePointId);
+        Assert.Null(state.Behavior.TargetPartyId);
+        Assert.Null(state.Behavior.TargetSettlementId);
+        Assert.Null(state.Behavior.MoveTargetPartyId);
+        Assert.Equal(MoveModeType.Hold, state.Behavior.PartyMoveMode);
+    }
+
+    private static bool TryCreateJoinStateWithCampaign(
+        MobilePartyBehaviorSnapshot snapshot,
+        MobileParty party,
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements,
+        out MobilePartyJoinState state,
+        out string failure)
+    {
+        Campaign previousCampaign = Campaign.Current;
+        try
+        {
+            Campaign.Current = ObjectHelper.SkipConstructor<Campaign>();
+            return snapshot.TryCreateJoinState(
+                party,
+                liveParties,
+                liveSettlements,
+                out state,
+                out failure);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    private static HashSet<MobileParty> LiveParties(params MobileParty[] parties) => new(parties);
+
+    private static HashSet<Settlement> LiveSettlements(params Settlement[] settlements) => new(settlements);
 }
