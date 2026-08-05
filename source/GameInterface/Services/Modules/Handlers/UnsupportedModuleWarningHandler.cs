@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Linq;
+using System.Text.Json.Serialization;
+using System.Xml.Linq;
 using TaleWorlds.Library;
+using GameInterface.Services.UI.CoopOptions;
 
 namespace GameInterface.Services.Modules.Handlers;
 
@@ -12,25 +15,41 @@ namespace GameInterface.Services.Modules.Handlers;
 public class UnsupportedModuleWarningHandler
 {
     public const string PromptTitle = "Additional Modules Detected";
+    public const string TabId = "Warnings";
+    public const string SectionId = "UnsupportedModules";
 
     private const string CoopModuleId = "Coop";
     private const string DedicatedServerModulePrefix = "DedicatedServer.";
     
     private readonly IModuleInfoProvider moduleInfoProvider;
-
+    private readonly ICoopOptionsStore optionsStore;
+    private readonly Action<Exception> reportError;
+    
+    private bool optionsLoaded;
+    private bool warningsSuppressed; 
     private bool modulesEvaluated;
     private bool promptShown;
     private string[] unsupportedModuleIds = Array.Empty<string>();
     
     public UnsupportedModuleWarningHandler(
-        IModuleInfoProvider moduleInfoProvider)
+        IModuleInfoProvider moduleInfoProvider,
+        ICoopOptionsStore optionsStore,
+        Action<Exception> reportError)
     {
         this.moduleInfoProvider = moduleInfoProvider ?? throw new ArgumentNullException(nameof(moduleInfoProvider));
+        this.optionsStore = optionsStore ?? throw new ArgumentNullException(nameof(optionsStore));
+        this.reportError = reportError;
     }
 
     public void TryShowPrompt(bool canShow, Action<InquiryData> showInquiry)
     {
         if (!canShow || promptShown)
+        {
+            return;
+        }
+
+        LoadOptions();
+        if (warningsSuppressed)
         {
             return;
         }
@@ -51,11 +70,52 @@ public class UnsupportedModuleWarningHandler
             PromptTitle,
             BuildPromptText(unsupportedModuleIds),
             true,
-            false,
+            true,
             "Continue",
-            string.Empty,
+            "Don't Show Again",
             null,
-            null));
+            SupressWarning));
+    }
+    
+    private void LoadOptions()
+    {
+        if (optionsLoaded)
+        {
+            return;
+        }
+        
+        optionsLoaded = true;
+
+        CoopOptionsData options = optionsStore.LoadOrDefault();
+        if (options.TryGetSection(
+                TabId,
+                SectionId,
+                out UnsupportedModuleWarningOptions saved))
+        {
+            warningsSuppressed = saved.DontShowAgain;
+        }
+    }
+
+    private void SupressWarning()
+    {
+        warningsSuppressed = true;
+
+        try
+        {
+            CoopOptionsData options = optionsStore.LoadOrDefault();
+            options.SetSection(
+                TabId,
+                SectionId,
+                new UnsupportedModuleWarningOptions
+                {
+                    DontShowAgain = true,
+                });
+            optionsStore.Save(options);
+        }
+        catch (Exception exception)
+        {
+            reportError?.Invoke(exception);
+        }
     }
 
     private void EvaluateModules()
@@ -99,4 +159,12 @@ public class UnsupportedModuleWarningHandler
                string.Join("\n", moduleIds.Select(id => "- " + id)) +
                "\n\nContinue at your own risk.";
     }
+}
+/// <summary>
+/// Stores the client's preference for the unsupported module startup warning.
+/// </summary>
+public class UnsupportedModuleWarningOptions
+{
+    [JsonPropertyName("dontShowAgain")]
+    public bool DontShowAgain {get; set;}
 }
