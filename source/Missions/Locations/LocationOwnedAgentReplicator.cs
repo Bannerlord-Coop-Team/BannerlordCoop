@@ -40,6 +40,14 @@ public interface ILocationOwnedAgentReplicator : IDisposable
     /// every agent unconditionally.
     /// </summary>
     void NotifyAgentRemoved(Agent agent, LocationDespawnReason reason);
+
+    /// <summary>
+    /// [Host, game thread] Broadcast scene-point use transitions (an NPC sat down / stood up /
+    /// started a work loop) so peers have their puppets use the SAME local point — the point then
+    /// drives alignment and animation natively on every client. Called once per mission tick;
+    /// transitions are rare, so this is a reference-compare sweep and an occasional tiny message.
+    /// </summary>
+    void PollPointUsage();
 }
 
 /// <inheritdoc cref="ILocationOwnedAgentReplicator"/>
@@ -61,6 +69,10 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
 
     private readonly string movementScopeId;
     private ushort nextMovementId = 1;
+
+    // Last-known used scene object per owned NPC, for the point-use transition sweep. Game thread only.
+    private readonly Dictionary<Guid, UsableMissionObject> lastUsedPoints
+        = new Dictionary<Guid, UsableMissionObject>();
 
     public LocationOwnedAgentReplicator(
         IBattleNetwork network,
@@ -149,6 +161,45 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
         }
     }
 
+    public void PollPointUsage()
+    {
+        foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
+        {
+            var agent = info.Agent;
+            if (agent == null || !bindingMap.TryGet(info.AgentId, out var binding)) continue;
+            if (binding.Kind != LocationAgentKind.Human) continue;
+
+            var current = agent.IsActive() ? agent.CurrentlyUsedGameObject : null;
+            lastUsedPoints.TryGetValue(info.AgentId, out var previous);
+            if (ReferenceEquals(current, previous)) continue;
+            lastUsedPoints[info.AgentId] = current;
+
+            if (current != null)
+            {
+                if (!TryGetScenePointId(current, out var pointId))
+                    continue; // runtime-created object — peers cannot resolve it; leave them un-animated
+
+                network.SendAll(new NetworkNpcPointUse(info.AgentId, pointId, inUse: true));
+                Logger.Debug("[LocationSync] NPC {AgentId} started using point {PointId}", info.AgentId, pointId);
+            }
+            else
+            {
+                network.SendAll(new NetworkNpcPointUse(info.AgentId, 0, inUse: false));
+                Logger.Debug("[LocationSync] NPC {AgentId} stopped using its point", info.AgentId);
+            }
+        }
+    }
+
+    // Scene-placed mission objects have deterministic ids on every client (the same identity native
+    // multiplayer ships in its own packets); a runtime-created one cannot be resolved remotely.
+    private static bool TryGetScenePointId(UsableMissionObject point, out int pointId)
+    {
+        pointId = 0;
+        if (point.Id.CreatedAtRuntime) return false;
+        pointId = point.Id.Id;
+        return true;
+    }
+
     public void NotifyAgentRemoved(Agent agent, LocationDespawnReason reason)
     {
         if (agent == null) return;
@@ -157,6 +208,8 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
         if (!registry.TryGetAgentInfo(agent, out var info)) return;
         if (info.CurrentAuthority != session.OwnControllerId) return;   // not ours to despawn — its owner reports it
         if (!bindingMap.TryGet(info.AgentId, out var binding)) return;  // not a replicated NPC (e.g. a player agent)
+
+        lastUsedPoints.Remove(info.AgentId);
 
         // SR-026: a passage exit already ran vanilla ChangeLocation here (entry moved to the
         // destination location's list before the fade completed) — find where the entry landed so
@@ -309,6 +362,15 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
             // Unset clothing colors assert-throw on some agent kinds (animals); 0 means "engine default".
         }
 
+        // Catch-up fidelity: a joiner's puppet uses the same local point mid-performance.
+        int? usedPointId = null;
+        if (binding.Kind == LocationAgentKind.Human
+            && agent.CurrentlyUsedGameObject is UsableMissionObject usedPoint
+            && TryGetScenePointId(usedPoint, out var scenePointId))
+        {
+            usedPointId = scenePointId;
+        }
+
         return new LocationAgentSpawnData(
             agentId,
             characterId,
@@ -327,7 +389,8 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
             scopeId,
             binding.Kind == LocationAgentKind.Human ? new AgentEquipmentData(agent) : (AgentEquipmentData?)null,
             binding.RosterEntry,
-            originalOwnerControllerId: originalOwner);
+            originalOwnerControllerId: originalOwner,
+            usedPointId: usedPointId);
     }
 
     private static void LogBatchSend(

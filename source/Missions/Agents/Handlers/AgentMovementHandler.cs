@@ -1087,11 +1087,11 @@ public class AgentMovementHandler : IAgentMovementHandler
                     puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
                 }
 
-                // A pose-pinned settlement puppet (seated, using an animation point) gets NO
-                // continuous-state writes: each direction/look write retriggers the native
-                // turn-in-place its enforced loop can never complete — the seated-NPC spin. Its
-                // position target still flows to the interpolator below for drift correction.
-                if (!LocationPoseLock.IsPosePinned(agent))
+                // A point-owned settlement puppet (seated, at an animation point) gets NO
+                // continuous-state writes: the local point it uses drives alignment and animation
+                // natively, and every direction/look write here would fight it (the seated-NPC
+                // spin). Its position target still flows to the interpolator below.
+                if (!LocationPoseLock.IsPointOwned(agent))
                 {
                     data.Apply(agent);
                     if (data.MountData != null && agent.MountAgent is Agent remoteMount)

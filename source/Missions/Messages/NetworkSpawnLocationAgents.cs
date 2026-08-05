@@ -135,6 +135,13 @@ public class LocationAgentSpawnData
     // Null for animals and for the rare human spawn with no roster entry.
     [ProtoMember(19)]
     public readonly LocationCharacterData RosterEntry;
+    // The scene MissionObjectId of the point this NPC is currently USING: a joiner's puppet uses
+    // the same local point mid-performance instead of idling beside it. Paired presence flag
+    // because 0 is a legal scene id and SkipConstructor leaves absent members at field defaults.
+    [ProtoMember(20)]
+    public readonly int UsedPointId;
+    [ProtoMember(21)]
+    public readonly bool HasUsedPoint;
 
     public LocationAgentSpawnData(
         Guid agentId,
@@ -154,7 +161,8 @@ public class LocationAgentSpawnData
         string movementScopeId,
         AgentEquipmentData? currentEquipment,
         LocationCharacterData rosterEntry,
-        string originalOwnerControllerId = null)
+        string originalOwnerControllerId = null,
+        int? usedPointId = null)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -175,5 +183,7 @@ public class LocationAgentSpawnData
         CurrentEquipment = currentEquipment.GetValueOrDefault();
         HasCurrentEquipment = currentEquipment.HasValue;
         RosterEntry = rosterEntry;
+        UsedPointId = usedPointId.GetValueOrDefault();
+        HasUsedPoint = usedPointId.HasValue;
     }
 }

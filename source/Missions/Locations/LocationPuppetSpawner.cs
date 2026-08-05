@@ -77,6 +77,11 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     private readonly object tombstoneLock = new object();
     private readonly HashSet<Guid> despawnedAgentIds = new HashSet<Guid>();
 
+    // A point-use that arrived before its puppet spawned (records and point messages share the
+    // reliable stream, but the puppet may still be buffered on budget/readiness) — consumed at
+    // spawn. Game thread only.
+    private readonly Dictionary<Guid, int> pendingPointUses = new Dictionary<Guid, int>();
+
     public LocationPuppetSpawner(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
@@ -100,6 +105,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
 
         messageBroker.Subscribe<NetworkSpawnLocationAgents>(Handle_NetworkSpawnLocationAgents);
         messageBroker.Subscribe<NetworkDespawnLocationAgents>(Handle_NetworkDespawnLocationAgents);
+        messageBroker.Subscribe<NetworkNpcPointUse>(Handle_NetworkNpcPointUse);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -109,6 +115,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     {
         messageBroker.Unsubscribe<NetworkSpawnLocationAgents>(Handle_NetworkSpawnLocationAgents);
         messageBroker.Unsubscribe<NetworkDespawnLocationAgents>(Handle_NetworkDespawnLocationAgents);
+        messageBroker.Unsubscribe<NetworkNpcPointUse>(Handle_NetworkNpcPointUse);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
@@ -166,6 +173,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
                 coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
                 registry.RemoveAgent(id);
                 bindingMap.Forget(id);
+                pendingPointUses.Remove(id);
                 removed++;
             }
 
@@ -230,6 +238,65 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         }
     }
 
+    // [Peer] The host's NPC started or stopped using a scene point: have our puppet use the SAME
+    // local point — it then drives alignment, animation and occupancy natively, replacing the whole
+    // replicate-the-outputs pin apparatus (floating/spinning/sliding sitters).
+    private void Handle_NetworkNpcPointUse(MessagePayload<NetworkNpcPointUse> payload)
+    {
+        var message = payload.What;
+        if (message.AgentId == Guid.Empty) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (Mission.Current == null) return;
+
+            if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(message.AgentId, out var info)
+                || info.Agent == null)
+            {
+                // The puppet is still buffered (budget/readiness) — remember the point for its spawn.
+                if (message.InUse) pendingPointUses[message.AgentId] = message.PointId;
+                else pendingPointUses.Remove(message.AgentId);
+                return;
+            }
+
+            if (message.InUse) ApplyPointUse(info.Agent, message.PointId, message.AgentId);
+            else StopPointUse(info.Agent);
+        }, context: nameof(Handle_NetworkNpcPointUse));
+    }
+
+    // [Game thread] Resolve the scene point by its deterministic MissionObjectId and use it.
+    private void ApplyPointUse(Agent agent, int pointId, Guid agentId)
+    {
+        if (agent == null || !agent.IsActive()) return;
+
+        UsableMissionObject point = null;
+        foreach (var missionObject in Mission.Current.MissionObjects)
+        {
+            if (missionObject.Id.CreatedAtRuntime || missionObject.Id.Id != pointId) continue;
+            point = missionObject as UsableMissionObject;
+            break;
+        }
+
+        if (point == null)
+        {
+            Logger.Warning("[LocationSync] Point {PointId} for NPC {AgentId} did not resolve locally — puppet stays un-animated", pointId, agentId);
+            return;
+        }
+
+        if (ReferenceEquals(agent.CurrentlyUsedGameObject, point)) return;
+        if (agent.CurrentlyUsedGameObject != null)
+            agent.StopUsingGameObject(isSuccessful: true);
+
+        agent.UseGameObject(point);
+    }
+
+    private static void StopPointUse(Agent agent)
+    {
+        if (agent == null || !agent.IsActive()) return;
+        if (agent.CurrentlyUsedGameObject != null)
+            agent.StopUsingGameObject(isSuccessful: true);
+    }
+
     // [Game thread] Spawn one puppet, consuming render slots on success. Returns false to buffer.
     private bool TrySpawnPuppetNow(LocationAgentSpawnData data, ref int slotsAvailable)
     {
@@ -279,6 +346,20 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         // plays its carry action set with empty hands (SR-023).
         if (data.Kind == LocationAgentKind.Human)
             AttachCarryPrefabs(agent, data.RosterEntry, binding);
+
+        // Mid-performance catch-up / a use that beat the spawn: have the puppet use its local point.
+        if (data.Kind == LocationAgentKind.Human)
+        {
+            if (pendingPointUses.TryGetValue(data.AgentId, out var pendingPointId))
+            {
+                pendingPointUses.Remove(data.AgentId);
+                ApplyPointUse(agent, pendingPointId, data.AgentId);
+            }
+            else if (data.HasUsedPoint)
+            {
+                ApplyPointUse(agent, data.UsedPointId, data.AgentId);
+            }
+        }
 
         // A retained record of a departed host applied AFTER our promotion: the bulk adoption ran
         // already, so hand this late arrival straight to the migrator (transfer + AI revive) instead

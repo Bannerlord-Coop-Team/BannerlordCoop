@@ -93,8 +93,10 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     public override void OnMissionTick(float dt)
     {
         // Host: flush captured spawns as batches BEFORE polling movement, so a puppet exists on the
-        // receiver before its first movement packet; then drain any buffered puppets.
+        // receiver before its first movement packet; point-use transitions go out after the spawns
+        // on the same reliable stream; then drain any buffered puppets.
         npcReplicator.FlushPendingSpawns();
+        npcReplicator.PollPointUsage();
         base.OnMissionTick(dt);
         npcPuppetSpawner.DrainPendingPuppets();
     }

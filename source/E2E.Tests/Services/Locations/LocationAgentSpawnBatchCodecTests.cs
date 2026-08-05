@@ -57,7 +57,8 @@ public sealed class LocationAgentSpawnBatchCodecTests
                 "settlement1_center", "townswoman_empire", null, null,
                 "npc_common", "as_human_villager", "SandBox.AI.BehaviorSets.AddOutdoorWandererBehaviors",
                 characterRelation: 0, fixedLocation: false, useCivilianEquipment: true,
-                prefabBones: new[] { 22 }, prefabNames: new[] { "carry_bd_basket_a" }));
+                prefabBones: new[] { 22 }, prefabNames: new[] { "carry_bd_basket_a" }),
+            usedPointId: 137);
         var animal = new LocationAgentSpawnData(
             Guid.NewGuid(), characterId: null, new Vec3(5, 6, 0), new Vec2(1, 0), 50f, "host",
             spawnEquipment: null, bodyProperties: default, clothingColor1: 0, clothingColor2: 0,
@@ -79,6 +80,11 @@ public sealed class LocationAgentSpawnBatchCodecTests
         Assert.True(decodedHuman.RosterEntry.UseCivilianEquipment);
         Assert.Equal(new[] { 22 }, decodedHuman.RosterEntry.PrefabBones);
         Assert.Equal(new[] { "carry_bd_basket_a" }, decodedHuman.RosterEntry.PrefabNames);
+        Assert.True(decodedHuman.HasUsedPoint);
+        Assert.Equal(137, decodedHuman.UsedPointId);
+
+        var decodedNoPoint = DecodeWireMessage(codec, codec.Encode(new[] { animal }, SpawnBatchPurpose.CatchUp).Single())[0];
+        Assert.False(decodedNoPoint.HasUsedPoint);
         Assert.Equal(0xAABBCCDD, decodedHuman.ClothingColor1);
         Assert.Equal("host:scope", decodedHuman.MovementScopeId);
         Assert.Equal(7, decodedHuman.MovementId);

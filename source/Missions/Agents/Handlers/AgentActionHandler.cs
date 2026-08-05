@@ -378,15 +378,16 @@ public class AgentActionHandler : IAgentActionHandler
                 state.HasAction1DefendingAction,
                 state.Action1DefendingAction);
 
-        // Settlement ambient flavor (dances, cheers, animation-point loops) is CONTINUOUS and
-        // untyped (ActionCodeType.Other), so the discrete filter drops it — correct for battle
-        // locomotion churn, wrong for location NPCs whose whole performance IS the looped action.
-        // For an owned non-player agent in a coop location mission, any action-index change
-        // broadcasts: loops change on behavior transitions only, so this stays low-volume, and the
-        // gate is false in battles so their filtering is untouched.
+        // Settlement ambient flavor NOT driven by a scene point (one-off gestures, barks) is
+        // CONTINUOUS and untyped (ActionCodeType.Other), so the discrete filter drops it — correct
+        // for battle locomotion churn, wrong for location NPCs. Point-driven performances (dances,
+        // sitting, work loops) are EXCLUDED here: their use is replicated semantically
+        // (NetworkNpcPointUse) and the local point animates the puppet itself — broadcasting the
+        // point's output actions on top would fight it.
         bool locationAmbientAgent =
             LocationNpcGate.IsCoopLocationMissionActive
-            && !isPlayerControlled;
+            && !isPlayerControlled
+            && agent.CurrentlyUsedGameObject == null;
 
         // Defend input and realized guard state can change before the animation index, so send them explicitly too.
         bool discreteActionChanged =
@@ -496,13 +497,14 @@ public class AgentActionHandler : IAgentActionHandler
                         defendFlags,
                         actionGuardMode);
                 }
-                // Settlement NPCs hold persistent ambient loops (dances, cheers, point animations)
-                // a joiner never saw start — its puppet would idle until the NEXT transition, which
-                // for a dedicated dancer is never. Send their current action too, not only held
-                // defend/guard state.
+                // Settlement NPCs hold persistent non-point ambient loops a joiner never saw start —
+                // its puppet would idle until the NEXT transition. Send their current action too,
+                // not only held defend/guard state. Point users are excluded: the joiner's spawn
+                // record carries the used point id and the local point animates the puppet.
                 bool locationAmbient =
                     LocationNpcGate.IsCoopLocationMissionActive
                     && agent.Controller != AgentControllerType.Player
+                    && agent.CurrentlyUsedGameObject == null
                     && (agent.GetCurrentAction(0) != ActionIndexCache.act_none
                         || agent.GetCurrentAction(1) != ActionIndexCache.act_none);
                 if (defendFlags == Agent.MovementControlFlag.None

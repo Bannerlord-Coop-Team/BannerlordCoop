@@ -115,6 +115,19 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
 - **SR-042 (Passages/doors).** Players use passages locally, unaffected. NPC puppets never use
   passages themselves (no navigator); host-side passage traffic arrives as spawn/despawn records
   (SR-026). IMPLEMENTED (live verification outstanding)
+- **SR-043 (Scene-point performances).** NPC performances driven by scene points (chairs, animation
+  points, usable machines — sitting, dancing, work loops) replicate SEMANTICALLY: the host
+  broadcasts "NPC X uses point Y" (`NetworkNpcPointUse`, native `MissionObjectId` identity —
+  scene-placed ids are deterministic across clients) and the receiver's puppet USES the same local
+  point, which then owns alignment, animation, facing and occupancy natively (a non-host player
+  cannot take a chair a puppet occupies). Spawn records carry the current point for joiner
+  catch-up. Every continuous-state write path stands down for a point-owned puppet
+  (`LocationPoseLock.IsPointOwned`); point users' actions are NOT broadcast (the point animates
+  both sides). This replaced the enforce-flag pin apparatus that compensated for replicating the
+  point's OUTPUTS (the floating/spinning/sliding sitter chain). Non-point ambient one-offs stay on
+  the action carve-out. Degradation: a point id that fails to resolve locally leaves that puppet
+  un-animated with a warning (only possible on mismatched scenes).
+  IMPLEMENTED (live verification outstanding)
 
 ---
 
