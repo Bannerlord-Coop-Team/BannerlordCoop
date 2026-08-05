@@ -49,9 +49,9 @@ public readonly struct ModOptions
     [ProtoMember(14)]
     public readonly float MaximumLootersMultiplier { get; } = 1f;
     [ProtoMember(15)]
-    public readonly bool EnableHeroExecutions { get; } = true;
+    public readonly bool EnableHeroExecutions { get; } = false;
     [ProtoMember(16)]
-    public readonly bool EnablePlayerClanMemberExecutions { get; } = true;
+    public readonly bool EnablePlayerClanMemberExecutions { get; } = false;
 
     public ModOptions(ModOptionsData modOptionsData)
     {

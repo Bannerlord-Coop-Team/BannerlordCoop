@@ -1,9 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Configuration;
-using GameInterface.Services.Clans.Extensions;
-using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Serilog;
@@ -161,15 +159,13 @@ internal class PartyScreenLogicPatches
 
     [HarmonyPatch(nameof(PartyScreenLogic.IsExecutable))]
     [HarmonyPrefix]
-    public static bool IsExecutablePrefix(CharacterObject character)
+    public static bool IsExecutablePrefix(ref bool __result, CharacterObject character)
     {
-        // Use config to determine if a hero is executable
-        if (!ModConfigProvider.ModOptions.EnableHeroExecutions
-            || (!ModConfigProvider.ModOptions.EnablePlayerClanMemberExecutions
-                && character.HeroObject?.Clan?.IsPlayerClan() == true
-                && character.HeroObject?.IsPlayerHero() != true)
-            || character.HeroObject?.IsPlayerHero() == true) // TODO: Config for toggling player executions when player deaths supported
+        if (!HeroExecutionRules.IsExecutable(character.HeroObject, out var _))
+        {
+            __result = false;
             return false;
+        }
 
         return true;
     }
@@ -182,24 +178,9 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool GetExecutableReasonStringPrefix(ref string __result, CharacterObject character)
     {
-        if (!ModConfigProvider.ModOptions.EnableHeroExecutions)
+        if (!HeroExecutionRules.IsExecutable(character.HeroObject, out var reason))
         {
-            // TODO: Replace with localization "str_coop_cannot_execute_heroes"
-            __result = "Executing heroes has been disabled by the host.";
-            return false;
-        }
-        if (character.HeroObject?.IsPlayerHero() == true) // TODO: Add future config to this check
-        {
-            // TODO: Replace with localization "str_coop_cannot_execute_players"
-            __result = "Executing players is disabled in Co-op for now.";
-            return false;
-        }
-        if (!ModConfigProvider.ModOptions.EnablePlayerClanMemberExecutions
-            && character.HeroObject?.Clan?.IsPlayerClan() == true
-            && character.HeroObject?.IsPlayerHero() != true)
-        {
-            // TODO: Replace with localization "str_coop_cannot_execute_player_clan_members"
-            __result = "Executing members of other players' clans has been disabled by the host.";
+            __result = reason;
             return false;
         }
 
