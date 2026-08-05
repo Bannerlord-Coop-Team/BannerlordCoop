@@ -53,26 +53,35 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             return FailCreation("party AI is unavailable", out failure);
         if (!TryGetCompactId(party, out string partyId))
             return FailCreation("party is not registered", out failure);
+        // An unresolvable REFERENCE must not abandon the whole update. These three used to return false, which
+        // meant no behaviour was ever produced for that party - and because the sync only ever sends behaviour
+        // this way, the client never learned the party's ShortTermBehavior and left it at None. Such a party
+        // shows the DefaultBehavior it was given ("patrolling", or nothing the UI can name) and never acts on
+        // it, permanently, because the missing reference never comes back.
+        //
+        // Seen live after a battle wedged and took its parties down with it: ~850 parties still pointed at
+        // destroyed ones, so 850 updates were dropped in silence - FailCreation discards its reason - leaving
+        // the map frozen on every client while the server ran on happily. Dropping the reference and keeping
+        // the behaviour is strictly better: the client gets a party that moves, and the AI re-targets on its
+        // next decision. This is what the MoveTargetParty branch below has always done.
         if (!TryGetInteractableReference(
             party.Ai.AiBehaviorInteractable,
             out string interactablePointId,
             out bool isInteractableAnchor))
         {
-            return FailCreation(
-                $"AI interactable '{party.Ai.AiBehaviorInteractable?.GetType().Name}' is not registered",
-                out failure);
+            WarnDroppedReference(party, "AI interactable", party.Ai.AiBehaviorInteractable?.GetType().Name);
+            interactablePointId = null;
+            isInteractableAnchor = false;
         }
         if (!TryGetCompactId(party.TargetParty, out string targetPartyId))
         {
-            return FailCreation(
-                $"target party '{party.TargetParty?.StringId}' is not registered",
-                out failure);
+            WarnDroppedReference(party, "target party", party.TargetParty?.StringId);
+            targetPartyId = null;
         }
         if (!TryGetCompactId(party.TargetSettlement, out string targetSettlementId))
         {
-            return FailCreation(
-                $"target settlement '{party.TargetSettlement?.StringId}' is not registered",
-                out failure);
+            WarnDroppedReference(party, "target settlement", party.TargetSettlement?.StringId);
+            targetSettlementId = null;
         }
 
         MoveModeType partyMoveMode = party.PartyMoveMode;
@@ -143,6 +152,24 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         return true;
     }
 
+    // Once per party per reference kind: a stuck party would otherwise repeat this every tick, and the point
+    // is to make a previously SILENT drop visible, not to trade one log flood for another.
+    private static readonly HashSet<string> warnedDrops = new HashSet<string>();
+
+    private static void WarnDroppedReference(MobileParty party, string what, string referenced)
+    {
+        var key = party.StringId + "|" + what;
+        lock (warnedDrops)
+        {
+            if (!warnedDrops.Add(key)) return;
+        }
+
+        Logger.Warning(
+            "[PartySync] {Party} references an unregistered {What} ('{Referenced}'); dropping that reference and " +
+            "syncing the behaviour without it, rather than sending nothing for this party",
+            party.StringId, what, referenced ?? "<null>");
+    }
+
     private static bool FailCreation(string reason, out string failure)
     {
         failure = reason;
@@ -160,53 +187,97 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         return true;
     }
 
+    /// <summary>
+    /// Applies as much of a joining client's authoritative party baseline as will resolve.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately best-effort, and it was not always so. This used to be all-or-nothing: a single party that
+    /// failed to resolve, or a client whose party count differed from the server's by even one, threw the
+    /// ENTIRE baseline away and returned false without logging a word.
+    ///
+    /// That is a far worse outcome than it looks, because the baseline is the only way a client ever learns the
+    /// behaviour of a party whose orders do not subsequently change. Ordinary updates are published on CHANGE,
+    /// so a lord already patrolling when the client joined generates nothing to send. Lose the baseline and
+    /// that party sits on the client with ShortTermBehavior = None forever: it displays the DefaultBehavior it
+    /// was given and never acts on it. Live, that stranded roughly 650 parties while the ~250 whose orders
+    /// happened to change afterwards moved normally - which reads, correctly, as "everything on the map is
+    /// frozen, but the ones that came out of settlements are fine".
+    ///
+    /// So: apply every party that resolves, count the ones that do not, and say so. A partial baseline leaves a
+    /// few parties waiting for their next change; no baseline leaves all of them stuck for good.
+    /// </remarks>
     public bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply)
     {
         if (states == null || beforeApply == null) return false;
 
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-        var parties = objectManager?.MobileParties;
-        var settlements = objectManager?.Settlements;
-        if (parties == null || settlements == null || states.Length != parties.Count)
-            return false;
+        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+        var parties = campaignObjectManager?.MobileParties;
+        var settlements = campaignObjectManager?.Settlements;
+        if (parties == null || settlements == null) return false;
 
         var liveParties = new HashSet<MobileParty>(parties);
         var liveSettlements = new HashSet<Settlement>(settlements);
         var seenParties = new HashSet<MobileParty>();
-        var resolved = new ResolvedBehaviorUpdate[states.Length];
+        var resolvedUpdates = new List<ResolvedBehaviorUpdate>(states.Length);
+        var resolvedStates = new List<MobilePartyJoinState>(states.Length);
+        int skipped = 0;
 
         for (int i = 0; i < states.Length; i++)
         {
             PartyBehaviorUpdateData behavior = states[i].Behavior;
             if (string.IsNullOrEmpty(behavior.MobilePartyId) ||
-                !this.objectManager.TryGetObjectWithLogging(behavior.MobilePartyId, out MobileParty party) ||
+                !this.objectManager.TryGetObject(behavior.MobilePartyId, out MobileParty party) ||
                 !liveParties.Contains(party) ||
                 !seenParties.Add(party) ||
-                !TryPrepare(party, behavior, liveParties, liveSettlements, out resolved[i]))
+                !TryPrepare(party, behavior, liveParties, liveSettlements, out ResolvedBehaviorUpdate prepared))
             {
-                return false;
+                skipped++;
+                continue;
             }
+
+            resolvedUpdates.Add(prepared);
+            resolvedStates.Add(states[i]);
         }
 
-        if (seenParties.Count != liveParties.Count) return false;
+        if (resolvedUpdates.Count == 0)
+        {
+            Logger.Error(
+                "[PartySync] Join baseline resolved none of its {Total} party state(s); this client can then only " +
+                "learn a party's behaviour if it later changes, so parties with standing orders will never move",
+                states.Length);
+            return false;
+        }
 
         try
         {
             beforeApply();
             using (new AllowedThread())
             {
-                for (int i = 0; i < resolved.Length; i++)
+                for (int i = 0; i < resolvedUpdates.Count; i++)
                 {
-                    ApplyJoinState(resolved[i].Party, states[i]);
-                    ApplyBehavior(resolved[i], resetPath: true);
+                    ApplyJoinState(resolvedUpdates[i].Party, resolvedStates[i]);
+                    ApplyBehavior(resolvedUpdates[i], resetPath: true);
                 }
+            }
+
+            if (skipped > 0)
+            {
+                Logger.Warning(
+                    "[PartySync] Join baseline applied to {Applied} of {Total} party state(s); {Skipped} did not " +
+                    "resolve and will stay still until their orders next change",
+                    resolvedUpdates.Count, states.Length, skipped);
+            }
+            else
+            {
+                Logger.Information(
+                    "[PartySync] Join baseline applied to all {Applied} party state(s)", resolvedUpdates.Count);
             }
 
             return true;
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to apply a complete mobile-party join baseline");
+            Logger.Error(ex, "Failed to apply a mobile-party join baseline");
             return false;
         }
     }
