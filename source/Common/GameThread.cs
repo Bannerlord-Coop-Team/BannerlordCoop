@@ -232,6 +232,10 @@ public class GameThread : IUpdateable
                 throw new OperationCanceledException(
                     $"The game-thread session ended before the blocking {nameof(Run)} action was queued.");
             }
+            // This return is one of the few places marshalled work can vanish without a trace;
+            // name the dropped action so a lost state-apply is diagnosable from the log.
+            Logger.Warning("Dropping game-thread action {Label}: the session was cancelled before it was queued",
+                label ?? BuildLabel(callerFile, callerMember));
             return;
         }
 
@@ -414,6 +418,15 @@ public class GameThread : IUpdateable
         {
             discarded = new List<(Action, EventWaitHandle, string, CancellationToken)>(m_Queue);
             m_Queue.Clear();
+        }
+
+        if (discarded.Count > 0)
+        {
+            // A non-empty queue here means marshalled work was enqueued but never pumped — for a
+            // test harness that is a silently lost state-apply, so name every dropped action.
+            Logger.Warning("Discarding {Count} queued game-thread action(s) that no pump ever ran: {Labels}",
+                discarded.Count,
+                string.Join(", ", discarded.Select(task => task.Label ?? "(unlabeled)")));
         }
 
         foreach (var task in discarded)

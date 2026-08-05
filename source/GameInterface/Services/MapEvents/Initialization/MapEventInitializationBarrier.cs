@@ -115,10 +115,21 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                     tracker.AddParty(party);
         }
         Capture(state, mapEvent);
-        if (!TryGetId(mapEvent, out var mapEventId) ||
-            !TryGetId(tracker, out var trackerId) || !TryGetId(mapEvent.Component, out var componentId) ||
-            !TryGetId(mapEvent.MapEventVisual as GauntletMapEventVisual, out var visualId))
+        bool hasEventId = TryGetId(mapEvent, out var mapEventId);
+        bool hasTrackerId = TryGetId(tracker, out var trackerId);
+        bool hasComponentId = TryGetId(mapEvent.Component, out var componentId);
+        bool hasVisualId = TryGetId(mapEvent.MapEventVisual as GauntletMapEventVisual, out var visualId);
+        if (!hasEventId || !hasTrackerId || !hasComponentId || !hasVisualId)
         {
+            // The abort destroys the whole battle graph on the server AND every client; without a
+            // named reason its only trace is a generic ObjectManager id-miss line, which has made
+            // this exit the least diagnosable step of battle replication.
+            Logger.Error(
+                "Aborting MapEvent commit: unresolvable id (event={HasEventId}, tracker={HasTrackerId}, " +
+                "component={HasComponentId} [{ComponentType}], visual={HasVisualId} [{VisualType}])",
+                hasEventId, hasTrackerId,
+                hasComponentId, mapEvent.Component?.GetType().Name ?? "null",
+                hasVisualId, mapEvent.MapEventVisual?.GetType().Name ?? "null");
             AbortServer(mapEvent);
             return;
         }
@@ -131,7 +142,10 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     public void AbortServer(MapEvent mapEvent)
     {
         if (mapEvent == null || !states.TryGetValue(mapEvent, out var state) || state.Committed) return;
-        if (TryGetId(mapEvent, out var id)) network.SendAll(new NetworkMapEventInitialized(id, true));
+        bool notified = TryGetId(mapEvent, out var id);
+        Logger.Error("Aborting MapEvent {MapEventId}: destroying its graph on the server and every notified client",
+            notified ? id : "<unregistered>");
+        if (notified) network.SendAll(new NetworkMapEventInitialized(id, true));
         DestroyGraph(mapEvent);
     }
 
@@ -160,11 +174,28 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent)) return;
-            if (message.IsTerminal || string.IsNullOrEmpty(message.TroopUpgradeTrackerId) ||
-                !objectManager.TryGetObjectWithLogging<TroopUpgradeTracker>(message.TroopUpgradeTrackerId, out var tracker) ||
-                !Matches(message.ComponentId, mapEvent.Component) ||
-                !Matches(message.VisualId, mapEvent.MapEventVisual as GauntletMapEventVisual))
+            if (message.IsTerminal)
             {
+                FinishClient(mapEvent, abort: true);
+                return;
+            }
+
+            TroopUpgradeTracker tracker = null;
+            bool hasTracker = !string.IsNullOrEmpty(message.TroopUpgradeTrackerId) &&
+                objectManager.TryGetObjectWithLogging<TroopUpgradeTracker>(message.TroopUpgradeTrackerId, out tracker);
+            bool componentMatches = Matches(message.ComponentId, mapEvent.Component);
+            bool visualMatches = Matches(message.VisualId, mapEvent.MapEventVisual as GauntletMapEventVisual);
+            if (!hasTracker || !componentMatches || !visualMatches)
+            {
+                // Destroying the replica graph over a mismatch must say WHICH member mismatched —
+                // the local-vs-message visual identity in particular separates "the server's null
+                // overwrite never replicated here" from "the commit raced the reference sync".
+                Logger.Error(
+                    "Client destroying MapEvent {MapEventId} graph at commit: tracker={HasTracker}, " +
+                    "componentMatch={ComponentMatches}, visualMatch={VisualMatches} " +
+                    "(message visual id {VisualId}, local visual {LocalVisualType})",
+                    message.MapEventId, hasTracker, componentMatches, visualMatches,
+                    message.VisualId ?? "null", mapEvent.MapEventVisual?.GetType().Name ?? "null");
                 FinishClient(mapEvent, abort: true);
                 return;
             }
