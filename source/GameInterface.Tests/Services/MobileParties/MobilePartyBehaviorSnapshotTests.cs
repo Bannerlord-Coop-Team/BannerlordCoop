@@ -121,6 +121,70 @@ public class MobilePartyBehaviorSnapshotTests
     }
 
     [Fact]
+    public void TryCreateJoinState_RemovedMoveTarget_UsesLastTargetPoint()
+    {
+        var party = CreateParty();
+        var removedMoveTarget = ObjectHelper.SkipConstructor<MobileParty>();
+        removedMoveTarget._position = new CampaignVec2(new Vec2(30f, 40f), isOnLand: true);
+        party.MoveTargetParty = removedMoveTarget;
+
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        string missingId = null!;
+        objectManager.Setup(m => m.TryGetId(party, out partyId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(removedMoveTarget, out missingId)).Returns(false);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        bool created = snapshot.TryCreateJoinState(
+            party,
+            LiveParties(party),
+            LiveSettlements(),
+            out MobilePartyJoinState state,
+            out string failure);
+
+        Assert.True(created, failure);
+        Assert.Null(failure);
+        Assert.Same(removedMoveTarget, party.MoveTargetParty);
+        Assert.Equal(MoveModeType.Party, party.PartyMoveMode);
+        Assert.Equal(MoveModeType.Point, state.Behavior.PartyMoveMode);
+        Assert.Null(state.Behavior.MoveTargetPartyId);
+        Assert.Equal(removedMoveTarget.Position, state.Behavior.MoveTargetPoint);
+    }
+
+    [Fact]
+    public void TryCreateJoinState_RegisteredNonLiveMoveTarget_UsesLastTargetPoint()
+    {
+        var party = CreateParty();
+        var removedMoveTarget = ObjectHelper.SkipConstructor<MobileParty>();
+        removedMoveTarget._position = new CampaignVec2(new Vec2(30f, 40f), isOnLand: true);
+        party.MoveTargetParty = removedMoveTarget;
+
+        var objectManager = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        string removedMoveTargetId = "MobileParty_Created_2";
+        objectManager.Setup(m => m.TryGetId(party, out partyId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(removedMoveTarget, out removedMoveTargetId)).Returns(true);
+
+        var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+
+        bool created = snapshot.TryCreateJoinState(
+            party,
+            LiveParties(party),
+            LiveSettlements(),
+            out MobilePartyJoinState state,
+            out string failure);
+
+        Assert.True(created, failure);
+        Assert.Null(failure);
+        Assert.Same(removedMoveTarget, party.MoveTargetParty);
+        Assert.Equal(MoveModeType.Party, party.PartyMoveMode);
+        Assert.Equal(MoveModeType.Point, state.Behavior.PartyMoveMode);
+        Assert.Null(state.Behavior.MoveTargetPartyId);
+        Assert.Equal(removedMoveTarget.Position, state.Behavior.MoveTargetPoint);
+    }
+
+    [Fact]
     public void TryCreateJoinState_UnregisteredReferences_ResetsPartyToHold()
     {
         var party = CreateParty();

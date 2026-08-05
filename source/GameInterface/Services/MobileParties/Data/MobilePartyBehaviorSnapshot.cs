@@ -138,7 +138,7 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             liveSettlements,
             out string invalidReferences))
         {
-            if (party?.Ai == null || !TryGetCompactId(party, out _))
+            if (!TryGetCompactId(party, out _))
                 return false;
 
             try
@@ -179,6 +179,9 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             return false;
         }
 
+        // Preserve a removed move target as its last point instead of resetting the party to Hold.
+        PreserveUnavailableMoveTarget(party, liveParties, ref behavior);
+
         state = new MobilePartyJoinState
         {
             Behavior = behavior,
@@ -216,13 +219,26 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             invalidReferences.Add(nameof(MobileParty.TargetParty));
         if (IsInvalidJoinReference(party.TargetSettlement, liveSettlements))
             invalidReferences.Add(nameof(MobileParty.TargetSettlement));
-        if (IsInvalidJoinReference(party.MoveTargetParty, liveParties))
-            invalidReferences.Add(nameof(MobileParty.MoveTargetParty));
 
         if (invalidReferences.Count == 0) return false;
 
         references = string.Join(", ", invalidReferences);
         return true;
+    }
+
+    private static void PreserveUnavailableMoveTarget(
+        MobileParty party,
+        ISet<MobileParty> liveParties,
+        ref PartyBehaviorUpdateData behavior)
+    {
+        MobileParty moveTargetParty = party.MoveTargetParty;
+        if (moveTargetParty == null || liveParties.Contains(moveTargetParty)) return;
+
+        behavior.MoveTargetPartyId = null;
+        if (behavior.PartyMoveMode != MoveModeType.Party) return;
+
+        behavior.PartyMoveMode = MoveModeType.Point;
+        behavior.MoveTargetPoint = moveTargetParty.Position;
     }
 
     private bool IsInvalidJoinReference<T>(T instance, ISet<T> liveObjects)
