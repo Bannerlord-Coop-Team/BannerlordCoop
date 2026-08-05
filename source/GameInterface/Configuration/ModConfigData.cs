@@ -95,6 +95,10 @@ public sealed class ModOptionsData
 
     public float? MaximumLootersMultiplier { get; set; }
 
+    public bool? EnableHeroExecutions { get; set; }
+
+    public bool? EnablePlayerClanMemberExecutions { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

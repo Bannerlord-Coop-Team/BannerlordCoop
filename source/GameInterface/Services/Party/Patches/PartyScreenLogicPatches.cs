@@ -1,6 +1,8 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Configuration;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
@@ -8,11 +10,11 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
-using TaleWorlds.Localization;
 using MathF = TaleWorlds.Library.MathF;
 
 namespace GameInterface.Services.Party.Patches;
@@ -146,12 +148,6 @@ internal class PartyScreenLogicPatches
         partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
     }
 
-    /// <summary>
-    /// Executing prisoner heroes is disabled in coop: the kill rides KillCharacterAction and its follow-on
-    /// death/inheritance handling, which crashes the game when it targets a lord or player
-    /// (<see href="https://github.com/Bannerlord-Coop-Team/BannerlordCoop/issues/2310">issue #2310</see>).
-    /// Skipping the original also skips its local prisoner-roster mutation, so nothing diverges from the server.
-    /// </summary>
     [HarmonyPatch(nameof(PartyScreenLogic.ExecuteTroop))]
     [HarmonyPostfix]
     public static void ExecuteTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command)
@@ -159,7 +155,7 @@ internal class PartyScreenLogicPatches
         if (!__instance.ValidateCommand(command)) return;
 
         // Send message to server to run KillCharacterAction.ApplyByExecution
-        var message = new HeroExecuted(command.Character.HeroObject, Hero.MainHero);
+        var message = new HeroExecuted(command.Character.HeroObject, Hero.MainHero, KillCharacterAction.KillCharacterActionDetail.Executed, false);
         MessageBroker.Instance.Publish(__instance, message);
     }
 
@@ -167,8 +163,15 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool IsExecutablePrefix(CharacterObject character)
     {
-        // Executable if NOT player hero and NOT a player companion/wanderer
-        return character.HeroObject?.IsPlayerHero() != true && character.HeroObject?.IsWanderer != true;
+        // Use config to determine if a hero is executable
+        if (!ModConfigProvider.ModOptions.EnableHeroExecutions
+            || (!ModConfigProvider.ModOptions.EnablePlayerClanMemberExecutions
+                && character.HeroObject?.Clan?.IsPlayerClan() == true
+                && character.HeroObject?.IsPlayerHero() != true)
+            || character.HeroObject?.IsPlayerHero() == true) // TODO: Config for toggling player executions when player deaths supported
+            return false;
+
+        return true;
     }
 
     /// <summary>
@@ -179,16 +182,24 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool GetExecutableReasonStringPrefix(ref string __result, CharacterObject character)
     {
-        if (character.HeroObject?.IsPlayerHero() == true)
+        if (!ModConfigProvider.ModOptions.EnableHeroExecutions)
         {
-            // TODO: Replace with localization "str_coop_cannot_execute_players"
-            __result = "Executing players is disabled in Co-op.";
+            // TODO: Replace with localization "str_coop_cannot_execute_heroes"
+            __result = "Executing heroes has been disabled by the host.";
             return false;
         }
-        if (character.HeroObject?.IsWanderer == true)
+        if (character.HeroObject?.IsPlayerHero() == true) // TODO: Add future config to this check
         {
-            // TODO: Replace with localization "str_coop_cannot_execute_companions"
-            __result = "Executing companions/wanderers is disabled in Co-op.";
+            // TODO: Replace with localization "str_coop_cannot_execute_players"
+            __result = "Executing players is disabled in Co-op for now.";
+            return false;
+        }
+        if (!ModConfigProvider.ModOptions.EnablePlayerClanMemberExecutions
+            && character.HeroObject?.Clan?.IsPlayerClan() == true
+            && character.HeroObject?.IsPlayerHero() != true)
+        {
+            // TODO: Replace with localization "str_coop_cannot_execute_player_clan_members"
+            __result = "Executing members of other players' clans has been disabled by the host.";
             return false;
         }
 
