@@ -140,10 +140,14 @@ public static class SteamGameServerBoot
         }
     }
 
-    /// <summary>Dispatches the game-server callbacks; called every tick by the pump.</summary>
+    /// <summary>
+    /// Dispatches the game-server callbacks; called every tick by the pump. Stops once <see cref="Shutdown"/>
+    /// has run: the pump stays registered in the update list after teardown, and dispatching into the
+    /// unloaded native module throws on every remaining tick.
+    /// </summary>
     public static void RunCallbacks()
     {
-        if (started) GameServer.RunCallbacks();
+        if (started && Volatile.Read(ref shutDown) == 0) GameServer.RunCallbacks();
     }
 
     private static void OnLoggedOn(SteamServersConnected_t _)
