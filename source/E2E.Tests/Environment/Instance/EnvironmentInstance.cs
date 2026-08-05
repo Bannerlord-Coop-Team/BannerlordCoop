@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -12,6 +12,9 @@ using HarmonyLib;
 using LiteNetLib;
 using ProtoBuf.Meta;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Environment.Instance;
 
@@ -57,9 +60,10 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source of the message</param>
     /// <param name="message">Received Message</param>
-    public void SimulateMessage<T>(object source, T message) where T : IMessage
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulateMessage<T>(object source, T message, bool markGameThread = true) where T : IMessage
     {
-        using (new StaticScope(this))
+        using (new StaticScope(this, markGameThread))
         {
             messageBroker.Publish(source, message);
         }
@@ -70,9 +74,10 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source Peer</param>
     /// <param name="packet">Received Packet</param>
-    public void SimulatePacket(NetPeer source, IPacket packet)
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulatePacket(NetPeer source, IPacket packet, bool markGameThread = true)
     {
-        using (new StaticScope(this))
+        using (new StaticScope(this, markGameThread))
         {
             EnsureSerializable(packet);
             mockNetwork.ReceiveFromNetwork(source, packet);
@@ -92,6 +97,9 @@ public abstract class EnvironmentInstance : IDisposable
 
         lock (_lock)
         {
+            // xUnit can move a test from its constructor thread before the next instance call.
+            GameThread.Instance.MarkGameThread();
+
             using (new PatchScope(disabledMethods))
             {
                 using (new StaticScope(this))
@@ -142,35 +150,64 @@ public abstract class EnvironmentInstance : IDisposable
     private class StaticScope : IDisposable
     {
         private readonly ILifetimeScope previousContainer;
+        private readonly MBObjectManager previousObjectManager;
+        private readonly Campaign previousCampaign;
+        private readonly Game previousGame;
+        private readonly TaleWorlds.MountAndBlade.Module previousModule;
+        private readonly TestMessageBroker previousMessageBroker;
         private readonly bool wasServer;
 
-        public StaticScope(EnvironmentInstance instance)
+        public StaticScope(EnvironmentInstance instance, bool markGameThread = true)
         {
             Monitor.Enter(GameInstance.@lock);
+            bool restorePreviousStatics = false;
 
             // The lock must be released even when the body throws (resolving from an instance a
             // concurrent test already disposed), otherwise it stays owned by this (possibly
             // recycled) thread forever and every later scope or GameInstance build deadlocks.
             try
             {
+                if (markGameThread)
+                {
+                    // xUnit can move a test from its fixture-constructor thread before the next scoped call.
+                    GameThread.Instance.MarkGameThread();
+                }
+
                 // Save previous static values
                 wasServer = ModInformation.IsServer;
+                previousObjectManager = MBObjectManager.Instance;
+                previousCampaign = Campaign.Current;
+                previousGame = Game.Current;
+                previousModule = TaleWorlds.MountAndBlade.Module.CurrentModule;
                 if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
                 {
                     // If no previous container is set, set it to the current container
                     previousContainer = instance.Container;
                 }
+                previousMessageBroker = previousContainer.Resolve<TestMessageBroker>();
+                var instanceMessageBroker = instance.Container.Resolve<TestMessageBroker>();
 
                 // Set new static values
+                restorePreviousStatics = true;
                 instance.GameInstance.SetStatics();
 
                 ModInformation.IsServer = instance is ServerInstance;
-                instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
+                instanceMessageBroker.SetStaticInstance();
                 GameInterface.ContainerProvider.SetContainer(instance.Container);
             }
             catch
             {
-                Monitor.Exit(GameInstance.@lock);
+                try
+                {
+                    if (restorePreviousStatics)
+                    {
+                        RestorePreviousStatics();
+                    }
+                }
+                finally
+                {
+                    Monitor.Exit(GameInstance.@lock);
+                }
                 throw;
             }
         }
@@ -179,15 +216,23 @@ public abstract class EnvironmentInstance : IDisposable
         {
             try
             {
-                // Restore previous static values
-                ModInformation.IsServer = wasServer;
-                GameInterface.ContainerProvider.SetContainer(previousContainer);
-                previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
+                RestorePreviousStatics();
             }
             finally
             {
                 Monitor.Exit(GameInstance.@lock);
             }
+        }
+
+        private void RestorePreviousStatics()
+        {
+            MBObjectManager.Instance = previousObjectManager;
+            Campaign.Current = previousCampaign;
+            Game.Current = previousGame;
+            TaleWorlds.MountAndBlade.Module.CurrentModule = previousModule;
+            ModInformation.IsServer = wasServer;
+            GameInterface.ContainerProvider.SetContainer(previousContainer);
+            previousMessageBroker.SetStaticInstance();
         }
     }
 
