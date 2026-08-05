@@ -75,9 +75,8 @@ public class Poller
         // Setup initial start time
         var startTime = DateTime.Now;
 
-        // Track the last error so a fault that recurs every tick doesn't flood the log.
-        string lastError = null;
-        long repeatCount = 0;
+        // Keeps a fault that recurs every tick from flooding the log.
+        var faultThrottle = new FaultLogThrottle();
 
         while (cts.IsCancellationRequested == false)
         {
@@ -94,15 +93,14 @@ public class Poller
             }
             catch (Exception ex)
             {
-                if (ex.Message != lastError)
+                switch (faultThrottle.Classify(ex, out long repeats))
                 {
-                    lastError = ex.Message;
-                    repeatCount = 0;
-                    Logger.Error(ex, "Polling function threw an exception; the poll loop will continue");
-                }
-                else if (++repeatCount % 1000 == 0)
-                {
-                    Logger.Error("Polling function still throwing the same exception ({RepeatCount}x): {Message}", repeatCount, ex.Message);
+                    case FaultLogAction.Full:
+                        Logger.Error(ex, "Polling function threw an exception; the poll loop will continue");
+                        break;
+                    case FaultLogAction.Summary:
+                        Logger.Error("Polling function still throwing the same exception ({RepeatCount}x): {Message}", repeats, ex.Message);
+                        break;
                 }
             }
             finally
