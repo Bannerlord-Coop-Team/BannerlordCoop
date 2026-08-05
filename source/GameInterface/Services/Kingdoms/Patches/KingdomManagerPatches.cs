@@ -1,9 +1,10 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Core;
 
@@ -35,6 +36,7 @@ internal class KingdomManagerPatches
                 }
             }
             MessageBroker.Instance.Publish(__instance, new RulingClanChanged(kingdom, clan));
+            GameThread.WaitWhilePumping(() => kingdom.RulingClan == clan, DateTime.UtcNow.AddSeconds(5));
             kingdom.AddDecision(new KingSelectionKingdomDecision(rulingClan, rulingClan)
             {
                 IsEnforced = true
