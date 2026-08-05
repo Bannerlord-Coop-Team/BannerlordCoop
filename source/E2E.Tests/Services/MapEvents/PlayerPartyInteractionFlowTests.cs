@@ -3096,7 +3096,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             harmony.Patch(
                 AccessTools.Method(
                     typeof(ConversationPartyHold),
-                    nameof(ConversationPartyHold.EndEngagement)),
+                    nameof(ConversationPartyHold.EndEngagement),
+                    new[] { typeof(ConversationPartyTracker), typeof(object) }),
                 prefix: new HarmonyMethod(
                     typeof(PlayerPartyInteractionFlowTests),
                     nameof(ThrowAfterBanditBarterMutation)));
