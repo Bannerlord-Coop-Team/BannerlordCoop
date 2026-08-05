@@ -1087,9 +1087,16 @@ public class AgentMovementHandler : IAgentMovementHandler
                     puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
                 }
 
-                data.Apply(agent);
-                if (data.MountData != null && agent.MountAgent is Agent remoteMount)
-                    UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+                // A pose-pinned settlement puppet (seated, using an animation point) gets NO
+                // continuous-state writes: each direction/look write retriggers the native
+                // turn-in-place its enforced loop can never complete — the seated-NPC spin. Its
+                // position target still flows to the interpolator below for drift correction.
+                if (!LocationPoseLock.IsPosePinned(agent))
+                {
+                    data.Apply(agent);
+                    if (data.MountData != null && agent.MountAgent is Agent remoteMount)
+                        UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+                }
 
                 // Position is reconciled per-frame by the interpolator (smoother than a per-packet
                 // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.

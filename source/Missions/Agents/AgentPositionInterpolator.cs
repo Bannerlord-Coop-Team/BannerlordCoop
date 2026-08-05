@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Locations;
-using Missions.Agents.Packets;
+﻿using Missions.Agents.Packets;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -74,6 +73,10 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         new Dictionary<Agent, long>();
     private readonly Dictionary<Agent, long> _enforcedPoseProcessedSequences =
         new Dictionary<Agent, long>();
+    // Agents currently frozen in a pose-enforced pin: aligned ONCE on entry, then position-only drift
+    // corrections — every further direction/look write would retrigger the native turn-in-place the
+    // enforced loop can never complete (the seated-NPC spin).
+    private readonly HashSet<Agent> _pinnedPoseAgents = new HashSet<Agent>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
@@ -162,6 +165,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         _targets.Remove(agent);
         _mountedGuardProcessedSequences.Remove(agent);
         _enforcedPoseProcessedSequences.Remove(agent);
+        _pinnedPoseAgents.Remove(agent);
     }
 
     public bool TryGetTargetMovementFlags(
@@ -214,6 +218,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         _targets.Clear();
         _mountedGuardProcessedSequences.Clear();
         _enforcedPoseProcessedSequences.Clear();
+        _pinnedPoseAgents.Clear();
     }
 
     private long GetNextUpdateSequence()
@@ -233,6 +238,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             {
                 continue;
             }
+
+            // A pose-pinned puppet's facing is owned by its enforced animation — a look write per
+            // native cycle is exactly the churn that spun seated NPCs.
+            if (_pinnedPoseAgents.Contains(agent))
+                continue;
 
             TargetFrame target = pair.Value;
             if (agent.MountAgent != null && target.HasMountSnapPosition)
@@ -282,13 +292,15 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             // point) must be PINNED, not sought: the native 2D locomotion seek walks them to the
             // seat's ground position while the enforced loop locks the skeleton — the floating-squat-
             // beside-the-bench artifact. The owner's reported frame is exact (native seating aligns
-            // the root to the seat), so snap to it in full 3D once per owner frame and leave the
-            // action timeline alone (the mounted-guard path above set the precedent).
-            if (LocationNpcGate.IsCoopLocationMissionActive && HasEnforcedPose(agent))
+            // the root to the seat), so align ONCE on entering the pose and then only correct
+            // position drift — repeated direction/look writes retrigger the native turn-in-place the
+            // enforced loop can never complete, spinning the NPC in its chair.
+            if (LocationPoseLock.IsPosePinned(agent))
             {
                 PinEnforcedPose(agent, pair.Value);
                 continue;
             }
+            _pinnedPoseAgents.Remove(agent); // enforce dropped (stood up) — normal seek resumes
 
             // A mount tolerates more slack before we snap; an on-foot rider is held tighter.
             float snapDistance = agent.IsMount ? MountSnapDistance : RiderSnapDistance;
@@ -306,35 +318,34 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 _targets.Remove(agent);
                 _mountedGuardProcessedSequences.Remove(agent);
                 _enforcedPoseProcessedSequences.Remove(agent);
+                _pinnedPoseAgents.Remove(agent);
             }
             _evict.Clear();
         }
     }
 
-    // The same test native conversation logic uses to recognize a pose the animation system owns.
-    private static bool HasEnforcedPose(Agent agent)
-    {
-        return agent.MountAgent == null
-            && agent.GetCurrentAnimationFlag(0).HasAnyFlag(
-                AnimFlags.anf_enforce_all
-                | AnimFlags.anf_enforce_lowerbody
-                | AnimFlags.anf_enforce_root_rotation);
-    }
-
-    // One semantic correction per owner frame: zero locomotion (nothing may walk the pose), face the
-    // owner's reported directions, and snap the root to the exact reported 3D position when drifted.
+    // Entry: one full alignment to the owner's frame (seat position + facing), then freeze — the
+    // enforced animation owns the pose. Steady state: position-only drift correction, once per owner
+    // frame, with NO direction or look writes (each would retrigger the never-completing native
+    // turn-in-place).
     private void PinEnforcedPose(Agent agent, TargetFrame target)
     {
+        if (_pinnedPoseAgents.Add(agent))
+        {
+            agent.MovementInputVector = Vec2.Zero;
+            agent.SetMovementDirection(target.AgentState.MovementDirection);
+            agent.LookDirection = target.AgentState.LookDirection;
+            agent.TeleportToPosition(target.Position);
+            _enforcedPoseProcessedSequences[agent] = target.UpdateSequence;
+            return;
+        }
+
         if (_enforcedPoseProcessedSequences.TryGetValue(agent, out long processedSequence)
             && processedSequence == target.UpdateSequence)
         {
             return;
         }
         _enforcedPoseProcessedSequences[agent] = target.UpdateSequence;
-
-        agent.MovementInputVector = Vec2.Zero;
-        agent.SetMovementDirection(target.AgentState.MovementDirection);
-        agent.LookDirection = target.AgentState.LookDirection;
 
         if (agent.Position.Distance(target.Position) > EnforcedPoseTolerance)
             agent.TeleportToPosition(target.Position);
