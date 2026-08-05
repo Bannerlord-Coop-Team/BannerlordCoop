@@ -109,7 +109,7 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
 
         if (Detach(requester.Party)) left.Add(requester.Party);
 
-        BroadcastLeft(left);
+        BroadcastLeft(left, requester.Party);
     }
 
     private static bool Detach(PartyBase party)
@@ -124,13 +124,20 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
     /// Tells every client to drop the parties that just retreated from their copy of the battle.
     /// </summary>
     /// <remarks>
-    /// FinishLocalMenus is false: the retreating player's own teardown is driven by the
-    /// NetworkBattleRetreatResolved that follows, and finishing menus twice on that client would close a menu
-    /// it has already moved past. LeaveSiege is false for the same reason - the retreat clears its own besieger
-    /// camps and reports them through campClearedPartyIds, so re-running the siege leave here would clear them
-    /// a second time. What is wanted from this message is only the map-event removal.
+    /// FinishLocalMenus is per-party, and the requester is the exception rather than the rule. The retreating
+    /// player's own teardown is driven by the NetworkBattleRetreatResolved that follows, so asking for menus to
+    /// be finished here as well would close a menu that client has already moved past - hence false for it.
+    ///
+    /// Every OTHER party gets true. A commanded or attached party is dropped from the map event by the
+    /// cascade, but nothing else tells its owner: NetworkBattleRetreatResolved only closes the REQUESTER's
+    /// encounter, so another player pulled out by their army leader's retreat would lose their party from the
+    /// battle while still sitting in the battle UI. ApplyNetworkLeave gates the teardown on
+    /// <c>isMainParty</c>, so true here reaches exactly the one client that owns each party and nobody else.
+    ///
+    /// LeaveSiege stays false throughout: the retreat clears its own besieger camps and reports them through
+    /// campClearedPartyIds, so re-running the siege leave would clear them a second time.
     /// </remarks>
-    private static void BroadcastLeft(List<PartyBase> left)
+    private static void BroadcastLeft(List<PartyBase> left, PartyBase requester)
     {
         if (left.Count == 0) return;
         if (!ContainerProvider.TryResolve<INetwork>(out var network)) return;
@@ -140,7 +147,10 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
         {
             if (!objectManager.TryGetId(party, out var partyId)) continue;
 
-            network.SendAll(new NetworkPartyLeftBattle(partyId, leaveSiege: false, finishLocalMenus: false));
+            network.SendAll(new NetworkPartyLeftBattle(
+                partyId,
+                leaveSiege: false,
+                finishLocalMenus: party != requester));
         }
     }
 
