@@ -55,6 +55,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
         messageBroker.Subscribe<NetworkAddDecision>(HandleNetworkAddDecision);
+        messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomeName);
     }
 
     private void HandleNetworkRequestCreateKingdom(MessagePayload<NetworkRequestCreateKingdom> obj)
@@ -82,6 +83,15 @@ public class ServerKingdomHandler : IHandler
         }
 
         messageBroker.Publish(this, new CreateKingdom(payload.ControllerId, payload.KingdomName, payload.CultureId));
+    }
+
+    private void HandleNetworkRequestChangeKingdomName(MessagePayload<NetworkRequestChangeKingdomName> obj)
+    {
+        if (obj.Who is not NetPeer peer) return;
+        if (!playerManager.TryGetPlayer(peer, out var player)) return;
+
+        var payload = obj.What;
+        messageBroker.Publish(this, new ChangeKingdomName(player.ControllerId, payload.KingdomId, payload.Name));
     }
 
     private void HandleLocalPlayerKingdomCreated(MessagePayload<PlayerKingdomCreated> obj)
@@ -293,6 +303,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestCreateKingdom>(HandleNetworkRequestCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
+        messageBroker.Unsubscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
     }
 
     private readonly struct PendingSettlementRestore
