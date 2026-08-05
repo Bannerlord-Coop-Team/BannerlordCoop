@@ -65,12 +65,13 @@ internal class EquipmentAdjustmentHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.CompanionHeroId, out var companionHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Equipment>(data.BattleEquipmentId, out var battleEquipment)) return;
-            if (!objectManager.TryGetObjectWithLogging<Equipment>(data.BattleEquipmentId, out var civilianEquipment)) return;
+            if (!objectManager.TryGetObjectWithLogging<Equipment>(data.CivilianEquipmentId, out var civilianEquipment)) return;
 
             using (new AllowedThread())
             {
-                battleEquipment = data.BattleEquipment;
-                civilianEquipment = data.CivilianEquipment;
+                battleEquipment.FillFrom(data.BattleEquipment);
+                civilianEquipment.FillFrom(data.CivilianEquipment);
+
                 companionHero._battleEquipment = battleEquipment;
                 companionHero._civilianEquipment = civilianEquipment;
             }
