@@ -114,7 +114,12 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
             // Counted before ownership is considered: the totals describe the SIDE, and every client must
             // receive the same pair or their battle-size splits disagree.
+            //
+            // The running total before this party is added is also its OFFSET within the side. Because this
+            // loop runs over every party in a fixed order on the server, those offsets partition the side
+            // exactly once, which is what lets each owner take a slice that adds up (see PartyReserve).
             var partySide = party.Party?.Side ?? BattleSideEnum.None;
+            var partyOffset = partySide == BattleSideEnum.Attacker ? attackerTotal : defenderTotal;
             if (partySide == BattleSideEnum.Attacker) attackerTotal += entries.Count;
             else defenderTotal += entries.Count;
 
@@ -131,7 +136,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 partyId,
                 supplied,
                 entriesArray,
-                isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId));
+                isReceiverPlayerParty: IsPartyRegisteredToController(party, controllerId),
+                sideOffset: partyOffset);
             if (partySide == BattleSideEnum.Attacker)
                 attacker.Add(reserve);
             else

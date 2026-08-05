@@ -34,6 +34,8 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         public string PartyId;
         public TroopReserveEntry[] Entries = Array.Empty<TroopReserveEntry>();
         public int Supplied;
+        /// <summary>Where this party starts within its side; see <see cref="PartyReserve.SideOffset"/>.</summary>
+        public int SideOffset;
     }
 
     private readonly object gate = new object();
@@ -111,6 +113,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
                         PartyId = party.PartyId,
                         Entries = entries,
                         Supplied = supplied,
+                        SideOffset = party.SideOffset,
                     };
                     // Allocate this client's own party first. Otherwise an army's AI parties can fill the
                     // render cap before the local hero is reserved, leaving deployment without a player agent.
@@ -286,20 +289,45 @@ public class CoopTroopSupplier : IMissionTroopSupplier
             var total = sideTotalTroops > 0 ? sideTotalTroops : owned;
             if (owned >= total) return sideAllocation;
 
-            // Rounded, so the owners' slices can differ from the allocation by at most one troop per side -
-            // invisible against a battle size in the hundreds, and the next wave re-derives from scratch.
-            // ponytail: exact apportionment would need each owner to know the others' shares; not worth a
-            // wire field and a migration path for a possible off-by-one.
-            var share = (int)Math.Round(sideAllocation * (double)owned / total, MidpointRounding.AwayFromZero);
+            // Exact apportionment by cumulative flooring: each party takes the difference between the
+            // allocation scaled to the END of its range and to its START. Because every party on the side
+            // occupies one contiguous, non-overlapping range of [0, total), the slices taken by ALL owners
+            // sum to exactly sideAllocation - no owner needs to know what the others hold.
+            //
+            // This replaces proportional rounding, which could overshoot the allocation, and a floor that
+            // forced every owner with troops to at least one - that floor turned a one-troop wave into one
+            // troop PER OWNER.
+            var share = 0;
+            foreach (var party in parties)
+            {
+                var count = party.Entries.Length;
+                if (count <= 0) continue;
 
-            // Never round an owner with troops down to nothing. A share of zero on the side holding the local
-            // player's party is what CoopBattleMissionSpawnHandler treats as "origin missing" - it aborts the
-            // battle - so a small allocation must still field someone.
-            if (share <= 0) share = 1;
+                var start = ScaleToAllocation(party.SideOffset, total, sideAllocation);
+                var end = ScaleToAllocation(party.SideOffset + count, total, sideAllocation);
+                share += end - start;
+            }
+
+            // The local player's own party is the exception the floor existed for: a share of zero on the
+            // side holding it reads as "origin missing" to CoopBattleMissionSpawnHandler and aborts the
+            // battle outright. Only that owner is topped up, so a small wave still fields the player
+            // without every other owner also adding one.
+            if (share <= 0 && OwnsReceiverPlayerParty()) share = 1;
 
             return Math.Min(share, sideAllocation);
         }
     }
+
+    /// <summary>Where a position within the side falls once the side is scaled to the allocation.</summary>
+    /// <remarks>
+    /// long arithmetic because position * allocation overflows int for a large side and a large wave, and
+    /// an overflow here would silently hand out a negative or wrapped share.
+    /// </remarks>
+    private static int ScaleToAllocation(int position, int total, int allocation)
+        => (int)((long)position * allocation / total);
+
+    /// <summary>Whether one of this client's parties is the receiver's own party in this battle.</summary>
+    private bool OwnsReceiverPlayerParty() => playerPartyId != null;
 
     public int NumTroopsNotSupplied
     {
