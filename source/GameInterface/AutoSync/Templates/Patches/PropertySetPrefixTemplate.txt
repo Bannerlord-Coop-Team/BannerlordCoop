@@ -7,20 +7,24 @@ public class {{ MemberDeclaringTypeName }}_{{ MemberName }}_PropertySetPrefix : 
     {
         if (CallOriginalPolicy.IsOriginalAllowed())
             return;
-        
+
+        // Redundant writes are not worth a word on either side. The engine rewrites plenty of these to the
+        // value they already hold, every frame, for every object it owns - Settlement.IsVisible alone was
+        // measured at ~4,200 client log lines PER SECOND on a live campaign, 99.8% of the whole log, all of
+        // it Serilog work on the game thread while the map was trying to run. Checked before the client
+        // branch, not after, because the client is the side that was paying for it.
+        if (EqualityComparer<{{MemberType}}>.Default.Equals(__instance.{{MemberName}}, value))
+        {
+            {{~ if Debug ~}}
+            Logger.Debug("Value same, skipping {member}", "{{MemberDeclaringType}}.{{MemberName}}");
+            {{~ end ~}}
+            return;
+        }
+
         if (ModInformation.IsClient)
         {
             Logger.Error("Client updated managed {member}", "{{MemberDeclaringType}}.{{MemberName}}");
             return;
-        }
-        
-        if(EqualityComparer<{{MemberType}}>.Default.Equals(__instance.{{MemberName}}, value))
-        {
-            {{~ if Debug ~}}
-            Logger.Debug("[Server] Value same, skipping {member}", "{{MemberDeclaringType}}.{{MemberName}}");
-            {{~ end ~}}
-            return;
-
         }
 
         {{~ if Debug ~}}
