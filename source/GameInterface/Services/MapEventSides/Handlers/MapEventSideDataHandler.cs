@@ -107,6 +107,11 @@ internal class MapEventSideDataHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out var mapEventId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEventSide, out var mapEventSideId)) return;
 
+        Logger.Information(
+            "[SideDiag][server] assign side {Side} of {MapEventId} -> {SideId} (MissionSide={MissionSide}, leader={Leader})",
+            payload.What.Side, mapEventId, mapEventSideId,
+            payload.What.MapEventSide?.MissionSide, payload.What.MapEventSide?.LeaderParty?.Id ?? "<none>");
+
         var message = new NetworkAssignMapEventSide(mapEventId, mapEventSideId, payload.What.Side);
         network.SendAll(message);
     }
@@ -128,6 +133,20 @@ internal class MapEventSideDataHandler : IHandler
                 {
                     mapEvent._sides[side] = mapEventSide;
                 }
+
+                // A mismatch here means every party added to this side afterwards lands on the wrong one.
+                if ((int)mapEventSide.MissionSide != side)
+                {
+                    Logger.Error(
+                        "[SideDiag][client] MISMATCH: assigned index {Index} but the side reports MissionSide={MissionSide} ({SideId})",
+                        side, mapEventSide.MissionSide, data.MapEventSideId);
+                }
+                else
+                {
+                    Logger.Information(
+                        "[SideDiag][client] assigned index {Index} <- {SideId} (MissionSide={MissionSide})",
+                        side, data.MapEventSideId, mapEventSide.MissionSide);
+                }
             }
             catch (Exception e)
             {
@@ -142,6 +161,11 @@ internal class MapEventSideDataHandler : IHandler
             return;
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEventSide, out var mapEventSideId))
             return;
+
+        Logger.Information(
+            "[SideDiag][server] add party {Party} -> side {SideId} (MissionSide={MissionSide}, leader={Leader})",
+            payload.What.MapEventParty?.Party?.Id ?? mapEventPartyId, mapEventSideId,
+            payload.What.MapEventSide?.MissionSide, payload.What.MapEventSide?.LeaderParty?.Id ?? "<none>");
 
         var message = new NetworkAddBattleParty(mapEventSideId, mapEventPartyId);
         network.SendAll(message);
@@ -160,10 +184,24 @@ internal class MapEventSideDataHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(data.MapEventPartyId, out var mapEventParty))
                     return;
 
+                var addedParty = mapEventParty.Party;
+                var isLocalPlayer = addedParty != null && ReferenceEquals(addedParty, PartyBase.MainParty);
+
                 initializationBarrier.AttachClient(
                     mapEventSide,
                     mapEventParty,
                     () => AfterClientPartyAttached(mapEventSide.MapEvent));
+
+                // Only the local player's own placement is worth a line: that is the one whose disagreement
+                // with the server makes the spawn handler look for its troops in the other side's reserve
+                // and abort the battle.
+                if (isLocalPlayer)
+                {
+                    Logger.Information(
+                        "[SideDiag][client] LOCAL PLAYER {Party} attached to side {SideId} (MissionSide={MissionSide}, leader={Leader}); MainParty.Side now {Resolved}",
+                        addedParty.Id, data.MapEventSideId, mapEventSide.MissionSide,
+                        mapEventSide.LeaderParty?.Id ?? "<none>", PartyBase.MainParty.Side);
+                }
             }
             catch (Exception e)
             {
