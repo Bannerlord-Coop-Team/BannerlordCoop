@@ -59,6 +59,13 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
 
         campClearedPartyIds = ClearBesiegerCamps(requester, commanded);
 
+        // Leave the battle before anything reports success. Without this the server still holds the party
+        // on the defender side, so it stays in the encounter and a second click runs the whole retreat
+        // again - sacrificing troops and goods a second time for a party that already got away.
+        // Everything above needs the battle intact (the loss model reads it, camps are cleared from it),
+        // so the removal happens here rather than at the top.
+        LeaveBattle(requester, commanded);
+
         requester.TeleportPartyToOutSideOfEncounterRadius();
         requester.IgnoreByOtherPartiesTill(CampaignTime.HoursFromNow(1f));
 
@@ -70,6 +77,25 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
             requester.StringId, sacrificed, campClearedPartyIds.Length);
 
         return true;
+    }
+
+    /// <summary>
+    /// Detaches the retreating force from its map event.
+    /// </summary>
+    /// <remarks>
+    /// PartyBase's MapEventSide setter is the whole removal: assigning null calls RemovePartyInternal on
+    /// the side it was on, and cascades to attached parties on its own. Commanded parties are cleared too,
+    /// because they left with the requester - leaving them behind would keep the battle alive around
+    /// parties that are no longer there.
+    /// </remarks>
+    private static void LeaveBattle(MobileParty requester, List<MobileParty> commanded)
+    {
+        foreach (var party in commanded)
+        {
+            if (party?.Party?.MapEventSide != null) party.Party.MapEventSide = null;
+        }
+
+        if (requester.Party?.MapEventSide != null) requester.Party.MapEventSide = null;
     }
 
     private static void PublishPosition(MobileParty party)
