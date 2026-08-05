@@ -43,6 +43,7 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     private readonly Dictionary<int, string> seedToPartyId = new Dictionary<int, string>();
     private string playerPartyId;
     private bool populated;
+    private int sideTotalTroops;
     private int reserveRevision;
     private int numWounded, numKilled, numRouted;
     // Injected at construction (a stable per-session singleton) so the per-agent supply path resolves troop/party
@@ -75,11 +76,15 @@ public class CoopTroopSupplier : IMissionTroopSupplier
     /// definitively this supplier's last word on those parties.
     /// </para>
     /// </summary>
-    public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve)
+    public IReadOnlyList<(string PartyId, int Supplied)> SetReserve(IReadOnlyList<PartyReserve> reserve,
+        int sideTotal = 0)
     {
         var dropped = new List<(string PartyId, int Supplied)>();
         lock (gate)
         {
+            // 0 means the server sent no total (older peer): keep the previous value rather than forgetting it.
+            if (sideTotal > 0) sideTotalTroops = sideTotal;
+
             // Capture the current per-party pointers before rebuilding. A resend can carry a STALE pointer: the
             // server's ledger lags our local supply by up to one report interval, and on migration it re-sends
             // our OWN party at that lagging value. Resuming from the server value alone would rewind a party we
@@ -245,6 +250,57 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
     }
 
+    /// <summary>
+    /// Every troop on this side across ALL owners, or <see cref="TotalTroops"/> when the server sent none.
+    /// The spawn handler sizes the engine from this so each client computes the same split; the supplier then
+    /// contributes only its <see cref="OwnedShareOf"/> that allocation.
+    /// </summary>
+    public int SideTotalTroops
+    {
+        get
+        {
+            lock (gate)
+            {
+                if (sideTotalTroops > 0) return sideTotalTroops;
+                int owned = 0;
+                foreach (var party in parties) owned += party.Entries.Length;
+                return owned;
+            }
+        }
+    }
+
+    /// <summary>
+    /// This client's slice of a side-wide allocation, in proportion to the troops it owns. Every owner runs
+    /// the same sum, so the slices add up to the allocation instead of each owner serving all of it.
+    /// </summary>
+    public int OwnedShareOf(int sideAllocation)
+    {
+        if (sideAllocation <= 0) return 0;
+
+        lock (gate)
+        {
+            int owned = 0;
+            foreach (var party in parties) owned += party.Entries.Length;
+            if (owned <= 0) return 0;
+
+            var total = sideTotalTroops > 0 ? sideTotalTroops : owned;
+            if (owned >= total) return sideAllocation;
+
+            // Rounded, so the owners' slices can differ from the allocation by at most one troop per side -
+            // invisible against a battle size in the hundreds, and the next wave re-derives from scratch.
+            // ponytail: exact apportionment would need each owner to know the others' shares; not worth a
+            // wire field and a migration path for a possible off-by-one.
+            var share = (int)Math.Round(sideAllocation * (double)owned / total, MidpointRounding.AwayFromZero);
+
+            // Never round an owner with troops down to nothing. A share of zero on the side holding the local
+            // player's party is what CoopBattleMissionSpawnHandler treats as "origin missing" - it aborts the
+            // battle - so a small allocation must still field someone.
+            if (share <= 0) share = 1;
+
+            return Math.Min(share, sideAllocation);
+        }
+    }
+
     public int NumTroopsNotSupplied
     {
         get
@@ -277,6 +333,12 @@ public class CoopTroopSupplier : IMissionTroopSupplier
 
     public IEnumerable<IAgentOriginBase> SupplyTroops(int numberToAllocate)
     {
+        // The engine asks every client for the WHOLE side's allocation, because each one now sizes from the
+        // same side totals. Serving all of it from our own pool would field the side once per owner, so take
+        // only our share; the other owners' agents arrive replicated (OwnedAgentReplicator/PuppetSpawner).
+        numberToAllocate = OwnedShareOf(numberToAllocate);
+        if (numberToAllocate <= 0) return Array.Empty<IAgentOriginBase>();
+
         // BR-110: allocate no more troops than the engine has RENDER-SLOT capacity for — a mounted troop needs
         // two slots (rider + horse). The unallocated remainder stays UNSUPPLIED (wave-eligible), so the native
         // wave logic re-requests it as casualties free slots; the supplied pointer stays aligned with what can

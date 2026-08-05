@@ -212,4 +212,81 @@ public class CoopTroopSupplierTests
         Assert.Equal(0, SuppliedFor(supplier, "A"));
         Assert.Equal(3, supplier.GetRemainingForParty("A"));
     }
+
+    // --- side totals and per-owner shares -------------------------------------------------------------
+    // The engine splits a fixed battle size in proportion to the totals it is handed, and it asks EVERY
+    // client for the whole side's allocation. Sizing from what a client happens to own made a side divided
+    // between two players measure smaller than it is: its opponent was capped against that fraction while
+    // the divided side kept filling from each owner. Live case that produced it: attacker 955 across two
+    // clients (382 here), defender 1400 held by the host -> the split came out 1400:382 instead of 1400:955,
+    // capping the defenders at 300 while the attackers fielded 673.
+
+    [Fact]
+    public void SideTotal_DefaultsToOwned_WhenServerSendsNone()
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        supplier.SetReserve(new[] { Party("P1", 382) });
+
+        Assert.Equal(382, supplier.SideTotalTroops);
+        Assert.Equal(100, supplier.OwnedShareOf(100)); // sole owner: the whole allocation
+    }
+
+    [Fact]
+    public void SideTotal_UsesServerValue_AndSharesAllocationByOwnership()
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        supplier.SetReserve(new[] { Party("P1", 382) }, sideTotal: 955);
+
+        Assert.Equal(955, supplier.SideTotalTroops);
+        Assert.Equal(160, supplier.OwnedShareOf(400)); // 400 * 382/955 = 160.0
+    }
+
+    [Fact]
+    public void OwnersShares_SumToTheAllocation_WithoutOverSpawning()
+    {
+        var mine = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        mine.SetReserve(new[] { Party("P1", 382) }, sideTotal: 955);
+
+        var theirs = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        theirs.SetReserve(new[] { Party("P2", 573, seedBase: 9000) }, sideTotal: 955);
+
+        const int allocation = 400;
+        var combined = mine.OwnedShareOf(allocation) + theirs.OwnedShareOf(allocation);
+
+        // Rounding may move a single troop either way; what must never happen is the side being fielded
+        // once per owner, which is what the bug did.
+        Assert.InRange(combined, allocation - 1, allocation + 1);
+        Assert.True(combined < allocation * 2);
+    }
+
+    [Fact]
+    public void SoleOwnerOfASide_StillGetsTheWholeAllocation()
+    {
+        var host = new CoopTroopSupplier("M1", BattleSideEnum.Defender, null, new BattleAgentBudget());
+        host.SetReserve(new[] { Party("AI", 1400) }, sideTotal: 1400);
+
+        Assert.Equal(600, host.OwnedShareOf(600));
+    }
+
+    [Fact]
+    public void SmallAllocation_NeverRoundsAnOwnerDownToNothing()
+    {
+        // A zero share on the side holding the local player's party reads as "origin missing" to the spawn
+        // handler, which aborts the battle - the failure this must not reintroduce.
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        supplier.SetReserve(new[] { Party("P1", 10) }, sideTotal: 1000);
+
+        Assert.Equal(1, supplier.OwnedShareOf(1));
+        Assert.True(supplier.OwnedShareOf(5) >= 1);
+    }
+
+    [Fact]
+    public void ZeroSideTotal_FromAnOlderServer_LeavesEarlierValueIntact()
+    {
+        var supplier = new CoopTroopSupplier("M1", BattleSideEnum.Attacker, null, new BattleAgentBudget());
+        supplier.SetReserve(new[] { Party("P1", 382) }, sideTotal: 955);
+        supplier.SetReserve(new[] { Party("P1", 382) }); // resend with no total
+
+        Assert.Equal(955, supplier.SideTotalTroops);
+    }
 }

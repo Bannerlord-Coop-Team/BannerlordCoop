@@ -175,8 +175,13 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     {
         bool defenderPopulated = _defenderSupplier.IsPopulated;
         bool attackerPopulated = _attackerSupplier.IsPopulated;
-        int defenderOwned = _defenderSupplier.TotalTroops;
-        int attackerOwned = _attackerSupplier.TotalTroops;
+        // The SIDE's totals, not this client's share of them. The engine splits a fixed battle size in
+        // proportion to the two numbers it is given, so a client sizing from what it happens to own measures
+        // a side that is divided between players at a fraction of its strength: its opponent gets capped
+        // against that fraction, and the divided side ends up fielding more men than the larger one.
+        // Falls back to owned totals when the server sent none.
+        int defenderOwned = _defenderSupplier.SideTotalTroops;
+        int attackerOwned = _attackerSupplier.SideTotalTroops;
         return new SideSizing(defenderPopulated, attackerPopulated, defenderOwned, attackerOwned);
     }
 
