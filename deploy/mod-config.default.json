@@ -122,5 +122,14 @@
     // false: vanilla - a retreat decides the battle, and the siege ends with it.
     // If the BESIEGER is the side that retreats, the siege is lifted either way.
     "resumeSiegeWhenEnemyRetreats": true,
+
+    // Whether a besieged settlement's garrison joins a relief force that attacks the besiegers.
+    // A garrison only ever leaves the walls through a sally-out, and that is checked on the
+    // settlement's hourly tick - which cannot run while a player sits in the relief battle, since
+    // campaign time is paused. So without this the defenders you came to save never show up.
+    // (Default) true:  the garrison (and militia, per militiaJoinsSallyOut) sorties to fight beside
+    //                  the relieving force, exactly as a sally-out would.
+    // false: vanilla - the relief force fights alone.
+    "garrisonJoinsSiegeRelief": true,
   }
 }

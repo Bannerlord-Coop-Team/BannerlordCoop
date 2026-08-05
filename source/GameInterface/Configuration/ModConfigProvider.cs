@@ -50,6 +50,8 @@ public readonly struct ModOptions
     public readonly float MaximumLootersMultiplier { get; } = 1f;
     [ProtoMember(17)]
     public readonly bool ResumeSiegeWhenEnemyRetreats { get; } = true;
+    [ProtoMember(18)]
+    public readonly bool GarrisonJoinsSiegeRelief { get; } = true;
 
     [ProtoMember(16)]
     public readonly bool MilitiaJoinsSallyOut { get; } = true;
@@ -72,5 +74,6 @@ public readonly struct ModOptions
         MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;
         MilitiaJoinsSallyOut = modOptionsData.MilitiaJoinsSallyOut ?? MilitiaJoinsSallyOut;
         ResumeSiegeWhenEnemyRetreats = modOptionsData.ResumeSiegeWhenEnemyRetreats ?? ResumeSiegeWhenEnemyRetreats;
+        GarrisonJoinsSiegeRelief = modOptionsData.GarrisonJoinsSiegeRelief ?? GarrisonJoinsSiegeRelief;
     }
 }
