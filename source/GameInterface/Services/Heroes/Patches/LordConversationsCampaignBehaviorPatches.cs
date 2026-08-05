@@ -31,6 +31,7 @@ internal class LordConversationsCampaignBehaviorPatches
 
         var message = new TakeLordPrisoner(Campaign.Current.MainParty.Party, Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(null, message);
+        MarkFreedLordConversationHandled(Hero.OneToOneConversationHero);
 
         return false;
     }
