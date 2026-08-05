@@ -93,21 +93,26 @@ public class KingdomHandler : IHandler
             if (data.KingdomId != null &&
                 !objectManager.TryGetObjectWithLogging<Kingdom>(data.KingdomId, out kingdom)) return;
 
-            if (ReferenceEquals(clan.Kingdom, kingdom)) return;
-
-            using (new AllowedThread())
+            // Only MOVE the clan when the value actually changed - but always refresh the visuals below.
+            // The _kingdom AutoSync packet usually lands before this explicit message, so by the time it
+            // arrives the value already matches and returning early here left every fief the clan holds
+            // still flying its old kingdom's colours until something else happened to redraw them.
+            if (!ReferenceEquals(clan.Kingdom, kingdom))
             {
-                clan._kingdom = kingdom;
-            }
+                using (new AllowedThread())
+                {
+                    clan._kingdom = kingdom;
+                }
 
-            // The kingdom's own rosters arrive as their own collection messages; keeping the local
-            // caches consistent here avoids a window where the clan points at a kingdom that does
-            // not list it (or vice versa).
-            kingdomMembershipState.MoveClanToKingdom(
-                previousKingdom: null,
-                kingdom,
-                clan,
-                publishCollectionChanges: false);
+                // The kingdom's own rosters arrive as their own collection messages; keeping the local
+                // caches consistent here avoids a window where the clan points at a kingdom that does
+                // not list it (or vice versa).
+                kingdomMembershipState.MoveClanToKingdom(
+                    previousKingdom: null,
+                    kingdom,
+                    clan,
+                    publishCollectionChanges: false);
+            }
 
             RefreshSettlementVisuals(clan);
         },
