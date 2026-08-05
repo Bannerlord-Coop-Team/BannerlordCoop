@@ -424,9 +424,15 @@ internal class InteractionPatches
             return;
 
         initializingPlayerBattles.Remove(__instance);
+
+        // Window first, THEN the announcement. Publish is synchronous, so the reinforcement handler runs
+        // inside this call - and it asks IsWithinAiJoinWindow before deciding whether to scan. Announcing
+        // first meant that question was always asked of a window that did not exist yet, so the immediate
+        // scan was rejected every time and nearby lords only ever joined on a later tick, if at all.
         playerBattleWindows.GetValue(
             __instance,
             _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
+
         MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
     }
 
