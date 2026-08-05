@@ -168,15 +168,37 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        var validation = FactionHelper.IsKingdomNameApplicable(payload.Name);
-        if (validation == null || !validation.Item1)
+        if (!IsKingdomNameAvailable(kingdom, payload.Name, out string validationReason))
         {
-            string validationReason = validation?.Item2 ?? "kingdom name was invalid";
             RejectKingdomNameChange(payload, validationReason);
             return;
         }
 
         ApplyNativeKingdomNameChange(kingdom, payload.Name);
+    }
+
+    // FactionHelper.IsKIngdomNameApplicable relies on Clan.PlayerClan.Kingdom
+    // But Clan.PlayerCla is null on a dedicated server. Applied a new name so others are not confused
+    private static bool IsKingdomNameAvailable(Kingdom kingdom, string requestedName, out string reason)
+    {
+        var validationErr = FactionHelper.IsFactionNameApplicable(requestedName);
+        
+        bool nameAlreadyExists = Kingdom.All?.Any(
+            otherKingdom => !ReferenceEquals(otherKingdom, kingdom) && otherKingdom.Name.ToString() == requestedName) == true;
+        
+        if (nameAlreadyExists)
+        {
+            validationErr.Add(GameTexts.FindText("str_kingdom_name_invalid_already_exist", null));
+        }
+
+        if (validationErr.Count == 0)
+        {
+            reason = null;
+            return true;
+        }
+        
+        reason = string.Join(Environment.NewLine + Environment.NewLine, validationErr.Select(error => error.ToString()));
+        return false;
     }
 
     private static void ApplyNativeKingdomNameChange(Kingdom kingdom, string requestedName)
