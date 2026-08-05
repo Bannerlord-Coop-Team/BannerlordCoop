@@ -5,8 +5,8 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.UI.Credits;
 
 /// <summary>
-/// Backs the credits popup: a title above named sections (contributors, community, supporters)
-/// and a close button. Section names come from <see cref="CreditsRoster"/>.
+/// Backs the credits popup: a title above named sections (sponsors, supporters, contributors,
+/// community) and a close button. Section names come from <see cref="CreditsRoster"/>.
 /// </summary>
 public class CreditsPopupVM : ViewModel
 {
@@ -20,12 +20,14 @@ public class CreditsPopupVM : ViewModel
     }
 
     public string TitleText => "Credits";
+    public string SponsorsHeaderText => "Sponsors";
+    public string SupportersHeaderText => "Supporters";
     public string ContributorsHeaderText => "Contributors";
     public string CommunityHeaderText => "Community";
-    public string SupportersHeaderText => "Supporters";
+    public string SponsorsText => FormatNames(CreditsRoster.Sponsors);
+    public string SupportersText => FormatNames(CreditsRoster.Supporters);
     public string ContributorsText => FormatNames(CreditsRoster.Contributors);
     public string CommunityText => FormatNames(CreditsRoster.Community);
-    public string SupportersText => FormatNames(CreditsRoster.Supporters);
     public string CloseButtonText => "Close";
 
     public void ActionClose()

@@ -1647,7 +1647,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 Server.NetPeer,
                 new NetworkConversationDenied(
                     ConversationDeniedReason.PartyEngaged,
-                    firstRequest.RequestId)));
+                    firstRequest.RequestId),
+                markGameThread: false));
         Common.GameThread.Instance.MarkGameThread();
 
         Assert.Equal(firstRequest.RequestId, GetPendingConversationRequestId(client));
@@ -1738,7 +1739,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     playerPartyId,
                     forcePlayerOutFromSettlement: false,
                     ConversationRestartSource.EncounterManager,
-                    secondRequestId)));
+                    secondRequestId),
+                markGameThread: false));
         Common.GameThread.Instance.MarkGameThread();
         Assert.True(Common.GameThread.Instance.QueueLength > 0);
 

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace GameInterface.Services.UI.Credits;
 
@@ -8,6 +8,19 @@ namespace GameInterface.Services.UI.Credits;
 /// </summary>
 internal static class CreditsRoster
 {
+    /// <summary>Organizations and communities sponsoring the project.</summary>
+    public static readonly IReadOnlyList<string> Sponsors = new[]
+    {
+        "骑砍中文站 (www.mountblade.com.cn)",
+    };
+
+    /// <summary>People who supported the project financially (donations, Patreon).</summary>
+    public static readonly IReadOnlyList<string> Supporters = new[]
+    {
+        "Koung",
+        "Lord Zippykins",
+    };
+
     /// <summary>
     /// GitHub contributors ordered by contribution count
     /// (github.com/Bannerlord-Coop-Team/BannerlordCoop/graphs/contributors).
@@ -64,10 +77,4 @@ internal static class CreditsRoster
 
     /// <summary>Community members: moderators, translators, testers, and other helpers.</summary>
     public static readonly IReadOnlyList<string> Community = new string[0];
-
-    /// <summary>People who supported the project financially (donations, Patreon).</summary>
-    public static readonly IReadOnlyList<string> Supporters = new[]
-    {
-        "Koung",
-    };
 }
