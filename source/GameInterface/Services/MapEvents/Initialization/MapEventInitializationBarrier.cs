@@ -115,21 +115,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                     tracker.AddParty(party);
         }
         Capture(state, mapEvent);
-        bool hasEventId = TryGetId(mapEvent, out var mapEventId);
-        bool hasTrackerId = TryGetId(tracker, out var trackerId);
-        bool hasComponentId = TryGetId(mapEvent.Component, out var componentId);
-        bool hasVisualId = TryGetId(mapEvent.MapEventVisual as GauntletMapEventVisual, out var visualId);
-        if (!hasEventId || !hasTrackerId || !hasComponentId || !hasVisualId)
+        if (!TryResolveCommitIds(mapEvent, tracker,
+                out var mapEventId, out var trackerId, out var componentId, out var visualId))
         {
-            // The abort destroys the whole battle graph on the server AND every client; without a
-            // named reason its only trace is a generic ObjectManager id-miss line, which has made
-            // this exit the least diagnosable step of battle replication.
-            Logger.Error(
-                "Aborting MapEvent commit: unresolvable id (event={HasEventId}, tracker={HasTrackerId}, " +
-                "component={HasComponentId} [{ComponentType}], visual={HasVisualId} [{VisualType}])",
-                hasEventId, hasTrackerId,
-                hasComponentId, mapEvent.Component?.GetType().Name ?? "null",
-                hasVisualId, mapEvent.MapEventVisual?.GetType().Name ?? "null");
             AbortServer(mapEvent);
             return;
         }
@@ -137,6 +125,27 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         network.SendAll(new NetworkMapEventInitialized(mapEventId, false, trackerId, componentId, visualId));
         state.Committed = true;
         state.Announced.Clear();
+    }
+
+    private bool TryResolveCommitIds(MapEvent mapEvent, TroopUpgradeTracker tracker,
+        out string mapEventId, out string trackerId, out string componentId, out string visualId)
+    {
+        bool hasEventId = TryGetId(mapEvent, out mapEventId);
+        bool hasTrackerId = TryGetId(tracker, out trackerId);
+        bool hasComponentId = TryGetId(mapEvent.Component, out componentId);
+        bool hasVisualId = TryGetId(mapEvent.MapEventVisual as GauntletMapEventVisual, out visualId);
+        if (hasEventId && hasTrackerId && hasComponentId && hasVisualId) return true;
+
+        // The resulting abort destroys the whole battle graph on the server AND every client;
+        // without a named reason its only trace is a generic ObjectManager id-miss line, which has
+        // made this exit the least diagnosable step of battle replication.
+        Logger.Error(
+            "Aborting MapEvent commit: unresolvable id (event={HasEventId}, tracker={HasTrackerId}, " +
+            "component={HasComponentId} [{ComponentType}], visual={HasVisualId} [{VisualType}])",
+            hasEventId, hasTrackerId,
+            hasComponentId, mapEvent.Component?.GetType().Name ?? "null",
+            hasVisualId, mapEvent.MapEventVisual?.GetType().Name ?? "null");
+        return false;
     }
 
     public void AbortServer(MapEvent mapEvent)
