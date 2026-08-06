@@ -43,7 +43,7 @@ namespace Common
                 catch (Exception e)
                 {
                     string name = updateable.GetType().Name;
-                    switch (faultThrottle.Classify(e, out long repeats))
+                    switch (faultThrottle.Classify(name, e, out long repeats))
                     {
                         case FaultLogAction.Full:
                             Logger.Error(e, "{Updateable} threw during update and was suppressed", name);

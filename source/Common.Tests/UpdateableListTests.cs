@@ -1,3 +1,4 @@
+using Common.Logging;
 using System;
 using System.Collections.Generic;
 
@@ -43,6 +44,36 @@ public sealed class UpdateableListTests
     }
 
     [Fact]
+    public void UpdateAll_WhenTwoEntriesRaiseTheSameFault_ReportsBothOfThem()
+    {
+        // One throttle serves the whole list, and both entries have to be named.
+        const string marker = "same fault from two updateables";
+        var reported = new List<string>();
+        void Capture(string line)
+        {
+            if (!line.Contains(marker)) return;
+            lock (reported) reported.Add(line);
+        }
+
+        var list = new UpdateableList();
+        list.Add(new FaultingFirst(marker));
+        list.Add(new FaultingSecond(marker));
+
+        OutputSinkManager.AddLogCallback(Capture);
+        try
+        {
+            list.UpdateAll(TimeSpan.Zero);
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(Capture);
+        }
+
+        Assert.Contains(reported, line => line.Contains(nameof(FaultingFirst)));
+        Assert.Contains(reported, line => line.Contains(nameof(FaultingSecond)));
+    }
+
+    [Fact]
     public void UpdateAll_WithoutFailures_UpdatesEveryEntryInPriorityOrder()
     {
         var updated = new List<string>();
@@ -54,6 +85,30 @@ public sealed class UpdateableListTests
         list.UpdateAll(TimeSpan.Zero);
 
         Assert.Equal(new[] { "high", "low" }, updated);
+    }
+
+    /// <summary>Two types, because the throttle keys on the entry's type name.</summary>
+    private sealed class FaultingFirst : IUpdateable
+    {
+        private readonly string message;
+
+        public FaultingFirst(string message) => this.message = message;
+
+        public int Priority => 10;
+
+        public void Update(TimeSpan frameTime) => throw new InvalidOperationException(message);
+    }
+
+    /// <inheritdoc cref="FaultingFirst"/>
+    private sealed class FaultingSecond : IUpdateable
+    {
+        private readonly string message;
+
+        public FaultingSecond(string message) => this.message = message;
+
+        public int Priority => 0;
+
+        public void Update(TimeSpan frameTime) => throw new InvalidOperationException(message);
     }
 
     private sealed class StubUpdateable : IUpdateable

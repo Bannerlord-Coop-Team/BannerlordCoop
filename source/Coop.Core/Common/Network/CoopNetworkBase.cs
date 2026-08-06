@@ -30,7 +30,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     protected readonly IPacketManager packetManager;
     protected readonly IMessagePacketHandler messagePacketHandler;
 
-    // Per-endpoint: a peer sending unreadable payloads would otherwise log at packet rate.
+    // A peer sending unreadable payloads would otherwise log at packet rate.
     private readonly FaultLogThrottle receiveFaultThrottle = new FaultLogThrottle();
 
     private readonly Poller poller;
@@ -389,7 +389,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         }
         catch (Exception ex)
         {
-            switch (receiveFaultThrottle.Classify(ex, out long repeats))
+            switch (receiveFaultThrottle.Classify(DescribePeer(peer), ex, out long repeats))
             {
                 case FaultLogAction.Full:
                     Logger.Error(ex, "Failed to process packet of type {Type} from peer {PeerId}",
@@ -402,6 +402,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
             }
         }
     }
+
+    private static string DescribePeer(NetPeer peer) => peer?.Id.ToString() ?? "(no peer)";
 
     public abstract void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType);
 
