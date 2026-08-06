@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using LiteNetLib;
@@ -95,7 +96,9 @@ internal class ClanPartiesVMHandler : IHandler
 
         string newLeaderId = null;
         if (data.NewLeader != null && !objectManager.TryGetIdWithLogging(data.NewLeader, out newLeaderId)) return;
-        if (!objectManager.TryGetIdWithLogging(data.OldLeader, out var oldLeaderId)) return;
+
+        string oldLeaderId = null;
+        if (data.OldLeader != null && !objectManager.TryGetIdWithLogging(data.OldLeader, out oldLeaderId)) return;
 
         string selectedPartyId = null;
         if (data.SelectedParty != null && !objectManager.TryGetIdWithLogging(data.SelectedParty, out selectedPartyId)) return;
@@ -115,15 +118,22 @@ internal class ClanPartiesVMHandler : IHandler
             Hero newLeader = null;
             if (data.NewLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(data.NewLeaderId, out newLeader)) return;
 
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OldLeaderId, out var oldLeader)) return;
+            Hero oldLeader = null;
+            if (data.OldLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(data.OldLeaderId, out oldLeader)) return;
 
-            MobileParty selectedParty = null;
-            if (data.SelectedPartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(data.SelectedPartyId, out selectedParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.SelectedPartyId, out var selectedParty)) return;
 
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
+            // Block changing leader if party is a player party
+            if (selectedParty.IsPlayerParty())
+            {
+                Logger.Error($"Blocked clan party leader change for player party {selectedParty.Name}, {selectedParty.StringId}");
+                return;
+            }
+
             var isDisbanding = newLeader == null;
-            var existingOldLeader = selectedParty?.Party?.LeaderHero != null;
+            var existingOldLeader = oldLeader != null;
             if (existingOldLeader)
             {
                 if (isDisbanding) // Disbanding party

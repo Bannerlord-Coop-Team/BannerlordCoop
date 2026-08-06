@@ -30,12 +30,28 @@ internal class ClanPartiesVMPatches
         return false;
     }
 
+    /// <summary>
+    /// The party the change-leader popup was opened for. Save to use in OnPartyLeaderChangedPrefix.
+    /// Any incoming refresh messages can change ClanPartiesVM.CurrentSelectedParty to the player's party.
+    /// </summary>
+    private static MobileParty popupParty;
+
+    [HarmonyPatch(nameof(ClanPartiesVM.OnShowChangeLeaderPopup))]
+    [HarmonyPrefix]
+    public static void OnShowChangeLeaderPopupPrefix(ClanPartiesVM __instance)
+    {
+        popupParty = __instance.CurrentSelectedParty?.Party?.MobileParty;
+    }
+
     [HarmonyPatch(nameof(ClanPartiesVM.OnPartyLeaderChanged))]
     [HarmonyPrefix]
     public static bool OnPartyLeaderChangedPrefix(ClanPartiesVM __instance, Hero newLeader)
     {
-        var selectedParty = __instance.CurrentSelectedParty.Party.MobileParty;
-        var oldLeader = __instance.CurrentSelectedParty.Party.LeaderHero;
+        // Use popupParty instead of the CurrentSelectedParty that can change from any incoming refresh messages
+        var selectedParty = popupParty ?? __instance.CurrentSelectedParty?.Party?.MobileParty;
+        popupParty = null;
+
+        var oldLeader = selectedParty?.Party?.LeaderHero;
 
         // Change clan party leader on the server
         var message = new ClanPartyLeaderChanged(Hero.MainHero, newLeader, oldLeader, selectedParty, MobileParty.MainParty);
