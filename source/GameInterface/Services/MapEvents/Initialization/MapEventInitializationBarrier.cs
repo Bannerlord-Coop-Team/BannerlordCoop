@@ -192,7 +192,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             TroopUpgradeTracker tracker = null;
             bool hasTracker = !string.IsNullOrEmpty(message.TroopUpgradeTrackerId) &&
                 objectManager.TryGetObjectWithLogging<TroopUpgradeTracker>(message.TroopUpgradeTrackerId, out tracker);
-            bool componentMatches = Matches(message.ComponentId, mapEvent.Component);
+            bool componentMatches = TryBindComponent(message.ComponentId, mapEvent);
             bool visualMatches = Matches(message.VisualId, mapEvent.MapEventVisual as GauntletMapEventVisual);
             if (!hasTracker || !componentMatches || !visualMatches)
             {
@@ -217,6 +217,31 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private bool Matches<T>(string id, T actual) where T : class =>
         id == null ? actual == null :
         objectManager.TryGetObjectWithLogging<T>(id, out var expected) && ReferenceEquals(expected, actual);
+
+    private bool TryBindComponent(string id, MapEvent mapEvent)
+    {
+        MapEventComponent component = null;
+        if (id != null && !objectManager.TryGetObjectWithLogging(id, out component))
+            return false;
+
+        if (component?.MapEvent != null && !ReferenceEquals(component.MapEvent, mapEvent))
+            return false;
+
+        if (ReferenceEquals(mapEvent.Component, component) &&
+            (component == null || ReferenceEquals(component.MapEvent, mapEvent)))
+        {
+            return true;
+        }
+
+        using (new AllowedThread())
+        {
+            if (component != null)
+                component.MapEvent = mapEvent;
+            mapEvent.Component = component;
+        }
+
+        return true;
+    }
 
     private void FinishClient(MapEvent mapEvent, bool abort)
     {

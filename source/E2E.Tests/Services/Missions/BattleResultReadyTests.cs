@@ -432,7 +432,6 @@ public class BattleResultReadyTests : MissionTestEnvironment
                 clients[1].NetPeer,
                 "late-player",
                 mapEventId,
-                out _,
                 out _));
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             Assert.Equal(BattleState.None, mapEvent.BattleState);

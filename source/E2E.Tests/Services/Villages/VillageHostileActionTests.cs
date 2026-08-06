@@ -1197,6 +1197,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
         Assert.Equal(mapEventId, Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single().MapEventId);
 
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer));
         Server.SimulateMessage(client.NetPeer, new NetworkMissionEntered("PlayerOne", mapEventId!));
 
         Server.Call(() => Assert.False(InvokeMapEventUpdatePrefix(mapEvent!)), MapEventDisabledMethods);

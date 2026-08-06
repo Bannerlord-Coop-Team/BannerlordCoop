@@ -393,6 +393,54 @@ internal class PartyCommands
     }
 
     /// <summary>
+    /// Applies the same upgrade command created by the Party-screen row.
+    /// </summary>
+    [CommandLineArgumentFunction("upgrade_party_screen_troop", "coop.debug.mobileparty")]
+    public static string UpgradePartyScreenTroopCommand(List<string> strings)
+    {
+        if (ModInformation.IsServer) return "Command can only be run on a client.";
+        if (strings.Count < 1 || strings.Count > 2)
+            return "Usage: coop.debug.mobileparty.upgrade_party_screen_troop <character id> [upgrade target index]";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out CharacterObject character))
+            return $"Character with id {strings[0]} not found.";
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
+            return "No active party screen.";
+
+        int upgradeTarget = 0;
+        if (strings.Count == 2 && (!int.TryParse(strings[1], out upgradeTarget) || upgradeTarget < 0))
+            return "Upgrade target index must be a non-negative integer.";
+        if (upgradeTarget >= character.UpgradeTargets.Length)
+            return $"{strings[0]} has {character.UpgradeTargets.Length} upgrade targets.";
+
+        var logic = partyState.PartyScreenLogic;
+        int rosterIndex = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]
+            .FindIndexOfTroop(character);
+        if (rosterIndex < 0) return $"{strings[0]} is not in the right member roster.";
+
+        var troop = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]
+            .GetElementCopyAtIndex(rosterIndex);
+        int insertionIndex = logic.GetIndexToInsertTroop(
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Member,
+            troop);
+        var command = new PartyScreenLogic.PartyCommand();
+        command.FillForUpgradeTroop(
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Member,
+            character,
+            1,
+            upgradeTarget,
+            insertionIndex);
+        if (!logic.ValidateCommand(command))
+            return $"PARTY_SCREEN_UPGRADE_REJECTED character={strings[0]} target={upgradeTarget}";
+
+        logic.AddCommand(command);
+        return $"PARTY_SCREEN_UPGRADE_STAGED character={strings[0]} " +
+            $"target={character.UpgradeTargets[upgradeTarget].StringId} pending={logic.IsThereAnyChanges()}";
+    }
+
+    /// <summary>
     /// Creates a real pending Party-screen transfer for live synchronization tests.
     /// </summary>
     [CommandLineArgumentFunction("stage_party_screen_transfer", "coop.debug.mobileparty")]
