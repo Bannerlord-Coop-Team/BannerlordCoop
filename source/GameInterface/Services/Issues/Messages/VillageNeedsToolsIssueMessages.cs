@@ -69,7 +69,7 @@ public readonly struct VillageIssueAlternativeAcceptTriggered : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageIssueCreated : ICommand
+public readonly struct NetworkVillageIssueCreated : IServerToClientCommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
@@ -118,7 +118,7 @@ public readonly struct RequestVillageIssueRemoved : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageIssueRemoved : ICommand
+public readonly struct NetworkVillageIssueRemoved : IServerToClientCommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
@@ -145,7 +145,7 @@ public readonly struct RequestVillageIssueAcceptQuest : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageIssueQuestAccepted : ICommand
+public readonly struct NetworkVillageIssueQuestAccepted : IServerToClientCommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
@@ -172,7 +172,7 @@ public readonly struct RequestVillageIssueAcceptAlternative : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageIssueAlternativeAccepted : ICommand
+public readonly struct NetworkVillageIssueAlternativeAccepted : IServerToClientCommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
@@ -187,7 +187,7 @@ public readonly struct NetworkVillageIssueAlternativeAccepted : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageIssueAcceptRejected : ICommand
+public readonly struct NetworkVillageIssueAcceptRejected : IServerToClientCommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
