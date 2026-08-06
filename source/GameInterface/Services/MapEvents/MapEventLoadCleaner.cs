@@ -29,11 +29,21 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
         foreach (var mapEvent in loadedPlayerMapEvents)
         {
+            var involvedMobileParties = mapEvent.InvolvedParties
+                .Where(party => party.IsMobile && party.MobileParty.IsActive)
+                .Select(party => party.MobileParty)
+                .ToArray();
+
             logger.Information(
                 "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
                 mapEvent.StringId,
                 mapEvent.InvolvedParties.Count());
             mapEvent.FinalizeEvent();
+
+            foreach (var mobileParty in involvedMobileParties)
+            {
+                mobileParty.Ai.ForceDefaultBehaviorUpdate();
+            }
         }
     }
 }

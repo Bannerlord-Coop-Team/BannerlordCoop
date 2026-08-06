@@ -22,12 +22,16 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+            attacker.Ai.DefaultBehaviorNeedsUpdate = false;
+            defender.Ai.DefaultBehaviorNeedsUpdate = false;
 
             Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Null(attacker.Party.MapEventSide);
             Assert.Null(defender.Party.MapEventSide);
+            Assert.True(attacker.Ai.DefaultBehaviorNeedsUpdate);
+            Assert.True(defender.Ai.DefaultBehaviorNeedsUpdate);
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
         }, MapEventDisabledMethods);
 
