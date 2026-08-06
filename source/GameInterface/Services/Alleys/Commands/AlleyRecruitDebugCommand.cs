@@ -345,7 +345,7 @@ public class AlleyRecruitDebugCommand
         for (var index = roster.Count - 1; index >= 0; index--)
         {
             var element = roster.GetElementCopyAtIndex(index);
-            roster.AddToCountsAtIndex(index, -element.Number, -element.WoundedNumber, 0, false);
+            roster.AddToCountsAtIndex(index, -element.Number, -element.WoundedNumber, -element.Xp, false);
         }
         foreach (var element in elements)
         {
