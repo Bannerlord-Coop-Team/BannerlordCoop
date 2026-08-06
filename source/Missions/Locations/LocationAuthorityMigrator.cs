@@ -5,6 +5,7 @@ using Missions.Messages;
 using Missions.Services.Network;
 using SandBox;
 using SandBox.Missions.AgentBehaviors;
+using SandBox.Objects.AnimationPoints;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -304,7 +305,26 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         // SetTarget(null) the seated agent right back off the point.
         var walking = navigator.GetBehaviorGroup<DailyBehaviorGroup>()?.GetBehavior<WalkingBehavior>();
         if (walking != null)
+        {
             walking._lastTarget = machine;
+
+            // SetCustomWanderTarget cleared the wander wait timer, and with most of the crowd on
+            // points at migration (216 of 228 in the live repro) a FRESH full wait for everyone at
+            // once is a synchronized transition drought — the square looks frozen for the first
+            // minute-plus. The previous host's timers were mid-flight, so hand this agent a
+            // BACKDATED one: uniform elapsed share of the point's own rolled duration, restoring
+            // the steady-state leave cadence from the first post-migration tick. npc_idle-tagged
+            // targets get no timer, exactly like the native arrival path.
+            if (!machine.GameEntity.HasTag("npc_idle"))
+            {
+                float wait = usedPoint is AnimationPoint animationPoint
+                    ? animationPoint.GetRandomWaitInSeconds()
+                    : 10f;
+                if (wait >= 0f)
+                    walking._waitTimer = new TaleWorlds.Core.Timer(
+                        Mission.Current.CurrentTime - wait * MBRandom.RandomFloat, wait);
+            }
+        }
 
         // Restore the native Using-state anchor — the AI-scripted seat frame AnimationPoint issues
         // when a native agent seats (and which never took effect on the Controller.None puppet) —
