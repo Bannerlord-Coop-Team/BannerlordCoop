@@ -1,32 +1,36 @@
 using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
+using LiteNetLib;
+using Serilog;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Handlers;
 
-/// <summary>
-/// Routes <see cref="Interfaces.AwaitingAlternativeSolutionTroopsRegistry"/> deposits/drains to the server.
-/// Deliberately one-way (client -&gt; server only, no broadcast back to other clients): only the server's own
-/// registry matters, since that is what a reconnecting owner's own client is restored from.
-/// </summary>
 internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AwaitingAlternativeSolutionTroopsHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IPlayerManager playerManager;
 
     public AwaitingAlternativeSolutionTroopsHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        ITroopRosterInterface troopRosterInterface)
+        ITroopRosterInterface troopRosterInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<AwaitingAlternativeSolutionTroopsDepositedLocally>(Handle_AwaitingAlternativeSolutionTroopsDepositedLocally);
         messageBroker.Subscribe<RequestAwaitingAlternativeSolutionTroopsDeposit>(Handle_RequestAwaitingAlternativeSolutionTroopsDeposit);
@@ -58,6 +62,13 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        if (!IsFromRegisteredPeer(payload.Who) || !playerManager.TryGetPlayer(data.OwnerControllerId, out _))
+        {
+            Logger.Error("Rejecting {Message} for unrecognized/unregistered owner {Owner}",
+                nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), data.OwnerControllerId);
+            return;
+        }
+
         var roster = TroopRoster.CreateDummyTroopRoster();
         foreach (var element in troopRosterInterface.UnpackTroopRosterData(data.Troops))
         {
@@ -78,6 +89,16 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        AwaitingAlternativeSolutionTroopsRegistry.Clear(payload.What.OwnerControllerId);
+        var ownerControllerId = payload.What.OwnerControllerId;
+        if (!IsFromRegisteredPeer(payload.Who) || !playerManager.TryGetPlayer(ownerControllerId, out _))
+        {
+            Logger.Error("Rejecting {Message} for unrecognized/unregistered owner {Owner}",
+                nameof(RequestAwaitingAlternativeSolutionTroopsDrain), ownerControllerId);
+            return;
+        }
+
+        AwaitingAlternativeSolutionTroopsRegistry.Clear(ownerControllerId);
     }
+
+    private bool IsFromRegisteredPeer(object who) => who is NetPeer peer && playerManager.TryGetPlayer(peer, out _);
 }
