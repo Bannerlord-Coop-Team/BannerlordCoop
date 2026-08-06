@@ -229,6 +229,26 @@ public class AlleyRecruitDebugCommand
         }
     }
 
+    [CommandLineArgumentFunction("recruit_overseer_state", "coop.debug.alley")]
+    public static string RecruitOverseerState(List<string> args)
+    {
+        if (ModInformation.IsServer) return "Run this command on the owning client.";
+        if (args.Count != 2)
+            return "Usage: coop.debug.alley.recruit_overseer_state <settlementId> <alleyIndex>";
+        if (!TryGetAlley(args[0], args[1], out var alley, out var error)) return error;
+        if (Mission.Current == null) return "ALLEY_RECRUIT_OVERSEER_STATE mission=False present=False";
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<AlleyCampaignBehavior>();
+        var playerAlleyData = behavior?._playerOwnedCommonAreaData.FirstOrDefault(data => data.Alley == alley);
+        if (playerAlleyData == null) return "ALLEY_RECRUIT_OVERSEER_STATE mission=True present=False owner=False";
+
+        var overseerAgent = Mission.Current.Agents.FirstOrDefault(candidate =>
+            candidate.Character is CharacterObject character &&
+            character.HeroObject == playerAlleyData.AssignedClanMember);
+        return $"ALLEY_RECRUIT_OVERSEER_STATE mission=True present={overseerAgent != null} " +
+               $"owner=True overseer={playerAlleyData.AssignedClanMember.StringId}";
+    }
+
     [CommandLineArgumentFunction("recruit_conversation_start", "coop.debug.alley")]
     public static string StartRecruitConversation(List<string> args)
     {
