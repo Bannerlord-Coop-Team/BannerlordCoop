@@ -35,8 +35,9 @@ internal class GenericQuestTypeQuestSolutionAcceptTriggerPatch
     private static void Postfix(Hero issueOwner, bool __result)
     {
         // A mirror replay runs under AllowedThread - skip re-publishing so it doesn't loop back through the
-        // network again.
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        // network again. A genuine server-side replay only runs under IssueDispatchReplayGuard, so other
+        // unrelated patches still fire normally.
+        if (CallOriginalPolicy.IsOriginalAllowed() || IssueDispatchReplayGuard.IsActive) return;
         if (!__result) return;
 
         var descriptor = QuestTypeRegistry.Get(issueOwner?.Issue);
@@ -55,7 +56,7 @@ internal class GenericQuestTypeAlternativeAcceptTriggerPatch
     [HarmonyPostfix]
     private static void Postfix(IssueBase __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallOriginalPolicy.IsOriginalAllowed() || IssueDispatchReplayGuard.IsActive) return;
 
         var descriptor = QuestTypeRegistry.Get(__instance);
         if (descriptor?.OnGenuineAlternativeAccept == null) return;
