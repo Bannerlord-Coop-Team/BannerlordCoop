@@ -1,6 +1,8 @@
 ﻿using Serilog;
+using GameInterface.Services.MobileParties.Extensions;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -33,6 +35,11 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 .Where(party => party.IsMobile && party.MobileParty.IsActive)
                 .Select(party => party.MobileParty)
                 .ToArray();
+            var playerLedArmies = involvedMobileParties
+                .Select(mobileParty => mobileParty.Army)
+                .Where(army => army != null && army.LeaderParty.IsPlayerParty())
+                .Distinct()
+                .ToArray();
 
             logger.Information(
                 "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
@@ -40,9 +47,19 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 mapEvent.InvolvedParties.Count());
             mapEvent.FinalizeEvent();
 
+            foreach (var army in playerLedArmies)
+            {
+                logger.Information(
+                    "Dispersing loaded player-led army {ArmyName} released from map event {MapEventId}",
+                    army.Name,
+                    mapEvent.StringId);
+                DisbandArmyAction.ApplyByUnknownReason(army);
+            }
+
             foreach (var mobileParty in involvedMobileParties)
             {
-                mobileParty.Ai.ForceDefaultBehaviorUpdate();
+                if (mobileParty.IsActive && !mobileParty.IsPlayerParty())
+                    mobileParty.ResetNavigationToHold();
             }
         }
     }
