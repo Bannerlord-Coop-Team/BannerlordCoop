@@ -12,6 +12,7 @@ using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Handlers;
+using GameInterface.Services.Chat;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
@@ -487,6 +488,9 @@ namespace Coop
 
             if (ContainerProvider.TryResolve<IGameInterface>(out var gameInterface))
                 gameInterface.PatchGameStarted();
+
+            if (!isServer && ContainerProvider.TryResolve<IChatService>(out var chatService))
+                chatService.Initialize();
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
