@@ -305,6 +305,17 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         var walking = navigator.GetBehaviorGroup<DailyBehaviorGroup>()?.GetBehavior<WalkingBehavior>();
         if (walking != null)
             walking._lastTarget = machine;
+
+        // Restore the native Using-state anchor — the AI-scripted seat frame AnimationPoint issues
+        // when a native agent seats (and which never took effect on the Controller.None puppet) —
+        // realigning in the same stroke whatever offset the agent accumulated as a puppet.
+        var frame = usedPoint.GetUserFrameForAgent(agent);
+        agent.ClearTargetFrame();
+        agent.SetScriptedPositionAndDirection(
+            ref frame.Origin,
+            frame.Rotation.f.AsVec2.RotationInRadians,
+            addHumanLikeDelay: false,
+            Agent.AIScriptedFrameFlags.DoNotRun);
     }
 
     private static UsableMachine FindOwningMachine(StandingPoint point)

@@ -288,6 +288,15 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
             agent.StopUsingGameObject(isSuccessful: true);
 
         agent.UseGameObject(point);
+
+        // Plant the puppet on the point's user frame — the same thing native MP does for remote
+        // users (UsableMissionObject.OnUse client branch). The alignment the point issues natively
+        // is AI-scripted movement a Controller.None agent ignores, and the point's arrive gate
+        // (AnimationPoint.IsTargetReached) measures the agent against its ENGINE TARGET — left
+        // stale it passes wherever the puppet stands, playing the sit displaced beside the seat.
+        // With the target set, the puppet walks the last step, faces the seat, then sits on it.
+        var frame = point.GetUserFrameForAgent(agent);
+        agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
     }
 
     private static void StopPointUse(Agent agent)

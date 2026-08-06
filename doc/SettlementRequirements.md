@@ -140,8 +140,14 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   (`LocationPoseLock.IsPointOwned`); point users' actions are NOT broadcast (the point animates
   both sides). This replaced the enforce-flag pin apparatus that compensated for replicating the
   point's OUTPUTS (the floating/spinning/sliding sitter chain). Non-point ambient one-offs stay on
-  the action carve-out. Degradation: a point id that fails to resolve locally leaves that puppet
-  un-animated with a warning (only possible on mismatched scenes).
+  the action carve-out. Puppet seating alignment: the point's native alignment is AI-scripted
+  movement a `Controller.None` puppet ignores, and `AnimationPoint.IsTargetReached` gates the
+  arrive action on distance to the agent's ENGINE TARGET — so on use application the puppet's
+  target is set to `GetUserFrameForAgent` (the native-MP remote-user planting,
+  `UsableMissionObject.OnUse` client branch): it walks the last step onto the seat, faces it, then
+  sits. Adoption re-issues the AI-scripted seat anchor for the same reason (SR-030). Degradation: a
+  point id that fails to resolve locally leaves that puppet un-animated with a warning (only
+  possible on mismatched scenes).
   IMPLEMENTED (live verification outstanding)
 
 ---
