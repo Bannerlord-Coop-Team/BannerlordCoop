@@ -383,8 +383,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
             }
             else
             {
-                Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type} from peer {PeerId}",
-                    received?.GetType(), peer?.Id);
+                ReportUnhandledPayload(peer, received);
             }
         }
         catch (OperationCanceledException) when (sessionCancellation.IsCancellationRequested)
@@ -406,6 +405,27 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
                         peer?.Id, repeats, ex.Message);
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Throttled like the caught failures around it, because this branch takes no exception to get here
+    /// and a peer can hit it on every packet it sends.
+    /// </summary>
+    private void ReportUnhandledPayload(NetPeer peer, object received)
+    {
+        string type = received?.GetType().FullName ?? "(null)";
+
+        switch (receiveFaultThrottle.Classify(DescribePeer(peer), "unhandled payload " + type, out long repeats))
+        {
+            case FaultLogAction.Full:
+                Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type} from peer {PeerId}",
+                    type, peer?.Id);
+                break;
+            case FaultLogAction.Summary:
+                Logger.Error("Still receiving payloads that are neither IPacket nor IMessage from peer {PeerId} ({RepeatCount}x): {Type}",
+                    peer?.Id, repeats, type);
+                break;
         }
     }
 

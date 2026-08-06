@@ -1,3 +1,4 @@
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
@@ -7,6 +8,7 @@ using Coop.Tests.Extensions;
 using LiteNetLib;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.Serialization;
@@ -110,6 +112,34 @@ public sealed class CoopNetworkBaseReceiveTests : IDisposable
     }
 
     [Fact]
+    public void HandleReceivedPayload_WithRepeatedUnhandledPayloads_ReportsOnlyTheFirst()
+    {
+        var reported = new List<string>();
+        void Capture(string line)
+        {
+            if (!line.Contains(nameof(UnhandledPayloadStub))) return;
+            lock (reported) reported.Add(line);
+        }
+
+        serializer.Setup(s => s.Deserialize(It.IsAny<byte[]>())).Returns(new UnhandledPayloadStub());
+
+        OutputSinkManager.AddLogCallback(Capture);
+        try
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                network.Receive(peer, new byte[] { 15 });
+            }
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(Capture);
+        }
+
+        Assert.Single(reported);
+    }
+
+    [Fact]
     public void HandleReceivedPayload_WithAValidPacket_StillDispatchesIt()
     {
         var packet = Mock.Of<IPacket>();
@@ -144,6 +174,11 @@ public sealed class CoopNetworkBaseReceiveTests : IDisposable
     {
         network.Dispose();
         sessionCancellation.Dispose();
+    }
+
+    /// <summary>A payload that is neither <see cref="IPacket"/> nor <see cref="IMessage"/>.</summary>
+    private sealed class UnhandledPayloadStub
+    {
     }
 
     /// <summary>
