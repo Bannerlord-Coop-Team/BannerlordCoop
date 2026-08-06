@@ -115,7 +115,9 @@ internal class CompanionRolesPatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        __instance._partyCreatedAfterRescueForCompanion = false;
+        // Skip CompanionRescued when a party was created
+        if (__instance._partyCreatedAfterRescueForCompanion) return false;
+
         if (Hero.OneToOneConversationHero.IsPrisoner)
         {
             var message = new CompanionRescued(Hero.OneToOneConversationHero);
