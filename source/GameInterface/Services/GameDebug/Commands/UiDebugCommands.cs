@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using GameInterface.Utils.Commands;
 using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
@@ -48,6 +49,30 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         }
 
         return "Called GameMenu.ExitToLast().";
+    }
+
+    [CommandLineArgumentFunction("switch_menu", "coop.debug.ui")]
+    public static string SwitchMenu(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.ui.switch_menu <menuId>";
+
+        if (Campaign.Current == null)
+            return "Failed: no active campaign.";
+
+        try
+        {
+            GameMenu.SwitchToMenu(args[0]);
+        }
+        catch (Exception ex)
+        {
+            return CommandHelpers.FormatException("Switch menu", ex);
+        }
+
+        return $"Switched to game menu {args[0]}.";
     }
 
     [CommandLineArgumentFunction("pop_state", "coop.debug.ui")]

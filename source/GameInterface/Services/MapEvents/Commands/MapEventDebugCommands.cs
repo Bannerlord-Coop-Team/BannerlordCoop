@@ -144,6 +144,9 @@ public class MapEventDebugCommands
         public string ControllerId;
         public MobileParty PlayerParty;
         public MobileParty BanditParty;
+        public Settlement PlayerSettlement;
+        public bool BanditWasActive;
+        public TroopRosterElement[] BanditMemberRoster;
         public MapEvent MapEvent;
         public PartyBase[] InvolvedParties;
         public PartyBehaviorUpdateData PlayerBehavior;
@@ -602,16 +605,16 @@ public class MapEventDebugCommands
                $"against player {args[0]} after removing {removedTroops} excess fixture troops.";
     }
 
-    // coop.debug.mapevent.bandit_attack_fixture_start PlayerOne mountain_bandits_24
-    /// <summary>Starts a reversible server-authoritative attack by an exact bandit party.</summary>
-    [CommandLineArgumentFunction("bandit_attack_fixture_start", "coop.debug.mapevent")]
-    public static string StartBanditAttackFixture(List<string> args)
+    // coop.debug.mapevent.bandit_attack_fixture_prepare PlayerOne mountain_bandits_24
+    /// <summary>Prepares a reversible exact-bandit attack fixture for evidence capture.</summary>
+    [CommandLineArgumentFunction("bandit_attack_fixture_prepare", "coop.debug.mapevent")]
+    public static string PrepareBanditAttackFixture(List<string> args)
     {
         if (ModInformation.IsClient)
             return "Run this command on the server.";
 
         if (args.Count != 2)
-            return "Usage: coop.debug.mapevent.bandit_attack_fixture_start <controllerId> <banditPartyId>";
+            return "Usage: coop.debug.mapevent.bandit_attack_fixture_prepare <controllerId> <banditPartyId>";
 
         if (banditAttackFixture != null)
             return "A bandit attack fixture is already active.";
@@ -626,14 +629,13 @@ public class MapEventDebugCommands
             return $"Unable to resolve bandit party {args[1]}: {error}";
         }
 
-        if (!banditParty.IsActive || !banditParty.IsBandit || banditParty.MapEvent != null ||
-            banditParty.CurrentSettlement != null || banditParty.MemberRoster.TotalManCount <= 0)
+        if (!banditParty.IsBandit || banditParty.MapEvent != null || banditParty.CurrentSettlement != null)
         {
-            return $"Bandit party {args[1]} must be active, populated, outside a settlement, and outside a map event.";
+            return $"Bandit party {args[1]} must be a bandit outside a settlement and map event.";
         }
 
-        if (playerParty.CurrentSettlement != null)
-            return $"Player {args[0]} must be outside a settlement.";
+        if (playerParty.Army?.LeaderParty == playerParty && playerParty.AttachedParties.Count > 0)
+            return $"Player {args[0]} must not lead an army with attached parties.";
 
         if (!objectManager.TryGetId(playerParty, out string playerPartyId) ||
             !objectManager.TryGetId(playerParty.Party, out string playerPartyBaseId) ||
@@ -650,15 +652,115 @@ public class MapEventDebugCommands
             return "Unable to capture the original party behavior.";
         }
 
+        CharacterObject fixtureTroop = null;
+        if (banditParty.MemberRoster.TotalManCount <= 0)
+        {
+            fixtureTroop = MobileParty.All
+                .Where(party => party != banditParty && party.IsActive && party.IsBandit &&
+                                party.MemberRoster.TotalManCount > 0)
+                .SelectMany(party => party.MemberRoster.GetTroopRoster())
+                .Where(element => !element.Character.IsHero && element.Number > 0)
+                .OrderByDescending(element => element.Number)
+                .Select(element => element.Character)
+                .FirstOrDefault();
+            if (fixtureTroop == null)
+                return "No active bandit party has a regular troop for the fixture.";
+        }
+
         var fixture = new BanditAttackFixture
         {
             ControllerId = args[0],
             PlayerParty = playerParty,
             BanditParty = banditParty,
+            PlayerSettlement = playerParty.CurrentSettlement,
+            BanditWasActive = banditParty.IsActive,
+            BanditMemberRoster = banditParty.MemberRoster.GetTroopRoster().ToArray(),
             PlayerBehavior = playerBehavior,
             BanditBehavior = banditBehavior,
         };
         banditAttackFixture = fixture;
+
+        try
+        {
+            if (playerParty.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(playerParty);
+
+            if (fixtureTroop != null)
+                banditParty.MemberRoster.AddToCounts(fixtureTroop, 1);
+            banditParty.IsActive = true;
+            banditParty.Position = new CampaignVec2(
+                new Vec2(playerParty.Position.X - 0.4f, playerParty.Position.Y),
+                isOnLand: true);
+            banditParty.SetMoveModeHold();
+            banditParty.ResetNavigationToHold();
+
+            MessageBroker.Instance.Publish(
+                typeof(MapEventDebugCommands),
+                new PartyBehaviorChangeAttempted(
+                    banditParty,
+                    forcePosition: true,
+                    isCurrentlyAtSea: false,
+                    resetMovementToHold: true));
+
+            return $"Bandit attack fixture prepared: controller={args[0]}, playerParty={playerPartyId}, " +
+                   $"playerPartyBase={playerPartyBaseId}, banditParty={banditPartyId}, " +
+                   $"banditPartyBase={banditPartyBaseId}, banditStringId={banditParty.StringId}, " +
+                   $"originalSettlement={fixture.PlayerSettlement?.StringId ?? "none"}, " +
+                   $"originalBanditActive={fixture.BanditWasActive}, " +
+                   $"originalBanditTroops={fixture.BanditMemberRoster.Sum(element => element.Number)}.";
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to prepare bandit attack fixture");
+            if (TryRestoreBanditAttackFixture(fixture, out var restoreError))
+                banditAttackFixture = null;
+            else
+                return $"Fixture preparation failed: {e.Message}. Cleanup failed: {restoreError}. Run the restore command.";
+
+            return $"Fixture preparation failed: {e.Message}";
+        }
+    }
+
+    // coop.debug.mapevent.bandit_attack_fixture_start PlayerOne mountain_bandits_24
+    /// <summary>Starts the prepared server-authoritative attack by the exact bandit party.</summary>
+    [CommandLineArgumentFunction("bandit_attack_fixture_start", "coop.debug.mapevent")]
+    public static string StartBanditAttackFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.bandit_attack_fixture_start <controllerId> <banditPartyId>";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager";
+
+        var fixture = banditAttackFixture;
+        if (fixture == null || fixture.ControllerId != args[0] ||
+            !MatchesPartyId(objectManager, fixture.BanditParty, args[1]))
+        {
+            return $"Prepare the bandit attack fixture for {args[0]} and {args[1]} first.";
+        }
+
+        if (fixture.MapEvent != null)
+            return "The bandit attack fixture was already started.";
+
+        var playerParty = fixture.PlayerParty;
+        var banditParty = fixture.BanditParty;
+        if (!banditParty.IsActive || banditParty.MemberRoster.TotalManCount <= 0 ||
+            playerParty.CurrentSettlement != null || banditParty.CurrentSettlement != null ||
+            playerParty.MapEvent != null || banditParty.MapEvent != null)
+        {
+            return "The prepared bandit attack fixture is no longer ready.";
+        }
+
+        if (!objectManager.TryGetId(playerParty, out string playerPartyId) ||
+            !objectManager.TryGetId(playerParty.Party, out string playerPartyBaseId) ||
+            !objectManager.TryGetId(banditParty, out string banditPartyId) ||
+            !objectManager.TryGetId(banditParty.Party, out string banditPartyBaseId))
+        {
+            return "The player and bandit parties must have registered MobileParty and PartyBase ids.";
+        }
 
         try
         {
@@ -723,7 +825,11 @@ public class MapEventDebugCommands
         return $"Bandit attack fixture state: controller={args[0]}, local={playerParty == MobileParty.MainParty}, " +
                $"playerParty={playerPartyId ?? "unregistered"}, banditParty={banditPartyId ?? "unregistered"}, " +
                $"banditStringId={banditParty.StringId}, playerMapEvent={playerMapEventId ?? "none"}, " +
-               $"banditMapEvent={banditMapEventId ?? "none"}, sharedMapEvent={playerParty.MapEvent != null && playerParty.MapEvent == banditParty.MapEvent}, " +
+               $"banditMapEvent={banditMapEventId ?? "none"}, " +
+               $"sharedMapEvent={playerParty.MapEvent != null && playerParty.MapEvent == banditParty.MapEvent}, " +
+               $"playerSettlement={playerParty.CurrentSettlement?.StringId ?? "none"}, " +
+               $"banditSettlement={banditParty.CurrentSettlement?.StringId ?? "none"}, " +
+               $"banditActive={banditParty.IsActive}, banditTroops={banditParty.MemberRoster.TotalManCount}, " +
                $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "none"}.";
     }
 
@@ -781,6 +887,12 @@ public class MapEventDebugCommands
                     fixture.BanditParty,
                     forcePosition: true,
                     isCurrentlyAtSea: fixture.BanditParty.IsCurrentlyAtSea));
+
+            RestoreTroopRoster(fixture.BanditParty.MemberRoster, fixture.BanditMemberRoster);
+            fixture.BanditParty.IsActive = fixture.BanditWasActive;
+
+            if (fixture.PlayerSettlement != null)
+                EnterSettlementAction.ApplyForParty(fixture.PlayerParty, fixture.PlayerSettlement);
 
             error = null;
             return true;
