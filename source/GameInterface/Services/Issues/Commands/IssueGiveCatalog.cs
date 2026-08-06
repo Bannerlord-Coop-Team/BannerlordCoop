@@ -173,11 +173,16 @@ internal static class IssueGiveCatalog
     // --- Related-object types (20) - derive a simple, always-constructible default ---
     private static void AddRelatedObjectEntries(Dictionary<string, IssueGiveEntry> map)
     {
+        AddFortificationRelatedEntries(map);
+        AddHideoutRelatedEntries(map);
+        AddOtherHeroRelatedEntries(map);
+        AddMiscRelatedEntries(map);
+    }
+
+    private static void AddFortificationRelatedEntries(Dictionary<string, IssueGiveEntry> map)
+    {
         void Wire(string key, Type issueType, Func<Hero, (PotentialIssueData.StartIssueDelegate, string)> resolve) =>
             IssueGiveCatalog.Wire(map, key, issueType, resolve);
-
-        Wire("VillageNeedsTools", typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue),
-            hero => Ok(h => new VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue(h, DefaultItems.Tools)));
 
         Wire("TheConquestOfSettlement", typeof(TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue), hero =>
         {
@@ -218,6 +223,12 @@ internal static class IssueGiveCatalog
                 ? Fail("no town/castle settlement exists in the current campaign")
                 : Ok(h => new TheSpyPartyIssueQuestBehavior.TheSpyPartyIssue(h, settlement));
         });
+    }
+
+    private static void AddHideoutRelatedEntries(Dictionary<string, IssueGiveEntry> map)
+    {
+        void Wire(string key, Type issueType, Func<Hero, (PotentialIssueData.StartIssueDelegate, string)> resolve) =>
+            IssueGiveCatalog.Wire(map, key, issueType, resolve);
 
         Wire("CapturedByBountyHunters", typeof(CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue), hero =>
         {
@@ -250,14 +261,12 @@ internal static class IssueGiveCatalog
                 ? Fail("no hideout settlement exists in the current campaign")
                 : Ok(h => new MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue(h, hideoutSettlement.Hideout));
         });
+    }
 
-        Wire("MerchantArmyOfPoachers", typeof(MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue), hero =>
-        {
-            var village = AnyVillageSettlement();
-            return village?.Village == null
-                ? Fail("no village settlement exists in the current campaign")
-                : Ok(h => new MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue(h, village.Village));
-        });
+    private static void AddOtherHeroRelatedEntries(Dictionary<string, IssueGiveEntry> map)
+    {
+        void Wire(string key, Type issueType, Func<Hero, (PotentialIssueData.StartIssueDelegate, string)> resolve) =>
+            IssueGiveCatalog.Wire(map, key, issueType, resolve);
 
         Wire("LordsNeedsTutor", typeof(LordsNeedsTutorIssueBehavior.LordsNeedsTutorIssue), hero =>
         {
@@ -297,6 +306,23 @@ internal static class IssueGiveCatalog
             return counterOfferHero == null
                 ? Fail("no other alive hero exists in the current campaign to act as the counter-offer hero")
                 : Ok(h => new ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue(h, counterOfferHero, DefaultItems.Grain));
+        });
+    }
+
+    private static void AddMiscRelatedEntries(Dictionary<string, IssueGiveEntry> map)
+    {
+        void Wire(string key, Type issueType, Func<Hero, (PotentialIssueData.StartIssueDelegate, string)> resolve) =>
+            IssueGiveCatalog.Wire(map, key, issueType, resolve);
+
+        Wire("VillageNeedsTools", typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue),
+            hero => Ok(h => new VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue(h, DefaultItems.Tools)));
+
+        Wire("MerchantArmyOfPoachers", typeof(MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue), hero =>
+        {
+            var village = AnyVillageSettlement();
+            return village?.Village == null
+                ? Fail("no village settlement exists in the current campaign")
+                : Ok(h => new MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssue(h, village.Village));
         });
 
         Wire("LandLordTheArtOfTheTrade", typeof(LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue),
