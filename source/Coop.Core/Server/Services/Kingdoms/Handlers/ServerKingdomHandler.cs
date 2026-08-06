@@ -129,11 +129,9 @@ public class ServerKingdomHandler : IHandler
     private void HandleLocalKingdomNameChanged(MessagePayload<KingdomNameChanged> obj)
     {
         var payload = obj.What;
-
-        if (!playerManager.TryGetPeer(payload.ControllerId, out var peer)) return;
         
-        // Obtain the player's NetPeer and send only to that peer
-        network.Send(peer, new NetworkKingdomNameChanged(payload.KingdomId));
+        // Broadcasts the notification to all clients
+        network.SendAll(new NetworkKingdomNameChanged(payload.KingdomId));
     }
 
     private static bool TryCreatePendingSettlementRestore(
