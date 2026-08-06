@@ -12,8 +12,9 @@ namespace GameInterface.Services.MapEvents;
 /// Server-side registry of AI parties currently held in a conversation/encounter with a player.
 /// </summary>
 /// <remarks>
-/// Each player can engage one target. Hostile contenders may share a target, which stays held until the last
-/// engagement ends.
+/// One engagement per player, and one player per target: a party someone else already holds cannot be engaged,
+/// hostile or not. Every server-side consequence of a map conversation is authorised only as "this peer holds an
+/// engagement with this party", so a shared hold would let two players each apply the same one-shot outcome.
 /// </remarks>
 internal sealed class ConversationPartyTracker : IHandler
 {
@@ -128,8 +129,9 @@ internal sealed class ConversationPartyTracker : IHandler
     }
 
     /// <summary>
-    /// Begins or refreshes an engagement. A player cannot replace a live engagement with a different target, and
-    /// every player sharing a target preserves the AI state recorded by its first engagement.
+    /// Begins or refreshes an engagement. A player cannot replace a live engagement with a different target, and a
+    /// target another player already holds is refused. Refreshing keeps the AI state recorded when the engagement
+    /// began, so releasing it restores what the party was doing before.
     /// </summary>
     public bool TryBeginEngagement(
         object engagerKey,

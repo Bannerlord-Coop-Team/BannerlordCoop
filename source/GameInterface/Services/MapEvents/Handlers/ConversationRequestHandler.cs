@@ -32,8 +32,8 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// both parties are players or either party is already in a <see cref="TaleWorlds.CampaignSystem.MapEvents.MapEvent"/>.
 /// Client (on approval): re-runs <c>PlayerEncounter.RestartPlayerEncounter</c> with the same parameters under an
 /// <see cref="AllowedThread"/> so the now-approved original executes.
-/// Server (additionally): while a conversation is open, the AI party is held in place. Hostile players may share
-/// that hold so simultaneous attack attempts can converge on one MapEvent.
+/// Server (additionally): while a conversation is open, the AI party is held in place for exactly one player. A
+/// second player is refused the hold rather than sharing it, hostile or not.
 /// </remarks>
 internal class ConversationRequestHandler : IHandler
 {

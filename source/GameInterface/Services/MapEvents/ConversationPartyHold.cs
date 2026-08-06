@@ -50,7 +50,8 @@ internal static class ConversationPartyHold
     }
 
     /// <summary>
-    /// Marks the party as engaged and holds it in place. The tracker decides whether the engagement can be shared.
+    /// Marks the party as engaged and holds it in place. The tracker refuses a party another player already holds,
+    /// so a successful call means this engager owns it alone.
     /// </summary>
     public static bool TryEngage(
         ConversationPartyTracker tracker,
