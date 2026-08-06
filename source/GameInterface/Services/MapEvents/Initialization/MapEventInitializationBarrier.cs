@@ -14,6 +14,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -49,6 +50,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
+    private HashSet<PartyBase> pendingParties = new HashSet<PartyBase>();
     private bool disposed;
 
     public MapEventInitializationBarrier(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
@@ -69,37 +71,48 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         messageBroker.Unsubscribe<NetworkMapEventInitialized>(HandleCommit);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         states.Clear();
+        PublishPendingParties();
     }
 
     public bool IsPending(MapEvent mapEvent) =>
         mapEvent != null && states.TryGetValue(mapEvent, out var state) && !state.Committed;
 
     public bool IsPartyPending(PartyBase party) =>
-        party != null && states.Values.Any(state => state.Parties.Contains(party) || state.Announced.Contains(party));
+        party != null && Volatile.Read(ref pendingParties).Contains(party);
 
     public void Register(MapEvent mapEvent, bool committed = false)
     {
         if (disposed || mapEvent == null) return;
         if (!states.TryGetValue(mapEvent, out var state)) states.Add(mapEvent, state = new State(mapEvent));
-        if (!committed) return;
-        Capture(state, mapEvent);
-        state.Committed = true;
-        state.Parties.Clear();
+        if (committed)
+        {
+            Capture(state, mapEvent);
+            state.Committed = true;
+            state.Parties.Clear();
+        }
+        PublishPendingParties();
     }
 
     public void SetServerPartyPending(MapEvent mapEvent, PartyBase party, bool pending)
     {
         if (mapEvent == null || party == null || !states.TryGetValue(mapEvent, out var state)) return;
-        if (!state.Committed && !(pending ? state.Announced.Add(party) : state.Announced.Remove(party))) return;
+        bool stateChanged = false;
+        if (!state.Committed)
+        {
+            stateChanged = pending ? state.Announced.Add(party) : state.Announced.Remove(party);
+            if (!stateChanged) return;
+        }
         if (objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId) &&
             objectManager.TryGetIdWithLogging(party, out var partyId))
         {
+            if (stateChanged) PublishPendingParties();
             network.SendAll(new NetworkMapEventPartyPending(mapEventId, partyId, !pending));
             return;
         }
-        if (!state.Committed)
+        if (stateChanged)
         {
             if (pending) state.Announced.Remove(party); else state.Announced.Add(party);
+            PublishPendingParties();
         }
     }
 
@@ -125,6 +138,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         network.SendAll(new NetworkMapEventInitialized(mapEventId, false, trackerId, componentId, visualId));
         state.Committed = true;
         state.Announced.Clear();
+        PublishPendingParties();
     }
 
     private bool TryResolveCommitIds(MapEvent mapEvent, TroopUpgradeTracker tracker,
@@ -174,6 +188,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             Register(mapEvent);
             if (message.IsCancellation) states[mapEvent].Parties.Remove(party);
             else states[mapEvent].Parties.Add(party);
+            PublishPendingParties();
         }, context: nameof(NetworkMapEventPartyPending));
     }
 
@@ -280,6 +295,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             if (state.Visual != null) PublishVisual(state.Visual, state.Position);
             state.Committed = true;
             state.Parties.Clear();
+            PublishPendingParties();
         }
         catch (Exception ex)
         {
@@ -306,12 +322,13 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
         if (state == null || state.Committed)
         {
-            state?.Parties.Remove(party.Party);
+            if (state?.Parties.Remove(party.Party) == true) PublishPendingParties();
             afterCommit?.Invoke();
             return;
         }
 
         state.Parties.Add(party.Party);
+        PublishPendingParties();
         state.Callback += afterCommit;
     }
 
@@ -374,6 +391,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
         foreach (var visual in state.Owned.OfType<GauntletMapEventVisual>().ToArray()) EndVisual(visual);
         states.Remove(mapEvent);
+        PublishPendingParties();
         foreach (var instance in state.Owned) objectManager.Remove(instance);
     }
 
@@ -518,6 +536,17 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         (mapEvent.MapEventVisual is not GauntletMapEventVisual visual || ReferenceEquals(state.Visual, visual));
 
     internal static TroopUpgradeTracker GetTracker(MapEvent mapEvent) => mapEvent == null ? null : TrackerField(mapEvent);
+
+    private void PublishPendingParties()
+    {
+        var snapshot = new HashSet<PartyBase>();
+        foreach (var state in states.Values)
+        {
+            snapshot.UnionWith(state.Parties);
+            snapshot.UnionWith(state.Announced);
+        }
+        Volatile.Write(ref pendingParties, snapshot);
+    }
 
     private static void Capture(State state, MapEvent mapEvent)
     {
