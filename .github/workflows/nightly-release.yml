@@ -239,6 +239,7 @@ jobs:
           HEAD_SHA: ${{ steps.release.outputs.head_sha }}
         run: |
           set -eu
+          apk add --no-cache rclone >/dev/null
           test -n "$R2_ACCOUNT_ID"
           test -n "$R2_PUBLIC_BUCKET"
           export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
