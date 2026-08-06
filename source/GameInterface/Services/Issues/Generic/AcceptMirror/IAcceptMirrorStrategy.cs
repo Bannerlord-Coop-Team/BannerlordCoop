@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -13,52 +12,52 @@ public interface IAcceptMirrorStrategy<in TQuest, in TFields> where TQuest : Que
 
 public sealed class GenericAcceptMirror<TQuest, TFields> : IAcceptMirrorStrategy<TQuest, TFields> where TQuest : QuestBase
 {
-    private readonly IReadOnlyList<(FieldInfo Field, Func<TFields, object> Selector)> _writers;
+    private readonly IReadOnlyList<Action<TQuest, TFields>> _writers;
 
-    public GenericAcceptMirror(params (FieldInfo Field, Func<TFields, object> Selector)[] writers)
+    public GenericAcceptMirror(params Action<TQuest, TFields>[] writers)
     {
-        _writers = writers ?? Array.Empty<(FieldInfo, Func<TFields, object>)>();
+        _writers = writers ?? Array.Empty<Action<TQuest, TFields>>();
     }
 
     public void ForceWrite(TQuest quest, TFields fields)
     {
         if (quest == null) return;
-        foreach (var (field, selector) in _writers)
+        foreach (var writer in _writers)
         {
-            field.SetValue(quest, selector(fields));
+            writer(quest, fields);
         }
     }
 }
 
 public sealed class ScalarFieldAcceptMirror<TQuest, TValue> : IAcceptMirrorStrategy<TQuest, TValue> where TQuest : QuestBase
 {
-    private readonly FieldInfo _field;
+    private readonly Action<TQuest, TValue> _writer;
 
-    public ScalarFieldAcceptMirror(FieldInfo field)
+    public ScalarFieldAcceptMirror(Action<TQuest, TValue> writer)
     {
-        _field = field ?? throw new ArgumentNullException(nameof(field));
+        _writer = writer ?? throw new ArgumentNullException(nameof(writer));
     }
 
     public void ForceWrite(TQuest quest, TValue value)
     {
         if (quest == null) return;
-        _field.SetValue(quest, value);
+        _writer(quest, value);
     }
 }
 
 public sealed class IndexAcceptMirror<TQuest> : IAcceptMirrorStrategy<TQuest, int> where TQuest : QuestBase
 {
-    private readonly FieldInfo _indexField;
+    private readonly Action<TQuest, int> _indexWriter;
 
-    public IndexAcceptMirror(FieldInfo indexField)
+    public IndexAcceptMirror(Action<TQuest, int> indexWriter)
     {
-        _indexField = indexField ?? throw new ArgumentNullException(nameof(indexField));
+        _indexWriter = indexWriter ?? throw new ArgumentNullException(nameof(indexWriter));
     }
 
     public void ForceWrite(TQuest quest, int index)
     {
         if (quest == null) return;
-        _indexField.SetValue(quest, index);
+        _indexWriter(quest, index);
     }
 }
 
