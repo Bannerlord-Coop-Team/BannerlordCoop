@@ -73,9 +73,9 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     TrySetReleasedPartySettlementObjective(mobileParty, out var settlement))
                 {
                     logger.Information(
-                        "Sending released army party {PartyName} to {SettlementName} after finalizing map event {MapEventId}",
-                        mobileParty.Name,
-                        settlement.Name,
+                        "Sending released army party {PartyId} to {SettlementId} after finalizing map event {MapEventId}",
+                        mobileParty.StringId,
+                        settlement.StringId,
                         mapEvent.StringId);
                     continue;
                 }

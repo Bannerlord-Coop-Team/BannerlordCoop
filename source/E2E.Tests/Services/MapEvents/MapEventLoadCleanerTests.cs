@@ -3,6 +3,7 @@ using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -33,6 +34,8 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             var destination = GameObjectCreator.CreateInitializedObject<Settlement>();
             destination.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Town>());
             destination._position = follower.Position;
+            follower.SetCustomHomeSettlement(destination);
+            gatheringFollower.SetCustomHomeSettlement(destination);
             var army = new Army(kingdom, attacker, Army.ArmyTypes.Raider);
             follower.Army = army;
             follower.AttachedTo = attacker;
@@ -46,6 +49,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Null(gatheringFollower.MapEvent);
 
             Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            TestEnvironment.FlushCoalescer();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Null(attacker.Party.MapEventSide);
