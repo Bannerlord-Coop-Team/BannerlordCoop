@@ -308,7 +308,6 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         {
             harmony.UnpatchAll(harmony.Id);
         }
-
     }
 
     private static bool SuppressMarriageBarterableApply() => false;

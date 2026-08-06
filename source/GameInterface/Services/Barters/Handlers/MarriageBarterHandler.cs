@@ -208,33 +208,15 @@ internal sealed class MarriageBarterHandler : IHandler
                 return;
             }
 
-            var offeredBarterables = barterData.GetOfferedBarterables();
-            foreach (var barterable in offeredBarterables)
-                barterable.Apply();
-            // Past this point the marriage and any gold have already moved on the authoritative
-            // server. Anything that fails from here must NOT be reported as a rejection, or the
-            // client rolls its UI back and the two sides disagree about a change that really
-            // happened.
-            mutationApplied = true;
-            CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, barterData.OtherHero, offeredBarterables);
-            ApplyOverpayRelationBonus(playerHero, barterData.OtherHero, MathF.Max(0f, offerValue));
-            if (heroBeingProposedTo.Spouse != proposingHero || proposingHero.Spouse != heroBeingProposedTo)
-            {
-                // The barterables have already been applied and any gold has already moved, so this
-                // cannot be reported as a rejection - that is the desync, not the fix. Report success
-                // and let the replicated state stand; log it, because a spouse link that did not take
-                // is a real problem worth seeing even though the client must not roll back.
-                Logger.Error(
-                    "Marriage barter applied but the spouse links did not take: {Proposing} <-> {Proposed}",
-                    proposingHero?.StringId,
-                    heroBeingProposedTo?.StringId);
-            }
-
-            FlushHeroGold(playerHero);
-            FlushHeroGold(barterData.OtherHero);
-            FlushHeroGold(heroBeingProposedTo);
-            FlushHeroGold(proposingHero);
-            Accept(peer, request, playerHero.Gold);
+            ApplyMarriage(
+                peer,
+                request,
+                playerHero,
+                barterData,
+                heroBeingProposedTo,
+                proposingHero,
+                offerValue,
+                ref mutationApplied);
         }
         catch (Exception exception)
         {
@@ -253,6 +235,52 @@ internal sealed class MarriageBarterHandler : IHandler
                 playerHero.Gold,
                 "The server could not process the marriage offer.");
         }
+    }
+
+    /// <summary>
+    /// Commits the marriage and reports success.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="mutationApplied"/> as soon as the barterables land. Past that point the
+    /// marriage and any gold have already moved on the authoritative server, so nothing here may be
+    /// reported as a rejection - the client would roll its UI back over a change that really happened.
+    /// </remarks>
+    private void ApplyMarriage(
+        NetPeer peer,
+        NetworkRequestMarriageBarter request,
+        Hero playerHero,
+        BarterData barterData,
+        Hero heroBeingProposedTo,
+        Hero proposingHero,
+        float offerValue,
+        ref bool mutationApplied)
+    {
+        var offeredBarterables = barterData.GetOfferedBarterables();
+        foreach (var barterable in offeredBarterables)
+            barterable.Apply();
+
+        mutationApplied = true;
+
+        CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, barterData.OtherHero, offeredBarterables);
+        ApplyOverpayRelationBonus(playerHero, barterData.OtherHero, MathF.Max(0f, offerValue));
+
+        if (heroBeingProposedTo.Spouse != proposingHero || proposingHero.Spouse != heroBeingProposedTo)
+        {
+            // The barterables have already been applied and any gold has already moved, so this
+            // cannot be reported as a rejection - that is the desync, not the fix. Report success
+            // and let the replicated state stand; log it, because a spouse link that did not take
+            // is a real problem worth seeing even though the client must not roll back.
+            Logger.Error(
+                "Marriage barter applied but the spouse links did not take: {Proposing} <-> {Proposed}",
+                proposingHero?.StringId,
+                heroBeingProposedTo?.StringId);
+        }
+
+        FlushHeroGold(playerHero);
+        FlushHeroGold(barterData.OtherHero);
+        FlushHeroGold(heroBeingProposedTo);
+        FlushHeroGold(proposingHero);
+        Accept(peer, request, playerHero.Gold);
     }
 
     private void ProcessAuthorization(NetPeer peer, NetworkAuthorizeMarriageBarter request)
