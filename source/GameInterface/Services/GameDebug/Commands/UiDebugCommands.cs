@@ -1,5 +1,7 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Util;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Utils.Commands;
 using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
@@ -7,8 +9,10 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -49,6 +53,44 @@ Exits the current game menu (GameMenu.ExitToLast). Use to dismiss a post-battle 
         }
 
         return "Called GameMenu.ExitToLast().";
+    }
+
+    [CommandLineArgumentFunction("leave_settlement_encounter", "coop.debug.ui")]
+    public static string LeaveSettlementEncounter(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.ui.leave_settlement_encounter";
+
+        if (Campaign.Current == null)
+            return "Failed: no active campaign.";
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null)
+            return "Failed: no main party.";
+
+        if (PlayerEncounter.Battle != null || mainParty.MapEvent != null)
+            return "Cannot leave the settlement encounter after a battle has started.";
+
+        if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement == null)
+            return "No active settlement encounter to leave.";
+
+        if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
+            return "Unable to resolve the settlement interface.";
+
+        try
+        {
+            using (new AllowedThread())
+                settlementInterface.EndSettlementEncounter();
+        }
+        catch (Exception ex)
+        {
+            return CommandHelpers.FormatException("Leave settlement encounter", ex);
+        }
+
+        return "Cleared the local settlement encounter and returned to the campaign map.";
     }
 
     [CommandLineArgumentFunction("switch_menu", "coop.debug.ui")]
