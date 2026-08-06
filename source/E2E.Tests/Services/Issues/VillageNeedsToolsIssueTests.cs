@@ -492,21 +492,23 @@ public class VillageNeedsToolsIssueTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(owner.Issue.IsSolvingWithAlternative);
 
-            // Default CampaignTime reads as always-in-the-past - definitely past, unlike CampaignTime.Now
-            // which may not yet compare as IsPast at the exact instant it's assigned.
             owner.Issue.AlternativeSolutionReturnTimeForTroops = default;
             Assert.True(owner.Issue.AlternativeSolutionReturnTimeForTroops.IsPast);
 
-            // The real vanilla completion cascade NREs past this harness's boundary - expected and swallowed;
-            // what's under test is that OnHourlyTick reached TryTriggerOwnedAlternativeSolutionCompletion first.
-            try
-            {
-                OnHourlyTickMethod.Invoke(null, null);
-            }
-            catch (TargetInvocationException ex) when (ex.InnerException is NullReferenceException)
-            {
-            }
+            OnHourlyTickMethod.Invoke(null, null);
+        });
 
+        var request = Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAlternativeSolutionCompletion>());
+        Assert.Equal(fixture.HeroId, request.OwnerId);
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, request);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(IssueManagerQuestCompletedReasonCapture.PendingReasons.TryGetValue(owner, out var reason));
             Assert.Equal(VillageIssueFinalizeReason.AlternativeSolutionSuccess, reason);
         });

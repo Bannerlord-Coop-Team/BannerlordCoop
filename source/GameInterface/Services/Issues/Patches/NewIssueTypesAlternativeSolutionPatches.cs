@@ -1,7 +1,10 @@
 using Common;
+using Common.Network;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -244,23 +247,17 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
         }
     }
 
-    /// <summary>
-    /// Generic equivalent of e.g. <c>VillageNeedsToolsIssueInterface.TryTriggerOwnedAlternativeSolutionCompletion</c>
-    /// - safe to share across all four types here because none of it is type-specific: every
-    /// <see cref="IssueBase"/> already exposes <c>IsSolvingWithAlternative</c>/<c>AlternativeSolutionReturnTimeForTroops</c>/
-    /// <c>CompleteIssueWithAlternativeSolution</c> publicly, and the deterministic-success reasoning (no type
-    /// here has <c>AlternativeSolutionScaleFlag.FailureRisk</c> EXCEPT <c>CapturedByBountyHuntersIssue</c>,
-    /// which genuinely can fail - see its own bespoke Patches file for why that's still fine to route through
-    /// this same generic trigger: a failure just produces <c>VillageIssueFinalizeReason.IssueOnly</c> via
-    /// <see cref="IssueManagerQuestCompletedReasonCapture"/>'s fallback instead of
-    /// <c>AlternativeSolutionSuccess</c> - a cosmetic label difference only, harmless).
-    /// </summary>
     private static void TryTriggerOwnedAlternativeSolutionCompletion(IssueBase issue)
     {
-        if (!issue.IsSolvingWithAlternative || !issue.AlternativeSolutionReturnTimeForTroops.IsPast) return;
+        AlternativeSolutionCompletionRunner.TryTriggerOwnedCompletion(issue.IssueOwner, RequestServerCompletion);
+    }
 
-        IssueManagerQuestCompletedReasonCapture.PendingReasons[issue.IssueOwner] = VillageIssueFinalizeReason.AlternativeSolutionSuccess;
+    private static void RequestServerCompletion(Hero owner)
+    {
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
+        if (!ContainerProvider.TryResolve<INetwork>(out var network)) return;
+        if (!objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
 
-        issue.CompleteIssueWithAlternativeSolution(); // genuine call - NOT under AllowedThread, this is the real trigger
+        network.SendAll(new RequestAlternativeSolutionCompletion(ownerId));
     }
 }

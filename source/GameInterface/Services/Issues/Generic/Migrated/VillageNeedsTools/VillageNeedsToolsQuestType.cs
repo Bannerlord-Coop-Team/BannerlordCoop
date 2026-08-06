@@ -1,7 +1,10 @@
 using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic.CreationCapture;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -65,15 +68,16 @@ internal static class VillageNeedsToolsQuestType
 
     public static bool TryTriggerOwnedAlternativeSolutionCompletion(Hero owner)
     {
-        if (owner?.Issue is not Issue issue) return false;
-        if (!issue.IsSolvingWithAlternative || !issue.AlternativeSolutionReturnTimeForTroops.IsPast) return false;
-        if (!IssueOwnershipRegistry.IsLocalPeerOwner(owner)) return false;
+        return AlternativeSolutionCompletionRunner.TryTriggerOwnedCompletion(owner, RequestServerCompletion);
+    }
 
-        // Seeds the reason IssueFinalizedPatches.Postfix picks up when IssueFinalized() cascades below.
-        global::GameInterface.Services.Issues.Patches.IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = VillageIssueFinalizeReason.AlternativeSolutionSuccess;
+    private static void RequestServerCompletion(Hero owner)
+    {
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
+        if (!ContainerProvider.TryResolve<INetwork>(out var network)) return;
+        if (!objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
 
-        issue.CompleteIssueWithAlternativeSolution(); // genuine call - NOT under AllowedThread, this is the real trigger
-        return true;
+        network.SendAll(new RequestAlternativeSolutionCompletion(ownerId));
     }
 
     static VillageNeedsToolsQuestType()
