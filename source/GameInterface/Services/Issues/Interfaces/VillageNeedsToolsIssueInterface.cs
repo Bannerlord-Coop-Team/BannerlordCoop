@@ -1,5 +1,6 @@
 using Common.Util;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using System;
@@ -112,15 +113,5 @@ public class VillageNeedsToolsIssueInterface : IVillageNeedsToolsIssueInterface
         }
     }
 
-    public void RejectAcceptance(Hero owner)
-    {
-        if (owner?.Issue == null || owner.Issue.IsOngoingWithoutQuest) return;
-        if (owner.Issue.IssueQuest == null) return;
-        if (IssueOwnershipRegistry.IsLocalPeerOwner(owner)) return;
-
-        using (new AllowedThread())
-        {
-            owner.Issue.CompleteIssueWithCancel();
-        }
-    }
+    public void RejectAcceptance(Hero owner) => AcceptMirrorSupport.RejectAcceptance(owner);
 }
