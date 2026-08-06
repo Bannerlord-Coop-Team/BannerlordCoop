@@ -40,14 +40,17 @@ internal sealed partial class LordBarterHandler
             var breakdown = string.Join(", ", barter.GetOfferedBarterables()
                 .Select(b => $"{b.GetType().Name}x{b.CurrentAmount}={b.GetValueForFaction(targetHero.Clan)}"));
 
+            // The requesting player, NOT Hero.MainHero / Clan.PlayerClan: this runs on the server,
+            // where those are null on a dedicated host and are the HOST's own hero and clan on a
+            // listen host - never the player whose barter was refused, which is the one that matters.
             Logger.Warning(
                 "Lord barter refused on value. offerValue={OfferValue} threshold=-0.01 offered=[{Breakdown}] " +
-                "mainHero={MainHero} playerClan={PlayerClan} targetClan={TargetClan} " +
+                "playerHero={PlayerHero} playerClan={PlayerClan} targetClan={TargetClan} " +
                 "targetKingdom={Kingdom} kingdomClans={ClanCount} kingdomFiefs={FiefCount}",
                 offerValue,
                 breakdown,
-                Hero.MainHero?.StringId,
-                Clan.PlayerClan?.StringId,
+                playerHero?.StringId,
+                playerHero?.Clan?.StringId,
                 targetHero.Clan?.StringId,
                 targetKingdom?.StringId,
                 targetKingdom?.Clans?.Count,
