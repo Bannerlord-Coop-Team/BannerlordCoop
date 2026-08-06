@@ -253,6 +253,104 @@ public class MapEventDebugCommands
             $"OriginalWarState: {fixture.WasAtWar}";
     }
 
+    [CommandLineArgumentFunction("player_field_battle_fixture_state", "coop.debug.mapevent")]
+    public static string PlayerFieldBattleFixtureState(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.player_field_battle_fixture_state <attackerMobilePartyId> <defenderMobilePartyId>";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+
+        var attackerError = string.Empty;
+        if ((!objectManager.TryGetObject(args[0], out MobileParty attacker) &&
+             !CommandHelpers.TryGetMobileParty(args[0], out attacker, out attackerError)) ||
+            attacker?.Party == null)
+            return "Unable to resolve attacker party: " + attackerError;
+
+        var defenderError = string.Empty;
+        if ((!objectManager.TryGetObject(args[1], out MobileParty defender) &&
+             !CommandHelpers.TryGetMobileParty(args[1], out defender, out defenderError)) ||
+            defender?.Party == null)
+            return "Unable to resolve defender party: " + defenderError;
+
+        var attackerMapEvent = attacker.MapEvent;
+        var defenderMapEvent = defender.MapEvent;
+        var sharedMapEvent = attackerMapEvent != null && attackerMapEvent == defenderMapEvent
+            ? attackerMapEvent
+            : null;
+        var sharedMapEventIdResolved = sharedMapEvent != null &&
+                                       objectManager.TryGetId(sharedMapEvent, out string _);
+        var attackerSide = sharedMapEvent == null
+            ? BattleSideEnum.None
+            : GetPartySide(sharedMapEvent, attacker.Party);
+        var defenderSide = sharedMapEvent == null
+            ? BattleSideEnum.None
+            : GetPartySide(sharedMapEvent, defender.Party);
+        var factionsAtWar = attacker.MapFaction != null &&
+                            defender.MapFaction != null &&
+                            AreFactionsAtWar(attacker.MapFaction, defender.MapFaction);
+        var canCreate = attacker != defender &&
+                        attacker.IsActive &&
+                        defender.IsActive &&
+                        attackerMapEvent == null &&
+                        defenderMapEvent == null &&
+                        attacker.CurrentSettlement == null &&
+                        defender.CurrentSettlement == null &&
+                        attacker.MapFaction != null &&
+                        defender.MapFaction != null &&
+                        attacker.MapFaction != defender.MapFaction;
+        var canReuse = attacker != defender &&
+                       attacker.IsActive &&
+                       defender.IsActive &&
+                       sharedMapEvent != null &&
+                       !sharedMapEvent.IsFinalized &&
+                       sharedMapEvent.BattleState == BattleState.None &&
+                       sharedMapEvent.IsFieldBattle &&
+                       !sharedMapEvent.IsNavalMapEvent &&
+                       sharedMapEvent.MapEventSettlement == null &&
+                       sharedMapEventIdResolved &&
+                       attackerSide != BattleSideEnum.None &&
+                       defenderSide != BattleSideEnum.None &&
+                       attackerSide != defenderSide;
+        var mode = canCreate ? "create" : canReuse ? "reuse" : "invalid";
+
+        return
+            $"Mode: {mode}\n" +
+            $"AttackerActive: {attacker.IsActive}\n" +
+            $"DefenderActive: {defender.IsActive}\n" +
+            $"AttackerMapEventId: {FormatMapEventId(attackerMapEvent, objectManager)}\n" +
+            $"DefenderMapEventId: {FormatMapEventId(defenderMapEvent, objectManager)}\n" +
+            $"SharedFieldBattle: {sharedMapEvent?.IsFieldBattle == true}\n" +
+            $"SharedBattleState: {sharedMapEvent?.BattleState.ToString() ?? "none"}\n" +
+            $"AttackerSide: {attackerSide}\n" +
+            $"DefenderSide: {defenderSide}\n" +
+            $"FactionsAtWar: {factionsAtWar}\n" +
+            $"AttackerSettlement: {attacker.CurrentSettlement?.StringId ?? "none"}\n" +
+            $"DefenderSettlement: {defender.CurrentSettlement?.StringId ?? "none"}";
+    }
+
+    private static BattleSideEnum GetPartySide(MapEvent mapEvent, PartyBase party)
+    {
+        if (mapEvent.AttackerSide.Parties.Any(mapEventParty => mapEventParty.Party == party))
+            return BattleSideEnum.Attacker;
+        if (mapEvent.DefenderSide.Parties.Any(mapEventParty => mapEventParty.Party == party))
+            return BattleSideEnum.Defender;
+
+        return BattleSideEnum.None;
+    }
+
+    private static string FormatMapEventId(MapEvent mapEvent, IObjectManager objectManager)
+    {
+        if (mapEvent == null)
+            return "none";
+
+        return objectManager.TryGetId(mapEvent, out string id) ? id : "unresolved";
+    }
+
     [CommandLineArgumentFunction("restore_player_field_battle", "coop.debug.mapevent")]
     public static string RestorePlayerFieldBattle(List<string> args)
     {
