@@ -7,6 +7,7 @@ using Common.Network.Messages;
 using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.Barters.Patches;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
@@ -23,6 +24,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Barters.Handlers;
@@ -35,6 +37,7 @@ internal sealed partial class LordBarterHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly LocationConversationTracker locationConversationTracker;
     private readonly IBarterClientPresentation presentation;
@@ -51,6 +54,7 @@ internal sealed partial class LordBarterHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
+        IKingdomMembershipState kingdomMembershipState,
         ConversationPartyTracker conversationPartyTracker,
         LocationConversationTracker locationConversationTracker,
         IBarterClientPresentation presentation,
@@ -62,6 +66,7 @@ internal sealed partial class LordBarterHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.kingdomMembershipState = kingdomMembershipState;
         this.conversationPartyTracker = conversationPartyTracker;
         this.locationConversationTracker = locationConversationTracker;
         this.presentation = presentation;
@@ -183,7 +188,11 @@ internal sealed partial class LordBarterHandler : IHandler
                 return;
             }
 
-            var isSafePassage = (LordBarterKind)request.Kind == LordBarterKind.SafePassage;
+            var kind = (LordBarterKind)request.Kind;
+            var isSafePassage = kind == LordBarterKind.SafePassage;
+            var previousTargetKingdom = kind == LordBarterKind.JoinKingdomAsClan
+                ? targetHero.Clan.Kingdom
+                : null;
             IReadOnlyList<MobileParty> safePassageOpponents = Array.Empty<MobileParty>();
             float offerValue;
             if (isSafePassage)
@@ -220,6 +229,16 @@ internal sealed partial class LordBarterHandler : IHandler
                 {
                     barterable.Apply();
                 }
+            }
+
+            if (kind == LordBarterKind.JoinKingdomAsClan)
+            {
+                kingdomMembershipState.MoveClanToKingdom(
+                    previousTargetKingdom,
+                    targetKingdom,
+                    targetHero.Clan,
+                    publishCollectionChanges: true,
+                    republishExistingCollections: true);
             }
 
             if (isSafePassage)
@@ -376,7 +395,8 @@ internal sealed partial class LordBarterHandler : IHandler
         playerParty = mobileParty.Party;
         targetParty = targetHero.PartyBelongedTo?.Party;
 
-        if ((PeaceConversationContext)request.Context == PeaceConversationContext.MapParty)
+        var context = (PeaceConversationContext)request.Context;
+        if (context == PeaceConversationContext.MapParty)
         {
             if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty) ||
                 requestedParty != targetParty ||
@@ -392,7 +412,7 @@ internal sealed partial class LordBarterHandler : IHandler
                 return false;
             }
         }
-        else
+        else if (context == PeaceConversationContext.Location)
         {
             if (targetHero.CharacterObject == null ||
                 !objectManager.TryGetId(targetHero.CharacterObject, out var characterId) ||
@@ -400,6 +420,16 @@ internal sealed partial class LordBarterHandler : IHandler
                 npcKey != LocationConversationTracker.ComposeKey(request.ContextId, characterId))
             {
                 reason = "The lord conversation is no longer active.";
+                return false;
+            }
+        }
+        else
+        {
+            if (!objectManager.TryGetObject(request.ContextId, out Settlement settlement) ||
+                mobileParty.CurrentSettlement != settlement ||
+                targetHero.CurrentSettlement != settlement)
+            {
+                reason = "The lord settlement conversation is no longer active.";
                 return false;
             }
         }
