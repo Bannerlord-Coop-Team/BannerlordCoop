@@ -104,6 +104,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkAddDecision.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkKingdomNameChanged.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkChangeKingdomPolicy.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRequestChangeKingdomName.cs" />
@@ -117,6 +118,9 @@
 	  <Reference Include="SandBox.View">
 	    <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
 	  </Reference>
+      <Reference Include="SandBox.GauntletUI">
+          <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
+      </Reference>
 	  <Reference Include="TaleWorlds.CampaignSystem">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
 	  </Reference>
@@ -135,6 +139,9 @@
 	  <Reference Include="TaleWorlds.MountAndBlade">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
 	  </Reference>
+      <Reference Include="TaleWorlds.ScreenSystem">
+          <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+      </Reference>
 	  <Reference Include="TaleWorlds.ObjectSystem">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
 	  </Reference>
