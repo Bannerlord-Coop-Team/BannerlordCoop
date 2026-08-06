@@ -68,6 +68,12 @@ public class GameInterface : IGameInterface
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
 
+        // Must happen before any patched method can run: forces every migrated quest type's own static
+        // registration (QuestTypeRegistry.Register) to have already completed before the first genuinely
+        // registry-driven dispatch check (see Services.Issues.Generic.Dispatch.GenericQuestTypeDispatchPatches)
+        // can possibly run. See QuestTypeBootstrap's own doc comment for why this can't just happen lazily.
+        Services.Issues.Generic.QuestTypeBootstrap.EnsureAllMigratedTypesRegistered();
+
         foreach (HarmonyPatchCategoryRegistration patchCategory in patchCategories)
         {
             patchCategory.Apply(harmony);
