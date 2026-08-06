@@ -28,7 +28,14 @@ public sealed class RaceArbitratedAcceptMirrorHandler<TFields>
         if (owner == null || canAccept == null || !canAccept(owner)) return false;
 
         _strategy.ReplayQuestAccepted(owner);
-        return _strategy.TryCaptureQuestFields(owner, out fields);
+        if (_strategy.TryCaptureQuestFields(owner, out fields)) return true;
+
+        // ReplayQuestAccepted already mutated real state before we got here (either a genuine quest now exists,
+        // or vanilla's own StartIssueQuest failure path already tore the issue down) - capture failing means
+        // whatever's left doesn't match what the caller expected to broadcast. Roll back to a clean, acceptable-
+        // again state instead of leaving a half-mutated issue with nothing recorded or broadcast.
+        _strategy.RejectAcceptance(owner);
+        return false;
     }
 
     public bool TryCaptureQuestFields(Hero owner, out TFields fields) => _strategy.TryCaptureQuestFields(owner, out fields);
