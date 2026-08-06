@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Network;
+using Common.Network.Coalescing;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
@@ -139,7 +140,8 @@ public class AlleyRecruitDebugCommand
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
             !ContainerProvider.TryResolve<ISessionAlleyPlayerDataInterface>(out var sessionInterface) ||
-            !ContainerProvider.TryResolve<INetwork>(out var network))
+            !ContainerProvider.TryResolve<INetwork>(out var network) ||
+            !ContainerProvider.TryResolve<ISendCoalescer>(out var sendCoalescer))
             return "Unable to resolve the alley recruit fixture services.";
 
         try
@@ -166,6 +168,7 @@ public class AlleyRecruitDebugCommand
             }
 
             RestoreRoster(fixture.PlayerParty.MemberRoster, fixture.MemberRoster);
+            sendCoalescer.FlushInstance(rosterId, network);
             foreach (var resetCharacter in resetCharacters)
             {
                 var index = fixture.PlayerParty.MemberRoster.FindIndexOfTroop(resetCharacter.Character);
