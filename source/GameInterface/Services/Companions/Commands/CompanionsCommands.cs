@@ -2,10 +2,10 @@
 using Common;
 using Common.Messaging;
 using Common.Logging;
+using GameInterface.Serialization.External;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
-using HarmonyLib;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Utils.Commands;
@@ -184,8 +184,7 @@ internal class CompanionsCommands
         bool initializedExSpouses = companion.ExSpouses == null;
         if (initializedExSpouses)
         {
-            AccessTools.Field(typeof(Hero), nameof(Hero._exSpouses))
-                .SetValue(companion, new MBList<Hero>());
+            HeroBinaryPackage.Hero_ExSpouses.SetValue(companion, new MBList<Hero>());
         }
 
         string relation = ConversationHelper.GetHeroRelationToHeroTextShort(
