@@ -59,7 +59,12 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   excluded from capture. IMPLEMENTED (live verification outstanding)
 - **SR-021 (Capture).** Host-side capture is a postfix on `Mission.SpawnAgent(AgentBuildData, bool)`
   plus a second postfix on `Mission.SpawnMonster(EquipmentElement, EquipmentElement, in Vec3, in
-  Vec2, int)` (animals bypass `SpawnAgent(AgentBuildData)` — see V3). IMPLEMENTED (live verification outstanding)
+  Vec2, int)` (animals bypass `SpawnAgent(AgentBuildData)` — see V3). The wire record is built at
+  the NEXT flush tick, not inside the postfix: native population spawns the whole roster clustered
+  at tag spawn points and only then fast-forwards it (`MissionAgentHandler.SimulateAgent` — 35–50
+  simulation ticks that teleport each agent onto its machine and equip its point items), so a
+  capture-time record ships the pre-simulation cluster and every puppet visibly runs from it. By
+  flush time positions, facing, equipment and the used point are final. IMPLEMENTED (live verification outstanding)
 - **SR-022 (Roster binding).** Every human NPC spawn record carries its `LocationCharacter` roster
   identity. Non-hosts bind the puppet to a **local** roster entry — an existing server-synced entry
   for heroes, a reconstructed entry (from embedded `LocationCharacterData`) for ambient — and build

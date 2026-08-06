@@ -63,7 +63,14 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
     private readonly ILocationAgentBindingMap bindingMap;
     private readonly ILocationPuppetRosterBinder rosterBinder;
     private readonly ILocationAgentSpawnBatchCodec spawnBatchCodec;
-    private readonly List<LocationAgentSpawnData> pendingSpawns = new List<LocationAgentSpawnData>();
+    // Captured agents whose wire records are built at the NEXT flush tick, not at capture: native
+    // population spawns everyone clustered at tag spawn points and only then fast-forwards them
+    // (MissionAgentHandler.SimulateAgent teleports each agent onto its machine/day position), so a
+    // record built inside the spawn postfix ships the pre-simulation cluster and every puppet runs
+    // from it to its real spot. By the flush tick the simulation has completed, so positions,
+    // facing, equipment (simulation equips point items) and the used point are all final.
+    private readonly List<(Agent agent, Guid agentId, ushort movementId, LocationAgentBinding binding)> pendingCaptures
+        = new List<(Agent, Guid, ushort, LocationAgentBinding)>();
     private readonly List<(Guid agentId, LocationDespawnReason reason, string destinationLocationId)> pendingDespawns
         = new List<(Guid, LocationDespawnReason, string)>();
 
@@ -103,7 +110,7 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
     {
         messageBroker.Unsubscribe<AgentSpawnedInLocation>(Handle_AgentSpawnedInLocation);
         messageBroker.Unsubscribe<MonsterSpawnedInLocation>(Handle_MonsterSpawnedInLocation);
-        pendingSpawns.Clear();
+        pendingCaptures.Clear();
     }
 
     // Reading agent transforms must run on the game thread; non-blocking so a network-thread caller
@@ -128,17 +135,33 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
 
     public void FlushPendingSpawns()
     {
-        if (pendingSpawns.Count > 0)
+        if (pendingCaptures.Count > 0)
         {
-            IReadOnlyList<NetworkSpawnLocationAgents> batches =
-                spawnBatchCodec.Encode(pendingSpawns, SpawnBatchPurpose.Initial);
-            int recordCount = pendingSpawns.Count;
-            pendingSpawns.Clear();
+            var records = new List<LocationAgentSpawnData>(pendingCaptures.Count);
+            foreach (var capture in pendingCaptures)
+            {
+                // An agent that died or deregistered between capture and flush sends no spawn
+                // record; its already-queued despawn then references an id peers never applied,
+                // which every receiver treats as a no-op.
+                if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(capture.agentId, out _)) continue;
+                if (capture.agent == null || !capture.agent.IsActive()) continue;
 
-            foreach (NetworkSpawnLocationAgents batch in batches)
-                network.SendAll(batch);
+                var record = BuildRecord(capture.agent, capture.agentId, capture.movementId,
+                    movementScopeId, capture.binding, originalOwner: session.OwnControllerId);
+                if (record != null)
+                    records.Add(record);
+            }
+            pendingCaptures.Clear();
 
-            LogBatchSend("Broadcast", recordCount, batches, null);
+            if (records.Count > 0)
+            {
+                IReadOnlyList<NetworkSpawnLocationAgents> batches =
+                    spawnBatchCodec.Encode(records, SpawnBatchPurpose.Initial);
+                foreach (NetworkSpawnLocationAgents batch in batches)
+                    network.SendAll(batch);
+
+                LogBatchSend("Broadcast", records.Count, batches, null);
+            }
         }
 
         // Despawns flush AFTER spawns: a spawn+despawn pair captured in the same tick then applies in
@@ -315,12 +338,9 @@ public class LocationOwnedAgentReplicator : ILocationOwnedAgentReplicator
 
         bindingMap.Record(agentId, binding);
 
-        var record = BuildRecord(agent, agentId, movementId, movementScopeId, binding, originalOwner: owner);
-        if (record == null) return;
-
-        // Coalesce captures from native's spawn loop. The next mission tick emits bounded compressed
-        // batches instead of dozens of singleton reliable messages.
-        pendingSpawns.Add(record);
+        // Coalesce captures from native's spawn loop; the record itself is built at the flush tick,
+        // AFTER the native fast-forward simulation has placed the agent (see pendingCaptures).
+        pendingCaptures.Add((agent, agentId, movementId, binding));
         Logger.Debug("[LocationSync] Captured own spawn (agent {AgentId}, {Kind}); queued for batched replication",
             agentId, binding.Kind);
     }
