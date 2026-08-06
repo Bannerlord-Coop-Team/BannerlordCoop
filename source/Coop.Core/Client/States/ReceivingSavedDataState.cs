@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Coop.Core.Client.Messages;
+using Coop.Core.Common;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using Serilog;
@@ -18,16 +19,19 @@ public class ReceivingSavedDataState : ClientStateBase
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
     private readonly IGameStateInterface gameStateInterface;
+    private readonly ICoopFinalizer coopFinalizer;
 
     public ReceivingSavedDataState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         ILoadingInterface loadingInterface,
-        IGameStateInterface gameStateInterface) : base(logic)
+        IGameStateInterface gameStateInterface,
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.loadingInterface = loadingInterface;
         this.gameStateInterface = gameStateInterface;
+        this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<NetworkGameSaveDataProgress>(Handle_NetworkGameSaveDataProgress);
 
@@ -75,10 +79,13 @@ public class ReceivingSavedDataState : ClientStateBase
 
         if (!gameStateInterface.LoadSaveData(saveData))
         {
-            // Entering LoadingState now would wait on a CampaignReady that cannot arrive, leaving the
-            // joiner on the loading screen with no error. Fall back to the main menu instead.
-            Logger.Error("Loading the host save failed; aborting the join");
-            Disconnect();
+            // Entering LoadingState would wait on a CampaignReady that cannot arrive. Only the finalizer
+            // ends the session — the main menu alone leaves the peer connected and the server's connection
+            // in its own LoadingState, queueing world updates for it. Finalize disposes the container, so
+            // nothing may SetState after it.
+            Logger.Error("Loading the host save failed, aborting the join");
+            coopFinalizer.Finalize(
+                "Failed to load the host's campaign save.\nThe join has been aborted.");
             return;
         }
 

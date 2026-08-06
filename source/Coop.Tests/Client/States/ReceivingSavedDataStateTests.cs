@@ -3,6 +3,8 @@ using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
+using Coop.Core.Common.Services.Connection.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MobileParties;
@@ -89,10 +91,9 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void NetworkGameSaveDataReceived_WhenLoadingFails_AbortsToMainMenu()
+        public void NetworkGameSaveDataReceived_WhenLoadingFails_TearsDownTheSession()
         {
-            // Arrange — the load reports failure, which is what a rejected or corrupt host save produces
-            // now that the drain swallows the exception instead of taking the process down.
+            // Arrange — a rejected or corrupt host save is what makes the load report failure.
             var currentState = clientLogic.SetState<ReceivingSavedDataState>();
             var gameSaveData = new byte[16];
             gameStateMock.Setup(x => x.LoadSaveData(gameSaveData)).Returns(false);
@@ -101,8 +102,13 @@ namespace Coop.Tests.Client.States
             currentState.Handle_NetworkGameSaveDataReceived(
                 new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(gameSaveData, "12345")));
 
-            // Assert — entering LoadingState would wait forever on a campaign that never loaded.
-            Assert.IsType<MainMenuState>(clientLogic.State);
+            // Assert — the main menu alone would leave the peer connected, and LoadingState would wait
+            // forever on a campaign that never loaded.
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+            Assert.IsNotType<LoadingState>(clientLogic.State);
+
+            var popup = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Contains("Failed to load the host's campaign save.", popup.Text);
         }
 
         [Fact]
