@@ -25,10 +25,10 @@ public class HeroDebugCommand
 
     // coop.debug.hero.list
     /// <summary>
-    /// Lists all the heroes
+    /// Lists heroes whose names start with the optional prefix
     /// </summary>
-    /// <param name="args">actually none are being used..</param>
-    /// <returns>strings of all the heroes</returns>
+    /// <param name="args">Optional case-insensitive hero name prefix</param>
+    /// <returns>Strings of the matching heroes</returns>
     [CommandLineArgumentFunction("list", "coop.debug.hero")]
     public static string ListHeroes(List<string> args)
     {
@@ -39,7 +39,9 @@ public class HeroDebugCommand
             return $"Unable to get {nameof(IObjectManager)}";
         }
 
-        foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes())
+        string namePrefix = args == null ? string.Empty : string.Join(" ", args).Trim();
+        foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes()
+                     .Where(hero => NameStartsWithPrefix(hero.Name?.ToString(), namePrefix)))
         {
             if (objectManager.TryGetId(hero, out var id))
             {
@@ -53,6 +55,12 @@ public class HeroDebugCommand
         }
 
         return stringBuilder.ToString();
+    }
+
+    internal static bool NameStartsWithPrefix(string heroName, string prefix)
+    {
+        return string.IsNullOrEmpty(prefix) ||
+               heroName?.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) == true;
     }
 
     [CommandLineArgumentFunction("id", "coop.debug.hero")]
