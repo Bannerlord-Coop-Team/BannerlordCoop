@@ -10,21 +10,31 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// recruitment attempts.
 /// </summary>
 /// <remarks>
-/// Vanilla keeps two independent rules, and only one of them decides whether a lord may be asked again:
+/// Vanilla keeps THREE independent rules, and the one that reaches the player first is not the one
+/// that looks like the gate:
 ///
+///   <c>conversation_lord_from_ruling_clan_on_condition</c> - the PRE-GATE, and the real blocker. When
+///                                 the accumulated score is below <c>_maximumScoreCap</c> it refuses on
+///                                 <c>Any(a =&gt; a.PersuadedHero == OneToOneConversationHero)</c> and
+///                                 answers "You have tried to persuade me before." That predicate checks
+///                                 neither AGE nor SUCCESS, so a single prior attempt blocks forever, and
+///                                 it returns before CanAttemptToPersuade is ever consulted.
 ///   <c>CanAttemptToPersuade</c> - the GATE. Refuses while a matching unsuccessful attempt is less than
-///                                 ONE WEEK old. This is what actually blocks the player.
-///   <c>RemoveOldAttempts</c>    - housekeeping on the daily tick, dropping records over a YEAR old.
+///                                 ONE WEEK old.
+///   <c>RemoveOldAttempts</c>    - housekeeping on the daily tick, dropping records over a YEAR old. The
+///                                 only thing that ever removes an attempt, so it is what eventually
+///                                 releases the pre-gate.
 ///
-/// Both modes therefore have to change the gate. Changing only the daily prune - which is what this did
-/// before - cannot work: NeverExpire left the record in place but the gate stopped blocking after a week
-/// regardless, and AlwaysRetry cleared the list only when the next daily tick happened to run, so "retry
-/// immediately" still meant waiting up to a day.
+/// Patching the gate alone cannot work, because the pre-gate already answered. AlwaysRetry therefore has
+/// to drop this lord's attempt records as well - and it must drop ALL of them, not just the unsuccessful
+/// ones, because the pre-gate's predicate ignores success and every persuasion OPTION records its own
+/// attempt, so a failed persuasion leaves successes behind that would keep refusing on their own.
 ///
-///   Vanilla     - unchanged: a refusal blocks for one week (default, matches singleplayer)
+///   Vanilla     - unchanged: vanilla's own week/year rules apply (default, matches singleplayer)
 ///   NeverExpire - the gate blocks while ANY unsuccessful attempt survives, and the prune is suppressed
 ///                 so one always does
-///   AlwaysRetry - the gate never blocks, so the lord can be asked again at once
+///   AlwaysRetry - the pre-gate's record is cleared and the gate never blocks, so the lord can be asked
+///                 again at once
 /// </remarks>
 internal static class LordDefectionRetryPatches
 {
@@ -74,8 +84,58 @@ internal static class LordDefectionRetryPatches
     }
 
     /// <summary>
-    /// The yearly prune. Only NeverExpire touches it, and only to keep the records its gate depends on.
+    /// Clears this lord's attempt records so the pre-gate has nothing to refuse on.
     /// </summary>
+    /// <remarks>
+    /// Only AlwaysRetry touches this. Vanilla and NeverExpire want the records read exactly as they are:
+    /// vanilla so the stock week/year rules apply, NeverExpire so the refusal stands.
+    ///
+    /// Clearing the records rather than forcing the condition's result is deliberate - the method also
+    /// rebuilds <c>_allReservations</c> and answers several unrelated branches, so it has to run. With
+    /// this lord's attempts gone the score sums to zero and the refusal predicate finds nothing, which is
+    /// the same state a lord who was never approached is in. That is what "ask again at once" means.
+    /// </remarks>
+    [HarmonyPatch(typeof(LordDefectionCampaignBehavior),
+        "conversation_lord_from_ruling_clan_on_condition")]
+    internal class ConversationLordFromRulingClanPatch
+    {
+        [HarmonyPrefix]
+        private static void Prefix(LordDefectionCampaignBehavior __instance) => ClearAttemptsForRetry(
+            __instance,
+            Hero.OneToOneConversationHero,
+            ModConfigProvider.ModOptions.LordDefectionRetries);
+
+        /// <summary>
+        /// Takes the lord and the mode as arguments rather than reading
+        /// <see cref="Hero.OneToOneConversationHero"/>, which is getter-only and so cannot be driven
+        /// from a test.
+        /// </summary>
+        internal static void ClearAttemptsForRetry(
+            LordDefectionCampaignBehavior behavior, Hero lord, LordDefectionRetryMode mode)
+        {
+            if (mode != LordDefectionRetryMode.AlwaysRetry) return;
+
+            var attempts = behavior?._previousDefectionPersuasionAttempts;
+            if (attempts == null || lord == null) return;
+
+            // Deliberately NOT filtered by IsSuccesful(): the pre-gate's own predicate ignores success,
+            // and every persuasion option records its own attempt, so leaving the successful ones behind
+            // would let a failed persuasion keep refusing on the strength of its own partial wins.
+            attempts.RemoveAll(attempt => attempt.PersuadedHero == lord);
+        }
+    }
+
+    /// <summary>
+    /// The yearly prune. Only NeverExpire suppresses it, to keep the records its gate depends on.
+    /// </summary>
+    /// <remarks>
+    /// This is the ONLY prefix on OnDailyTick. DisableLordDefectionCampaignBehavior used to add a second
+    /// one returning <c>ModInformation.IsServer</c>, and because Harmony skips the original as soon as any
+    /// prefix returns false, that one silently won on clients: the prune never ran there, and since the
+    /// pre-gate is released only by a record being removed, a refusal lasted the whole session no matter
+    /// which mode was configured. Blocking it bought nothing - OnDailyTick's entire body is a call to
+    /// RemoveOldAttempts, which prunes the client's own local list and replicates nothing.
+    /// </remarks>
     [HarmonyPatch(typeof(LordDefectionCampaignBehavior),
         nameof(LordDefectionCampaignBehavior.OnDailyTick))]
     internal class OnDailyTickPatch
@@ -83,9 +143,6 @@ internal static class LordDefectionRetryPatches
         [HarmonyPrefix]
         private static bool Prefix()
         {
-            // Suppressed so nothing a refusal recorded is ever forgotten; the gate above reads it forever.
-            // AlwaysRetry lets the prune run normally - its gate ignores the list, and leaving vanilla to
-            // tidy up keeps the list from growing for the whole session.
             return ModConfigProvider.ModOptions.LordDefectionRetries != LordDefectionRetryMode.NeverExpire;
         }
     }
