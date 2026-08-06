@@ -4,6 +4,7 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using SandBox.CampaignBehaviors;
 using SandBox.Conversation.MissionLogics;
@@ -132,17 +133,54 @@ public class AlleyRecruitDebugCommand
     public static string RestoreFixture(List<string> args)
     {
         if (ModInformation.IsClient) return "Run this command on the server.";
-        if (args.Count != 0) return "Usage: coop.debug.alley.recruit_fixture_restore";
         if (fixture == null) return "The alley recruit fixture is not active.";
         if (fixture.PlayerParty.MapEvent != null) return "Finish the player's map event before restoring the fixture.";
 
-        if (!ContainerProvider.TryResolve<ISessionAlleyPlayerDataInterface>(out var sessionInterface) ||
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !ContainerProvider.TryResolve<ISessionAlleyPlayerDataInterface>(out var sessionInterface) ||
             !ContainerProvider.TryResolve<INetwork>(out var network))
             return "Unable to resolve the alley recruit fixture services.";
 
         try
         {
+            var charactersToReset = fixture.PlayerParty.MemberRoster.GetTroopRoster()
+                .Select(element => element.Character)
+                .Concat(fixture.MemberRoster.Select(element => element.Character))
+                .ToList();
+            foreach (var characterId in args)
+            {
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character))
+                    return $"Character '{characterId}' not found.";
+                charactersToReset.Add(character);
+            }
+
+            if (!objectManager.TryGetIdWithLogging(fixture.PlayerParty.MemberRoster, out var rosterId))
+                return "Unable to resolve the fixture roster id.";
+            var resetCharacters = new List<(CharacterObject Character, string Id)>();
+            foreach (var character in charactersToReset.Distinct())
+            {
+                if (!objectManager.TryGetIdWithLogging(character, out var characterId))
+                    return $"Unable to resolve the fixture character id for '{character.StringId}'.";
+                resetCharacters.Add((character, characterId));
+            }
+
             RestoreRoster(fixture.PlayerParty.MemberRoster, fixture.MemberRoster);
+            foreach (var resetCharacter in resetCharacters)
+            {
+                var index = fixture.PlayerParty.MemberRoster.FindIndexOfTroop(resetCharacter.Character);
+                var element = index >= 0
+                    ? fixture.PlayerParty.MemberRoster.GetElementCopyAtIndex(index)
+                    : default;
+                network.SendAll(new NetworkTroopRosterSetWoundedNumber(
+                    rosterId,
+                    resetCharacter.Id,
+                    index >= 0 ? element.WoundedNumber : 0));
+                network.SendAll(new NetworkTroopRosterSetNumber(
+                    rosterId,
+                    resetCharacter.Id,
+                    index >= 0 ? element.Number : 0));
+            }
+            network.SendAll(new NetworkTroopRosterRemoveZeroCounts(rosterId));
             fixture.Alley.SetOwner(fixture.OriginalOwner);
 
             if (fixture.OriginalManagementData == null)
@@ -257,11 +295,13 @@ public class AlleyRecruitDebugCommand
         {
             case "open":
                 InventoryScreenHelper.OpenScreenAsInventory();
+                RepairLocalPlayerInventoryContext();
                 return "ALLEY_RECRUIT_INVENTORY_OPENED";
             case "trade":
                 if (Settlement.CurrentSettlement?.StringId != "town_ES1")
                     return "Enter Danustica (town_ES1) before opening its trade screen.";
                 InventoryScreenHelper.ActivateTradeWithCurrentSettlement();
+                RepairLocalPlayerInventoryContext();
                 return "ALLEY_RECRUIT_TRADE_OPENED settlement=town_ES1";
             case "complete":
                 if (!(GameStateManager.Current?.ActiveState is InventoryState))
@@ -279,6 +319,17 @@ public class AlleyRecruitDebugCommand
             default:
                 return "Usage: coop.debug.alley.recruit_inventory <open|trade|complete|state>";
         }
+    }
+
+    private static void RepairLocalPlayerInventoryContext()
+    {
+        var character = Hero.MainHero?.CharacterObject;
+        var inventoryLogic = InventoryScreenHelper.GetActiveInventoryState()?.InventoryLogic;
+        if (character == null || inventoryLogic == null)
+            throw new InvalidOperationException("The local player inventory context is unavailable.");
+
+        inventoryLogic.OwnerCharacter = character;
+        inventoryLogic.InitialEquipmentCharacter = character;
     }
 
     private static bool TryGetAlley(string settlementId, string indexArg, out Alley alley, out string error)
