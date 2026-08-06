@@ -160,6 +160,65 @@ public class ServerMissionMembershipHandlerTests
     }
 
     [Fact]
+    public void MissionEntered_ReconnectPublishesCompletionResetEvent()
+    {
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51013), 13);
+        var messageBroker = new TestMessageBroker();
+        var missionManager = new Mock<IMissionManager>();
+        var playerManager = CreatePlayerManager(peer, "current");
+        var entry = new MissionEntryResult(
+            "current",
+            InstanceId,
+            MissionEntryStatus.Reconnected,
+            Array.Empty<(string, NetPeer)>(),
+            Array.Empty<MissionDeparture>(),
+            isFirstMember: false);
+        missionManager
+            .Setup(manager => manager.TryEnterMission(peer, "current", InstanceId, out entry))
+            .Returns(true);
+        MissionMemberEntered? entered = null;
+        messageBroker.Subscribe<MissionMemberEntered>(payload => entered = payload.What);
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+
+        messageBroker.Publish(peer, new NetworkMissionEntered("current", InstanceId));
+        DrainGameThread();
+
+        Assert.True(entered.HasValue);
+        Assert.Equal("current", entered.Value.ControllerId);
+        Assert.Equal(InstanceId, entered.Value.InstanceId);
+        Assert.False(entered.Value.IsFirstMember);
+    }
+
+    [Fact]
+    public void MissionEntered_DuplicateDoesNotPublishCompletionResetEvent()
+    {
+        var peer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51014), 14);
+        var messageBroker = new TestMessageBroker();
+        var missionManager = new Mock<IMissionManager>();
+        var playerManager = CreatePlayerManager(peer, "current");
+        var entry = new MissionEntryResult(
+            "current",
+            InstanceId,
+            MissionEntryStatus.Unchanged,
+            Array.Empty<(string, NetPeer)>(),
+            Array.Empty<MissionDeparture>(),
+            isFirstMember: false);
+        missionManager
+            .Setup(manager => manager.TryEnterMission(peer, "current", InstanceId, out entry))
+            .Returns(true);
+        MissionMemberEntered? entered = null;
+        messageBroker.Subscribe<MissionMemberEntered>(payload => entered = payload.What);
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+
+        messageBroker.Publish(peer, new NetworkMissionEntered("current", InstanceId));
+        DrainGameThread();
+
+        Assert.False(entered.HasValue);
+    }
+
+    [Fact]
     public void MissionEntered_RejectsPeerReplacedByReconnect()
     {
         var oldPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51009), 9);

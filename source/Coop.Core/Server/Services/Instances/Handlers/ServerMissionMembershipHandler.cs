@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
@@ -7,6 +8,7 @@ using Coop.Core.Common.Session;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
+using Serilog;
 using System.Globalization;
 using System.Net;
 
@@ -18,6 +20,8 @@ namespace Coop.Core.Server.Services.Instances.Handlers;
 /// </summary>
 public class ServerMissionMembershipHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ServerMissionMembershipHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IMissionManager missionManager;
     private readonly INetwork network;
@@ -65,7 +69,11 @@ public class ServerMissionMembershipHandler : IHandler
 
         var message = payload.What;
         if (!TryGetCurrentController(peer, out var controllerId))
+        {
+            Logger.Debug("Ignoring mission entry for instance {Instance} from stale or unregistered peer {Peer}",
+                message.InstanceId, peer);
             return;
+        }
 
         GameThread.RunSafe(() =>
         {
@@ -78,11 +86,9 @@ public class ServerMissionMembershipHandler : IHandler
             foreach (var departure in result.PreviousDepartures)
                 PublishDeparture(departure, wasRetreat: true);
 
-            if (result.Status == MissionEntryStatus.Entered)
-            {
-                messageBroker.Publish(this,
-                    new MissionMemberEntered(result.ControllerId, result.InstanceId, result.IsFirstMember));
-            }
+            // A replacement peer must report battle completion again even though membership is preserved.
+            messageBroker.Publish(this,
+                new MissionMemberEntered(result.ControllerId, result.InstanceId, result.IsFirstMember));
 
             // Introduce the newcomer and each existing member to each other so BOTH sides send their join info.
             var newcomerSteamId = ResolveSteamId(peer, result.ControllerId);
@@ -125,7 +131,11 @@ public class ServerMissionMembershipHandler : IHandler
 
         var message = payload.What;
         if (!TryGetCurrentController(peer, out var controllerId))
+        {
+            Logger.Debug("Ignoring mission leave for instance {Instance} from stale or unregistered peer {Peer}",
+                message.InstanceId, peer);
             return;
+        }
 
         missionManager.RevokeRelay(peer);
 
