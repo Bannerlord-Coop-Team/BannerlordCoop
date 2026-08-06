@@ -117,7 +117,7 @@ internal static class ConversationPartyHold
     }
 
     /// <summary>
-    /// [Server] True when the target is held and the interacting party is not one of its registered contenders.
+    /// [Server] True when the target is held and the interacting party is not the single player holding it.
     /// </summary>
     public static bool IsInteractionBlocked(PartyBase targetParty, MobileParty interactor)
     {

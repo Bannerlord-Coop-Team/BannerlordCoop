@@ -33,7 +33,9 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// Client (on approval): re-runs <c>PlayerEncounter.RestartPlayerEncounter</c> with the same parameters under an
 /// <see cref="AllowedThread"/> so the now-approved original executes.
 /// Server (additionally): while a conversation is open, the AI party is held in place for exactly one player. A
-/// second player is refused the hold rather than sharing it, hostile or not.
+/// second player is refused the hold rather than sharing it, hostile or not. Simultaneous attackers still converge
+/// on one MapEvent, but by retrying rather than by sharing: once the holder has started the battle, the map-event
+/// branch approves the contender's next request so it joins that MapEvent.
 /// </remarks>
 internal class ConversationRequestHandler : IHandler
 {
