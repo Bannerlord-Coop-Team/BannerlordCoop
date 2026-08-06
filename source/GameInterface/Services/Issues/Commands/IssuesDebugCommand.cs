@@ -72,6 +72,14 @@ public static class IssuesDebugCommand
             return CommandHelpers.FormatException($"coop.debug.issues.give ({key}): CreateNewIssue", ex);
         }
 
+        return StartQuestOrRollback(hero, key);
+    }
+
+    // IssueBase.StartIssueWithQuest assigns IssueQuest only *after* GenerateIssueQuest returns, so a throw here
+    // means hero.Issue is stuck attached with no live quest - roll it back via DeactivateIssue rather than
+    // soft-locking the hero for future give/complete calls.
+    private static string StartQuestOrRollback(Hero hero, string key)
+    {
         bool started;
         try
         {
@@ -79,19 +87,6 @@ public static class IssuesDebugCommand
         }
         catch (Exception ex)
         {
-            // CreateNewIssue above already succeeded (hero.Issue is non-null), but the QUEST object's own
-            // constructor - only reached from inside StartIssueQuest via IssueBase.StartIssueWithQuest ->
-            // GenerateIssueQuest, never from the Issue's own ctor - can need deeper settlement/hero context
-            // than this debug command's always-safe-for-the-Issue-ctor defaults provide (e.g. a quest ctor
-            // that dereferences hero.CurrentSettlement). IssueBase.StartIssueWithQuest assigns its IssueQuest
-            // field only *after* GenerateIssueQuest returns, so on this path hero.Issue.IssueQuest is still
-            // null - nothing has actually gone live. Left alone, hero.Issue would stay permanently attached
-            // (CreateNewIssue's Add into IssueManager's dictionary already ran and nothing rolls it back),
-            // soft-locking this hero for both further "give" and "complete" calls. IssueManager.DeactivateIssue
-            // handles the "no quest yet" case correctly in its own real body (Hero.OnIssueDeactivatedForHero
-            // sets hero.Issue back to null, plus ConversationManager cleanup and removal from the manager's
-            // Issues dictionary), so use it to fully detach the issue before reporting the failure - this is a
-            // failure-path-only rollback, general to all wired quest types, not a per-type special case.
             var stuckIssue = hero.Issue;
             if (stuckIssue != null)
             {

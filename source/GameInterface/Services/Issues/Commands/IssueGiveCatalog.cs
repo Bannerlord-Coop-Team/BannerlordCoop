@@ -74,15 +74,27 @@ internal static class IssueGiveCatalog
 
     // --- Catalog -------------------------------------------------------------------------------------------
 
+    private static void Wire(
+        Dictionary<string, IssueGiveEntry> map, string key, Type issueType,
+        Func<Hero, (PotentialIssueData.StartIssueDelegate, string)> resolve) =>
+        map[key] = new IssueGiveEntry(key, issueType, resolve, null);
+
+    private static void NotWired(Dictionary<string, IssueGiveEntry> map, string key, Type issueType, string reason) =>
+        map[key] = new IssueGiveEntry(key, issueType, null, reason);
+
     private static Dictionary<string, IssueGiveEntry> Build()
     {
         var map = new Dictionary<string, IssueGiveEntry>(StringComparer.OrdinalIgnoreCase);
+        AddBareHeroEntries(map);
+        AddRelatedObjectEntries(map);
+        AddNotYetWiredEntries(map);
+        return map;
+    }
 
+    private static void AddBareHeroEntries(Dictionary<string, IssueGiveEntry> map)
+    {
         void Wire(string key, Type issueType, Func<Hero, (PotentialIssueData.StartIssueDelegate, string)> resolve) =>
-            map[key] = new IssueGiveEntry(key, issueType, resolve, null);
-
-        void NotWired(string key, Type issueType, string reason) =>
-            map[key] = new IssueGiveEntry(key, issueType, null, reason);
+            IssueGiveCatalog.Wire(map, key, issueType, resolve);
 
         // --- Bare-Hero constructor types (22) - mechanical, no related object, safe as-is ---
 
@@ -156,8 +168,13 @@ internal static class IssueGiveCatalog
 
         Wire("RuralNotableInnAndOut", typeof(RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue),
             hero => Ok(h => new RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue(h)));
+    }
 
-        // --- Related-object types (20) - derive a simple, always-constructible default ---
+    // --- Related-object types (20) - derive a simple, always-constructible default ---
+    private static void AddRelatedObjectEntries(Dictionary<string, IssueGiveEntry> map)
+    {
+        void Wire(string key, Type issueType, Func<Hero, (PotentialIssueData.StartIssueDelegate, string)> resolve) =>
+            IssueGiveCatalog.Wire(map, key, issueType, resolve);
 
         Wire("VillageNeedsTools", typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue),
             hero => Ok(h => new VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue(h, DefaultItems.Tools)));
@@ -311,8 +328,13 @@ internal static class IssueGiveCatalog
                 ? Fail("no other alive hero exists in the current campaign to act as the target notable")
                 : Ok(h => new FamilyFeudIssueBehavior.FamilyFeudIssue(h, notable, village));
         });
+    }
 
-        // --- Known, not yet wired (1) ---
+    // --- Known, not yet wired (1) ---
+    private static void AddNotYetWiredEntries(Dictionary<string, IssueGiveEntry> map)
+    {
+        void NotWired(string key, Type issueType, string reason) =>
+            IssueGiveCatalog.NotWired(map, key, issueType, reason);
 
         // ProdigalSonIssue's own constructor (not deferred to quest-accept like the other 42 types) immediately
         // does: `_targetSettlement = targetGangHero.CurrentSettlement` (null if that hero isn't currently
@@ -331,8 +353,6 @@ internal static class IssueGiveCatalog
             "currently be inside a settlement with a free reservable location or it null-refs, and even a " +
             "successful call silently disables an arbitrary chosen hero as a side effect. Too fragile to default " +
             "safely without guessing.");
-
-        return map;
     }
 }
 
