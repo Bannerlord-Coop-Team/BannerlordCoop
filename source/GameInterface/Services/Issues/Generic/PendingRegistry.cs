@@ -5,13 +5,13 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Issues.Generic;
 
 /// <summary>
-/// Factors out the shape shared by <see cref="Interfaces.VillageNeedsToolsIssueOwnership"/>
-/// (<c>Dictionary&lt;Hero, string&gt;</c>) and <see cref="Interfaces.LordsNeedsTutorQuestFlags"/>
-/// (<c>Dictionary&lt;Hero, Entry&gt;</c>), which hand-duplicate this exact shape today. Not yet consumed by
-/// either - rewiring an existing registry to delegate to this primitive is a separate, purely-mechanical
-/// follow-up with its own regression surface across every quest type that already depends on it.
+/// Generalizes the Hero-keyed pending-value registry shape already hand-implemented by
+/// <see cref="Interfaces.VillageNeedsToolsIssueOwnership"/> (<c>Dictionary&lt;Hero, string&gt;</c>), for reuse
+/// by future quest-type-specific registries with the same shape. Not yet consumed anywhere - rewiring an
+/// existing registry to delegate to this primitive is a separate, purely-mechanical follow-up with its own
+/// regression surface across every quest type that already depends on it.
 ///
-/// Both existing registries are Hero-keyed for the identical reason: each peer holds a different object
+/// Hero-keyed for the same reason the existing registry is: each peer holds a different object
 /// instance for "the same logical issue," converging only on the shared owner-<see cref="Hero"/> key. <c>Set</c>
 /// writes only from an authoritative broadcast, <c>TryGet</c> is a non-destructive read, <c>Clear(Hero)</c>
 /// drains a single entry on genuine finalize, <c>ClearAll()</c> wipes everything before a load-time repopulate,

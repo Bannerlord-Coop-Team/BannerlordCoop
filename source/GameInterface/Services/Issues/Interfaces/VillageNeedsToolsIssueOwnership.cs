@@ -8,15 +8,11 @@ namespace GameInterface.Services.Issues.Interfaces;
 /// <summary>
 /// Records which connected player's <see cref="Player.ControllerId"/> genuinely accepted a given village-issue
 /// (Village Needs Tools OR Village Needs Crafting Materials - despite the "Tools" name, this registry is
-/// type-agnostic and Hero-keyed, so it's shared unchanged by both features' dialogue-gate/alternative-solution
-/// fixes) - the missing "real ownership" concept both the dialogue-gate fix
-/// (<see cref="Patches.VillageNeedsToolsIssueOwnershipGatePatches"/>/<see cref="Patches.VillageNeedsCraftingMaterialsQuestOwnershipGatePatch"/>)
-/// and the alternative-solution completion fix
-/// (<see cref="Patches.VillageNeedsToolsAlternativeSolutionCompletionPatches"/>/<see cref="Patches.VillageNeedsCraftingMaterialsAlternativeSolutionCompletionPatches"/>)
-/// need.
+/// type-agnostic and Hero-keyed, so it can be shared unchanged by any per-issue-type dialogue-gate or
+/// alternative-solution completion fix that needs a real "who actually owns this issue" concept, not just the
+/// per-peer replicated Issue/Quest object instance a raw type check would see.
 ///
-/// Fragile-coupling note (flagged, not fixed - see the design critique this stems from): persistence
-/// (<see cref="Patches.VillageNeedsToolsIssueOwnershipPersistencePatches"/>) piggybacks on
+/// Fragile-coupling note (flagged, not fixed): persistence piggybacks on
 /// <c>VillageNeedsToolsIssueBehavior.SyncData</c> specifically, since that's the only currently-allowlisted
 /// behavior with a non-empty <c>SyncData</c> override. This registry's own save/restore correctly covers BOTH
 /// issue types today only because Tools remains active - if Tools were ever removed while Crafting Materials
@@ -25,15 +21,11 @@ namespace GameInterface.Services.Issues.Interfaces;
 ///
 /// Keyed by the issue's owning/quest-giver <see cref="Hero"/> rather than by the
 /// <c>VillageNeedsToolsIssue</c>/<c>VillageNeedsToolsIssueQuest</c> instance, because each peer holds a
-/// DIFFERENT object instance representing "the same logical issue" (see
-/// <see cref="VillageNeedsToolsIssueInterface"/>'s per-peer replicated construction) - they all share the
-/// same owner Hero key, exactly like the existing
-/// <see cref="Patches.IssueManagerQuestCompletedReasonCapture.PendingReasons"/> dictionary already relies on
+/// DIFFERENT object instance representing "the same logical issue" - they all share the same owner Hero key
 /// (1 issue per hero, enforced by <c>IssueManager.Issues</c>).
 ///
 /// Populated ONLY from the server's authoritative <c>NetworkVillageIssueQuestAccepted</c>/
-/// <c>NetworkVillageIssueAlternativeAccepted</c> broadcast (see
-/// <see cref="Handlers.VillageNeedsToolsIssueHandler"/>) - never optimistically set from a not-yet-confirmed
+/// <c>NetworkVillageIssueAlternativeAccepted</c> broadcast - never optimistically set from a not-yet-confirmed
 /// local accept, including on the accepting peer's own machine. That means there is a brief (one network
 /// round-trip, milliseconds) window on the genuine accepter's own machine between their local accept
 /// completing and their own confirmation arriving, during which <see cref="IsLocalPeerOwner"/> would
@@ -54,10 +46,8 @@ internal static class VillageNeedsToolsIssueOwnership
     }
 
     /// <summary>
-    /// Drains this hero's entry, if any, on a genuine finalize (see
-    /// <see cref="Patches.IssueFinalizedPatches"/>) so it can never leak into this hero's NEXT, unrelated
-    /// issue - exactly the same concern already handled for
-    /// <see cref="Patches.IssueManagerQuestCompletedReasonCapture.PendingReasons"/>.
+    /// Drains this hero's entry, if any, on a genuine finalize so it can never leak into this hero's NEXT,
+    /// unrelated issue.
     /// </summary>
     public static void Clear(Hero issueGiver)
     {

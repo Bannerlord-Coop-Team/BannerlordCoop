@@ -13,8 +13,8 @@ namespace GameInterface.Services.Issues.Patches;
 /// used by <c>PlayerCaptivityAttackProtectionPersistencePatches</c>.
 ///
 /// Unlike that precedent (which is server-owned-only data a client never independently holds), this
-/// registry is symmetric: every peer populates its own copy identically from the server's broadcast (see
-/// <see cref="Handlers.VillageNeedsToolsIssueHandler"/>), so every peer just saves/restores its own copy as-is - no
+/// registry is symmetric: every peer populates its own copy identically from the server's broadcast, so every
+/// peer just saves/restores its own copy as-is - no
 /// client/server special-casing needed. This is also what makes join and reconnect both come out correct:
 /// per <c>Coop.Core.Server.Connections.States.TransferSaveState</c>, every (re)connection is serviced by the
 /// server calling <c>SaveCurrentGame()</c> on its own live state and shipping that snapshot to the

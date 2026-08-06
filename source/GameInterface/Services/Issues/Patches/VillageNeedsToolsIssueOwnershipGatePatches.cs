@@ -9,11 +9,11 @@ namespace GameInterface.Services.Issues.Patches;
 /// <c>VillageNeedsToolsIssue</c>'s quest solution, so ANY peer whose own roster happened to satisfy
 /// <c>PlayerHasTools</c> could turn the quest in and collect the reward - even though every peer, after
 /// Finding 1's accept-sync fix, now has its own real, locally-registered <c>DiscussDialogFlow</c> for the
-/// same logical issue (see <see cref="Interfaces.VillageNeedsToolsIssueInterface"/>'s doc comment).
+/// same logical issue.
 ///
 /// Gates the dialogue CONDITION itself rather than adding a round-trip: it's a pure, cheap, local boolean
 /// check against already-synced state (<see cref="VillageNeedsToolsIssueOwnership"/>, populated by the
-/// existing accept broadcast - see <see cref="Handlers.VillageNeedsToolsIssueHandler"/>), so it needs no new
+/// existing accept broadcast), so it needs no new
 /// network round-trip, no "waiting" UI state, and cannot itself desync anything since it only ever *hides*
 /// an option, never changes how the conversation runs. A non-owner's conversation still opens (harmless -
 /// the greeting line and "I'm still looking for your goods." option have no gating condition and no

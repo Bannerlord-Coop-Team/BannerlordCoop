@@ -10,9 +10,9 @@ namespace GameInterface.Services.Issues.Generic;
 /// returns null for them and the Generic/ infrastructure is never consulted for them - they keep running on
 /// their existing hand-written Interfaces/Messages/Handlers/Patches files.
 ///
-/// Process-wide static state (same pattern as <see cref="Interfaces.VillageNeedsToolsIssueOwnership"/>/
-/// <see cref="Interfaces.LordsNeedsTutorQuestFlags"/>): registration happens once, at mod bootstrap, for the
-/// lifetime of the process. <see cref="ClearAllForTests"/> resets it between unit tests.
+/// Process-wide static state (same pattern as <see cref="Interfaces.VillageNeedsToolsIssueOwnership"/>):
+/// registration happens once, at mod bootstrap, for the lifetime of the process.
+/// <see cref="ClearAllForTests"/> resets it between unit tests.
 /// </summary>
 public static class QuestTypeRegistry
 {
