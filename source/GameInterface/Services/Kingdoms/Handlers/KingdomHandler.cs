@@ -185,7 +185,7 @@ public class KingdomHandler : IHandler
         var validationErr = FactionHelper.IsFactionNameApplicable(requestedName);
         
         bool nameAlreadyExists = Kingdom.All?.Any(
-            otherKingdom => !ReferenceEquals(otherKingdom, kingdom) && otherKingdom.Name.ToString() == requestedName) == true;
+            otherKingdom => !ReferenceEquals(otherKingdom, kingdom) && string.Equals(otherKingdom.Name.ToString(), requestedName, StringComparison.InvariantCultureIgnoreCase)) == true;
         
         if (nameAlreadyExists)
         {
