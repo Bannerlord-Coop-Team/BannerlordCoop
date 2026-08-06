@@ -1,8 +1,6 @@
 ﻿using Common.Messaging;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.Clans.Messages;
 
@@ -46,15 +44,5 @@ public readonly struct ClanPartyLeaderChanged : IEvent
         OldLeader = oldLeader;
         SelectedParty = selectedParty;
         MainParty = mainParty;
-    }
-}
-
-public readonly struct ClanPartyDisbanded : IEvent
-{
-    public readonly MobileParty SelectedParty;
-
-    public ClanPartyDisbanded(MobileParty selectedParty)
-    {
-        SelectedParty = selectedParty;
     }
 }

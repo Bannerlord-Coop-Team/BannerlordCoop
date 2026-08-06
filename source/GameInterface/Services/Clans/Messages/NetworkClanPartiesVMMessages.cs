@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using System.Collections.Generic;
 
 namespace GameInterface.Services.Clans.Messages;
 
@@ -62,17 +61,5 @@ internal readonly struct ChangeClanPartyLeader : ICommand
         OldLeaderId = oldLeaderId;
         SelectedPartyId = selectedPartyId;
         MainPartyId = mainPartyId;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-internal readonly struct DisbandClanParty : ICommand
-{
-    [ProtoMember(1)]
-    public readonly string SelectedPartyId;
-
-    public DisbandClanParty(string selectedPartyId)
-    {
-        SelectedPartyId = selectedPartyId;
     }
 }

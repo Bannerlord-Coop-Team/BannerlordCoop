@@ -1,16 +1,9 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
-using TaleWorlds.Core;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Patches;
 
@@ -19,7 +12,7 @@ internal class ClanPartiesVMPatches
 {
     [HarmonyPatch(nameof(ClanPartiesVM.CreateNewClanParty))]
     [HarmonyPrefix]
-    public static bool CreateNewClanPartyPrefix(ref ClanPartiesVM __instance, Hero newLeader, int partyGoldLowerThreshold)
+    public static bool CreateNewClanPartyPrefix(ClanPartiesVM __instance, Hero newLeader, int partyGoldLowerThreshold)
     {
         if (newLeader.PartyBelongedTo == MobileParty.MainParty)
         {
@@ -39,7 +32,7 @@ internal class ClanPartiesVMPatches
 
     [HarmonyPatch(nameof(ClanPartiesVM.OnPartyLeaderChanged))]
     [HarmonyPrefix]
-    public static bool OnPartyLeaderChangedPrefix(ref ClanPartiesVM __instance, Hero newLeader)
+    public static bool OnPartyLeaderChangedPrefix(ClanPartiesVM __instance, Hero newLeader)
     {
         var selectedParty = __instance.CurrentSelectedParty.Party.MobileParty;
         var oldLeader = __instance.CurrentSelectedParty.Party.LeaderHero;
@@ -53,12 +46,10 @@ internal class ClanPartiesVMPatches
 
     [HarmonyPatch(nameof(ClanPartiesVM.OnDisbandCurrentParty))]
     [HarmonyPrefix]
-    public static bool OnDisbandCurrentPartyPrefix(ref ClanPartiesVM __instance)
+    public static bool OnDisbandCurrentPartyPrefix()
     {
-        // Disband clan party on the server
-        var message = new ClanPartyDisbanded(__instance.CurrentSelectedParty.Party.MobileParty);
-        MessageBroker.Instance.Publish(__instance, message);
-
+        // Block and implement as part of OnPartyLeaderChanged to use correct party
+        // instead of currently selected (which can switch back to the player's party)
         return false;
     }
 }
