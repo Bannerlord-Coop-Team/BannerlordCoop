@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.MobileParties.Audit;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
@@ -182,6 +183,40 @@ internal class MobilePartyDebugCommand
             ? $"Server AI tick blocked for player party {args[0]}"
             : $"Server AI tick ran for player party {args[0]}";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("ai_state", "coop.debug.mobileparty")]
+    public static string AiState(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mobileparty.ai_state <MobilePartyId>";
+        }
+
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(args[0], out var mobileParty))
+        {
+            return $"Unable to get {nameof(MobileParty)} with id: {args[0]}";
+        }
+
+        var ai = mobileParty.Ai;
+        if (ai == null)
+        {
+            return $"Party {args[0]} has no {nameof(MobilePartyAi)}";
+        }
+
+        return $"party={args[0]}|isDisabled={ai.IsDisabled}|doNotMakeNewDecisions={ai.DoNotMakeNewDecisions}|" +
+            $"rethinkAtNextHourlyTick={ai.RethinkAtNextHourlyTick}|hourCounter={ai.HourCounter}|" +
+            $"defaultBehaviorNeedsUpdate={ai.DefaultBehaviorNeedsUpdate}|defaultBehavior={mobileParty.DefaultBehavior}|" +
+            $"shortTermBehavior={mobileParty.ShortTermBehavior}|isPlayerParty={mobileParty.IsPlayerParty()}|" +
+            $"isControlledByThisInstance={mobileParty.IsControlledByThisInstance()}|isDisbanding={mobileParty.IsDisbanding}|" +
+            $"attackInitiative={ai.AttackInitiative}|avoidInitiative={ai.AvoidInitiative}";
+    }
+#endif
 
     private static void AppendAttachmentId(StringBuilder sb, IObjectManager objectManager, string label, object obj)
     {
