@@ -145,6 +145,7 @@ public class MapEventDebugCommands
         public MobileParty PlayerParty;
         public MobileParty BanditParty;
         public Settlement PlayerSettlement;
+        public Settlement BanditSettlement;
         public bool BanditWasActive;
         public TroopRosterElement[] BanditMemberRoster;
         public MapEvent MapEvent;
@@ -629,13 +630,19 @@ public class MapEventDebugCommands
             return $"Unable to resolve bandit party {args[1]}: {error}";
         }
 
-        if (!banditParty.IsBandit || banditParty.MapEvent != null || banditParty.CurrentSettlement != null)
+        if (!banditParty.IsBandit || banditParty.MapEvent != null)
         {
-            return $"Bandit party {args[1]} must be a bandit outside a settlement and map event.";
+            return $"Bandit party {args[1]} must be a bandit outside a map event.";
         }
 
         if (playerParty.Army?.LeaderParty == playerParty && playerParty.AttachedParties.Count > 0)
             return $"Player {args[0]} must not lead an army with attached parties.";
+
+        if (banditParty.CurrentSettlement?.SettlementComponent is Hideout &&
+            banditParty.CurrentSettlement.Parties.Count <= 1)
+        {
+            return $"Bandit party {args[1]} must not be the last party in its hideout.";
+        }
 
         if (!objectManager.TryGetId(playerParty, out string playerPartyId) ||
             !objectManager.TryGetId(playerParty.Party, out string playerPartyBaseId) ||
@@ -673,6 +680,7 @@ public class MapEventDebugCommands
             PlayerParty = playerParty,
             BanditParty = banditParty,
             PlayerSettlement = playerParty.CurrentSettlement,
+            BanditSettlement = banditParty.CurrentSettlement,
             BanditWasActive = banditParty.IsActive,
             BanditMemberRoster = banditParty.MemberRoster.GetTroopRoster().ToArray(),
             PlayerBehavior = playerBehavior,
@@ -684,6 +692,8 @@ public class MapEventDebugCommands
         {
             if (playerParty.CurrentSettlement != null)
                 LeaveSettlementAction.ApplyForParty(playerParty);
+            if (banditParty.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(banditParty);
 
             if (fixtureTroop != null)
                 banditParty.MemberRoster.AddToCounts(fixtureTroop, 1);
@@ -706,6 +716,7 @@ public class MapEventDebugCommands
                    $"playerPartyBase={playerPartyBaseId}, banditParty={banditPartyId}, " +
                    $"banditPartyBase={banditPartyBaseId}, banditStringId={banditParty.StringId}, " +
                    $"originalSettlement={fixture.PlayerSettlement?.StringId ?? "none"}, " +
+                   $"originalBanditSettlement={fixture.BanditSettlement?.StringId ?? "none"}, " +
                    $"originalBanditActive={fixture.BanditWasActive}, " +
                    $"originalBanditTroops={fixture.BanditMemberRoster.Sum(element => element.Number)}.";
         }
@@ -893,6 +904,8 @@ public class MapEventDebugCommands
 
             if (fixture.PlayerSettlement != null)
                 EnterSettlementAction.ApplyForParty(fixture.PlayerParty, fixture.PlayerSettlement);
+            if (fixture.BanditSettlement != null)
+                EnterSettlementAction.ApplyForParty(fixture.BanditParty, fixture.BanditSettlement);
 
             error = null;
             return true;
