@@ -8,9 +8,14 @@ namespace GameInterface.Services.Issues.Generic;
 
 public sealed record ModuleRescanCompletion<TIssue>(Func<Hero, bool> TryTriggerOwnedCompletion) where TIssue : IssueBase;
 
-public static class ModuleRescanCompletionRunner
+public interface IModuleRescanCompletionRunner
 {
-    public static void Run<TIssue>(ModuleRescanCompletion<TIssue> spec) where TIssue : IssueBase
+    void Run<TIssue>(ModuleRescanCompletion<TIssue> spec) where TIssue : IssueBase;
+}
+
+internal sealed class ModuleRescanCompletionRunner : IModuleRescanCompletionRunner
+{
+    public void Run<TIssue>(ModuleRescanCompletion<TIssue> spec) where TIssue : IssueBase
     {
         if (spec?.TryTriggerOwnedCompletion == null) return;
         if (Campaign.Current?.IssueManager == null) return;

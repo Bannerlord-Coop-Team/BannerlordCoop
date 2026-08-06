@@ -4,13 +4,28 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Generic.PartySpawn;
 
-public static class PartySpawnRunner
+public interface IPartySpawnRunner
 {
-    public static bool AlreadySpawned<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, TQuest quest)
+    bool AlreadySpawned<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, TQuest quest)
+        where TQuest : QuestBase;
+
+    bool TryForwardSpawnRequest<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, Hero owner, TQuest quest)
+        where TQuest : QuestBase;
+
+    TSpawned CreateOnServer<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, Hero owner, TCapture captured)
+        where TQuest : QuestBase;
+
+    void ApplySpawnResult<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, TQuest quest, TSpawned spawned)
+        where TQuest : QuestBase;
+}
+
+internal sealed class PartySpawnRunner : IPartySpawnRunner
+{
+    public bool AlreadySpawned<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, TQuest quest)
         where TQuest : QuestBase
         => quest != null && (spec?.AlreadySpawnedCheck?.Invoke(quest) ?? false);
 
-    public static bool TryForwardSpawnRequest<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, Hero owner, TQuest quest)
+    public bool TryForwardSpawnRequest<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, Hero owner, TQuest quest)
         where TQuest : QuestBase
     {
         if (spec?.TryCaptureForForwarding == null || spec.ForwardSpawnRequest == null || quest == null || owner == null) return false;
@@ -20,11 +35,11 @@ public static class PartySpawnRunner
         return true;
     }
 
-    public static TSpawned CreateOnServer<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, Hero owner, TCapture captured)
+    public TSpawned CreateOnServer<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, Hero owner, TCapture captured)
         where TQuest : QuestBase
         => spec != null && spec.CreateOnServer != null ? spec.CreateOnServer(owner, captured) : default;
 
-    public static void ApplySpawnResult<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, TQuest quest, TSpawned spawned)
+    public void ApplySpawnResult<TQuest, TCapture, TSpawned>(PartySpawnSpec<TQuest, TCapture, TSpawned> spec, TQuest quest, TSpawned spawned)
         where TQuest : QuestBase
         => spec?.ApplySpawnResult?.Invoke(quest, spawned);
 }

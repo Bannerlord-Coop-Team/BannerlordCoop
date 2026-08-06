@@ -7,10 +7,15 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Issues.Generic.InstanceResolution;
 
-// Not yet wired into any existing patch.
-public static class LocationKeyedInstanceResolution
+public interface ILocationKeyedInstanceResolution
 {
-    public static TQuest Resolve<TQuest>(
+    TQuest Resolve<TQuest>(Func<TQuest, Settlement> locationSelector, Settlement currentSettlement, bool preserveVanillaFallback)
+        where TQuest : QuestBase;
+}
+
+internal sealed class LocationKeyedInstanceResolution : ILocationKeyedInstanceResolution
+{
+    public TQuest Resolve<TQuest>(
         Func<TQuest, Settlement> locationSelector, Settlement currentSettlement, bool preserveVanillaFallback)
         where TQuest : QuestBase =>
         ResolveFrom(Campaign.Current.QuestManager.Quests.OfType<TQuest>(), locationSelector, currentSettlement, preserveVanillaFallback);
