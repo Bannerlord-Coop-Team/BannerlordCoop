@@ -295,7 +295,7 @@ public class GameThread : IUpdateable
         [CallerMemberName] string callerMember = null)
     {
         string label = context ?? BuildLabel(callerFile, callerMember);
-        Run(WrapSafe(action, context), blocking, label);
+        Run(WrapSafe(action, label), blocking, label);
     }
 
     /// <summary>
@@ -312,7 +312,7 @@ public class GameThread : IUpdateable
         string label = context ?? BuildLabel(callerFile, callerMember);
         lock (Instance.m_QueueLock)
         {
-            Instance.m_Queue.Enqueue((WrapSafe(action, context), null, label, cancellation));
+            Instance.m_Queue.Enqueue((WrapSafe(action, label), null, label, cancellation));
         }
     }
 
@@ -371,7 +371,7 @@ public class GameThread : IUpdateable
         return $"{Path.GetFileNameWithoutExtension(callerFile)}.{callerMember}";
     }
 
-    private static Action WrapSafe(Action action, string context) => () =>
+    private static Action WrapSafe(Action action, string label) => () =>
     {
         try
         {
@@ -379,7 +379,17 @@ public class GameThread : IUpdateable
         }
         catch (Exception e)
         {
-            Logger.Error(e, "Failed to run action on the game thread: {Context}", context ?? "(none)");
+            // The busier of the two guarded paths, and the drain never sees these faults.
+            switch (DrainFaultThrottle.Classify(label, e, out long repeats))
+            {
+                case FaultLogAction.Full:
+                    Logger.Error(e, "Failed to run action on the game thread: {Label}", label ?? "(none)");
+                    break;
+                case FaultLogAction.Summary:
+                    Logger.Error("An action on the game thread keeps failing ({RepeatCount}x): {Label}, {Message}",
+                        repeats, label ?? "(none)", e.Message);
+                    break;
+            }
         }
     };
 
@@ -448,6 +458,13 @@ public class GameThread : IUpdateable
     public static IDisposable ActivateCancellation(CancellationToken cancellation) =>
         new CancellationScope(cancellation);
 
+    /// <summary>
+    /// An action queued every frame or every packet that keeps throwing would otherwise write a full stack
+    /// each time, and <see cref="UpdateableList"/>'s throttle never sees the fault because it is consumed
+    /// here.
+    /// </summary>
+    private static readonly FaultLogThrottle DrainFaultThrottle = new FaultLogThrottle();
+
     private static void RunQueuedTask(
         (Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation) task)
     {
@@ -464,8 +481,17 @@ public class GameThread : IUpdateable
         {
             // Update runs inside the engine's tick, so an escaping exception kills the process and
             // abandons the rest of the drain. RunSafe's guard, applied to plain Run callers too.
-            Logger.Error(e, "A queued game-thread action threw and was suppressed: {Label}",
-                task.Label ?? "(unlabeled)");
+            string label = task.Label ?? "(unlabeled)";
+            switch (DrainFaultThrottle.Classify(label, e, out long repeats))
+            {
+                case FaultLogAction.Full:
+                    Logger.Error(e, "A queued game-thread action threw and was suppressed: {Label}", label);
+                    break;
+                case FaultLogAction.Summary:
+                    Logger.Error("A queued game-thread action keeps throwing ({RepeatCount}x): {Label}, {Message}",
+                        repeats, label, e.Message);
+                    break;
+            }
         }
         finally
         {

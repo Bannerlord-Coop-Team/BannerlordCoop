@@ -1,5 +1,7 @@
 using Common;
+using Common.Logging;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Xunit;
@@ -40,6 +42,37 @@ public sealed class GameThreadGuardTests
         Assert.True(elapsed.Elapsed < Timeout, $"the blocking caller was stalled for {elapsed.Elapsed}");
 
         AssertPumpStillDrains();
+    }
+
+    [Fact]
+    public void Update_WhenTheSameActionKeepsThrowing_ReportsItOnce()
+    {
+        // A handler queued per frame fails at that rate, and the stack belongs in the log once.
+        const string label = "GameThreadGuardTests.repeatedFailure";
+        var reported = new List<string>();
+        void Capture(string line)
+        {
+            if (!line.Contains(label)) return;
+            lock (reported) reported.Add(line);
+        }
+
+        OutputSinkManager.AddLogCallback(Capture);
+        try
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                GameThread.Run(() => throw new InvalidOperationException("repeated queued failure"), label: label);
+            }
+
+            // Drained in order, so the probe completing proves all five went through the guard.
+            AssertPumpStillDrains();
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(Capture);
+        }
+
+        Assert.Single(reported);
     }
 
     [Fact]
