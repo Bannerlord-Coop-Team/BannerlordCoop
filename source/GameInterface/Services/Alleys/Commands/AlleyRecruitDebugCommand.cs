@@ -184,6 +184,13 @@ public class AlleyRecruitDebugCommand
                     rosterId,
                     resetCharacter.Id,
                     index >= 0 ? element.Number : 0));
+                if (index >= 0)
+                {
+                    network.SendAll(new NetworkTroopRosterElementBatch(
+                        rosterId,
+                        resetCharacter.Id,
+                        new[] { TroopRosterElementOperation.SetXp(element.Xp) }));
+                }
             }
             network.SendAll(new NetworkTroopRosterRemoveZeroCounts(rosterId));
             fixture.Alley.SetOwner(fixture.OriginalOwner);
