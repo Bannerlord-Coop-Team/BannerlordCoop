@@ -3313,7 +3313,10 @@ public class VillageHostileActionTests : MapEventTestBase
             SwitchCalls.Clear();
             harmony.Patch(
                 SwitchToMenuMethod,
-                prefix: new HarmonyMethod(typeof(GameMenuSwitchRecorder), nameof(RecordSwitchToMenu)));
+                prefix: new HarmonyMethod(typeof(GameMenuSwitchRecorder), nameof(RecordSwitchToMenu))
+                {
+                    priority = Priority.First,
+                });
         }
 
         public string[] SwitchesFor(EnvironmentInstance instance) =>
