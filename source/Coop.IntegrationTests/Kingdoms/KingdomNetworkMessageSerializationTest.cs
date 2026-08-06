@@ -124,6 +124,16 @@ public class KingdomNetworkMessageSerializationTest
         Assert.Equal("New Kingdom", copy.Name);
     }
 
+    [Fact]
+    public void NetworkKingdomNameChanged_RoundTrips()
+    {
+        var original = new NetworkKingdomNameChanged("Kingdom_empire");
+        
+        var copy = RoundTrip(original);
+        
+        Assert.Equal("Kingdom_empire", copy.KingdomId);
+    }
+
     private static T RoundTrip<T>(T original)
     {
         using var stream = new MemoryStream();
