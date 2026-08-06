@@ -12,5 +12,6 @@ internal static class QuestTypeBootstrap
         // Add one line here for every future migrated type:
         // RuntimeHelpers.RunClassConstructor(typeof(Migrated.SomeQuestType.SomeQuestTypeQuestType).TypeHandle);
         RuntimeHelpers.RunClassConstructor(typeof(Migrated.VillageNeedsTools.VillageNeedsToolsQuestType).TypeHandle);
+        RuntimeHelpers.RunClassConstructor(typeof(Migrated.VillageNeedsCraftingMaterials.VillageNeedsCraftingMaterialsQuestType).TypeHandle);
     }
 }
