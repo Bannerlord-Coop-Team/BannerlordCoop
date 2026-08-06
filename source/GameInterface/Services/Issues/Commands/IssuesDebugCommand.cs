@@ -9,23 +9,9 @@ using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Issues.Commands;
 
-/// <summary>
-/// Live/console debug commands for the Issue-quest multiplayer-sync work
-/// (<c>source/GameInterface/Services/Issues/</c>). Follows this project's established
-/// <c>coop.debug.&lt;domain&gt;.&lt;action&gt;</c> convention (see <c>Villages/Commands/VillageDebugCommand.cs</c>,
-/// <c>Heroes/Commands/HeroDebugCommand.cs</c>) and the newer <see cref="CommandHelpers"/> helper set rather than
-/// ad hoc <c>ModInformation.IsClient</c> checks.
-/// </summary>
 public static class IssuesDebugCommand
 {
     // coop.debug.issues.give lord_2_7 VillageNeedsTools
-    /// <summary>
-    /// Force-gives a specific quest type to a hero: builds a real <see cref="PotentialIssueData"/> and calls
-    /// the PUBLIC <see cref="IssueManager.CreateNewIssue"/> directly (bypassing the real eligibility-condition
-    /// collection dance - that is the whole point of a debug command), then immediately promotes it to a live
-    /// Quest via the PUBLIC <see cref="IssueManager.StartIssueQuest"/> (what a real "accept" dialogue click does
-    /// under the hood), so the result is a fully-live, testable quest rather than just a pre-accept offer.
-    /// </summary>
     [CommandLineArgumentFunction("give", "coop.debug.issues")]
     public static string Give(List<string> args)
     {
@@ -75,9 +61,7 @@ public static class IssuesDebugCommand
         return StartQuestOrRollback(hero, key);
     }
 
-    // IssueBase.StartIssueWithQuest assigns IssueQuest only *after* GenerateIssueQuest returns, so a throw here
-    // means hero.Issue is stuck attached with no live quest - roll it back via DeactivateIssue rather than
-    // soft-locking the hero for future give/complete calls.
+    // A throw here leaves hero.Issue stuck attached with no live quest - roll it back via DeactivateIssue.
     private static string StartQuestOrRollback(Hero hero, string key)
     {
         bool started;
@@ -121,11 +105,6 @@ public static class IssuesDebugCommand
 
     // coop.debug.issues.complete lord_2_7
     // coop.debug.issues.complete lord_2_7 fail
-    /// <summary>
-    /// Force-completes a hero's active quest. Fully generic across all 43 vanilla Issue types - no per-type
-    /// code needed, since completion already cascades through each quest's own overrides via the 5 public
-    /// zero-required-arg <see cref="TaleWorlds.CampaignSystem.QuestBase"/> completion methods.
-    /// </summary>
     [CommandLineArgumentFunction("complete", "coop.debug.issues")]
     public static string Complete(List<string> args)
     {
@@ -187,8 +166,6 @@ public static class IssuesDebugCommand
     }
 
     // coop.debug.issues.list_types
-    /// <summary>Lists all 43 real vanilla Issue type keys, each tagged [wired] or [not wired: reason] - see
-    /// <see cref="IssueGiveCatalog"/>.</summary>
     [CommandLineArgumentFunction("list_types", "coop.debug.issues")]
     public static string ListTypes(List<string> args)
     {

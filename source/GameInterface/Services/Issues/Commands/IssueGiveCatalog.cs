@@ -9,18 +9,8 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Commands;
 
-/// <summary>
-/// One catalog entry per real vanilla <see cref="IssueBase"/> subtype (43 total - 36 in
-/// <c>TaleWorlds.CampaignSystem.Issues</c>, 7 in <c>SandBox.Issues</c>, confirmed by grepping the decompiled
-/// vanilla source for every <c>: IssueBase</c> subclass). Keyed by the short, human-typable name used
-/// throughout <c>source/GameInterface/Services/Issues/Generic/Migrated/&lt;Name&gt;/</c> for types this project
-/// has already migrated (the issue type's own class name with the trailing "Issue" stripped), so
-/// <c>coop.debug.issues.give</c> stays consistent with names testers already see elsewhere in this project.
-///
-/// A "not wired" entry has <see cref="IssueGiveEntry.Resolve"/> null and a non-null
-/// <see cref="IssueGiveEntry.NotWiredReason"/> - <see cref="IssuesDebugCommand"/> reports that reason verbatim
-/// rather than silently no-op'ing, per this project's standing zero-tolerance-for-silent-coverage-gaps rule.
-/// </summary>
+// One entry per real vanilla IssueBase subtype (43 total). A "not wired" entry has a null Resolve and a
+// non-null NotWiredReason, which IssuesDebugCommand reports verbatim rather than silently no-op'ing.
 internal static class IssueGiveCatalog
 {
     private static readonly Dictionary<string, IssueGiveEntry> ByKey = Build();
@@ -35,10 +25,7 @@ internal static class IssueGiveCatalog
     private static (PotentialIssueData.StartIssueDelegate Factory, string Error) Fail(string reason)
         => (null, reason);
 
-    // --- Related-object defaults -------------------------------------------------------------------------
-    // Debug "give" intentionally bypasses each real type's own ConditionsHold/eligibility selection (that IS
-    // the point - see this project's task notes). These pick a simple, always-safe-to-construct-with default
-    // straight off live campaign state; they do not attempt to reproduce vanilla's own eligibility nuance.
+    // Debug "give" bypasses each type's own eligibility selection - these are simple always-safe defaults.
 
     private static Settlement AnyFortification(Hero hero)
     {
@@ -95,8 +82,6 @@ internal static class IssueGiveCatalog
     {
         void Wire(string key, Type issueType, Func<Hero, (PotentialIssueData.StartIssueDelegate, string)> resolve) =>
             IssueGiveCatalog.Wire(map, key, issueType, resolve);
-
-        // --- Bare-Hero constructor types (22) - mechanical, no related object, safe as-is ---
 
         Wire("ArmyNeedsSupplies", typeof(ArmyNeedsSuppliesIssueBehavior.ArmyNeedsSuppliesIssue),
             hero => Ok(h => new ArmyNeedsSuppliesIssueBehavior.ArmyNeedsSuppliesIssue(h)));
@@ -158,11 +143,8 @@ internal static class IssueGiveCatalog
         Wire("VillageNeedsCraftingMaterials", typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue),
             hero => Ok(h => new VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue(h)));
 
-        // NotableWantsDaughterFoundIssue's own constructor is a bare field-store (verified in decompiled
-        // source) - the HeroCreator.CreateSpecialHero minting this project's task notes flagged happens inside
-        // NotableWantsDaughterFoundQuest's constructor, only reached via the generic StartIssueQuest ->
-        // GenerateIssueQuest path every one of these 43 types already goes through identically to a real
-        // player's accept - not a special risk introduced by this debug command.
+        // The hero-minting side effect this project flagged elsewhere lives in the Quest ctor, not this Issue
+        // ctor - not a special risk from this debug command.
         Wire("NotableWantsDaughterFound", typeof(NotableWantsDaughterFoundIssueBehavior.NotableWantsDaughterFoundIssue),
             hero => Ok(h => new NotableWantsDaughterFoundIssueBehavior.NotableWantsDaughterFoundIssue(h)));
 
@@ -170,7 +152,6 @@ internal static class IssueGiveCatalog
             hero => Ok(h => new RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue(h)));
     }
 
-    // --- Related-object types (20) - derive a simple, always-constructible default ---
     private static void AddRelatedObjectEntries(Dictionary<string, IssueGiveEntry> map)
     {
         AddFortificationRelatedEntries(map);
@@ -356,22 +337,11 @@ internal static class IssueGiveCatalog
         });
     }
 
-    // --- Known, not yet wired (1) ---
     private static void AddNotYetWiredEntries(Dictionary<string, IssueGiveEntry> map)
     {
         void NotWired(string key, Type issueType, string reason) =>
             IssueGiveCatalog.NotWired(map, key, issueType, reason);
 
-        // ProdigalSonIssue's own constructor (not deferred to quest-accept like the other 42 types) immediately
-        // does: `_targetSettlement = targetGangHero.CurrentSettlement` (null if that hero isn't currently
-        // physically inside a settlement) then `_targetSettlement.LocationComplex.GetListOfLocations()
-        // .FirstOrDefault(...).ReserveLocation(...)` (NRE if no free location exists either), and unconditionally
-        // calls `DisableHeroAction.Apply(_prodigalSon)` on the caller-supplied prodigal-son hero as a real,
-        // immediate world-state mutation - not a re-derivable "pick a better default" problem, since even a
-        // *successful* construction disables an arbitrary chosen hero as a side effect of "give" itself, before
-        // any quest has actually started. Confirmed via decompiled source
-        // (SandBox.Issues.ProdigalSonIssueBehavior.ProdigalSonIssue's ctor) - too fragile/surprising to wire
-        // blindly per this project's "do not guess" instruction.
         NotWired("ProdigalSon", typeof(ProdigalSonIssueBehavior.ProdigalSonIssue),
             "constructor reserves a location on the target hero's CURRENT settlement and unconditionally calls " +
             "DisableHeroAction.Apply on both the prodigal-son and target-gang heroes at issue-creation time " +
@@ -382,9 +352,7 @@ internal static class IssueGiveCatalog
     }
 }
 
-/// <summary>One catalog row. <see cref="Resolve"/> is null when this type is a deliberate, documented
-/// "known, not yet wired" gap - see <see cref="IssueGiveCatalog.Build"/>'s own comments for the full list and
-/// reasons.</summary>
+// One catalog row. A null Resolve means this type is a deliberate "known, not yet wired" gap.
 internal sealed class IssueGiveEntry
 {
     public string Key { get; }
