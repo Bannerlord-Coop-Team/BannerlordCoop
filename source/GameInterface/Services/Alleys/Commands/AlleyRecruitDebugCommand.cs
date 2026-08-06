@@ -22,6 +22,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
+using static GameInterface.Services.ObjectManager.ObjectManager;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Alleys.Commands;
@@ -168,7 +169,7 @@ public class AlleyRecruitDebugCommand
             }
 
             RestoreRoster(fixture.PlayerParty.MemberRoster, fixture.MemberRoster);
-            sendCoalescer.FlushInstance(rosterId, network);
+            sendCoalescer.DropInstance(Compact(rosterId, typeof(TroopRoster)));
             foreach (var resetCharacter in resetCharacters)
             {
                 var index = fixture.PlayerParty.MemberRoster.FindIndexOfTroop(resetCharacter.Character);
