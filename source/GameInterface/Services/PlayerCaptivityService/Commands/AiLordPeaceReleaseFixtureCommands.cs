@@ -5,6 +5,7 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Utils.Commands;
 using System;
@@ -260,7 +261,12 @@ internal static class AiLordPeaceReleaseFixtureCommands
         party.Party.SetAsCameraFollowParty();
         mapScreen.FastMoveCameraToPosition(party.Position);
         mapScreen.MapCameraView.SetCameraMode(MapCameraView.CameraFollowMode.FollowParty);
-        return $"Following party '{party.StringId}' on the campaign map.";
+        var partyVisual = party.Party.GetPartyVisual();
+        if (partyVisual == null)
+            return $"Failed to focus party: '{party.StringId}' has no campaign map visual.";
+
+        partyVisual.OnHover();
+        return $"Following party '{party.StringId}' with its tooltip on the campaign map.";
     }
 
     [CommandLineArgumentFunction("restore_ai_lord_fixture", "coop.debug.player_captivity")]
