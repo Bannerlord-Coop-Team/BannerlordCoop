@@ -20,10 +20,13 @@ public sealed class CreationCaptureRunner<TIssue, TFields> where TIssue : IssueB
 
     public TIssue ConstructAndRegisterReplicated(Hero owner, TFields fields, Action<TIssue, TFields> afterRegistered = null)
     {
-        var issue = _strategy.ConstructReplicated(owner, fields);
-        RegisterReplicated(owner, issue);
-        afterRegistered?.Invoke(issue, fields);
-        return issue;
+        using (new AllowedThread())
+        {
+            var issue = _strategy.ConstructReplicated(owner, fields);
+            RegisterReplicated(owner, issue);
+            afterRegistered?.Invoke(issue, fields);
+            return issue;
+        }
     }
 
     private void RegisterReplicated(Hero owner, TIssue issue)
@@ -31,9 +34,6 @@ public sealed class CreationCaptureRunner<TIssue, TFields> where TIssue : IssueB
         PotentialIssueData.StartIssueDelegate factory = (in PotentialIssueData _, Hero _owner) => issue;
         var pid = new PotentialIssueData(factory, typeof(TIssue), _frequency);
 
-        using (new AllowedThread())
-        {
-            Campaign.Current.IssueManager.CreateNewIssue(in pid, owner);
-        }
+        Campaign.Current.IssueManager.CreateNewIssue(in pid, owner);
     }
 }
