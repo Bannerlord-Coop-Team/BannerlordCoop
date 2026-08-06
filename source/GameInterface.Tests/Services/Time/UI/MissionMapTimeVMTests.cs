@@ -4,6 +4,9 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Time.UI;
 
+/// <summary>
+/// Verifies the display text produced by "MissionMapTimeVM for campaign time control modes.
+/// </summary>
 public class MissionMapTimeVMTests
 {
     [Theory]

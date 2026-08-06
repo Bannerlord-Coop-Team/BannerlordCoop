@@ -7,7 +7,13 @@ using TaleWorlds.MountAndBlade.View.MissionViews;
 
 namespace GameInterface.Services.Time.UI;
 
-public class MissionMapTimeView : MissionView, ILocationMissionBehavior
+/// <summary>
+/// Displays the current campaign map time control-state while the player is inside a mission
+/// Initializes the overlay from the current time control mode and updates it when the server
+/// broadcasts a new mode. Implementing "ILocationMissionBehavior" allows the view
+/// to be attached to location missions through the existing location behavior composition.
+/// </summary>
+public sealed class MissionMapTimeView : MissionView, ILocationMissionBehavior
 {
     private const int LayerOrder = 10;
 

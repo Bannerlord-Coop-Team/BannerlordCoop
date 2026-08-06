@@ -4,6 +4,9 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Time.UI;
 
+/// <summary>
+/// Provides the campaign map time control state displayed by the mission map time overlay.
+/// </summary>
 public sealed class MissionMapTimeVM : ViewModel
 {
     private string mapTimeText;
