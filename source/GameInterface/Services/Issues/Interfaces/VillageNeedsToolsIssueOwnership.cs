@@ -5,35 +5,8 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Interfaces;
 
-/// <summary>
-/// Records which connected player's <see cref="Player.ControllerId"/> genuinely accepted a given village-issue
-/// (Village Needs Tools OR Village Needs Crafting Materials - despite the "Tools" name, this registry is
-/// type-agnostic and Hero-keyed, so it can be shared unchanged by any per-issue-type dialogue-gate or
-/// alternative-solution completion fix that needs a real "who actually owns this issue" concept, not just the
-/// per-peer replicated Issue/Quest object instance a raw type check would see.
-///
-/// Fragile-coupling note (flagged, not fixed): persistence piggybacks on
-/// <c>VillageNeedsToolsIssueBehavior.SyncData</c> specifically, since that's the only currently-allowlisted
-/// behavior with a non-empty <c>SyncData</c> override. This registry's own save/restore correctly covers BOTH
-/// issue types today only because Tools remains active - if Tools were ever removed while Crafting Materials
-/// remained, persistence would silently break. Worth revisiting (a type-neutral rename, or its own dedicated
-/// SyncData hook) if that ever happens.
-///
-/// Keyed by the issue's owning/quest-giver <see cref="Hero"/> rather than by the
-/// <c>VillageNeedsToolsIssue</c>/<c>VillageNeedsToolsIssueQuest</c> instance, because each peer holds a
-/// DIFFERENT object instance representing "the same logical issue" - they all share the same owner Hero key
-/// (1 issue per hero, enforced by <c>IssueManager.Issues</c>).
-///
-/// Populated ONLY from the server's authoritative <c>NetworkVillageIssueQuestAccepted</c>/
-/// <c>NetworkVillageIssueAlternativeAccepted</c> broadcast - never optimistically set from a not-yet-confirmed
-/// local accept, including on the accepting peer's own machine. That means there is a brief (one network
-/// round-trip, milliseconds) window on the genuine accepter's own machine between their local accept
-/// completing and their own confirmation arriving, during which <see cref="IsLocalPeerOwner"/> would
-/// (correctly, fail-closed) read false for them too. This is a deliberate, accepted trade-off, not a bug:
-/// the exploitable "turn the quest in" action is a separate, later conversation (the player has to walk
-/// back up to the same NPC), not the same one that accepted it, so the window never matters in practice -
-/// worst case is "try again a moment later."
-/// </summary>
+// Fragile: persistence piggybacks on VillageNeedsToolsIssueBehavior.SyncData. If Tools is ever removed while
+// Crafting Materials remains, this registry's persistence silently breaks.
 internal static class VillageNeedsToolsIssueOwnership
 {
     private static readonly Dictionary<Hero, string> OwnerControllerIdByIssueGiver = new();
@@ -45,10 +18,6 @@ internal static class VillageNeedsToolsIssueOwnership
         OwnerControllerIdByIssueGiver[issueGiver] = controllerId;
     }
 
-    /// <summary>
-    /// Drains this hero's entry, if any, on a genuine finalize so it can never leak into this hero's NEXT,
-    /// unrelated issue.
-    /// </summary>
     public static void Clear(Hero issueGiver)
     {
         if (issueGiver == null) return;
@@ -56,7 +25,6 @@ internal static class VillageNeedsToolsIssueOwnership
         OwnerControllerIdByIssueGiver.Remove(issueGiver);
     }
 
-    /// <summary>Wipes every entry - used when repopulating from save data on load.</summary>
     public static void ClearAll()
     {
         OwnerControllerIdByIssueGiver.Clear();
@@ -68,11 +36,10 @@ internal static class VillageNeedsToolsIssueOwnership
         return issueGiver != null && OwnerControllerIdByIssueGiver.TryGetValue(issueGiver, out controllerId);
     }
 
-    /// <summary>
-    /// True only on the one machine whose own <see cref="IControllerIdProvider.ControllerId"/> matches the
-    /// recorded owner for this issue - a dedicated server with no local player, or any other non-owning
-    /// peer, always reads false.
-    /// </summary>
+    // Only ever set from the server's confirmed broadcast, never optimistically - so there's a brief window on
+    // the genuine accepter's own machine, before their own confirmation arrives, where this reads false for
+    // them too. Deliberate: turning the quest in is always a separate, later conversation, so the window never
+    // matters in practice.
     public static bool IsLocalPeerOwner(Hero issueGiver)
     {
         if (!TryGetOwnerControllerId(issueGiver, out var ownerControllerId)) return false;
@@ -81,8 +48,6 @@ internal static class VillageNeedsToolsIssueOwnership
         return controllerIdProvider.ControllerId == ownerControllerId;
     }
 
-    /// <summary>Used by <see cref="Patches.VillageNeedsToolsIssueOwnershipPersistencePatches"/> to save the
-    /// registry alongside the behavior's own save record.</summary>
     public static IReadOnlyCollection<KeyValuePair<Hero, string>> Snapshot()
     {
         return OwnerControllerIdByIssueGiver.ToArray();

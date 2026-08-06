@@ -11,20 +11,11 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Issues;
 
-/// <summary>
-/// Exercises the real <see cref="VillageNeedsToolsIssueOwnership"/> registry directly (not a
-/// reimplementation of its logic) - this is the "ownership-gate mechanism" the harmony patches in
-/// GameInterface/Services/Issues/Patches lean on. <see cref="ContainerProvider"/> is process-wide static
-/// state, so every test here runs in <see cref="ModInformationRoleCollection"/> to avoid a parallel test
-/// elsewhere observing a container swapped out from under it.
-/// </summary>
 [Collection(ModInformationRoleCollection.Name)]
 public class VillageNeedsToolsIssueOwnershipTests : IDisposable
 {
     public VillageNeedsToolsIssueOwnershipTests()
     {
-        // The registry is static/process-wide too - start every test from a clean slate regardless of
-        // what a previous test (or a previous run's crash) left behind.
         VillageNeedsToolsIssueOwnership.ClearAll();
     }
 
@@ -36,11 +27,6 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
 
     private static Hero NewHero() => ObjectHelper.SkipConstructor<Hero>();
 
-    /// <summary>
-    /// Installs a container whose <see cref="IControllerIdProvider"/> reports <paramref name="controllerId"/>
-    /// as "this machine's own player" - exactly what <see cref="VillageNeedsToolsIssueOwnership.IsLocalPeerOwner"/>
-    /// resolves via <see cref="ContainerProvider"/> in production.
-    /// </summary>
     private static void SetLocalControllerId(string controllerId)
     {
         var provider = new Mock<IControllerIdProvider>();
@@ -60,8 +46,6 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
         SetLocalControllerId("player-A");
         Assert.True(VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(issueGiver));
 
-        // A different peer (e.g. the losing side of an accept race, or a dedicated server with no
-        // local player) must never read itself as the owner just because SOMEONE owns the issue.
         SetLocalControllerId("player-B");
         Assert.False(VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(issueGiver));
     }
@@ -78,8 +62,6 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
     [Fact]
     public void IsLocalPeerOwner_FalseWhenNoControllerIdProviderCanBeResolved()
     {
-        // A dedicated server with no local player is exactly this case: no IControllerIdProvider
-        // registration to resolve at all.
         var issueGiver = NewHero();
         VillageNeedsToolsIssueOwnership.SetOwner(issueGiver, "player-A");
         ContainerProvider.Clear();
@@ -101,8 +83,6 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
     [Fact]
     public void SetOwner_OverwritesAPreviouslyRecordedOwnerForTheSameHero()
     {
-        // Models a same-issue double-accept race resolving: the server's arbitration confirms a winner
-        // AFTER a different (losing) ControllerId may have raced in first.
         var issueGiver = NewHero();
         VillageNeedsToolsIssueOwnership.SetOwner(issueGiver, "player-A");
         VillageNeedsToolsIssueOwnership.SetOwner(issueGiver, "player-B");
@@ -122,7 +102,6 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
         VillageNeedsToolsIssueOwnership.Clear(issueGiver);
 
         Assert.False(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(issueGiver, out _));
-        // The unrelated hero's own entry must survive - Clear is keyed per-hero, not a blanket wipe.
         Assert.True(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(otherIssueGiver, out var otherControllerId));
         Assert.Equal("player-B", otherControllerId);
     }
@@ -130,8 +109,6 @@ public class VillageNeedsToolsIssueOwnershipTests : IDisposable
     [Fact]
     public void Snapshot_RoundTripsThroughClearAllExactlyAsThePersistencePatchRelies()
     {
-        // This is exactly the save/load shape VillageNeedsToolsIssueOwnershipPersistencePatches uses:
-        // snapshot everything, ClearAll, then re-populate from the snapshot.
         var heroA = NewHero();
         var heroB = NewHero();
         VillageNeedsToolsIssueOwnership.SetOwner(heroA, "player-A");

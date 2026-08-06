@@ -8,12 +8,6 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Issues.Generic;
 
-/// <summary>
-/// Exercises the "coexistence, not flag day" registry the migration story depends on: "generic runners check
-/// QuestTypeRegistry.Get(issueType) first, null means 'not migrated'." An issue type that was never
-/// <see cref="QuestTypeRegistry.Register"/>-ed must always resolve to null - that's what lets every unmigrated
-/// quest type keep running on its own hand-written files, unaware this infrastructure exists at all.
-/// </summary>
 [Collection(nameof(QuestTypeRegistryCollection))]
 public class QuestTypeRegistryTests : IDisposable
 {
@@ -27,8 +21,6 @@ public class QuestTypeRegistryTests : IDisposable
         QuestTypeRegistry.ClearAllForTests();
     }
 
-    // Minimal, never-registered-with-the-real-game stand-ins - only used as Type keys here, never constructed
-    // (abstract, and the base-constructor calls below only need to satisfy the compiler, not run for real).
     private abstract class FakeIssueA : IssueBase
     {
         protected FakeIssueA() : base(null, CampaignTime.Never)
@@ -86,8 +78,6 @@ public class QuestTypeRegistryTests : IDisposable
         Assert.Same(descriptor, QuestTypeRegistry.Get(typeof(FakeIssueA)));
         Assert.True(QuestTypeRegistry.IsRegistered(typeof(FakeIssueA)));
 
-        // A DIFFERENT, never-registered issue type must still resolve to null - registering one type must not
-        // make every type look "migrated".
         Assert.Null(QuestTypeRegistry.Get(typeof(FakeIssueB)));
         Assert.False(QuestTypeRegistry.IsRegistered(typeof(FakeIssueB)));
     }
@@ -120,7 +110,6 @@ public class QuestTypeRegistryTests : IDisposable
         Assert.Equal("FakeA", descriptor.DisplayName);
         Assert.Same(creationCapture, descriptor.GetCreationCapture<int>());
 
-        // Asking for the wrong TFields shape must fail safe (null), not throw or silently return the wrong type.
         Assert.Null(descriptor.GetCreationCapture<string>());
         Assert.Null(descriptor.GetQuestSolutionAcceptMirror<int>());
         Assert.Null(descriptor.GetAlternativeAcceptMirror<Unit>());
@@ -131,10 +120,6 @@ public class QuestTypeRegistryTests : IDisposable
         public int Value;
     }
 
-    // --- Registry-driven dispatch trigger delegates (post-phase-1 safety-audit fix) - exercises exactly the
-    // shape Generic.Dispatch.GenericQuestTypeDispatchPatches relies on: QuestTypeRegistry.Get(issueType) first,
-    // then invoke whatever trigger delegate (if any) the resolved descriptor carries. ---
-
     [Fact]
     public void Descriptor_CarriesTheGenuineCreationTrigger_AndOnlyInvokesItForItsOwnIssueType()
     {
@@ -144,13 +129,9 @@ public class QuestTypeRegistryTests : IDisposable
             .Build();
         QuestTypeRegistry.Register(descriptor);
 
-        // The real dispatch shape: resolve via the base (type-erased) descriptor, then invoke the delegate -
-        // exactly what GenericQuestTypeCreationTriggerPatch does.
         var resolved = QuestTypeRegistry.Get(typeof(FakeIssueA));
         Assert.NotNull(resolved?.OnGenuineCreation);
 
-        // An unregistered type must resolve to null, and therefore never invoke anything - the actual
-        // coexistence guarantee this whole fix exists to make real.
         Assert.Null(QuestTypeRegistry.Get(typeof(FakeIssueB))?.OnGenuineCreation);
     }
 
@@ -165,9 +146,6 @@ public class QuestTypeRegistryTests : IDisposable
         Assert.NotNull(withTriggers.OnGenuineQuestSolutionAccept);
         Assert.NotNull(withTriggers.OnGenuineAlternativeAccept);
 
-        // A type that never calls WithQuestSolutionAcceptTrigger/WithAlternativeAcceptTrigger at all (e.g. one
-        // with no such mechanism to migrate) must carry null, not a no-op delegate - callers null-check before
-        // invoking (see GenericQuestTypeDispatchPatches).
         var withoutTriggers = QuestDescriptorBuilder.For<FakeIssueB, FakeQuestB>("FakeB").Build();
         Assert.Null(withoutTriggers.OnGenuineQuestSolutionAccept);
         Assert.Null(withoutTriggers.OnGenuineAlternativeAccept);

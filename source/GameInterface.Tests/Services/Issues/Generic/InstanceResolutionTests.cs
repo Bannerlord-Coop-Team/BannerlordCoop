@@ -15,16 +15,6 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Issues.Generic;
 
-/// <summary>
-/// Exercises <see cref="OwnershipKeyedInstanceResolution"/>/<see cref="LocationKeyedInstanceResolution"/>'s real
-/// selection logic via their <c>ResolveFrom</c> entry points, against
-/// real (constructor-skipped) <see cref="QuestBase"/> instances rather than a re-implementation of the
-/// selection loop. <see cref="QuestBase"/> is abstract with vanilla-defined abstract members, so a concrete
-/// stand-in (<see cref="VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest"/>,
-/// already used elsewhere in this codebase) is built via <see cref="ObjectHelper.SkipConstructor{T}"/> and its
-/// own private <c>_questState</c>/<c>_questGiver</c> fields are force-set by reflection - the same reflection
-/// technique this whole design (and this codebase generally) already relies on throughout.
-/// </summary>
 [Collection(ModInformationRoleCollection.Name)]
 public class InstanceResolutionTests : IDisposable
 {
@@ -101,7 +91,7 @@ public class InstanceResolutionTests : IDisposable
     public void OwnershipKeyed_ReturnsNull_WhenNoCandidateIsLocallyOwned()
     {
         SetLocalControllerId("player-A");
-        var quest = NewQuest(NewHero(), isOngoing: true); // never recorded as owned by anyone
+        var quest = NewQuest(NewHero(), isOngoing: true);
 
         var result = OwnershipKeyedInstanceResolution.ResolveFrom(new[] { quest });
 
@@ -136,7 +126,6 @@ public class InstanceResolutionTests : IDisposable
         var questA = NewQuest(NewHero(), isOngoing: true);
         var locations = new Dictionary<QuestBase, Settlement> { [questA] = settlementA };
 
-        // LordNeedsGarrisonTroops' real shape: preserveVanillaFallback=false, __result stays null on no match.
         var result = LocationKeyedInstanceResolution.ResolveFrom(
             new[] { questA }, q => locations[q], currentSettlement: settlementOther, preserveVanillaFallback: false);
 
@@ -152,7 +141,6 @@ public class InstanceResolutionTests : IDisposable
         var secondOngoing = NewQuest(NewHero(), isOngoing: true);
         var locations = new Dictionary<QuestBase, Settlement> { [firstOngoing] = settlementA, [secondOngoing] = settlementA };
 
-        // MerchantArmyOfPoachers' real shape: preserveVanillaFallback=true, falls back to the first ongoing quest.
         var result = LocationKeyedInstanceResolution.ResolveFrom(
             new[] { firstOngoing, secondOngoing }, q => locations[q], currentSettlement: settlementOther, preserveVanillaFallback: true);
 

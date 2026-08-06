@@ -6,13 +6,6 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Issues.Generic;
 
-/// <summary>
-/// Exercises the real <see cref="PendingRegistry{TValue}"/> primitive directly - the exact
-/// <c>Set</c>/<c>TryGet</c>/<c>Clear</c>/<c>ClearAll</c>/<c>Snapshot</c>/<c>RestoreAll</c> semantics
-/// <see cref="Interfaces.VillageNeedsToolsIssueOwnership"/> already hand-implements today, unchanged by this
-/// file (see <see cref="PendingRegistry{TValue}"/>'s own type doc comment for why it isn't rewired to
-/// delegate to this primitive yet).
-/// </summary>
 public class PendingRegistryTests
 {
     private static Hero NewHero() => ObjectHelper.SkipConstructor<Hero>();
