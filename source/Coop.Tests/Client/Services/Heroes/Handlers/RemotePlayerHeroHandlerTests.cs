@@ -71,4 +71,20 @@ public class RemotePlayerHeroHandlerTests
         heroInterface.Verify(x => x.ClientUnpackHero(It.IsAny<byte[]>(), It.IsAny<Player>()), Times.Never);
         playerManager.Verify(x => x.AddPlayer(It.IsAny<Player>()), Times.Never);
     }
+
+    [Fact]
+    public void PlayerRegistrationUpdated_ReplacesExistingMapping()
+    {
+        var registered = new Player("ctrl", "hero1", "staleParty", "clan1", "char1");
+        var replacement = new Player("ctrl", "hero1", "party1", "clan1", "char1");
+        var resolvedPlayer = registered;
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(registered.ControllerId, out resolvedPlayer))
+            .Returns(true);
+        playerManager.Setup(manager => manager.ReplacePlayer(registered, replacement)).Returns(true);
+
+        messageBroker.Publish(this, new NetworkPlayerRegistrationUpdated(replacement));
+
+        playerManager.Verify(manager => manager.ReplacePlayer(registered, replacement), Times.Once);
+    }
 }
