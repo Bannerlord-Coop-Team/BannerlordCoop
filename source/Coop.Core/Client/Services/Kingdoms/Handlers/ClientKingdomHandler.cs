@@ -14,6 +14,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.ScreenSystem;
+using SandBox.GauntletUI;
 
 namespace Coop.Core.Client.Services.Kingdoms.Handlers;
 
@@ -57,6 +59,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<KingdomCreationRequested>(HandleKingdomCreationRequested);
         messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
         messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
+        messageBroker.Subscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
     }
 
     private void HandleKingdomCreationRequested(MessagePayload<KingdomCreationRequested> obj)
@@ -90,6 +93,26 @@ public class ClientKingdomHandler : IHandler
 
         var message = new NetworkRequestChangeKingdomName(kingdomId, payload.Name);
         network.SendAll(message);
+    }
+
+    private void HandleNetworkKingdomNameChanged(MessagePayload<NetworkKingdomNameChanged> obj)
+    {
+        var kingdomId = obj.What.KingdomId;
+
+        GameThread.RunSafe(() =>
+        {
+            if (ScreenManager.TopScreen is not GauntletKingdomScreen kingdomScreen) return;
+
+            var dataSource = kingdomScreen.DataSource;
+            if (dataSource == null) return;
+
+            if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom)) return;
+
+            if (!ReferenceEquals(dataSource.Kingdom, kingdom)) return;
+            
+            dataSource.OnRefresh();
+            dataSource.RefreshValues();
+        }, context: nameof(ClientKingdomHandler));
     }
 
     private void HandleNetworkPlayerKingdomCreated(MessagePayload<NetworkPlayerKingdomCreated> obj)
@@ -383,6 +406,7 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<KingdomCreationRequested>(HandleKingdomCreationRequested);
         messageBroker.Unsubscribe<DecisionAdded>(HandleLocalDecisionAdded);
         messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
+        messageBroker.Unsubscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
     }
 
     private readonly struct PendingSettlementRestore

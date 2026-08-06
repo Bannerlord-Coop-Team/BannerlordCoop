@@ -56,6 +56,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Subscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
         messageBroker.Subscribe<NetworkAddDecision>(HandleNetworkAddDecision);
         messageBroker.Subscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
+        messageBroker.Subscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
     }
 
     private void HandleNetworkRequestCreateKingdom(MessagePayload<NetworkRequestCreateKingdom> obj)
@@ -123,6 +124,16 @@ public class ServerKingdomHandler : IHandler
             settlementId,
             payload.CultureId);
         network.SendAll(message);
+    }
+
+    private void HandleLocalKingdomNameChanged(MessagePayload<KingdomNameChanged> obj)
+    {
+        var payload = obj.What;
+
+        if (!playerManager.TryGetPeer(payload.ControllerId, out var peer)) return;
+        
+        // Obtain the player's NetPeer and send only to that peer
+        network.Send(peer, new NetworkKingdomNameChanged(payload.KingdomId));
     }
 
     private static bool TryCreatePendingSettlementRestore(
@@ -304,6 +315,7 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandleLocalPlayerKingdomCreated);
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
         messageBroker.Unsubscribe<NetworkRequestChangeKingdomName>(HandleNetworkRequestChangeKingdomName);
+        messageBroker.Unsubscribe<KingdomNameChanged>(HandleLocalKingdomNameChanged);
     }
 
     private readonly struct PendingSettlementRestore

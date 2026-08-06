@@ -173,8 +173,9 @@ public class KingdomHandler : IHandler
             RejectKingdomNameChange(payload, validationReason);
             return;
         }
-
+        
         ApplyNativeKingdomNameChange(kingdom, payload.Name);
+        messageBroker.Publish(this, new KingdomNameChanged(payload.ControllerId, payload.KingdomId));
     }
 
     // FactionHelper.IsKIngdomNameApplicable relies on Clan.PlayerClan.Kingdom
