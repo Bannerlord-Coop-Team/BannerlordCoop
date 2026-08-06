@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -30,7 +31,7 @@ namespace GameInterface.Services.MapEvents.Handlers;
 /// <summary>
 /// Owns the live battle-mission start flow (split out of <see cref="BattleHandler"/>). On the server it answers the
 /// mission-mode <see cref="NetworkBattleStartRequest"/>: gate it against <see cref="ServerBattleModeArbiter"/>, apply
-/// the attack's hostile consequences, make the sides mission-ready, reply, broadcast the mission start
+/// the attack's hostile consequences, make the sides mission-ready, reply, send the mission start to participants
 /// (<see cref="NetworkStartAttackMission"/>), and claim the mission mode on every client
 /// (<see cref="NetworkBattleModeSet"/>). Eligible clients in the map event open the coop field-battle mission.
 /// </summary>
@@ -100,7 +101,7 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     /// <summary>[Server] Handle a battle-start request for the live-mission mode: gate it, make the sides
-    /// mission-ready, broadcast the mission start, and reply. Requests for other modes are ignored here.</summary>
+    /// mission-ready, send the mission start to participants, and reply. Other modes are ignored here.</summary>
     private void Handle_NetworkBattleStartRequest(MessagePayload<NetworkBattleStartRequest> payload)
     {
         if (ModInformation.IsClient)
@@ -109,14 +110,11 @@ internal class BattleMissionStartHandler : IHandler
         if (payload.What.Mode != (int)BattleStartMode.Mission)
             return;
 
-        if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent _))
+        if (!(payload.Who is NetPeer requester))
+        {
+            Logger.Error("Received {Message} with no originating peer", nameof(NetworkBattleStartRequest));
             return;
-
-        // Roll the terrain seed once for this map event and reuse it for every client
-        // that opens the battle, so they all use the same terrain seed. The seed is
-        // chosen server-side and carried in the message instead of rolled per machine.
-        var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(payload.What.MapEventId, _ => RollTerrainSeed());
-        var requester = payload.Who as NetPeer;
+        }
 
         // _sides is game state the main-thread tick also touches; mutating it from the
         // network thread races the tick. Make the sides mission-ready on the main thread.
@@ -131,6 +129,15 @@ internal class BattleMissionStartHandler : IHandler
             {
                 if (!objectManager.TryGetObject(payload.What.MapEventId, out MapEvent mapEvent))
                     return;
+
+                operation = "validate requesting participant";
+                if (!TryGetRequestingParticipant(requester, payload.What, mapEvent, out var attackerMobileParty))
+                {
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: requester is not an authoritative participant",
+                        payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
 
                 operation = "validate hostile action mode";
                 if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
@@ -168,7 +175,7 @@ internal class BattleMissionStartHandler : IHandler
                 // authoritatively before the mission opens, reproducing the hostile-action head of
                 // vanilla EncounterAttackConsequence that neither the client nor the server runs.
                 operation = "apply attack hostile-action consequences";
-                ApplyClientAttackHostileConsequences(mapEvent, payload.What.AttackerPartyId);
+                ApplyClientAttackHostileConsequences(mapEvent, attackerMobileParty.Party);
 
                 if (isNewMissionClaim)
                 {
@@ -190,8 +197,11 @@ internal class BattleMissionStartHandler : IHandler
                     side.MakeReadyForMission(null);
                 }
 
+                operation = "snapshot mission participants";
+                var participants = GetMissionParticipants(mapEvent);
+
                 operation = "reserve mission participants";
-                ReserveMissionParticipants(payload.What.MapEventId, mapEvent);
+                ReserveMissionParticipants(payload.What.MapEventId, participants);
 
                 // Reply first so the requesting client's blocked consequence unblocks before the mission-open
                 // message arrives — the mission then opens off the menu-consequence stack, as in the pre-coordinator
@@ -204,25 +214,31 @@ internal class BattleMissionStartHandler : IHandler
                     operation = "send siege mission snapshot";
                     var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
                     // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
-                    network.SendAll(new NetworkStartSiegeMission(
+                    var startMessage = new NetworkStartSiegeMission(
                         snapshot.MapEventId,
                         snapshot.WallLevel,
                         snapshot.WallHitPointRatios,
                         snapshot.AttackerEngines,
                         snapshot.DefenderEngines,
-                        payload.What.AttackerPartyId));
+                        payload.What.AttackerPartyId);
+                    SendMissionStart(participants, startMessage);
                 }
                 else
                 {
+                    // Roll the terrain seed once for this map event and reuse it for every entrant.
+                    var randomTerrainSeed = mapEventTerrainSeeds.GetOrAdd(
+                        payload.What.MapEventId,
+                        _ => RollTerrainSeed());
                     operation = "read campaign atmosphere";
                     AtmosphereInfo atmosphereOnCampaign = GetOrCreateAtmosphereSnapshot(
                         payload.What.MapEventId,
                         () => GetAtmosphereOnCampaign(mapEvent));
 
                     operation = "send attack mission start";
-                    network.SendAll(new NetworkStartAttackMission(
+                    var startMessage = new NetworkStartAttackMission(
                         payload.What.MapEventId, randomTerrainSeed, atmosphereOnCampaign,
-                        payload.What.AttackerPartyId));
+                        payload.What.AttackerPartyId);
+                    SendMissionStart(participants, startMessage);
                 }
 
                 // Claim the event for the mission mode on every client, so one still sitting at the encounter menu
@@ -239,19 +255,66 @@ internal class BattleMissionStartHandler : IHandler
         }, context: nameof(Handle_NetworkBattleStartRequest));
     }
 
-    private void ReserveMissionParticipants(string mapEventId, MapEvent mapEvent)
+    private bool TryGetRequestingParticipant(
+        NetPeer requester,
+        NetworkBattleStartRequest request,
+        MapEvent mapEvent,
+        out MobileParty party)
     {
+        party = null;
+        if (requester == null ||
+            !playerManager.TryGetPlayer(requester, out var player) ||
+            !string.Equals(player.MobilePartyId, request.AttackerPartyId, StringComparison.Ordinal) ||
+            !objectManager.TryGetObject(player.MobilePartyId, out party))
+        {
+            return false;
+        }
+
+        return mapEvent.FindMapEventParty(party.Party) != null;
+    }
+
+    private IReadOnlyList<MissionParticipant> GetMissionParticipants(MapEvent mapEvent)
+    {
+        var participants = new List<MissionParticipant>();
         foreach (var player in playerManager.Players)
         {
             if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
                 !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
-                !ReferenceEquals(party.Party.MapEvent, mapEvent))
+                mapEvent.FindMapEventParty(party.Party) == null)
             {
                 continue;
             }
 
-            messageBroker.Publish(peer,
-                new BattleJoinAccepted(mapEventId, player.ControllerId, Guid.NewGuid()));
+            participants.Add(new MissionParticipant(player.ControllerId, peer));
+        }
+
+        return participants;
+    }
+
+    private void ReserveMissionParticipants(string mapEventId, IReadOnlyList<MissionParticipant> participants)
+    {
+        foreach (var participant in participants)
+        {
+            messageBroker.Publish(participant.Peer,
+                new BattleJoinAccepted(mapEventId, participant.ControllerId, Guid.NewGuid()));
+        }
+    }
+
+    private void SendMissionStart(IReadOnlyList<MissionParticipant> participants, IMessage message)
+    {
+        foreach (var participant in participants)
+            network.Send(participant.Peer, message);
+    }
+
+    private sealed class MissionParticipant
+    {
+        public string ControllerId { get; }
+        public NetPeer Peer { get; }
+
+        public MissionParticipant(string controllerId, NetPeer peer)
+        {
+            ControllerId = controllerId;
+            Peer = peer;
         }
     }
 
@@ -284,15 +347,9 @@ internal class BattleMissionStartHandler : IHandler
     /// neither the client (it defers to the server) nor the dedicated server (it never opens the
     /// encounter menu) runs.
     /// </summary>
-    private void ApplyClientAttackHostileConsequences(MapEvent mapEvent, string attackerPartyId)
+    private static void ApplyClientAttackHostileConsequences(MapEvent mapEvent, PartyBase attackerParty)
     {
-        if (!objectManager.TryGetObject(attackerPartyId, out MobileParty attackerMobileParty))
-        {
-            Logger.Warning("Could not resolve attacker party {AttackerPartyId} for attack hostile-action consequences", attackerPartyId);
-            return;
-        }
-
-        MapEventHostileActionConsequences.Apply(mapEvent, attackerMobileParty.Party, "attack");
+        MapEventHostileActionConsequences.Apply(mapEvent, attackerParty, "attack");
     }
 
     private bool RemoveWoundedNonInitiatorParties(
@@ -306,7 +363,7 @@ internal class BattleMissionStartHandler : IHandler
                 !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
                 !hero.IsWounded ||
                 !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var mobileParty) ||
-                mobileParty.Party.MapEvent != mapEvent ||
+                mapEvent.FindMapEventParty(mobileParty.Party) == null ||
                 !objectManager.TryGetId(mobileParty.Party, out var partyId))
                 continue;
 
@@ -494,6 +551,13 @@ internal class BattleMissionStartHandler : IHandler
         if (!MatchesMapEventId(objectManager, battle, expectedMapEventId))
         {
             Logger.Warning("Received {Message} for map event {MapEventId}, but the local player is not in that battle; not opening the mission", messageName, expectedMapEventId);
+            return false;
+        }
+
+        if (battle.FindMapEventParty(PartyBase.MainParty) == null)
+        {
+            Logger.Warning("Received {Message} for map event {MapEventId}, but the main party has no authoritative side membership; not opening the mission",
+                messageName, expectedMapEventId);
             return false;
         }
 

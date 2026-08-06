@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -863,7 +864,7 @@ internal class BattleHostHandler : IHandler
             if (player.ControllerId != requesterId)
                 continue;
             return objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)
-                && party?.MapEvent == mapEvent;
+                && mapEvent.FindMapEventParty(party.Party) != null;
         }
         return false;
     }
