@@ -5,13 +5,13 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Smithing.Messages;
 
-public record ResearchPointsUpdated : IEvent
+public readonly struct UpdateResearchPoints : IEvent
 {
-    public Hero MainHero;
-    public CraftingTemplate CraftingTemplate;
-    public float NewXp;
+    public readonly Hero MainHero;
+    public readonly CraftingTemplate CraftingTemplate;
+    public readonly float NewXp;
 
-    public ResearchPointsUpdated(Hero mainHero, CraftingTemplate craftingTemplate, float newXp)
+    public UpdateResearchPoints(Hero mainHero, CraftingTemplate craftingTemplate, float newXp)
     {
         MainHero = mainHero;
         CraftingTemplate = craftingTemplate;
@@ -19,13 +19,13 @@ public record ResearchPointsUpdated : IEvent
     }
 }
 
-public record CraftingPartOpened : IEvent
+public readonly struct OpenCraftingPart : IEvent
 {
-    public Hero MainHero;
-    public CraftingTemplate CraftingTemplate;
-    public CraftingPiece CraftingPiece;
+    public readonly Hero MainHero;
+    public readonly CraftingTemplate CraftingTemplate;
+    public readonly CraftingPiece CraftingPiece;
 
-    public CraftingPartOpened(Hero mainHero, CraftingTemplate craftingTemplate, CraftingPiece craftingPiece)
+    public OpenCraftingPart(Hero mainHero, CraftingTemplate craftingTemplate, CraftingPiece craftingPiece)
     {
         MainHero = mainHero;
         CraftingTemplate = craftingTemplate;
@@ -34,16 +34,16 @@ public record CraftingPartOpened : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkUpdateResearchPoints : ICommand
+internal readonly struct NetworkUpdateResearchPoints : ICommand
 {
     [ProtoMember(1)]
-    public string PlayerHeroId;
+    public readonly string PlayerHeroId;
 
     [ProtoMember(2)]
-    public string CraftingTemplateId;
+    public readonly string CraftingTemplateId;
 
     [ProtoMember(3)]
-    public float NewXp;
+    public readonly float NewXp;
 
     public NetworkUpdateResearchPoints(string playerHeroId, string craftingTemplateId, float newXp)
     {
@@ -54,16 +54,16 @@ public class NetworkUpdateResearchPoints : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkOpenCraftingPart : ICommand
+internal readonly struct NetworkOpenCraftingPart : ICommand
 {
     [ProtoMember(1)]
-    public string PlayerHeroId;
+    public readonly string PlayerHeroId;
 
     [ProtoMember(2)]
-    public string CraftingTemplateId;
+    public readonly string CraftingTemplateId;
 
     [ProtoMember(3)]
-    public string CraftingPieceId;
+    public readonly string CraftingPieceId;
 
     public NetworkOpenCraftingPart(string playerHeroId, string craftingTemplateId, string craftingPieceId)
     {

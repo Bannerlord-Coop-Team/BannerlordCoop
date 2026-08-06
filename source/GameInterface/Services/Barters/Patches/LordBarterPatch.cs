@@ -11,6 +11,8 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation.Persuasion;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -86,8 +88,46 @@ internal static class LordBarterPatch
             pendingContextId,
             pendingKind,
             terms.ToArray(),
-            pendingRequestId));
+            pendingRequestId,
+            CollectDefectionPersuasionOutcomes(pendingKind, barterData?.OtherHero)));
         return false;
+    }
+
+    // A client that wins the recruitment persuasion gains no Charm XP: the XP writes are blocked
+    // client-side (GainRawXpPatch/SetSkillXpPatch/ChangeSkillLevelPatch) and the server never runs
+    // the dialogue, so it was simply lost. Ship the per-attempt outcomes so the server can award it.
+    //
+    // Vanilla re-awards every surviving successful attempt against this lord (the list is only pruned
+    // after an in-game year), so we reproduce that rather than sending just this conversation's - but
+    // cap it, because the list is client-owned. 8 = one clean conversation's 4 reservation types,
+    // doubled.
+    internal const int MaxDefectionPersuasionOutcomes = 8;
+
+    private static DefectionPersuasionOutcome[] CollectDefectionPersuasionOutcomes(
+        LordBarterKind kind, Hero conversationHero)
+    {
+        if (kind != LordBarterKind.JoinKingdomAsClan || conversationHero == null)
+            return Array.Empty<DefectionPersuasionOutcome>();
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<LordDefectionCampaignBehavior>();
+        var attempts = behavior?._previousDefectionPersuasionAttempts;
+        if (attempts == null) return Array.Empty<DefectionPersuasionOutcome>();
+
+        var outcomes = new List<DefectionPersuasionOutcome>();
+        foreach (var attempt in attempts)
+        {
+            if (attempt.PersuadedHero != conversationHero) continue;
+            if (attempt.Result != PersuasionOptionResult.Success &&
+                attempt.Result != PersuasionOptionResult.CriticalSuccess) continue;
+            if (attempt.Args == null) continue;
+            if (outcomes.Count == MaxDefectionPersuasionOutcomes) break;
+
+            outcomes.Add(new DefectionPersuasionOutcome(
+                (int)attempt.Result,
+                (int)attempt.Args.ArgumentStrength));
+        }
+
+        return outcomes.ToArray();
     }
 
     [HarmonyPatch(nameof(BarterManager.CancelAndFinalizePlayerBarter))]
@@ -111,7 +151,7 @@ internal static class LordBarterPatch
         var barter = authorizedBarter;
         var context = pendingContext;
         var kind = pendingKind;
-        var shouldCompleteUi = pendingUiActive && IsPendingContextActive();
+        var shouldCompleteUi = pendingUiActive;
         if (!result.Accepted)
         {
             requestPending = false;
@@ -222,19 +262,6 @@ internal static class LordBarterPatch
         return true;
     }
 
-    private static bool IsPendingContextActive()
-    {
-        if (authorizedBarter == null) return false;
-        if (pendingContext == PeaceConversationContext.Location)
-        {
-            var mission = CampaignMission.Current;
-            return mission?.Location != null && mission.Mode == MissionMode.Barter &&
-                   ContainerProvider.TryResolve<IObjectManager>(out var manager) &&
-                   manager.TryGetId(mission.Location, out var locationId) && locationId == pendingContextId;
-        }
-        return PlayerEncounter.Current != null && authorizedBarter.OtherParty == MobileParty.ConversationParty?.Party;
-    }
-
     private static bool TryAuthorize(BarterData barterData, LordBarterKind kind)
     {
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
@@ -300,7 +327,7 @@ internal static class LordBarterPatch
         }
     }
 
-    private static bool TryGetConversationContext(BarterData barterData, IObjectManager manager, out PeaceConversationContext context, out string contextId)
+    internal static bool TryGetConversationContext(BarterData barterData, IObjectManager manager, out PeaceConversationContext context, out string contextId)
     {
         var location = CampaignMission.Current?.Location;
         if (location != null && manager.TryGetId(location, out contextId))
@@ -308,6 +335,15 @@ internal static class LordBarterPatch
             context = PeaceConversationContext.Location;
             return true;
         }
+
+        var settlement = barterData.OffererParty?.MobileParty?.CurrentSettlement;
+        if (settlement != null && barterData.OtherHero?.CurrentSettlement == settlement &&
+            manager.TryGetId(settlement, out contextId))
+        {
+            context = PeaceConversationContext.Settlement;
+            return true;
+        }
+
         if (barterData.OtherParty?.MobileParty?.IsActive == true && manager.TryGetId(barterData.OtherParty, out contextId))
         {
             context = PeaceConversationContext.MapParty;

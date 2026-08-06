@@ -25,6 +25,7 @@ namespace Missions.Battles;
 internal static class BattleDebugCommands
 {
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
+    private static int ownDamageEvents;
     private static readonly Dictionary<Agent, AgentControllerType> CavalryControllers =
         new Dictionary<Agent, AgentControllerType>();
     private const int MaximumMountPoseSamples = 120;
@@ -48,6 +49,26 @@ internal static class BattleDebugCommands
         public override void OnPreDisplayMissionTick(float dt)
         {
             CaptureMountPoseFrame();
+        }
+
+        public override void OnAgentHit(
+            Agent affectedAgent,
+            Agent affectorAgent,
+            in MissionWeapon affectorWeapon,
+            in Blow blow,
+            in AttackCollisionData attackCollisionData)
+        {
+            if (blow.InflictedDamage <= 0
+                || affectedAgent?.Team == null
+                || affectorAgent?.Team == null
+                || !affectedAgent.IsHuman
+                || !affectorAgent.IsHuman
+                || affectedAgent.Team.Side == affectorAgent.Team.Side)
+                return;
+
+            var playerSide = Mission?.PlayerTeam?.Side ?? BattleSideEnum.None;
+            if (affectedAgent.Team.Side == playerSide)
+                ownDamageEvents++;
         }
 
         public override void OnRemoveBehavior()
@@ -267,6 +288,7 @@ internal static class BattleDebugCommands
         }
 
         ObserveMission(mission);
+        EnsureBattleDebugTickBehavior(mission);
 
         var enemies = new List<Agent>();
         int enemyParties = 0;
@@ -303,8 +325,43 @@ internal static class BattleDebugCommands
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
             $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
             $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyFleeing={enemyFleeing} " +
-            $"enemyMovedSinceLast={moved} resultState={result?.BattleState.ToString() ?? "None"} " +
+            $"enemyMovedSinceLast={moved} damageReceivedEvents={ownDamageEvents} " +
+            $"resultState={result?.BattleState.ToString() ?? "None"} " +
             $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}";
+    }
+
+    [CommandLineArgumentFunction("charge_owned_formations", "coop.debug.battle")]
+    public static string ChargeOwnedFormations(List<string> args)
+    {
+        if (args.Count != 0)
+            return "Usage: coop.debug.battle.charge_owned_formations";
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        if (mission == null || controller == null)
+            return "No active coop battle mission";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "Network agent registry is unavailable";
+
+        CoopAgentInfo[] ownedAgents = registry.GetAgents(controller.Session.OwnControllerId)
+            .Where(info => info.OriginalOwner == controller.Session.OwnControllerId)
+            .Where(info => info.Agent != null
+                && info.Agent.IsActive()
+                && info.Agent.IsHuman
+                && info.Agent.Team == mission.PlayerTeam
+                && info.Agent.Formation != null)
+            .ToArray();
+        Formation[] formations = ownedAgents
+            .Select(info => info.Agent.Formation)
+            .Distinct()
+            .ToArray();
+        if (formations.Length == 0)
+            return "The local player has no active owned formations";
+
+        foreach (Formation formation in formations)
+            formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
+
+        return $"Charged {formations.Length} locally owned formation(s) with {ownedAgents.Length} active agent(s)";
     }
 
     [CommandLineArgumentFunction("mount_state", "coop.debug.battle")]
@@ -735,6 +792,7 @@ internal static class BattleDebugCommands
             return;
 
         EnemyPositions.Clear();
+        ownDamageEvents = 0;
         CavalryControllers.Clear();
         capturedMount = null;
         capturedMountId = Guid.Empty;

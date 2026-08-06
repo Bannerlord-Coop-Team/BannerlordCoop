@@ -1,13 +1,15 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
+using Coop.Core.Server.Services.Time.Handlers;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Players;
 using GameInterface.Tests.Bootstrap;
@@ -51,13 +53,20 @@ public class E2ETestEnvironment : IDisposable
 
         GameThread.Instance.MarkGameThread();
 
+        // An action a previous environment queued but never pumped would otherwise execute inside
+        // this environment's first pump, against a torn-down container and the wrong game statics.
+        GameThread.Instance.DiscardQueuedActions();
+
         GameBootStrap.Initialize();
 
         // Process-wide interaction state must not leak between E2E test environments.
         PlayerPartyInteractionDialogState.Clear();
         PlayerPartyTradeContext.End();
+        ResetBattleModeState();
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
+
+        StopCampaignTimeHeartbeat();
 
         SetupMainHero();
 
@@ -67,10 +76,34 @@ public class E2ETestEnvironment : IDisposable
 
         SetupAutoSync();
 
-        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        Server.Call(() =>
         {
-            Server.ObjectManager.AddExisting(settlement.StringId, settlement);
-        }
+            foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+            {
+                Server.ObjectManager.AddExisting(settlement.StringId, settlement);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Stops the server's authoritative campaign-time heartbeat for the lifetime of this environment.
+    /// </summary>
+    private void StopCampaignTimeHeartbeat()
+        => Server.Resolve<CampaignTimeSyncHandler>().Dispose();
+
+    /// <summary>
+    /// Battle-mode gating lives in process-wide statics keyed by object-manager ids, and every
+    /// fresh environment re-mints the same ids (MapEvent_Created_1, ...). A claim leaked by a test
+    /// that never finalized its battle would silently gate joins, updates, and surrender for an
+    /// unrelated later test class that happens to reuse the id.
+    /// </summary>
+    private static void ResetBattleModeState()
+    {
+        ServerBattleModeArbiter.Reset();
+        BattleModeRegistry.End();
+        BattleConclusionGate.IsInCoopBattleMission = false;
+        BattleSpawnGate.EndBattle();
+        BattleSimulationReplay.Reset();
     }
 
     /// <summary>
@@ -103,6 +136,11 @@ public class E2ETestEnvironment : IDisposable
             if (disposed) return;
             disposed = true;
 
+            // Teardown disposes handlers whose Dispose bodies marshal via GameThread.RunSafe; make
+            // this thread the game thread so that work runs inline here instead of queueing onto a
+            // queue that would only be pumped inside a later test's environment.
+            GameThread.Instance.MarkGameThread();
+
             try
             {
                 if (AutoSyncConfiguration.Enabled)
@@ -123,12 +161,22 @@ public class E2ETestEnvironment : IDisposable
             }
             finally
             {
-                // Must run even when a disposal above throws: a live container left in ContainerProvider
-                // makes CallOriginalPolicy deny originals for every later environment-less test in the
-                // process (the shared Harmony patches stay applied), silently corrupting game-object
-                // construction there.
-                OutputSinkManager.RemoveLogCallback(TestOutputCallback);
-                ContainerProvider.Clear();
+                try
+                {
+                    // Must run even when a disposal above throws: a live container left in ContainerProvider
+                    // makes CallOriginalPolicy deny originals for every later environment-less test in the
+                    // process (the shared Harmony patches stay applied), silently corrupting game-object
+                    // construction there.
+                    OutputSinkManager.RemoveLogCallback(TestOutputCallback);
+                    ContainerProvider.Clear();
+                }
+                finally
+                {
+                    // Nothing queued by this environment may survive into the next one.
+                    GameThread.Instance.DiscardQueuedActions();
+                    // Async tests can re-mark their continuation thread; keep it marked through fixture teardown.
+                    GameThread.Instance.UnmarkGameThread();
+                }
             }
         }
         finally

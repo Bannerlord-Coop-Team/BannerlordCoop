@@ -1,4 +1,4 @@
-﻿using Serilog.Core;
+using Serilog.Core;
 using Serilog.Events;
 using System;
 using System.Collections.Generic;
@@ -10,14 +10,28 @@ public class OutputSinkManager : ILogEventSink
 {
     private static List<Action<string>> Callbacks { get; } = new List<Action<string>>();
 
+    // Emit runs on whatever thread logged (timers, pollers, thread-pool continuations) while
+    // callbacks are added/removed on the main thread; an unguarded List enumeration racing a
+    // mutation throws out of the sink into the logging caller.
+    private static readonly object gate = new object();
+
     internal OutputSinkManager() { }
 
     public static void AddLogCallback(Action<string> callback)
     {
-        Callbacks.Add(callback);
+        lock (gate)
+        {
+            Callbacks.Add(callback);
+        }
     }
 
-    public static bool RemoveLogCallback(Action<string> callback) => Callbacks.Remove(callback);
+    public static bool RemoveLogCallback(Action<string> callback)
+    {
+        lock (gate)
+        {
+            return Callbacks.Remove(callback);
+        }
+    }
 
     public void Emit(LogEvent logEvent)
     {
@@ -33,9 +47,24 @@ public class OutputSinkManager : ILogEventSink
             textWriter.Write(logEvent.Exception);
         }
 
-        foreach (var callback in Callbacks)
+        Action<string>[] callbacks;
+        lock (gate)
         {
-            callback(textWriter.ToString());
+            callbacks = Callbacks.ToArray();
+        }
+
+        foreach (var callback in callbacks)
+        {
+            try
+            {
+                callback(textWriter.ToString());
+            }
+            catch
+            {
+                // A dead sink (e.g. an xUnit output helper whose test already finished when a
+                // background thread logs) must not take down the logging caller or starve the
+                // remaining sinks.
+            }
         }
     }
 }

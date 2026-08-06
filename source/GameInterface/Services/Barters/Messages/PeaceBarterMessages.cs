@@ -17,6 +17,7 @@ internal enum PeaceConversationContext
 {
     MapParty,
     Location,
+    Settlement,
 }
 
 [ProtoContract(SkipConstructor = true)]

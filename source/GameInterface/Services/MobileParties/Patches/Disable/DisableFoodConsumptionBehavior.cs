@@ -1,5 +1,5 @@
 ﻿using Common;
-using GameInterface.Extentions;
+using GameInterface.Configuration;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -118,13 +118,25 @@ internal class FoodConsumptionBehaviorPatches
 
     private static bool ShouldTickFoodChange(IPlayerManager playerManager, MobileParty playerParty)
     {
-        // Don't tick food change for disconnected players
-        if (playerManager.IsOwnerOfPartyDisconnected(playerParty)) return false;
+        // Don't tick food change for disconnected players based on config
+        if (ModInformation.IsServer
+            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeForDisconnectedPlayers
+            && playerManager.IsOwnerOfPartyDisconnected(playerParty)) return false;
 
-        // Use AI join window to determine if a player party should consume food.
-        // This way players only have food change at most once during a map event.
-        if (playerParty.MapEvent != null
-            && !InteractionPatches.IsWithinAiJoinWindow(playerParty.MapEvent)) return false;
+        // Don't tick food change when party is in a settlement based on config
+        if (playerParty.CurrentSettlement != null
+            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInSettlements) return false;
+
+        // Party not in a map event, calculate gold change normally
+        if (playerParty.MapEvent == null) return true;
+
+        // Food change is disabled in battles, skip this tick
+        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.Disabled) return false;
+
+        // Use gold food consumption window to determine if a player party should consume food based on config.
+        // This way players only have food change at most once during a map event when set to OneDayMax.
+        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.OneDayMax
+            && !InteractionPatches.IsWithinGoldFoodConsumptionWindow(playerParty.MapEvent)) return false;
 
         return true;
     }
