@@ -170,6 +170,7 @@ public class AlleyRecruitDebugCommand
 
             RestoreRoster(fixture.PlayerParty.MemberRoster, fixture.MemberRoster);
             sendCoalescer.DropInstance(Compact(rosterId, typeof(TroopRoster)));
+            fixture.PlayerParty.MemberRoster.RemoveZeroCounts();
             foreach (var resetCharacter in resetCharacters)
             {
                 var index = fixture.PlayerParty.MemberRoster.FindIndexOfTroop(resetCharacter.Character);
