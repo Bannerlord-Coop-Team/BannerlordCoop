@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -50,5 +51,28 @@ public static class HeroExtensions
             return false;
 
         return controlledObjectInfo.IsControlled;
+    }
+
+    /// <summary>
+    /// Checks for local player hero as well heroes in a player's party.
+    /// Hero health is owned by the party leader's client in battle.
+    /// </summary>
+    public static bool IsHealthControlledByThisInstance(this Hero hero)
+    {
+        if (hero is null)
+        {
+            Logger.Error("{parameterName} was null", nameof(hero));
+            return false;
+        }
+
+        // Hero is this player's character, don't need to check party
+        if (hero.IsControlledByThisInstance()) return true;
+
+        // Don't manage health for other players in this player's party (for future)
+        if (hero.IsPlayerHero()) return false;
+
+        var party = hero.PartyBelongedTo;
+
+        return party != null && party.IsControlledByThisInstance();
     }
 }
