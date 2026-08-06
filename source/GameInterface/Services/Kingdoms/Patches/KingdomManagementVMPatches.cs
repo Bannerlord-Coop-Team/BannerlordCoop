@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
@@ -48,4 +49,23 @@ internal class KingdomManagementVMPatches
         __instance.ExecuteClose();
         return false;
     }
+
+    /// <summary>
+    /// Intercepts the client rename logic
+    /// </summary>
+    [HarmonyPatch("OnChangeKingdomNameDone")]
+    [HarmonyPrefix]
+    private static bool OnChangeKingdomNameDonePrefix(KingdomManagementVM __instance, string __0)
+    {
+        if (!ModInformation.IsClient)
+        {
+            return true;
+        }
+
+        MessageBroker.Instance.Publish(__instance, new KingdomNameChangeRequested(__instance.Kingdom, __0));
+        return false;
+    }
 }
+
+    
+

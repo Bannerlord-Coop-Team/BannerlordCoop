@@ -6,12 +6,14 @@ using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using Moq;
 using System;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Players;
@@ -77,7 +79,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             broker,
             playerManager.Object,
             objectManager.Object,
-            Mock.Of<INetwork>());
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
@@ -100,12 +103,44 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
             broker,
             playerManager.Object,
             objectManager.Object,
-            Mock.Of<INetwork>());
+            Mock.Of<INetwork>(),
+            Mock.Of<ISiegeEventInterface>());
 
         broker.Publish(this, new SavedPlayerRegistrationsRestored());
 
         Assert.True(party.IsActive);
         objectManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void SavedPlayerRegistrationsRestored_LeavesSiegeBeforeParking()
+    {
+        var player = CreatePlayer();
+        var party = CreateParty();
+        party._besiegerCamp = (BesiegerCamp)FormatterServices.GetUninitializedObject(typeof(BesiegerCamp));
+
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager.SetupGet(manager => manager.Players).Returns(new[] { player });
+        playerManager.Setup(manager => manager.IsConnected(player)).Returns(false);
+
+        var objectManager = new Mock<IObjectManager>();
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party))
+            .Returns(true);
+
+        var siegeEventInterface = new Mock<ISiegeEventInterface>();
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker,
+            playerManager.Object,
+            objectManager.Object,
+            Mock.Of<INetwork>(),
+            siegeEventInterface.Object);
+
+        broker.Publish(this, new SavedPlayerRegistrationsRestored());
+
+        siegeEventInterface.Verify(value => value.BreakSiegeForPartyOnly(party), Times.Once);
+        Assert.False(party.IsActive);
     }
 
     private static Player CreatePlayer() =>

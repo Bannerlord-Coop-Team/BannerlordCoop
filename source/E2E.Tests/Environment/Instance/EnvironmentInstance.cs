@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -43,8 +43,6 @@ public abstract class EnvironmentInstance : IDisposable
     private readonly MockNetworkBase mockNetwork;
     private readonly ILifetimeScope container;
 
-    private readonly static object _lock = new object();
-
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
         MockNetworkBase mockNetwork,
@@ -60,9 +58,10 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source of the message</param>
     /// <param name="message">Received Message</param>
-    public void SimulateMessage<T>(object source, T message) where T : IMessage
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulateMessage<T>(object source, T message, bool markGameThread = true) where T : IMessage
     {
-        using (new StaticScope(this))
+        using (new StaticScope(this, markGameThread))
         {
             messageBroker.Publish(source, message);
         }
@@ -73,9 +72,10 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source Peer</param>
     /// <param name="packet">Received Packet</param>
-    public void SimulatePacket(NetPeer source, IPacket packet)
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulatePacket(NetPeer source, IPacket packet, bool markGameThread = true)
     {
-        using (new StaticScope(this))
+        using (new StaticScope(this, markGameThread))
         {
             EnsureSerializable(packet);
             mockNetwork.ReceiveFromNetwork(source, packet);
@@ -93,7 +93,13 @@ public abstract class EnvironmentInstance : IDisposable
             disabledMethods = Array.Empty<MethodBase>();
         }
 
-        lock (_lock)
+        // The same lock StaticScope takes, so PatchScope's patch/unpatch cannot interleave with
+        // another thread executing patched game code inside a SimulateMessage/SimulatePacket —
+        // those only enter GameInstance.@lock (via StaticScope), and the previous separate _lock
+        // left the Harmony rewrites unguarded against them. Monitor is reentrant per thread, which
+        // routed sends rely on: a Call's handler chain synchronously delivers into another
+        // instance's Simulate*, nesting scopes on the same thread.
+        lock (GameInstance.@lock)
         {
             using (new PatchScope(disabledMethods))
             {
@@ -151,8 +157,10 @@ public abstract class EnvironmentInstance : IDisposable
         private readonly TaleWorlds.MountAndBlade.Module previousModule;
         private readonly TestMessageBroker previousMessageBroker;
         private readonly bool wasServer;
+        private readonly bool markedGameThread;
+        private readonly int previousGameThreadId;
 
-        public StaticScope(EnvironmentInstance instance)
+        public StaticScope(EnvironmentInstance instance, bool markGameThread = true)
         {
             Monitor.Enter(GameInstance.@lock);
             bool restorePreviousStatics = false;
@@ -162,6 +170,18 @@ public abstract class EnvironmentInstance : IDisposable
             // recycled) thread forever and every later scope or GameInstance build deadlocks.
             try
             {
+                if (markGameThread)
+                {
+                    // xUnit can move a test from its fixture-constructor thread before the next scoped call.
+                    // Save-and-restore rather than bare-mark: a scope entered on a worker thread (e.g.
+                    // Task.Run(() => Server.Call(...))) must not leave the game-thread mark on that thread —
+                    // every later GameThread.RunSafe from the real test thread would silently enqueue onto
+                    // a queue nobody pumps instead of running inline.
+                    markedGameThread = true;
+                    previousGameThreadId = GameThread.Instance.GameThreadId;
+                    GameThread.Instance.MarkGameThread();
+                }
+
                 // Save previous static values
                 wasServer = ModInformation.IsServer;
                 previousObjectManager = MBObjectManager.Instance;
@@ -191,6 +211,12 @@ public abstract class EnvironmentInstance : IDisposable
                     if (restorePreviousStatics)
                     {
                         RestorePreviousStatics();
+                    }
+                    else if (markedGameThread)
+                    {
+                        // The mark is set before the statics are saved, so a throw in between must
+                        // still put it back (RestorePreviousStatics is not reachable yet here).
+                        GameThread.Instance.RestoreGameThread(previousGameThreadId);
                     }
                 }
                 finally
@@ -222,6 +248,10 @@ public abstract class EnvironmentInstance : IDisposable
             ModInformation.IsServer = wasServer;
             GameInterface.ContainerProvider.SetContainer(previousContainer);
             previousMessageBroker.SetStaticInstance();
+            if (markedGameThread)
+            {
+                GameThread.Instance.RestoreGameThread(previousGameThreadId);
+            }
         }
     }
 

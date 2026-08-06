@@ -1,4 +1,5 @@
 using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using GameInterface.Services.Entity;
@@ -24,7 +25,7 @@ public class MeshNetworkRouter
 
         foreach (var (instance, mesh) in clients)
             if (mesh != sender)
-                instance.SimulateMessage(sender.NetPeer, message);
+                Deliver(() => instance.SimulateMessage(sender.NetPeer, message));
     }
 
     public void Send(MockBattleNetwork sender, string controllerId, IMessage message)
@@ -33,7 +34,7 @@ public class MeshNetworkRouter
 
         foreach (var (instance, mesh) in clients)
             if (mesh != sender && ControllerIdOf(instance) == controllerId)
-                instance.SimulateMessage(sender.NetPeer, message);
+                Deliver(() => instance.SimulateMessage(sender.NetPeer, message));
     }
 
     public void SendAllBut(MockBattleNetwork sender, string excludedControllerId, IMessage message)
@@ -42,11 +43,20 @@ public class MeshNetworkRouter
 
         foreach (var (instance, mesh) in clients)
             if (mesh != sender && ControllerIdOf(instance) != excludedControllerId)
-                instance.SimulateMessage(sender.NetPeer, message);
+                Deliver(() => instance.SimulateMessage(sender.NetPeer, message));
     }
 
     private ClientInstance SenderInstance(MockBattleNetwork sender)
         => clients.First(c => c.mesh == sender).instance;
+
+    private static void Deliver(Action delivery)
+    {
+        // Each E2E instance represents a separate process, so the receiver must not inherit the sender's allowance.
+        using (AllowedThread.Suspend())
+        {
+            delivery();
+        }
+    }
 
     private static string ControllerIdOf(ClientInstance instance)
         => instance.Resolve<IControllerIdProvider>().ControllerId;

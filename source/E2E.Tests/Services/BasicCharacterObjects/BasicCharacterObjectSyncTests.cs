@@ -50,7 +50,7 @@ namespace E2E.Tests.Services.BasicCharacterObjects
             assertHelper.AssertField<BasicCharacterObject, bool>(nameof(BasicCharacterObject._isBasicHero), true);
             assertHelper.AssertField<BasicCharacterObject, bool>(nameof(BasicCharacterObject._isMounted), true);
             assertHelper.AssertField<BasicCharacterObject, bool>(nameof(BasicCharacterObject._isRanged),true);
-            assertHelper.AssertField<BasicCharacterObject, TextObject>(nameof(BasicCharacterObject._basicName), new TextObject("test"));
+            assertHelper.AssertField<BasicCharacterObject, TextObject>(nameof(BasicCharacterObject._basicName), new TextObject("test", new()));
 
             assertHelper.AssertReferenceField<BasicCharacterObject, MBEquipmentRoster>(nameof(BasicCharacterObject._equipmentRoster));
             assertHelper.AssertReferenceField<BasicCharacterObject, MBCharacterSkills>(nameof(BasicCharacterObject.DefaultCharacterSkills));

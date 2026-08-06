@@ -5,18 +5,27 @@ using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch(typeof(LordConversationsCampaignBehavior))]
 internal class LordConversationsCampaignBehaviorPatches
 {
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.OnBarterAccepted))]
+    [HarmonyPrefix]
+    public static bool OnBarterAcceptedPrefix()
+    {
+        return !ModInformation.IsServer;
+    }
+
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_player_liberates_prisoner_on_consequence))]
     [HarmonyPrefix]
     public static bool ConversationPlayerLiberatesPrisonerOnConsequencePrefix()
     {
         var message = new LiberateLordPrisoner(Hero.MainHero, Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(null, message);
+        MarkFreedLordConversationHandled(Hero.OneToOneConversationHero);
 
         return false;
     }
@@ -29,6 +38,7 @@ internal class LordConversationsCampaignBehaviorPatches
 
         var message = new TakeLordPrisoner(Campaign.Current.MainParty.Party, Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(null, message);
+        MarkFreedLordConversationHandled(Hero.OneToOneConversationHero);
 
         return false;
     }
@@ -78,6 +88,7 @@ internal class LordConversationsCampaignBehaviorPatches
 
         var message = new TakeLordPrisoner(Campaign.Current.MainParty.Party, Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(null, message);
+        MarkFreedLordConversationHandled(Hero.OneToOneConversationHero);
 
         return false;
     }
@@ -88,7 +99,17 @@ internal class LordConversationsCampaignBehaviorPatches
     {
         var message = new LordFreedToRelease(Hero.MainHero, Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(null, message);
+        MarkFreedLordConversationHandled(Hero.OneToOneConversationHero);
 
         return false;
+    }
+
+    private static void MarkFreedLordConversationHandled(Hero conversationHero)
+    {
+        var pendingHeroes = PlayerEncounter.Current?._capturedAlreadyPrisonerHeroes;
+        if (pendingHeroes == null) return;
+
+        // Vanilla advances this list through its synchronous captivity action before the next encounter update.
+        pendingHeroes.RemoveAll(element => element.Character?.HeroObject == conversationHero);
     }
 }

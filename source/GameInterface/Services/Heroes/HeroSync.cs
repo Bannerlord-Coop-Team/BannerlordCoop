@@ -1,6 +1,5 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -77,6 +76,9 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._heroSkills)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._characterAttributes)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._deathDay))); // Despite having a property, directly set by SetDeathDay() method
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._defaultAge)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._birthDay)));
+
             // _heroState is NOT registered here: native state transitions (KillCharacterAction.MakeDead,
             // captivity, ...) go through Hero.ChangeState, whose direct field store is already intercepted
             // and replicated by HeroFieldPatches.HeroStateTranspiler; registering the field here would be
