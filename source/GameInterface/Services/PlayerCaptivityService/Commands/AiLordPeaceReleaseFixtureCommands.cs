@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using SandBox.View.Map;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -252,7 +253,13 @@ internal static class AiLordPeaceReleaseFixtureCommands
             !CommandHelpers.TryGetMobileParty(args[0], out party, out error))
             return "Failed to focus party: " + error;
 
+        MapScreen mapScreen = MapScreen.Instance;
+        if (mapScreen?.MapCameraView == null)
+            return "Failed to focus party: the campaign map screen is not active.";
+
         party.Party.SetAsCameraFollowParty();
+        mapScreen.FastMoveCameraToPosition(party.Position);
+        mapScreen.MapCameraView.SetCameraMode(MapCameraView.CameraFollowMode.FollowParty);
         return $"Following party '{party.StringId}' on the campaign map.";
     }
 
