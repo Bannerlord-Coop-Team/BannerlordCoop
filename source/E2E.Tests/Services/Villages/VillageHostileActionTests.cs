@@ -1823,7 +1823,7 @@ public class VillageHostileActionTests : MapEventTestBase
             }
 
             Assert.Same(mapEvent, joinerParty.MapEvent);
-            Assert.NotNull(mapEvent.FindMapEventParty(joinerParty.Party));
+            Assert.Contains(mapEvent.AttackerSide.Parties, party => party.Party == joinerParty.Party);
         }, MapEventDisabledMethods);
 
         client.SimulateMessage(Server.NetPeer, new NetworkJoinBattleReply(
@@ -1840,7 +1840,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(PlayerEncounter.Current.IsJoinedBattle);
             Assert.Same(mapEvent, PlayerEncounter.Battle);
             Assert.Same(mapEvent, joinerParty.MapEvent);
-            Assert.NotNull(mapEvent.FindMapEventParty(joinerParty.Party));
+            Assert.Contains(mapEvent.AttackerSide.Parties, party => party.Party == joinerParty.Party);
         }, MapEventDisabledMethods);
 
         Assert.Empty(menuSwitchRecorder.SwitchesFor(client));
