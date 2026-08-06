@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
@@ -339,6 +340,37 @@ public class AlleyRecruitDebugCommand
             default:
                 return "Usage: coop.debug.alley.recruit_inventory <open|trade|complete|state>";
         }
+    }
+
+    [CommandLineArgumentFunction("recruit_start_looter_battle", "coop.debug.alley")]
+    public static string StartLooterBattle(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Run this command on the server.";
+        if (args.Count != 1)
+            return "Usage: coop.debug.alley.recruit_start_looter_battle <heroRegistryId>";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve IObjectManager.";
+        if (!objectManager.TryGetObjectWithLogging<Hero>(args[0], out var owner))
+            return $"Hero '{args[0]}' not found.";
+        var playerParty = owner.PartyBelongedTo;
+        if (playerParty == null || playerParty.MapEvent != null)
+            return "The fixture owner must lead a party outside a map event.";
+
+        if (playerParty.CurrentSettlement != null)
+            LeaveSettlementAction.ApplyForParty(playerParty);
+        var position = playerParty.Position.ToVec2();
+        var banditParty = MobileParty.All
+            .Where(candidate => candidate.IsActive && candidate.IsBandit && candidate != playerParty &&
+                candidate.MapEvent == null && candidate.CurrentSettlement == null &&
+                candidate.MemberRoster.TotalManCount > 0)
+            .OrderBy(candidate => candidate.Position.ToVec2().DistanceSquared(position))
+            .FirstOrDefault();
+        if (banditParty == null) return "No active bandit party is available for the loot fixture.";
+
+        StartBattleAction.Apply(banditParty.Party, playerParty.Party);
+        if (playerParty.MapEvent == null) return "The looter battle map event was not created.";
+        return $"ALLEY_RECRUIT_LOOTER_BATTLE_STARTED party={banditParty.StringId} " +
+               $"troops={banditParty.MemberRoster.TotalManCount}";
     }
 
     private static void RepairLocalPlayerInventoryContext()
