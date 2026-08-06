@@ -132,6 +132,8 @@ internal class BattleJoinLeaveHandler : IHandler
     /// <summary>[Client] Bridge the local player's battle join to a server request.</summary>
     private void Handle_PlayerJoinBattleAttempted(MessagePayload<PlayerJoinBattleAttempted> payload)
     {
+        if (ModInformation.IsServer) return;
+
         var data = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
@@ -164,11 +166,29 @@ internal class BattleJoinLeaveHandler : IHandler
             }
 
             pendingJoinRequests.TryRemove(reply.PartyId, out _);
-            if (!reply.Accepted)
+            if (reply.Accepted) return;
+
+            Logger.Warning("Server rejected battle join for party {PartyId} and map event {MapEventId}",
+                reply.PartyId, reply.MapEventId);
+
+            if (Campaign.Current == null) return;
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(reply.MapEventId, out var mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging<PartyBase>(reply.PartyId, out var party)) return;
+
+            var encounter = PlayerEncounter.Current;
+            if (!ReferenceEquals(party, PartyBase.MainParty) ||
+                party.MapEventSide != null ||
+                mapEvent.FindMapEventParty(party) != null ||
+                encounter == null ||
+                !encounter.IsJoinedBattle ||
+                !ReferenceEquals(encounter._mapEvent, mapEvent))
             {
-                Logger.Warning("Server rejected battle join for party {PartyId} and map event {MapEventId}",
-                    reply.PartyId, reply.MapEventId);
+                return;
             }
+
+            PlayerEncounter.LeaveBattle();
+            if (Campaign.Current.CurrentMenuContext != null)
+                GameMenu.SwitchToMenu("join_encounter");
         }, context: nameof(Handle_NetworkJoinBattleReply));
     }
 

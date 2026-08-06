@@ -43,6 +43,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -1668,7 +1669,7 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void RaidJoinEncounter_HelpAttackers_KeepsMembershipAuthoritativeAndCoalescesPendingJoin()
+    public void RaidJoinEncounter_RejectedJoinRestoresEncounterAndAllowsRetry()
     {
         var client = Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId("PlayerTwo");
@@ -1764,10 +1765,71 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Equal(joinerPartyId, request.PartyId);
         Assert.Equal(BattleSideEnum.Attacker, request.Side);
 
+        client.Call(() =>
+        {
+            var gameStateManager = Game.Current.GameStateManager;
+            var mapState = gameStateManager.CreateState<MapState>();
+            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            gameStateManager._gameStates.Add(mapState);
+        });
+
+        using var menuSwitchRecorder = new GameMenuSwitchRecorder();
+
         client.SimulateMessage(Server.NetPeer, new NetworkJoinBattleReply(
             request.RequestId,
             request.MapEventId,
             request.PartyId,
+            accepted: false));
+
+        Assert.Equal(new[] { "join_encounter" }, menuSwitchRecorder.SwitchesFor(client));
+        menuSwitchRecorder.Clear();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(raidMapEventId!, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.False(PlayerEncounter.Current.IsJoinedBattle);
+            Assert.Null(PlayerEncounter.Battle);
+            Assert.Same(mapEvent, PlayerEncounter.EncounteredBattle);
+            Assert.Null(joinerParty.MapEvent);
+            Assert.Null(joinerParty.Party.MapEventSide);
+
+            var runOriginal = InvokeRaidJoinEncounterConsequencePrefix("game_menu_join_encounter_help_attackers_on_consequence");
+            Assert.False(runOriginal);
+            Assert.True(PlayerEncounter.Current.IsJoinedBattle);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+            Assert.Null(joinerParty.MapEvent);
+            Assert.Null(joinerParty.Party.MapEventSide);
+        }, disabledMethods);
+
+        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.SwitchesFor(client));
+        menuSwitchRecorder.Clear();
+
+        var requests = client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().ToArray();
+        Assert.Equal(2, requests.Length);
+        Assert.False(string.IsNullOrWhiteSpace(requests[1].RequestId));
+        Assert.NotEqual(requests[0].RequestId, requests[1].RequestId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(raidMapEventId!, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
+
+            using (new AllowedThread())
+            {
+                joinerParty.Party.MapEventSide = mapEvent.AttackerSide;
+            }
+
+            Assert.Same(mapEvent, joinerParty.MapEvent);
+            Assert.NotNull(mapEvent.FindMapEventParty(joinerParty.Party));
+        }, MapEventDisabledMethods);
+
+        client.SimulateMessage(Server.NetPeer, new NetworkJoinBattleReply(
+            requests[1].RequestId,
+            requests[1].MapEventId,
+            requests[1].PartyId,
             accepted: false));
 
         client.Call(() =>
@@ -1775,15 +1837,13 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(raidMapEventId!, out var mapEvent));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var joinerParty));
 
-            joinerParty.Party.MapEventSide = mapEvent.AttackerSide;
-            Assert.Null(joinerParty.MapEvent);
-            Assert.Null(joinerParty.Party.MapEventSide);
-        }, disabledMethods);
+            Assert.True(PlayerEncounter.Current.IsJoinedBattle);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+            Assert.Same(mapEvent, joinerParty.MapEvent);
+            Assert.NotNull(mapEvent.FindMapEventParty(joinerParty.Party));
+        }, MapEventDisabledMethods);
 
-        var requests = client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().ToArray();
-        Assert.Equal(2, requests.Length);
-        Assert.False(string.IsNullOrWhiteSpace(requests[1].RequestId));
-        Assert.NotEqual(requests[0].RequestId, requests[1].RequestId);
+        Assert.Empty(menuSwitchRecorder.SwitchesFor(client));
     }
 
     [Fact]
@@ -3239,6 +3299,41 @@ public class VillageHostileActionTests : MapEventTestBase
         forceBlockadeAttack: false,
         forceBlockadeSallyOutAttack: false,
         forceHideoutSendTroops: false);
+
+    private sealed class GameMenuSwitchRecorder : IDisposable
+    {
+        private static readonly System.Reflection.MethodInfo SwitchToMenuMethod =
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) });
+        private static readonly List<(object Container, string MenuId)> SwitchCalls = new();
+
+        private readonly Harmony harmony = new($"village-join-menu-recorder-{Guid.NewGuid()}");
+
+        public GameMenuSwitchRecorder()
+        {
+            SwitchCalls.Clear();
+            harmony.Patch(
+                SwitchToMenuMethod,
+                prefix: new HarmonyMethod(typeof(GameMenuSwitchRecorder), nameof(RecordSwitchToMenu)));
+        }
+
+        public string[] SwitchesFor(EnvironmentInstance instance) =>
+            SwitchCalls
+                .Where(call => ReferenceEquals(call.Container, instance.Container))
+                .Select(call => call.MenuId)
+                .ToArray();
+
+        public void Clear() => SwitchCalls.Clear();
+
+        public void Dispose() =>
+            harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
+
+        private static bool RecordSwitchToMenu(string menuId)
+        {
+            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
+                SwitchCalls.Add((container, menuId));
+            return false;
+        }
+    }
 
     private readonly record struct VillageTarget(string SettlementId, string VillageId, string SettlementPartyId, string OwnerFactionId);
     private readonly record struct RaidMapEventContext(
