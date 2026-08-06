@@ -314,8 +314,7 @@ public class MapEventDebugCommands
                        sharedMapEvent.MapEventSettlement == null &&
                        sharedMapEventIdResolved &&
                        attackerSide != BattleSideEnum.None &&
-                       defenderSide != BattleSideEnum.None &&
-                       attackerSide != defenderSide;
+                       defenderSide != BattleSideEnum.None;
         var mode = canCreate ? "create" : canReuse ? "reuse" : "invalid";
 
         return
