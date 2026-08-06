@@ -1,4 +1,5 @@
-﻿using Common.Network.Messages;
+﻿using Common;
+using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -79,6 +80,44 @@ public class MapEventCollectionTests : MapEventTestBase
                 client.Resolve<IMapEventInitializationBarrier>()
                     .RunAfterCommit(mapEvent, () => immediateCallbackRan = true);
                 Assert.True(immediateCallbackRan);
+            });
+        }
+    }
+
+    [Fact]
+    public void Client_CommitRestoresAuthoritativeComponentLinks()
+    {
+        var staged = CreateServerMapEvent(commit: false);
+        string componentId = null;
+        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(
+            Get<MapEvent>(Server, staged.MapEventId).Component, out componentId)));
+        Assert.NotNull(componentId);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+                var component = Get<FieldBattleEventComponent>(client, componentId);
+                using (new AllowedThread())
+                {
+                    mapEvent.Component = null;
+                    component.MapEvent = null;
+                }
+            });
+        }
+
+        Server.Call(() => Campaign.Current.MapEventManager.OnMapEventCreated(
+            Get<MapEvent>(Server, staged.MapEventId)), MapEventDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+                var component = Get<FieldBattleEventComponent>(client, componentId);
+                Assert.Same(component, mapEvent.Component);
+                Assert.Same(mapEvent, component.MapEvent);
             });
         }
     }
