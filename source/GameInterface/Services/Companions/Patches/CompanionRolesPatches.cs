@@ -97,13 +97,12 @@ internal class CompanionRolesPatches
 
         if (fromCancel) return false;
 
+        __instance._partyCreatedAfterRescueForCompanion = true;
+
         var message = new PartyScreenClosedFromRescuing(
-            leftOwnerParty,
             leftMemberRoster,
             leftPrisonRoster,
-            rightOwnerParty,
-            rightMemberRoster,
-            rightPrisonRoster);
+            rightOwnerParty);
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
