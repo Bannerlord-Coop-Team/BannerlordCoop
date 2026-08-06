@@ -134,7 +134,12 @@ internal static class ConversationPartyHold
         if (interactor?.Party != null)
             objectManager.TryGetId(interactor.Party, out interactorId);
 
-        // Every contender registered for a shared hostile encounter may interact with the target.
+        // A held party belongs to exactly one player: the tracker now refuses a second engagement on
+        // the same party, so only the holder may interact and everyone else is blocked. This used to
+        // let every contender in a shared hostile encounter through, which meant two players could
+        // each run the same one-shot outcome against one lord. Simultaneous attackers still converge
+        // on one MapEvent - see ConversationRequestHandler, where the contender's retry is approved
+        // once the holder has started the battle.
         if (tracker.TryGetEngagement(targetPartyId, out _))
             return !tracker.IsEngagerParty(targetPartyId, interactorId);
 

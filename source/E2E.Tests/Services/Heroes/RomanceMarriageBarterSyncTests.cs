@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using Common.Network;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
@@ -213,6 +213,105 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         if (id == "str_barter_agreed")
             throw new NullReferenceException("Server conversation presentation was invoked.");
     }
+
+    /// <summary>
+    /// Once the barterables have been applied the gold has already moved on the authoritative server, so a
+    /// later failure must NOT be reported as a rejection - the client would roll its UI back over a change
+    /// that really happened, and the two sides would disagree about the gold. The spouse links failing is
+    /// worth logging, but the answer to the client is still "accepted".
+    /// </summary>
+    [Fact]
+    public void PersonalMarriageBarter_WhenSpouseLinksDoNotTakeAfterApply_StillReportsSuccess()
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int offeredGold = 250_000;
+
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var counterparty = CreatePartyWithRegisteredLeader();
+        var spouseId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var requestId = Guid.NewGuid().ToString("N");
+        var harmony = new Harmony($"e2e.marriage-links-fail.{Guid.NewGuid():N}");
+
+        RegisterPlayer(client, player.HeroId, player.MobilePartyId);
+        SetMainHero(player.HeroId);
+
+        try
+        {
+            Server.Call(() =>
+            {
+                new GoldBarterBehavior().RegisterEvents();
+
+                // Suppress ONLY the marriage barterable, so every other barterable (the gold) still
+                // applies. That reproduces "the mutation landed but the spouse links did not".
+                harmony.Patch(
+                    AccessTools.Method(typeof(MarriageBarterable), nameof(MarriageBarterable.Apply)),
+                    prefix: new HarmonyMethod(
+                        typeof(RomanceMarriageBarterSyncTests),
+                        nameof(SuppressMarriageBarterableApply)));
+
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(counterparty.HeroId, out var counterpartyHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(spouseId, out var spouse));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+                playerHero.SetBirthDay(CampaignTime.YearsFromNow(-30f));
+                spouse.SetBirthDay(CampaignTime.YearsFromNow(-25f));
+                playerHero.Occupation = Occupation.Lord;
+                spouse.Occupation = Occupation.Lord;
+                spouse.IsFemale = !playerHero.IsFemale;
+                spouse.Clan = counterpartyHero.Clan;
+                playerHero.Gold = initialPlayerGold;
+
+                playerParty.CurrentSettlement = settlement;
+                counterpartyHero.PartyBelongedTo = null;
+                counterpartyHero.StayingInSettlement = settlement;
+
+                Romance.SetRomanticState(playerHero, spouse, Romance.RomanceLevelEnum.CoupleAgreedOnMarriage);
+            });
+            Server.NetworkSentMessages.Clear();
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeMarriageBarter(
+                requestId, counterparty.HeroId, MarriageConversationContext.Settlement, settlementId,
+                spouseId, player.HeroId)));
+
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestMarriageBarter(
+                counterparty.HeroId, MarriageConversationContext.Settlement, settlementId,
+                spouseId, player.HeroId,
+                new[]
+                {
+                    new MarriageBarterTerm(
+                        MarriageBarterTermType.Gold, player.HeroId, objectId: null,
+                        itemModifierId: null, itemModifierNull: true, amount: offeredGold),
+                },
+                requestId)));
+            TestEnvironment.FlushCoalescer();
+
+            var result = Server.NetworkSentMessages.GetMessages<NetworkMarriageBarterResult>().Single();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(spouseId, out var spouse));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+
+                // Premise: the links really did not take...
+                Assert.NotEqual(playerHero, spouse.Spouse);
+                // ...and the gold really did move, which is why a rejection would be the desync.
+                Assert.Equal(initialPlayerGold - offeredGold, playerHero.Gold);
+            });
+
+            Assert.True(result.Accepted);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+    }
+
+    private static bool SuppressMarriageBarterableApply() => false;
 
     [Theory]
     [InlineData(false, false, false)]

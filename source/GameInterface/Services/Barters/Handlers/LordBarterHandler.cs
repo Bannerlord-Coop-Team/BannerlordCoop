@@ -372,6 +372,19 @@ internal sealed partial class LordBarterHandler : IHandler
             return;
         }
 
+        // A map-party conversation is already exclusive: ConversationPartyTracker holds the target for
+        // exactly one peer. A settlement-menu conversation acquires no such hold - authority there is
+        // co-location - and co-location is NOT exclusive: every player standing in the settlement
+        // satisfies it, so without this two kingdom leaders could each authorize, each pay, and each
+        // move the same clan in turn. Reserve the target hero for one peer at a time.
+        if (IsTargetHeldByAnotherPeer(peer, authorization.TargetHeroId))
+        {
+            Logger.Warning(
+                "Rejected lord barter authorization for {TargetHeroId}: another player is already negotiating with that lord",
+                authorization.TargetHeroId);
+            return;
+        }
+
         authorizations[peer] = new LordBarterAuthorization(
             authorization.RequestId,
             authorization.TargetHeroId,
@@ -381,6 +394,26 @@ internal sealed partial class LordBarterHandler : IHandler
             authorization.TargetKingdomId,
             DateTime.UtcNow.Add(AuthorizationLifetime));
         completedResults.Remove(peer);
+    }
+
+    /// <summary>
+    /// Whether a DIFFERENT peer already holds a live authorization against this lord. Expired entries
+    /// do not reserve anything, so a player who walked away cannot block the lord for the rest of the
+    /// session - the authorization lifetime is what releases it.
+    /// </summary>
+    private bool IsTargetHeldByAnotherPeer(NetPeer peer, string targetHeroId)
+    {
+        if (string.IsNullOrEmpty(targetHeroId)) return false;
+
+        var now = DateTime.UtcNow;
+        foreach (var entry in authorizations)
+        {
+            if (entry.Key == peer) continue;
+            if (entry.Value.ExpiresAtUtc <= now) continue;
+            if (entry.Value.TargetHeroId == targetHeroId) return true;
+        }
+
+        return false;
     }
 
     private bool TryGetAuthorization(
@@ -739,7 +772,7 @@ internal sealed partial class LordBarterHandler : IHandler
     private sealed class LordBarterAuthorization
     {
         public string RequestId { get; }
-        private string TargetHeroId { get; }
+        public string TargetHeroId { get; }
         private int Context { get; }
         private string ContextId { get; }
         private int Kind { get; }

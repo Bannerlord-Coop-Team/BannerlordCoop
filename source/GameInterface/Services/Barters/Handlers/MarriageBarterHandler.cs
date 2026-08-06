@@ -220,8 +220,14 @@ internal sealed class MarriageBarterHandler : IHandler
             ApplyOverpayRelationBonus(playerHero, barterData.OtherHero, MathF.Max(0f, offerValue));
             if (heroBeingProposedTo.Spouse != proposingHero || proposingHero.Spouse != heroBeingProposedTo)
             {
-                Reject(peer, request, playerHero.Gold, "The marriage could not be completed.");
-                return;
+                // The barterables have already been applied and any gold has already moved, so this
+                // cannot be reported as a rejection - that is the desync, not the fix. Report success
+                // and let the replicated state stand; log it, because a spouse link that did not take
+                // is a real problem worth seeing even though the client must not roll back.
+                Logger.Error(
+                    "Marriage barter applied but the spouse links did not take: {Proposing} <-> {Proposed}",
+                    proposingHero?.StringId,
+                    heroBeingProposedTo?.StringId);
             }
 
             FlushHeroGold(playerHero);
