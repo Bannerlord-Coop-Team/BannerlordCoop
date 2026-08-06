@@ -373,22 +373,24 @@ internal static class LordBarterPatch
             return true;
         }
 
-        if (barterData.OtherParty?.MobileParty?.IsActive == true && manager.TryGetId(barterData.OtherParty, out contextId))
-        {
-            context = PeaceConversationContext.MapParty;
-            return true;
-        }
-
-        // Last: a settlement-menu conversation. There is no location mission and no map party to
-        // point at, so identify the conversation by the settlement both sides are standing in.
-        // Checked after the two above so an ordinary map or location conversation keeps its stronger
-        // context - this only catches what would otherwise have no context at all.
+        // Settlement BEFORE map party, and the order matters. A lord's party stays IsActive while the
+        // lord is inside a settlement - IsActive is only cleared by RemoveParty, captivity and load -
+        // so checking the map party first classifies every settlement-menu barter as MapParty. The
+        // server then demands a conversation hold that a settlement menu never acquires, and rejects
+        // the barter. This cannot steal an ordinary map conversation, because it requires BOTH sides
+        // to be inside the SAME settlement, and a party talking on the map has no CurrentSettlement.
         var settlement = barterData.OffererParty?.MobileParty?.CurrentSettlement;
         if (settlement != null &&
             barterData.OtherHero?.CurrentSettlement == settlement &&
             manager.TryGetId(settlement, out contextId))
         {
             context = PeaceConversationContext.Settlement;
+            return true;
+        }
+
+        if (barterData.OtherParty?.MobileParty?.IsActive == true && manager.TryGetId(barterData.OtherParty, out contextId))
+        {
+            context = PeaceConversationContext.MapParty;
             return true;
         }
 
