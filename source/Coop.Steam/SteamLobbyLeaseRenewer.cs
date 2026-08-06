@@ -15,20 +15,8 @@ public class SteamLobbyLeaseRenewer : ISteamLobbyLeaseRenewer
 {
     public static readonly TimeSpan RenewalInterval = TimeSpan.FromSeconds(15);
 
-    private readonly TimeSpan interval;
     private Timer timer;
     private bool disposed;
-
-    public SteamLobbyLeaseRenewer()
-        : this(RenewalInterval)
-    {
-    }
-
-    internal SteamLobbyLeaseRenewer(TimeSpan interval)
-    {
-        if (interval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
-        this.interval = interval;
-    }
 
     public void Start(Action renew)
     {
@@ -37,7 +25,7 @@ public class SteamLobbyLeaseRenewer : ISteamLobbyLeaseRenewer
 
         Stop();
         timer = new Timer(_ => GameThread.RunSafe(renew, context: "RenewSteamLobbyLease"),
-            null, interval, interval);
+            null, RenewalInterval, RenewalInterval);
     }
 
     public void Stop()
