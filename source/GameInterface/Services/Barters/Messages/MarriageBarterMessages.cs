@@ -16,6 +16,7 @@ internal enum MarriageConversationContext
 {
     MapParty,
     Location,
+    Settlement,
 }
 
 [ProtoContract(SkipConstructor = true)]

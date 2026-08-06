@@ -38,6 +38,7 @@ public interface IPuppetSpawner : IDisposable
 public class PuppetSpawner : IPuppetSpawner
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PuppetSpawner>();
+    private const int MaxBufferedSpawnsPerTick = 64;
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -48,6 +49,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IPuppetRoutApplier puppetRoutApplier;
 
     // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
@@ -68,7 +70,8 @@ public class PuppetSpawner : IPuppetSpawner
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
         IBattleAgentBudget agentBudget,
-        IPuppetRoutApplier puppetRoutApplier = null)
+        IPuppetRoutApplier puppetRoutApplier = null,
+        IBattleAgentSpawnBatchCodec spawnBatchCodec = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -79,6 +82,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.deployment = deployment;
         this.formationAssigner = formationAssigner;
         this.agentBudget = agentBudget;
+        this.spawnBatchCodec = spawnBatchCodec ?? new BattleAgentSpawnBatchCodec();
         this.puppetRoutApplier = puppetRoutApplier;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
@@ -98,27 +102,71 @@ public class PuppetSpawner : IPuppetSpawner
     // [Peer] Spawn the owner's agents as local puppets, driven by replicated movement.
     private void Handle_NetworkSpawnBattleAgents(MessagePayload<NetworkSpawnBattleAgents> payload)
     {
-        if (payload.What.Agents == null) return;
+        NetworkSpawnBattleAgents message = payload.What;
+        if (!spawnBatchCodec.TryDecode(message, out BattleAgentSpawnData[] agents))
+        {
+            Logger.Error(
+                "[BattleTraffic] Rejected malformed spawn batch {TransferId} {BatchIndex}/{BatchCount} " +
+                "with {RecordCount} declared record(s)",
+                message.TransferId,
+                message.BatchIndex + 1,
+                message.BatchCount,
+                message.RecordCount);
+            return;
+        }
 
-        Logger.Information("[BattleSync] Received {Count} spawn record(s) from the host over the mesh", payload.What.Agents.Length);
-        foreach (var data in payload.What.Agents)
-            SpawnPuppet(data);
+        Logger.Information(
+            "[BattleTraffic] Received {Count} {Purpose} spawn record(s), batch {BatchIndex}/{BatchCount}, " +
+            "{WireBytes} wire bytes from {UncompressedBytes} protobuf bytes",
+            agents.Length,
+            message.Purpose,
+            message.BatchIndex + 1,
+            Math.Max(1, message.BatchCount),
+            message.Payload?.Length ?? 0,
+            message.UncompressedLength);
+
+        // One bounded game-thread action per wire batch preserves ReliableOrdered barriers without adding one
+        // queue entry per agent. The codec caps production batches at 32 records.
+        GameThread.RunSafe(
+            () => SpawnPuppetBatch(message, agents),
+            context: nameof(Handle_NetworkSpawnBattleAgents));
     }
 
-    private void SpawnPuppet(BattleAgentSpawnData data)
+    private void SpawnPuppetBatch(
+        NetworkSpawnBattleAgents message,
+        BattleAgentSpawnData[] agents)
     {
-        if (data.AgentId == Guid.Empty) return;
-
-        // Spawn on the game thread, but do NOT block the network (receive) thread: while the mission is still
-        // loading the game loop isn't draining the GameThread queue, so a blocking wait here deadlocks the
-        // receive thread. Buffer missing mission identity and deployment-gated records for the tick drain.
-        GameThread.RunSafe(() =>
+        if (Mission.Current == null)
         {
-            // One puppet from the receive path: size the running slot budget to the live remaining capacity.
-            int slotsAvailable = agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current));
-            if (!TrySpawnPuppetNow(data, ref slotsAvailable))
-                lock (pendingPuppetLock) pendingPuppets.Add(data);
-        });
+            Logger.Warning(
+                "[BattleTraffic] Dropping spawn transfer {TransferId} batch {BatchIndex}/{BatchCount}: mission ended",
+                message.TransferId,
+                message.BatchIndex + 1,
+                Math.Max(1, message.BatchCount));
+            return;
+        }
+
+        int slotsAvailable = agentBudget.RemainingCapacity(agentBudget.CountLiveAgents(Mission.Current));
+        foreach (BattleAgentSpawnData data in agents)
+        {
+            if (data == null || data.AgentId == Guid.Empty) continue;
+
+            try
+            {
+                if (!TrySpawnPuppetNow(data, ref slotsAvailable))
+                    lock (pendingPuppetLock) pendingPuppets.Add(data);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "[BattleSync] Failed to spawn puppet {AgentId}; dropping it", data.AgentId);
+            }
+        }
+
+        Logger.Information(
+            "[BattleTraffic] Applied spawn transfer {TransferId} batch {BatchIndex}/{BatchCount} on the game thread",
+            message.TransferId,
+            message.BatchIndex + 1,
+            Math.Max(1, message.BatchCount));
     }
 
     // [Game thread] Spawn one puppet, consuming <paramref name="slotsAvailable"/> render slots on success.
@@ -375,8 +423,10 @@ public class PuppetSpawner : IPuppetSpawner
         lock (pendingPuppetLock)
         {
             if (pendingPuppets.Count == 0) return;
-            pending = pendingPuppets.ToArray();
-            pendingPuppets.Clear();
+            int count = Math.Min(MaxBufferedSpawnsPerTick, pendingPuppets.Count);
+            pending = new BattleAgentSpawnData[count];
+            pendingPuppets.CopyTo(0, pending, 0, count);
+            pendingPuppets.RemoveRange(0, count);
         }
 
         // BR-110: count the live remaining capacity ONCE for the whole drain and decrement it as puppets spawn,

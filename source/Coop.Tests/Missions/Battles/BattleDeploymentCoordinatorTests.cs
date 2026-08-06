@@ -1,8 +1,9 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -11,7 +12,7 @@ namespace Coop.Tests.Missions.Battles;
 /// Unit tests for <see cref="BattleDeploymentCoordinator"/> — the mesh effects it performs around the pure
 /// <see cref="global::GameInterface.Services.MapEvents.BattleDeploymentActivator"/> verdicts, and the commit
 /// latch of the "hidden everywhere until deployed" rule (#4): own-party spawns are withheld from peers until
-/// the local deployment commit, the first commit asks the caller for exactly one reveal, and the host's NPC/AI
+/// the local deployment commit, the first commit performs exactly one reveal, and the host's NPC/AI
 /// is never withheld so it shows frozen on every client during deployment (#1).
 /// </summary>
 public class BattleDeploymentCoordinatorTests
@@ -84,6 +85,21 @@ public class BattleDeploymentCoordinatorTests
         sut.OnLocalDeploymentFinished();
 
         network.Verify(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()), Times.Once);
+    }
+
+    [Fact]
+    public void LocalFinish_ReplicatesCommittedTroopsBeforeFinishedAndActivation()
+    {
+        AsHost();
+        var order = new List<string>();
+        network.Setup(n => n.SendAll(It.IsAny<NetworkBattleDeploymentFinished>()))
+            .Callback(() => order.Add("finished"));
+        network.Setup(n => n.SendAll(It.IsAny<NetworkBattleActivated>()))
+            .Callback(() => order.Add("activated"));
+
+        sut.OnLocalDeploymentFinished(() => order.Add("spawn"));
+
+        Assert.Equal(new[] { "spawn", "finished", "activated" }, order);
     }
 
     [Fact]

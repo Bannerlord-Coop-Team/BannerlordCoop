@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Settlements.Patches;
@@ -8,7 +9,7 @@ internal class DisableEffectsOnSecurityPatch
 {
     [HarmonyPatch(nameof(DefaultSettlementSecurityModel.CalculateInfestedHideoutEffectsOnSecurity))]
     [HarmonyPrefix]
-    public static bool CalculateInfestedHideoutEffectsOnSecurityPrefix() => false;
+    public static bool CalculateInfestedHideoutEffectsOnSecurityPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(nameof(DefaultSettlementSecurityModel.CalculateIssueEffectsOnSecurity))]
     [HarmonyPrefix]

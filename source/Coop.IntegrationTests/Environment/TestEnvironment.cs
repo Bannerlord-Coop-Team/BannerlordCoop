@@ -6,6 +6,7 @@ using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using Coop.Core.Server.Services.Settlements;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
@@ -14,6 +15,8 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using Moq;
 using Serilog;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -101,6 +104,9 @@ public class TestEnvironment
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
+        builder.RegisterInstance(new AllowSettlementEncounterDistanceValidator())
+            .As<ISettlementEncounterDistanceValidator>()
+            .SingleInstance();
 
         RegisterMock<ISettlementInterface>(builder);
 
@@ -112,6 +118,21 @@ public class TestEnvironment
         var mock = new Mock<T>();
         builder.RegisterInstance(mock).AsSelf().SingleInstance();
         builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
+    }
+
+    /// <summary>
+    /// Bypasses campaign-map geometry in the headless integration environment.
+    /// </summary>
+    private sealed class AllowSettlementEncounterDistanceValidator : ISettlementEncounterDistanceValidator
+    {
+        public bool TryValidate(
+            MobileParty party,
+            Settlement settlement,
+            out string rejectionReason)
+        {
+            rejectionReason = string.Empty;
+            return true;
+        }
     }
 
     public void RegisterObjectInNetwork<T>(T obj, string? stringId = null)

@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -40,6 +41,7 @@ internal class BattleJoinLeaveHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IMapEventInitializationBarrier initializationBarrier;
+    private readonly ISiegeEventInterface siegeEventInterface;
 
     public BattleJoinLeaveHandler(
         IMessageBroker messageBroker,
@@ -47,7 +49,8 @@ internal class BattleJoinLeaveHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IMapEventLogger mapEventLogger,
-        IMapEventInitializationBarrier initializationBarrier)
+        IMapEventInitializationBarrier initializationBarrier,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -55,6 +58,7 @@ internal class BattleJoinLeaveHandler : IHandler
         this.playerManager = playerManager;
         this.mapEventLogger = mapEventLogger;
         this.initializationBarrier = initializationBarrier;
+        this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
         messageBroker.Subscribe<PlayerJoinBattleAttempted>(Handle_PlayerJoinBattleAttempted);
@@ -209,9 +213,9 @@ internal class BattleJoinLeaveHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.LeavingParty, out var partyId)) return;
 
         if (ModInformation.IsServer)
-            RemovePartyFromBattleAndBroadcast(partyId);
+            RemovePartyFromBattleAndBroadcast(partyId, payload.What.FinishLocalMenus);
         else
-            network.SendAll(new NetworkRequestLeaveBattle(partyId));
+            network.SendAll(new NetworkRequestLeaveBattle(partyId, payload.What.FinishLocalMenus));
     }
 
     /// <summary>[Server] A client asked to leave a battle without ending it.</summary>
@@ -219,12 +223,18 @@ internal class BattleJoinLeaveHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
-        RemovePartyFromBattleAndBroadcast(payload.What.PartyId, payload.Who as NetPeer);
+        RemovePartyFromBattleAndBroadcast(
+            payload.What.PartyId,
+            payload.What.FinishLocalMenus,
+            payload.Who as NetPeer);
     }
 
     // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
     // collection sync), so remove authoritatively and broadcast the removal explicitly.
-    private void RemovePartyFromBattleAndBroadcast(string partyId, NetPeer requestingPeer = null)
+    private void RemovePartyFromBattleAndBroadcast(
+        string partyId,
+        bool finishLocalMenus = true,
+        NetPeer requestingPeer = null)
     {
         GameThread.RunSafe(
             () =>
@@ -235,7 +245,10 @@ internal class BattleJoinLeaveHandler : IHandler
                 bool leaveSiege = IsAttackingSiegeAssault(party);
                 ApplyAuthoritativeLeave(party);
                 // Preserve the client's PlayerSiege reference until its explicit cleanup runs.
-                network.SendAll(new NetworkPartyLeftBattle(partyId, leaveSiege));
+                network.SendAll(new NetworkPartyLeftBattle(
+                    partyId,
+                    leaveSiege,
+                    finishLocalMenus));
 
                 if (leaveSiege && party.MobileParty?.BesiegerCamp != null)
                     party.MobileParty.BesiegerCamp = null;
@@ -264,7 +277,10 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (Campaign.Current == null) return;
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.PartyId, out var party)) return;
 
-                ApplyNetworkLeave(party, message.LeaveSiege);
+                ApplyNetworkLeave(
+                    party,
+                    message.LeaveSiege,
+                    message.FinishLocalMenus);
             },
             context: nameof(Handle_NetworkPartyLeftBattle));
     }
@@ -320,16 +336,16 @@ internal class BattleJoinLeaveHandler : IHandler
         return party.MapEvent?.IsSiegeAssault == true && party.Side == BattleSideEnum.Attacker;
     }
 
-    // Apply the received removal under AllowedThread and unwind this client's local siege/encounter state.
-    private static void ApplyNetworkLeave(PartyBase party, bool leaveSiege)
+    // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
+    private void ApplyNetworkLeave(PartyBase party, bool leaveSiege, bool finishLocalMenus)
     {
         using (new AllowedThread())
         {
+            var mapEvent = party.MapEvent;
+            bool isSiegeAssault = mapEvent?.IsSiegeAssault == true;
+            var siegeSettlement = mapEvent?.MapEventSettlement;
             bool isMainParty = party == PartyBase.MainParty;
             var mobileParty = party.MobileParty;
-
-            if (leaveSiege && isMainParty && PlayerSiege.PlayerSiegeEvent != null)
-                PlayerSiege.FinalizePlayerSiege();
 
             if (party.MapEventSide != null)
                 party.MapEventSide = null;
@@ -337,12 +353,18 @@ internal class BattleJoinLeaveHandler : IHandler
             if (leaveSiege && mobileParty?.BesiegerCamp != null)
                 mobileParty.BesiegerCamp = null;
 
-            if (isMainParty)
+            if (isMainParty && finishLocalMenus)
             {
-                if (PlayerEncounter.Current != null)
+                if (leaveSiege || isSiegeAssault)
+                {
+                    siegeEventInterface.FinishLocalPlayerSiegeLeave(
+                        siegeSettlement,
+                        forcePlayerOutFromSettlement: false);
+                }
+                else if (PlayerEncounter.Current != null)
+                {
                     PlayerEncounter.Finish(false);
-                else if (leaveSiege)
-                    GameMenu.ExitToLast();
+                }
             }
 
             if (leaveSiege && isMainParty)

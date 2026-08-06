@@ -1,8 +1,10 @@
 using Common.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using TaleWorlds.Library;
 
@@ -70,7 +72,7 @@ internal sealed class ModConfig : IModConfig
             var loaded = JsonConvert.DeserializeObject<ModConfigData>(File.ReadAllText(path), MakeSettings())
                 ?? new ModConfigData();
             Logger.Information("mod-config.json loaded ({Path})", path);
-            WarnUnknownKeys(loaded);
+            WarnAllUnknownKeys(loaded);
             return loaded;
         }
         catch (Exception ex)
@@ -143,21 +145,18 @@ internal sealed class ModConfig : IModConfig
         };
     }
 
-    private static void WarnUnknownKeys(ModConfigData data)
+    private static void WarnAllUnknownKeys(ModConfigData data)
     {
-        if (data.UnknownKeys != null)
+        if (data.UnknownKeys != null) WarnUnknownKeys(data.UnknownKeys);
+        if (data.Difficulty?.UnknownKeys != null) WarnUnknownKeys(data.Difficulty.UnknownKeys, "difficulty ");
+        if (data.ModOptions?.UnknownKeys != null) WarnUnknownKeys(data.ModOptions.UnknownKeys, "mod option ");
+    }
+
+    private static void WarnUnknownKeys(IDictionary<string, JToken> unknownKeys, string keyType = "")
+    {
+        foreach (var key in unknownKeys.Keys)
         {
-            foreach (var key in data.UnknownKeys.Keys)
-            {
-                Logger.Warning("mod-config.json: unknown key '{Key}' ignored", key);
-            }
-        }
-        if (data.Difficulty?.UnknownKeys != null)
-        {
-            foreach (var key in data.Difficulty.UnknownKeys.Keys)
-            {
-                Logger.Warning("mod-config.json: unknown difficulty key '{Key}' ignored", key);
-            }
+            Logger.Warning("mod-config.json: unknown {keyType}key '{Key}' ignored", keyType, key);
         }
     }
 

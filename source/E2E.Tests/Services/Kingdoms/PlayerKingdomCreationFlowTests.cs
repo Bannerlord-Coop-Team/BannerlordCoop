@@ -518,8 +518,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var player = CreateSyncedPlayerContext();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetPlayer = CreateSyncedPlayerContext("TargetKingdomTimeout", _ => false);
 
         ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(targetPlayer.ClanId, targetKingdomId);
         EnsureKingdomRegisteredEverywhere(kingdomId);
         EnsureKingdomRegisteredEverywhere(targetKingdomId);
 
@@ -531,8 +533,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
 
             decision = new DeclareWarDecision(playerClan, targetKingdom);
+            decision.TriggerTime = CampaignTime.Never;
             kingdom.AddDecision(decision);
 
+            Assert.False(decision.ShouldBeCancelled());
+            Assert.False(decision.TriggerTime.IsPast);
             CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
 
             Assert.Same(decision, Assert.Single(kingdom.UnresolvedDecisions));
@@ -545,7 +550,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
 
-            decision.TriggerTime = CampaignTime.HoursFromNow(-1);
+            decision.TriggerTime = CampaignTime.Zero;
+            Assert.True(decision.TriggerTime.IsPast);
             CoopKingdomDecisionProposalBehaviorPatch.HourlyTickPrefix();
 
             Assert.Empty(kingdom.UnresolvedDecisions);
@@ -1275,16 +1281,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
             var playerManager = Server.Resolve<IPlayerManager>();
-            var players = (HashSet<Player>)AccessTools.Field(playerManager.GetType(), "_players").GetValue(playerManager);
-            var oldPlayer = players.Single(player => player.ControllerId == SecondControllerId);
+            var players = (Dictionary<string, Player>)AccessTools.Field(playerManager.GetType(), "_players").GetValue(playerManager);
+            Assert.True(players.ContainsKey(SecondControllerId));
 
-            Assert.True(players.Remove(oldPlayer));
-            Assert.True(players.Add(new Player(
+            players[SecondControllerId] = new Player(
                 SecondControllerId,
                 "missingHero",
                 player2.PartyId,
                 player2.ClanId,
-                player2.CharacterId)));
+                player2.CharacterId);
 
             kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
         });
@@ -1608,6 +1613,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var client = Clients.First();
         var settlementId = CreateSyncedSettlement();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        TestEnvironment.ConnectRegisteredPlayer(client, ControllerId);
 
         client.Call(() =>
         {
@@ -1764,16 +1770,19 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     {
         var player = CreateSyncedPlayerContext();
         var settlementId = CreateSyncedSettlement();
+        var client = Clients.First();
+        TestEnvironment.ConnectRegisteredPlayer(client, ControllerId);
 
         Server.SimulateMessage(
-            this,
+            client.NetPeer,
             new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
-        Server.SimulateMessage(this, new NetworkRequestEndSettlementEncounter(player.PartyId));
+        Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(player.PartyId));
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
 
-        Assert.DoesNotContain(
+        var leaveResult = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
-            message => true);
+            message => message.PartyId == player.PartyId);
+        Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, leaveResult.Outcome);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
             message => message.PartyId == player.PartyId);

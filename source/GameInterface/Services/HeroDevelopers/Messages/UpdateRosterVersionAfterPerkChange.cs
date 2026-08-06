@@ -3,11 +3,11 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.HeroDevelopers.Messages;
 
-public readonly struct UpdateRosterVersionAfterPerkActivation : IEvent
+public readonly struct UpdateRosterVersionAfterPerkChange : IEvent
 {
     public readonly TroopRoster MemberRoster;
 
-    public UpdateRosterVersionAfterPerkActivation(TroopRoster memberRoster)
+    public UpdateRosterVersionAfterPerkChange(TroopRoster memberRoster)
     {
         MemberRoster = memberRoster;
     }
