@@ -4,6 +4,7 @@ using Common.Messaging;
 using Missions.Messages;
 using Missions.Services.Network;
 using SandBox;
+using SandBox.Missions.AgentBehaviors;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -262,6 +263,59 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         if (component.AgentNavigator == null)
             component.CreateAgentNavigator(entry);
         entry.AddBehaviors(agent);
+        ReconnectAdoptedPointUse(agent, component.AgentNavigator);
         return true;
+    }
+
+    // [Game thread] Keep an adopted mid-performance NPC in its seat: wire the fresh navigator and
+    // wander behavior to the point the agent is ALREADY using — the exact steady state the native
+    // pipeline would have produced had this client sent it there (SR-043). Without this, the first
+    // behavior tick sees NoTarget and either retargets (dragging the sitter through the furniture
+    // toward a random new point) or calls SetTarget(null), whose DisableScriptedMovement releases a
+    // still-seated agent's locked seat frame and breaks its facing; native never reaches either path
+    // because a native sitter always carries TargetUsableMachine. IDetachment.AddAgent is
+    // deliberately NOT called — it only assigns VACANT points and would shuffle the agent to a
+    // different seat of the same machine. The natural leave later flows through the untouched native
+    // path (behavior retarget → IDetachment.RemoveAgent → StopUsingGameObjectMT), which the host's
+    // point-usage poll then replicates.
+    private void ReconnectAdoptedPointUse(Agent agent, AgentNavigator navigator)
+    {
+        if (navigator == null || !(agent.CurrentlyUsedGameObject is StandingPoint usedPoint)) return;
+
+        var machine = FindOwningMachine(usedPoint);
+        if (machine == null)
+        {
+            // Not a machine's point (unexpected for settlement performances): stand down cleanly
+            // NOW, before anything ticks, rather than let the fresh AI fight the seat.
+            agent.StopUsingGameObject(isSuccessful: true);
+            Logger.Warning("[LocationSync] Adopted NPC {Agent} used a machine-less point — stood it down for AI takeover", agent.Index);
+            return;
+        }
+
+        navigator.TargetUsableMachine = machine;
+        navigator._agentState = AgentNavigator.NavigationState.UseMachine;
+        navigator._targetBehavior = machine.CreateAIBehaviorObject();
+
+        foreach (var group in navigator._behaviorGroups)
+            foreach (var behavior in group.Behaviors)
+                behavior.SetCustomWanderTarget(machine);
+
+        // WalkingBehavior tracks its last target separately; left null its next tick would
+        // SetTarget(null) the seated agent right back off the point.
+        var walking = navigator.GetBehaviorGroup<DailyBehaviorGroup>()?.GetBehavior<WalkingBehavior>();
+        if (walking != null)
+            walking._lastTarget = machine;
+    }
+
+    private static UsableMachine FindOwningMachine(StandingPoint point)
+    {
+        foreach (var missionObject in Mission.Current.MissionObjects)
+        {
+            if (missionObject is UsableMachine machine
+                && machine.StandingPoints != null
+                && machine.StandingPoints.Contains(point))
+                return machine;
+        }
+        return null;
     }
 }

@@ -93,7 +93,15 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   local `LocationCharacter` (via the origin binding of SR-022), then
   `GetComponent<CampaignAgentComponent>().CreateAgentNavigator(locationCharacter)` +
   `locationCharacter.AddBehaviors(agent)` + `Controller = AI` (verified native sequence, V5).
-  Animals get `Controller = AI` only. No battle `AgentAiWaker.Wake` (would set Alarmed). IMPLEMENTED (live verification outstanding)
+  Animals get `Controller = AI` only. No battle `AgentAiWaker.Wake` (would set Alarmed).
+  An adopted NPC that is mid-performance keeps its seat: the fresh navigator and wander behavior
+  are wired to the point it is already using (`TargetUsableMachine`/`UseMachine` state/machine AI
+  object + `SetCustomWanderTarget` and `WalkingBehavior._lastTarget` seeding — Publicizer members,
+  no `IDetachment.AddAgent`, which only assigns vacant points). Otherwise the first behavior tick
+  sees `NoTarget` and either retargets the sitter or `SetTarget(null)`s its locked seat frame away
+  — the post-migration mass stand-up/orientation break. The natural leave later flows through the
+  untouched native path (`RemoveAgent` → `StopUsingGameObjectMT`), replicated by the point-usage
+  poll. IMPLEMENTED (live verification outstanding)
 - **SR-031 (Graceful fallback).** An adopted puppet whose roster entry cannot be resolved converts
   to a stationary AI agent with a warning log — never a crash. IMPLEMENTED (live verification outstanding)
 - **SR-032 (No duplicates).** After migration, the new host's native systems must not re-spawn
