@@ -23,20 +23,17 @@ internal class VassalServiceHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<VassalServiceHandler>();
 
     private readonly IMessageBroker messageBroker;
-    private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
 
     public VassalServiceHandler(
         IMessageBroker messageBroker,
-        IKingdomMembershipState kingdomMembershipState,
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
-        this.kingdomMembershipState = kingdomMembershipState;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
@@ -105,10 +102,10 @@ internal class VassalServiceHandler : IHandler
             return false;
         }
 
-        Kingdom previousKingdom = clan.Kingdom;
-
         if (clan.Kingdom == kingdom)
         {
+            // Promoting a mercenary already in this kingdom only clears IsUnderMercenaryService; the
+            // kingdom's rosters do not change, so there is nothing to republish here.
             if (!clan.IsUnderMercenaryService)
             {
                 Logger.Warning("Rejected vassal service request because clan {ClanId} already belongs to kingdom {KingdomId}", clanId, kingdomId);
@@ -130,6 +127,8 @@ internal class VassalServiceHandler : IHandler
                 EndMercenaryServiceAction.EndByLeavingKingdom(clan);
             }
 
+            // ClanKingdomMembershipReplicationPatch postfixes ApplyInternal, so the kingdom's clan and
+            // fief collections are republished from there.
             ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom);
         }
 
@@ -139,12 +138,6 @@ internal class VassalServiceHandler : IHandler
             return false;
         }
 
-        kingdomMembershipState.MoveClanToKingdom(
-            previousKingdom,
-            kingdom,
-            clan,
-            publishCollectionChanges: true,
-            republishExistingCollections: true);
         if (!kingdom.Clans.Contains(clan))
         {
             Logger.Error("Vassal service did not add clan {ClanId} to kingdom {KingdomId} collections", clanId, kingdomId);

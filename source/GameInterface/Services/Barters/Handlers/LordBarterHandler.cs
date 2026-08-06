@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -37,7 +37,6 @@ internal sealed partial class LordBarterHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
-    private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly LocationConversationTracker locationConversationTracker;
     private readonly IBarterClientPresentation presentation;
@@ -54,7 +53,6 @@ internal sealed partial class LordBarterHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
-        IKingdomMembershipState kingdomMembershipState,
         ConversationPartyTracker conversationPartyTracker,
         LocationConversationTracker locationConversationTracker,
         IBarterClientPresentation presentation,
@@ -66,7 +64,6 @@ internal sealed partial class LordBarterHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
-        this.kingdomMembershipState = kingdomMembershipState;
         this.conversationPartyTracker = conversationPartyTracker;
         this.locationConversationTracker = locationConversationTracker;
         this.presentation = presentation;
@@ -190,9 +187,6 @@ internal sealed partial class LordBarterHandler : IHandler
 
             var kind = (LordBarterKind)request.Kind;
             var isSafePassage = kind == LordBarterKind.SafePassage;
-            var previousTargetKingdom = kind == LordBarterKind.JoinKingdomAsClan
-                ? targetHero.Clan.Kingdom
-                : null;
             IReadOnlyList<MobileParty> safePassageOpponents = Array.Empty<MobileParty>();
             float offerValue;
             if (isSafePassage)
@@ -231,15 +225,9 @@ internal sealed partial class LordBarterHandler : IHandler
                 }
             }
 
-            if (kind == LordBarterKind.JoinKingdomAsClan)
-            {
-                kingdomMembershipState.MoveClanToKingdom(
-                    previousTargetKingdom,
-                    targetKingdom,
-                    targetHero.Clan,
-                    publishCollectionChanges: true,
-                    republishExistingCollections: true);
-            }
+            // JoinKingdomAsClanBarterable.Apply ends in a ChangeKingdomAction on every path it can
+            // take, so ClanKingdomMembershipReplicationPatch has already republished the kingdom's
+            // collections and broadcast the membership by the time the loop above returns.
 
             if (isSafePassage)
                 ApplySafePassage(

@@ -21,11 +21,14 @@ namespace GameInterface.Services.Clans.Patches;
 ///
 /// Individual call sites used to fix this one at a time, so each new membership path (expel, leave,
 /// rebellion, clan destruction, a host-initiated defection that never reaches LordBarterHandler) had
-/// to remember to do it, and most did not. Every one of them funnels through ApplyInternal, so the
-/// republish belongs here rather than in each caller.
+/// to remember to do it, and most did not. Every ChangeKingdomAction entry point funnels through
+/// ApplyInternal, so the republish belongs here rather than in each caller, and the callers that
+/// used to do it themselves have had that removed - two republishes of the same collections is
+/// idempotent but sends every snapshot twice.
 ///
-/// MoveClanToKingdom and KingdomCollectionSync.AddClan are idempotent, so call sites that already
-/// republish explicitly stay correct.
+/// Call sites that change membership WITHOUT a ChangeKingdomAction - KingdomDebugCommand and
+/// PlayerPartyInteractionOutcomeHandler drive IKingdomMembershipState directly, which is what moves
+/// the clan - are unaffected by this patch and still publish for themselves.
 /// </remarks>
 [HarmonyPatch(typeof(ChangeKingdomAction), "ApplyInternal")]
 internal class ClanKingdomMembershipReplicationPatch
