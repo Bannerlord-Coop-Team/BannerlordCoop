@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -20,6 +21,7 @@ public class InitialServerState : ServerStateBase
 
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
+    private readonly IMapEventLoadCleaner mapEventLoadCleaner;
     private readonly IModuleValidator moduleValidator;
     private readonly IGameStateInterface gameStateInterface;
     private readonly ILoadingInterface loadingInterface;
@@ -29,6 +31,7 @@ public class InitialServerState : ServerStateBase
         IServerLogic context,
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
+        IMapEventLoadCleaner mapEventLoadCleaner,
         IModuleInfoProvider moduleInfoProvider,
         IModuleValidator moduleValidator,
         IGameStateInterface gameStateInterface,
@@ -37,6 +40,7 @@ public class InitialServerState : ServerStateBase
     {
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
+        this.mapEventLoadCleaner = mapEventLoadCleaner;
         this.moduleValidator = moduleValidator;
         this.gameStateInterface = gameStateInterface;
         this.loadingInterface = loadingInterface;
@@ -65,6 +69,7 @@ public class InitialServerState : ServerStateBase
 
         // Register all objects after main party is removed to keep order
         registryManager.RegisterAllGameObjects();
+        mapEventLoadCleaner.FinalizePlayerMapEvents();
 
         loadingInterface.SetLoadingMessage("Hosting Coop Server", "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
