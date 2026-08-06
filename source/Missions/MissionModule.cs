@@ -53,6 +53,15 @@ public class MissionModule : Module
         builder.RegisterType<BattleAgentSpawnBatchCodec>()
             .As<IBattleAgentSpawnBatchCodec>()
             .InstancePerDependency();
+        builder.RegisterType<AgentReplicationValidator>()
+            .As<IAgentReplicationValidator>()
+            .InstancePerDependency();
+        builder.RegisterType<AnimationActionCountProvider>()
+            .As<IAnimationActionCountProvider>()
+            .InstancePerDependency();
+        builder.RegisterType<AgentPositionInterpolator>()
+            .As<IAgentPositionInterpolator>()
+            .InstancePerDependency();
         builder.RegisterType<CompressedMovementPacketHandler>()
             .AsSelf()
             .InstancePerLifetimeScope()

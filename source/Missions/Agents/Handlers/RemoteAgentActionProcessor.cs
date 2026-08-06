@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
@@ -8,6 +9,7 @@ using Missions.Diagnostics;
 #endif
 using Missions.Messages;
 using Missions.Services.Network;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -30,6 +32,7 @@ public interface IRemoteAgentActionProcessor : IDisposable
 
 public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<RemoteAgentActionProcessor>();
     private const float RetainedGuardReleaseBlendPeriod = 0.4f;
 
     private readonly INetworkAgentRegistry agentRegistry;
@@ -37,6 +40,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private readonly IBattleHostRegistry battleHostRegistry;
     private readonly IMissionContext missionContext;
     private readonly IAgentVisualActionAccessor agentVisualActionAccessor;
+    private readonly IAgentReplicationValidator replicationValidator;
 
     // All receive-side state for one agent stays together so authority changes clear it atomically.
     private readonly Dictionary<Guid, RemoteAgentActionState> _agentStates =
@@ -215,13 +219,15 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         IControllerIdProvider controllerIdProvider,
         IBattleHostRegistry battleHostRegistry,
         IMissionContext missionContext,
-        IAgentVisualActionAccessor agentVisualActionAccessor)
+        IAgentVisualActionAccessor agentVisualActionAccessor,
+        IAgentReplicationValidator replicationValidator)
     {
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.battleHostRegistry = battleHostRegistry;
         this.missionContext = missionContext;
         this.agentVisualActionAccessor = agentVisualActionAccessor;
+        this.replicationValidator = replicationValidator;
     }
 
     public int GetOutgoingBattleHostEpoch()
@@ -406,13 +412,16 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     public void Receive(AgentActionPacket packet)
     {
-        if (packet.AgentIds == null
-            || packet.Actions == null
-            || packet.Sequences == null
-            || packet.AgentIds.Length != packet.Actions.Length
-            || packet.AgentIds.Length != packet.Sequences.Length
-            || string.IsNullOrEmpty(packet.ControllerId))
+        if (!replicationValidator.TryValidate(packet, out string validationFailure))
         {
+            if (replicationValidator.ShouldLogRejection(out int suppressed))
+            {
+                Logger.Warning(
+                    "Discarding invalid remote action packet: {Failure} " +
+                    "(suppressed since last log: {Suppressed})",
+                    validationFailure,
+                    suppressed);
+            }
             return;
         }
 

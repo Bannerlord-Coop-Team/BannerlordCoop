@@ -111,6 +111,9 @@ public class TestEnvironment
         builder.RegisterType<MockAgentVisualActionAccessor>()
             .As<IAgentVisualActionAccessor>()
             .InstancePerDependency();
+        builder.RegisterType<MockAnimationActionCountProvider>()
+            .As<IAnimationActionCountProvider>()
+            .InstancePerDependency();
         builder.RegisterType<MockGuardReactionActionResolver>()
             .As<IGuardReactionActionResolver>()
             .InstancePerDependency();

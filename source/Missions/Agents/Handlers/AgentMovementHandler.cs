@@ -8,6 +8,9 @@ using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Packets;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using Missions.Messages;
 using Serilog;
 using System;
@@ -61,6 +64,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IMovementBatchSender movementBatchSender;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly IAgentVisualActionAccessor visualActionAccessor;
+    private readonly IAgentReplicationValidator replicationValidator;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
@@ -181,7 +185,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
-    private readonly AgentPositionInterpolator _interpolator = new AgentPositionInterpolator();
+    private readonly IAgentPositionInterpolator _interpolator;
     public IAgentPositionInterpolator Interpolator => _interpolator;
 
     // Masterless-horse movement receive side. Owned here (registered/removed with this handler) so both
@@ -203,7 +207,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         IAgentEquipmentApplier equipmentApplier,
         IMovementBatchSender movementBatchSender,
         IPuppetMountStateRepairer puppetMountStateRepairer,
-        IAgentVisualActionAccessor visualActionAccessor)
+        IAgentVisualActionAccessor visualActionAccessor,
+        IAgentReplicationValidator replicationValidator,
+        IAgentPositionInterpolator interpolator)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
 
@@ -216,6 +222,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.movementBatchSender = movementBatchSender;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
         this.visualActionAccessor = visualActionAccessor;
+        this.replicationValidator = replicationValidator;
+        this._interpolator = interpolator;
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
         this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -230,7 +238,8 @@ public class AgentMovementHandler : IAgentMovementHandler
             _interpolator,
             puppetMountStateRepairer,
             UpdateRemoteSyntheticMountTurn,
-            QueueMountMovement);
+            QueueMountMovement,
+            replicationValidator);
         this.packetManager.RegisterPacketHandler(_mountMovementApplier);
     }
 
@@ -462,6 +471,83 @@ public class AgentMovementHandler : IAgentMovementHandler
                 mountResult.DeferredCount,
             GetMaximumDeferredAge());
     }
+
+#if DEBUG
+    internal int SendDiagnosticsMovementBurst(int sampleCount)
+    {
+        if (_disposed || Mission.Current == null || sampleCount <= 0)
+            return 0;
+
+        Agent agent = Agent.Main;
+        if (agent == null || !agent.IsActive() || !agent.HasMount ||
+            agent.MountAgent == null || !agent.MountAgent.IsActive() ||
+            !agentRegistry.TryGetAgentInfo(agent, out CoopAgentInfo info) ||
+            !agentRegistry.IsLocallyControlled(agent))
+        {
+            return 0;
+        }
+
+        GetRegisteredMountIdentity(
+            agent,
+            info.MovementScopeId,
+            out ushort mountMovementId,
+            out string mountIdentityScopeId,
+            out Guid mountAgentId);
+        var baseline = new AgentData(
+            agent,
+            mountMovementId,
+            mountIdentityScopeId,
+            mountAgentId);
+        if (baseline.MountData == null) return 0;
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            AgentData sample = baseline;
+            if (i + 1 < sampleCount)
+            {
+                float offset = (i + 1) * 0.001f;
+                bool alternate = (i & 1) != 0;
+                Vec3 look = alternate
+                    ? new Vec3(0f, 1f, 0f)
+                    : new Vec3(1f, 0f, 0f);
+                Vec2 direction = alternate
+                    ? new Vec2(0f, 1f)
+                    : new Vec2(1f, 0f);
+                Vec2 input = alternate
+                    ? new Vec2(0.25f, 0.75f)
+                    : new Vec2(0.75f, 0.25f);
+                float speed = 1f + (i % 5);
+                uint movementFlag = (uint)(alternate
+                    ? Agent.MovementControlFlag.Forward
+                    : Agent.MovementControlFlag.StrafeLeft);
+                AgentMountData mount = baseline.MountData.WithStateForDiagnostics(
+                    baseline.MountData.MountPosition + new Vec3(-offset, offset, 0f),
+                    input,
+                    look,
+                    direction,
+                    speed + 1f,
+                    movementFlag);
+                sample = baseline.WithStateForDiagnostics(
+                    baseline.Position + new Vec3(offset, -offset, 0f),
+                    input,
+                    look,
+                    direction,
+                    mount,
+                    speed,
+                    movementFlag);
+            }
+
+            bool usesCompactId = info.MovementId != 0;
+            client.SendAll(CreateMovementPacket(
+                usesCompactId ? info.MovementScopeId : null,
+                usesCompactId ? new[] { info.MovementId } : null,
+                usesCompactId ? null : new[] { info.AgentId },
+                new[] { sample }));
+        }
+
+        return sampleCount;
+    }
+#endif
 
     private bool ShouldSendMovement(Guid agentId, AgentData current)
     {
@@ -976,12 +1062,20 @@ public class AgentMovementHandler : IAgentMovementHandler
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
         var movement = (MovementPacket)packet;
-        int idCount = movement.AgentIds?.Length ?? movement.AgentGuids?.Length ?? 0;
-        if (idCount == 0 || movement.Agents == null ||
-            movement.Agents.Length != idCount)
+        if (!replicationValidator.TryValidate(movement, out string validationFailure))
         {
+#if DEBUG
+            ClientReplicationDiagnostics.RecordValidationRejection(movement);
+#endif
+            LogRejectedMovement(validationFailure);
             return;
         }
+        int idCount = movement.Agents.Length;
+
+#if DEBUG
+        for (int i = 0; i < idCount; i++)
+            ClientReplicationDiagnostics.RecordAccepted(movement, i);
+#endif
 
         if (_disposed) return;
 
@@ -1036,73 +1130,162 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         using (new AllowedThread())
         {
-            foreach (ReceivedMovement snapshot in snapshots)
+            for (int i = 0; i < snapshots.Count; i++)
             {
-                if (snapshot.IsMount)
+                ReceivedMovement snapshot = snapshots[i];
+                try
                 {
-                    _mountMovementApplier.ApplySnapshot(
-                        snapshot.IdentityScopeId,
-                        snapshot.CompactId,
-                        snapshot.CanonicalId,
-                        snapshot.UsesCompactId,
-                        snapshot.MountData);
-                    continue;
+#if DEBUG
+                    if (ClientReplicationDiagnostics.ConsumeInjectedEntryFailure())
+                        throw new InvalidOperationException("Injected movement entry failure");
+#endif
+                    ApplyMovementSnapshot(snapshot);
+#if DEBUG
+                    RecordProcessed(snapshot);
+#endif
                 }
-
-                CoopAgentInfo agentInfo;
-                bool found = snapshot.UsesCompactId
-                    ? agentRegistry.TryGetAgentInfo(
-                        snapshot.IdentityScopeId, snapshot.CompactId, out agentInfo)
-                    : agentRegistry.TryGetAgentInfo(snapshot.CanonicalId, out agentInfo);
-                if (!found) continue;
-
-                Agent agent = agentInfo.Agent;
-                AgentData data = snapshot.Data;
-
-                // The agent may have become invalid (player left, mission torn down) between queueing
-                // and running; only apply while it is still active in the current mission.
-                if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
-                    continue;
-
-                // Re-check authority ON the game thread: a packet from the previous owner can be queued
-                // behind a host-migration adoption (both are game-thread actions queued from the network
-                // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
-                // stale position/input snapshot the AI then fights.
-                if (agentRegistry.IsLocallyControlled(agent))
-                    continue;
-
-                Agent previousMount = agent.MountAgent;
-                SyncMountState(
-                    agent,
-                    snapshot.IdentityScopeId ?? agentInfo.MovementScopeId,
-                    data);
-                if (previousMount != null && !ReferenceEquals(previousMount, agent.MountAgent))
-                    UpdateRemoteSyntheticMountTurn(previousMount, null);
-
-                // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
-                if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
+                catch (Exception ex)
                 {
-                    puppetMount.Controller = AgentControllerType.None;
-                    puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
-                }
-
-                data.Apply(agent);
-                if (data.MountData != null && agent.MountAgent is Agent remoteMount)
-                    UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
-
-                // Position is reconciled per-frame by the interpolator (smoother than a per-packet
-                // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
-                if (agent.HasMount && data.MountData != null)
-                {
-                    _interpolator.Forget(agent.MountAgent);
-                    _interpolator.SetMountedRiderTarget(agent, data);
-                }
-                else
-                {
-                    _interpolator.SetRiderTarget(agent, data);
+#if DEBUG
+                    RecordFailed(snapshot);
+#endif
+                    if (replicationValidator.ShouldLogApplicationFailure(
+                            out int suppressedFailures))
+                    {
+                        Logger.Warning(
+                            ex,
+                            "Failed to apply movement entry {EntryIndex}; continuing the packet " +
+                            "(suppressed since last log: {Suppressed})",
+                            i,
+                            suppressedFailures);
+                    }
                 }
             }
         }
+    }
+
+    private void ApplyMovementSnapshot(ReceivedMovement snapshot)
+    {
+        if (snapshot.IsMount)
+        {
+            _mountMovementApplier.ApplySnapshot(
+                snapshot.IdentityScopeId,
+                snapshot.CompactId,
+                snapshot.CanonicalId,
+                snapshot.UsesCompactId,
+                snapshot.MountData);
+            return;
+        }
+
+        CoopAgentInfo agentInfo;
+        bool found = snapshot.UsesCompactId
+            ? agentRegistry.TryGetAgentInfo(
+                snapshot.IdentityScopeId, snapshot.CompactId, out agentInfo)
+            : agentRegistry.TryGetAgentInfo(snapshot.CanonicalId, out agentInfo);
+        if (!found) return;
+
+        Agent agent = agentInfo.Agent;
+        AgentData data = snapshot.Data;
+
+        // The agent may have become invalid (player left, mission torn down) between queueing
+        // and running; only apply while it is still active in the current mission.
+        if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
+            return;
+
+        // Re-check authority ON the game thread: a packet from the previous owner can be queued
+        // behind a host-migration adoption and must not overwrite the newly local agent.
+        if (agentRegistry.IsLocallyControlled(agent))
+            return;
+
+#if DEBUG
+        ClientReplicationDiagnostics.RecordNativeApplication(
+            snapshot.IdentityScopeId,
+            snapshot.CompactId,
+            snapshot.CanonicalId,
+            snapshot.UsesCompactId,
+            data);
+#endif
+        Agent previousMount = agent.MountAgent;
+        SyncMountState(
+            agent,
+            snapshot.IdentityScopeId ?? agentInfo.MovementScopeId,
+            data);
+        if (previousMount != null && !ReferenceEquals(previousMount, agent.MountAgent))
+            UpdateRemoteSyntheticMountTurn(previousMount, null);
+
+        if (agent.MountAgent is Agent puppetMount &&
+            puppetMount.Controller != AgentControllerType.None)
+        {
+            puppetMount.Controller = AgentControllerType.None;
+            puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
+        }
+
+        data.Apply(agent);
+        if (data.MountData != null && agent.MountAgent is Agent remoteMount)
+            UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+
+        if (agent.HasMount && data.MountData != null)
+        {
+            _interpolator.Forget(agent.MountAgent);
+            _interpolator.SetMountedRiderTarget(agent, data);
+        }
+        else
+        {
+            _interpolator.SetRiderTarget(agent, data);
+        }
+    }
+
+#if DEBUG
+    private static void RecordProcessed(ReceivedMovement snapshot)
+    {
+        if (snapshot.IsMount)
+        {
+            ClientReplicationDiagnostics.RecordProcessed(
+                snapshot.IdentityScopeId,
+                snapshot.CompactId,
+                snapshot.CanonicalId,
+                snapshot.UsesCompactId,
+                snapshot.MountData);
+            return;
+        }
+
+        ClientReplicationDiagnostics.RecordProcessed(
+            snapshot.IdentityScopeId,
+            snapshot.CompactId,
+            snapshot.CanonicalId,
+            snapshot.UsesCompactId,
+            snapshot.Data);
+    }
+
+    private static void RecordFailed(ReceivedMovement snapshot)
+    {
+        if (snapshot.IsMount)
+        {
+            ClientReplicationDiagnostics.RecordFailed(
+                snapshot.IdentityScopeId,
+                snapshot.CompactId,
+                snapshot.CanonicalId,
+                snapshot.UsesCompactId,
+                snapshot.MountData);
+            return;
+        }
+
+        ClientReplicationDiagnostics.RecordFailed(
+            snapshot.IdentityScopeId,
+            snapshot.CompactId,
+            snapshot.CanonicalId,
+            snapshot.UsesCompactId,
+            snapshot.Data);
+    }
+#endif
+
+    private void LogRejectedMovement(string failure)
+    {
+        if (!replicationValidator.ShouldLogRejection(out int suppressed)) return;
+        Logger.Warning(
+            "Discarding invalid movement packet: {Failure} (suppressed since last log: {Suppressed})",
+            failure,
+            suppressed);
     }
 
     // [Game thread] Replicate the owner's mount/dismount onto its puppet. The per-tick AgentData reports

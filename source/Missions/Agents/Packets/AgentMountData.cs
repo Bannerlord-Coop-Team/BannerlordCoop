@@ -94,6 +94,57 @@ namespace Missions.Agents.Packets
         {
         }
 
+#if DEBUG
+        internal AgentMountData WithStateForDiagnostics(
+            Vec3 position,
+            Vec2 inputVector,
+            Vec3 lookDirection,
+            Vec2 movementDirection,
+            float speed,
+            uint movementFlag)
+        {
+            return new AgentMountData(
+                this,
+                position,
+                inputVector,
+                lookDirection,
+                movementDirection,
+                speed,
+                movementFlag);
+        }
+
+        private AgentMountData(
+            AgentMountData source,
+            Vec3 position,
+            Vec2 inputVector,
+            Vec3 lookDirection,
+            Vec2 movementDirection,
+            float speed,
+            uint movementFlag)
+        {
+            MountInputVector = inputVector;
+            MountAction1Flag = source.MountAction1Flag;
+            MountAction1Progress = source.MountAction1Progress;
+            MountAction1Index = source.MountAction1Index;
+            MountLookDirection = lookDirection;
+            MountMovementDirection = movementDirection;
+            MountPosition = position;
+            MountMovementId = source.MountMovementId;
+            MountAction0Flag = source.MountAction0Flag;
+            MountAction0Progress = source.MountAction0Progress;
+            MountAction0Index = source.MountAction0Index;
+            MountSpeed = speed;
+            MountIdentityScopeId = source.MountIdentityScopeId;
+            MountAgentId = source.MountAgentId;
+            MountMovementFlag = movementFlag;
+            MountAction0Speed = source.MountAction0Speed;
+            MountAction0IsLocomotion = source.MountAction0IsLocomotion;
+            MountAction0TurnDirection = source.MountAction0TurnDirection;
+            MountAction0TurnActionIndexWire = source.MountAction0TurnActionIndexWire;
+            MountAction0IsSyntheticTurn = source.MountAction0IsSyntheticTurn;
+        }
+#endif
+
         public void ApplyMount(Agent mountAgent)
         {
             // NOTE: mount position is NOT applied here — it is reconciled per-frame by AgentPositionInterpolator

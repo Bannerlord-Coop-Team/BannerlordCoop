@@ -2,6 +2,7 @@
 using System.Runtime.CompilerServices;
 using Common.Util;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace E2E.Tests.Environment.MockEngine;
@@ -122,6 +123,7 @@ public sealed class MockMission
             Index = nextIndex++,
             Controller = AgentControllerType.None,
             IsMount = true,
+            LookDirection = new Vec3(0f, 1f, 0f),
             Mission = Shell,
         };
         AgentMirror.Bind(horse, mirror);

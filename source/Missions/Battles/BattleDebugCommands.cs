@@ -2,6 +2,8 @@
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
+using Missions.Agents;
+using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 #if DEBUG
 using Missions.Diagnostics;
@@ -19,6 +21,7 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
+using MovementAgentData = Missions.Agents.Packets.AgentData;
 
 namespace Missions.Battles;
 
@@ -100,6 +103,120 @@ internal static class BattleDebugCommands
     private static Guid wieldTestAgentId;
     private static EquipmentIndex wieldTestOriginalMainHand;
     private static bool wieldTestActive;
+
+    [CommandLineArgumentFunction("movement_resilience", "coop.debug.battle")]
+    public static string MovementResilience(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.battle.movement_resilience " +
+                   "<start|snapshot|stop|ready|burst|invalid|isolate>";
+        }
+
+        if (ModInformation.IsServer)
+            return "movement_resilience must be run on a client";
+
+        string operation = args[0].ToLowerInvariant();
+        if (operation == "start")
+        {
+            ClientReplicationDiagnostics.Start();
+            return "MOVEMENT_RESILIENCE " +
+                   ClientReplicationDiagnostics.Snapshot(stop: false);
+        }
+        if (operation == "snapshot" || operation == "stop")
+        {
+            return "MOVEMENT_RESILIENCE " +
+                   ClientReplicationDiagnostics.Snapshot(
+                       stop: operation == "stop");
+        }
+
+        Mission mission = Mission.Current;
+        CoopBattleController controller =
+            mission?.GetMissionBehavior<CoopBattleController>();
+        if (mission == null || controller == null)
+            return "No active coop battle mission";
+        if (!(controller.DebugMovementHandler is AgentMovementHandler handler))
+            return "Movement handler is unavailable";
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+            return "Network agent registry is unavailable";
+
+        CoopAgentInfo[] remoteAgents = registry.GetControllerIds()
+            .SelectMany(registry.GetAgents)
+            .Where(info =>
+                info.Agent != null &&
+                info.Agent.IsHuman &&
+                info.Agent.IsActive() &&
+                !registry.IsLocallyControlled(info.Agent))
+            .OrderBy(info => info.AgentId)
+            .ToArray();
+
+        if (operation == "ready")
+        {
+            Agent local = Agent.Main;
+            bool localReady = local != null && local.IsActive() &&
+                registry.TryGetAgentInfo(local, out _) &&
+                registry.IsLocallyControlled(local);
+            bool mounted = localReady && local.HasMount &&
+                local.MountAgent != null && local.MountAgent.IsActive();
+            return $"MOVEMENT_RESILIENCE_READY localAgent={localReady} " +
+                   $"mounted={mounted} remoteHumans={remoteAgents.Length}";
+        }
+
+        if (operation == "burst")
+        {
+            const int sampleCount = 4500;
+            int emitted = handler.SendDiagnosticsMovementBurst(sampleCount);
+            return $"MOVEMENT_RESILIENCE_BURST emitted={emitted} requested={sampleCount}";
+        }
+
+        if (operation == "invalid")
+        {
+            if (remoteAgents.Length == 0)
+                return "No active remote human agent is available";
+
+            CoopAgentInfo target = remoteAgents[0];
+            MovementAgentData baseline = new MovementAgentData(target.Agent);
+            MovementAgentData invalid = baseline.WithStateForDiagnostics(
+                new Vec3(float.NaN, 0f, 0f),
+                baseline.InputVector,
+                baseline.LookDirection,
+                baseline.MovementDirection,
+                baseline.MountData,
+                baseline.Speed,
+                baseline.MovementFlag);
+            var invalidPacket = new MovementPacket(
+                new[] { target.AgentId },
+                new[] { invalid });
+            ClientReplicationDiagnostics.ArmInvalidProbe(invalidPacket);
+            handler.HandlePacket(null, invalidPacket);
+            return "MOVEMENT_RESILIENCE_INVALID " +
+                   ClientReplicationDiagnostics.Snapshot(stop: false);
+        }
+
+        if (operation == "isolate")
+        {
+            if (remoteAgents.Length < 2)
+                return "At least two active remote human agents are required";
+
+            CoopAgentInfo[] targets = remoteAgents.Take(2).ToArray();
+            var data = new[]
+            {
+                new MovementAgentData(targets[0].Agent),
+                new MovementAgentData(targets[1].Agent),
+            };
+            ClientReplicationDiagnostics.ArmSingleEntryFailure();
+            handler.HandlePacket(
+                null,
+                new MovementPacket(
+                    targets.Select(info => info.AgentId).ToArray(),
+                    data));
+            return "MOVEMENT_RESILIENCE_ISOLATED " +
+                   ClientReplicationDiagnostics.Snapshot(stop: false);
+        }
+
+        return "Usage: coop.debug.battle.movement_resilience " +
+               "<start|snapshot|stop|ready|burst|invalid|isolate>";
+    }
 
     [CommandLineArgumentFunction("action_performance", "coop.debug.battle")]
     public static string ActionPerformance(List<string> args)

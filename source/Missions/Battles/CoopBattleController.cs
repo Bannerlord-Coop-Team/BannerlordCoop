@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Agents;
+using Missions.Agents.Handlers;
 using Missions.Data;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -58,6 +59,11 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
+
+#if DEBUG
+    internal IAgentMovementHandler DebugMovementHandler =>
+        coopMissionComponent.AgentMovementHandler;
+#endif
 
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;

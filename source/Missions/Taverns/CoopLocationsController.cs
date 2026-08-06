@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -9,6 +9,7 @@ using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Missions.Data;
+using Missions.Agents.Handlers;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -26,6 +27,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private static readonly ILogger Logger = LogManager.GetLogger<CoopLocationsController>();
     private readonly INetwork relayNetwork;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IAgentReplicationValidator replicationValidator;
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -36,11 +38,13 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         IControllerIdProvider controllerIdProvider,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
-        ICoopMissionComponent coopMissionComponent)
+        ICoopMissionComponent coopMissionComponent,
+        IAgentReplicationValidator replicationValidator)
         : base(network, messageBroker, objectManager, coopMissionComponent)
     {
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;
+        this.replicationValidator = replicationValidator;
         //this.boardGameManager = boardGameManager;
 
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_LeaveMission);
@@ -51,7 +55,6 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     {
         messageBroker.Unsubscribe<NetworkMissionLeft>(Handle_LeaveMission);
         messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
-
         base.Dispose();
     }
 
@@ -244,6 +247,12 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
     protected override void HandleJoinInfo(NetPeer netPeer, NetworkMissionJoinInfo joinInfo)
     {
+        if (!replicationValidator.TryValidate(joinInfo, out string validationFailure))
+        {
+            LogRejectedJoin(validationFailure);
+            return;
+        }
+
         // Spawning needs the interior mission fully set up (player agent + teams). On a rejoin the join
         // info beats the mission setup, so buffer it and drain once we are ready (TryRegisterLocalAgent).
         // Re-check readiness after enqueuing to close the race with the main thread flipping it.
@@ -256,6 +265,16 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         }
 
         ProcessJoinInfo(netPeer, joinInfo);
+    }
+
+    private void LogRejectedJoin(string failure)
+    {
+        if (!replicationValidator.ShouldLogRejection(out int suppressed)) return;
+        Logger.Warning(
+            "[LocationSync] Discarding invalid join info: {Failure} " +
+            "(suppressed since last log: {Suppressed})",
+            failure,
+            suppressed);
     }
 
     private void ProcessJoinInfo(NetPeer netPeer, NetworkMissionJoinInfo joinInfo)

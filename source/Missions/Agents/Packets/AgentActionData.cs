@@ -397,7 +397,7 @@ namespace Missions.Agents.Packets
             movementFlags &= ~DefendMovementFlagsMask;
             movementFlags |= defendFlags;
 
-            MovementFlag = (uint)movementFlags;
+            MovementFlag = (uint)GetDefendMovementFlags(movementFlags);
             EventFlag = (uint)agent.EventControlFlags;
             CrouchMode = agent.CrouchMode;
             GuardState = ToWireGuardState(guardMode);

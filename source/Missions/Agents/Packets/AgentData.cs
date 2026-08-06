@@ -73,6 +73,45 @@ namespace Missions.Agents.Packets
         {
         }
 
+#if DEBUG
+        internal AgentData WithStateForDiagnostics(
+            Vec3 position,
+            Vec2 inputVector,
+            Vec3 lookDirection,
+            Vec2 movementDirection,
+            AgentMountData mountData,
+            float speed,
+            uint movementFlag)
+        {
+            return new AgentData(
+                position,
+                inputVector,
+                lookDirection,
+                movementDirection,
+                mountData,
+                speed,
+                movementFlag);
+        }
+
+        private AgentData(
+            Vec3 position,
+            Vec2 inputVector,
+            Vec3 lookDirection,
+            Vec2 movementDirection,
+            AgentMountData mountData,
+            float speed,
+            uint movementFlag)
+        {
+            Position = position;
+            InputVector = inputVector;
+            LookDirection = lookDirection;
+            MovementDirection = movementDirection;
+            MountData = mountData;
+            Speed = speed;
+            MovementFlag = movementFlag;
+        }
+#endif
+
         public void Apply(Agent agent)
         {
             // if the player is dead, dont sync anything

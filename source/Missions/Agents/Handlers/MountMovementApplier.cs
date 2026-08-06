@@ -1,7 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.PacketHandlers;
 using LiteNetLib;
 using Missions.Agents.Packets;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
+using Serilog;
 using System;
 using TaleWorlds.MountAndBlade;
 using AgentControllerType = TaleWorlds.Core.AgentControllerType;
@@ -18,24 +23,29 @@ namespace Missions.Agents.Handlers;
 /// </summary>
 public class MountMovementApplier : IPacketHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<MountMovementApplier>();
+
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IAgentPositionInterpolator interpolator;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Action<Agent, AgentMountData> updateSyntheticTurn;
     private readonly Action<MountMovementPacket> queueMovement;
+    private readonly IAgentReplicationValidator replicationValidator;
 
     public MountMovementApplier(
         INetworkAgentRegistry agentRegistry,
         IAgentPositionInterpolator interpolator,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         Action<Agent, AgentMountData> updateSyntheticTurn,
-        Action<MountMovementPacket> queueMovement)
+        Action<MountMovementPacket> queueMovement,
+        IAgentReplicationValidator replicationValidator)
     {
         this.agentRegistry = agentRegistry;
         this.interpolator = interpolator;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
         this.updateSyntheticTurn = updateSyntheticTurn;
         this.queueMovement = queueMovement;
+        this.replicationValidator = replicationValidator;
     }
 
     public PacketType PacketType => PacketType.MountMovement;
@@ -46,7 +56,29 @@ public class MountMovementApplier : IPacketHandler
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
-        queueMovement((MountMovementPacket)packet);
+        var movement = (MountMovementPacket)packet;
+        if (!replicationValidator.TryValidate(movement, out string validationFailure))
+        {
+#if DEBUG
+            ClientReplicationDiagnostics.RecordValidationRejection();
+#endif
+            if (replicationValidator.ShouldLogRejection(out int suppressed))
+            {
+                Logger.Warning(
+                    "Discarding invalid mount movement packet: {Failure} " +
+                    "(suppressed since last log: {Suppressed})",
+                    validationFailure,
+                    suppressed);
+            }
+            return;
+        }
+
+        int idCount = movement.Mounts.Length;
+#if DEBUG
+        for (int i = 0; i < idCount; i++)
+            ClientReplicationDiagnostics.RecordAccepted(movement, i);
+#endif
+        queueMovement(movement);
     }
 
     internal void ApplySnapshot(
@@ -58,7 +90,8 @@ public class MountMovementApplier : IPacketHandler
     {
         CoopAgentInfo mountInfo;
         bool found = usesCompactId
-            ? agentRegistry.TryGetAgentInfo(identityScopeId, compactId, out mountInfo)
+            ? agentRegistry.TryGetAgentInfo(
+                identityScopeId, compactId, out mountInfo)
             : agentRegistry.TryGetAgentInfo(canonicalId, out mountInfo);
         if (!found) return;
 
@@ -68,8 +101,6 @@ public class MountMovementApplier : IPacketHandler
         if (agentRegistry.IsLocallyControlled(horse))
             return;
 
-        // A stale loose-horse packet can arrive after a rider packet remounts it. Drop the direct target so
-        // the rider and masterless-mount interpolators cannot fight.
         if (horse.RiderAgent is Agent rider && rider.IsActive())
         {
             interpolator.Forget(horse);

@@ -1,13 +1,18 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Entity;
 using Missions;
 using Missions.Agents;
+using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
+using Moq;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -2194,6 +2199,130 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.Equal(0, horseMirror.SetTargetPositionAndDirectionCalls);
             Assert.Equal(0, horseMirror.TeleportToPositionCalls);
         });
+    }
+
+    [Fact]
+    public void MountMovementApplier_PreservesEveryAcceptedIntermediarySampleInOrder()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            Guid horseId = Guid.NewGuid();
+            Agent puppetHorse = mock.SpawnMount();
+            Assert.True(registry.TryRegisterAgent("owner", horseId, puppetHorse));
+
+            Agent sourceHorse = mock.SpawnMount();
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceMirror));
+            sourceMirror.Position = new Vec3(1f, 0f, 0f);
+            sourceMirror.RealGlobalVelocity = new Vec3(2f, 0f, 0f);
+            var first = new AgentMountData(sourceHorse, horseId);
+            sourceMirror.Position = new Vec3(3f, 0f, 0f);
+            sourceMirror.RealGlobalVelocity = new Vec3(4f, 0f, 0f);
+            var second = new AgentMountData(sourceHorse, horseId);
+
+            var observed = new List<(Vec3 Position, float Speed)>();
+            var interpolator = new Mock<IAgentPositionInterpolator>();
+            interpolator
+                .Setup(x => x.SetMountTarget(
+                    It.IsAny<Agent>(),
+                    It.IsAny<AgentMountData>()))
+                .Callback<Agent, AgentMountData>((_, data) =>
+                    observed.Add((data.MountPosition, data.MountSpeed)));
+            using var handler = CreateAgentMovementHandler(
+                peer,
+                registry,
+                interpolator.Object);
+            var applier = handler.MountMovementApplier;
+
+            applier.HandlePacket(
+                null,
+                new MountMovementPacket(new[] { horseId }, new[] { first }));
+            applier.HandlePacket(
+                null,
+                new MountMovementPacket(new[] { horseId }, new[] { second }));
+
+            Assert.Equal(2, observed.Count);
+            Assert.Equal(1f, observed[0].Position.X);
+            Assert.Equal(2f, observed[0].Speed);
+            Assert.Equal(3f, observed[1].Position.X);
+            Assert.Equal(4f, observed[1].Speed);
+        });
+    }
+
+    [Fact]
+    public void MountMovementApplier_ContinuesAfterOneEntryThrows()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            Guid firstId = Guid.NewGuid();
+            Guid secondId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("owner", firstId, mock.SpawnMount()));
+            Assert.True(registry.TryRegisterAgent("owner", secondId, mock.SpawnMount()));
+
+            Agent firstSource = mock.SpawnMount();
+            Agent secondSource = mock.SpawnMount();
+            var first = new AgentMountData(firstSource, firstId);
+            var second = new AgentMountData(secondSource, secondId);
+            int calls = 0;
+            var successful = new List<Guid>();
+            var interpolator = new Mock<IAgentPositionInterpolator>();
+            interpolator
+                .Setup(x => x.SetMountTarget(
+                    It.IsAny<Agent>(),
+                    It.IsAny<AgentMountData>()))
+                .Callback<Agent, AgentMountData>((_, data) =>
+                {
+                    calls++;
+                    if (calls == 1)
+                        throw new InvalidOperationException("isolated test failure");
+                    successful.Add(data.MountAgentId);
+                });
+            using var handler = CreateAgentMovementHandler(
+                peer,
+                registry,
+                interpolator.Object);
+            var applier = handler.MountMovementApplier;
+
+            applier.HandlePacket(
+                null,
+                new MountMovementPacket(
+                    new[] { firstId, secondId },
+                    new[] { first, second }));
+
+            Assert.Equal(2, calls);
+            Assert.Equal(new[] { secondId }, successful);
+        });
+    }
+
+    private static AgentMovementHandler CreateAgentMovementHandler(
+        EnvironmentInstance peer,
+        INetworkAgentRegistry registry,
+        IAgentPositionInterpolator interpolator)
+    {
+        peer.Resolve<ICoopMissionComponent>().AgentMovementHandler.Dispose();
+        return new AgentMovementHandler(
+            peer.Resolve<IBattleNetwork>(),
+            peer.Resolve<IPacketManager>(),
+            peer.Resolve<IMessageBroker>(),
+            registry,
+            peer.Resolve<IControllerIdProvider>(),
+            peer.Resolve<IAgentEquipmentApplier>(),
+            peer.Resolve<IMovementBatchSender>(),
+            peer.Resolve<IPuppetMountStateRepairer>(),
+            peer.Resolve<IAgentVisualActionAccessor>(),
+            peer.Resolve<IAgentReplicationValidator>(),
+            interpolator);
     }
 
     private static Agent SpawnRider(MockMission mock)

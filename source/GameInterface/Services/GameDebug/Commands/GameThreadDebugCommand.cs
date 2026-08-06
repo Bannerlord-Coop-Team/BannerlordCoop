@@ -1,5 +1,6 @@
 ﻿using Common;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -66,4 +67,33 @@ public class GameThreadDebugCommand
         Thread.Sleep(milliseconds);
         return $"Stalled the server game thread for {milliseconds} ms";
     }
+
+#if DEBUG
+    [CommandLineArgumentFunction("stall_client", "coop.debug.gamethread")]
+    public static string StallClient(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "gamethread.stall_client must be run on a client";
+
+        if ((args.Count != 1 && args.Count != 2) ||
+            !int.TryParse(args[0], out int milliseconds) ||
+            milliseconds < 1 ||
+            milliseconds > 2500 ||
+            (args.Count == 2 && !Regex.IsMatch(
+                args[1],
+                @"^Local\\CoopMovementStall-[A-Za-z0-9_-]{1,64}$")))
+        {
+            return "Usage: coop.debug.gamethread.stall_client " +
+                   "<milliseconds from 1 to 2500> [start-event]";
+        }
+
+        if (args.Count == 2)
+        {
+            using (EventWaitHandle started = EventWaitHandle.OpenExisting(args[1]))
+                started.Set();
+        }
+        Thread.Sleep(milliseconds);
+        return $"Stalled the client game thread for {milliseconds} ms";
+    }
+#endif
 }
