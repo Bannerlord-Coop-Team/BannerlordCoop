@@ -54,7 +54,9 @@ public class HeroDebugCommand
 
         }
 
-        return stringBuilder.ToString();
+        return stringBuilder.Length == 0 && string.IsNullOrEmpty(namePrefix) == false
+            ? $"No hero with a name starting with '{namePrefix}' was found."
+            : stringBuilder.ToString();
     }
 
     internal static bool NameStartsWithPrefix(string heroName, string prefix)
