@@ -3,6 +3,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
@@ -179,7 +180,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("host-controller", ownerControllerId);
         });
 
@@ -220,7 +221,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
             Assert.True(owner.Issue.StartIssueWithQuest());
             joiningPeerQuest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(owner.Issue.IssueQuest);
 
-            Assert.False(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out var recordedOwner) &&
+            Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner) &&
                 OtherClient.Resolve<IControllerIdProvider>().ControllerId == recordedOwner);
 
             Assert.True(OtherClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -264,7 +265,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
             // The server still gets a real Quest object here even though it never itself accepted - see
             // VillageNeedsToolsIssueInterface.EnsureServerQuestMirror.
             Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(owner.Issue.IssueQuest);
-            Assert.True(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("player-A", ownerControllerId);
         });
 
@@ -287,7 +288,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 Assert.Null(owner.Issue.IssueQuest);
                 Assert.True(owner.Issue.IsSolvingWithQuest);
-                Assert.True(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out var ownerControllerId));
+                Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
                 Assert.Equal("player-A", ownerControllerId);
             });
         }
@@ -312,7 +313,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(owner.Issue.IsOngoingWithoutQuest);
-            Assert.False(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out _));
+            Assert.False(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out _));
         });
     }
 
@@ -482,7 +483,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("player-A", ownerControllerId);
         });
 
@@ -540,7 +541,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(owner.Issue.IsSolvingWithAlternative);
-            Assert.False(VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(owner));
+            Assert.False(IssueOwnershipRegistry.IsLocalPeerOwner(owner));
 
             OnHourlyTickMethod.Invoke(null, null);
 

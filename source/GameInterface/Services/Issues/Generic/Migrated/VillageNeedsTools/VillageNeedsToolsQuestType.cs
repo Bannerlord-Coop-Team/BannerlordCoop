@@ -67,7 +67,7 @@ internal static class VillageNeedsToolsQuestType
     {
         if (owner?.Issue is not Issue issue) return false;
         if (!issue.IsSolvingWithAlternative || !issue.AlternativeSolutionReturnTimeForTroops.IsPast) return false;
-        if (!VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(owner)) return false;
+        if (!IssueOwnershipRegistry.IsLocalPeerOwner(owner)) return false;
 
         // Seeds the reason IssueFinalizedPatches.Postfix picks up when IssueFinalized() cascades below.
         global::GameInterface.Services.Issues.Patches.IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = VillageIssueFinalizeReason.AlternativeSolutionSuccess;

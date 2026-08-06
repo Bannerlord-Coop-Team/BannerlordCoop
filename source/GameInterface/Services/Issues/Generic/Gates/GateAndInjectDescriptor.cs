@@ -18,7 +18,7 @@ public sealed record GateAndInjectDescriptor<TQuest>(
 {
     public bool Prefix(TQuest instance)
     {
-        if (!VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(QuestGiverSelector(instance))) return false;
+        if (!IssueOwnershipRegistry.IsLocalPeerOwner(QuestGiverSelector(instance))) return false;
         // Must run before returning true, so its message enqueues before the vanilla body's own trailing side
         // effect (message ordering here depends on all messages being ReliableOrdered).
         if (InjectionCondition == null || InjectionCondition(instance)) PreBodyInjection(instance);

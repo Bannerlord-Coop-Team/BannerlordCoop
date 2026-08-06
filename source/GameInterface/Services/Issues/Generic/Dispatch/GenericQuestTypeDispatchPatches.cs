@@ -74,7 +74,7 @@ internal class GenericQuestTypeAlternativeSolutionOwnershipGatePatch
     {
         if (!QuestTypeRegistry.IsRegistered(__instance?.GetType())) return true;
 
-        return VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(__instance.IssueOwner)
+        return IssueOwnershipRegistry.IsLocalPeerOwner(__instance.IssueOwner)
             || AlternativeSolutionCompletionAuthorityGuard.IsActive;
     }
 }

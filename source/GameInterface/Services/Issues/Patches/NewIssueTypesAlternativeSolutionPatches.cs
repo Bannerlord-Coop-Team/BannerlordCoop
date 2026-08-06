@@ -37,7 +37,7 @@ internal class NewIssueTypesAlternativeSolutionOwnershipGatePatch
     {
         if (!GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Contains(__instance.GetType())) return true;
 
-        return VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(__instance.IssueOwner)
+        return IssueOwnershipRegistry.IsLocalPeerOwner(__instance.IssueOwner)
             || AlternativeSolutionCompletionAuthorityGuard.IsActive;
     }
 }
@@ -238,7 +238,7 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
         foreach (var kvp in snapshot)
         {
             if (!GenericAcceptMirrorIssueTypes.AlternativeSolutionMirrorEligible.Contains(kvp.Value.GetType())) continue;
-            if (!VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(kvp.Key)) continue;
+            if (!IssueOwnershipRegistry.IsLocalPeerOwner(kvp.Key)) continue;
 
             TryTriggerOwnedAlternativeSolutionCompletion(kvp.Value);
         }

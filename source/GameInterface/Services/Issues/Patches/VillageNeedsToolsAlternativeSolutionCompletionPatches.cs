@@ -19,7 +19,7 @@ internal class VillageNeedsToolsAlternativeSolutionOwnershipGatePatch
     {
         if (__instance is not VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue) return true;
 
-        return VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(__instance.IssueOwner);
+        return IssueOwnershipRegistry.IsLocalPeerOwner(__instance.IssueOwner);
     }
 }
 

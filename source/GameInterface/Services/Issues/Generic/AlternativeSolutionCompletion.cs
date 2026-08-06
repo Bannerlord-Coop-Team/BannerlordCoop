@@ -36,7 +36,7 @@ public static class AlternativeSolutionCompletionRunner
     {
         if (owner?.Issue is not IssueBase issue) return false;
         if (!issue.IsSolvingWithAlternative || !issue.AlternativeSolutionReturnTimeForTroops.IsPast) return false;
-        if (!VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(owner)) return false;
+        if (!IssueOwnershipRegistry.IsLocalPeerOwner(owner)) return false;
 
         if (ModInformation.IsServer)
         {

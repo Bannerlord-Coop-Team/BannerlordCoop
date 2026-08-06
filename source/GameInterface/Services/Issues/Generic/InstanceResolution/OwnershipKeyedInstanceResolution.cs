@@ -17,5 +17,5 @@ internal sealed class OwnershipKeyedInstanceResolution : IOwnershipKeyedInstance
         ResolveFrom(Campaign.Current.QuestManager.Quests.OfType<TQuest>());
 
     internal static TQuest ResolveFrom<TQuest>(IEnumerable<TQuest> candidates) where TQuest : QuestBase =>
-        candidates.FirstOrDefault(q => q.IsOngoing && VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(q.QuestGiver));
+        candidates.FirstOrDefault(q => q.IsOngoing && IssueOwnershipRegistry.IsLocalPeerOwner(q.QuestGiver));
 }

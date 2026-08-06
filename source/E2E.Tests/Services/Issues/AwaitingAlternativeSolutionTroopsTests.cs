@@ -3,6 +3,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
@@ -160,7 +161,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     /// stand up a real battle) at the moment <c>TryToMakeTroopsReturn</c> is invoked.
     ///
     /// 1. A CLIENT (player-A) genuinely accepts the alternative solution for real - the server's own
-    ///    <see cref="VillageNeedsToolsIssueOwnership"/> is populated from that same genuine accept broadcast,
+    ///    <see cref="IssueOwnershipRegistry"/> is populated from that same genuine accept broadcast,
     ///    exactly like every other issue type in this project.
     /// 2. The SAME CLIENT drives the exact real, Harmony-patched, PUBLIC production entry point
     ///    (<c>IssueManager.TryToMakeTroopsReturn</c>) that <c>CompleteIssueWithAlternativeSolution</c> calls
@@ -222,7 +223,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out var ownerControllerId));
+            Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal(controllerId, ownerControllerId);
         });
 
@@ -297,7 +298,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
 
         // 4. "Reconnect": MobileParty.MainParty is present again on the owner's own client. NOTE:
         // AwaitingAlternativeSolutionTroopsRegistry (like every other bare "internal static class ...Registry"
-        // in this project - VillageNeedsToolsIssueOwnership, LordsNeedsTutorQuestFlags, etc.) is a single
+        // in this project - IssueOwnershipRegistry, LordsNeedsTutorQuestFlags, etc.) is a single
         // process-wide static, not swapped per EnvironmentInstance the way Campaign.Current/ModInformation.IsServer
         // are - so step 3's save+reload above already proves the ONLY genuinely separate thing worth proving
         // (the entry survives a real SyncData round-trip); re-wiping and re-loading it again here would only
@@ -396,7 +397,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
-            VillageNeedsToolsIssueOwnership.SetOwner(owner, controllerId);
+            IssueOwnershipRegistry.SetOwner(owner, controllerId);
 
             using (new AllowedThread())
             {

@@ -1,6 +1,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using Helpers;
@@ -22,10 +23,10 @@ namespace GameInterface.Services.Issues.Patches;
 /// <see cref="TroopRoster"/> field, which permanently strands a disconnected owner's troops (nothing routes
 /// them back on reconnect) and can duplicate them across every connected client if that field is ever non-empty.
 /// Fixed via <see cref="AwaitingAlternativeSolutionTroopsRegistry"/>, keyed by the owning peer's own
-/// <c>ControllerId</c> (resolved via <see cref="VillageNeedsToolsIssueOwnership"/>) instead of Hero - by the
+/// <c>ControllerId</c> (resolved via <see cref="IssueOwnershipRegistry"/>) instead of Hero - by the
 /// time troops reach this point, <c>IssueFinalized()</c> has already cleared the issue's own state, so the
 /// connection identity is the only durable key left. Persisted alongside
-/// <see cref="VillageNeedsToolsIssueOwnership"/>'s own save record - see
+/// <see cref="IssueOwnershipRegistry"/>'s own save record - see
 /// <see cref="AwaitingAlternativeSolutionTroopsPersistencePatches"/>.
 ///
 /// Also fixes a separate dedicated-host NRE reachable through the same entry point: vanilla's
@@ -53,13 +54,13 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         bool modelGatePasses = IsLocalMainHeroSafelyAvailable() && MobileParty.MainParty != null
             && Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution();
 
-        if (VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(issue.IssueOwner) && modelGatePasses)
+        if (IssueOwnershipRegistry.IsLocalPeerOwner(issue.IssueOwner) && modelGatePasses)
         {
             MakeAlternativeTroopsReturn(troops);
             return false;
         }
 
-        if (!VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(issue.IssueOwner, out var ownerControllerId))
+        if (!IssueOwnershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var ownerControllerId))
         {
             Logger.Error(
                 "TryToMakeTroopsReturn: no recorded owner ControllerId for issue owner {IssueOwner} - these " +

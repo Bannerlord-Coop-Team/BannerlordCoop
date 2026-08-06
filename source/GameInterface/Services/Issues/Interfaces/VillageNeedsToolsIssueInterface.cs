@@ -1,4 +1,5 @@
 using Common.Util;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using System;
@@ -8,32 +9,21 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Interfaces;
 
-/// <summary>Shared accept-mirror/finalize surface used by ~30 issue types (see <see cref="GenericAcceptMirrorIssueTypes"/>), not exclusive to VillageNeedsToolsIssue despite the name.</summary>
 public interface IVillageNeedsToolsIssueInterface : IGameAbstraction
 {
-    /// <summary>Mirrors a finalize broadcast under <see cref="AllowedThread"/>; no-op if the hero has no issue.</summary>
     void FinalizeMirror(Hero owner, VillageIssueFinalizeReason reason);
 
-    /// <summary>Force-writes the issue state to SolvingWithQuestSolution on a non-accepting peer; deliberately leaves <c>IssueQuest</c> null (safe - see <see cref="EnsureServerQuestMirror"/> for the one exception). No-op if not <c>IsOngoingWithoutQuest</c>.</summary>
     void MirrorQuestAccepted(Hero owner);
 
-    /// <summary>Server-only: builds a real Quest even when the server isn't the recorded owner, since it still needs one for party-spawn/battle arbitration on the owner's behalf. No-op if not <c>IsOngoingWithoutQuest</c> or not mirror-eligible.</summary>
     void EnsureServerQuestMirror(Hero owner);
 
-    /// <summary>
-    /// Force-writes issue state to SolvingWithAlternativeSolution on a non-accepting peer. No-op if not <c>IsOngoingWithoutQuest</c>.
-    /// Deliberately leaves <c>AlternativeSolutionReturnTimeForTroops</c> untouched - permanently overwriting it here would get resynced back onto the real owner on their next reconnect and silently strand their troops/reward (see <see cref="Patches.VillageNeedsToolsAlternativeSolutionOwnershipGatePatch"/> for how the real consequence is actually gated instead).
-    /// </summary>
     void MirrorAlternativeAccepted(Hero owner);
 
-    /// <summary>Rolls back a losing peer's own optimistic accept after the server reports another peer won the same-issue race. No-op if an owner is already recorded (a legitimate mirror already superseded it) or the issue is still <c>IsOngoingWithoutQuest</c>.</summary>
     void RejectAcceptance(Hero owner);
 }
 
-/// <inheritdoc cref="IVillageNeedsToolsIssueInterface"/>
 public class VillageNeedsToolsIssueInterface : IVillageNeedsToolsIssueInterface
 {
-    // Private nested enum - reflected once, statically, rather than per-call.
     private static readonly Type IssueStateEnumType =
         AccessTools.Inner(typeof(IssueBase), "IssueState");
     private static readonly FieldInfo IssueStateField =
@@ -72,7 +62,6 @@ public class VillageNeedsToolsIssueInterface : IVillageNeedsToolsIssueInterface
                         quest.CompleteQuestWithBetrayal();
                         return;
                     default:
-                        // Reason didn't say how an active quest ended - fail safe to cancel rather than orphan it.
                         quest.CompleteQuestWithCancel();
                         return;
                 }
@@ -126,13 +115,8 @@ public class VillageNeedsToolsIssueInterface : IVillageNeedsToolsIssueInterface
     public void RejectAcceptance(Hero owner)
     {
         if (owner?.Issue == null || owner.Issue.IsOngoingWithoutQuest) return;
-
-        // Ownership is only ever recorded from the server's authoritative broadcast, never optimistically by
-        // this peer's own accept trigger - so "no owner recorded yet" means owner.Issue is still this peer's
-        // own, never-mirrored, optimistic accept (safe to roll back). Once an owner IS recorded, a legitimate
-        // mirror already superseded it and must be left alone (see
-        // RequestVillageIssueAcceptQuest_FirstRequestWins_SecondIsRejectedAndOwnershipConvergesOnEveryPeer).
-        if (VillageNeedsToolsIssueOwnership.TryGetOwnerControllerId(owner, out _)) return;
+        if (owner.Issue.IssueQuest == null) return;
+        if (IssueOwnershipRegistry.IsLocalPeerOwner(owner)) return;
 
         using (new AllowedThread())
         {

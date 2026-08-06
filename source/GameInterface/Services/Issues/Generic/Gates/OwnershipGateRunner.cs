@@ -9,6 +9,6 @@ public static class OwnershipGateRunner
         if (spec?.QuestGiverSelector == null || instance == null) return false;
 
         var questGiver = spec.QuestGiverSelector(instance);
-        return VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(questGiver);
+        return IssueOwnershipRegistry.IsLocalPeerOwner(questGiver);
     }
 }

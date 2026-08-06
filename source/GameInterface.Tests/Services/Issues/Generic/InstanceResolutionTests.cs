@@ -1,6 +1,7 @@
 using Autofac;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.InstanceResolution;
 using GameInterface.Services.Issues.Interfaces;
 using HarmonyLib;
@@ -26,12 +27,12 @@ public class InstanceResolutionTests : IDisposable
 
     public InstanceResolutionTests()
     {
-        VillageNeedsToolsIssueOwnership.ClearAll();
+        IssueOwnershipRegistry.ClearAll();
     }
 
     public void Dispose()
     {
-        VillageNeedsToolsIssueOwnership.ClearAll();
+        IssueOwnershipRegistry.ClearAll();
         ContainerProvider.Clear();
     }
 
@@ -62,7 +63,7 @@ public class InstanceResolutionTests : IDisposable
     public void OwnershipKeyed_ReturnsTheOngoingQuestTheLocalPeerOwns()
     {
         var ownedGiver = NewHero();
-        VillageNeedsToolsIssueOwnership.SetOwner(ownedGiver, "player-A");
+        IssueOwnershipRegistry.SetOwner(ownedGiver, "player-A");
         SetLocalControllerId("player-A");
 
         var ownedQuest = NewQuest(ownedGiver, isOngoing: true);
@@ -77,7 +78,7 @@ public class InstanceResolutionTests : IDisposable
     public void OwnershipKeyed_SkipsAnOwnedQuestThatIsNoLongerOngoing()
     {
         var ownedGiver = NewHero();
-        VillageNeedsToolsIssueOwnership.SetOwner(ownedGiver, "player-A");
+        IssueOwnershipRegistry.SetOwner(ownedGiver, "player-A");
         SetLocalControllerId("player-A");
 
         var finalizedOwnedQuest = NewQuest(ownedGiver, isOngoing: false);

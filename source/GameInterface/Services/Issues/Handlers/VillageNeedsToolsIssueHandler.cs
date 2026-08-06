@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsTools;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
@@ -130,7 +131,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
-            VillageNeedsToolsIssueOwnership.SetOwner(owner, hostControllerId);
+            IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
             network.SendAll(new NetworkVillageIssueQuestAccepted(ownerId, hostControllerId));
         }
         else
@@ -164,7 +165,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
             if (GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest)
             {
                 issueInterface.EnsureServerQuestMirror(owner);
-                VillageNeedsToolsIssueOwnership.SetOwner(owner, player.ControllerId);
+                IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
                 network.SendAll(new NetworkVillageIssueQuestAccepted(ownerId, player.ControllerId));
             }
             else
@@ -184,7 +185,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
             // Mirror and ownership record happen in the same synchronous block - no TOCTOU window between
             // "dialogue registered" and "ownership known".
             issueInterface.MirrorQuestAccepted(owner);
-            VillageNeedsToolsIssueOwnership.SetOwner(owner, ownerControllerId);
+            IssueOwnershipRegistry.SetOwner(owner, ownerControllerId);
         });
     }
 
@@ -196,7 +197,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         if (ModInformation.IsServer)
         {
             var hostControllerId = payload.What.ControllerId;
-            VillageNeedsToolsIssueOwnership.SetOwner(owner, hostControllerId);
+            IssueOwnershipRegistry.SetOwner(owner, hostControllerId);
             network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId, hostControllerId));
         }
         else
@@ -226,7 +227,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
             if (GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest)
             {
                 issueInterface.MirrorAlternativeAccepted(owner);
-                VillageNeedsToolsIssueOwnership.SetOwner(owner, player.ControllerId);
+                IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
                 network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId, player.ControllerId));
             }
             else
@@ -244,7 +245,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
             issueInterface.MirrorAlternativeAccepted(owner);
-            VillageNeedsToolsIssueOwnership.SetOwner(owner, ownerControllerId);
+            IssueOwnershipRegistry.SetOwner(owner, ownerControllerId);
         });
     }
 

@@ -30,7 +30,7 @@ internal sealed class ModuleRescanCompletionRunner : IModuleRescanCompletionRunn
 
         foreach (var kvp in snapshot)
         {
-            if (kvp.Value is TIssue && VillageNeedsToolsIssueOwnership.IsLocalPeerOwner(kvp.Key))
+            if (kvp.Value is TIssue && IssueOwnershipRegistry.IsLocalPeerOwner(kvp.Key))
             {
                 spec.TryTriggerOwnedCompletion(kvp.Key);
             }
