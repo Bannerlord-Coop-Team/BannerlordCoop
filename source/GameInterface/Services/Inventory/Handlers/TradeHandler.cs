@@ -246,9 +246,9 @@ internal class TradeHandler : IHandler
 
         for (int i = 0; i < items.Length; i++)
         {
-            if (TryResolveItemRosterId(items[0], out var resolvedItem))
+            if (TryResolveItemRosterId(items[i], out var resolvedItem))
             {
-                resolvedItems.Add((resolvedItem, items[0].Amount));
+                resolvedItems.Add((resolvedItem, items[i].Amount));
             }
         }
 
