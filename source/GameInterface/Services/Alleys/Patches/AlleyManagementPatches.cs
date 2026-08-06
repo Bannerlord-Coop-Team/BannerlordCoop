@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Alleys.Patches;
 
@@ -100,6 +101,35 @@ internal class AlleyManagementPatches
         {
             MessageBroker.Instance.Publish(alley, new SetAlleyGarrisonRequested(alley, leftMemberRoster));
         }
+    }
+
+    [HarmonyPatch("player_recruited_troops_from_alley")]
+    [HarmonyPrefix]
+    private static bool PlayerRecruitedTroopsFromAlleyPrefix(AlleyCampaignBehavior __instance)
+    {
+        if (ModInformation.IsClient)
+        {
+            var playerAlleyData = __instance._playerOwnedCommonAreaData.FirstOrDefault(
+                data => data.Alley?.Settlement == Settlement.CurrentSettlement);
+            if (playerAlleyData == null) return false;
+
+            var troops = Campaign.Current.Models.AlleyModel.GetTroopsToRecruitFromAlleyDependingOnAlleyRandom(
+                playerAlleyData.Alley,
+                playerAlleyData.RandomFloatWeekly);
+
+            MessageBroker.Instance.Publish(
+                playerAlleyData.Alley,
+                new RecruitAlleyTroopsRequested(playerAlleyData.Alley, troops));
+
+            MBInformationManager.AddQuickInformation(
+                new TextObject("{=8CW2y0p3}Troops have been joined to your party"),
+                0,
+                null,
+                null,
+                string.Empty);
+        }
+
+        return false;
     }
 
     private static bool TryGetCurrentSettlementAlley(out Alley alley)
