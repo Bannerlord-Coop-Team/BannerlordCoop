@@ -19,6 +19,8 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         RegisterAsPlayerParty("loaded-player", heroId, mapEventContext.AttackerPartyId);
         string? armyId = null;
         string? followerId = null;
+        string? gatheringFollowerId = null;
+        string? destinationId = null;
 
         Server.Call(() =>
         {
@@ -27,13 +29,21 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
             var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
             var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var gatheringFollower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var destination = GameObjectCreator.CreateInitializedObject<Settlement>();
+            destination.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Town>());
+            destination._position = follower.Position;
             var army = new Army(kingdom, attacker, Army.ArmyTypes.Raider);
             follower.Army = army;
             follower.AttachedTo = attacker;
+            gatheringFollower.Army = army;
             follower.Ai.RethinkAtNextHourlyTick = false;
             Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
             Assert.True(Server.ObjectManager.TryGetId(follower, out followerId));
+            Assert.True(Server.ObjectManager.TryGetId(gatheringFollower, out gatheringFollowerId));
+            Assert.True(Server.ObjectManager.TryGetId(destination, out destinationId));
             Assert.Same(mapEvent, follower.MapEvent);
+            Assert.Null(gatheringFollower.MapEvent);
 
             Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
 
@@ -43,7 +53,12 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Null(follower.Party.MapEventSide);
             Assert.Null(follower.Army);
             Assert.Null(follower.AttachedTo);
-            Assert.True(follower.Ai.RethinkAtNextHourlyTick);
+            Assert.Equal(AiBehavior.GoToSettlement, follower.DefaultBehavior);
+            Assert.Same(destination, follower.TargetSettlement);
+            Assert.Null(gatheringFollower.Army);
+            Assert.Null(gatheringFollower.AttachedTo);
+            Assert.Equal(AiBehavior.GoToSettlement, gatheringFollower.DefaultBehavior);
+            Assert.Same(destination, gatheringFollower.TargetSettlement);
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
             Assert.False(Server.ObjectManager.TryGetObject<Army>(armyId, out _));
         }, MapEventDisabledMethods);
@@ -53,8 +68,16 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
             Assert.False(client.ObjectManager.TryGetObject<Army>(armyId, out _));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(followerId, out var follower));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(gatheringFollowerId, out var gatheringFollower));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(destinationId, out var destination));
             Assert.Null(follower.Army);
             Assert.Null(follower.AttachedTo);
+            Assert.Equal(AiBehavior.GoToSettlement, follower.DefaultBehavior);
+            Assert.Same(destination, follower.TargetSettlement);
+            Assert.Null(gatheringFollower.Army);
+            Assert.Null(gatheringFollower.AttachedTo);
+            Assert.Equal(AiBehavior.GoToSettlement, gatheringFollower.DefaultBehavior);
+            Assert.Same(destination, gatheringFollower.TargetSettlement);
         }
     }
 
