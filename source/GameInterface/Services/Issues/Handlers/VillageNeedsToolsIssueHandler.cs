@@ -281,9 +281,24 @@ internal class VillageNeedsToolsIssueHandler : IHandler
 
         var ownerId = payload.What.OwnerId;
         var reason = payload.What.Reason;
+        var requester = payload.Who as NetPeer;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+
+            if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
+            {
+                Logger.Error("Rejecting {Message} from an unregistered/unknown requester for owner {Owner}",
+                    nameof(RequestVillageIssueRemoved), ownerId);
+                return;
+            }
+
+            if (!IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner) || recordedOwner != player.ControllerId)
+            {
+                Logger.Error("Rejecting {Message} from {Requester}, who is not the recorded owner of {Owner}",
+                    nameof(RequestVillageIssueRemoved), player.ControllerId, ownerId);
+                return;
+            }
 
             issueInterface.FinalizeMirror(owner, reason);
 

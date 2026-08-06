@@ -323,12 +323,18 @@ public class VillageNeedsToolsIssueTests : IDisposable
         var fixture = SetupVillageOwner();
         CreateIssueOnServer(fixture);
 
-        Server.Resolve<IControllerIdProvider>().SetControllerId("host-controller");
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", "", "", "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+            IssueOwnershipRegistry.SetOwner(owner, "player-A");
         });
 
         Server.Call(() =>
@@ -374,6 +380,19 @@ public class VillageNeedsToolsIssueTests : IDisposable
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnServer(fixture);
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", "", "", "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            IssueOwnershipRegistry.SetOwner(owner, "player-A");
+        });
 
         Server.Call(() =>
         {
