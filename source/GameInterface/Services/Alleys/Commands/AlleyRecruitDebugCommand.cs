@@ -462,15 +462,17 @@ public class AlleyRecruitDebugCommand
             var element = roster.GetElementCopyAtIndex(index);
             roster.AddToCountsAtIndex(index, -element.Number, -element.WoundedNumber, -element.Xp, false);
         }
-        foreach (var element in elements)
+        for (var index = 0; index < elements.Length; index++)
         {
+            var element = elements[index];
             roster.AddToCounts(
                 element.Character,
                 element.Number,
                 false,
                 element.WoundedNumber,
                 element.Xp,
-                true);
+                true,
+                index);
         }
     }
 
