@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace Coop.Core.Server.Services.Kingdoms.Messages;
 
 /// <summary>
-/// Notifies the requesting client that its kingdom rename was applied
+/// Notifies all clients that a kingdom rename was applied
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NetworkKingdomNameChanged : ICommand
