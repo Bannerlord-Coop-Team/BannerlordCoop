@@ -73,6 +73,31 @@ public sealed class CoopNetworkBaseReceiveTests : IDisposable
     }
 
     [Fact]
+    public void HandleReceivedPayload_WhenTeardownCancelsAHandler_LetsTheCancellationOut()
+    {
+        serializer.Setup(s => s.Deserialize(It.IsAny<byte[]>())).Returns(Mock.Of<IMessage>());
+        messagePacketHandler
+            .Setup(h => h.PublishEvent(It.IsAny<NetPeer>(), It.IsAny<IMessage>()))
+            .Throws(new OperationCanceledException("the session ended before the marshal completed"));
+        sessionCancellation.Cancel();
+
+        Assert.IsType<OperationCanceledException>(
+            Record.Exception(() => network.Receive(peer, new byte[] { 1 })));
+    }
+
+    [Fact]
+    public void HandleReceivedPayload_WhenAHandlerIsCancelledWithoutTeardown_StillDoesNotAbandonTheTick()
+    {
+        serializer.Setup(s => s.Deserialize(It.IsAny<byte[]>())).Returns(Mock.Of<IMessage>());
+        messagePacketHandler
+            .Setup(h => h.PublishEvent(It.IsAny<NetPeer>(), It.IsAny<IMessage>()))
+            .Throws(new OperationCanceledException("a handler's own cancellation"));
+
+        // Only teardown gets the pass-through.
+        Assert.Null(Record.Exception(() => network.Receive(peer, new byte[] { 2 })));
+    }
+
+    [Fact]
     public void HandleReceivedPayload_WithAnUnregisteredTypeId_IsRejectedWithoutDispatching()
     {
         // An unregistered type id deserializes to null, which is neither IPacket nor IMessage.

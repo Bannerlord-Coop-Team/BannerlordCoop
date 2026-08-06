@@ -363,7 +363,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     /// Runs on the poll thread inside <c>netManager.PollEvents()</c>, so an escaping exception abandons
     /// the rest of the tick — including <see cref="Update"/>'s flushes — for every player, not just the
     /// payload that caused it. A payload whose type id is not registered deserializes to <c>null</c> and
-    /// is reported by the final branch; corrupt bytes throw inside the serializer and are caught here.
+    /// is reported by the final branch, and corrupt bytes throw inside the serializer and are caught here.
     /// Failures are throttled because a peer can produce them at packet rate.
     /// </remarks>
     protected void HandleReceivedPayload(NetPeer peer, byte[] payload)
@@ -386,6 +386,12 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
                 Logger.Error("Received payload deserialized to neither IPacket nor IMessage: {Type} from peer {PeerId}",
                     received?.GetType(), peer?.Id);
             }
+        }
+        catch (OperationCanceledException) when (sessionCancellation.IsCancellationRequested)
+        {
+            // Ends the tick in UpdateWithinSession. Swallowing it would keep PollEvents dispatching
+            // into a session being disposed, and report every clean disconnect as a packet failure.
+            throw;
         }
         catch (Exception ex)
         {
