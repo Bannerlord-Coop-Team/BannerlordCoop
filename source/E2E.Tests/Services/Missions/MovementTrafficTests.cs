@@ -84,6 +84,83 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_TournamentProfileUsesSixtyHertzCadence()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent agent = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, agent));
+            component.AgentMovementHandler.Configure(MovementCadenceProfile.Tournament);
+
+            component.AgentMovementHandler.PollMovement(0f);
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            network.NetworkSentPackets.Packets.Clear();
+            mirror.Position = new Vec3(1f, 0f, 0f);
+            component.AgentMovementHandler.PollMovement(0.016f);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            component.AgentMovementHandler.PollMovement(0.001f);
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+        });
+    }
+
+    [Fact]
+    public void PollMovement_BattlePriorityCadenceIncludesPlayerAndCurrentMount()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent rider = SpawnRider(mock);
+            Agent mount = mock.SpawnMount(rider);
+            Agent formationAgent = SpawnRider(mock);
+            mock.MainAgent = rider;
+            Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
+            Assert.True(AgentMirror.TryGet(formationAgent, out var formationMirror));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, rider));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 2, mount));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 3, formationAgent));
+            component.AgentMovementHandler.Configure(MovementCadenceProfile.Battle);
+            Assert.True(component.AgentMovementHandler.TrySetForcedBulkHz(10, out _));
+
+            component.AgentMovementHandler.PollMovement(0f);
+            network.NetworkSentPackets.Packets.Clear();
+            mountMirror.Position = new Vec3(2f, 0f, 0f);
+            formationMirror.Position = new Vec3(3f, 0f, 0f);
+
+            component.AgentMovementHandler.PollMovement(0.024f);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<MovementPacket>());
+            Assert.Empty(network.NetworkSentPackets.GetPackets<MountMovementPacket>());
+
+            component.AgentMovementHandler.PollMovement(0.002f);
+
+            MovementPacket movement = Assert.Single(
+                network.NetworkSentPackets.GetPackets<MovementPacket>());
+            Assert.Equal(new ushort[] { 1 }, movement.AgentIds);
+            AgentMountData mountData = Assert.Single(movement.Agents).MountData;
+            Assert.NotNull(mountData);
+            Assert.Equal(2f, mountData.MountPosition.X);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<MountMovementPacket>());
+        });
+    }
+
+    [Fact]
     public void PollMovement_SendsNonPositionalChangesAndHeartbeat()
     {
         using var fixture = new MissionEngineFixture();

@@ -7,6 +7,7 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using Missions;
 using Missions.Agents;
+using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -936,12 +937,14 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.Forward;
             Assert.True(registry.TryRegisterAgent("peer", riderId, rider));
             Assert.True(registry.TryRegisterAgent("peer", horseId, horse));
+            component.AgentMovementHandler.Configure(MovementCadenceProfile.Battle);
+            Assert.True(component.AgentMovementHandler.TrySetForcedBulkHz(10, out _));
 
             component.AgentMovementHandler.PollMovement(0f);
             horseMirror.MovementDirection = new Vec2(-1f, 0f);
             horseMirror.RealGlobalVelocity = Vec3.Zero;
             network.NetworkSentPackets.Packets.Clear();
-            component.AgentMovementHandler.PollMovement(0.025f);
+            component.AgentMovementHandler.PollMovement(0.1f);
 
             Assert.Equal(
                 Agent.MovementControlFlag.Backward |
@@ -976,7 +979,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 horseMirror.LastAgentVisualActionBlendPeriodOverride);
 
             network.NetworkSentPackets.Packets.Clear();
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 5; i++)
             {
                 riderMirror.MovementFlags =
                     Agent.MovementControlFlag.Backward |
@@ -986,13 +989,13 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 horseMirror.MovementDirection = new Vec2(
                     -1f,
                     0.001f * (i + 1));
-                component.AgentMovementHandler.PollMovement(0.025f);
+                component.AgentMovementHandler.PollMovement(0.1f);
             }
             component.AgentMovementHandler
                 .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
 
             Assert.Equal(
-                20,
+                5,
                 network.NetworkSentPackets.GetPackets<MovementPacket>().Count());
 
             Assert.Equal(
@@ -1025,7 +1028,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 advancingMount.MountAction0Progress,
                 precision: 3);
 
-            for (int i = 20; i < 79; i++)
+            for (int i = 5; i < 19; i++)
             {
                 riderMirror.MovementFlags =
                     Agent.MovementControlFlag.Backward |
@@ -1035,9 +1038,9 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 horseMirror.MovementDirection = new Vec2(
                     -1f,
                     0.001f * (i + 1));
-                component.AgentMovementHandler.PollMovement(0.025f);
+                component.AgentMovementHandler.PollMovement(0.1f);
             }
-            component.AgentMovementHandler.PollMovement(0.025f);
+            component.AgentMovementHandler.PollMovement(0.1f);
 
             Assert.Equal(
                 Agent.MovementControlFlag.Backward |

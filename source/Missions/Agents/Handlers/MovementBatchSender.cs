@@ -19,7 +19,7 @@ public interface IMovementBatchSender
         Func<string, ushort[], Guid[], T[], IPacket> createPacket,
         Action<Guid, T> onSent);
 
-    void EndFrame(int deferredSnapshots, float maximumDeferredAgeSeconds);
+    MovementTrafficFrame EndFrame(int deferredSnapshots, float maximumDeferredAgeSeconds);
 
     void Clear();
 }
@@ -128,7 +128,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         return result;
     }
 
-    public void EndFrame(int deferredSnapshots, float maximumDeferredAgeSeconds) =>
+    public MovementTrafficFrame EndFrame(int deferredSnapshots, float maximumDeferredAgeSeconds) =>
         trafficBudget.ReportFrame(deferredSnapshots, maximumDeferredAgeSeconds);
 
     public void Clear()

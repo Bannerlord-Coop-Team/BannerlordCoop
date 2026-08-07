@@ -1,6 +1,9 @@
 ﻿#if DEBUG
 using Autofac;
 using Common;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.Commands;
 using System;
@@ -25,6 +28,7 @@ internal static class LargeBattleRosterFixtureCommands
         public Campaign Campaign;
         public PartySnapshot FirstParty;
         public PartySnapshot SecondParty;
+        public int? ExactHealthyCount;
     }
 
     private sealed class PartySnapshot
@@ -33,6 +37,8 @@ internal static class LargeBattleRosterFixtureCommands
         public MobileParty Party;
         public TroopRosterElement[] MemberRoster;
         public string Fingerprint;
+        public bool HasBehavior;
+        public PartyBehaviorUpdateData Behavior;
     }
 
     [CommandLineArgumentFunction("large_battle_roster_begin", "coop.debug.mobileparty")]
@@ -94,18 +100,126 @@ internal static class LargeBattleRosterFixtureCommands
 
         return
             $"LARGE_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} addedPerParty={addedPerParty}\n" +
-            FormatState("active", firstParty, secondParty);
+            FormatState("active", firstParty, secondParty, null);
+    }
+
+    [CommandLineArgumentFunction("exact_battle_roster_begin", "coop.debug.mobileparty")]
+    public static string BeginExact(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
+        if (args.Count != 3
+            || !int.TryParse(args[2], out int healthyPerParty)
+            || (healthyPerParty != 5 && healthyPerParty != 900))
+        {
+            return "Usage: coop.debug.mobileparty.exact_battle_roster_begin " +
+                   "<firstPartyId> <secondPartyId> <healthyPerParty:5|900>";
+        }
+        if (fixture != null)
+            return "A large-battle roster fixture is already pending restoration.";
+        if (!TryGetObjectManager(out IObjectManager objectManager) ||
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+        {
+            return "Unable to resolve the exact battle fixture services.";
+        }
+        if (!TryResolveParty(
+                objectManager,
+                args[0],
+                out MobileParty firstParty,
+                out string firstError))
+        {
+            return firstError;
+        }
+        if (!TryResolveParty(
+                objectManager,
+                args[1],
+                out MobileParty secondParty,
+                out string secondError))
+        {
+            return secondError;
+        }
+        if (firstParty == secondParty)
+            return "The fixture requires two distinct parties.";
+        if (!CanStageExactBattleParty(firstParty) || !CanStageExactBattleParty(secondParty))
+            return "Both parties must be active on the campaign map, outside settlements and map events.";
+        if (!objectManager.TryGetObjectWithLogging(
+                FixtureTroopId,
+                out CharacterObject fixtureTroop))
+        {
+            return $"Unable to resolve fixture troop {FixtureTroopId}.";
+        }
+        if (!behaviorSnapshot.TryCreate(firstParty, out var firstBehavior) ||
+            !behaviorSnapshot.TryCreate(secondParty, out var secondBehavior))
+        {
+            return "Unable to capture both parties' original movement state.";
+        }
+
+        PartySnapshot firstSnapshot = Capture(firstParty, firstBehavior);
+        PartySnapshot secondSnapshot = Capture(secondParty, secondBehavior);
+        if (!TryGetFixtureTroopCount(
+                firstSnapshot,
+                healthyPerParty,
+                out int firstTroops,
+                out firstError))
+        {
+            return firstError;
+        }
+        if (!TryGetFixtureTroopCount(
+                secondSnapshot,
+                healthyPerParty,
+                out int secondTroops,
+                out secondError))
+        {
+            return secondError;
+        }
+
+        var activeFixture = new LargeBattleRosterFixture
+        {
+            Campaign = Campaign.Current,
+            FirstParty = firstSnapshot,
+            SecondParty = secondSnapshot,
+            ExactHealthyCount = healthyPerParty,
+        };
+        fixture = activeFixture;
+        try
+        {
+            SetExactRoster(firstSnapshot, fixtureTroop, firstTroops);
+            SetExactRoster(secondSnapshot, fixtureTroop, secondTroops);
+        }
+        catch (Exception ex)
+        {
+            Restore(firstSnapshot);
+            Restore(secondSnapshot);
+            bool firstBehaviorRestored = RestoreBehavior(firstSnapshot);
+            bool secondBehaviorRestored = RestoreBehavior(secondSnapshot);
+            bool restored =
+                Fingerprint(firstParty.MemberRoster) == firstSnapshot.Fingerprint &&
+                Fingerprint(secondParty.MemberRoster) == secondSnapshot.Fingerprint &&
+                firstBehaviorRestored &&
+                secondBehaviorRestored;
+            if (restored) fixture = null;
+
+            return
+                $"Unable to stage the exact battle roster fixture: {ex.GetType().Name}: {ex.Message}\n" +
+                $"restored={restored}";
+        }
+
+        return
+            $"EXACT_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} healthyPerParty={healthyPerParty}\n" +
+            FormatState("active", firstParty, secondParty, healthyPerParty);
     }
 
     [CommandLineArgumentFunction("large_battle_roster_status", "coop.debug.mobileparty")]
-    public static string Status(List<string> args)
+    public static string Status(List<string> args) =>
+        Status(args, "coop.debug.mobileparty.large_battle_roster_status");
+
+    private static string Status(List<string> args, string commandName)
     {
         if (!ModInformation.IsServer)
             return "Run this command on the server.";
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.mobileparty.large_battle_roster_status " +
-                   "<firstPartyId> <secondPartyId>";
+            return $"Usage: {commandName} <firstPartyId> <secondPartyId>";
         }
         if (!TryGetObjectManager(out IObjectManager objectManager))
             return "Unable to resolve ObjectManager.";
@@ -129,16 +243,24 @@ internal static class LargeBattleRosterFixtureCommands
         return FormatState(
             fixture == null ? "none" : "active",
             firstParty,
-            secondParty);
+            secondParty,
+            fixture?.ExactHealthyCount);
     }
 
+    [CommandLineArgumentFunction("exact_battle_roster_status", "coop.debug.mobileparty")]
+    public static string ExactStatus(List<string> args) =>
+        Status(args, "coop.debug.mobileparty.exact_battle_roster_status");
+
     [CommandLineArgumentFunction("large_battle_roster_restore", "coop.debug.mobileparty")]
-    public static string Restore(List<string> args)
+    public static string Restore(List<string> args) =>
+        Restore(args, "coop.debug.mobileparty.large_battle_roster_restore");
+
+    private static string Restore(List<string> args, string commandName)
     {
         if (!ModInformation.IsServer)
             return "Run this command on the server.";
         if (args.Count != 0)
-            return "Usage: coop.debug.mobileparty.large_battle_roster_restore";
+            return $"Usage: {commandName}";
         if (fixture == null)
             return "No large-battle roster fixture is pending restoration.";
 
@@ -167,12 +289,13 @@ internal static class LargeBattleRosterFixtureCommands
             return secondError;
         }
 
-        bool firstRestoredDeadHero =
-            Restore(activeFixture.FirstParty);
-        bool secondRestoredDeadHero =
-            Restore(activeFixture.SecondParty);
+        bool firstRestoredDeadHero = Restore(activeFixture.FirstParty);
+        bool secondRestoredDeadHero = Restore(activeFixture.SecondParty);
         bool restoredDeadHero =
             firstRestoredDeadHero || secondRestoredDeadHero;
+        bool firstBehaviorRestored = RestoreBehavior(activeFixture.FirstParty);
+        bool secondBehaviorRestored = RestoreBehavior(activeFixture.SecondParty);
+        bool behaviorRestored = firstBehaviorRestored && secondBehaviorRestored;
         string warning = restoredDeadHero
             ? "WARNING: the restored roster contains a dead hero and may be invalid.\n"
             : string.Empty;
@@ -182,14 +305,16 @@ internal static class LargeBattleRosterFixtureCommands
         string secondFingerprint = Fingerprint(
             activeFixture.SecondParty.Party.MemberRoster);
         if (firstFingerprint != activeFixture.FirstParty.Fingerprint
-            || secondFingerprint != activeFixture.SecondParty.Fingerprint)
+            || secondFingerprint != activeFixture.SecondParty.Fingerprint
+            || !behaviorRestored)
         {
-            return "Large-battle roster restoration did not reproduce the original fingerprints.\n" +
+            return "Large-battle fixture restoration did not restore the original rosters and movement behavior.\n" +
                    warning +
                    FormatState(
                        "restore-failed",
                        activeFixture.FirstParty.Party,
-                       activeFixture.SecondParty.Party);
+                       activeFixture.SecondParty.Party,
+                       activeFixture.ExactHealthyCount);
         }
 
         fixture = null;
@@ -199,8 +324,13 @@ internal static class LargeBattleRosterFixtureCommands
             FormatState(
                 "none",
                 activeFixture.FirstParty.Party,
-                activeFixture.SecondParty.Party);
+                activeFixture.SecondParty.Party,
+                null);
     }
+
+    [CommandLineArgumentFunction("exact_battle_roster_restore", "coop.debug.mobileparty")]
+    public static string RestoreExact(List<string> args) =>
+        Restore(args, "coop.debug.mobileparty.exact_battle_roster_restore");
 
     private static bool TryGetObjectManager(
         out IObjectManager objectManager)
@@ -235,7 +365,7 @@ internal static class LargeBattleRosterFixtureCommands
         PartySnapshot snapshot,
         out string error)
     {
-        if (objectManager.TryGetObject(
+        if (objectManager.TryGetObjectWithLogging(
                 snapshot.PartyId,
                 out MobileParty party))
         {
@@ -260,6 +390,81 @@ internal static class LargeBattleRosterFixtureCommands
         };
     }
 
+    private static PartySnapshot Capture(
+        MobileParty party,
+        PartyBehaviorUpdateData behavior)
+    {
+        PartySnapshot snapshot = Capture(party);
+        snapshot.HasBehavior = true;
+        snapshot.Behavior = behavior;
+        return snapshot;
+    }
+
+    private static bool CanStageExactBattleParty(MobileParty party) =>
+        party != null &&
+        party.IsActive &&
+        party.MapEvent == null &&
+        party.CurrentSettlement == null;
+
+    private static bool TryGetFixtureTroopCount(
+        PartySnapshot snapshot,
+        int healthyTarget,
+        out int fixtureTroops,
+        out string error)
+    {
+        int healthyHeroes = 0;
+        bool hasHealthyLeader = false;
+        foreach (TroopRosterElement element in snapshot.MemberRoster)
+        {
+            if (!element.Character.IsHero) continue;
+
+            int healthy = Math.Max(0, element.Number - element.WoundedNumber);
+            healthyHeroes += healthy;
+            if (element.Character.HeroObject == snapshot.Party.LeaderHero && healthy > 0)
+                hasHealthyLeader = true;
+        }
+
+        if (!hasHealthyLeader)
+        {
+            fixtureTroops = 0;
+            error = $"Party {snapshot.PartyId} must have a healthy leader before staging the battle.";
+            return false;
+        }
+        if (healthyHeroes > healthyTarget)
+        {
+            fixtureTroops = 0;
+            error = $"Party {snapshot.PartyId} has {healthyHeroes} healthy heroes, more than target {healthyTarget}.";
+            return false;
+        }
+
+        fixtureTroops = healthyTarget - healthyHeroes;
+        error = null;
+        return true;
+    }
+
+    private static void SetExactRoster(
+        PartySnapshot snapshot,
+        CharacterObject fixtureTroop,
+        int fixtureTroops)
+    {
+        TroopRoster roster = snapshot.Party.MemberRoster;
+        ClearRoster(roster);
+        foreach (TroopRosterElement element in snapshot.MemberRoster)
+        {
+            if (!element.Character.IsHero) continue;
+
+            roster.AddToCounts(
+                element.Character,
+                element.Number,
+                false,
+                element.WoundedNumber,
+                element.Xp,
+                true);
+        }
+        if (fixtureTroops > 0)
+            roster.AddToCounts(fixtureTroop, fixtureTroops);
+    }
+
     private static TroopRosterElement[] CopyRoster(TroopRoster roster)
     {
         var copy = new TroopRosterElement[roster.Count];
@@ -273,18 +478,7 @@ internal static class LargeBattleRosterFixtureCommands
     {
         bool restoredDeadHero = false;
         TroopRoster roster = snapshot.Party.MemberRoster;
-        for (int index = roster.Count - 1; index >= 0; index--)
-        {
-            TroopRosterElement element =
-                roster.GetElementCopyAtIndex(index);
-            roster.AddToCountsAtIndex(
-                index,
-                -element.Number,
-                -element.WoundedNumber,
-                0,
-                false);
-        }
-        roster.RemoveZeroCounts();
+        ClearRoster(roster);
 
         foreach (TroopRosterElement element in snapshot.MemberRoster)
         {
@@ -305,14 +499,50 @@ internal static class LargeBattleRosterFixtureCommands
         return restoredDeadHero;
     }
 
+    private static void ClearRoster(TroopRoster roster)
+    {
+        for (int index = roster.Count - 1; index >= 0; index--)
+        {
+            TroopRosterElement element = roster.GetElementCopyAtIndex(index);
+            roster.AddToCountsAtIndex(
+                index,
+                -element.Number,
+                -element.WoundedNumber,
+                0,
+                false);
+        }
+        roster.RemoveZeroCounts();
+    }
+
+    private static bool RestoreBehavior(PartySnapshot snapshot)
+    {
+        if (!snapshot.HasBehavior) return true;
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
+            return false;
+
+        snapshot.Party.Position = snapshot.Behavior.PartyPosition;
+        if (!behaviorSnapshot.TryApply(snapshot.Party, snapshot.Behavior, out _))
+            return false;
+
+        MessageBroker.Instance.Publish(
+            typeof(LargeBattleRosterFixtureCommands),
+            new PartyBehaviorChangeAttempted(
+                snapshot.Party,
+                forcePosition: true,
+                isCurrentlyAtSea: snapshot.Behavior.IsCurrentlyAtSea));
+        return true;
+    }
+
     private static string FormatState(
         string state,
         MobileParty firstParty,
-        MobileParty secondParty)
+        MobileParty secondParty,
+        int? exactHealthyCount)
     {
         var output = new StringBuilder();
         output.AppendLine(
-            $"LARGE_BATTLE_ROSTER_FIXTURE state={state}");
+            $"LARGE_BATTLE_ROSTER_FIXTURE state={state}|" +
+            $"exactHealthy={exactHealthyCount?.ToString() ?? "none"}");
         AppendPartyState(output, firstParty);
         AppendPartyState(output, secondParty);
         return output.ToString().TrimEnd();
@@ -335,6 +565,8 @@ internal static class LargeBattleRosterFixtureCommands
 
         output.AppendLine(
             $"party={party.StringId}|total={total}|wounded={wounded}|healthy={total - wounded}|" +
+            $"position={party.Position.X:R},{party.Position.Y:R},{party.Position.IsOnLand}|" +
+            $"moveMode={party.PartyMoveMode}|" +
             $"fingerprint={Fingerprint(roster)}");
     }
 

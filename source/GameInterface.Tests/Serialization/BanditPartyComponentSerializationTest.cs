@@ -4,6 +4,7 @@ using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Services.SiegeEvents;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -14,6 +15,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
+    [Collection(nameof(CampaignCurrentCollection))]
     public class BanditPartyComponentSerializationTest
     {
         readonly IContainer container;

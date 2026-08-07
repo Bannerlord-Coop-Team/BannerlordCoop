@@ -127,7 +127,12 @@ public class CoopTournamentController : CoopMissionController
         ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory,
         IGuardedHitWindow guardedHitWindow,
         IMissionContext missionContext)
-        : base(network, messageBroker, objectManager, coopMissionComponent)
+        : base(
+            network,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            Missions.Agents.Handlers.MovementCadenceProfile.Tournament)
     {
         this.relayNetwork = relayNetwork;
         this.worldItemRegistry = worldItemRegistry;
