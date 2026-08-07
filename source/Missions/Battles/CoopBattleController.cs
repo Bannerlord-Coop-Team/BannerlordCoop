@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Retreat;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -13,6 +14,7 @@ using Missions.Messages;
 using Missions.Services.Network;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -493,6 +495,34 @@ public class CoopBattleController : CoopMissionController
         // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
         ResultCommitter.ReportResolvedResult(missionResult);
 
+        ReportMissionRetreatIfUnresolved(missionResult);
+
         lifecycle.Leave();
+    }
+
+    /// <summary>
+    /// This player left the battle mission with nothing decided - the scoreboard's retreat, or any other exit
+    /// that ends the mission without a result. Tell the server so the party leaves the battle as well.
+    /// </summary>
+    /// <remarks>
+    /// Withdrawing the leaver's agents (BattleAuthorityMigrator) only empties the FIELD. The party stayed on
+    /// its side of the map event, so a two-player siege whose attacker walked out left the defender facing a
+    /// side that was gone but still registered — and a defender still deploying cannot notice anything at all,
+    /// because vanilla's BattleEndLogic skips every end-condition check while a BattleDeploymentHandler is on
+    /// the mission. The server-side leave is what actually ends it.
+    ///
+    /// A resolved result is deliberately excluded: that battle concludes through the completion barrier, which
+    /// is the path that forfeits rosters and captures the losers.
+    /// </remarks>
+    private void ReportMissionRetreatIfUnresolved(MissionResult missionResult)
+    {
+        if (missionResult?.BattleResolved == true) return;
+
+        // The mission is always the local player's, so MainParty is the party that just walked out of it.
+        var mainParty = MobileParty.MainParty;
+        var battle = mainParty?.MapEvent;
+        if (battle == null) return;
+
+        messageBroker.Publish(this, new BattleMissionRetreatAttempted(mainParty, battle));
     }
 }

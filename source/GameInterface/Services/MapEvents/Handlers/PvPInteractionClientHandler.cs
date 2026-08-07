@@ -173,7 +173,74 @@ internal class PvPInteractionClientHandler : IHandler
         if (shownDefenderPartyId != null)
             HideWaitingPopup();
 
+        EndMissionIfItCanNoLongerResolve(message);
+
         CloseEncounter(localParty);
+    }
+
+    /// <summary>
+    /// Ends a battle mission that nothing will ever end.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="CloseEncounter"/> deliberately leaves an active mission alone, because a battle that produced a
+    /// RESULT still owns its screens - the winner reads the scoreboard and leaves when it chooses. A battle
+    /// finalized with nothing decided is the opposite case: the only opposing player walked out of it, so the
+    /// map event is gone and no end condition can ever fire. A defender cannot even reach one while still
+    /// deploying, since vanilla's BattleEndLogic skips every check for as long as a BattleDeploymentHandler is
+    /// on the mission - which is exactly how issue #1840 stranded a player in a PvP siege.
+    ///
+    /// A resolved MissionResult is the discriminator: the winner of a concluded battle always has one by the
+    /// time the server finalizes, so its scoreboard is never touched here.
+    /// </remarks>
+    private void EndMissionIfItCanNoLongerResolve(NetworkClosePvpEncounter message)
+    {
+        var mission = Mission.Current;
+
+        // The finalize destroys the map event before it sends this close, and both travel the same
+        // reliable-ordered channel, so an unresolvable id here means the battle really has ended - not that
+        // this client is merely behind.
+        var battleStillExists = !string.IsNullOrEmpty(message.MapEventId)
+            && objectManager.TryGetObject<MapEvent>(message.MapEventId, out _);
+
+        if (!ShouldEndUnresolvableMission(
+                hasMission: mission != null,
+                hasMissionResult: mission?.MissionResult != null,
+                missionEnded: mission?.MissionEnded == true,
+                namesABattle: !string.IsNullOrEmpty(message.MapEventId),
+                battleStillExists: battleStillExists))
+        {
+            return;
+        }
+
+        Logger.Information("[PvPEncounterClose] Battle {MapEventId} was finalized with nothing decided; ending the local mission that can no longer resolve",
+            message.MapEventId);
+
+        // Vanilla's own "leave this battle with no result" path: it fans OnRetreatMission out to the mission
+        // logics before ending, which the deployment and spawn logics need, rather than cutting the mission off.
+        mission.RetreatMission();
+    }
+
+    /// <summary>
+    /// Pure rule for <see cref="EndMissionIfItCanNoLongerResolve"/>, as a seam so headless tests can cover it
+    /// (no <see cref="Mission"/> exists in the test harness).
+    /// </summary>
+    /// <remarks>
+    /// A resolved <c>MissionResult</c> is the discriminator between the two kinds of finalize. The winner of a
+    /// concluded battle always has one by the time the server finalizes, so its scoreboard is never cut off; a
+    /// battle abandoned by its only opponent never produces one, and that is the mission nothing else can end.
+    /// The battle must also be verifiably GONE - a close that names no battle, or one this client can still
+    /// resolve, is not evidence that the fight is over.
+    /// </remarks>
+    internal static bool ShouldEndUnresolvableMission(
+        bool hasMission,
+        bool hasMissionResult,
+        bool missionEnded,
+        bool namesABattle,
+        bool battleStillExists)
+    {
+        if (!hasMission || hasMissionResult || missionEnded) return false;
+
+        return namesABattle && !battleStillExists;
     }
 
     private void ClearMapEventBackReferences(string[] partyIds, PartyBase deferredParty = null)
