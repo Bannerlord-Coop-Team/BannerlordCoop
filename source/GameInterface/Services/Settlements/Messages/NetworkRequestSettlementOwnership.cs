@@ -44,3 +44,23 @@ public readonly struct NetworkRequestSettlementOwnership : ICommand
         NewOwnerId = newOwnerId;
     }
 }
+
+/// <summary>
+/// Server telling the requesting client its gift was refused, and why.
+/// </summary>
+/// <remarks>
+/// The kingdom screen closes its popup as soon as the player confirms, so a refusal that only reached
+/// the server log left exactly the silent no-op this feature set out to fix - the fief simply did not
+/// move and nothing said why. Only the requester is told; a refusal is not world state.
+/// </remarks>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkSettlementGiftRejected : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string Reason;
+
+    public NetworkSettlementGiftRejected(string reason)
+    {
+        Reason = reason;
+    }
+}

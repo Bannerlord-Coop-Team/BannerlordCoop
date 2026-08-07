@@ -11,6 +11,7 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Settlements.Handlers
 {
@@ -35,6 +36,7 @@ namespace GameInterface.Services.Settlements.Handlers
             messageBroker.Subscribe<NetworkChangeSettlementOwnership>(Handle);
             messageBroker.Subscribe<SettlementGiftRequested>(Handle);
             messageBroker.Subscribe<NetworkRequestSettlementOwnership>(Handle);
+            messageBroker.Subscribe<NetworkSettlementGiftRejected>(Handle);
         }
 
         public void Dispose()
@@ -43,6 +45,7 @@ namespace GameInterface.Services.Settlements.Handlers
             messageBroker.Unsubscribe<NetworkChangeSettlementOwnership>(Handle);
             messageBroker.Unsubscribe<SettlementGiftRequested>(Handle);
             messageBroker.Unsubscribe<NetworkRequestSettlementOwnership>(Handle);
+            messageBroker.Unsubscribe<NetworkSettlementGiftRejected>(Handle);
         }
 
         /// <summary>Client side: forward the player's gift to the server.</summary>
@@ -61,57 +64,77 @@ namespace GameInterface.Services.Settlements.Handlers
         /// Server side: a client asked to gift a settlement. Authority is re-derived here - the
         /// request carries only two ids and is never trusted for who may give what away.
         /// </summary>
+        /// <remarks>
+        /// Everything runs on the game thread, resolution included. Resolving ids and testing authority
+        /// reads campaign state - OwnerClan, Kingdom, IsAlive - and doing that on the network thread both
+        /// races the game loop and judges the request against a world that a queued action may be about
+        /// to change, so a request could be refused on state that was already stale when it was read.
+        /// </remarks>
         private void Handle(MessagePayload<NetworkRequestSettlementOwnership> obj)
         {
             if (!ModInformation.IsServer) return;
             if (!(obj.Who is NetPeer peer)) return;
 
             var payload = obj.What;
+
+            GameThread.RunSafe(
+                () => ProcessGiftRequest(peer, payload),
+                context: nameof(NetworkRequestSettlementOwnership));
+        }
+
+        /// <summary>[Server, game thread] Validates and applies a gift, telling the requester on refusal.</summary>
+        private void ProcessGiftRequest(NetPeer peer, NetworkRequestSettlementOwnership payload)
+        {
             if (!playerManager.TryGetPlayer(peer, out var player) ||
                 !objectManager.TryGetObject(player.HeroId, out Hero requestingHero))
             {
-                Logger.Warning("Settlement gift rejected: the requesting player could not be identified");
+                RejectGift(peer, "The server could not identify the requesting player.",
+                    "Settlement gift rejected: the requesting player could not be identified");
                 return;
             }
 
             if (!objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) ||
                 !objectManager.TryGetObject(payload.NewOwnerId, out Hero newOwner))
             {
-                Logger.Warning("Settlement gift rejected: settlement {Settlement} or hero {Hero} is unknown",
+                RejectGift(peer, "That settlement or recipient is no longer available.",
+                    "Settlement gift rejected: settlement {Settlement} or hero {Hero} is unknown",
                     payload.SettlementId, payload.NewOwnerId);
                 return;
             }
 
-            // Cheap pre-filter, so an obviously invalid request never reaches the game thread at all.
             if (!CanGift(requestingHero, settlement, newOwner, out var reason))
             {
-                Logger.Warning("Settlement gift of {Settlement} by {Hero} rejected: {Reason}",
+                RejectGift(peer, $"The settlement could not be given: {reason}.",
+                    "Settlement gift of {Settlement} by {Hero} rejected: {Reason}",
                     settlement.StringId, requestingHero.StringId, reason);
                 return;
             }
 
             // ApplyByGift re-enters ChangeOwnerOfSettlementPatch on the server, which publishes
             // SettlementOwnershipChanged and replicates to every client.
-            GameThread.RunSafe(
-                () =>
-                {
-                    // Re-derived here as well, because the check above ran on the network thread and this
-                    // action only runs once the game thread gets to it. In between, ownership or kingdom
-                    // membership can change - the fief can be captured, sold, or the clan can leave the
-                    // realm - and the queued request would then transfer a settlement the requester is no
-                    // longer entitled to give away. This is the check that actually guards the transfer.
-                    if (!CanGift(requestingHero, settlement, newOwner, out var lateReason))
-                    {
-                        Logger.Warning(
-                            "Settlement gift of {Settlement} by {Hero} rejected on apply: {Reason}",
-                            settlement.StringId, requestingHero.StringId, lateReason);
-                        return;
-                    }
+            ApplyGiftRelationBonus(settlement, newOwner);
+            ChangeOwnerOfSettlementAction.ApplyByGift(settlement, newOwner);
+        }
 
-                    ApplyGiftRelationBonus(settlement, newOwner);
-                    ChangeOwnerOfSettlementAction.ApplyByGift(settlement, newOwner);
-                },
-                context: nameof(NetworkRequestSettlementOwnership));
+        /// <summary>
+        /// Logs the refusal and tells the requester, so a late failure is not the same silent no-op
+        /// this feature exists to fix.
+        /// </summary>
+        private void RejectGift(NetPeer peer, string playerReason, string logTemplate, params object[] logArgs)
+        {
+            Logger.Warning(logTemplate, logArgs);
+            network.Send(peer, new NetworkSettlementGiftRejected(playerReason));
+        }
+
+        /// <summary>Client side: surface a refused gift, which the kingdom screen has already closed.</summary>
+        private void Handle(MessagePayload<NetworkSettlementGiftRejected> obj)
+        {
+            if (!ModInformation.IsClient) return;
+
+            var reason = obj.What.Reason;
+            if (string.IsNullOrWhiteSpace(reason)) reason = "The settlement could not be given.";
+
+            InformationManager.DisplayMessage(new InformationMessage(reason));
         }
 
         /// <summary>
@@ -156,14 +179,17 @@ namespace GameInterface.Services.Settlements.Handlers
                 return false;
             }
 
-            // Either the owning clan's leader gives away their own fief, or the kingdom's ruler
-            // grants one held by their realm - the two cases vanilla's Give Settlement covers.
+            // Ownership, and nothing else - this mirrors vanilla exactly. KingdomSettlementVM.ExecuteAnnex
+            // opens the gift popup only when settlement.OwnerClan.Leader == Hero.MainHero, and offers the
+            // ANNEX action (which costs influence) to everyone else; _onGrantFief is invoked nowhere else.
+            // So a kingdom ruler cannot gift a vassal's fief - that is an annex, not a gift - and a vassal
+            // CAN gift their own. Requiring ownership also closes the replay hole: once the gift lands the
+            // giver no longer owns the fief, so a stale duplicate request finds a different owner and is
+            // refused, instead of moving the settlement a second time.
             var kingdom = ownerClan.Kingdom;
-            bool isOwner = ownerClan.Leader == requestingHero;
-            bool isRuler = kingdom != null && kingdom.Leader == requestingHero;
-            if (!isOwner && !isRuler)
+            if (ownerClan.Leader != requestingHero)
             {
-                reason = "the requester neither owns the settlement nor rules its kingdom";
+                reason = "the requester does not own the settlement";
                 return false;
             }
 
