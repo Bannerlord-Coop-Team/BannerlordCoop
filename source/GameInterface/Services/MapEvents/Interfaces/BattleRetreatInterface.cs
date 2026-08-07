@@ -36,6 +36,12 @@ public interface IBattleRetreatInterface : IGameAbstraction
     /// [Server, game thread] Applies the troop loss for a party that broke into a besieged settlement.
     /// </summary>
     void ApplyBreakInCasualties(MobileParty requester, Settlement settlement);
+
+    /// <summary>
+    /// [Server, game thread] Takes a party out of the battle whose MISSION it just left unresolved.
+    /// Returns false if the request does not apply, in which case nothing was mutated.
+    /// </summary>
+    bool TryLeaveBattleAfterMissionRetreat(MobileParty requester, MapEvent battle);
 }
 
 internal class BattleRetreatInterface : IBattleRetreatInterface
@@ -79,6 +85,54 @@ internal class BattleRetreatInterface : IBattleRetreatInterface
         Logger.Debug("Applied retreat for {PartyId}: {Sacrificed} troops, {Cleared} camps cleared",
             requester.StringId, sacrificed, campClearedPartyIds.Length);
 
+        return true;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Leaving a battle mission without resolving it is a retreat, but until now only the retreating player's
+    /// AGENTS went away (BattleAuthorityMigrator withdraws them on every client) - the party itself stayed on
+    /// its side of the map event. In a two-player siege that stranded both of them: the attacker was gone from
+    /// the field but still an attacker, so the battle could never conclude, and the defender - who cannot
+    /// evaluate any end condition at all while a BattleDeploymentHandler is on its mission - sat in deployment
+    /// facing an enemy that no longer existed, with both parties still counted in the map event.
+    ///
+    /// BattleState is deliberately left at None. A victory state is what forfeits the losing side's roster and
+    /// captures its heroes; charging that to someone who walked out of an assault would take their whole army
+    /// prisoner. Vanilla ends an abandoned assault with no victor and keeps the siege, which is exactly what
+    /// the finalize below does.
+    /// </remarks>
+    public bool TryLeaveBattleAfterMissionRetreat(MobileParty requester, MapEvent battle)
+    {
+        if (requester?.Party == null || battle == null) return false;
+
+        // A battle that already produced a result finalizes through the completion barrier instead; that path
+        // owns the rosters, so a late leave message must not divert it.
+        if (battle.IsFinalized || battle.BattleState != BattleState.None) return false;
+
+        var side = requester.Party.MapEventSide;
+        if (side == null || side.MapEvent != battle) return false;
+
+        // The last party of a side cannot simply be detached: PartyBase's setter reaches vanilla's
+        // RemovePartyInternal, which finalizes the whole event itself once the side empties - bypassing the
+        // coop finalize, and with it the reserve cleanup, the siege that has to survive an unvictorious
+        // assault, and the encounter close every remaining player needs. Hand it to the finalize handler,
+        // which does all of that once and in the right order.
+        if (side.Parties.Count <= 1)
+        {
+            Logger.Debug("Mission retreat of {PartyId} emptied its side of {BattleId}; finalizing the battle",
+                requester.StringId, battle.StringId);
+            MessageBroker.Instance.Publish(this, new MapEventFinalizeAttempted(battle));
+            return true;
+        }
+
+        // Other parties are still fighting on this side, so the battle goes on without this one.
+        var left = new List<PartyBase>();
+        if (Detach(requester.Party)) left.Add(requester.Party);
+        BroadcastLeft(left, requester.Party);
+
+        Logger.Debug("Applied mission retreat for {PartyId}: left battle {BattleId}",
+            requester.StringId, battle.StringId);
         return true;
     }
 

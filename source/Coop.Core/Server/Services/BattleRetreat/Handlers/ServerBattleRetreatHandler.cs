@@ -6,6 +6,7 @@ using Common.Util;
 using Coop.Core.Client.Services.BattleRetreat.Messages;
 using Coop.Core.Server.Services.BattleRetreat.Messages;
 using GameInterface.Services.MapEvents.Interfaces;
+using GameInterface.Services.MapEvents.Messages.Retreat;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -42,7 +43,46 @@ internal class ServerBattleRetreatHandler : IHandler
         this.playerManager = playerManager;
         this.retreatInterface = retreatInterface;
         messageBroker.Subscribe<NetworkRequestBattleRetreat>(Handle);
+        messageBroker.Subscribe<NetworkRequestBattleMissionRetreat>(HandleMissionRetreat);
+        messageBroker.Subscribe<BattleMissionRetreatAttempted>(HandleHostMissionRetreat);
         messageBroker.Subscribe<NetworkRequestBreakInCasualties>(HandleBreakInCasualties);
+    }
+
+    /// <summary>
+    /// A client left a battle mission without resolving it: take its party out of the battle.
+    /// </summary>
+    private void HandleMissionRetreat(MessagePayload<NetworkRequestBattleMissionRetreat> payload)
+    {
+        var obj = payload.What;
+        var peer = (NetPeer)payload.Who;
+
+        GameThread.RunSafe(() =>
+        {
+            // Same ownership rule as the get-away retreat: a peer may only pull out the party it controls.
+            if (!playerManager.TryGetPlayer(peer, out var player) ||
+                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var owned) ||
+                !objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var requested) ||
+                !ReferenceEquals(owned, requested))
+            {
+                Logger.Warning("Peer reported a mission retreat for party {PartyId} it does not own", obj.PartyId);
+                return;
+            }
+
+            if (!objectManager.TryGetObject<MapEvent>(obj.MapEventId, out var battle)) return;
+
+            retreatInterface.TryLeaveBattleAfterMissionRetreat(requested, battle);
+        });
+    }
+
+    /// <summary>
+    /// The host's own battle mission ended without resolving. There is no peer to derive ownership from -
+    /// the event is raised locally by the mission the host was in, so its party is already the right one.
+    /// </summary>
+    private void HandleHostMissionRetreat(MessagePayload<BattleMissionRetreatAttempted> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() => retreatInterface.TryLeaveBattleAfterMissionRetreat(obj.Party, obj.Battle));
     }
 
     private void Handle(MessagePayload<NetworkRequestBattleRetreat> payload)
@@ -111,6 +151,8 @@ internal class ServerBattleRetreatHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkRequestBattleRetreat>(Handle);
+        messageBroker.Unsubscribe<NetworkRequestBattleMissionRetreat>(HandleMissionRetreat);
+        messageBroker.Unsubscribe<BattleMissionRetreatAttempted>(HandleHostMissionRetreat);
         messageBroker.Unsubscribe<NetworkRequestBreakInCasualties>(HandleBreakInCasualties);
     }
 }
