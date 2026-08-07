@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -275,13 +276,9 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             depositedManCount = serverDeposited.TotalManCount;
         });
 
-        // 3. Persistence: round-trip the registry through VillageNeedsToolsIssueBehavior's own SyncData exactly
-        // like a real save+reload would, on the server (the machine whose own save a reconnect restores from).
-        // By this point no further async delivery is pending, so the count captured just above is now stable
-        // and reused as the precise expectation for the rest of this test.
         Server.Call(() =>
         {
-            var behavior = new VillageNeedsToolsIssueBehavior();
+            var behavior = new IssuesCampaignBehavior();
             var records = new Dictionary<string, object>();
 
             behavior.SyncData(new TestDataStore(isSaving: true, records));

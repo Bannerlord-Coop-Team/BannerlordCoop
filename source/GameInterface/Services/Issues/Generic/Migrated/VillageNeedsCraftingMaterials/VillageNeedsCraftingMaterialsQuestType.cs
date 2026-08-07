@@ -18,6 +18,7 @@ namespace GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMat
 using Issue = VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue;
 using Quest = VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest;
 
+[QuestTypeModule]
 internal static class VillageNeedsCraftingMaterialsQuestType
 {
     private static readonly FieldInfo RequestedItemField = AccessTools.Field(typeof(Issue), "_requestedItem");

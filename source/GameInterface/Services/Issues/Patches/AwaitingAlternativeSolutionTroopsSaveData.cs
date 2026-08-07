@@ -7,13 +7,13 @@ using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.Issues.Patches;
 
-/// <summary>Save-system representation of one owner's pending <see cref="AwaitingAlternativeSolutionTroopsRegistry"/> entry.</summary>
 internal sealed class AwaitingAlternativeSolutionTroopsSaveData
 {
     [SaveableField(1)]
@@ -53,15 +53,7 @@ public sealed class AwaitingAlternativeSolutionTroopsSaveableTypeDefiner : Savea
     }
 }
 
-/// <summary>
-/// Persists <see cref="AwaitingAlternativeSolutionTroopsRegistry"/> piggybacked on
-/// <see cref="VillageNeedsToolsIssueBehavior"/>'s own <c>SyncData</c>.
-/// Also migrates vanilla's legacy <c>IssueManager._awaitingAlternativeSolutionTroops</c> field: a campaign
-/// imported from a single-player save (or a pre-fix coop save) can have a non-empty legacy field with no
-/// per-owner attribution, which would otherwise sit unreachable forever. Best-effort attribution: migrated
-/// onto the server's own local <c>ControllerId</c>, then the legacy field is cleared. Server-only.
-/// </summary>
-[HarmonyPatch(typeof(VillageNeedsToolsIssueBehavior))]
+[HarmonyPatch(typeof(IssuesCampaignBehavior))]
 internal class AwaitingAlternativeSolutionTroopsPersistencePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AwaitingAlternativeSolutionTroopsPersistencePatches>();
@@ -71,7 +63,7 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
     private static readonly System.Reflection.FieldInfo LegacyAwaitingTroopsField =
         AccessTools.Field(typeof(IssueManager), "_awaitingAlternativeSolutionTroops");
 
-    [HarmonyPatch(nameof(VillageNeedsToolsIssueBehavior.SyncData))]
+    [HarmonyPatch(nameof(IssuesCampaignBehavior.SyncData))]
     [HarmonyPostfix]
     private static void SyncDataPostfix(IDataStore dataStore)
     {

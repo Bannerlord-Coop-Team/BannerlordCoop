@@ -4,17 +4,6 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Interfaces;
 
-/// <summary>
-/// Issue types that can ride the shared accept mirror (<see cref="Patches.IssueAcceptancePatches"/> +
-/// <see cref="VillageNeedsToolsIssueInterface.MirrorQuestAccepted"/>/<see cref="VillageNeedsToolsIssueInterface.MirrorAlternativeAccepted"/>)
-/// unchanged. A type belongs in <see cref="QuestSolutionMirrorEligible"/> only if every field its
-/// <c>GenerateIssueQuest</c>/Quest constructor reads is already frozen (and, if per-client-divergent,
-/// captured+forced) at creation time - types that roll something genuinely per-client-divergent at accept
-/// time instead need their own bespoke Interfaces/*IssueInterface.cs. A type belongs in
-/// <see cref="AlternativeSolutionMirrorEligible"/> only if it has <c>IsThereAlternativeSolution == true</c> and
-/// needs no additional per-client-divergent field beyond what <c>MirrorAlternativeAccepted</c> already forces
-/// (issue state + <c>IsTriedToSolveBefore</c> + due time).
-/// </summary>
 internal static class GenericAcceptMirrorIssueTypes
 {
     internal static readonly HashSet<Type> QuestSolutionMirrorEligible = new HashSet<Type>

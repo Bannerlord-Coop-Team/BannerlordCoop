@@ -13,25 +13,6 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Patches;
 
-/// <summary>
-/// Same bug/fix shape as <see cref="VillageNeedsToolsAlternativeSolutionOwnershipGatePatch"/>/
-/// <see cref="VillageNeedsCraftingMaterialsAlternativeSolutionOwnershipGatePatch"/> (see the former's doc
-/// comment for the full derivation), consolidated into ONE shared patch/HourlyTick-scan pair covering every
-/// NEW issue type that has <c>IsThereAlternativeSolution == true</c>: <c>LordNeedsHorsesIssue</c>,
-/// <c>CapturedByBountyHuntersIssue</c>, <c>LandlordTrainingForRetainersIssue</c>,
-/// <c>GangLeaderNeedsRecruitsIssue</c>, and (Tier 1 Group 1B) <c>LandLordNeedsManualLaborersIssue</c>,
-/// <c>HeadmanVillageNeedsDraughtAnimalsIssue</c>, <c>LordNeedsGarrisonTroopsIssue</c>, and (Tier 1 Group 1C/1D
-/// plus Village Needs Grain Seeds) <c>NearbyBanditBaseIssue</c>, <c>LandLordTheArtOfTheTradeIssue</c>,
-/// <c>RuralNotableInnAndOutIssue</c>, <c>ProdigalSonIssue</c>, <c>TheSpyPartyIssue</c>,
-/// <c>HeadmanNeedsGrainIssue</c> - all need the
-/// identical fix (gate the real
-/// <c>CompleteIssueWithAlternativeSolution</c> consequence to the recorded owner only, plus an
-/// unconditional, ownership-self-limiting <c>HourlyTickEvent</c> listener so the machine that actually needs
-/// to trigger it - very often a remote client, not the server - has a reason to). Written once here instead
-/// of as four more near-identical copies of Tools'/Crafting Materials' own two-class pattern; Tools' and
-/// Crafting Materials' existing patches are left untouched (independently verified, no need to fold them into
-/// this shared version).
-/// </summary>
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAlternativeSolution))]
 internal class NewIssueTypesAlternativeSolutionOwnershipGatePatch
 {
@@ -45,7 +26,6 @@ internal class NewIssueTypesAlternativeSolutionOwnershipGatePatch
     }
 }
 
-/// <summary>See <see cref="NewIssueTypesAlternativeSolutionOwnershipGatePatch"/>'s doc comment.</summary>
 [HarmonyPatch]
 internal class NewIssueTypesAlternativeSolutionCompletionPatches
 {

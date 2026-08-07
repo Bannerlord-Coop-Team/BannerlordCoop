@@ -138,13 +138,6 @@ internal static class SimpleIssueFactoryRegistry
         return true;
     }
 
-    /// <summary>
-    /// Builds (via the real constructor - safe, since these types roll nothing that needs forcing) and
-    /// registers a replicated issue for <paramref name="key"/>/<paramref name="owner"/>, replaying
-    /// <see cref="IssueManager.CreateNewIssue"/>'s own bookkeeping via a custom <see cref="PotentialIssueData"/> -
-    /// same technique as e.g. <see cref="VillageNeedsToolsIssueInterface.RegisterReplicated"/>. Returns false
-    /// (no-op) if <paramref name="key"/> is unknown.
-    /// </summary>
     internal static bool TryConstructAndRegister(string key, Hero owner)
     {
         if (owner == null || !ByKey.TryGetValue(key, out var entry)) return false;

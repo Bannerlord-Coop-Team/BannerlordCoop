@@ -17,6 +17,7 @@ namespace GameInterface.Services.Issues.Generic.Migrated.VillageNeedsTools;
 using Issue = VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue;
 using Quest = VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest;
 
+[QuestTypeModule]
 internal static class VillageNeedsToolsQuestType
 {
     private static readonly FieldInfo ExchangeItemField = AccessTools.Field(typeof(Issue), "_exchangeItem");
