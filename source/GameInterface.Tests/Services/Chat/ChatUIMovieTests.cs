@@ -46,7 +46,7 @@ public class ChatUIMovieTests
         var ribbon = FindById(document, "CoopChatRibbon");
         Assert.Equal("Right", ribbon.Attribute("HorizontalAlignment")?.Value);
         Assert.Equal("Bottom", ribbon.Attribute("VerticalAlignment")?.Value);
-        Assert.Equal("101", ribbon.Attribute("MarginBottom")?.Value);
+        Assert.Equal("187", ribbon.Attribute("MarginBottom")?.Value);
         Assert.Null(ribbon.Attribute("PositionYOffset"));
         Assert.Equal("@IsRibbonVisible", ribbon.Attribute("IsVisible")?.Value);
 

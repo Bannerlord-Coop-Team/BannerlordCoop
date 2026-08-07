@@ -4,7 +4,7 @@
       <Children>
         <Widget Id="CoopChatRibbon" WidthSizePolicy="Fixed" SuggestedWidth="150"
                 HeightSizePolicy="Fixed" SuggestedHeight="58"
-                HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="101"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="187"
                 IsVisible="@IsRibbonVisible">
           <Children>
             <ButtonWidget Id="CoopChatRibbonButton" DoNotPassEventsToChildren="true"
