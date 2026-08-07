@@ -49,6 +49,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
     public void MissionStart_WoundedSoleOpponent_FinalizesWithoutOpeningMission()
     {
         var setup = SetupTwoOpposingPlayersInBattle();
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "1");
 
         Server.Call(() =>
         {

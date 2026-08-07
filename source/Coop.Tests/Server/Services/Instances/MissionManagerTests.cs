@@ -1,6 +1,7 @@
 ﻿using Coop.Core.Server.Services.Instances;
 using LiteNetLib;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using Xunit;
@@ -22,13 +23,13 @@ public class MissionManagerTests
         var first = CreatePeer(1);
         var second = CreatePeer(2);
 
-        Assert.True(manager.TryEnterMission(first, "first", "battle", out var firstExisting, out var isFirst));
-        Assert.True(isFirst);
-        Assert.Empty(firstExisting);
+        Assert.True(manager.TryEnterMission(first, "first", "battle", out var firstEntry));
+        Assert.True(firstEntry.IsFirstMember);
+        Assert.Empty(firstEntry.ExistingMembers);
 
-        Assert.True(manager.TryEnterMission(second, "second", "battle", out var secondExisting, out isFirst));
-        Assert.False(isFirst);
-        Assert.Single(secondExisting);
+        Assert.True(manager.TryEnterMission(second, "second", "battle", out var secondEntry));
+        Assert.False(secondEntry.IsFirstMember);
+        Assert.Single(secondEntry.ExistingMembers);
     }
 
     [Fact]
@@ -37,7 +38,7 @@ public class MissionManagerTests
         var manager = new MissionManager();
 
         Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
-        Assert.False(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _, out _));
+        Assert.False(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _));
         manager.CompleteInstanceConclusion("battle", succeeded: true);
     }
 
@@ -54,7 +55,7 @@ public class MissionManagerTests
         Assert.False(manager.TryGetControllers("battle", out _));
         Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
         manager.CompleteInstanceConclusion("battle", succeeded: true);
-        Assert.False(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _, out _));
+        Assert.False(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _));
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public class MissionManagerTests
 
         Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
         manager.CompleteInstanceConclusion("battle", succeeded: false);
-        Assert.True(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _, out _));
+        Assert.True(manager.TryEnterMission(CreatePeer(1), "late", "battle", out _));
     }
 
     [Fact]
@@ -77,10 +78,10 @@ public class MissionManagerTests
     {
         var manager = new MissionManager();
 
-        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _, out _));
+        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _));
         Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "host" }));
         manager.CompleteInstanceConclusion("battle", succeeded: true);
-        Assert.False(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _, out _));
+        Assert.False(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _));
     }
 
     [Fact]
@@ -88,11 +89,11 @@ public class MissionManagerTests
     {
         var manager = new MissionManager();
 
-        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _, out _));
+        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _));
         Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "host" }));
         manager.CompleteInstanceConclusion("battle", succeeded: false);
 
-        Assert.True(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _, out _));
+        Assert.True(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _));
         Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "host", "late" }));
     }
 
@@ -101,10 +102,191 @@ public class MissionManagerTests
     {
         var manager = new MissionManager();
 
-        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _, out _));
-        Assert.True(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _, out _));
+        Assert.True(manager.TryEnterMission(CreatePeer(1), "host", "battle", out _));
+        Assert.True(manager.TryEnterMission(CreatePeer(2), "late", "battle", out _));
 
         Assert.False(manager.TryBeginActiveInstanceConclusion("battle", new[] { "host" }));
+    }
+
+    [Fact]
+    public void DuplicateEntryDoesNotChangeMembership()
+    {
+        var manager = new MissionManager();
+        var peer = CreatePeer(1);
+
+        Assert.True(manager.TryEnterMission(peer, "host", "battle", out _));
+        Assert.True(manager.TryEnterMission(peer, "host", "battle", out var duplicate));
+
+        Assert.Equal(MissionEntryStatus.Unchanged, duplicate.Status);
+        Assert.Empty(duplicate.ExistingMembers);
+        Assert.Empty(duplicate.PreviousDepartures);
+        Assert.True(manager.TryGetControllers("battle", out var controllers));
+        Assert.Equal(new[] { "host" }, controllers);
+    }
+
+    [Fact]
+    public void EntryAfterMissedLeaveMovesMembershipAtomically()
+    {
+        var manager = new MissionManager();
+        var movingPeer = CreatePeer(1);
+        var survivorPeer = CreatePeer(2);
+
+        Assert.True(manager.TryEnterMission(movingPeer, "moving", "old", out _));
+        Assert.True(manager.TryEnterMission(survivorPeer, "survivor", "old", out _));
+
+        Assert.True(manager.TryEnterMission(movingPeer, "moving", "new", out var moved));
+
+        var departure = Assert.Single(moved.PreviousDepartures);
+        Assert.Equal("moving", departure.ControllerId);
+        Assert.Equal("old", departure.InstanceId);
+        Assert.Equal("survivor", Assert.Single(departure.RemainingMembers).controllerId);
+        Assert.True(manager.TryGetControllers("old", out var oldControllers));
+        Assert.Equal(new[] { "survivor" }, oldControllers);
+        Assert.True(manager.TryGetControllers("new", out var newControllers));
+        Assert.Equal(new[] { "moving" }, newControllers);
+        Assert.False(manager.TryGetRelayTarget(movingPeer, "old", "survivor", out _));
+    }
+
+    [Fact]
+    public void ReconnectReplacesRouteWithoutLogicalDeparture()
+    {
+        var manager = new MissionManager();
+        var oldPeer = CreatePeer(1);
+        var replacementPeer = CreatePeer(2);
+        var observerPeer = CreatePeer(3);
+
+        Assert.True(manager.TryEnterMission(oldPeer, "host", "battle", out _));
+        Assert.True(manager.TryEnterMission(observerPeer, "observer", "battle", out _));
+
+        Assert.True(manager.TryEnterMission(replacementPeer, "host", "battle", out var replacement));
+
+        Assert.Equal(MissionEntryStatus.Reconnected, replacement.Status);
+        Assert.Empty(replacement.PreviousDepartures);
+        Assert.Equal("observer", Assert.Single(replacement.ExistingMembers).controllerId);
+        Assert.False(manager.TryGetRelayTarget(oldPeer, "battle", "observer", out _));
+        Assert.True(manager.TryGetRelayTarget(observerPeer, "battle", "host", out var hostPeer));
+        Assert.Same(replacementPeer, hostPeer);
+        Assert.Empty(manager.HandleDisconnect(oldPeer));
+    }
+
+    [Fact]
+    public void DisconnectCleansEveryMembershipTiedToPeer()
+    {
+        var manager = new MissionManager();
+        var peer = CreatePeer(1);
+        Assert.True(manager.TryEnterMission(peer, "current", "current-instance", out _));
+
+        var byInstanceIdField = typeof(MissionManager).GetField(
+            "byInstanceId",
+            BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var instances = (Dictionary<string, MissionInstance>)byInstanceIdField.GetValue(manager)!;
+        var staleInstance = new MissionInstance("stale-instance");
+        staleInstance.Memberships.Add(new MissionMembership("stale", peer, staleInstance));
+        instances[staleInstance.Id] = staleInstance;
+
+        var departures = manager.HandleDisconnect(peer);
+
+        Assert.Equal(2, departures.Count);
+        Assert.Contains(departures, departure => departure.ControllerId == "current");
+        Assert.Contains(departures, departure => departure.ControllerId == "stale");
+        Assert.False(manager.TryGetControllers("current-instance", out _));
+        Assert.False(manager.TryGetControllers("stale-instance", out _));
+    }
+
+    [Fact]
+    public void FailedLeaveReturnsNoDeparture()
+    {
+        var manager = new MissionManager();
+        var peer = CreatePeer(1);
+
+        Assert.True(manager.TryEnterMission(peer, "host", "battle", out _));
+
+        Assert.False(manager.TryLeaveMission(peer, "stale-id", "battle", out _));
+        Assert.False(manager.TryLeaveMission(peer, "host", "other", out _));
+        Assert.False(manager.TryLeaveMission(CreatePeer(2), "host", "battle", out _));
+        Assert.True(manager.TryGetControllers("battle", out var controllers));
+        Assert.Equal(new[] { "host" }, controllers);
+    }
+
+    [Fact]
+    public void RelayRequiresCurrentSourceAndTargetInSameInstance()
+    {
+        var manager = new MissionManager();
+        var source = CreatePeer(1);
+        var target = CreatePeer(2);
+        var other = CreatePeer(3);
+
+        Assert.True(manager.TryEnterMission(source, "source", "battle", out _));
+        Assert.True(manager.TryEnterMission(target, "target", "battle", out _));
+        Assert.True(manager.TryEnterMission(other, "other", "other-battle", out _));
+
+        Assert.True(manager.TryGetRelayTarget(source, "battle", "target", out var resolved));
+        Assert.Same(target, resolved);
+        Assert.False(manager.TryGetRelayTarget(source, "battle", "other", out _));
+        Assert.False(manager.TryGetRelayTarget(other, "battle", "target", out _));
+
+        manager.RevokeRelay(target);
+        Assert.False(manager.TryGetRelayTarget(source, "battle", "target", out _));
+        Assert.True(manager.TryLeaveMission(target, "target", "battle", out _));
+        Assert.True(manager.TryEnterMission(target, "target", "battle", out _));
+
+        manager.RevokeRelay(source);
+        Assert.False(manager.TryGetRelayTarget(source, "battle", "target", out _));
+        Assert.True(manager.TryLeaveMission(source, "source", "battle", out _));
+        Assert.False(manager.TryGetRelayTarget(source, "battle", "target", out _));
+    }
+
+    [Fact]
+    public void FailedLeaveClearsItsTemporaryPeerFence()
+    {
+        var manager = new MissionManager();
+        var source = CreatePeer(1);
+        var target = CreatePeer(2);
+
+        Assert.True(manager.TryEnterMission(source, "source", "battle", out _));
+        Assert.True(manager.TryEnterMission(target, "target", "battle", out _));
+
+        manager.RevokeRelay(source);
+        Assert.False(manager.TryGetRelayTarget(source, "battle", "target", out _));
+        Assert.False(manager.TryLeaveMission(source, "source", string.Empty, out _));
+        Assert.True(manager.TryGetRelayTarget(source, "battle", "target", out _));
+    }
+
+    [Fact]
+    public void EarlierFailedLeaveDoesNotClearLaterLeaveFence()
+    {
+        var manager = new MissionManager();
+        var source = CreatePeer(1);
+        var target = CreatePeer(2);
+
+        Assert.True(manager.TryEnterMission(source, "source", "battle", out _));
+        Assert.True(manager.TryEnterMission(target, "target", "battle", out _));
+
+        manager.RevokeRelay(source);
+        manager.RevokeRelay(source);
+        Assert.False(manager.TryLeaveMission(source, "source", "stale-battle", out _));
+
+        Assert.False(manager.TryGetRelayTarget(source, "battle", "target", out _));
+        Assert.True(manager.TryLeaveMission(source, "source", "battle", out _));
+    }
+
+    [Fact]
+    public void DisconnectRevocationDoesNotTransferToReconnectReplacement()
+    {
+        var manager = new MissionManager();
+        var oldPeer = CreatePeer(1);
+        var replacementPeer = CreatePeer(2);
+        var observerPeer = CreatePeer(3);
+
+        Assert.True(manager.TryEnterMission(oldPeer, "host", "battle", out _));
+        Assert.True(manager.TryEnterMission(observerPeer, "observer", "battle", out _));
+
+        manager.RevokeRelay(oldPeer);
+        Assert.True(manager.TryEnterMission(replacementPeer, "host", "battle", out _));
+        Assert.Empty(manager.HandleDisconnect(oldPeer));
+
+        Assert.True(manager.TryGetRelayTarget(observerPeer, "battle", "host", out var resolved));
+        Assert.Same(replacementPeer, resolved);
     }
 
     private static NetPeer CreatePeer(int id)

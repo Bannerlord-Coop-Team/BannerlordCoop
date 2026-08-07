@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -171,6 +171,7 @@ internal sealed class PeaceBarterHandler : IHandler
             Logger.Error(exception, "Failed to apply an authoritative peace barter");
             if (mutationApplied)
             {
+                // Peace is already made server-side; reporting failure would be the desync.
                 Accept(peer, request, playerHero?.Gold ?? 0);
                 return;
             }

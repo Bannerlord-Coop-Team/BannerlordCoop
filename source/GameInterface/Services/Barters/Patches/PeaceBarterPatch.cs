@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Network;
 using GameInterface.Policies;
 using GameInterface.Services.Barters.Messages;
@@ -210,8 +210,13 @@ internal static class PeaceBarterPatch
             return true;
         }
 
+        // Settlement BEFORE map party: a lord's party stays IsActive while the lord is inside a
+        // settlement, so checking the map party first classifies every settlement-menu barter as
+        // MapParty, and the server rejects it for having no conversation hold. Requiring BOTH sides
+        // in the SAME settlement means this cannot steal an ordinary map conversation.
         var settlement = barterData.OffererParty?.MobileParty?.CurrentSettlement;
-        if (settlement != null && barterData.OtherHero?.CurrentSettlement == settlement &&
+        if (settlement != null &&
+            barterData.OtherHero?.CurrentSettlement == settlement &&
             objectManager.TryGetId(settlement, out contextId))
         {
             context = PeaceConversationContext.Settlement;
