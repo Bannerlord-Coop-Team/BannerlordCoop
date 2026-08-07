@@ -37,6 +37,9 @@ public interface ISteamLobbyApi : IDisposable
 /// <summary>Standalone-server discovery operations layered on the existing invite-lobby API.</summary>
 public interface ISteamPublicLobbyApi : ISteamLobbyApi
 {
+    /// <summary>Current Steam server time as Unix seconds, or 0 when unavailable.</summary>
+    uint ServerRealTime { get; }
+
     /// <summary>Creates a browsable public lobby for a standalone server.</summary>
     void CreatePublicLobby(int maxMembers, Action<ulong, bool> onCompleted);
 

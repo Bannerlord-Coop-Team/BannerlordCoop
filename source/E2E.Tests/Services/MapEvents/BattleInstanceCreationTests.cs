@@ -112,10 +112,11 @@ public class BattleInstanceCreationTests : MissionTestEnvironment
                 mapEventId,
                 partyIds[0])), MapEventDisabledMethods);
 
-            // The server hands the mission to the clients: it broadcasts the attack-mission start carrying the
-            // battle's unique map-event id (BR-104), rather than opening a mission itself (BR-002 para 2).
-            var start = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
-            Assert.Equal(mapEventId, start.MapEventId);
+            // The server hands the mission to each authoritative participant, carrying the battle's unique
+            // map-event id (BR-104), rather than opening a mission itself (BR-002 para 2).
+            var starts = Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().ToArray();
+            Assert.Equal(2, starts.Length);
+            Assert.All(starts, start => Assert.Equal(mapEventId, start.MapEventId));
 
             // The event is claimed for the mission mode (so the auto-resolve option is greyed everywhere).
             var mode = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
