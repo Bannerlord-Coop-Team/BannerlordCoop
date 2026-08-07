@@ -20,8 +20,8 @@ namespace GameInterface.Configuration;
 /// client-hosted session that is Documents\Mount and Blade II
 /// Bannerlord\CoopData, beside the mod's CoopMapData. Seeds it from the
 /// module's template when absent, and falls back to defaults if it cannot be
-/// read. During the one-time schema migration it reads legacy difficulty values
-/// from the dedicated server's config; server-process settings remain independent.
+/// read. Existing files are migrated in place by activating formerly commented
+/// settings without replacing active operator values.
 /// </summary>
 internal sealed class ModConfig : IModConfig
 {
@@ -94,22 +94,16 @@ internal sealed class ModConfig : IModConfig
         string path = Path.Combine(dir, FileName);
         try
         {
-            bool seeded = false;
-            if (!File.Exists(path))
-            {
-                MigrateLegacyLocation(dir, path);
-            }
             if (!File.Exists(path))
             {
                 Seed(path);
-                seeded = File.Exists(path);
                 if (!File.Exists(path))
                 {
                     return new ModConfigData();
                 }
             }
 
-            MigrateDifficultySettings(dir, path, seeded || MatchesShippedTemplate(path));
+            MigrateDifficultySettings(path);
 
             var loaded = JsonConvert.DeserializeObject<ModConfigData>(File.ReadAllText(path), MakeSettings())
                 ?? new ModConfigData();
@@ -126,13 +120,12 @@ internal sealed class ModConfig : IModConfig
     }
 
     /// <summary>
-    /// Difficulty originally lived as flat properties in the dedicated server's
-    /// server-config.json, then moved into mod-config.json. Existing mod-config
-    /// values win; otherwise a legacy server value is ported, then a formerly
-    /// commented mod-config default is activated. The edit is deliberately textual
-    /// so operator comments, ordering and unrelated settings remain untouched.
+    /// Activates difficulty settings that older templates shipped as comments.
+    /// Existing active values win and entirely missing settings receive their
+    /// documented defaults. The edit is deliberately textual so operator comments,
+    /// ordering, and unrelated settings remain untouched.
     /// </summary>
-    private static void MigrateDifficultySettings(string directory, string path, bool legacyWins)
+    private static void MigrateDifficultySettings(string path)
     {
         string original = File.ReadAllText(path);
         JObject root;
@@ -147,7 +140,6 @@ internal sealed class ModConfig : IModConfig
             return;
         }
 
-        IDictionary<string, JToken> legacyValues = ReadLegacyServerDifficulty(directory);
         JToken difficultyToken = root.GetValue("difficulty", StringComparison.OrdinalIgnoreCase);
         if (difficultyToken == null)
         {
@@ -155,11 +147,8 @@ internal sealed class ModConfig : IModConfig
             var properties = new List<string>();
             foreach (string key in FormerlyCommentedDifficultyKeys)
             {
-                JToken value = legacyValues.TryGetValue(key, out JToken legacyValue)
-                    ? legacyValue
-                    : DifficultyDefaults[key];
                 properties.Add("    \"" + key + "\": " +
-                    value.ToString(Formatting.None) + ",");
+                    DifficultyDefaults[key].ToString(Formatting.None) + ",");
             }
             string block = Environment.NewLine + "  \"difficulty\": {" +
                 Environment.NewLine + string.Join(Environment.NewLine, properties) +
@@ -192,27 +181,9 @@ internal sealed class ModConfig : IModConfig
         var insertions = new List<string>();
         foreach (string key in FormerlyCommentedDifficultyKeys)
         {
-            legacyValues.TryGetValue(key, out JToken legacyValue);
             JToken existing = difficulty.GetValue(key, StringComparison.OrdinalIgnoreCase);
             if (existing != null)
             {
-                if (legacyWins && legacyValue != null)
-                {
-                    string activeBlock = migrated.Substring(openBrace, closeBrace - openBrace + 1);
-                    string activePattern = "^(?<indent>[\\t ]*)(?<setting>\\\"" +
-                        Regex.Escape(key) + "\\\"[\\t ]*:[\\t ]*)(?<value>\\\"[^\\\"\\r\\n]*\\\"|true|false)(?<rest>[\\t ]*,?.*)$";
-                    Match activeLine = Regex.Match(activeBlock, activePattern,
-                        RegexOptions.Multiline | RegexOptions.IgnoreCase);
-                    if (activeLine.Success)
-                    {
-                        string replacement = activeLine.Groups["indent"].Value +
-                            activeLine.Groups["setting"].Value + legacyValue.ToString(Formatting.None) +
-                            activeLine.Groups["rest"].Value;
-                        int absolute = openBrace + activeLine.Index;
-                        migrated = migrated.Remove(absolute, activeLine.Length).Insert(absolute, replacement);
-                        closeBrace += replacement.Length - activeLine.Length;
-                    }
-                }
                 continue;
             }
 
@@ -223,11 +194,9 @@ internal sealed class ModConfig : IModConfig
                 RegexOptions.Multiline | RegexOptions.IgnoreCase);
             if (commented.Success)
             {
-                string value = legacyValue == null
-                    ? commented.Groups["value"].Value
-                    : legacyValue.ToString(Formatting.None);
                 string replacement = commented.Groups["indent"].Value +
-                    commented.Groups["setting"].Value + value + commented.Groups["rest"].Value;
+                    commented.Groups["setting"].Value + commented.Groups["value"].Value +
+                    commented.Groups["rest"].Value;
                 int absolute = openBrace + commented.Index;
                 migrated = migrated.Remove(absolute, commented.Length).Insert(absolute, replacement);
                 int delta = replacement.Length - commented.Length;
@@ -235,9 +204,8 @@ internal sealed class ModConfig : IModConfig
                 continue;
             }
 
-            JToken insertedValue = legacyValue ?? DifficultyDefaults[key];
             insertions.Add("    \"" + key + "\": " +
-                insertedValue.ToString(Formatting.None) + ",");
+                DifficultyDefaults[key].ToString(Formatting.None) + ",");
         }
 
         if (insertions.Count > 0)
@@ -270,83 +238,6 @@ internal sealed class ModConfig : IModConfig
         }
     }
 
-    private static IDictionary<string, JToken> ReadLegacyServerDifficulty(string directory)
-    {
-        var values = new Dictionary<string, JToken>(StringComparer.OrdinalIgnoreCase);
-        string direct = Path.Combine(directory, "server-config.json");
-        string nested = Path.Combine(directory, "DedicatedServer", "server-config.json");
-        string[] candidates = new DirectoryInfo(directory).Name.Equals(
-                CoopDataFolderName, StringComparison.OrdinalIgnoreCase)
-            ? new[] { nested, direct }
-            : new[] { direct, nested };
-        string serverPath = Array.Find(candidates, File.Exists);
-        if (serverPath == null)
-        {
-            return values;
-        }
-
-        string text;
-        JObject server;
-        try
-        {
-            text = File.ReadAllText(serverPath);
-            server = JObject.Parse(text);
-        }
-        catch
-        {
-            return values;
-        }
-
-        foreach (string key in FormerlyCommentedDifficultyKeys)
-        {
-            JToken active = server.GetValue(key, StringComparison.OrdinalIgnoreCase);
-            if (IsValidDifficultyValue(key, active))
-            {
-                values[key] = active.DeepClone();
-                continue;
-            }
-
-            string pattern = "^[\\t ]*//[\\t ]*\\\"" + Regex.Escape(key) +
-                "\\\"[\\t ]*:[\\t ]*(?<value>\\\"[^\\\"\\r\\n]*\\\"|true|false)";
-            Match commented = Regex.Match(text, pattern,
-                RegexOptions.Multiline | RegexOptions.IgnoreCase);
-            if (commented.Success)
-            {
-                try
-                {
-                    JToken value = JToken.Parse(commented.Groups["value"].Value);
-                    if (IsValidDifficultyValue(key, value))
-                    {
-                        values[key] = value;
-                    }
-                }
-                catch
-                {
-                    // Ignore an invalid legacy comment and use the mod default.
-                }
-            }
-        }
-        return values;
-    }
-
-    private static bool MatchesShippedTemplate(string path)
-    {
-        string template = ResolveTemplatePath();
-        if (template == null)
-        {
-            return false;
-        }
-        try
-        {
-            return string.Equals(File.ReadAllText(path), File.ReadAllText(template),
-                StringComparison.Ordinal);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private static void ReplaceFile(string path, string contents)
     {
         string temporary = path + ".migration-" + Guid.NewGuid().ToString("N") + ".tmp";
@@ -363,24 +254,6 @@ internal sealed class ModConfig : IModConfig
                 File.Delete(temporary);
             }
         }
-    }
-
-    private static bool IsValidDifficultyValue(string key, JToken value)
-    {
-        if (value == null)
-        {
-            return false;
-        }
-        if (key.Equals("birthAndDeath", StringComparison.OrdinalIgnoreCase) ||
-            key.Equals("autoAllocateClanMemberPerks", StringComparison.OrdinalIgnoreCase))
-        {
-            return value.Type == JTokenType.Boolean;
-        }
-        if (value.Type != JTokenType.String)
-        {
-            return false;
-        }
-        return Enum.TryParse(value.Value<string>(), true, out DifficultyLevel _);
     }
 
     private static int FindMatchingBrace(string text, int openBrace)
@@ -436,32 +309,6 @@ internal sealed class ModConfig : IModConfig
             else if (current == '}' && --depth == 0) return i;
         }
         return -1;
-    }
-
-    /// <summary>
-    /// Builds before CoopData was introduced stored mod-config.json directly in
-    /// Bannerlord's user-data root. Copy that file forward once, but only for the
-    /// recognizable CoopData layout and never over an existing destination.
-    /// Keeping the source makes the migration recoverable if a launch is interrupted.
-    /// </summary>
-    private static void MigrateLegacyLocation(string directory, string path)
-    {
-        var targetDir = new DirectoryInfo(directory);
-        if (!targetDir.Name.Equals(CoopDataFolderName, StringComparison.OrdinalIgnoreCase) ||
-            targetDir.Parent == null)
-        {
-            return;
-        }
-
-        string legacyPath = Path.Combine(targetDir.Parent.FullName, FileName);
-        if (!File.Exists(legacyPath) || File.Exists(path))
-        {
-            return;
-        }
-
-        Directory.CreateDirectory(directory);
-        File.Copy(legacyPath, path);
-        Logger.Information("mod-config.json copied from its legacy user-data location into {Path}", path);
     }
 
     private string ResolveDirectory()
