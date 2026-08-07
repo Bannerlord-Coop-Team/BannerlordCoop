@@ -7,8 +7,10 @@ using GameInterface.Services.Time.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Core.Server.Services.MobileParties;
 
@@ -40,12 +42,18 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
 
     public void Send(NetPeer peer)
     {
-        var parties = Campaign.Current?.CampaignObjectManager?.MobileParties;
-        if (parties == null || !mapTimeTrackerInterface.TryGetCurrentTicks(out long serverTicks))
+        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+        var parties = campaignObjectManager?.MobileParties;
+        var settlements = campaignObjectManager?.Settlements;
+        if (parties == null ||
+            settlements == null ||
+            !mapTimeTrackerInterface.TryGetCurrentTicks(out long serverTicks))
         {
             throw new InvalidOperationException("Cannot capture a join baseline without a loaded campaign");
         }
 
+        var liveParties = new HashSet<MobileParty>(parties);
+        var liveSettlements = new HashSet<Settlement>(settlements);
         var partyStates = new MobilePartyJoinState[parties.Count];
         bool isComplete = true;
         for (int i = 0; i < parties.Count; i++)
@@ -53,6 +61,8 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
             MobileParty party = parties[i];
             if (!mobilePartyBehaviorSnapshot.TryCreateJoinState(
                 party,
+                liveParties,
+                liveSettlements,
                 out MobilePartyJoinState state,
                 out string failure))
             {

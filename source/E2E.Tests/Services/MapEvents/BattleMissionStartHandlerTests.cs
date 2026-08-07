@@ -145,6 +145,52 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         });
     }
 
+    [Fact]
+    public void AttackMissionStart_BackReferenceWithoutMapEventParty_DoesNotOpen()
+    {
+        var mapEvent = CreateServerMapEvent();
+        var outsiderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var client = Clients.First();
+        var missionInitializerResolver = new RecordingMissionInitializerResolver();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var clientBattle));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(outsiderPartyId, out var outsiderParty));
+            var previousMainParty = Campaign.Current.MainParty;
+            Campaign.Current.MainParty = outsiderParty;
+            outsiderParty.Party._mapEventSide = clientBattle.AttackerSide;
+
+            try
+            {
+                Assert.Same(clientBattle, outsiderParty.MapEvent);
+                Assert.DoesNotContain(clientBattle.AttackerSide.Parties, party => party.Party == outsiderParty.Party);
+
+                using var messageBroker = new MessageBroker();
+                using var handler = new BattleMissionStartHandler(
+                    messageBroker,
+                    client.ObjectManager,
+                    client.Resolve<IPlayerManager>(),
+                    client.Resolve<INetwork>(),
+                    client.Resolve<IMapEventLogger>(),
+                    missionInitializerResolver);
+
+                messageBroker.Publish(this, new NetworkStartAttackMission(
+                    mapEvent.MapEventId, 1234, default, mapEvent.AttackerPartyId));
+                GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
+
+                Assert.Equal(0, missionInitializerResolver.CallCount);
+                Assert.Null(PlayerEncounter.Current);
+            }
+            finally
+            {
+                outsiderParty.Party._mapEventSide = null;
+                Campaign.Current.MainParty = previousMainParty;
+                Campaign.Current.PlayerEncounter = null;
+            }
+        });
+    }
+
     private sealed class RecordingMissionInitializerResolver : IBattleMissionInitializerResolver
     {
         public int CallCount { get; private set; }
