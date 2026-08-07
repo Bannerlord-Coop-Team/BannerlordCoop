@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -26,7 +26,6 @@ using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Barters.Handlers;
 
@@ -147,23 +146,6 @@ internal sealed partial class LordBarterHandler : IHandler
         GameThread.RunSafe(() => LordBarterPatch.CompleteRequest(payload.What, presentation), context: nameof(NetworkLordBarterResult));
     }
 
-    /// <summary>Everything the apply phase needs, resolved and validated exactly once.</summary>
-    private readonly struct LordBarterContext
-    {
-        public readonly PartyBase PlayerParty;
-        public readonly Hero TargetHero;
-        public readonly PartyBase TargetParty;
-        public readonly Kingdom TargetKingdom;
-
-        public LordBarterContext(PartyBase playerParty, Hero targetHero, PartyBase targetParty, Kingdom targetKingdom)
-        {
-            PlayerParty = playerParty;
-            TargetHero = targetHero;
-            TargetParty = targetParty;
-            TargetKingdom = targetKingdom;
-        }
-    }
-
     private void ProcessRequest(NetPeer peer, NetworkRequestLordBarter request)
     {
         Hero playerHero = null;
@@ -177,26 +159,98 @@ internal sealed partial class LordBarterHandler : IHandler
                 return;
             }
 
-            if (!TryAuthorizeRequest(peer, request, out var context, out playerHero)) return;
+            if (!TryResolveContext(peer, request, out playerHero, out var playerParty, out var targetHero, out var targetParty, out var reason))
+            {
+                Reject(peer, request, playerHero?.Gold ?? 0, reason);
+                return;
+            }
 
-            // Scoped across the whole apply: the barterables read the player gold and party through it.
-            using var playerContext = new BarterPlayerContext(playerHero, context.PlayerParty.MobileParty);
-
-            if (!TryBuildBarter(
-                    playerHero, context.PlayerParty, context.TargetHero, context.TargetParty,
-                    request, context.TargetKingdom, out var barter, out var reason))
+            if (!TryGetAuthorization(peer, request, out var authorization, out reason))
             {
                 Reject(peer, request, playerHero.Gold, reason);
                 return;
             }
 
-            if (!TryPriceOffer(peer, request, context, playerHero, barter, out var offerValue, out var safePassageOpponents))
+            Kingdom targetKingdom = null;
+            if ((LordBarterKind)request.Kind == LordBarterKind.JoinKingdomAsClan &&
+                !objectManager.TryGetObject(authorization.TargetKingdomId, out targetKingdom))
+            {
+                Reject(peer, request, playerHero.Gold, "The destination kingdom is no longer available.");
                 return;
+            }
+
+            if (!CanAuthorizeKind(peer, playerHero, targetHero, request, targetKingdom, out reason))
+            {
+                Reject(peer, request, playerHero.Gold, reason);
+                return;
+            }
+
+            using var playerContext = new BarterPlayerContext(playerHero, playerParty.MobileParty);
+            if (!TryBuildBarter(
+                    playerHero,
+                    playerParty,
+                    targetHero,
+                    targetParty,
+                    request,
+                    targetKingdom,
+                    out var barter,
+                    out reason))
+            {
+                Reject(peer, request, playerHero.Gold, reason);
+                return;
+            }
+
+            var kind = (LordBarterKind)request.Kind;
+            var isSafePassage = kind == LordBarterKind.SafePassage;
+            var previousTargetKingdom = kind == LordBarterKind.JoinKingdomAsClan
+                ? targetHero.Clan.Kingdom
+                : null;
+
+            var (offerValue, safePassageOpponents) =
+                EvaluateOffer(barter, playerHero, playerParty, targetHero, targetParty, isSafePassage);
+
+            if (offerValue < -0.01f)
+            {
+                // The client's barter UI auto-balances the offer to land the total at exactly the
+                // acceptance boundary (BarterVM.AutoBalanceAdd, fulfillRatio 1f), so it always shows
+                // the deal as acceptable at the minimum price. Both sides then run the SAME test
+                // (GetOfferValueForFaction vs targetHero.Clan, threshold -0.01f) - but any drift in
+                // the inputs it reads, above all Kingdom._clans / Kingdom._fiefsCache, moves the
+                // result. Those feed a quadratic term in DefaultDiplomacyModel
+                // (10000 - 100 * sum(WarPartyLimit)^2), so a roster difference of a couple of clans
+                // is worth hundreds of thousands of denars - and a one-denar gap at the boundary
+                // flips accept into reject.
+                //
+                // Log the number so this is diagnosable, and tell the player the shortfall instead of
+                // a flat refusal they have no way to act on.
+                LogOfferValueBreakdown(playerHero, targetHero, targetKingdom, barter, offerValue);
+
+                var shortfall = (int)Math.Ceiling(-offerValue);
+                Reject(
+                    peer,
+                    request,
+                    playerHero.Gold,
+                    $"The lord will not accept this offer - it is short by about {shortfall} denars. Offer more than the suggested amount.");
+                return;
+            }
 
             authorizations.Remove(peer);
             mutationStarted = true;
 
-            ApplyBarter(peer, request, context, playerHero, barter, offerValue, safePassageOpponents);
+            ApplyAcceptedBarter(
+                peer,
+                request,
+                barter,
+                playerHero,
+                playerParty,
+                targetHero,
+                targetParty,
+                targetKingdom,
+                previousTargetKingdom,
+                kind,
+                isSafePassage,
+                offerValue,
+                safePassageOpponents);
         }
         catch (Exception exception)
         {
@@ -211,138 +265,103 @@ internal sealed partial class LordBarterHandler : IHandler
         }
     }
 
-    /// <summary>Resolves the participants and checks this peer is allowed the kind of barter it asked for.</summary>
-    private bool TryAuthorizeRequest(
-        NetPeer peer, NetworkRequestLordBarter request, out LordBarterContext context, out Hero playerHero)
+    /// <summary>
+    /// What the target thinks the offer is worth. Safe passage is priced against the parties it
+    /// would call off; everything else against the target's clan.
+    /// </summary>
+    private (float OfferValue, IReadOnlyList<MobileParty> OpponentParties) EvaluateOffer(
+        BarterData barter,
+        Hero playerHero,
+        PartyBase playerParty,
+        Hero targetHero,
+        PartyBase targetParty,
+        bool isSafePassage)
     {
-        context = default;
-
-        if (!TryResolveContext(peer, request, out playerHero, out var playerParty, out var targetHero, out var targetParty, out var reason))
+        if (isSafePassage)
         {
-            Reject(peer, request, playerHero?.Gold ?? 0, reason);
-            return false;
+            return EvaluateSafePassageOffer(
+                barter, playerHero, playerParty.MobileParty, targetHero, targetParty.MobileParty);
         }
 
-        if (!TryGetAuthorization(peer, request, out var authorization, out reason))
-        {
-            Reject(peer, request, playerHero.Gold, reason);
-            return false;
-        }
-
-        Kingdom targetKingdom = null;
-        if ((LordBarterKind)request.Kind == LordBarterKind.JoinKingdomAsClan &&
-            !objectManager.TryGetObject(authorization.TargetKingdomId, out targetKingdom))
-        {
-            Reject(peer, request, playerHero.Gold, "The destination kingdom is no longer available.");
-            return false;
-        }
-
-        if (!CanAuthorizeKind(peer, playerHero, targetHero, request, targetKingdom, out reason))
-        {
-            Reject(peer, request, playerHero.Gold, reason);
-            return false;
-        }
-
-        context = new LordBarterContext(playerParty, targetHero, targetParty, targetKingdom);
-        return true;
+        return (BarterManager.Instance.GetOfferValueForFaction(barter, targetHero.Clan),
+                Array.Empty<MobileParty>());
     }
 
     /// <summary>
-    /// Values the offer and refuses it if the lord will not take it. Rejecting here is the normal outcome of
-    /// a bad deal, not an error.
+    /// Commits an accepted barter.
     /// </summary>
-    private bool TryPriceOffer(
-        NetPeer peer, NetworkRequestLordBarter request, in LordBarterContext context, Hero playerHero,
-        BarterData barter, out float offerValue, out IReadOnlyList<MobileParty> safePassageOpponents)
+    /// <remarks>
+    /// Everything here runs past the point of no return - the authorization has been spent and
+    /// mutationStarted is set - so a throw from this point on is reported as success rather than
+    /// telling the client to roll back a change the server really made.
+    /// </remarks>
+    private void ApplyAcceptedBarter(
+        NetPeer peer,
+        NetworkRequestLordBarter request,
+        BarterData barter,
+        Hero playerHero,
+        PartyBase playerParty,
+        Hero targetHero,
+        PartyBase targetParty,
+        Kingdom targetKingdom,
+        Kingdom previousTargetKingdom,
+        LordBarterKind kind,
+        bool isSafePassage,
+        float offerValue,
+        IReadOnlyList<MobileParty> safePassageOpponents)
     {
-        safePassageOpponents = Array.Empty<MobileParty>();
-
-        if ((LordBarterKind)request.Kind == LordBarterKind.SafePassage)
-        {
-            var safePassageOffer = EvaluateSafePassageOffer(
-                barter, playerHero, context.PlayerParty.MobileParty, context.TargetHero, context.TargetParty.MobileParty);
-            safePassageOpponents = safePassageOffer.OpponentParties;
-            offerValue = safePassageOffer.OfferValue;
-        }
-        else
-        {
-            offerValue = BarterManager.Instance.GetOfferValueForFaction(barter, context.TargetHero.Clan);
-        }
-
-        if (offerValue >= -0.01f) return true;
-
-        // The client barter UI auto-balances the offer to land the total at exactly the acceptance boundary
-        // (BarterVM.AutoBalanceAdd, fulfillRatio 1f), so it always shows the deal as acceptable at the
-        // minimum price. Both sides then run the SAME test (GetOfferValueForFaction vs targetHero.Clan,
-        // threshold -0.01f) - but any drift in the inputs it reads, above all Kingdom._clans /
-        // Kingdom._fiefsCache, moves the result. Those feed a quadratic term in DefaultDiplomacyModel
-        // (10000 - 100 * sum(WarPartyLimit)^2), so a roster difference of a couple of clans is worth
-        // hundreds of thousands of denars - and a one-denar gap at the boundary flips accept into reject.
-        //
-        // Log the number so this is diagnosable, and tell the player the shortfall instead of a flat refusal
-        // they have no way to act on.
-        LogOfferValueBreakdown(playerHero, context.TargetHero, context.TargetKingdom, barter, offerValue);
-
-        var shortfall = (int)Math.Ceiling(-offerValue);
-        Reject(
-            peer,
-            request,
-            playerHero.Gold,
-            $"The lord will not accept this offer - it is short by about {shortfall} denars. Offer more than the suggested amount.");
-        return false;
-    }
-
-    /// <summary>Past this point the deal is going through; anything that throws is still reported accepted.</summary>
-    private void ApplyBarter(
-        NetPeer peer, NetworkRequestLordBarter request, in LordBarterContext context, Hero playerHero,
-        BarterData barter, float offerValue, IReadOnlyList<MobileParty> safePassageOpponents)
-    {
-        var isSafePassage = (LordBarterKind)request.Kind == LordBarterKind.SafePassage;
-
-        // Captured before Apply(), which is what moves the clan.
-        var joinTargetClan = (LordBarterKind)request.Kind == LordBarterKind.JoinKingdomAsClan
-            ? context.TargetHero.Clan
-            : null;
-        var joinPreviousKingdom = joinTargetClan?.Kingdom;
+        // Captured before Apply(), which is what moves the clan out of targetHero's reach.
+        var joinTargetClan = kind == LordBarterKind.JoinKingdomAsClan ? targetHero.Clan : null;
 
         var offered = barter.GetOfferedBarterables();
         foreach (var barterable in offered)
         {
-            if (!(barterable is SafePassageBarterable) && !(barterable is NoAttackBarterable))
+            if (!(barterable is SafePassageBarterable) &&
+                !(barterable is NoAttackBarterable))
             {
                 barterable.Apply();
             }
         }
 
         if (joinTargetClan != null)
-            ApplyDefection(playerHero, request, joinTargetClan, joinPreviousKingdom, context.TargetKingdom);
+            CompleteDefection(playerHero, request, joinTargetClan, previousTargetKingdom, targetKingdom);
 
         if (isSafePassage)
-            ApplySafePassage(context.TargetParty?.MobileParty, context.PlayerParty?.MobileParty, safePassageOpponents);
+            ApplySafePassage(
+                targetParty?.MobileParty,
+                playerParty?.MobileParty,
+                safePassageOpponents);
 
-        CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, context.TargetHero, offered);
-        ApplyOverpayRelationBonus(playerHero, context.TargetHero, offerValue);
+        CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, targetHero, offered);
+        ApplyOverpayRelationBonus(playerHero, targetHero, offerValue);
 
         if (isSafePassage)
             ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
 
         FlushGold(playerHero);
-        FlushGold(context.TargetHero);
+        FlushGold(targetHero);
         FlushHeroDeveloper(playerHero);
         SendAccepted(peer, request, playerHero.Gold);
     }
 
     /// <summary>
-    /// Clan._kingdom is AutoSynced, but the Kingdom._clans / fief collections are not reliably intercepted,
-    /// so clients would see the clan claim the kingdom while the kingdom's own roster still omitted it. Every
-    /// other membership mutation in the repo republishes explicitly (see VassalServiceHandler.ApplyVassalage).
+    /// Moves the defecting clan into its new kingdom and awards the persuasion XP.
     /// </summary>
-    private void ApplyDefection(
-        Hero playerHero, NetworkRequestLordBarter request, Clan joinTargetClan,
-        Kingdom joinPreviousKingdom, Kingdom targetKingdom)
+    /// <remarks>
+    /// Clan._kingdom is AutoSynced, but the Kingdom._clans / fief collections are not reliably
+    /// intercepted, so clients would otherwise see the clan claim the kingdom while the kingdom's
+    /// own roster still omitted it. The clan and its previous kingdom are captured BEFORE the
+    /// barterables are applied, which is what moves the clan out of targetHero's reach.
+    /// </remarks>
+    private void CompleteDefection(
+        Hero playerHero,
+        NetworkRequestLordBarter request,
+        Clan joinTargetClan,
+        Kingdom previousTargetKingdom,
+        Kingdom targetKingdom)
     {
         kingdomMembershipState.MoveClanToKingdom(
-            joinPreviousKingdom,
+            previousTargetKingdom,
             targetKingdom,
             joinTargetClan,
             publishCollectionChanges: true,
@@ -483,7 +502,6 @@ internal sealed partial class LordBarterHandler : IHandler
         return true;
     }
 
-
     private bool TryResolveContext(NetPeer peer, NetworkRequestLordBarter request, out Hero playerHero, out PartyBase playerParty, out Hero targetHero, out PartyBase targetParty, out string reason)
     {
         playerHero = null;
@@ -492,7 +510,7 @@ internal sealed partial class LordBarterHandler : IHandler
         targetParty = null;
         reason = null;
 
-        if (!IsWellFormedRequest(request))
+        if (!IsRequestWellFormed(request))
         {
             reason = "The server received an invalid lord barter request format.";
             return false;
@@ -504,7 +522,7 @@ internal sealed partial class LordBarterHandler : IHandler
             return false;
         }
 
-        if (!ParticipantsAreAvailable(playerHero, targetHero, mobileParty))
+        if (!AreParticipantsAvailable(playerHero, targetHero, mobileParty))
         {
             reason = "The lord barter participants are no longer available.";
             return false;
@@ -513,7 +531,7 @@ internal sealed partial class LordBarterHandler : IHandler
         playerParty = mobileParty.Party;
         targetParty = targetHero.PartyBelongedTo?.Party;
 
-        if (!ConversationIsStillLive(peer, request, playerParty, mobileParty, targetHero, targetParty, out reason))
+        if (!TryValidateConversation(peer, request, mobileParty, playerParty, targetParty, targetHero, out reason))
             return false;
 
         if (targetHero.IsPrisoner || targetHero.Clan == null)
@@ -526,107 +544,154 @@ internal sealed partial class LordBarterHandler : IHandler
     }
 
     /// <summary>
-    /// Persuasion outcomes only belong on a defection, and the count is bounded so a tampered client cannot
-    /// claim an arbitrary number of successful attempts. Rejected outright rather than truncated, so a
-    /// malformed request fails loudly instead of earning partial credit.
+    /// Whether the request is structurally valid, before anything is resolved from it.
     /// </summary>
-    private static bool IsWellFormedRequest(NetworkRequestLordBarter request)
+    /// <remarks>
+    /// Persuasion outcomes only belong on a defection, and the count is bounded so a tampered
+    /// client cannot claim an arbitrary number of successful attempts. Rejected outright rather
+    /// than truncated, so a malformed request fails loudly instead of earning partial credit.
+    /// </remarks>
+    private static bool IsRequestWellFormed(NetworkRequestLordBarter request)
     {
         if (string.IsNullOrEmpty(request.RequestId)) return false;
         if (!Enum.IsDefined(typeof(PeaceConversationContext), request.Context)) return false;
         if (!Enum.IsDefined(typeof(LordBarterKind), request.Kind)) return false;
-        if (request.PersuasionOutcomes == null || request.PersuasionOutcomes.Length == 0) return true;
 
-        return request.PersuasionOutcomes.Length <= LordBarterPatch.MaxDefectionPersuasionOutcomes
-            && (LordBarterKind)request.Kind == LordBarterKind.JoinKingdomAsClan;
+        var outcomes = request.PersuasionOutcomes;
+        if (outcomes == null) return true;
+        if (outcomes.Length > LordBarterPatch.MaxDefectionPersuasionOutcomes) return false;
+
+        return (LordBarterKind)request.Kind == LordBarterKind.JoinKingdomAsClan || outcomes.Length == 0;
     }
 
+    /// <summary>
+    /// Resolves the requesting player and the target. Outputs stay partially assigned on failure,
+    /// so a caller can still report the requester's gold when the target is what went missing.
+    /// </summary>
     private bool TryResolveParticipants(
-        NetPeer peer, NetworkRequestLordBarter request,
-        out Hero playerHero, out MobileParty mobileParty, out Hero targetHero)
+        NetPeer peer,
+        NetworkRequestLordBarter request,
+        out Hero playerHero,
+        out MobileParty mobileParty,
+        out Hero targetHero)
     {
         playerHero = null;
         mobileParty = null;
         targetHero = null;
 
-        return playerManager.TryGetPlayer(peer, out Player player)
-            && objectManager.TryGetObject(player.HeroId, out playerHero)
-            && objectManager.TryGetObject(player.MobilePartyId, out mobileParty)
-            && objectManager.TryGetObject(request.TargetHeroId, out targetHero);
+        return playerManager.TryGetPlayer(peer, out Player player) &&
+               objectManager.TryGetObject(player.HeroId, out playerHero) &&
+               objectManager.TryGetObject(player.MobilePartyId, out mobileParty) &&
+               objectManager.TryGetObject(request.TargetHeroId, out targetHero);
     }
 
     /// <summary>
-    /// IsAlive matches MarriageBarterHandler's participant check: a hero can die between the authorization
-    /// and the request, and every barterable dereferences both heroes.
+    /// IsAlive matches MarriageBarterHandler's participant check: a hero can die between the
+    /// authorization and the request, and every barterable dereferences both heroes.
     /// </summary>
-    private static bool ParticipantsAreAvailable(Hero playerHero, Hero targetHero, MobileParty mobileParty)
-        => !targetHero.IsPlayerHero()
-            && targetHero.IsAlive
-            && playerHero.IsAlive
-            && mobileParty.LeaderHero == playerHero
-            && mobileParty.IsActive;
-
-    private bool ConversationIsStillLive(
-        NetPeer peer, NetworkRequestLordBarter request, PartyBase playerParty,
-        MobileParty mobileParty, Hero targetHero, PartyBase targetParty, out string reason)
+    private static bool AreParticipantsAvailable(Hero playerHero, Hero targetHero, MobileParty mobileParty)
     {
-        reason = null;
+        return !targetHero.IsPlayerHero() &&
+               targetHero.IsAlive &&
+               playerHero.IsAlive &&
+               mobileParty.LeaderHero == playerHero &&
+               mobileParty.IsActive;
+    }
 
+    /// <summary>
+    /// Confirms the conversation the request claims is still live, by the rules of its context.
+    /// </summary>
+    private bool TryValidateConversation(
+        NetPeer peer,
+        NetworkRequestLordBarter request,
+        MobileParty mobileParty,
+        PartyBase playerParty,
+        PartyBase targetParty,
+        Hero targetHero,
+        out string reason)
+    {
         switch ((PeaceConversationContext)request.Context)
         {
             case PeaceConversationContext.Settlement:
-                if (SettlementConversationIsLive(request, mobileParty, targetHero)) return true;
                 reason = "The lord settlement conversation is no longer active.";
-                return false;
+                return IsSettlementConversationLive(request, mobileParty, targetHero, ref reason);
 
             case PeaceConversationContext.MapParty:
-                if (MapPartyConversationIsLive(peer, request, playerParty, mobileParty, targetParty)) return true;
                 reason = "The lord conversation is no longer active.";
-                return false;
+                return IsMapPartyConversationLive(peer, request, mobileParty, playerParty, targetParty, ref reason);
 
             case PeaceConversationContext.Location:
-                if (LocationConversationIsLive(peer, request, targetHero)) return true;
                 reason = "The lord conversation is no longer active.";
-                return false;
+                return IsLocationConversationLive(peer, request, targetHero, ref reason);
 
             default:
-                // Refused rather than treated as a Location conversation - accepting a context we do
-                // not understand is how an unvalidated barter gets through.
+                // Refused rather than validated as a settlement conversation - accepting a context we
+                // do not understand is how an unvalidated barter gets through.
                 reason = "The lord conversation context is not supported.";
                 return false;
         }
     }
 
     /// <summary>
-    /// A settlement-menu conversation acquires no engagement - there is no agent and no location mission to
-    /// lock - so authority comes from co-location instead: both the requesting party and the target must
-    /// actually be inside the settlement named by the request. That is as strong as the hold for this case,
-    /// because a player who is not in the settlement cannot be talking to someone who is.
+    /// A settlement-menu conversation acquires no engagement - there is no agent and no location
+    /// mission to lock - so authority comes from co-location instead: both the requesting party and
+    /// the target must actually be inside the settlement named by the request. That is as strong as
+    /// the hold for this case, because a player who is not in the settlement cannot be talking to
+    /// someone who is.
     /// </summary>
-    private bool SettlementConversationIsLive(NetworkRequestLordBarter request, MobileParty mobileParty, Hero targetHero)
-        => objectManager.TryGetObject(request.ContextId, out Settlement conversationSettlement)
-            && mobileParty.CurrentSettlement == conversationSettlement
-            && targetHero.CurrentSettlement == conversationSettlement;
-
-    private bool MapPartyConversationIsLive(
-        NetPeer peer, NetworkRequestLordBarter request, PartyBase playerParty,
-        MobileParty mobileParty, PartyBase targetParty)
+    private bool IsSettlementConversationLive(
+        NetworkRequestLordBarter request, MobileParty mobileParty, Hero targetHero, ref string reason)
     {
-        if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty)) return false;
-        if (requestedParty != targetParty) return false;
-        if (requestedParty.MobileParty?.IsActive != true) return false;
-        if (requestedParty.MobileParty.MapEvent != null || mobileParty.MapEvent != null) return false;
-        if (!objectManager.TryGetId(playerParty, out var playerPartyId)) return false;
-        if (!conversationPartyTracker.TryGetEngagement(peer, out var engagement)) return false;
+        if (!objectManager.TryGetObject(request.ContextId, out Settlement conversationSettlement) ||
+            mobileParty.CurrentSettlement != conversationSettlement ||
+            targetHero.CurrentSettlement != conversationSettlement)
+        {
+            return false;
+        }
 
-        return engagement.PartyId == request.ContextId && engagement.EngagerPartyId == playerPartyId;
+        reason = null;
+        return true;
     }
 
-    private bool LocationConversationIsLive(NetPeer peer, NetworkRequestLordBarter request, Hero targetHero)
-        => targetHero.CharacterObject != null
-            && objectManager.TryGetId(targetHero.CharacterObject, out var characterId)
-            && locationConversationTracker.TryGetEngagement(peer, out var npcKey)
-            && npcKey == LocationConversationTracker.ComposeKey(request.ContextId, characterId);
+    private bool IsMapPartyConversationLive(
+        NetPeer peer,
+        NetworkRequestLordBarter request,
+        MobileParty mobileParty,
+        PartyBase playerParty,
+        PartyBase targetParty,
+        ref string reason)
+    {
+        if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty) ||
+            requestedParty != targetParty ||
+            requestedParty.MobileParty?.IsActive != true ||
+            requestedParty.MobileParty.MapEvent != null ||
+            mobileParty.MapEvent != null ||
+            !objectManager.TryGetId(playerParty, out var playerPartyId) ||
+            !conversationPartyTracker.TryGetEngagement(peer, out var engagement) ||
+            engagement.PartyId != request.ContextId ||
+            engagement.EngagerPartyId != playerPartyId)
+        {
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
+
+    private bool IsLocationConversationLive(
+        NetPeer peer, NetworkRequestLordBarter request, Hero targetHero, ref string reason)
+    {
+        if (targetHero.CharacterObject == null ||
+            !objectManager.TryGetId(targetHero.CharacterObject, out var characterId) ||
+            !locationConversationTracker.TryGetEngagement(peer, out var npcKey) ||
+            npcKey != LocationConversationTracker.ComposeKey(request.ContextId, characterId))
+        {
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
 
     private bool CanAuthorizeKind(
         NetPeer peer,
@@ -761,38 +826,40 @@ internal sealed partial class LordBarterHandler : IHandler
     {
         switch (type)
         {
-            case PeaceBarterTermType.Gold:
-                return barterable is GoldBarterable;
+            case PeaceBarterTermType.Gold: return barterable is GoldBarterable;
             case PeaceBarterTermType.Item:
                 return barterable is ItemBarterable item && MatchesItem(item, term);
             case PeaceBarterTermType.Fief:
-                return barterable is FiefBarterable fief && MatchesObject(fief.TargetSettlement, term);
+                return barterable is FiefBarterable fief && objectManager.TryGetId(fief.TargetSettlement, out var settlementId) && settlementId == term.ObjectId;
             case PeaceBarterTermType.TransferPrisoner:
                 return barterable is TransferPrisonerBarterable transfer && MatchesPrisoner(transfer._prisonerCharacter, term);
             case PeaceBarterTermType.ReleasePrisoner:
                 return barterable is SetPrisonerFreeBarterable release && MatchesPrisoner(release._prisonerCharacter, term);
-            default:
-                return false;
+            default: return false;
         }
     }
 
+    /// <summary>
+    /// The item must be the same one, and carry the same modifier - or the same absence of one,
+    /// since an unmodified item and a modified one are different goods at a different price.
+    /// </summary>
     private bool MatchesItem(ItemBarterable item, PeaceBarterTerm term)
     {
         var equipment = item.ItemRosterElement.EquipmentElement;
 
-        if (!MatchesObject(equipment.Item, term)) return false;
-        // The term records whether the client's item had a modifier; a mismatch means a different item.
-        if ((equipment.ItemModifier == null) != term.ItemModifierNull) return false;
+        if (!objectManager.TryGetId(equipment.Item, out var itemId) ||
+            itemId != term.ObjectId ||
+            (equipment.ItemModifier == null) != term.ItemModifierNull)
+        {
+            return false;
+        }
 
         return equipment.ItemModifier == null ||
-            (objectManager.TryGetId(equipment.ItemModifier, out var modifierId) && modifierId == term.ItemModifierId);
+               (objectManager.TryGetId(equipment.ItemModifier, out var modifierId) &&
+                modifierId == term.ItemModifierId);
     }
 
-    private bool MatchesObject(MBObjectBase gameObject, PeaceBarterTerm term) =>
-        objectManager.TryGetId(gameObject, out var id) && id == term.ObjectId;
-
-    private bool MatchesPrisoner(Hero prisoner, PeaceBarterTerm term) =>
-        prisoner?.CharacterObject != null && MatchesObject(prisoner.CharacterObject, term);
+    private bool MatchesPrisoner(Hero prisoner, PeaceBarterTerm term) => prisoner?.CharacterObject != null && objectManager.TryGetId(prisoner.CharacterObject, out var id) && id == term.ObjectId;
 
     internal static void ApplyOverpayRelationBonus(Hero playerHero, Hero otherHero, float overpayAmount)
     {

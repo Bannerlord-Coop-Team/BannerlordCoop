@@ -54,7 +54,8 @@ internal static class ConversationPartyHold
     }
 
     /// <summary>
-    /// Marks the party as engaged and holds it in place. The tracker decides whether the engagement can be shared.
+    /// Marks the party as engaged and holds it in place. The tracker refuses a party another player already holds,
+    /// so a successful call means this engager owns it alone.
     /// </summary>
     public static bool TryEngage(
         ConversationPartyTracker tracker,
@@ -139,7 +140,7 @@ internal static class ConversationPartyHold
     }
 
     /// <summary>
-    /// [Server] True when the target is held and the interacting party is not one of its registered contenders.
+    /// [Server] True when the target is held and the interacting party is not the single player holding it.
     /// </summary>
     public static bool IsInteractionBlocked(PartyBase targetParty, MobileParty interactor)
     {
