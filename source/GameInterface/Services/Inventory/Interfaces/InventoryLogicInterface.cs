@@ -44,14 +44,14 @@ namespace GameInterface.Services.Inventory.Interfaces
     {
         static readonly ILogger logger = LogManager.GetLogger<InventoryLogicInterface>();
 
-        private readonly ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface;
+        private readonly ISessionTradePlayerDataInterface sessionTradePlayerDataInterface;
         private readonly IDefaultItemDiscardModelInterface defaultItemDiscardModelInterface;
 
         public InventoryLogicInterface(
-            ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface,
+            ISessionTradePlayerDataInterface sessionTradePlayerDataInterface,
             IDefaultItemDiscardModelInterface defaultItemDiscardModelInterface)
         {
-            this.tradeSkillCampaignBehaviorInterface = tradeSkillCampaignBehaviorInterface;
+            this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
             this.defaultItemDiscardModelInterface = defaultItemDiscardModelInterface;
         }
 
