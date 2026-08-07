@@ -3,6 +3,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Services.SiegeEvents;
 using Moq;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -289,6 +290,170 @@ public class MobilePartyBehaviorSnapshotTests
 
         Assert.False(created);
         Assert.Equal("party AI is unavailable", failure);
+    }
+
+    [Fact]
+    public void TryApplyJoinBaseline_MismatchedPartyCount_ReportsCounts()
+    {
+        Campaign previousCampaign = Campaign.Current;
+        try
+        {
+            var campaign = ObjectHelper.SkipConstructor<Campaign>();
+            campaign.CampaignObjectManager = new CampaignObjectManager
+            {
+                Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
+            };
+            Campaign.Current = campaign;
+            var snapshot = new MobilePartyBehaviorSnapshot(Mock.Of<IObjectManager>());
+
+            bool applied = snapshot.TryApplyJoinBaseline(
+                new MobilePartyJoinState[1],
+                () => { });
+
+            Assert.False(applied);
+            Assert.Equal(
+                "party count mismatch (baseline=1, client=0)",
+                snapshot.LastJoinBaselineFailure);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    [Fact]
+    public void TryApplyJoinBaseline_MissingPartyId_ReportsStateIndex()
+    {
+        Campaign previousCampaign = Campaign.Current;
+        try
+        {
+            var campaign = ObjectHelper.SkipConstructor<Campaign>();
+            var campaignObjectManager = new CampaignObjectManager
+            {
+                Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
+            };
+            campaignObjectManager._mobileParties.Add(CreateParty());
+            campaign.CampaignObjectManager = campaignObjectManager;
+            Campaign.Current = campaign;
+            var snapshot = new MobilePartyBehaviorSnapshot(Mock.Of<IObjectManager>());
+
+            bool applied = snapshot.TryApplyJoinBaseline(
+                new[] { new MobilePartyJoinState() },
+                () => { });
+
+            Assert.False(applied);
+            Assert.Equal("state 0 has no mobile-party id", snapshot.LastJoinBaselineFailure);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    [Fact]
+    public void TryApplyJoinBaseline_UnresolvedInteractable_ReportsPartyAndDependency()
+    {
+        Campaign previousCampaign = Campaign.Current;
+        try
+        {
+            var party = CreateParty();
+            var campaign = ObjectHelper.SkipConstructor<Campaign>();
+            var campaignObjectManager = new CampaignObjectManager
+            {
+                Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
+            };
+            campaignObjectManager._mobileParties.Add(party);
+            campaign.CampaignObjectManager = campaignObjectManager;
+            Campaign.Current = campaign;
+
+            var objectManager = new Mock<IObjectManager>();
+            MobileParty resolvedParty = party;
+            objectManager
+                .Setup(m => m.TryGetObject("Created_1", out resolvedParty))
+                .Returns(true);
+            var snapshot = new MobilePartyBehaviorSnapshot(objectManager.Object);
+            var behavior = new PartyBehaviorUpdateData(
+                "Created_1",
+                AiBehavior.Hold,
+                "MissingPartyBase",
+                default,
+                default,
+                AiBehavior.Hold,
+                default,
+                default);
+
+            bool applied = snapshot.TryApplyJoinBaseline(
+                new[] { new MobilePartyJoinState { Behavior = behavior } },
+                () => { });
+
+            Assert.False(applied);
+            Assert.Equal(
+                "state 0 party 'Created_1' failed validation: " +
+                "interactable 'MissingPartyBase' could not be resolved",
+                snapshot.LastJoinBaselineFailure);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    [Fact]
+    public void TryApplyJoinBaseline_SuccessClearsPreviousFailure()
+    {
+        Campaign previousCampaign = Campaign.Current;
+        try
+        {
+            var campaign = ObjectHelper.SkipConstructor<Campaign>();
+            campaign.CampaignObjectManager = new CampaignObjectManager
+            {
+                Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
+            };
+            Campaign.Current = campaign;
+            var snapshot = new MobilePartyBehaviorSnapshot(Mock.Of<IObjectManager>());
+
+            Assert.False(snapshot.TryApplyJoinBaseline(new MobilePartyJoinState[1], () => { }));
+            Assert.NotNull(snapshot.LastJoinBaselineFailure);
+            Assert.Equal(1, snapshot.LoggedJoinBaselineFailureCount);
+
+            Assert.True(snapshot.TryApplyJoinBaseline(Array.Empty<MobilePartyJoinState>(), () => { }));
+            Assert.Null(snapshot.LastJoinBaselineFailure);
+            Assert.Equal(0, snapshot.LoggedJoinBaselineFailureCount);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    [Fact]
+    public void TryApplyJoinBaseline_AlternatingRetriesTrackEachFailureOnce()
+    {
+        Campaign previousCampaign = Campaign.Current;
+        try
+        {
+            var campaign = ObjectHelper.SkipConstructor<Campaign>();
+            var campaignObjectManager = new CampaignObjectManager
+            {
+                Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
+            };
+            campaignObjectManager._mobileParties.Add(CreateParty());
+            campaign.CampaignObjectManager = campaignObjectManager;
+            Campaign.Current = campaign;
+            var snapshot = new MobilePartyBehaviorSnapshot(Mock.Of<IObjectManager>());
+            var missingIdBaseline = new[] { new MobilePartyJoinState() };
+
+            Assert.False(snapshot.TryApplyJoinBaseline(missingIdBaseline, () => { }));
+            Assert.False(snapshot.TryApplyJoinBaseline(Array.Empty<MobilePartyJoinState>(), () => { }));
+            Assert.False(snapshot.TryApplyJoinBaseline(missingIdBaseline, () => { }));
+
+            Assert.Equal("state 0 has no mobile-party id", snapshot.LastJoinBaselineFailure);
+            Assert.Equal(2, snapshot.LoggedJoinBaselineFailureCount);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
     }
 
     [Fact]
