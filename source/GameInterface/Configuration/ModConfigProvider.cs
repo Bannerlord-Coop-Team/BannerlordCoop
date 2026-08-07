@@ -1,4 +1,4 @@
-﻿using ProtoBuf;
+using ProtoBuf;
 
 namespace GameInterface.Configuration;
 
@@ -56,6 +56,9 @@ public readonly struct ModOptions
     [ProtoMember(16)]
     public readonly bool MilitiaJoinsSallyOut { get; } = true;
 
+    [ProtoMember(15)]
+    public readonly LordDefectionRetryMode LordDefectionRetries { get; } = LordDefectionRetryMode.Vanilla;
+
     public ModOptions(ModOptionsData modOptionsData)
     {
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
@@ -75,5 +78,7 @@ public readonly struct ModOptions
         MilitiaJoinsSallyOut = modOptionsData.MilitiaJoinsSallyOut ?? MilitiaJoinsSallyOut;
         ResumeSiegeWhenEnemyRetreats = modOptionsData.ResumeSiegeWhenEnemyRetreats ?? ResumeSiegeWhenEnemyRetreats;
         GarrisonJoinsSiegeRelief = modOptionsData.GarrisonJoinsSiegeRelief ?? GarrisonJoinsSiegeRelief;
+
+        LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;
     }
 }

@@ -1,4 +1,4 @@
-﻿{
+{
   // Bannerlord Coop gameplay configuration — owned by the Coop mod itself and
   // applied wherever the coop server runs (dedicated server or player-hosted
   // session). Settings for how a dedicated server PROCESS runs (save name,
@@ -131,5 +131,14 @@
     //                  the relieving force, exactly as a sally-out would.
     // false: vanilla - the relief force fights alone.
     "garrisonJoinsSiegeRelief": true,
+
+    // How long a lord remembers refusing to defect to your kingdom.
+    // Vanilla records each failed persuasion and refuses that lord until the
+    // record expires after one in-game year. Only the machine that ran the
+    // conversation records it, so co-op has to decide what a client's list means.
+    // (Default) "Vanilla":     a refusal blocks that lord for one in-game year, as in singleplayer.
+    // "NeverExpire": a refusal blocks that lord for the rest of the session.
+    // "AlwaysRetry": a refusal never blocks; you can ask the same lord again straight away.
+    "lordDefectionRetries": "Vanilla",
   }
 }
