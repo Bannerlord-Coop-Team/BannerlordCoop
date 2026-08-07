@@ -23,6 +23,7 @@ namespace Missions.Tournaments.Spectators;
 public interface ITournamentSpectatorAgentManager
 {
     void Reconcile(TournamentSessionSnapshot snapshot);
+    void UpdateCombatPermissions();
     void HandleJoinInfo(NetworkMissionJoinInfo joinInfo);
     CoopAgentSpawnData[] GetLocalSpawnData();
     string LastLocalSpawnName { get; }
@@ -111,6 +112,12 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
         }
 
         GameThread.RunSafe(() => ProcessJoinInfo(joinInfo));
+    }
+
+    public void UpdateCombatPermissions()
+    {
+        foreach (SpectatorAgentRecord record in spectators.Values.ToArray())
+            UpdateCombatPermissions(record.Agent);
     }
 
     public CoopAgentSpawnData[] GetLocalSpawnData()
@@ -222,7 +229,7 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
         if (agent == null) return;
         if (!coopMissionComponent.AgentRegistry.TryRegisterAgent(controllerId, agentId, agent))
         {
-            agent.FadeOut(false, true);
+            agent.FadeOut(true, true);
             return;
         }
 
@@ -258,7 +265,7 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
         if (agent == null) return;
         if (!coopMissionComponent.AgentRegistry.TryRegisterAgent(joinInfo.ControllerId, data.AgentId, agent))
         {
-            agent.FadeOut(false, true);
+            agent.FadeOut(true, true);
             return;
         }
 
@@ -407,6 +414,7 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
                     equippedOrange.Item?.StringId,
                     equippedOrange.Amount);
             }
+            UpdateCombatPermissions(agent);
             agent.FadeIn();
             return agent;
         }
@@ -436,7 +444,19 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
         if (agent == null || !agent.IsActive()) return;
 
         agent.Controller = AgentControllerType.None;
-        agent.FadeOut(false, true);
+        agent.FadeOut(true, true);
+    }
+
+    private void UpdateCombatPermissions(Agent agent)
+    {
+        if (agent == null || !agent.IsActive()) return;
+
+        MissionWeapon weapon = agent.Equipment[TournamentSpectatorOrange.EquipmentSlot];
+        bool hasUsableOrange = weapon.Amount > 0 && IsOrange(weapon.Item);
+        AgentFlag currentFlags = agent.GetAgentFlags();
+        AgentFlag combatFlags = TournamentSpectatorOrange.GetCombatFlags(currentFlags, hasUsableOrange);
+        if (combatFlags != currentFlags)
+            agent.SetAgentFlags(combatFlags);
     }
 
     private sealed class SpectatorAgentRecord
