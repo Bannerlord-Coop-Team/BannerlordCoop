@@ -1,4 +1,5 @@
 using Common.Messaging;
+using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -114,11 +115,14 @@ public readonly struct RequestVillageIssueAcceptAlternative : ICommand
     public readonly string OwnerId;
     [ProtoMember(2)]
     public readonly int Generation;
+    [ProtoMember(3)]
+    public readonly TroopRosterData SentTroops;
 
-    public RequestVillageIssueAcceptAlternative(string ownerId, int generation)
+    public RequestVillageIssueAcceptAlternative(string ownerId, int generation, TroopRosterData sentTroops)
     {
         OwnerId = ownerId;
         Generation = generation;
+        SentTroops = sentTroops;
     }
 }
 

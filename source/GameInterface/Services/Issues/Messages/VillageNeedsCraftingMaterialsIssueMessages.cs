@@ -1,5 +1,6 @@
 using Common.Messaging;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
+using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -119,8 +120,10 @@ public readonly struct RequestVillageCraftingIssueAcceptAlternative : ICommand
     public readonly string CompanionRewardSkillId;
     [ProtoMember(8)]
     public readonly int Generation;
+    [ProtoMember(9)]
+    public readonly TroopRosterData SentTroops;
 
-    public RequestVillageCraftingIssueAcceptAlternative(string ownerId, AlternativeSolutionVanillaState state, int generation)
+    public RequestVillageCraftingIssueAcceptAlternative(string ownerId, AlternativeSolutionVanillaState state, int generation, TroopRosterData sentTroops)
     {
         OwnerId = ownerId;
         ReturnTime = state.ReturnTime;
@@ -130,6 +133,7 @@ public readonly struct RequestVillageCraftingIssueAcceptAlternative : ICommand
         TotalTroopXpAmount = state.TotalTroopXpAmount;
         CompanionRewardSkillId = state.CompanionRewardSkillId;
         Generation = generation;
+        SentTroops = sentTroops;
     }
 
     public AlternativeSolutionVanillaState ToState() =>

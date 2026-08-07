@@ -2,16 +2,23 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsTools;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Handlers;
@@ -25,19 +32,25 @@ internal class VillageNeedsToolsIssueHandler : IHandler
     private readonly INetwork network;
     private readonly IVillageNeedsToolsIssueInterface issueInterface;
     private readonly IPlayerManager playerManager;
+    private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IPrisonerSaleValidator troopValidator;
 
     public VillageNeedsToolsIssueHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         IVillageNeedsToolsIssueInterface issueInterface,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ITroopRosterInterface troopRosterInterface,
+        IPrisonerSaleValidator troopValidator)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.issueInterface = issueInterface;
         this.playerManager = playerManager;
+        this.troopRosterInterface = troopRosterInterface;
+        this.troopValidator = troopValidator;
 
         messageBroker.Subscribe<VillageIssueCreated>(Handle_VillageIssueCreated);
         messageBroker.Subscribe<NetworkVillageIssueCreated>(Handle_NetworkVillageIssueCreated);
@@ -208,7 +221,8 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         else
         {
             IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
-            network.SendAll(new RequestVillageIssueAcceptAlternative(ownerId, generation));
+            var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            network.SendAll(new RequestVillageIssueAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
 
@@ -242,6 +256,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
             if (GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest &&
                 owner.Issue.IssueStayAliveConditions())
             {
+                ApplyValidatedSentTroops(owner, player, payload.What.SentTroops);
                 issueInterface.MirrorAlternativeAccepted(owner);
                 IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
                 network.SendAll(new NetworkVillageIssueAlternativeAccepted(ownerId, player.ControllerId));
@@ -251,6 +266,30 @@ internal class VillageNeedsToolsIssueHandler : IHandler
                 network.Send(requester, new NetworkVillageIssueAcceptRejected(ownerId));
             }
         });
+    }
+
+    private void ApplyValidatedSentTroops(Hero owner, Player player, TroopRosterData claimedTroops)
+    {
+        var claimedRoster = TroopRoster.CreateDummyTroopRoster();
+        foreach (var element in troopRosterInterface.UnpackTroopRosterData(claimedTroops))
+        {
+            claimedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
+        }
+
+        var validatedRoster = player.MobilePartyId != null &&
+            objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)
+            ? troopValidator.Validate(claimedRoster, party.MemberRoster)
+            : TroopRoster.CreateDummyTroopRoster();
+
+        using (new AllowedThread())
+        {
+            owner.Issue.AlternativeSolutionSentTroops.Clear();
+            foreach (var element in validatedRoster.GetTroopRoster())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(
+                    element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
+            }
+        }
     }
 
     private void Handle_NetworkVillageIssueAlternativeAccepted(MessagePayload<NetworkVillageIssueAlternativeAccepted> payload)
