@@ -1,4 +1,4 @@
-using GameInterface.Configuration;
+﻿using GameInterface.Configuration;
 using System;
 using System.IO;
 using Xunit;
@@ -112,6 +112,7 @@ public class ModConfigTests : IDisposable
         Assert.True(options.SmithingStaminaRecoveryOutsideSettlements);
         Assert.Equal(0.1f, options.SmithingStaminaRecoveryMultiplier);
         Assert.Equal(1f, options.MaximumLootersMultiplier);
+        Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
     }
 
     /// <summary>
