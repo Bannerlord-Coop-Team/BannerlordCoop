@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.TroopSupply;
 using Missions.Agents.Packets;
 #if DEBUG
 using Missions.Diagnostics;
@@ -269,6 +270,7 @@ internal static class BattleDebugCommands
         wieldTestActive = false;
         return $"WIELD_TEST_RESTORED agent={restoredAgentId:D}";
     }
+
 #endif
 
     [CommandLineArgumentFunction("state", "coop.debug.battle")]
@@ -319,10 +321,17 @@ internal static class BattleDebugCommands
         int activeAgents = mission.Agents.Count(agent => agent.IsActive());
         int enemyFleeing = enemies.Count(agent => agent.IsRunningAway);
         var result = mission.MissionResult;
+        var suppliers = CoopTroopSupplierRegistry.GetSuppliers(controller.Session.InstanceId);
+        var receiverReserves = suppliers
+            .Where(supplier => !string.IsNullOrEmpty(supplier.PlayerPartyId))
+            .Select(supplier => $"{supplier.Side}:{supplier.PlayerPartyId}")
+            .ToArray();
 
         return $"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
             $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
             $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
+            $"reserveSuppliers={suppliers.Count} populatedReserves={suppliers.Count(supplier => supplier.IsPopulated)} " +
+            $"receiverOwnedReserves={receiverReserves.Length} receiverReserve={string.Join(",", receiverReserves)} " +
             $"playerSide={playerTeam?.Side.ToString() ?? "None"} enemyParties={enemyParties} enemyActive={enemies.Count} " +
             $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyFleeing={enemyFleeing} " +
             $"enemyMovedSinceLast={moved} damageReceivedEvents={ownDamageEvents} " +
