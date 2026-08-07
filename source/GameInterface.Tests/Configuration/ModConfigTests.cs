@@ -46,42 +46,316 @@ public class ModConfigTests : IDisposable
 
         Assert.True(File.Exists(ConfigPath), "first load should create mod-config.json");
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
-        Assert.Null(config.Difficulty.PlayerReceivedDamage);
-        Assert.Null(config.Difficulty.BirthAndDeath);
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.True(config.Difficulty.BirthAndDeath);
     }
 
     [Fact]
-    public void ShippedTemplate_ShipsEveryKeyCommentedOut()
+    public void ShippedTemplate_ShipsEveryDifficultyKeyActive()
     {
-        // The template must stay behaviorally identical to no file at all, so
-        // seeding into an existing deployment can never change a live world.
         File.Copy(ShippedTemplatePath, ConfigPath);
 
         var config = NewModConfig().Data;
 
-        Assert.Null(config.Difficulty.PlayerReceivedDamage);
-        Assert.Null(config.Difficulty.PlayerTroopsReceivedDamage);
-        Assert.Null(config.Difficulty.CombatAIDifficulty);
-        Assert.Null(config.Difficulty.BattleDeath);
-        Assert.Null(config.Difficulty.BirthAndDeath);
-        Assert.Null(config.Difficulty.AutoAllocateClanMemberPerks);
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerTroopsReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
+        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
     }
 
     [Fact]
-    public void SeededTemplate_ParsesBackAsAllDefaults()
+    public void ExistingCommentedDifficulty_IsMigratedInPlace_WithoutOverwritingUserValues()
     {
-        _ = NewModConfig().Data;                     // seeds
+        File.WriteAllText(ConfigPath, @"{
+  // keep this operator comment
+  ""difficulty"": {
+    // ""playerReceivedDamage"": ""Realistic"",
+    ""battleDeath"": ""Easy"",
+    // ""birthAndDeath"": true,
+  },
+  ""modOptions"": { ""autoPauseEnabled"": false },
+}");
 
-        var config = NewModConfig().Data;            // fresh instance reads the seeded file
+        var config = NewModConfig().Data;
+        string migrated = File.ReadAllText(ConfigPath);
 
-        Assert.Null(config.Difficulty.PlayerReceivedDamage);
-        Assert.Null(config.Difficulty.PlayerTroopsReceivedDamage);
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
+        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.ModOptions.AutoPauseEnabled);
+        Assert.Contains("// keep this operator comment", migrated);
+        Assert.Contains("\"playerReceivedDamage\": \"Realistic\"", migrated);
+        Assert.DoesNotContain("// \"playerReceivedDamage\"", migrated);
+        Assert.Contains("\"battleDeath\": \"Easy\"", migrated);
+    }
+
+    [Fact]
+    public void LegacyServerDifficulty_IsPortedOverCommentedModDefaults()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  // keep this mod comment
+  ""difficulty"": {
+    // ""playerReceivedDamage"": ""Realistic"",
+    // ""battleDeath"": ""VeryEasy"",
+    // ""birthAndDeath"": true,
+  },
+  ""modOptions"": { ""autoPauseEnabled"": false },
+}");
+        File.WriteAllText(Path.Combine(tempDir, "server-config.json"), @"{
+  // old dedicated-server settings
+  ""playerReceivedDamage"": ""Easy"",
+  ""battleDeath"": ""Realistic"",
+  ""birthAndDeath"": false,
+}");
+
+        var config = NewModConfig().Data;
+        string migrated = File.ReadAllText(ConfigPath);
+
+        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.BattleDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.False(config.ModOptions.AutoPauseEnabled);
+        Assert.Contains("// keep this mod comment", migrated);
+        Assert.Contains("\"playerReceivedDamage\": \"Easy\"", migrated);
+        Assert.Contains("\"battleDeath\": \"Realistic\"", migrated);
+        Assert.Contains("\"birthAndDeath\": false", migrated);
+    }
+
+    [Fact]
+    public void ExistingModDifficulty_WinsOverLegacyServerDifficulty()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""difficulty"": {
+    ""battleDeath"": ""Easy"",
+    // ""birthAndDeath"": true,
+  },
+}");
+        File.WriteAllText(Path.Combine(tempDir, "server-config.json"), @"{
+  ""battleDeath"": ""Realistic"",
+  ""birthAndDeath"": false,
+}");
+
+        var config = NewModConfig().Data;
+
+        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
+    }
+
+    [Fact]
+    public void LegacyServerDifficulty_IsInsertedWhenModConfigHasNoMatchingComment()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""difficulty"": {
+    // unrelated operator note
+  },
+  ""modOptions"": { ""clientsCanUseCheats"": true },
+}");
+        File.WriteAllText(Path.Combine(tempDir, "server-config.json"), @"{
+  ""battleDeath"": ""Easy"",
+  // ""birthAndDeath"": false,
+}");
+
+        var config = NewModConfig().Data;
+        string firstMigration = File.ReadAllText(ConfigPath);
+        _ = NewModConfig().Data;
+
+        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
+        Assert.True(config.ModOptions.ClientsCanUseCheats);
+        Assert.Contains("// unrelated operator note", firstMigration);
+        Assert.Equal(firstMigration, File.ReadAllText(ConfigPath));
+    }
+
+    [Fact]
+    public void LegacyServerDifficulty_CreatesDifficultyBlockWhenModConfigHasNone()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  // preserve this operator file
+  ""modOptions"": { ""clientsCanUseCheats"": true },
+}");
+        File.WriteAllText(Path.Combine(tempDir, "server-config.json"), @"{
+  ""battleDeath"": ""Easy"",
+  // ""birthAndDeath"": false,
+}");
+
+        var config = NewModConfig().Data;
+        string firstMigration = File.ReadAllText(ConfigPath);
+        _ = NewModConfig().Data;
+
+        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
+        Assert.True(config.ModOptions.ClientsCanUseCheats);
+        Assert.Contains("// preserve this operator file", firstMigration);
+        Assert.Contains("\"difficulty\"", firstMigration);
+        Assert.Equal(firstMigration, File.ReadAllText(ConfigPath));
+        Assert.Empty(Directory.GetFiles(tempDir, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public void InvalidDifficultyBlockIsNotDuplicatedByMigration()
+    {
+        const string invalid = "{ \"difficulty\": false }";
+        File.WriteAllText(ConfigPath, invalid);
+        File.WriteAllText(Path.Combine(tempDir, "server-config.json"),
+            "{ \"battleDeath\": \"Easy\" }");
+
+        _ = NewModConfig().Data;
+
+        Assert.Equal(invalid, File.ReadAllText(ConfigPath));
+    }
+
+    [Fact]
+    public void FreshlySeededTemplate_PrefersLegacyServerDifficulty()
+    {
+        File.WriteAllText(Path.Combine(tempDir, "server-config.json"), @"{
+  ""playerReceivedDamage"": ""Easy"",
+  ""battleDeath"": ""Realistic"",
+  ""birthAndDeath"": false,
+}");
+
+        var config = NewModConfig().Data;
+
+        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.BattleDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
+    }
+
+    [Fact]
+    public void PreexistingPristineTemplate_PrefersLegacyServerDifficulty()
+    {
+        File.Copy(ShippedTemplatePath, ConfigPath);
+        File.WriteAllText(Path.Combine(tempDir, "server-config.json"), @"{
+  ""playerReceivedDamage"": ""Easy"",
+  ""battleDeath"": ""Realistic"",
+  ""birthAndDeath"": false,
+}");
+
+        var config = NewModConfig().Data;
+
+        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.BattleDeath);
+        Assert.False(config.Difficulty.BirthAndDeath);
+    }
+
+    [Fact]
+    public void OriginalShippedDifficultyBlock_MigratesEveryCommentedSetting_AndIsIdempotent()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""difficulty"": {
+    // ""playerReceivedDamage"": ""Realistic"",
+    // ""playerTroopsReceivedDamage"": ""VeryEasy"",
+    // ""combatAIDifficulty"": ""VeryEasy"",
+    // ""recruitmentDifficulty"": ""VeryEasy"",
+    // ""playerMapMovementSpeed"": ""VeryEasy"",
+    // ""stealthAndDisguiseDifficulty"": ""VeryEasy"",
+    // ""persuasionSuccessChance"": ""VeryEasy"",
+    // ""clanMemberDeathChance"": ""VeryEasy"",
+    // ""battleDeath"": ""VeryEasy"",
+    // ""birthAndDeath"": true,
+    // ""autoAllocateClanMemberPerks"": false,
+  },
+  ""modOptions"": { ""clientsCanUseCheats"": true }
+}");
+
+        var config = NewModConfig().Data;
+        string firstMigration = File.ReadAllText(ConfigPath);
+        _ = NewModConfig().Data;
+        string secondLoad = File.ReadAllText(ConfigPath);
+
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerTroopsReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.RecruitmentDifficulty);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerMapMovementSpeed);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.StealthAndDisguiseDifficulty);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PersuasionSuccessChance);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.ClanMemberDeathChance);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
+        Assert.True(config.Difficulty.BirthAndDeath);
+        Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
+        Assert.True(config.ModOptions.ClientsCanUseCheats);
+        Assert.DoesNotContain("// \"", firstMigration);
+        Assert.Equal(firstMigration, secondLoad);
+    }
+
+    [Fact]
+    public void MalformedConfig_IsNotChangedByMigration()
+    {
+        const string broken = "{ // \"birthAndDeath\": true,\r\n this is not JSON";
+        File.WriteAllText(ConfigPath, broken);
+
+        var config = NewModConfig().Data;
+
+        Assert.Equal(broken, File.ReadAllText(ConfigPath));
         Assert.Null(config.Difficulty.BirthAndDeath);
-        Assert.Null(config.Difficulty.AutoAllocateClanMemberPerks);
-        Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
-        Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
+    }
+
+    [Fact]
+    public void LegacyUserRootConfig_IsCopiedIntoCoopData_AndPreserved()
+    {
+        string userRoot = Path.Combine(tempDir, "Mount and Blade II Bannerlord");
+        string coopData = Path.Combine(userRoot, "CoopData");
+        Directory.CreateDirectory(userRoot);
+        string legacyPath = Path.Combine(userRoot, "mod-config.json");
+        string migratedPath = Path.Combine(coopData, "mod-config.json");
+        const string legacy = @"{
+  ""difficulty"": { ""battleDeath"": ""Easy"" },
+  ""modOptions"": { ""autoPauseEnabled"": false }
+}";
+        File.WriteAllText(legacyPath, legacy);
+
+        var config = new ModConfig(coopData).Data;
+
+        Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
+        Assert.False(config.ModOptions.AutoPauseEnabled);
+        Assert.True(File.Exists(legacyPath), "the recoverable legacy copy should remain");
+        Assert.Equal(legacy, File.ReadAllText(legacyPath));
+        Assert.Contains("\"battleDeath\": \"Easy\"", File.ReadAllText(migratedPath));
+    }
+
+    [Fact]
+    public void ExistingCoopDataConfig_WinsOverLegacyUserRootConfig()
+    {
+        string userRoot = Path.Combine(tempDir, "Mount and Blade II Bannerlord");
+        string coopData = Path.Combine(userRoot, "CoopData");
+        Directory.CreateDirectory(coopData);
+        string legacyPath = Path.Combine(userRoot, "mod-config.json");
+        string currentPath = Path.Combine(coopData, "mod-config.json");
+        File.WriteAllText(legacyPath, @"{ ""difficulty"": { ""battleDeath"": ""Easy"" } }");
+        File.WriteAllText(currentPath, @"{ ""difficulty"": { ""battleDeath"": ""Realistic"" } }");
+
+        var config = new ModConfig(coopData).Data;
+
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.BattleDeath);
+        Assert.Contains("Realistic", File.ReadAllText(currentPath));
+        Assert.Contains("Easy", File.ReadAllText(legacyPath));
+    }
+
+    [Fact]
+    public void CurrentNestedServerConfigWinsOverLegacySharedRootServerConfig()
+    {
+        string userRoot = Path.Combine(tempDir, "Mount and Blade II Bannerlord");
+        string coopData = Path.Combine(userRoot, "CoopData");
+        string dedicatedData = Path.Combine(coopData, "DedicatedServer");
+        Directory.CreateDirectory(dedicatedData);
+        File.WriteAllText(Path.Combine(coopData, "mod-config.json"),
+            "{ \"difficulty\": { } }");
+        File.WriteAllText(Path.Combine(coopData, "server-config.json"),
+            "{ \"battleDeath\": \"Easy\" }");
+        File.WriteAllText(Path.Combine(dedicatedData, "server-config.json"),
+            "{ \"battleDeath\": \"Realistic\" }");
+
+        var config = new ModConfig(coopData).Data;
+
+        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.BattleDeath);
     }
 
     /// <summary>
@@ -155,7 +429,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.PlayerTroopsReceivedDamage);
         Assert.False(config.Difficulty.BirthAndDeath);
-        Assert.Null(config.Difficulty.CombatAIDifficulty);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
     }
 
     [Fact]

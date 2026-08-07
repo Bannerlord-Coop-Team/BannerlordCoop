@@ -2,30 +2,29 @@
   // Bannerlord Coop gameplay configuration — owned by the Coop mod itself and
   // applied wherever the coop server runs (dedicated server or player-hosted
   // session). Settings for how a dedicated server PROCESS runs (save name,
-  // password, ports, autosaves) live in server-config.json instead, next to
-  // the server executable. Comments and trailing commas are allowed here.
+  // password, ports, autosaves) live in the dedicated server's own
+  // DedicatedServer\server-config.json instead. Comments and trailing commas
+  // are allowed here.
 
   // Campaign difficulty, applied by the HOSTING side at every boot; joining
-  // players inherit the values with the save transfer. A commented-out key
-  // keeps the save's own setting. Levels: "VeryEasy" | "Easy" | "Realistic".
+  // players inherit the values with the save transfer.
+  // Levels: "VeryEasy" | "Easy" | "Realistic".
   "difficulty": {
-    // Damage players take. Left unset on a HEADLESS server (dedicated/container)
-    // this defaults to Realistic — the headless profile would otherwise push
-    // quarter damage to every joining player. On a player-hosted session the
-    // host's own game setting stays in charge unless set here.
-    // "playerReceivedDamage": "Realistic",
+    // Damage players take. Realistic avoids the dedicated server's headless
+    // profile pushing quarter damage to every joining player.
+    "playerReceivedDamage": "Realistic",
 
-    // "playerTroopsReceivedDamage": "VeryEasy",
-    // "combatAIDifficulty": "VeryEasy",
-    // "recruitmentDifficulty": "VeryEasy",
-    // "playerMapMovementSpeed": "VeryEasy",
-    // "stealthAndDisguiseDifficulty": "VeryEasy",
-    // "persuasionSuccessChance": "VeryEasy",
-    // "clanMemberDeathChance": "VeryEasy",
-    // "battleDeath": "VeryEasy",
+    "playerTroopsReceivedDamage": "VeryEasy",
+    "combatAIDifficulty": "VeryEasy",
+    "recruitmentDifficulty": "VeryEasy",
+    "playerMapMovementSpeed": "VeryEasy",
+    "stealthAndDisguiseDifficulty": "VeryEasy",
+    "persuasionSuccessChance": "VeryEasy",
+    "clanMemberDeathChance": "VeryEasy",
+    "battleDeath": "VeryEasy",
 
-    // "birthAndDeath": true,                 // aging, births, natural deaths
-    // "autoAllocateClanMemberPerks": false,
+    "birthAndDeath": true,                 // aging, births, natural deaths
+    "autoAllocateClanMemberPerks": false,
   },
   "modOptions": {
     // Toggle fast forward (2x speed) being enabled
