@@ -8,10 +8,12 @@ using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Registry.Auto;
+using Helpers;
 using Serilog;
 using System.Reflection;
 using System;
 using System.Linq;
+using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Library;
@@ -57,6 +59,7 @@ public class KingdomHandler : IHandler
         messageBroker.Subscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Subscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
+        messageBroker.Subscribe<ChangeKingdomName>(HandleChangeKingdomName);
     }
 
     private void HandleCreateKingdom(MessagePayload<CreateKingdom> obj)
@@ -75,6 +78,18 @@ public class KingdomHandler : IHandler
 
         var payload = obj.What;
         GameThread.RunSafe(() => ApplyCreateKingdomRequest(payload), context: nameof(KingdomHandler));
+    }
+
+    private void HandleChangeKingdomName(MessagePayload<ChangeKingdomName> obj)
+    {
+        if (!ModInformation.IsServer)
+        {
+            Logger.Debug("Skipping kingdom rename request because this instance is not the server.");
+            return;
+        }
+
+        var payload = obj.What;
+        RunKingdomMutation(() => ApplyKingdomNameChange(payload));
     }
 
     private void ApplyCreateKingdomRequest(CreateKingdom payload)
@@ -129,6 +144,86 @@ public class KingdomHandler : IHandler
         }
     }
 
+    private void ApplyKingdomNameChange(ChangeKingdomName payload)
+    {
+        if (!playerManager.TryGetPlayer(payload.ControllerId, out var player))
+        {
+            RejectKingdomNameChange(payload, $"player not found for controller {payload.ControllerId}");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(player.ClanId) || !objectManager.TryGetObject(player.ClanId, out Clan clan))
+        {
+            RejectKingdomNameChange(payload, $"clan {player.ClanId} was not found.");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(payload.KingdomId) || !objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
+        {
+            RejectKingdomNameChange(payload, $"Kingdom {payload.KingdomId} was not found.");
+            return;
+        }
+
+        if (!CanChangeKingdomName(clan, kingdom, payload.Name, out string reason))
+        {
+            RejectKingdomNameChange(payload, reason);
+            return;
+        }
+
+        if (!IsKingdomNameAvailable(kingdom, payload.Name, out string validationReason))
+        {
+            RejectKingdomNameChange(payload, validationReason);
+            return;
+        }
+        
+        ApplyNativeKingdomNameChange(kingdom, payload.Name);
+        messageBroker.Publish(this, new KingdomNameChanged(payload.ControllerId, payload.KingdomId));
+    }
+
+    // FactionHelper.IsKIngdomNameApplicable relies on Clan.PlayerClan.Kingdom
+    // But Clan.PlayerClan is null on a dedicated server. Applied a new name so others are not confused
+    private static bool IsKingdomNameAvailable(Kingdom kingdom, string requestedName, out string reason)
+    {
+        var validationErr = FactionHelper.IsFactionNameApplicable(requestedName);
+        
+        bool nameAlreadyExists = Kingdom.All?.Any(
+            otherKingdom => !ReferenceEquals(otherKingdom, kingdom) && string.Equals(otherKingdom.Name.ToString(), requestedName, StringComparison.InvariantCultureIgnoreCase)) == true;
+        
+        if (nameAlreadyExists)
+        {
+            validationErr.Add(GameTexts.FindText("str_kingdom_name_invalid_already_exist", null));
+        }
+
+        if (validationErr.Count == 0)
+        {
+            reason = null;
+            return true;
+        }
+        
+        reason = string.Join(Environment.NewLine + Environment.NewLine, validationErr.Select(error => error.ToString()));
+        return false;
+    }
+
+    private static void ApplyNativeKingdomNameChange(Kingdom kingdom, string requestedName)
+    {
+        var rawName = new TextObject(requestedName);
+        
+        var fullName = GameTexts.FindText("str_generic_kingdom_name", null);
+        fullName.SetTextVariable("KINGDOM_NAME", rawName);
+
+        var shortName = GameTexts.FindText("str_generic_kingdom_short_name", null);
+        shortName.SetTextVariable("KINGDOM_SHORT_NAME", rawName);
+        
+        kingdom.ChangeKingdomName(fullName, shortName);
+    }
+
+    private static void RejectKingdomNameChange(ChangeKingdomName payload, string reason)
+    {
+        Logger.Warning("Unable to rename {KingdomId} to {KingdomName} for controller {ControllerId}: {Reason}",
+            payload.KingdomId,
+            payload.Name,
+            payload.ControllerId,
+            reason);
+    }
+
     private bool TryGetCulture(string cultureId, out CultureObject culture)
     {
         return objectManager.TryGetObject(cultureId, out culture);
@@ -154,6 +249,38 @@ public class KingdomHandler : IHandler
         if (clan.Kingdom != null)
         {
             reason = "clan is already in a kingdom";
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
+
+    internal static bool CanChangeKingdomName(Clan clan, Kingdom kingdom, string requestedName, out string reason)
+    {
+        if (clan == null)
+        {
+            reason = "clan was null";
+            return false;
+        }
+        if (kingdom == null)
+        {
+            reason = "kingdom was null";
+            return false;
+        }
+        if (!ReferenceEquals(clan.Kingdom, kingdom))
+        {
+            reason = "clan is not a member of the kingdom";
+            return false;
+        }
+        if (!ReferenceEquals(kingdom.RulingClan, clan))
+        {
+            reason = "clan is not the ruling clan of the kingdom";
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(requestedName))
+        {
+            reason = "kingdom name was empty";
             return false;
         }
 
@@ -398,5 +525,6 @@ public class KingdomHandler : IHandler
         messageBroker.Unsubscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Unsubscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
+        messageBroker.Unsubscribe<ChangeKingdomName>(HandleChangeKingdomName);
     }
 }
