@@ -27,8 +27,11 @@ internal sealed class ChatVM : ViewModel
 
     public ChatVM(Action<NetworkSendChatMessage> send, Func<string> getLocalControllerId)
     {
-        this.send = send ?? throw new ArgumentNullException(nameof(send));
-        this.getLocalControllerId = getLocalControllerId ?? throw new ArgumentNullException(nameof(getLocalControllerId));
+        if (send == null) throw new ArgumentNullException(nameof(send));
+        if (getLocalControllerId == null) throw new ArgumentNullException(nameof(getLocalControllerId));
+
+        this.send = send;
+        this.getLocalControllerId = getLocalControllerId;
 
         Channels = new MBBindingList<ChatChannelVM>();
         var global = EnsureChannel(GlobalChannelId, "Global");
@@ -169,6 +172,40 @@ internal sealed class ChatVM : ViewModel
         EnsureChannel(controllerId, displayName);
     }
 
+    public void SetParticipants(IEnumerable<(string ControllerId, string DisplayName)> participants)
+    {
+        if (participants == null) throw new ArgumentNullException(nameof(participants));
+
+        var availableIds = new HashSet<string>(StringComparer.Ordinal);
+        var availableParticipants = new List<(string ControllerId, string DisplayName)>();
+        foreach (var participant in participants)
+        {
+            if (string.IsNullOrWhiteSpace(participant.ControllerId) ||
+                string.Equals(participant.ControllerId, getLocalControllerId(), StringComparison.Ordinal) ||
+                !availableIds.Add(participant.ControllerId))
+            {
+                continue;
+            }
+
+            availableParticipants.Add(participant);
+        }
+
+        if (selectedChannel?.IsGlobal == false && !availableIds.Contains(selectedChannel.ControllerId))
+            SelectChannel(channelsById[GlobalChannelId]);
+
+        var directChannels = new List<ChatChannelVM>();
+        foreach (var channel in Channels)
+        {
+            if (!channel.IsGlobal) directChannels.Add(channel);
+        }
+
+        foreach (var channel in directChannels)
+            Channels.Remove(channel);
+
+        foreach (var participant in availableParticipants)
+            EnsureChannel(participant.ControllerId, participant.DisplayName);
+    }
+
     public void Receive(NetworkChatMessage message)
     {
         if (message.Channel != ChatChannel.System &&
@@ -231,6 +268,7 @@ internal sealed class ChatVM : ViewModel
         if (channelsById.TryGetValue(controllerId, out var existing))
         {
             existing.UpdateDisplayName(displayName);
+            if (!Channels.Contains(existing)) Channels.Add(existing);
             return existing;
         }
 

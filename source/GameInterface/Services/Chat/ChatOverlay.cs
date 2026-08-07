@@ -24,8 +24,11 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     public ChatOverlay(ChatVM dataSource, Action refreshParticipants)
     {
-        this.dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
-        this.refreshParticipants = refreshParticipants ?? throw new ArgumentNullException(nameof(refreshParticipants));
+        if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
+        if (refreshParticipants == null) throw new ArgumentNullException(nameof(refreshParticipants));
+
+        this.dataSource = dataSource;
+        this.refreshParticipants = refreshParticipants;
         dataSource.OpenRequested += OpenInput;
         dataSource.CloseRequested += CloseInput;
     }
@@ -45,7 +48,26 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     protected override void OnTick(float dt)
     {
         base.OnTick(dt);
-        if (!dataSource.IsOpen) return;
+        if (!dataSource.IsOpen)
+        {
+            if (ShouldOpenInput(
+                    Input.IsKeyPressed(InputKey.Enter),
+                    Input.IsKeyPressed(InputKey.NumpadEnter),
+                    Input.IsKeyPressed(InputKey.ControllerLOption)))
+            {
+                OpenInput();
+            }
+            return;
+        }
+
+        if (ShouldCloseInput(
+                Input.IsKeyPressed(InputKey.Escape),
+                Input.IsKeyPressed(InputKey.ControllerRRight),
+                Input.IsKeyPressed(InputKey.ControllerLOption)))
+        {
+            CloseInput();
+            return;
+        }
 
         bool leftMousePressed = Input.IsKeyPressed(InputKey.LeftMouseButton);
         bool mouseButtonPressed = leftMousePressed ||
@@ -75,9 +97,10 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             return;
         }
 
-        if (Input.IsKeyPressed(InputKey.Escape))
-            CloseInput();
-        else if (Input.IsKeyPressed(InputKey.Enter) || Input.IsKeyPressed(InputKey.NumpadEnter))
+        if (ShouldSendInput(
+                Input.IsKeyPressed(InputKey.Enter),
+                Input.IsKeyPressed(InputKey.NumpadEnter),
+                Input.IsKeyPressed(InputKey.ControllerRLeft)))
             dataSource.ActionSend();
     }
 
@@ -135,7 +158,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     private void FocusInput()
     {
-        if (inputWidget == null || gauntletLayer.UIContext.EventManager.IsControllerActive) return;
+        if (inputWidget == null) return;
 
         gauntletLayer.InputRestrictions.SetInputRestrictions();
         gauntletLayer.IsFocusLayer = true;
@@ -167,6 +190,30 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         bool inputHovered)
     {
         return inputFocused && mouseButtonPressed && !inputHovered;
+    }
+
+    internal static bool ShouldOpenInput(
+        bool enterPressed,
+        bool numpadEnterPressed,
+        bool controllerOpenPressed)
+    {
+        return enterPressed || numpadEnterPressed || controllerOpenPressed;
+    }
+
+    internal static bool ShouldCloseInput(
+        bool escapePressed,
+        bool controllerCancelPressed,
+        bool controllerTogglePressed)
+    {
+        return escapePressed || controllerCancelPressed || controllerTogglePressed;
+    }
+
+    internal static bool ShouldSendInput(
+        bool enterPressed,
+        bool numpadEnterPressed,
+        bool controllerSendPressed)
+    {
+        return enterPressed || numpadEnterPressed || controllerSendPressed;
     }
 
     internal static void SetPassiveInputRestrictions(InputRestrictions inputRestrictions)

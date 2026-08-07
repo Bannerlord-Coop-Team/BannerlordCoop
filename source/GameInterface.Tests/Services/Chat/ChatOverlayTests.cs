@@ -38,4 +38,34 @@ public class ChatOverlayTests
             mouseButtonPressed: true,
             inputHovered: false));
     }
+
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void OpenInput_UsesKeyboardAndNativeControllerChatKeys(
+        bool enterPressed,
+        bool numpadEnterPressed,
+        bool controllerOpenPressed)
+    {
+        Assert.True(ChatOverlay.ShouldOpenInput(
+            enterPressed,
+            numpadEnterPressed,
+            controllerOpenPressed));
+    }
+
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void CloseInput_IsAvailableWheneverChatIsOpen(
+        bool escapePressed,
+        bool controllerCancelPressed,
+        bool controllerTogglePressed)
+    {
+        Assert.True(ChatOverlay.ShouldCloseInput(
+            escapePressed,
+            controllerCancelPressed,
+            controllerTogglePressed));
+    }
 }

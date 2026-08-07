@@ -17,11 +17,13 @@ internal sealed class ClientChatHandler : IHandler
         this.chatService = chatService;
 
         messageBroker.Subscribe<NetworkChatMessage>(HandleChatMessage);
+        messageBroker.Subscribe<NetworkChatParticipants>(HandleParticipants);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkChatMessage>(HandleChatMessage);
+        messageBroker.Unsubscribe<NetworkChatParticipants>(HandleParticipants);
     }
 
     private void HandleChatMessage(MessagePayload<NetworkChatMessage> payload)
@@ -29,6 +31,14 @@ internal sealed class ClientChatHandler : IHandler
         var message = payload.What;
         GameThread.RunSafe(
             () => chatService.Receive(message),
+            context: nameof(ClientChatHandler));
+    }
+
+    private void HandleParticipants(MessagePayload<NetworkChatParticipants> payload)
+    {
+        var participants = payload.What;
+        GameThread.RunSafe(
+            () => chatService.ReceiveParticipants(participants),
             context: nameof(ClientChatHandler));
     }
 }

@@ -3,6 +3,7 @@ using Coop.Core.Server.Services.Chat.Handlers;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
 using Coop.Tests.Stubs;
+using GameInterface.Services.Chat;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
@@ -12,6 +13,7 @@ using LiteNetLib;
 using Moq;
 using Serilog;
 using System;
+using System.Linq;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Chat;
@@ -22,6 +24,7 @@ public class ServerChatHandlerTests : IDisposable
     private readonly TestNetwork network = new();
     private readonly IPlayerManager playerManager;
     private readonly Mock<IObjectManager> objectManager = new();
+    private readonly Mock<IChatPlayerNameResolver> playerNameResolver = new();
     private readonly ServerChatHandler handler;
 
     public ServerChatHandlerTests()
@@ -30,11 +33,14 @@ public class ServerChatHandlerTests : IDisposable
             Mock.Of<ILogger>(),
             objectManager.Object,
             Mock.Of<IControllerIdProvider>());
+        playerNameResolver
+            .Setup(resolver => resolver.Resolve(It.IsAny<Player>()))
+            .Returns((Player player) => player.ControllerId);
         handler = new ServerChatHandler(
             messageBroker,
             network,
             playerManager,
-            objectManager.Object);
+            playerNameResolver.Object);
     }
 
     [Fact]
@@ -58,6 +64,8 @@ public class ServerChatHandlerTests : IDisposable
             Assert.Equal("sender", message.SenderName);
             Assert.Equal("hello world", message.Text);
         }
+
+        Assert.Equal(2, network.ImmediateSends.Count(send => send.Payload is NetworkChatMessage));
     }
 
     [Fact]
@@ -87,6 +95,7 @@ public class ServerChatHandlerTests : IDisposable
         }
 
         Assert.False(network.SentNetworkMessages.ContainsKey(observerPeer.Id));
+        Assert.Equal(2, network.ImmediateSends.Count(send => send.Payload is NetworkChatMessage));
     }
 
     [Fact]
@@ -105,6 +114,7 @@ public class ServerChatHandlerTests : IDisposable
         Assert.Equal(ChatChannel.System, rejection.Channel);
         Assert.Equal("disconnected", rejection.RecipientControllerId);
         Assert.Equal("That player is not currently connected.", rejection.Text);
+        Assert.Single(network.ImmediateSends);
     }
 
     [Fact]
@@ -123,6 +133,39 @@ public class ServerChatHandlerTests : IDisposable
         Assert.Equal(ChatChannel.System, rejection.Channel);
         Assert.Contains(ChatMessageLimits.MaxMessageLength.ToString(), rejection.Text);
         Assert.False(network.SentNetworkMessages.ContainsKey(otherPeer.Id));
+        Assert.Single(network.ImmediateSends);
+    }
+
+    [Fact]
+    public void ParticipantRequest_ReturnsOnlyLiveSessionMembersImmediately()
+    {
+        using var broker = new StubMessageBroker();
+        using var participantNetwork = new TestNetwork();
+        var requesterPeer = participantNetwork.CreatePeer();
+        var requester = Player("requester");
+        var connected = Player("connected");
+        var disconnected = Player("disconnected");
+        var players = new Mock<IPlayerManager>();
+        Player registeredRequester = requester;
+        players.Setup(manager => manager.TryGetPlayer(requesterPeer, out registeredRequester)).Returns(true);
+        players.SetupGet(manager => manager.Players).Returns(new[] { requester, connected, disconnected });
+        players.Setup(manager => manager.IsConnected(requester)).Returns(true);
+        players.Setup(manager => manager.IsConnected(connected)).Returns(true);
+        players.Setup(manager => manager.IsConnected(disconnected)).Returns(false);
+
+        using var participantHandler = new ServerChatHandler(
+            broker,
+            participantNetwork,
+            players.Object,
+            playerNameResolver.Object);
+
+        participantHandler.SendParticipants(requesterPeer);
+
+        var snapshot = Assert.Single(
+            participantNetwork.GetPeerMessagesFromType<NetworkChatParticipants>(requesterPeer));
+        Assert.Equal(new[] { "requester", "connected" }, snapshot.ControllerIds);
+        Assert.Single(participantNetwork.ImmediateSends);
+        Assert.IsType<NetworkChatParticipants>(participantNetwork.ImmediateSends[0].Payload);
     }
 
     public void Dispose()

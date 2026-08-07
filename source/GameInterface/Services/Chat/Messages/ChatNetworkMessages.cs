@@ -1,5 +1,6 @@
 using Common.Messaging;
 using ProtoBuf;
+using System;
 
 namespace GameInterface.Services.Chat.Messages;
 
@@ -13,6 +14,25 @@ public enum ChatChannel
 public static class ChatMessageLimits
 {
     public const int MaxMessageLength = 256;
+}
+
+/// <summary>Requests the controller ids that currently have a live server connection.</summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkRequestChatParticipants : ICommand
+{
+}
+
+/// <summary>Replaces the client's selectable direct-message recipients with live session members.</summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkChatParticipants : IEvent
+{
+    [ProtoMember(1)]
+    public readonly string[] ControllerIds;
+
+    public NetworkChatParticipants(string[] controllerIds)
+    {
+        ControllerIds = controllerIds ?? Array.Empty<string>();
+    }
 }
 
 /// <summary>

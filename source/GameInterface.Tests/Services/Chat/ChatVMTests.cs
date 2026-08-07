@@ -180,4 +180,25 @@ public class ChatVMTests
 
         Assert.Contains("[Global] Muted Hero: audible again", vm.TranscriptText);
     }
+
+    [Fact]
+    public void SetParticipants_ReplacesOfflineChannelsAndSelectsGlobalFallback()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.SetParticipants(new[]
+        {
+            (ControllerId: "offline", DisplayName: "Offline Hero"),
+            (ControllerId: "online", DisplayName: "Online Hero"),
+        });
+        vm.Channels.Single(channel => channel.ControllerId == "offline").ExecuteSelection();
+
+        vm.SetParticipants(new[]
+        {
+            (ControllerId: "online", DisplayName: "Online Hero"),
+        });
+
+        Assert.DoesNotContain(vm.Channels, channel => channel.ControllerId == "offline");
+        Assert.Contains(vm.Channels, channel => channel.ControllerId == "online");
+        Assert.True(vm.Channels.Single(channel => channel.IsGlobal).IsSelected);
+    }
 }

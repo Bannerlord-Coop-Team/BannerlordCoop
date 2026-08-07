@@ -1,7 +1,6 @@
 using Common.Network;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using System;
 using System.Collections.Generic;
@@ -13,6 +12,7 @@ public interface IChatService : IGameAbstraction
 {
     void Initialize();
     void Receive(NetworkChatMessage message);
+    void ReceiveParticipants(NetworkChatParticipants participants);
 }
 
 /// <summary>Owns the client chat view model and overlay for one co-op session.</summary>
@@ -20,7 +20,7 @@ public sealed class ChatService : IChatService, IDisposable
 {
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
-    private readonly IObjectManager objectManager;
+    private readonly IChatPlayerNameResolver playerNameResolver;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ChatVM viewModel;
     private readonly ChatOverlay overlay;
@@ -28,16 +28,16 @@ public sealed class ChatService : IChatService, IDisposable
     public ChatService(
         INetwork network,
         IPlayerManager playerManager,
-        IObjectManager objectManager,
+        IChatPlayerNameResolver playerNameResolver,
         IControllerIdProvider controllerIdProvider)
     {
         this.network = network;
         this.playerManager = playerManager;
-        this.objectManager = objectManager;
+        this.playerNameResolver = playerNameResolver;
         this.controllerIdProvider = controllerIdProvider;
 
         viewModel = new ChatVM(message => network.SendAll(message), () => controllerIdProvider.ControllerId);
-        overlay = new ChatOverlay(viewModel, RefreshParticipants);
+        overlay = new ChatOverlay(viewModel, RequestParticipants);
     }
 
     public void Initialize()
@@ -50,28 +50,34 @@ public sealed class ChatService : IChatService, IDisposable
         viewModel.Receive(message);
     }
 
+    public void ReceiveParticipants(NetworkChatParticipants message)
+    {
+        var participants = new List<(string ControllerId, string DisplayName)>();
+        foreach (var controllerId in message.ControllerIds ?? Array.Empty<string>())
+        {
+            if (string.Equals(controllerId, controllerIdProvider.ControllerId, StringComparison.Ordinal))
+                continue;
+
+            string displayName = controllerId;
+            if (playerManager.TryGetPlayer(controllerId, out var player))
+                displayName = playerNameResolver.Resolve(player);
+
+            participants.Add((controllerId, displayName));
+        }
+
+        viewModel.SetParticipants(participants.OrderBy(
+            participant => participant.DisplayName,
+            StringComparer.OrdinalIgnoreCase));
+    }
+
     public void Dispose()
     {
         overlay.Dispose();
     }
 
-    private void RefreshParticipants()
+    internal void RequestParticipants()
     {
-        var participants = new List<(string ControllerId, string Name)>();
-        foreach (var player in playerManager.Players)
-        {
-            if (string.Equals(player.ControllerId, controllerIdProvider.ControllerId, StringComparison.Ordinal))
-                continue;
-
-            participants.Add((player.ControllerId, ChatPlayerName.Resolve(objectManager, player)));
-        }
-
-        foreach (var participant in participants.OrderBy(
-                     participant => participant.Name,
-                     StringComparer.OrdinalIgnoreCase))
-        {
-            viewModel.AddParticipant(participant.ControllerId, participant.Name);
-        }
+        network.SendAll(new NetworkRequestChatParticipants());
     }
 
 }

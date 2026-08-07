@@ -4,13 +4,13 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Chat.Messages;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Coop.Core.Server.Services.Chat.Handlers;
 
@@ -22,25 +22,27 @@ internal sealed class ServerChatHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
-    private readonly IObjectManager objectManager;
+    private readonly IChatPlayerNameResolver playerNameResolver;
 
     public ServerChatHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IPlayerManager playerManager,
-        IObjectManager objectManager)
+        IChatPlayerNameResolver playerNameResolver)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.playerManager = playerManager;
-        this.objectManager = objectManager;
+        this.playerNameResolver = playerNameResolver;
 
         messageBroker.Subscribe<NetworkSendChatMessage>(HandleChatMessage);
+        messageBroker.Subscribe<NetworkRequestChatParticipants>(HandleParticipantRequest);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSendChatMessage>(HandleChatMessage);
+        messageBroker.Unsubscribe<NetworkRequestChatParticipants>(HandleParticipantRequest);
     }
 
     private void HandleChatMessage(MessagePayload<NetworkSendChatMessage> payload)
@@ -55,6 +57,34 @@ internal sealed class ServerChatHandler : IHandler
         GameThread.RunSafe(
             () => RouteMessage(peer, request),
             context: nameof(ServerChatHandler));
+    }
+
+    private void HandleParticipantRequest(MessagePayload<NetworkRequestChatParticipants> payload)
+    {
+        if (payload.Who is not NetPeer peer)
+        {
+            Logger.Warning("Ignoring chat participant request without an originating peer");
+            return;
+        }
+
+        GameThread.RunSafe(
+            () => SendParticipants(peer),
+            context: nameof(ServerChatHandler));
+    }
+
+    internal void SendParticipants(NetPeer peer)
+    {
+        if (!playerManager.TryGetPlayer(peer, out _))
+        {
+            Logger.Warning("Ignoring chat participant request from unregistered peer {PeerId}", peer.Id);
+            return;
+        }
+
+        string[] controllerIds = playerManager.Players
+            .Where(playerManager.IsConnected)
+            .Select(player => player.ControllerId)
+            .ToArray();
+        network.SendImmediate(peer, new NetworkChatParticipants(controllerIds));
     }
 
     internal void RouteMessage(NetPeer senderPeer, NetworkSendChatMessage request)
@@ -90,7 +120,7 @@ internal sealed class ServerChatHandler : IHandler
         var message = new NetworkChatMessage(
             ChatChannel.Global,
             sender.ControllerId,
-            ChatPlayerName.Resolve(objectManager, sender),
+            playerNameResolver.Resolve(sender),
             string.Empty,
             string.Empty,
             text);
@@ -99,7 +129,7 @@ internal sealed class ServerChatHandler : IHandler
         foreach (var player in playerManager.Players)
         {
             if (playerManager.TryGetPeer(player.ControllerId, out var peer) && sentPeers.Add(peer))
-                network.Send(peer, message);
+                network.SendImmediate(peer, message);
         }
     }
 
@@ -127,23 +157,23 @@ internal sealed class ServerChatHandler : IHandler
         var message = new NetworkChatMessage(
             ChatChannel.Direct,
             sender.ControllerId,
-            ChatPlayerName.Resolve(objectManager, sender),
+            playerNameResolver.Resolve(sender),
             recipient.ControllerId,
-            ChatPlayerName.Resolve(objectManager, recipient),
+            playerNameResolver.Resolve(recipient),
             text);
 
-        network.Send(senderPeer, message);
+        network.SendImmediate(senderPeer, message);
         if (!ReferenceEquals(senderPeer, recipientPeer))
-            network.Send(recipientPeer, message);
+            network.SendImmediate(recipientPeer, message);
     }
 
     private void SendSystemMessage(NetPeer peer, string recipientControllerId, string text)
     {
         string recipientName = recipientControllerId;
         if (playerManager.TryGetPlayer(recipientControllerId, out var recipient))
-            recipientName = ChatPlayerName.Resolve(objectManager, recipient);
+            recipientName = playerNameResolver.Resolve(recipient);
 
-        network.Send(peer, new NetworkChatMessage(
+        network.SendImmediate(peer, new NetworkChatMessage(
             ChatChannel.System,
             string.Empty,
             "System",

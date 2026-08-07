@@ -14,9 +14,11 @@ internal sealed class ChatChannelVM : ViewModel
 
     public ChatChannelVM(string controllerId, string displayName, Action<ChatChannelVM> select)
     {
+        if (select == null) throw new ArgumentNullException(nameof(select));
+
         ControllerId = controllerId ?? string.Empty;
         this.displayName = string.IsNullOrWhiteSpace(displayName) ? ControllerId : displayName;
-        this.select = select ?? throw new ArgumentNullException(nameof(select));
+        this.select = select;
     }
 
     public string ControllerId { get; }

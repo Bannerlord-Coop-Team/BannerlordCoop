@@ -489,7 +489,7 @@ namespace Coop
             if (ContainerProvider.TryResolve<IGameInterface>(out var gameInterface))
                 gameInterface.PatchGameStarted();
 
-            if (!isServer && ContainerProvider.TryResolve<IChatService>(out var chatService))
+            if (ModInformation.IsClient && ContainerProvider.TryResolve<IChatService>(out var chatService))
                 chatService.Initialize();
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
