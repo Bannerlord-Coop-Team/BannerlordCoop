@@ -13,7 +13,7 @@ namespace GameInterface.Services.Issues.Patches;
 [HarmonyPatch(typeof(IssueManager))]
 internal class IssueManagerQuestCompletedReasonCapture
 {
-    public static readonly Dictionary<Hero, VillageIssueFinalizeReason> PendingReasons = new();
+    public static readonly Dictionary<Hero, IssueFinalizeReason> PendingReasons = new();
 
     [HarmonyPatch(nameof(IssueManager.OnQuestCompleted))]
     [HarmonyPrefix]
@@ -24,12 +24,12 @@ internal class IssueManagerQuestCompletedReasonCapture
 
         PendingReasons[quest.QuestGiver] = detail switch
         {
-            QuestBase.QuestCompleteDetails.Success => VillageIssueFinalizeReason.QuestSuccess,
-            QuestBase.QuestCompleteDetails.Cancel => VillageIssueFinalizeReason.QuestCancel,
-            QuestBase.QuestCompleteDetails.Fail => VillageIssueFinalizeReason.QuestFail,
-            QuestBase.QuestCompleteDetails.Timeout => VillageIssueFinalizeReason.QuestTimeout,
-            QuestBase.QuestCompleteDetails.FailWithBetrayal => VillageIssueFinalizeReason.QuestBetrayal,
-            _ => VillageIssueFinalizeReason.IssueOnly,
+            QuestBase.QuestCompleteDetails.Success => IssueFinalizeReason.QuestSuccess,
+            QuestBase.QuestCompleteDetails.Cancel => IssueFinalizeReason.QuestCancel,
+            QuestBase.QuestCompleteDetails.Fail => IssueFinalizeReason.QuestFail,
+            QuestBase.QuestCompleteDetails.Timeout => IssueFinalizeReason.QuestTimeout,
+            QuestBase.QuestCompleteDetails.FailWithBetrayal => IssueFinalizeReason.QuestBetrayal,
+            _ => IssueFinalizeReason.IssueOnly,
         };
     }
 }
@@ -41,7 +41,7 @@ internal class IssueFinalizedPatches
     private static void Postfix(IssueBase __instance)
     {
         var owner = __instance.IssueOwner;
-        var reason = VillageIssueFinalizeReason.IssueOnly;
+        var reason = IssueFinalizeReason.IssueOnly;
         if (owner != null && IssueManagerQuestCompletedReasonCapture.PendingReasons.TryGetValue(owner, out var pending))
         {
             reason = pending;
@@ -53,6 +53,6 @@ internal class IssueFinalizedPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;
 
-        MessageBroker.Instance.Publish(__instance, new VillageIssueFinalizedTriggered(owner, reason));
+        MessageBroker.Instance.Publish(__instance, new IssueFinalizedTriggered(owner, reason));
     }
 }

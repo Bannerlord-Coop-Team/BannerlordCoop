@@ -51,10 +51,6 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         messageBroker.Subscribe<NetworkVillageIssueAlternativeAccepted>(Handle_NetworkVillageIssueAlternativeAccepted);
 
         messageBroker.Subscribe<NetworkVillageIssueAcceptRejected>(Handle_NetworkVillageIssueAcceptRejected);
-
-        messageBroker.Subscribe<VillageIssueFinalizedTriggered>(Handle_VillageIssueFinalizedTriggered);
-        messageBroker.Subscribe<RequestVillageIssueRemoved>(Handle_RequestVillageIssueRemoved);
-        messageBroker.Subscribe<NetworkVillageIssueRemoved>(Handle_NetworkVillageIssueRemoved);
     }
 
     public void Dispose()
@@ -71,10 +67,6 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         messageBroker.Unsubscribe<NetworkVillageIssueAlternativeAccepted>(Handle_NetworkVillageIssueAlternativeAccepted);
 
         messageBroker.Unsubscribe<NetworkVillageIssueAcceptRejected>(Handle_NetworkVillageIssueAcceptRejected);
-
-        messageBroker.Unsubscribe<VillageIssueFinalizedTriggered>(Handle_VillageIssueFinalizedTriggered);
-        messageBroker.Unsubscribe<RequestVillageIssueRemoved>(Handle_RequestVillageIssueRemoved);
-        messageBroker.Unsubscribe<NetworkVillageIssueRemoved>(Handle_NetworkVillageIssueRemoved);
     }
 
     private void Handle_VillageIssueCreated(MessagePayload<VillageIssueCreated> payload)
@@ -256,64 +248,6 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
             issueInterface.RejectAcceptance(owner);
-        });
-    }
-
-    private void Handle_VillageIssueFinalizedTriggered(MessagePayload<VillageIssueFinalizedTriggered> payload)
-    {
-        var owner = payload.What.Owner;
-        var reason = payload.What.Reason;
-        if (owner == null || !objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
-
-        if (ModInformation.IsServer)
-        {
-            network.SendAll(new NetworkVillageIssueRemoved(ownerId, reason));
-        }
-        else
-        {
-            network.SendAll(new RequestVillageIssueRemoved(ownerId, reason));
-        }
-    }
-
-    private void Handle_RequestVillageIssueRemoved(MessagePayload<RequestVillageIssueRemoved> payload)
-    {
-        if (ModInformation.IsClient) return;
-
-        var ownerId = payload.What.OwnerId;
-        var reason = payload.What.Reason;
-        var requester = payload.Who as NetPeer;
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
-
-            if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
-            {
-                Logger.Error("Rejecting {Message} from an unregistered/unknown requester for owner {Owner}",
-                    nameof(RequestVillageIssueRemoved), ownerId);
-                return;
-            }
-
-            if (!IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner) || recordedOwner != player.ControllerId)
-            {
-                Logger.Error("Rejecting {Message} from {Requester}, who is not the recorded owner of {Owner}",
-                    nameof(RequestVillageIssueRemoved), player.ControllerId, ownerId);
-                return;
-            }
-
-            issueInterface.FinalizeMirror(owner, reason);
-
-            network.SendAll(new NetworkVillageIssueRemoved(ownerId, reason));
-        });
-    }
-
-    private void Handle_NetworkVillageIssueRemoved(MessagePayload<NetworkVillageIssueRemoved> payload)
-    {
-        var ownerId = payload.What.OwnerId;
-        var reason = payload.What.Reason;
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
-            issueInterface.FinalizeMirror(owner, reason);
         });
     }
 }

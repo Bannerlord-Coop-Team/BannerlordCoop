@@ -357,12 +357,12 @@ public class VillageNeedsToolsIssueTests : IDisposable
         Server.Call(() =>
         {
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
-                new RequestVillageIssueRemoved(fixture.HeroId, VillageIssueFinalizeReason.QuestSuccess));
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestSuccess));
         });
 
-        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueRemoved>());
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
         Assert.Equal(fixture.HeroId, removed.OwnerId);
-        Assert.Equal(VillageIssueFinalizeReason.QuestSuccess, removed.Reason);
+        Assert.Equal(IssueFinalizeReason.QuestSuccess, removed.Reason);
 
         foreach (var instance in AllInstances)
         {
@@ -397,11 +397,11 @@ public class VillageNeedsToolsIssueTests : IDisposable
         Server.Call(() =>
         {
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
-                new RequestVillageIssueRemoved(fixture.HeroId, VillageIssueFinalizeReason.IssueOnly));
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.IssueOnly));
         });
 
-        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueRemoved>());
-        Assert.Equal(VillageIssueFinalizeReason.IssueOnly, removed.Reason);
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(IssueFinalizeReason.IssueOnly, removed.Reason);
 
         foreach (var instance in AllInstances)
         {
@@ -529,7 +529,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(IssueManagerQuestCompletedReasonCapture.PendingReasons.TryGetValue(owner, out var reason));
-            Assert.Equal(VillageIssueFinalizeReason.AlternativeSolutionSuccess, reason);
+            Assert.Equal(IssueFinalizeReason.AlternativeSolutionSuccess, reason);
         });
     }
 
@@ -570,6 +570,6 @@ public class VillageNeedsToolsIssueTests : IDisposable
             Assert.True(owner.Issue.IsSolvingWithAlternative);
         });
 
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueRemoved>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
     }
 }

@@ -1,7 +1,6 @@
 using Common.Util;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
-using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using System;
 using System.Reflection;
@@ -12,8 +11,6 @@ namespace GameInterface.Services.Issues.Interfaces;
 
 public interface IVillageNeedsToolsIssueInterface : IGameAbstraction
 {
-    void FinalizeMirror(Hero owner, VillageIssueFinalizeReason reason);
-
     void MirrorQuestAccepted(Hero owner);
 
     void EnsureServerQuestMirror(Hero owner);
@@ -35,48 +32,6 @@ public class VillageNeedsToolsIssueInterface : IVillageNeedsToolsIssueInterface
         Enum.Parse(IssueStateEnumType, "SolvingWithQuestSolution");
     private static readonly PropertyInfo IsTriedToSolveBeforeProperty =
         AccessTools.Property(typeof(IssueBase), nameof(IssueBase.IsTriedToSolveBefore));
-
-    public void FinalizeMirror(Hero owner, VillageIssueFinalizeReason reason)
-    {
-        if (owner?.Issue == null) return;
-
-        using (new AllowedThread())
-        {
-            var quest = owner.Issue.IssueQuest;
-            if (quest != null && quest.IsOngoing)
-            {
-                switch (reason)
-                {
-                    case VillageIssueFinalizeReason.QuestSuccess:
-                        quest.CompleteQuestWithSuccess();
-                        return;
-                    case VillageIssueFinalizeReason.QuestCancel:
-                        quest.CompleteQuestWithCancel();
-                        return;
-                    case VillageIssueFinalizeReason.QuestFail:
-                        quest.CompleteQuestWithFail();
-                        return;
-                    case VillageIssueFinalizeReason.QuestTimeout:
-                        quest.CompleteQuestWithTimeOut();
-                        return;
-                    case VillageIssueFinalizeReason.QuestBetrayal:
-                        quest.CompleteQuestWithBetrayal();
-                        return;
-                    default:
-                        quest.CompleteQuestWithCancel();
-                        return;
-                }
-            }
-
-            if (reason == VillageIssueFinalizeReason.RejectedAccept)
-            {
-                owner.Issue.CompleteIssueWithCancel();
-                return;
-            }
-
-            owner.Issue.IssueFinalized();
-        }
-    }
 
     public void MirrorQuestAccepted(Hero owner)
     {

@@ -54,7 +54,7 @@ public static class AlternativeSolutionCompletionRunner
     // (the owner IS the server, e.g. a listen-server host) or from a validated per-type request handler.
     public static void CompleteOnServer(Hero owner, IssueBase issue)
     {
-        IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = VillageIssueFinalizeReason.AlternativeSolutionSuccess;
+        IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = IssueFinalizeReason.AlternativeSolutionSuccess;
 
         using (new AlternativeSolutionCompletionAuthorityGuard())
         {
