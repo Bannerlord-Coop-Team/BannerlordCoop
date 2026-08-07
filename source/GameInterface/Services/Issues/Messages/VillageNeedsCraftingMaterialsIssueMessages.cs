@@ -53,11 +53,14 @@ public readonly struct NetworkVillageCraftingIssueCreated : IServerToClientComma
     public readonly string OwnerId;
     [ProtoMember(2)]
     public readonly string RequestedItemId;
+    [ProtoMember(3)]
+    public readonly int Generation;
 
-    public NetworkVillageCraftingIssueCreated(string ownerId, string requestedItemId)
+    public NetworkVillageCraftingIssueCreated(string ownerId, string requestedItemId, int generation)
     {
         OwnerId = ownerId;
         RequestedItemId = requestedItemId;
+        Generation = generation;
     }
 }
 
@@ -66,10 +69,13 @@ public readonly struct RequestVillageCraftingIssueAcceptQuest : ICommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly int Generation;
 
-    public RequestVillageCraftingIssueAcceptQuest(string ownerId)
+    public RequestVillageCraftingIssueAcceptQuest(string ownerId, int generation)
     {
         OwnerId = ownerId;
+        Generation = generation;
     }
 }
 
@@ -111,8 +117,10 @@ public readonly struct RequestVillageCraftingIssueAcceptAlternative : ICommand
     public readonly float TotalTroopXpAmount;
     [ProtoMember(7)]
     public readonly string CompanionRewardSkillId;
+    [ProtoMember(8)]
+    public readonly int Generation;
 
-    public RequestVillageCraftingIssueAcceptAlternative(string ownerId, AlternativeSolutionVanillaState state)
+    public RequestVillageCraftingIssueAcceptAlternative(string ownerId, AlternativeSolutionVanillaState state, int generation)
     {
         OwnerId = ownerId;
         ReturnTime = state.ReturnTime;
@@ -121,6 +129,7 @@ public readonly struct RequestVillageCraftingIssueAcceptAlternative : ICommand
         CasualtyCount = state.CasualtyCount;
         TotalTroopXpAmount = state.TotalTroopXpAmount;
         CompanionRewardSkillId = state.CompanionRewardSkillId;
+        Generation = generation;
     }
 
     public AlternativeSolutionVanillaState ToState() =>

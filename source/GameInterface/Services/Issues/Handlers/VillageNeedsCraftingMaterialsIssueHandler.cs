@@ -88,7 +88,9 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(requestedItem, out var requestedItemId)) return;
 
-        network.SendAll(new NetworkVillageCraftingIssueCreated(ownerId, requestedItemId));
+        var generation = IssueGenerationRegistry.Bump(issue.IssueOwner);
+
+        network.SendAll(new NetworkVillageCraftingIssueCreated(ownerId, requestedItemId, generation));
     }
 
     private void Handle_NetworkVillageCraftingIssueCreated(MessagePayload<NetworkVillageCraftingIssueCreated> payload)
@@ -99,6 +101,8 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
+
+            IssueGenerationRegistry.SetGeneration(owner, data.Generation);
 
             if (owner.Issue != null) return;
 
@@ -122,7 +126,8 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
         }
         else
         {
-            network.SendAll(new RequestVillageCraftingIssueAcceptQuest(ownerId));
+            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            network.SendAll(new RequestVillageCraftingIssueAcceptQuest(ownerId, generation));
         }
     }
 
@@ -131,6 +136,7 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var ownerId = payload.What.OwnerId;
+        var requestedGeneration = payload.What.Generation;
         var requester = payload.Who as NetPeer;
         GameThread.RunSafe(() =>
         {
@@ -144,7 +150,16 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
                 return;
             }
 
-            var canAccept = owner.Issue is VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue && owner.Issue.IsOngoingWithoutQuest;
+            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
+                    nameof(RequestVillageCraftingIssueAcceptQuest), ownerId);
+                network.Send(requester, new NetworkVillageCraftingIssueAcceptRejected(ownerId));
+                return;
+            }
+
+            var canAccept = owner.Issue is VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue issueForEligibility &&
+                issueForEligibility.IsOngoingWithoutQuest && issueForEligibility.IssueStayAliveConditions();
             if (VillageNeedsCraftingMaterialsQuestType.QuestSolutionAccept.TryArbitrate(owner, _ => canAccept, out var fields))
             {
                 IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
@@ -185,7 +200,8 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
         }
         else
         {
-            network.SendAll(new RequestVillageCraftingIssueAcceptAlternative(ownerId, payload.What.State));
+            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            network.SendAll(new RequestVillageCraftingIssueAcceptAlternative(ownerId, payload.What.State, generation));
         }
     }
 
@@ -194,6 +210,7 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var ownerId = payload.What.OwnerId;
+        var requestedGeneration = payload.What.Generation;
         var requester = payload.Who as NetPeer;
         GameThread.RunSafe(() =>
         {
@@ -207,7 +224,16 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
                 return;
             }
 
-            if (owner.Issue is VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue && owner.Issue.IsOngoingWithoutQuest)
+            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
+                    nameof(RequestVillageCraftingIssueAcceptAlternative), ownerId);
+                network.Send(requester, new NetworkVillageCraftingIssueAcceptRejected(ownerId));
+                return;
+            }
+
+            if (owner.Issue is VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue issueForEligibility &&
+                issueForEligibility.IsOngoingWithoutQuest && issueForEligibility.IssueStayAliveConditions())
             {
                 var state = payload.What.ToState();
                 VillageNeedsCraftingMaterialsQuestType.AlternativeAccept.Mirror(owner, state);

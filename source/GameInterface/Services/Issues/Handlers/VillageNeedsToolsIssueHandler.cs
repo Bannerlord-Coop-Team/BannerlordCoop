@@ -89,8 +89,10 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         string exchangeItemId = null;
         if (exchangeItem != null && !objectManager.TryGetIdWithLogging(exchangeItem, out exchangeItemId)) return;
 
+        var generation = IssueGenerationRegistry.Bump(issue.IssueOwner);
+
         network.SendAll(new NetworkVillageIssueCreated(
-            ownerId, requestedItemId, exchangeItemId, numberOfRequestedItem, numberOfExchangeItem, payment));
+            ownerId, requestedItemId, exchangeItemId, numberOfRequestedItem, numberOfExchangeItem, payment, generation));
     }
 
     private void Handle_NetworkVillageIssueCreated(MessagePayload<NetworkVillageIssueCreated> payload)
@@ -101,6 +103,8 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
+
+            IssueGenerationRegistry.SetGeneration(owner, data.Generation);
 
             if (owner.Issue != null) return;
 
@@ -128,9 +132,8 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         }
         else
         {
-            // No ControllerId here: identity is derived server-side from the authenticated NetPeer, never
-            // trusted from a client-claimed value.
-            network.SendAll(new RequestVillageIssueAcceptQuest(ownerId));
+            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            network.SendAll(new RequestVillageIssueAcceptQuest(ownerId, generation));
         }
     }
 
@@ -139,6 +142,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var ownerId = payload.What.OwnerId;
+        var requestedGeneration = payload.What.Generation;
         var requester = payload.Who as NetPeer;
         GameThread.RunSafe(() =>
         {
@@ -154,7 +158,16 @@ internal class VillageNeedsToolsIssueHandler : IHandler
                 return;
             }
 
-            if (GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest)
+            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
+                    nameof(RequestVillageIssueAcceptQuest), ownerId);
+                network.Send(requester, new NetworkVillageIssueAcceptRejected(ownerId));
+                return;
+            }
+
+            if (GenericAcceptMirrorIssueTypes.IsQuestSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest &&
+                owner.Issue.IssueStayAliveConditions())
             {
                 issueInterface.EnsureServerQuestMirror(owner);
                 IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);
@@ -194,7 +207,8 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         }
         else
         {
-            network.SendAll(new RequestVillageIssueAcceptAlternative(ownerId));
+            IssueGenerationRegistry.TryGetGeneration(owner, out var generation);
+            network.SendAll(new RequestVillageIssueAcceptAlternative(ownerId, generation));
         }
     }
 
@@ -203,6 +217,7 @@ internal class VillageNeedsToolsIssueHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var ownerId = payload.What.OwnerId;
+        var requestedGeneration = payload.What.Generation;
         var requester = payload.Who as NetPeer;
         GameThread.RunSafe(() =>
         {
@@ -216,7 +231,16 @@ internal class VillageNeedsToolsIssueHandler : IHandler
                 return;
             }
 
-            if (GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest)
+            if (!IssueGenerationRegistry.TryGetGeneration(owner, out var currentGeneration) || currentGeneration != requestedGeneration)
+            {
+                Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
+                    nameof(RequestVillageIssueAcceptAlternative), ownerId);
+                network.Send(requester, new NetworkVillageIssueAcceptRejected(ownerId));
+                return;
+            }
+
+            if (GenericAcceptMirrorIssueTypes.IsAlternativeSolutionMirrorEligible(owner.Issue) && owner.Issue.IsOngoingWithoutQuest &&
+                owner.Issue.IssueStayAliveConditions())
             {
                 issueInterface.MirrorAlternativeAccepted(owner);
                 IssueOwnershipRegistry.SetOwner(owner, player.ControllerId);

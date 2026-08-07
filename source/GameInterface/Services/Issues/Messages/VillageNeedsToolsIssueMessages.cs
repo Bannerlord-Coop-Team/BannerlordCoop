@@ -55,6 +55,8 @@ public readonly struct NetworkVillageIssueCreated : IServerToClientCommand
     public readonly int NumberOfExchangeItem;
     [ProtoMember(6)]
     public readonly int Payment;
+    [ProtoMember(7)]
+    public readonly int Generation;
 
     public NetworkVillageIssueCreated(
         string ownerId,
@@ -62,7 +64,8 @@ public readonly struct NetworkVillageIssueCreated : IServerToClientCommand
         string exchangeItemId,
         int numberOfRequestedItem,
         int numberOfExchangeItem,
-        int payment)
+        int payment,
+        int generation)
     {
         OwnerId = ownerId;
         RequestedItemId = requestedItemId;
@@ -70,6 +73,7 @@ public readonly struct NetworkVillageIssueCreated : IServerToClientCommand
         NumberOfRequestedItem = numberOfRequestedItem;
         NumberOfExchangeItem = numberOfExchangeItem;
         Payment = payment;
+        Generation = generation;
     }
 }
 
@@ -78,10 +82,13 @@ public readonly struct RequestVillageIssueAcceptQuest : ICommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly int Generation;
 
-    public RequestVillageIssueAcceptQuest(string ownerId)
+    public RequestVillageIssueAcceptQuest(string ownerId, int generation)
     {
         OwnerId = ownerId;
+        Generation = generation;
     }
 }
 
@@ -105,10 +112,13 @@ public readonly struct RequestVillageIssueAcceptAlternative : ICommand
 {
     [ProtoMember(1)]
     public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly int Generation;
 
-    public RequestVillageIssueAcceptAlternative(string ownerId)
+    public RequestVillageIssueAcceptAlternative(string ownerId, int generation)
     {
         OwnerId = ownerId;
+        Generation = generation;
     }
 }
 

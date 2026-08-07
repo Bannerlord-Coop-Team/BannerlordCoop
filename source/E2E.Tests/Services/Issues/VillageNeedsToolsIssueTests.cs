@@ -248,9 +248,12 @@ public class VillageNeedsToolsIssueTests : IDisposable
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
         TestEnvironment.ConnectRegisteredPlayer(OtherClient, "player-B");
 
+        var generation = 0;
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(IssueGenerationRegistry.TryGetGeneration(owner, out generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId, generation));
         });
 
         var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueQuestAccepted>());
@@ -262,8 +265,6 @@ public class VillageNeedsToolsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.False(owner.Issue.IsOngoingWithoutQuest);
-            // The server still gets a real Quest object here even though it never itself accepted - see
-            // VillageNeedsToolsIssueInterface.EnsureServerQuestMirror.
             Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(owner.Issue.IssueQuest);
             Assert.True(IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal("player-A", ownerControllerId);
@@ -271,7 +272,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
 
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId));
+            Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId, generation));
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueQuestAccepted>());
@@ -302,7 +303,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
 
         Server.Call(() =>
         {
-            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestVillageIssueAcceptQuest(fixture.HeroId, 0));
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueQuestAccepted>());
