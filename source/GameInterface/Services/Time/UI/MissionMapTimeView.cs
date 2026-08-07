@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Locations;
 using TaleWorlds.Engine.GauntletUI;
@@ -20,21 +22,29 @@ public sealed class MissionMapTimeView : MissionView, ILocationMissionBehavior
 
     private readonly IMessageBroker messageBroker;
     private readonly ITimeControlInterface timeControlInterface;
+    private readonly ICoopOptionsStore optionsStore;
 
     private MissionMapTimeVM dataSource;
     private GauntletLayer gauntletLayer;
     private GauntletMovieIdentifier movie;
     private bool subscribed;
 
-    public MissionMapTimeView(IMessageBroker messageBroker, ITimeControlInterface timeControlInterface)
+    public MissionMapTimeView(
+        IMessageBroker messageBroker, 
+        ITimeControlInterface timeControlInterface,
+        ICoopOptionsStore optionsStore)
     {
         this.messageBroker = messageBroker;
         this.timeControlInterface = timeControlInterface;
+        this.optionsStore = optionsStore;
     }
 
     public override void OnMissionScreenInitialize()
     {
         base.OnMissionScreenInitialize();
+
+        var options = optionsStore.LoadOrDefault();
+        if (!MapTimeOptionsTabProvider.GetShowMapTimeInMissionsOrDefault(options)) return;
         // Subscribing before the initial snapshot
         messageBroker.Subscribe<NetworkChangeTimeControlMode>(HandleTimeControlModeChanged);
         subscribed = true;
