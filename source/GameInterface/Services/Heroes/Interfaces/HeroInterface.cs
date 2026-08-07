@@ -117,6 +117,8 @@ internal class HeroInterface : IHeroInterface
         if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty playerParty))
             return;
 
+        LogPlayerSwitchState("before", player, playerHero, playerParty);
+
         Campaign.Current.MainParty = playerParty;
         Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
 
@@ -125,8 +127,6 @@ internal class HeroInterface : IHeroInterface
         // This is needed because if the player is captured the PartyBelongedTo is null
         // Causing ChangePlayerCharacterAction to fail
         playerHero.PartyBelongedTo = playerParty;
-
-        Logger.Information("Switching to new hero: {heroName}", playerHero.Name.ToString());
 
         // Vanilla's character change ejects a main hero from its settlement, which would pop the
         // reloaded party outside on this client only (the server's save keeps it inside); keep it
@@ -140,6 +140,8 @@ internal class HeroInterface : IHeroInterface
         {
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
         }
+
+        LogPlayerSwitchState("after", player, playerHero, playerParty);
 
         if (playerParty.CurrentSettlement != null || playerParty.BesiegerCamp != null)
         {
@@ -169,6 +171,49 @@ internal class HeroInterface : IHeroInterface
         // icons would stay revealed forever. Queued so it runs once the campaign state is entered
         // and the hero switched to above is the local main party.
         GameThread.RunSafe(partyVisibilitySweep.RebuildAroundMainParty);
+    }
+
+    private void LogPlayerSwitchState(
+        string phase,
+        Player player,
+        Hero playerHero,
+        MobileParty playerParty)
+    {
+        bool heroRegistered = objectManager.TryGetId(playerHero, out string registeredHeroId);
+        bool partyRegistered = objectManager.TryGetId(playerParty, out string registeredPartyId);
+        bool partyInCampaign = Campaign.Current?.MobileParties?.Contains(playerParty) == true;
+
+        Logger.Information(
+            "Player switch {Phase}: hero={HeroName} requestedHero={RequestedHeroId} " +
+            "registeredHero={RegisteredHeroId} heroRegistered={HeroRegistered} " +
+            "heroParty={HeroPartyId} requestedParty={RequestedPartyId} " +
+            "registeredParty={RegisteredPartyId} partyRegistered={PartyRegistered} " +
+            "mainHero={MainHeroId} mainParty={MainPartyId} inCampaign={PartyInCampaign} " +
+            "active={PartyActive} roster={RosterCount} mapEvent={MapEventId} " +
+            "settlement={SettlementId} moveMode={MoveMode} targetParty={TargetPartyId} " +
+            "targetSettlement={TargetSettlementId} moveTargetParty={MoveTargetPartyId} " +
+            "interactable={InteractableType}",
+            phase,
+            playerHero.Name?.ToString(),
+            player.HeroId,
+            heroRegistered ? registeredHeroId : "missing",
+            heroRegistered,
+            playerHero.PartyBelongedTo?.StringId,
+            player.MobilePartyId,
+            partyRegistered ? registeredPartyId : "missing",
+            partyRegistered,
+            Hero.MainHero?.StringId,
+            MobileParty.MainParty?.StringId,
+            partyInCampaign,
+            playerParty.IsActive,
+            playerParty.MemberRoster?.TotalManCount ?? -1,
+            playerParty.MapEvent?.StringId,
+            playerParty.CurrentSettlement?.StringId,
+            playerParty.PartyMoveMode,
+            playerParty.TargetParty?.StringId,
+            playerParty.TargetSettlement?.StringId,
+            playerParty.MoveTargetParty?.StringId,
+            playerParty.Ai?.AiBehaviorInteractable?.GetType().Name);
     }
 
     private void SetupNewHero(Hero hero, Action<Hero> assignNetworkIds)
