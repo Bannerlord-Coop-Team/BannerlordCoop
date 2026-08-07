@@ -664,7 +664,7 @@ public sealed class MovementRateController : IMovementRateController
     internal static int CalculateLoadCeiling(int activeAgents, int controllerCount)
     {
         int loadScore = Math.Max(0, activeAgents) +
-            (Math.Max(1, controllerCount) - 1) * 25;
+            ((Math.Max(1, controllerCount) - 1) * 25);
         if (loadScore <= 50) return 60;
         if (loadScore <= 250) return 40;
         if (loadScore <= 500) return 30;
