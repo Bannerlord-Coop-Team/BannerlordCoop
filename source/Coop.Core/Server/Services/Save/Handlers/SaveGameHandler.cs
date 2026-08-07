@@ -135,12 +135,21 @@ internal class SaveGameHandler : IHandler
 
         foreach (var player in SelectOneRegistrationPerController(savedSession.Players))
         {
-            playerPartyRestorer.Restore(player);
-            if (!playerRegistry.AddPlayer(player))
+            if (!playerPartyRestorer.TryRestore(player, out var registration))
+            {
+                Logger.Error(
+                    "Skipped saved registration for controller {ControllerId} (hero {HeroId}): " +
+                    "the player graph could not be restored",
+                    player.ControllerId,
+                    player.HeroId);
+                continue;
+            }
+
+            if (!playerRegistry.AddPlayer(registration))
                 Logger.Warning(
                     "Skipped saved registration for controller {ControllerId} (hero {HeroId}): " +
                     "that controller is already registered",
-                    player?.ControllerId, player?.HeroId);
+                    registration?.ControllerId, registration?.HeroId);
         }
     }
 
@@ -164,7 +173,9 @@ internal class SaveGameHandler : IHandler
                 continue;
             }
 
-            var live = registrations.FirstOrDefault(PlayerGraphExists) ?? registrations[0];
+            var live = registrations.FirstOrDefault(PlayerGraphExists) ??
+                registrations.FirstOrDefault(PlayerHeroExists) ??
+                registrations[0];
 
             Logger.Warning(
                 "Save carries {Count} registrations for controller {ControllerId} (heroes {HeroIds}); " +
@@ -183,4 +194,8 @@ internal class SaveGameHandler : IHandler
         !string.IsNullOrEmpty(player.MobilePartyId) &&
         objectManager.TryGetObject<Hero>(player.HeroId, out _) &&
         objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out _);
+
+    private bool PlayerHeroExists(Player player) =>
+        !string.IsNullOrEmpty(player.HeroId) &&
+        objectManager.TryGetObject<Hero>(player.HeroId, out _);
 }
