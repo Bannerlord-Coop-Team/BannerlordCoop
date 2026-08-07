@@ -9,7 +9,6 @@ using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.Workshops.Messages;
-using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using Serilog;
@@ -154,26 +153,47 @@ internal class TradeHandler : IHandler
             var toItemRosterData = message.ToItemRosterData;
             var totalAmount = message.TotalAmount;
 
-            // Undo any purchases that are no longer present in the roster
+            // Undo the part of any purchase the seller can no longer cover
             // When looting, taken items are treated as bought items. Don't need to manage changed rosters in these cases
             if (fromRoster != null)
             {
-                foreach (var boughtItem in boughtItems)
+                var sellerData = ToRosterDataList(fromItemRosterData);
+                var buyerData = ToRosterDataList(toItemRosterData);
+                var rostersAdjusted = false;
+
+                for (int i = 0; i < boughtItems.Count; i++)
                 {
-                    int difference = fromRoster.GetItemNumber(boughtItem.Item1.EquipmentElement.Item) - boughtItem.Item1.Amount;
+                    var (boughtElement, boughtPrice) = boughtItems[i];
+                    var equipmentElement = boughtElement.EquipmentElement;
 
-                    if (difference < 0)
-                    {
-                        int fromRosterDataIndex = fromItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                        if (fromRosterDataIndex >= 0) fromItemRosterData[fromRosterDataIndex].Amount -= difference;
-                        else fromItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
+                    int elementIndex = fromRoster.FindIndexOfElement(equipmentElement);
+                    int available = elementIndex >= 0 ? fromRoster.GetElementNumber(elementIndex) : 0;
 
-                        int toRosterDataIndex = toItemRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                        if (toRosterDataIndex >= 0) toItemRosterData[toRosterDataIndex].Amount += difference;
-                        else toItemRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
+                    int shortfall = boughtElement.Amount - available;
+                    if (shortfall <= 0) continue;
 
-                        totalAmount -= boughtItem.Item2;
-                    }
+                    int reclaimed = RemoveFromRosterData(buyerData, equipmentElement, shortfall);
+                    if (reclaimed <= 0) continue;
+
+                    // Hand back only what was reclaimed, and keep charging for the rest
+                    AddToRosterData(sellerData, equipmentElement, reclaimed);
+
+                    int refund = MathF.Round(boughtPrice * ((float)reclaimed / boughtElement.Amount));
+                    totalAmount -= refund;
+                    boughtItems[i] = (new ItemRosterElement(equipmentElement, boughtElement.Amount - reclaimed), boughtPrice - refund);
+
+                    // Log refunded items
+                    logger.Warning(
+                        "Seller is short {Shortfall} of {Item}, bought {Bought} but only {Available} available. Reclaimed {Reclaimed}, refunding {Refund} of {Price}",
+                        shortfall, equipmentElement.Item?.StringId, boughtElement.Amount, available, reclaimed, refund, boughtPrice);
+
+                    rostersAdjusted = true;
+                }
+
+                if (rostersAdjusted)
+                {
+                    fromItemRosterData = sellerData.ToArray();
+                    toItemRosterData = buyerData.ToArray();
                 }
             }
 
@@ -222,6 +242,47 @@ internal class TradeHandler : IHandler
                 inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
             }
         });
+    }
+
+    private static List<ItemRosterElement> ToRosterDataList(ItemRosterElement[] rosterData)
+        => rosterData == null ? new List<ItemRosterElement>() : new List<ItemRosterElement>(rosterData);
+
+    private static void AddToRosterData(List<ItemRosterElement> rosterData, EquipmentElement equipmentElement, int amount)
+    {
+        int index = rosterData.FindIndex(element => element.EquipmentElement.IsEqualTo(equipmentElement));
+
+        if (index < 0)
+        {
+            rosterData.Add(new ItemRosterElement(equipmentElement, amount));
+            return;
+        }
+
+        var updated = rosterData[index];
+        updated.Amount += amount;
+        rosterData[index] = updated;
+    }
+
+    private static int RemoveFromRosterData(List<ItemRosterElement> rosterData, EquipmentElement equipmentElement, int amount)
+    {
+        int index = rosterData.FindIndex(element => element.EquipmentElement.IsEqualTo(equipmentElement));
+
+        if (index < 0) return 0;
+
+        var updated = rosterData[index];
+        int removed = MathF.Min(amount, updated.Amount);
+
+        updated.Amount -= removed;
+
+        if (updated.Amount > 0)
+        {
+            rosterData[index] = updated;
+        }
+        else
+        {
+            rosterData.RemoveAt(index);
+        }
+
+        return removed;
     }
 
     private (ItemRosterElementData, int)[] ResolveTradeItemIds(
