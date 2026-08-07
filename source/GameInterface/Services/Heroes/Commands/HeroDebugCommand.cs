@@ -231,6 +231,36 @@ public class HeroDebugCommand
 
         return $"Set gold to {gold} for {heroes.Count} hero(es) named '{heroName}'";
     }
+
+    [CommandLineArgumentFunction("gold_state", "coop.debug.hero")]
+    public static string GoldState(List<string> args)
+    {
+        if (args.Count != 1) return "Usage: coop.debug.hero.gold_state <hero id>";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(args[0], out Hero hero))
+            return $"Hero with id {args[0]} not found.";
+
+        return $"HERO_GOLD_STATE hero={args[0]} gold={hero.Gold}";
+    }
+
+    [CommandLineArgumentFunction("set_gold_state", "coop.debug.hero")]
+    public static string SetGoldState(List<string> args)
+    {
+        if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_gold_state"))
+            return error;
+        if (args.Count != 2 || !int.TryParse(args[1], out int gold) || gold < 0)
+            return "Usage: coop.debug.hero.set_gold_state <hero id> <non-negative gold>";
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(args[0], out Hero hero))
+            return $"Hero with id {args[0]} not found.";
+
+        int oldGold = hero.Gold;
+        hero.Gold = gold;
+        return $"HERO_GOLD_SET hero={args[0]} oldGold={oldGold} newGold={hero.Gold}";
+    }
+
     // coop.debug.hero.set_hitpoints
     /// <summary>
     /// Sets the hitpoints of a hero
