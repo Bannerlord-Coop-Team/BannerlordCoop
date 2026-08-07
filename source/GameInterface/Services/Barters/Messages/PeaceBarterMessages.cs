@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
 
@@ -17,6 +17,17 @@ internal enum PeaceConversationContext
 {
     MapParty,
     Location,
+
+    /// <summary>
+    /// A conversation held inside a settlement without a location mission - the settlement menu.
+    /// </summary>
+    /// <remarks>
+    /// Talking to a lord from a castle or town menu creates no agent interaction and no
+    /// CampaignMission.Current.Location, so neither the map-party hold nor the location lock is ever
+    /// acquired and every barter from such a conversation was refused. There is nothing to lock here;
+    /// the server instead verifies both parties are in the settlement it was told about.
+    /// Appended, never reordered: the value travels as an int on the wire.
+    /// </remarks>
     Settlement,
 }
 

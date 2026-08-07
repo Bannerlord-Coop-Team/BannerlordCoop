@@ -45,10 +45,14 @@ namespace GameInterface.Services.Inventory.Interfaces
         static readonly ILogger logger = LogManager.GetLogger<InventoryLogicInterface>();
 
         private readonly ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface;
+        private readonly IDefaultItemDiscardModelInterface defaultItemDiscardModelInterface;
 
-        public InventoryLogicInterface(ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface)
+        public InventoryLogicInterface(
+            ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface,
+            IDefaultItemDiscardModelInterface defaultItemDiscardModelInterface)
         {
             this.tradeSkillCampaignBehaviorInterface = tradeSkillCampaignBehaviorInterface;
+            this.defaultItemDiscardModelInterface = defaultItemDiscardModelInterface;
         }
 
         public void ApplyDoneLogic(
@@ -138,11 +142,11 @@ namespace GameInterface.Services.Inventory.Interfaces
             }
 
             // Discarding items
-            if (isDiscardDonating)
+            if (isDiscardDonating && ownerHero.PartyBelongedTo != null)
             {
                 foreach (ItemRosterElement rosterElement in soldItems.Select(x => x.Item1))
                 {
-                    int xpBonusForDiscardingItems = Campaign.Current.Models.ItemDiscardModel.GetXpBonusForDiscardingItem(rosterElement.EquipmentElement.Item, rosterElement.Amount);
+                    int xpBonusForDiscardingItems = defaultItemDiscardModelInterface.GetXpBonusForDiscardingItem(ownerHero.PartyBelongedTo, rosterElement.EquipmentElement.Item, rosterElement.Amount);
                     if ((float)xpBonusForDiscardingItems > 0f)
                     {
                         MobilePartyHelper.PartyAddSharedXp(ownerHero.PartyBelongedTo, (float)xpBonusForDiscardingItems);
