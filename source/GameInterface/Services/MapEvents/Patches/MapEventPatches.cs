@@ -304,12 +304,16 @@ internal class InteractionPatches
     }
 
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleWindows> playerBattleWindows = new();
+    private static readonly ConditionalWeakTable<MapEvent, object> initializingPlayerBattles = new();
 
     /// <summary>True while a player's battle is still within its post-start window for AI parties to join as
-    /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened in
-    /// <see cref="Postfix_Initialize"/>; only the server ever populates it, so this is a server-side query.</summary>
+    /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened after
+    /// initialization; only the server ever populates it, so this is a server-side query.</summary>
     public static bool IsWithinAiJoinWindow(MapEvent mapEvent)
         => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.AiJoinWindowExpired;
+
+    internal static bool IsInitializingPlayerBattle(MapEvent mapEvent)
+        => initializingPlayerBattles.TryGetValue(mapEvent, out _);
 
     public static bool IsWithinGoldFoodConsumptionWindow(MapEvent mapEvent)
         => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.GoldFoodConsumptionExpired;
@@ -387,13 +391,26 @@ internal class InteractionPatches
         if (!__instance.ContainsPlayerParty())
             return;
 
-        // A player's battle stays open to AI reinforcements for a campaign day after it begins (the join
-        // window is opened in Postfix_Initialize). While it is open, AI may keep joining; once it expires —
+        // A player's battle stays open to AI reinforcements for a campaign day after it begins. While the
+        // window is open, AI may keep joining; once it expires —
         // or if no window was opened for this event — no more AI may join a player's battle.
-        if (IsWithinAiJoinWindow(__instance))
+        if (IsInitializingPlayerBattle(__instance) || IsWithinAiJoinWindow(__instance))
             return;
 
         __result = false;
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
+    [HarmonyPrefix]
+    private static void Prefix_Initialize(
+        MapEvent __instance,
+        PartyBase attackerParty,
+        PartyBase defenderParty)
+    {
+        if (ModInformation.IsClient || !StartsWithPlayerParty(attackerParty, defenderParty))
+            return;
+
+        initializingPlayerBattles.GetValue(__instance, _ => new object());
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
@@ -403,20 +420,24 @@ internal class InteractionPatches
         PartyBase attackerParty,
         PartyBase defenderParty)
     {
-        if (ModInformation.IsClient)
+        if (ModInformation.IsClient || !StartsWithPlayerParty(attackerParty, defenderParty))
             return;
 
-        var attackerIsPlayer = attackerParty.MobileParty?.IsPlayerParty() == true;
-        var defenderIsPlayer = defenderParty.MobileParty?.IsPlayerParty() == true;
-
-        // Only create a join window for battles that started with a player party.
-        if (!attackerIsPlayer && !defenderIsPlayer)
-            return;
-
-        MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
-
+        initializingPlayerBattles.Remove(__instance);
         playerBattleWindows.GetValue(
             __instance,
             _ => new PlayerBattleWindows(ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours));
+        MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle());
     }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
+    [HarmonyFinalizer]
+    private static void Finalizer_Initialize(MapEvent __instance)
+    {
+        initializingPlayerBattles.Remove(__instance);
+    }
+
+    private static bool StartsWithPlayerParty(PartyBase attackerParty, PartyBase defenderParty)
+        => attackerParty.MobileParty?.IsPlayerParty() == true ||
+           defenderParty.MobileParty?.IsPlayerParty() == true;
 }

@@ -50,7 +50,8 @@ internal static class ConversationPartyHold
     }
 
     /// <summary>
-    /// Marks the party as engaged and holds it in place. The tracker decides whether the engagement can be shared.
+    /// Marks the party as engaged and holds it in place. The tracker refuses a party another player already holds,
+    /// so a successful call means this engager owns it alone.
     /// </summary>
     public static bool TryEngage(
         ConversationPartyTracker tracker,
@@ -58,13 +59,20 @@ internal static class ConversationPartyHold
         string engagerPartyId,
         MobileParty party,
         string partyId,
-        bool engagerIsDefender)
+        bool engagerIsDefender,
+        string requestId = null)
     {
         if (tracker == null || party == null) return false;
 
         var wasAiDisabled = party.Ai?.IsDisabled != false;
 
-        if (!tracker.TryBeginEngagement(engagerKey, engagerPartyId, partyId, wasAiDisabled, engagerIsDefender))
+        if (!tracker.TryBeginEngagement(
+                engagerKey,
+                engagerPartyId,
+                partyId,
+                wasAiDisabled,
+                engagerIsDefender,
+                requestId))
             return false;
 
         if (!wasAiDisabled)
@@ -84,10 +92,24 @@ internal static class ConversationPartyHold
 
     /// <summary>Ends the given player's engagement and releases the held party, if any.</summary>
     public static void EndEngagement(ConversationPartyTracker tracker, object engagerKey)
+        => EndEngagement(tracker, engagerKey, requestId: null, requireRequestIdMatch: false);
+
+    /// <summary>Ends an engagement only when it is still owned by the supplied conversation request.</summary>
+    public static void EndEngagement(
+        ConversationPartyTracker tracker,
+        object engagerKey,
+        string requestId,
+        bool requireRequestIdMatch)
     {
         if (tracker == null) return;
 
-        if (!tracker.TryEndEngagement(engagerKey, out var partyId, out var engagement, out var shouldReleaseParty))
+        if (!tracker.TryEndEngagement(
+                engagerKey,
+                out var partyId,
+                out var engagement,
+                out var shouldReleaseParty,
+                requestId,
+                requireRequestIdMatch))
             return;
 
         if (shouldReleaseParty)
@@ -95,7 +117,7 @@ internal static class ConversationPartyHold
     }
 
     /// <summary>
-    /// [Server] True when the target is held and the interacting party is not one of its registered contenders.
+    /// [Server] True when the target is held and the interacting party is not the single player holding it.
     /// </summary>
     public static bool IsInteractionBlocked(PartyBase targetParty, MobileParty interactor)
     {
@@ -113,7 +135,12 @@ internal static class ConversationPartyHold
         if (interactor?.Party != null)
             objectManager.TryGetId(interactor.Party, out interactorId);
 
-        // Every contender registered for a shared hostile encounter may interact with the target.
+        // A held party belongs to exactly one player: the tracker now refuses a second engagement on
+        // the same party, so only the holder may interact and everyone else is blocked. This used to
+        // let every contender in a shared hostile encounter through, which meant two players could
+        // each run the same one-shot outcome against one lord. Simultaneous attackers still converge
+        // on one MapEvent - see ConversationRequestHandler, where the contender's retry is approved
+        // once the holder has started the battle.
         if (tracker.TryGetEngagement(targetPartyId, out _))
             return !tracker.IsEngagerParty(targetPartyId, interactorId);
 

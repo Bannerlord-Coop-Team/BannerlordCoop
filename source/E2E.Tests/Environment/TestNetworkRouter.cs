@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using LiteNetLib;
 
@@ -30,13 +31,13 @@ public class TestNetworkRouter
 
         if (receiver == Server.NetPeer)
         {
-            Server.SimulateMessage(sender, message);
+            Deliver(() => Server.SimulateMessage(sender, message));
         }
         else
         {
             var receivingClient = Clients.Single(client => client.NetPeer == receiver);
 
-            receivingClient.SimulateMessage(sender, message);
+            Deliver(() => receivingClient.SimulateMessage(sender, message));
         }
     }
     public void SendAll(NetPeer sender, IMessage message)
@@ -47,12 +48,12 @@ public class TestNetworkRouter
         {
             foreach (var client in Clients)
             {
-                client.SimulateMessage(sender, message);
+                Deliver(() => client.SimulateMessage(sender, message));
             }
         }
         else
         {
-            Server.SimulateMessage(sender, message);
+            Deliver(() => Server.SimulateMessage(sender, message));
         }
     }
 
@@ -64,13 +65,13 @@ public class TestNetworkRouter
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
             {
-                client.SimulateMessage(sender, message);
+                Deliver(() => client.SimulateMessage(sender, message));
             }
         }
         else
         {
             if (ignored == Server.NetPeer) return;
-            Server.SimulateMessage(sender, message);
+            Deliver(() => Server.SimulateMessage(sender, message));
         }
     }
 
@@ -78,13 +79,13 @@ public class TestNetworkRouter
     {
         if (receiver == Server.NetPeer)
         {
-            Server.SimulatePacket(sender, message);
+            Deliver(() => Server.SimulatePacket(sender, message));
         }
         else
         {
             var receivingClient = Clients.Single(client => client.NetPeer == receiver);
 
-            receivingClient.SimulatePacket(sender, message);
+            Deliver(() => receivingClient.SimulatePacket(sender, message));
         }
     }
     public void SendAll(NetPeer sender, IPacket message)
@@ -93,12 +94,12 @@ public class TestNetworkRouter
         {
             foreach (var client in Clients)
             {
-                client.SimulatePacket(sender, message);
+                Deliver(() => client.SimulatePacket(sender, message));
             }
         }
         else
         {
-            Server.SimulatePacket(sender, message);
+            Deliver(() => Server.SimulatePacket(sender, message));
         }
     }
 
@@ -108,13 +109,22 @@ public class TestNetworkRouter
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
             {
-                client.SimulatePacket(sender, message);
+                Deliver(() => client.SimulatePacket(sender, message));
             }
         }
         else
         {
             if (ignored == Server.NetPeer) return;
-            Server.SimulatePacket(sender, message);
+            Deliver(() => Server.SimulatePacket(sender, message));
+        }
+    }
+
+    private static void Deliver(Action delivery)
+    {
+        // Each E2E instance represents a separate process, so the receiver must not inherit the sender's allowance.
+        using (AllowedThread.Suspend())
+        {
+            delivery();
         }
     }
 }

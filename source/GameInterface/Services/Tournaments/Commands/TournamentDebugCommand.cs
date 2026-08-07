@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,16 +23,8 @@ public class TournamentDebugCommand
         if (Campaign.Current?.TournamentManager is not TournamentManager tournamentManager)
             return "No campaign is currently loaded";
 
-        string townIdentifier = args[0];
-        Town town = Campaign.Current.CampaignObjectManager.Settlements
-            .Where(settlement => settlement.IsTown)
-            .FirstOrDefault(settlement =>
-                string.Equals(settlement.StringId, townIdentifier, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(settlement.Town?.StringId, townIdentifier, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(settlement.Name?.ToString(), townIdentifier, StringComparison.OrdinalIgnoreCase))
-            ?.Town;
-        if (town == null)
-            return $"Town '{townIdentifier}' not found";
+        if (!TryResolveTown(args[0], out var town))
+            return $"Town '{args[0]}' not found";
 
         if (tournamentManager.GetTournamentGame(town) != null)
             return $"{town.Name} already has an active tournament";
@@ -50,5 +42,17 @@ public class TournamentDebugCommand
         return tournamentAdded
             ? $"Added a tournament to {town.Name}"
             : $"Failed to add a tournament to {town.Name}; check the log for details";
+    }
+
+    private static bool TryResolveTown(string townIdentifier, out Town town)
+    {
+        town = Campaign.Current?.CampaignObjectManager?.Settlements
+            .Where(settlement => settlement.IsTown)
+            .FirstOrDefault(settlement =>
+                string.Equals(settlement.StringId, townIdentifier, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(settlement.Town?.StringId, townIdentifier, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(settlement.Name?.ToString(), townIdentifier, StringComparison.OrdinalIgnoreCase))
+            ?.Town;
+        return town != null;
     }
 }

@@ -119,22 +119,38 @@ internal static class BanditBarterPatch
             return;
         }
 
-        barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
-
         var encounterIsActive = shouldCompleteUi && PlayerEncounter.Current != null &&
             completedBarter.OtherParty == MobileParty.ConversationParty?.Party;
 
-        if (encounterIsActive && BarterManager.Instance != null)
+        if (shouldCompleteUi && BarterManager.Instance != null)
         {
             BarterManager.Instance.LastBarterIsAccepted = true;
             BarterManager.Instance.Close();
+        }
+
+        try
+        {
+            barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
+        }
+        catch
+        {
+            // The authoritative result has already closed the barter UI.
         }
 
         if (encounterIsActive)
         {
             PlayerEncounter.LeaveEncounter = true;
             if (Campaign.Current?.ConversationManager?.IsConversationInProgress == true)
-                Campaign.Current.ConversationManager.ContinueConversation();
+            {
+                try
+                {
+                    Campaign.Current.ConversationManager.ContinueConversation();
+                }
+                catch
+                {
+                    // The authoritative result has already closed the barter UI.
+                }
+            }
         }
 
         MBInformationManager.AddQuickInformation(GameTexts.FindText("str_offer_accepted"));
