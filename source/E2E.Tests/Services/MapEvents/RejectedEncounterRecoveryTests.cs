@@ -41,6 +41,25 @@ public class RejectedEncounterRecoveryTests : MapEventTestBase
     {
     }
 
+    [Fact]
+    public void ServerJoinAttemptEvent_DoesNotSendClientRequest()
+    {
+        var context = CreateServerMapEvent();
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(context.AttackerPartyId, out var party));
+
+            Server.Resolve<IMessageBroker>().Publish(
+                this,
+                new PlayerJoinBattleAttempted(party.Party, mapEvent, BattleSideEnum.Attacker));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
