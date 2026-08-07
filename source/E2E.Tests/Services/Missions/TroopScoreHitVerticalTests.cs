@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -29,10 +30,12 @@ namespace E2E.Tests.Services.Missions;
 /// </summary>
 public class TroopScoreHitVerticalTests : MissionTestEnvironment
 {
+    private const int ScoreHitXp = 40;
+
     public TroopScoreHitVerticalTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void ReportedTroopScoreHit_UpdatesContributionEverywhere()
+    public void ReportedTroopScoreHit_AfterAttackerKilled_UpdatesContributionEverywhere()
     {
         var (partyId, troopSeed, victimId) = SetupScoredBattleOnServer();
 
@@ -42,12 +45,18 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
             var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
+            Assert.True(Server.ObjectManager.TryGetId(attacker, out string attackerId));
+
+            // A casualty report from another client can arrive before this projectile's delayed hit.
+            party.Troops.OnTroopKilled(new UniqueTroopDescriptor(troopSeed));
+            Assert.Contains(party.Troops, element =>
+                element.Descriptor.UniqueSeed == troopSeed && element.IsKilled);
 
             int before = party.ContributionToBattle;
 
             // The blow-applying client reports the hit; the server accounts it.
             Server.Resolve<IMessageBroker>().Publish(this,
-                new NetworkTroopScoreHit(partyId, troopSeed, victimId, damage: 30, isFatal: true, isSimulatedHit: false));
+                new NetworkTroopScoreHit(partyId, attackerId, victimId, damage: 30, isFatal: true, isSimulatedHit: false));
 
             Assert.True(party.ContributionToBattle > before,
                 $"Server contribution did not increase (before={before}, after={party.ContributionToBattle})");
@@ -65,9 +74,20 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void LiveBattleScoreHit_ClientOriginReport_AppliesOnceOnServerAndConverges()
+    public void LiveBattleScoreHit_AfterServerRosterReflatten_AppliesOnceWithCurrentDescriptorAndConverges()
     {
-        var (partyId, troopSeed, victimId) = SetupScoredBattleOnServer();
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+        int contributionBefore = 0;
+        int xpBefore = 0;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+
+            // Battle setup can re-flatten after the reserve descriptor was handed to the spawning client.
+            party.Update();
+            Assert.DoesNotContain(party.Troops, element => element.Descriptor.UniqueSeed == troopSeed);
+        });
 
         var reporter = Clients.First();
 
@@ -80,14 +100,26 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
             reporter.CreateRegisteredObject<CharacterObject>("e2e_victim");
         });
 
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
+            var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+
+            contributionBefore = party.ContributionToBattle;
+            xpBefore = party.Troops
+                .Where(element => element.Troop == attacker)
+                .Sum(element => element.XpGained);
+        });
+
         reporter.Call(() =>
         {
             Assert.True(reporter.ObjectManager.TryGetObject<MapEventParty>(partyId, out var clientParty));
             var attacker = reporter.GetRegisteredObject<CharacterObject>("e2e_attacker");
             var victim = reporter.GetRegisteredObject<CharacterObject>("e2e_victim");
 
-            // What BattleAgentLogic.OnAgentHit invokes on the client that applied the blow. The replicated
-            // battle set PartyBase.MapEventSide (MapEventSideDataHandler), so the origin resolves its party.
+            // The origin still carries the old spawn descriptor. The report must use attacker character
+            // identity so the server selects the replacement descriptor from its current roster.
             IAgentOriginBase origin = new CoopAgentOrigin(attacker, clientParty.Party, 0, null, new UniqueTroopDescriptor(troopSeed));
 
             origin.OnScoreHit(victim, null, damage: 30, isFatal: true, isTeamKill: false, attackerWeapon: null);
@@ -110,7 +142,23 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(partyId, out var party));
-            Assert.True(party.ContributionToBattle > 1, "Server did not account the client-reported hit");
+            var attacker = Server.GetRegisteredObject<CharacterObject>("e2e_attacker");
+            int contributionDelta = party.ContributionToBattle - contributionBefore;
+            int xpDelta = party.Troops
+                .Where(element => element.Troop == attacker)
+                .Sum(element => element.XpGained) - xpBefore;
+            var victim = Server.GetRegisteredObject<CharacterObject>("e2e_victim");
+            int expectedXp = Campaign.Current.Models.CombatXpModel.GetXpFromHit(
+                attacker,
+                null,
+                victim,
+                party.Party,
+                30,
+                true,
+                CombatXpModel.MissionTypeEnum.Battle).RoundedResultNumber;
+            Assert.True(expectedXp > 0, "The fixture hit must produce XP");
+            Assert.Equal(expectedXp, contributionDelta);
+            Assert.Equal(expectedXp, xpDelta);
             serverContribution = party.ContributionToBattle;
         });
 
@@ -121,7 +169,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     [Fact]
     public void SimulatedScoreHit_OnServer_AppliesNativelyAndBroadcasts()
     {
-        var (partyId, troopSeed, victimId) = SetupScoredBattleOnServer();
+        var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
 
         int serverContribution = 0;
 
@@ -192,7 +240,10 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         Assert.NotNull(partyBaseId);
         Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
 
-        Server.SimulateMessage(this, new NetworkRequestLeaveBattle(partyBaseId!));
+        // The leave and finalization paths run normally; only the campaign-map locatable scan is unavailable headlessly.
+        Server.Call(
+            () => Server.Resolve<IMessageBroker>().Publish(this, new NetworkRequestLeaveBattle(partyBaseId!)),
+            new[] { AccessTools.Method(typeof(MapEvent), "ResetUnsuitablePartiesThatWereTargetingThisMapEvent") });
 
         var messages = Server.NetworkSentMessages.Messages;
         int contributionIndex = messages.FindIndex(message => IsContributionMessageFor(message, partyId));
@@ -291,17 +342,35 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     {
         Server.Call(() =>
         {
-            if (Campaign.Current.Models != null) return;
-
             var models = new List<GameModel>
             {
-                new DefaultCombatXpModel(),
+                new FixedCombatXpModel(),
                 new DefaultMilitaryPowerModel(),
                 new DefaultCharacterStatsModel(),
             };
 
-            var gameModels = Server.GameInstance.Game.AddGameModelsManager<GameModels>(models);
-            AccessTools.Field(typeof(Campaign), "_gameModels").SetValue(Campaign.Current, gameModels);
+            var gameModels = new GameModels(models);
+            Server.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
+            Campaign.Current._gameModels = gameModels;
         });
+    }
+
+    private sealed class FixedCombatXpModel : CombatXpModel
+    {
+        public override float CaptainRadius => 0f;
+
+        public override SkillObject GetSkillForWeapon(WeaponComponentData weapon, bool isSiegeEngineHit) => null;
+
+        public override ExplainedNumber GetXpFromHit(
+            CharacterObject attackerTroop,
+            CharacterObject captain,
+            CharacterObject attackedTroop,
+            PartyBase attackerParty,
+            int damage,
+            bool isFatal,
+            MissionTypeEnum missionType) =>
+            new ExplainedNumber(ScoreHitXp);
+
+        public override float GetXpMultiplierFromShotDifficulty(float shotDifficulty) => 1f;
     }
 }

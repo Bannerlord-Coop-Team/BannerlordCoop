@@ -1,8 +1,11 @@
 ﻿using Coop.Core.Server.Services.Instances;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Missions;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using Missions.Messages;
 using Missions.Services.Network;
 
@@ -14,6 +17,7 @@ namespace Coop.IntegrationTests.Missions;
 /// join and leave an instance. Each client's view excludes its own controller id, so "equivalent" means: the
 /// server lists every present controller, and each client lists exactly the others.
 /// </summary>
+[Collection(KingdomSyncGameThreadCollection.Name)]
 public class MissionMembershipTests
 {
     private const string InstanceId = "Settlement|Location";
@@ -93,6 +97,36 @@ public class MissionMembershipTests
         Assert.False(membershipRegistry.IsInstanceOccupied(InstanceId));
     }
 
+    [Fact]
+    public void EntryIntoAnotherInstance_RemovesMissedPriorMembershipFirst()
+    {
+        const string nextInstanceId = "Settlement|OtherLocation";
+        var members = SetupClients().Take(2).ToArray();
+        var departures = new List<MissionMemberDeparted>();
+        TestEnvironment.Server.Subscribe<MissionMemberDeparted>(payload => departures.Add(payload.What));
+
+        Join(members[0]);
+        Join(members[1]);
+
+        GameThreadTestRunner.Run(() =>
+            TestEnvironment.Server.SimulateMessage(
+                members[1].Instance.NetPeer,
+                new NetworkMissionEntered("stale-controller", nextInstanceId)));
+
+        var departure = Assert.Single(departures);
+        Assert.Equal(members[1].ControllerId, departure.ControllerId);
+        Assert.Equal(InstanceId, departure.InstanceId);
+        Assert.True(departure.WasRetreat);
+        Assert.False(departure.IsInstanceEmpty);
+
+        var manager = TestEnvironment.Server.Resolve<IMissionManager>();
+        Assert.True(manager.TryGetControllers(InstanceId, out var oldControllers));
+        Assert.Equal(new[] { members[0].ControllerId }, oldControllers);
+        Assert.True(manager.TryGetControllers(nextInstanceId, out var newControllers));
+        Assert.Equal(new[] { members[1].ControllerId }, newControllers);
+        Assert.Empty(members[0].Instance.Resolve<MissionContext>().ControllersInMission);
+    }
+
     private record Member(EnvironmentInstance Instance, string ControllerId);
 
     /// <summary>Assigns each client a distinct controller id (the id MissionContext filters itself out by).</summary>
@@ -104,6 +138,13 @@ public class MissionMembershipTests
         {
             var controllerId = $"Client{++i}";
             client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+            TestEnvironment.Server.Call(() =>
+            {
+                var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
+                Assert.True(playerManager.AddPlayer(
+                    new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
+                playerManager.SetPeer(controllerId, client.NetPeer);
+            });
             members.Add(new Member(client, controllerId));
         }
         return members;
@@ -111,11 +152,17 @@ public class MissionMembershipTests
 
     /// <summary>Simulates the server receiving a MissionEntered over the member's connection.</summary>
     private void Join(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.ControllerId, InstanceId));
+        GameThreadTestRunner.Run(() =>
+            TestEnvironment.Server.SimulateMessage(
+                member.Instance.NetPeer,
+                new NetworkMissionEntered(member.ControllerId, InstanceId)));
 
     /// <summary>Simulates the server receiving a MissionLeft over the member's connection.</summary>
     private void Leave(Member member) =>
-        TestEnvironment.Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionLeft(member.ControllerId, InstanceId));
+        GameThreadTestRunner.Run(() =>
+            TestEnvironment.Server.SimulateMessage(
+                member.Instance.NetPeer,
+                new NetworkMissionLeft(member.ControllerId, InstanceId)));
 
     /// <summary>
     /// Asserts the server's instance controllers equal the present members, and each present member's

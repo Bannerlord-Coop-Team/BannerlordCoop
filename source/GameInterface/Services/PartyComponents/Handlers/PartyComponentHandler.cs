@@ -96,7 +96,7 @@ internal class PartyComponentHandler : IHandler
         {
             try
             {
-                var obj = (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+                var obj = CreatePartyComponent(data);
 
                 switch (data.TypeIndex)
                 {
@@ -221,6 +221,24 @@ internal class PartyComponentHandler : IHandler
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkCreatePartyComponent));
             }
         });
+    }
+
+    private PartyComponent CreatePartyComponent(PartyComponentData data)
+    {
+        if (data.TypeIndex != 0 || data.HomeSettlementId is null)
+        {
+            return (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+        }
+
+        if (!objectManager.TryGetObjectWithLogging(data.HomeSettlementId, out Settlement relatedSettlement))
+        {
+            return (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+        }
+
+        using (new AllowedThread())
+        {
+            return new BanditPartyComponent(relatedSettlement, null);
+        }
     }
 
     private void Handle_PartyComponentMobilePartyUpdated(MessagePayload<PartyComponentMobilePartyUpdated> payload)

@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Notifications.Messages;
+using Helpers;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -60,6 +61,9 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NotifyMoraleLossDueToFunds>(Handle_NotifyMoraleLossDueToFunds);
         messageBroker.Subscribe<NetworkNotifyMoraleLossDueToFunds>(Handle_NetworkNotifyMoraleLossDueToFunds);
 
+        messageBroker.Subscribe<NotifyHeroJoinedParty>(Handle_NotifyHeroJoinedParty);
+        messageBroker.Subscribe<NetworkNotifyHeroJoinedParty>(Handle_NetworkNotifyHeroJoinedParty);
+
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
@@ -91,6 +95,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyMoraleLossDueToFunds>(Handle_NotifyMoraleLossDueToFunds);
         messageBroker.Unsubscribe<NetworkNotifyMoraleLossDueToFunds>(Handle_NetworkNotifyMoraleLossDueToFunds);
+
+        messageBroker.Unsubscribe<NotifyHeroJoinedParty>(Handle_NotifyHeroJoinedParty);
+        messageBroker.Unsubscribe<NetworkNotifyHeroJoinedParty>(Handle_NetworkNotifyHeroJoinedParty);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -346,6 +353,32 @@ internal class OtherNotificationsHandler : IHandler
 
             MBTextManager.SetTextVariable("reg1", MathF.Round(MathF.Abs(obj.What.MoraleChange), 1), 2);
             MBInformationManager.AddQuickInformation(GameTexts.FindText("str_party_loses_moral_due_to_insufficent_funds", null), 0, null, null, "");
+        });
+    }
+
+    private void Handle_NotifyHeroJoinedParty(MessagePayload<NotifyHeroJoinedParty> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.NewParty, out var newPartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Companion, out var companionId)) return;
+
+            network.SendAll(new NetworkNotifyHeroJoinedParty(newPartyId, companionId));
+        });
+    }
+
+    private void Handle_NetworkNotifyHeroJoinedParty(MessagePayload<NetworkNotifyHeroJoinedParty> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.NewPartyId, out var newParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CompanionId, out var companion)) return;
+
+            if (newParty != MobileParty.MainParty) return;
+
+            TextObject textObject = GameTexts.FindText("str_companion_added", null);
+            StringHelpers.SetCharacterProperties("COMPANION", companion.CharacterObject, textObject, false);
+            MBInformationManager.AddQuickInformation(textObject, 0, null, null, "");
         });
     }
 

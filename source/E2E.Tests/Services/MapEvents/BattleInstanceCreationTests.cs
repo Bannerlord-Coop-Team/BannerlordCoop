@@ -1,3 +1,4 @@
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
@@ -5,6 +6,7 @@ using E2E.Tests.Services.Missions;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -75,7 +77,10 @@ public class BattleInstanceCreationTests : MissionTestEnvironment
     {
         var (mapEventId, partyIds) = SetupCoopBattle("ctrl-A", "ctrl-B");
         var troopId = CreateRegisteredObject<CharacterObject>();
-        var client = Clients.First();
+        var clients = Clients.ToArray();
+        var client = clients[0];
+        Server.Resolve<IPlayerManager>().SetPeer("ctrl-A", clients[0].NetPeer);
+        Server.Resolve<IPlayerManager>().SetPeer("ctrl-B", clients[1].NetPeer);
 
         // Give both sides some troops so the native make-ready step has something to field (mirrors the working
         // village-raid mission-start path). Seeded server-side only (that is where the handler makes sides ready).
@@ -94,6 +99,12 @@ public class BattleInstanceCreationTests : MissionTestEnvironment
         try
         {
             Server.NetworkSentMessages.Clear();
+            var reservedControllers = new HashSet<string>();
+            Server.Resolve<IMessageBroker>().Subscribe<BattleJoinAccepted>(payload =>
+            {
+                if (payload.What.InstanceId == mapEventId)
+                    reservedControllers.Add(payload.What.ControllerId);
+            });
 
             client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
                 Guid.NewGuid().ToString(),
@@ -101,10 +112,11 @@ public class BattleInstanceCreationTests : MissionTestEnvironment
                 mapEventId,
                 partyIds[0])), MapEventDisabledMethods);
 
-            // The server hands the mission to the clients: it broadcasts the attack-mission start carrying the
-            // battle's unique map-event id (BR-104), rather than opening a mission itself (BR-002 para 2).
-            var start = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>());
-            Assert.Equal(mapEventId, start.MapEventId);
+            // The server hands the mission to each authoritative participant, carrying the battle's unique
+            // map-event id (BR-104), rather than opening a mission itself (BR-002 para 2).
+            var starts = Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().ToArray();
+            Assert.Equal(2, starts.Length);
+            Assert.All(starts, start => Assert.Equal(mapEventId, start.MapEventId));
 
             // The event is claimed for the mission mode (so the auto-resolve option is greyed everywhere).
             var mode = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
@@ -113,6 +125,7 @@ public class BattleInstanceCreationTests : MissionTestEnvironment
 
             var reply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>());
             Assert.True(reply.Accepted);
+            Assert.Equal(new[] { "ctrl-A", "ctrl-B" }, reservedControllers.OrderBy(id => id));
         }
         finally
         {

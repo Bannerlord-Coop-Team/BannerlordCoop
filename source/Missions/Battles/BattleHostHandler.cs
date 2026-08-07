@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -19,6 +20,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace Missions.Battles;
 
@@ -78,6 +80,7 @@ internal class BattleHostHandler : IHandler
         public readonly HashSet<string> HostOwnedOfflineControllers = new HashSet<string>();
         public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
         public HostEndpoint HostEndpoint;
+        public BattleState ResolvedState;
     }
 
     private sealed class HostEndpoint
@@ -139,6 +142,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Subscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -152,6 +156,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Unsubscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -218,10 +223,9 @@ internal class BattleHostHandler : IHandler
                 // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
                 if (TryAppendSuccessor(existing, requesterId, out var updated))
                 {
-                    hostRegistry.Set(mapEventId, updated);
+                    SetServerAssignment(mapEventId, updated);
                     Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
                         requesterId, mapEventId, string.Join(", ", updated.SuccessorControllerIds));
-                    network.SendAll(ToMessage(mapEventId, updated));
                 }
                 else if (requester != null)
                 {
@@ -234,12 +238,10 @@ internal class BattleHostHandler : IHandler
                 // battle, or one past the last generation if this map event was abandoned and re-entered.
                 var epoch = NextEpoch(mapEventId);
                 var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
-                hostRegistry.Set(mapEventId, assignment);
+                SetServerAssignment(mapEventId, assignment);
 
                 Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
                     requesterId, mapEventId, epoch);
-
-                network.SendAll(ToMessage(mapEventId, assignment));
             }
 
             // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
@@ -308,6 +310,23 @@ internal class BattleHostHandler : IHandler
 
             SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides);
         });
+    }
+
+    private void Handle_BattleResolvedStateRecorded(MessagePayload<BattleResolvedStateRecorded> payload)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        var result = payload.What;
+        if (result.BattleState != BattleState.AttackerVictory &&
+            result.BattleState != BattleState.DefenderVictory)
+        {
+            return;
+        }
+
+        GetOrCreateRuntimeState(result.MapEventId).ResolvedState = result.BattleState;
+        if (hostRegistry.TryGet(result.MapEventId, out var assignment))
+            BroadcastResolvedState(result.MapEventId, assignment, result.BattleState);
     }
 
     /// <summary>[Server] Send the requester every reserve it owns, one message per side. With
@@ -736,12 +755,10 @@ internal class BattleHostHandler : IHandler
                 var newHost = successors[0];
                 successors.RemoveAt(0);
                 var promoted = new BattleHostAssignment(newHost, successors, NextEpoch(mapEventId, assignment.Epoch));
-                hostRegistry.Set(mapEventId, promoted);
+                SetServerAssignment(mapEventId, promoted);
 
                 Logger.Information("[BattleHost] Host {Old} left battle {MapEventId}; promoted {New} at epoch {Epoch} (successors: {Successors})",
                     controllerId, mapEventId, newHost, promoted.Epoch, string.Join(", ", successors));
-
-                network.SendAll(ToMessage(mapEventId, promoted));
 
                 // The departed host can no longer ack a reserve flush: serve any return grant that was
                 // pending on it from the current ledger. AFTER the promotion, so the grant is scoped
@@ -752,12 +769,10 @@ internal class BattleHostHandler : IHandler
             {
                 // Successor-line cleanup: the host did not change, so the epoch is unchanged (BR-102).
                 var updated = new BattleHostAssignment(assignment.HostControllerId, successors, assignment.Epoch);
-                hostRegistry.Set(mapEventId, updated);
+                SetServerAssignment(mapEventId, updated);
 
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
                     controllerId, mapEventId, string.Join(", ", successors));
-
-                network.SendAll(ToMessage(mapEventId, updated));
             }
 
             if (newlyAbsent && mapEvent != null && assignment.HostControllerId != controllerId)
@@ -795,6 +810,7 @@ internal class BattleHostHandler : IHandler
 
         // Capture the host we knew before applying the update, so we can detect a migration TO us.
         string previousHost = null;
+        bool wasLocalHost = false;
         if (hostRegistry.TryGet(message.MapEventId, out var previous))
         {
             // BR-102: assignments are ordered by their host epoch. One LOWER than what we already hold is a
@@ -808,6 +824,7 @@ internal class BattleHostHandler : IHandler
             }
 
             previousHost = previous.HostControllerId;
+            wasLocalHost = previous.HostControllerId == controllerIdProvider.ControllerId;
         }
 
         var assignment = new BattleHostAssignment(
@@ -815,6 +832,10 @@ internal class BattleHostHandler : IHandler
             message.SuccessorControllerIds ?? Array.Empty<string>(),
             message.Epoch);
         hostRegistry.Set(message.MapEventId, assignment);
+
+        bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
+        if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))
+            messageBroker.Publish(this, new BattleHostAuthorityAcquired(message.MapEventId));
 
         Logger.Information("[BattleHost] Battle {MapEventId} host is {Host}{IsMe} at epoch {Epoch} (successors: {Successors})",
             message.MapEventId,
@@ -827,7 +848,7 @@ internal class BattleHostHandler : IHandler
         // battle continues uninterrupted (the controller does the actual adoption with the live mission).
         if (previousHost != null
             && previousHost != message.HostControllerId
-            && message.HostControllerId == controllerIdProvider.ControllerId)
+            && isLocalHost)
         {
             Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
             messageBroker.Publish(this, new BattleHostMigrated(message.MapEventId, previousHost));
@@ -843,7 +864,7 @@ internal class BattleHostHandler : IHandler
             if (player.ControllerId != requesterId)
                 continue;
             return objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)
-                && party?.MapEvent == mapEvent;
+                && mapEvent.FindMapEventParty(party.Party) != null;
         }
         return false;
     }
@@ -962,5 +983,31 @@ internal class BattleHostHandler : IHandler
             successors[i] = assignment.SuccessorControllerIds[i];
 
         return new NetworkBattleHostAssigned(mapEventId, assignment.HostControllerId, successors, assignment.Epoch);
+    }
+
+    private void SetServerAssignment(string mapEventId, BattleHostAssignment assignment)
+    {
+        hostRegistry.Set(mapEventId, assignment);
+        network.SendAll(ToMessage(mapEventId, assignment));
+        if (battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) &&
+            (runtimeState.ResolvedState == BattleState.AttackerVictory ||
+             runtimeState.ResolvedState == BattleState.DefenderVictory))
+        {
+            BroadcastResolvedState(mapEventId, assignment, runtimeState.ResolvedState);
+        }
+
+        messageBroker.Publish(this, new BattleHostAssignmentChanged(mapEventId));
+    }
+
+    private void BroadcastResolvedState(
+        string mapEventId,
+        BattleHostAssignment assignment,
+        BattleState battleState)
+    {
+        network.SendAll(new NetworkBattleResultSnapshot(
+            mapEventId,
+            assignment.HostControllerId,
+            assignment.Epoch,
+            battleState));
     }
 }

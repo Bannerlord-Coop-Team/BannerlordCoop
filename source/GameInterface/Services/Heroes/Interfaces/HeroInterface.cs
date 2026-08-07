@@ -10,6 +10,7 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using SandBox.View.Map.Managers;
@@ -41,17 +42,20 @@ internal class HeroInterface : IHeroInterface
     private readonly IMessageBroker messageBroker;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IPartyVisibilitySweep partyVisibilitySweep;
+    private readonly IPlayerPartyRestorer playerPartyRestorer;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
         IObjectManager objectManager,
-        IPartyVisibilitySweep partyVisibilitySweep)
+        IPartyVisibilitySweep partyVisibilitySweep,
+        IPlayerPartyRestorer playerPartyRestorer)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
         this.partyVisibilitySweep = partyVisibilitySweep;
+        this.playerPartyRestorer = playerPartyRestorer;
     }
 
     public byte[] PackageMainHero()
@@ -63,7 +67,7 @@ internal class HeroInterface : IHeroInterface
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
-        return BinaryPackageSerializer.Serialize(package);
+        return BinaryPackageSerializer.SerializeCompressed(package);
     }
 
     public Hero ServerUnpackHero(byte[] bytes)
@@ -90,7 +94,7 @@ internal class HeroInterface : IHeroInterface
                 using (new AllowedThread())
                 {
                     hero = BinaryPackageSerializer
-                        .Deserialize<HeroBinaryPackage>(bytes)
+                        .DeserializeCompressed<HeroBinaryPackage>(bytes)
                         .Unpack<Hero>(binaryPackageFactory);
 
                     SetupNewHero(hero, assignNetworkIds);
@@ -211,7 +215,7 @@ internal class HeroInterface : IHeroInterface
 
         // Restore the roster before assignNetworkIds registers it. Otherwise the AllowedThread AddToCounts
         // patch sends a roster update before clients receive the hero creation message.
-        RestorePlayerMemberships(hero, party);
+        playerPartyRestorer.Restore(hero, party);
 
         // Assign the network StringIds BEFORE adding to the CampaignObjectManager. FindNextUniqueStringId derives
         // the next "PlayerN" from CampaignObjectType.MaxCreatedPostfixIndex, which is cached in OnItemAdded when an
@@ -241,18 +245,6 @@ internal class HeroInterface : IHeroInterface
         campaignObjectManager.AddHero(hero);
         campaignObjectManager.AddMobileParty(party);
         campaignObjectManager.AddClan(hero.Clan);
-    }
-
-    internal static void RestorePlayerMemberships(Hero hero, MobileParty party)
-    {
-        // PackageMainHero unregisters the player hero before packaging, so ClanBinaryPackage cannot store its
-        // network ID in the clan's hero and alive-lord caches.
-        if (!hero.Clan.Heroes.Contains(hero))
-            hero.Clan.OnLordAdded(hero);
-
-        // TroopRosterBinaryPackage excludes roster elements, so the imported party has an empty member roster.
-        if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
-            party.MemberRoster.AddToCounts(hero.CharacterObject, 1, insertAtFront: true);
     }
 
     /// <summary>

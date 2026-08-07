@@ -100,13 +100,25 @@ internal class TimeControlInterface : ITimeControlInterface
     /// <returns>The highest mode the policies permit for the request</returns>
     internal TimeControlEnum LimitTimeControl(TimeControlEnum requestedMode)
     {
-        if (requestedMode != TimeControlEnum.Pause && AnyPolicyDisallows(unpausePolicies))
+        if (requestedMode != TimeControlEnum.Pause &&
+            TryGetDisallowingPolicy(unpausePolicies, out var unpausePolicy))
         {
+            Logger.Information(
+                "Time control request {RequestedMode} limited to {EffectiveMode} by {Policy}",
+                requestedMode,
+                TimeControlEnum.Pause,
+                unpausePolicy);
             return TimeControlEnum.Pause;
         }
 
-        if (requestedMode == TimeControlEnum.Play_2x && AnyPolicyDisallows(fastForwardPolicies))
+        if (requestedMode == TimeControlEnum.Play_2x &&
+            TryGetDisallowingPolicy(fastForwardPolicies, out var fastForwardPolicy))
         {
+            Logger.Information(
+                "Time control request {RequestedMode} limited to {EffectiveMode} by {Policy}",
+                requestedMode,
+                TimeControlEnum.Play_1x,
+                fastForwardPolicy);
             return TimeControlEnum.Play_1x;
         }
 
@@ -118,8 +130,9 @@ internal class TimeControlInterface : ITimeControlInterface
     /// action is allowed; if any live policy returns false, the action is disallowed.
     /// </summary>
     /// <param name="policies">The policies to evaluate</param>
+    /// <param name="policyName">The policy that disallowed the action</param>
     /// <returns>True if any policy disallows the action, otherwise false</returns>
-    private static bool AnyPolicyDisallows(List<WeakDelegate> policies)
+    private static bool TryGetDisallowingPolicy(List<WeakDelegate> policies, out string policyName)
     {
         foreach (var policy in policies)
         {
@@ -130,10 +143,12 @@ internal class TimeControlInterface : ITimeControlInterface
 
             if (policy.Invoke<bool>(Array.Empty<object>()) == false)
             {
+                policyName = $"{policy.Method.DeclaringType?.Name}.{policy.Method.Name}";
                 return true;
             }
         }
 
+        policyName = null;
         return false;
     }
 
@@ -150,9 +165,17 @@ internal class TimeControlInterface : ITimeControlInterface
             return;
         }
 
+        var currentMode = Campaign.Current == null
+            ? "<unavailable>"
+            : GetTimeControl().ToString();
+        var requestedMode = timeMode;
         timeMode = LimitTimeControl(timeMode);
 
-        Logger.Verbose("Server changing time to {mode}", timeMode);
+        Logger.Information(
+            "Applying server time control: current={CurrentMode} requested={RequestedMode} effective={EffectiveMode}",
+            currentMode,
+            requestedMode,
+            timeMode);
 
         network.SendAll(new NetworkChangeTimeControlMode(timeMode));
 

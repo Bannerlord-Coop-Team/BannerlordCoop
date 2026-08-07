@@ -1,15 +1,16 @@
+using GameInterface.Services.UI.Credits;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.Donate;
 
 /// <summary>
-/// Shared community / donation link actions used by the co-op menus (connect menu, coop options).
-/// Keeps the platform URLs and the donate-popup launch in one place so screens stay in sync.
+/// Shared community / donation / credits actions used by the co-op menus (connect menu, coop options).
+/// Keeps the platform URLs and the popup launches in one place so screens stay in sync.
 /// </summary>
 internal static class CommunityLinks
 {
     private const string DiscordUrl = "https://discord.gg/ngC4RVb";
-    private const string PatreonUrl = "https://www.patreon.com/c/bannerlordcoop";
+    private const string PatreonUrl = "https://www.patreon.com/c/bannerlordcoop/membership";
 
     public static void OpenDiscord() => Open(DiscordUrl);
 
@@ -21,6 +22,15 @@ internal static class CommunityLinks
         if (ScreenManager.TopScreen is ScreenBase owner)
         {
             DonatePopupOverlay.Show(owner);
+        }
+    }
+
+    /// <summary>Shows the credits popup layered over whichever screen is currently on top.</summary>
+    public static void ShowCreditsPopup()
+    {
+        if (ScreenManager.TopScreen is ScreenBase owner)
+        {
+            CreditsPopupOverlay.Show(owner);
         }
     }
 

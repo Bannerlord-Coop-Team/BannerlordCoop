@@ -33,7 +33,7 @@ namespace E2E.Tests.Services.BasicCultureObjects
             assertHelper.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.ForegroundColor2), 88U);
             assertHelper.AssertProperty<BasicCultureObject, bool>(nameof(BasicCultureObject.IsBandit), true);
             assertHelper.AssertProperty<BasicCultureObject, bool>(nameof(BasicCultureObject.IsMainCulture), true);
-            assertHelper.AssertProperty<BasicCultureObject, TextObject>(nameof(BasicCultureObject.Name), new TextObject("testName"));
+            assertHelper.AssertProperty<BasicCultureObject, TextObject>(nameof(BasicCultureObject.Name), new TextObject("testName", new()));
         }
     }
 }

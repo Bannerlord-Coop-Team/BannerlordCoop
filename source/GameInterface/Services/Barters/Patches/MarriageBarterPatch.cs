@@ -133,12 +133,21 @@ internal static class MarriageBarterPatch
             return true;
         }
 
-        barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
         if (shouldCompleteUi && BarterManager.Instance != null)
         {
-            BarterManager.Instance.HandleHeroCooldown(completedBarter.OtherHero);
             BarterManager.Instance.LastBarterIsAccepted = true;
             BarterManager.Instance.Close();
+        }
+
+        try
+        {
+            barterClientPresentation.SynchronizeMainHeroGold(result.PlayerGold);
+            if (shouldCompleteUi && BarterManager.Instance != null)
+                BarterManager.Instance.HandleHeroCooldown(completedBarter.OtherHero);
+        }
+        catch
+        {
+            // The authoritative result has already closed the barter UI.
         }
 
         if (shouldCompleteUi && Campaign.Current?.ConversationManager?.IsConversationInProgress == true)
@@ -206,7 +215,7 @@ internal static class MarriageBarterPatch
             network.SendAll(new NetworkCancelMarriageBarterAuthorization(requestId));
     }
 
-    private static bool TryGetConversationContext(
+    internal static bool TryGetConversationContext(
         BarterData barterData,
         IObjectManager objectManager,
         out MarriageConversationContext context,
@@ -216,6 +225,14 @@ internal static class MarriageBarterPatch
         if (location != null && objectManager.TryGetId(location, out contextId))
         {
             context = MarriageConversationContext.Location;
+            return true;
+        }
+
+        var settlement = barterData.OffererParty?.MobileParty?.CurrentSettlement;
+        if (settlement != null && barterData.OtherHero?.CurrentSettlement == settlement &&
+            objectManager.TryGetId(settlement, out contextId))
+        {
+            context = MarriageConversationContext.Settlement;
             return true;
         }
 

@@ -10,17 +10,21 @@ public interface IAgentVisualActionAccessor
         Agent agent,
         int channel,
         in ActionIndexCache action);
-    void AdvanceActionIfAvailable(
+
+    bool HasVisibleAction(
+        Agent agent,
+        int channel);
+
+    bool TrySetAction(
         Agent agent,
         int channel,
         in ActionIndexCache action,
-        float progress);
+        float progress,
+        float blendPeriodOverride);
 }
 
 public class AgentVisualActionAccessor : IAgentVisualActionAccessor
 {
-    private const float RetainedGuardAnimationBlendPeriod = -1f;
-
     public bool IsActionVisible(
         Agent agent,
         int channel,
@@ -33,14 +37,16 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
             if (ReferenceEquals(skeleton, null)) return false;
 
             ActionIndexCache visualAction = skeleton.GetActionAtChannel(channel);
-            if (visualAction == action) return true;
-            if (visualAction != ActionIndexCache.act_none) return false;
-
             int animationIndex = MBActionSet.GetAnimationIndexOfAction(
                 agent.ActionSet,
                 in action);
-            return animationIndex >= 0
-                && skeleton.GetAnimationIndexAtChannel(channel) == animationIndex;
+            int visualAnimation =
+                skeleton.GetAnimationIndexAtChannel(channel);
+            if (visualAction == action)
+                return true;
+            if (visualAction != ActionIndexCache.act_none) return false;
+
+            return animationIndex >= 0 && visualAnimation == animationIndex;
         }
         catch
         {
@@ -53,56 +59,96 @@ public class AgentVisualActionAccessor : IAgentVisualActionAccessor
         }
     }
 
-    public void AdvanceActionIfAvailable(
+    public bool HasVisibleAction(
         Agent agent,
-        int channel,
-        in ActionIndexCache action,
-        float progress)
+        int channel)
     {
         Skeleton skeleton = null;
         try
         {
             skeleton = GetSkeleton(agent);
-            if (ReferenceEquals(skeleton, null)) return;
+            if (ReferenceEquals(skeleton, null)) return false;
 
-            ActionIndexCache visualAction = skeleton.GetActionAtChannel(channel);
-            if (visualAction != ActionIndexCache.act_none
-                && visualAction != action)
-            {
-                return;
-            }
-
-            int animationIndex = MBActionSet.GetAnimationIndexOfAction(
-                agent.ActionSet,
-                in action);
-            if (animationIndex < 0) return;
-
-            int visualAnimation = skeleton.GetAnimationIndexAtChannel(channel);
-            if (visualAction == ActionIndexCache.act_none
-                && visualAnimation >= 0
-                && visualAnimation != animationIndex)
-            {
-                return;
-            }
-
-            // Native ticking removes the puppet action before it can blend. Keep its visual clip
-            // independent and re-arm the authored blend without resetting progress.
-            skeleton.SetAnimationAtChannel(
-                animationIndex,
-                channel,
-                animationSpeedMultiplier: 1f,
-                blendInPeriod: RetainedGuardAnimationBlendPeriod,
-                startProgress: progress);
+            return skeleton.GetActionAtChannel(channel)
+                    != ActionIndexCache.act_none
+                || skeleton.GetAnimationIndexAtChannel(channel) >= 0;
         }
         catch
         {
-            // Visuals can become invalid between the validity check and skeleton access.
+            return false;
         }
         finally
         {
             if (!ReferenceEquals(skeleton, null))
                 skeleton.ManualInvalidate();
         }
+    }
+
+    public bool TrySetAction(
+        Agent agent,
+        int channel,
+        in ActionIndexCache action,
+        float progress,
+        float blendPeriodOverride)
+    {
+        Skeleton skeleton = null;
+        try
+        {
+            MBAgentVisuals visuals = agent.AgentVisuals;
+            if (ReferenceEquals(visuals, null) || !visuals.IsValid())
+                return false;
+
+            skeleton = visuals.GetSkeleton();
+            if (ReferenceEquals(skeleton, null)) return false;
+
+            if (IsActionVisible(agent, skeleton, channel, in action))
+            {
+                skeleton.SetAnimationParameterAtChannel(
+                    channel,
+                    Math.Max(0f, Math.Min(1f, progress)));
+                skeleton.SetAnimationSpeedAtChannel(channel, 1f);
+            }
+            else
+            {
+                visuals.SetAgentActionChannel(
+                    channel,
+                    action.Index,
+                    channelParameter:
+                        Math.Max(0f, Math.Min(1f, progress)),
+                    blendPeriodOverride: blendPeriodOverride,
+                    forceFaceMorphRestart: false);
+            }
+
+            return true;
+        }
+        catch (NullReferenceException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (!ReferenceEquals(skeleton, null))
+                skeleton.ManualInvalidate();
+        }
+    }
+
+    private static bool IsActionVisible(
+        Agent agent,
+        Skeleton skeleton,
+        int channel,
+        in ActionIndexCache action)
+    {
+        ActionIndexCache visualAction = skeleton.GetActionAtChannel(channel);
+        int animationIndex = MBActionSet.GetAnimationIndexOfAction(
+            agent.ActionSet,
+            in action);
+        int visualAnimation =
+            skeleton.GetAnimationIndexAtChannel(channel);
+        if (visualAction == action)
+            return true;
+        if (visualAction != ActionIndexCache.act_none) return false;
+
+        return animationIndex >= 0 && visualAnimation == animationIndex;
     }
 
     private static Skeleton GetSkeleton(Agent agent)

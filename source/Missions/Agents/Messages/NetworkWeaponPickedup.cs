@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Missions.Agents.Packets;
 using ProtoBuf;
 using System;
 using TaleWorlds.Core;
@@ -25,18 +26,23 @@ namespace Missions.Agents.Messages
         [ProtoMember(5)]
         public Banner Banner { get; }
 
+        [ProtoMember(6)]
+        public AgentEquipmentData CurrentEquipment { get; }
+
         public NetworkWeaponPickedup(
             Guid agentId, 
             EquipmentIndex equipmentIndex, 
             ItemObject weaponObject, 
             ItemModifier itemModifier, 
-            Banner banner)
+            Banner banner,
+            AgentEquipmentData currentEquipment)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
             ItemObject = weaponObject;
             ItemModifier = itemModifier;
             Banner = banner;
+            CurrentEquipment = currentEquipment;
         }
     }
 }

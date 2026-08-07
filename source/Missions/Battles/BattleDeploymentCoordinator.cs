@@ -29,11 +29,11 @@ public interface IBattleDeploymentCoordinator : IDisposable
 
     /// <summary>
     /// The local player finished their own deployment (Start Battle): announce it to the mesh, mark the battle
-    /// live if we are the host, and charge our own troops when no player agent leads them. Returns true on the
-    /// FIRST commit only — the caller must then reveal the withheld own-party troops at their deployed
-    /// positions (requirement #4), synchronously, before the native un-pause moves them.
+    /// live if we are the host, and charge our own troops when no player agent leads them. On the first commit,
+    /// invoke <paramref name="replicateCommittedTroops"/> before either marker is sent. Returns true only for
+    /// that first commit.
     /// </summary>
-    bool OnLocalDeploymentFinished();
+    bool OnLocalDeploymentFinished(Action replicateCommittedTroops = null);
 
     /// <summary>This client was just promoted to host (migration): release the adopted NPCs if the battle is live.</summary>
     void OnPromotedToHost();
@@ -138,7 +138,7 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
 
     // [All clients] The local player just finished their own deployment (Start Battle): the native
     // FinishDeployment un-paused our own troops and handed us our hero.
-    public bool OnLocalDeploymentFinished()
+    public bool OnLocalDeploymentFinished(Action replicateCommittedTroops = null)
     {
         // The deployment finished (manually, or via this very gate's expiry) — the time limit no longer
         // applies (BR-025). Disarming here also covers the native auto-finish paths (e.g. a leaderless
@@ -146,7 +146,25 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
         autoFinishPending = false;
         deploymentTimer.OnDeploymentFinished();
 
-        // Announce it to the battle mesh so the host releases the NPC AI on the first finish from ANY client.
+        // Commit and replicate the withheld troops before announcing deployment. Both messages use the same
+        // ReliableOrdered stream, so a peer cannot accept the marker while this army is still behind it.
+        bool firstCommit = !committed;
+        if (firstCommit)
+        {
+            committed = true;
+            try
+            {
+                replicateCommittedTroops?.Invoke();
+            }
+            catch
+            {
+                committed = false;
+                throw;
+            }
+
+            if (deployerFinished) RelatchSiegeTactic();
+        }
+
         network.SendAll(new NetworkBattleDeploymentFinished(session.OwnControllerId));
 
         // If WE are the host, that same native FinishDeployment also released our NPCs — record the battle as
@@ -160,13 +178,7 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
         Logger.Information("[BattleSync] Local deployment finished (host={IsHost}, activated={Active})",
             session.IsLocalHost, activator.IsActivated);
 
-        // First commit → the caller reveals the withheld own-party troops; idempotent afterwards.
-        if (committed) return false;
-        committed = true;
-
-        if (deployerFinished) RelatchSiegeTactic();
-
-        return true;
+        return firstCommit;
     }
 
     public void OnPromotedToHost()
@@ -237,8 +249,9 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     //    (reserves still inside CoopBattleMissionSpawnHandler's hold). This is transient; disarming here (as the
     //    original one-shot did) would leave the AFK player never auto-finished once setup completes, so we ask
     //    again on the next tick.
-    //  - Finished (permanent disarm): the native FinishDeployment ran; its fan-out re-enters
-    //    OnLocalDeploymentFinished, so the announce/activation/reveal follow exactly as a manual finish.
+    //  - Finished (permanent disarm): the native FinishDeployment was queued for the next game-loop pump;
+    //    its fan-out re-enters OnLocalDeploymentFinished, so the announce/activation/reveal follow exactly
+    //    as a manual finish.
     private static DeploymentAutoFinishResult FinishNativeDeployment()
     {
         var mission = Mission.Current;
@@ -263,8 +276,18 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
             return DeploymentAutoFinishResult.Unavailable;
         }
 
-        Logger.Information("[BattleSync] Auto-finishing the local deployment via the native DeploymentHandler.FinishDeployment");
-        deploymentHandler.FinishDeployment();
+        Logger.Information("[BattleSync] Queuing native DeploymentHandler.FinishDeployment outside the mission behavior tick");
+        GameThread.EnqueueSafe(() =>
+        {
+            if (!ReferenceEquals(Mission.Current, mission)) return;
+
+            var currentController = mission.GetMissionBehavior<DeploymentMissionController>();
+            var currentHandler = mission.GetMissionBehavior<DeploymentHandler>();
+            if (currentController?.TeamSetupOver != true || currentHandler == null) return;
+
+            Logger.Information("[BattleSync] Auto-finishing the local deployment via the native DeploymentHandler.FinishDeployment");
+            currentHandler.FinishDeployment();
+        }, "deferred battle deployment auto-finish");
         return DeploymentAutoFinishResult.Finished;
     }
 
@@ -274,25 +297,25 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     // returns false for them; and once activated (our own finish, or an earlier peer), later finishes are no-ops.
     private void Handle_NetworkBattleDeploymentFinished(MessagePayload<NetworkBattleDeploymentFinished> payload)
     {
-        Logger.Information("[BattleSync] Peer {Controller} finished deployment", payload.What.ControllerId);
-
-        if (activator.OnRemoteDeploymentFinished(session.IsLocalHost))
+        string controllerId = payload.What.ControllerId;
+        // Spawn batches received before this marker also use GameThread.RunSafe. Keeping the whole marker apply
+        // on that FIFO queue makes deployment and activation a barrier behind puppet registration.
+        GameThread.RunSafe(() =>
         {
-            network.SendAll(new NetworkBattleActivated(session.InstanceId));
-            ActivateNpcAi();
-        }
+            Logger.Information("[BattleSync] Peer {Controller} finished deployment", controllerId);
 
-        // The engine deployer finished: its placements are final here (same ReliableOrdered channel).
-        // This handler runs on the poll thread while the commit path runs on the game thread; marshal
-        // the flag work there so the deployerFinished/committed pair is read and written on one thread.
-        if (session.IsHostController(payload.What.ControllerId) && !session.IsLocalHost)
-        {
-            GameThread.RunSafe(() =>
+            if (activator.OnRemoteDeploymentFinished(session.IsLocalHost))
+            {
+                network.SendAll(new NetworkBattleActivated(session.InstanceId));
+                ActivateNpcAi();
+            }
+
+            if (session.IsHostController(controllerId) && !session.IsLocalHost)
             {
                 deployerFinished = true;
                 if (committed) RelatchSiegeTactic();
-            });
-        }
+            }
+        }, context: nameof(Handle_NetworkBattleDeploymentFinished));
     }
 
     // [Non-deployer, game thread] Our siege tactic latched its assault lanes at our own commit, possibly
@@ -324,8 +347,12 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     // action — their NPCs are host-driven puppets that follow the host's movement.
     private void Handle_NetworkBattleActivated(MessagePayload<NetworkBattleActivated> payload)
     {
-        Logger.Information("[BattleSync] Battle-activated signal received for {Instance}", payload.What.MapEventId);
-        activator.OnBattleActivatedReceived();
+        string mapEventId = payload.What.MapEventId;
+        GameThread.RunSafe(() =>
+        {
+            Logger.Information("[BattleSync] Battle-activated signal received for {Instance}", mapEventId);
+            activator.OnBattleActivatedReceived();
+        }, context: nameof(Handle_NetworkBattleActivated));
     }
 
     // [Host, game thread] Release the host-driven NPC AI so it engages mid-deployment. The mission gates AI

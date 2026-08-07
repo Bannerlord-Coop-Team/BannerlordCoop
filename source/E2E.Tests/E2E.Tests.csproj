@@ -13,6 +13,10 @@
     <Optimize>false</Optimize>
     <DebugType>portable</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <!-- e2e.runsettings pins the testhost's JIT behavior so Harmony detours can't be dropped
+         mid-test; see the comment there. dotnet test picks this up; direct vstest.console runs
+         need /Settings:e2e.runsettings. -->
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)e2e.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>

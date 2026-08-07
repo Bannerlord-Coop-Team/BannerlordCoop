@@ -14,12 +14,14 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -43,18 +45,21 @@ internal class PlayerPartyVisibilityHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISiegeEventInterface siegeEventInterface;
     private readonly Dictionary<MobileParty, MapEvent> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.network = network;
+        this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
@@ -101,6 +106,8 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 return;
             }
 
+            LeaveSiegeBeforeParking(party);
+
             if (!party.IsActive)
             {
                 Logger.Debug("Party {PartyId} already parked, skipping", party.StringId);
@@ -140,6 +147,18 @@ internal class PlayerPartyVisibilityHandler : IHandler
                 return; // fresh join, never parked, nothing to restore
             }
 
+            // Retrieves the player and outs it to the Hero Object
+            // Checks if the player is prisoner or if they belong there
+            // If they do, the Debug message appears.
+            if (objectManager.TryGetObject(player.HeroId, out Hero hero) &&
+                (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null))
+            {
+                Logger.Debug("Keeping captive party {PartyId} parked for peer {Peer}",
+                    party.StringId,
+                    peer.Id);
+                return;
+            }
+
             party.IsActive = true;
             CreateVisual(party, player.MobilePartyId);
             party.Party.UpdateVisibilityAndInspected(party.Position);
@@ -159,8 +178,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
             if (party.MapEvent != null) continue;
 
             deferredMapEventParking.Remove(party);
-            if (!party.IsActive || !IsDisconnectedPlayerParty(party)) continue;
+            if (!party.IsActive || !playerManager.IsOwnerOfPartyDisconnected(party)) continue;
 
+            LeaveSiegeBeforeParking(party);
             party.IsActive = false;
             RemoveVisual(party);
             Logger.Information(
@@ -169,11 +189,15 @@ internal class PlayerPartyVisibilityHandler : IHandler
         }
     }
 
-    private bool IsDisconnectedPlayerParty(MobileParty party) =>
-        playerManager.Players.Any(player =>
-            !playerManager.IsConnected(player) &&
-            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) &&
-            ReferenceEquals(playerParty, party));
+    private void LeaveSiegeBeforeParking(MobileParty party)
+    {
+        if (party.BesiegerCamp == null) return;
+
+        Logger.Information(
+            "Removing disconnected party {PartyId} from its siege camp before parking",
+            party.StringId);
+        siegeEventInterface.BreakSiegeForPartyOnly(party);
+    }
 
     /// <summary>
     /// Removes the party's map figure and tells every client to do the same, mirroring

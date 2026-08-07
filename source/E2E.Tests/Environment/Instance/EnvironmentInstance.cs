@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -12,6 +12,9 @@ using HarmonyLib;
 using LiteNetLib;
 using ProtoBuf.Meta;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Environment.Instance;
 
@@ -40,8 +43,6 @@ public abstract class EnvironmentInstance : IDisposable
     private readonly MockNetworkBase mockNetwork;
     private readonly ILifetimeScope container;
 
-    private readonly static object _lock = new object();
-
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
         MockNetworkBase mockNetwork,
@@ -57,9 +58,10 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source of the message</param>
     /// <param name="message">Received Message</param>
-    public void SimulateMessage<T>(object source, T message) where T : IMessage
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulateMessage<T>(object source, T message, bool markGameThread = true) where T : IMessage
     {
-        using (new StaticScope(this))
+        using (new StaticScope(this, markGameThread))
         {
             messageBroker.Publish(source, message);
         }
@@ -70,9 +72,10 @@ public abstract class EnvironmentInstance : IDisposable
     /// </summary>
     /// <param name="source">Source Peer</param>
     /// <param name="packet">Received Packet</param>
-    public void SimulatePacket(NetPeer source, IPacket packet)
+    /// <param name="markGameThread">Whether the current test thread should apply game-thread work inline.</param>
+    public void SimulatePacket(NetPeer source, IPacket packet, bool markGameThread = true)
     {
-        using (new StaticScope(this))
+        using (new StaticScope(this, markGameThread))
         {
             EnsureSerializable(packet);
             mockNetwork.ReceiveFromNetwork(source, packet);
@@ -90,7 +93,13 @@ public abstract class EnvironmentInstance : IDisposable
             disabledMethods = Array.Empty<MethodBase>();
         }
 
-        lock (_lock)
+        // The same lock StaticScope takes, so PatchScope's patch/unpatch cannot interleave with
+        // another thread executing patched game code inside a SimulateMessage/SimulatePacket —
+        // those only enter GameInstance.@lock (via StaticScope), and the previous separate _lock
+        // left the Harmony rewrites unguarded against them. Monitor is reentrant per thread, which
+        // routed sends rely on: a Call's handler chain synchronously delivers into another
+        // instance's Simulate*, nesting scopes on the same thread.
+        lock (GameInstance.@lock)
         {
             using (new PatchScope(disabledMethods))
             {
@@ -142,35 +151,78 @@ public abstract class EnvironmentInstance : IDisposable
     private class StaticScope : IDisposable
     {
         private readonly ILifetimeScope previousContainer;
+        private readonly MBObjectManager previousObjectManager;
+        private readonly Campaign previousCampaign;
+        private readonly Game previousGame;
+        private readonly TaleWorlds.MountAndBlade.Module previousModule;
+        private readonly TestMessageBroker previousMessageBroker;
         private readonly bool wasServer;
+        private readonly bool markedGameThread;
+        private readonly int previousGameThreadId;
 
-        public StaticScope(EnvironmentInstance instance)
+        public StaticScope(EnvironmentInstance instance, bool markGameThread = true)
         {
             Monitor.Enter(GameInstance.@lock);
+            bool restorePreviousStatics = false;
 
             // The lock must be released even when the body throws (resolving from an instance a
             // concurrent test already disposed), otherwise it stays owned by this (possibly
             // recycled) thread forever and every later scope or GameInstance build deadlocks.
             try
             {
+                if (markGameThread)
+                {
+                    // xUnit can move a test from its fixture-constructor thread before the next scoped call.
+                    // Save-and-restore rather than bare-mark: a scope entered on a worker thread (e.g.
+                    // Task.Run(() => Server.Call(...))) must not leave the game-thread mark on that thread —
+                    // every later GameThread.RunSafe from the real test thread would silently enqueue onto
+                    // a queue nobody pumps instead of running inline.
+                    markedGameThread = true;
+                    previousGameThreadId = GameThread.Instance.GameThreadId;
+                    GameThread.Instance.MarkGameThread();
+                }
+
                 // Save previous static values
                 wasServer = ModInformation.IsServer;
+                previousObjectManager = MBObjectManager.Instance;
+                previousCampaign = Campaign.Current;
+                previousGame = Game.Current;
+                previousModule = TaleWorlds.MountAndBlade.Module.CurrentModule;
                 if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
                 {
                     // If no previous container is set, set it to the current container
                     previousContainer = instance.Container;
                 }
+                previousMessageBroker = previousContainer.Resolve<TestMessageBroker>();
+                var instanceMessageBroker = instance.Container.Resolve<TestMessageBroker>();
 
                 // Set new static values
+                restorePreviousStatics = true;
                 instance.GameInstance.SetStatics();
 
                 ModInformation.IsServer = instance is ServerInstance;
-                instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
+                instanceMessageBroker.SetStaticInstance();
                 GameInterface.ContainerProvider.SetContainer(instance.Container);
             }
             catch
             {
-                Monitor.Exit(GameInstance.@lock);
+                try
+                {
+                    if (restorePreviousStatics)
+                    {
+                        RestorePreviousStatics();
+                    }
+                    else if (markedGameThread)
+                    {
+                        // The mark is set before the statics are saved, so a throw in between must
+                        // still put it back (RestorePreviousStatics is not reachable yet here).
+                        GameThread.Instance.RestoreGameThread(previousGameThreadId);
+                    }
+                }
+                finally
+                {
+                    Monitor.Exit(GameInstance.@lock);
+                }
                 throw;
             }
         }
@@ -179,14 +231,26 @@ public abstract class EnvironmentInstance : IDisposable
         {
             try
             {
-                // Restore previous static values
-                ModInformation.IsServer = wasServer;
-                GameInterface.ContainerProvider.SetContainer(previousContainer);
-                previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
+                RestorePreviousStatics();
             }
             finally
             {
                 Monitor.Exit(GameInstance.@lock);
+            }
+        }
+
+        private void RestorePreviousStatics()
+        {
+            MBObjectManager.Instance = previousObjectManager;
+            Campaign.Current = previousCampaign;
+            Game.Current = previousGame;
+            TaleWorlds.MountAndBlade.Module.CurrentModule = previousModule;
+            ModInformation.IsServer = wasServer;
+            GameInterface.ContainerProvider.SetContainer(previousContainer);
+            previousMessageBroker.SetStaticInstance();
+            if (markedGameThread)
+            {
+                GameThread.Instance.RestoreGameThread(previousGameThreadId);
             }
         }
     }
@@ -202,7 +266,15 @@ public abstract class EnvironmentInstance : IDisposable
         {
             var disableMethod = AccessTools.Method(typeof(PatchScope), nameof(Disable));
             methods = disableMethods.ToArray();
-            patches = methods.Select(m => new HarmonyMethod(disableMethod)).ToArray();
+            // Priority.Last, not First: an explicit priority keeps the disable's position deterministic
+            // across container rebuilds (same-priority prefixes run in patch-insertion order, which varies),
+            // but it must sort AFTER the mod's own prefixes — a bool prefix returning false skips every
+            // later bool prefix, and tests drive real patched natives expecting their routing prefixes
+            // (e.g. SiegeEntryFlowPatches' publish-and-pre-null shapes) to still fire while only the
+            // native body is suppressed.
+            patches = methods
+                .Select(_ => new HarmonyMethod(disableMethod) { priority = Priority.Last })
+                .ToArray();
 
             for (int i = 0; i < methods.Length; i++)
             {

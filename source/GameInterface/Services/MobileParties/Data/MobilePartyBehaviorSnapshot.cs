@@ -19,7 +19,12 @@ public interface IMobilePartyBehaviorSnapshot
 {
     bool TryCreate(MobileParty party, out PartyBehaviorUpdateData data);
     bool CanApply(MobileParty party, PartyBehaviorUpdateData data);
-    bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state);
+    bool TryCreateJoinState(
+        MobileParty party,
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements,
+        out MobilePartyJoinState state,
+        out string failure);
     bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable);
     bool TryApplyJoinBaseline(MobilePartyJoinState[] states, Action beforeApply);
 }
@@ -34,19 +39,43 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 
     public bool TryCreate(
         MobileParty party,
-        out PartyBehaviorUpdateData data)
+        out PartyBehaviorUpdateData data) =>
+        TryCreate(party, out data, out _);
+
+    private bool TryCreate(
+        MobileParty party,
+        out PartyBehaviorUpdateData data,
+        out string failure)
     {
         data = default;
-        if (party?.Ai == null)
-            return false;
-        if (!TryGetCompactId(party, out string partyId) ||
-            !TryGetInteractableReference(
-                party.Ai.AiBehaviorInteractable,
-                out string interactablePointId,
-                out bool isInteractableAnchor) ||
-            !TryGetCompactId(party.TargetParty, out string targetPartyId) ||
-            !TryGetCompactId(party.TargetSettlement, out string targetSettlementId))
-            return false;
+        failure = null;
+        if (party == null)
+            return FailCreation("party is null", out failure);
+        if (party.Ai == null)
+            return FailCreation("party AI is unavailable", out failure);
+        if (!TryGetCompactId(party, out string partyId))
+            return FailCreation("party is not registered", out failure);
+        if (!TryGetInteractableReference(
+            party.Ai.AiBehaviorInteractable,
+            out string interactablePointId,
+            out bool isInteractableAnchor))
+        {
+            return FailCreation(
+                $"AI interactable '{party.Ai.AiBehaviorInteractable?.GetType().Name}' is not registered",
+                out failure);
+        }
+        if (!TryGetCompactId(party.TargetParty, out string targetPartyId))
+        {
+            return FailCreation(
+                $"target party '{party.TargetParty?.StringId}' is not registered",
+                out failure);
+        }
+        if (!TryGetCompactId(party.TargetSettlement, out string targetSettlementId))
+        {
+            return FailCreation(
+                $"target settlement '{party.TargetSettlement?.StringId}' is not registered",
+                out failure);
+        }
 
         MoveModeType partyMoveMode = party.PartyMoveMode;
         CampaignVec2 moveTargetPoint = party.MoveTargetPoint;
@@ -91,11 +120,67 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
         TryResolve(data.TargetSettlementId, out Settlement _) &&
         TryResolve(data.MoveTargetPartyId, out MobileParty _);
 
-    public bool TryCreateJoinState(MobileParty party, out MobilePartyJoinState state)
+    public bool TryCreateJoinState(
+        MobileParty party,
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements,
+        out MobilePartyJoinState state,
+        out string failure)
     {
         state = default;
-        if (!TryCreate(party, out PartyBehaviorUpdateData behavior))
+        if (liveParties == null || liveSettlements == null)
+            return FailCreation("live campaign objects are unavailable", out failure);
+
+        bool created = TryCreate(party, out PartyBehaviorUpdateData behavior, out failure);
+        if (TryGetInvalidJoinReferences(
+            party,
+            liveParties,
+            liveSettlements,
+            out string invalidReferences))
+        {
+            if (!TryGetCompactId(party, out _))
+                return false;
+
+            try
+            {
+                // Mirror vanilla's removed-target cleanup so behavior and navigation stay coherent.
+                party.SetMoveModeHold();
+                party.SetNavigationModeHold();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to reset stale join references on party {Party}", party.StringId);
+                return FailCreation(
+                    $"failed to reset stale join references ({invalidReferences}): " +
+                    $"{ex.GetType().Name}: {ex.Message}",
+                    out failure);
+            }
+
+            Logger.Warning(
+                "Reset stale join references ({References}) on party {Party} to Hold",
+                invalidReferences,
+                party.StringId);
+
+            if (!TryCreate(party, out behavior, out failure))
+                return false;
+            if (TryGetInvalidJoinReferences(
+                party,
+                liveParties,
+                liveSettlements,
+                out string remainingReferences))
+            {
+                return FailCreation(
+                    $"stale join references remain after reset ({remainingReferences})",
+                    out failure);
+            }
+        }
+        else if (!created)
+        {
             return false;
+        }
+
+        // Preserve a removed move target as its last point instead of resetting the party to Hold.
+        PreserveUnavailableMoveTarget(party, liveParties, ref behavior);
 
         state = new MobilePartyJoinState
         {
@@ -109,7 +194,62 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
             StartTransitionNextFrameToExitFromPort = party.StartTransitionNextFrameToExitFromPort,
             ForceAiNoPathMode = party.ForceAiNoPathMode,
         };
+        failure = null;
         return true;
+    }
+
+    private bool TryGetInvalidJoinReferences(
+        MobileParty party,
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements,
+        out string references)
+    {
+        references = null;
+        if (party?.Ai == null) return false;
+
+        var invalidReferences = new List<string>();
+        IInteractablePoint interactable = party.Ai.AiBehaviorInteractable;
+        if (interactable != null &&
+            (!TryGetInteractableReference(interactable, out _, out _) ||
+             !IsLiveInteractable(interactable, liveParties, liveSettlements)))
+        {
+            invalidReferences.Add(nameof(MobilePartyAi.AiBehaviorInteractable));
+        }
+        if (IsInvalidJoinReference(party.TargetParty, liveParties))
+            invalidReferences.Add(nameof(MobileParty.TargetParty));
+        if (IsInvalidJoinReference(party.TargetSettlement, liveSettlements))
+            invalidReferences.Add(nameof(MobileParty.TargetSettlement));
+
+        if (invalidReferences.Count == 0) return false;
+
+        references = string.Join(", ", invalidReferences);
+        return true;
+    }
+
+    private static void PreserveUnavailableMoveTarget(
+        MobileParty party,
+        ISet<MobileParty> liveParties,
+        ref PartyBehaviorUpdateData behavior)
+    {
+        MobileParty moveTargetParty = party.MoveTargetParty;
+        if (moveTargetParty == null || liveParties.Contains(moveTargetParty)) return;
+
+        behavior.MoveTargetPartyId = null;
+        if (behavior.PartyMoveMode != MoveModeType.Party) return;
+
+        behavior.PartyMoveMode = MoveModeType.Point;
+        behavior.MoveTargetPoint = moveTargetParty.Position;
+    }
+
+    private bool IsInvalidJoinReference<T>(T instance, ISet<T> liveObjects)
+        where T : class =>
+        instance != null &&
+        (!TryGetCompactId(instance, out _) || !liveObjects.Contains(instance));
+
+    private static bool FailCreation(string reason, out string failure)
+    {
+        failure = reason;
+        return false;
     }
 
     public bool TryApply(MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint interactable)
@@ -221,8 +361,8 @@ public sealed class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSnapshot
 
     private static bool IsLiveInteractable(
         IInteractablePoint interactable,
-        HashSet<MobileParty> liveParties,
-        HashSet<Settlement> liveSettlements)
+        ISet<MobileParty> liveParties,
+        ISet<Settlement> liveSettlements)
     {
         if (interactable == null) return true;
         if (interactable is AnchorPoint anchor)

@@ -28,6 +28,9 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     /// <summary>Per-frame position smoother for received puppets; ticked by CoopMissionController.OnMissionTick.</summary>
     IAgentPositionInterpolator Interpolator { get; }
 
+    /// <summary>Replays authoritative synthetic mount turns after native agent processing.</summary>
+    void ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
     /// <summary>Receive side for masterless-horse movement (<see cref="MountMovementPacket"/>); the send side
     /// is this handler's movement tick. Exposed so the packet flow is reachable in tests.</summary>
     IPacketHandler MountMovementApplier { get; }
@@ -37,11 +40,17 @@ public class AgentMovementHandler : IAgentMovementHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
-    // Movement is strictly droppable, so keep even mounted snapshots below the 1 KB unreliable ceiling.
-    private const int MaxAgentsPerMovementPacket = 3;
-
     // Forty updates per second keeps locally authoritative agents responsive.
     private const float MovementPollingIntervalSeconds = 0.025f;
+    private const int SyntheticMountTurnPollLimit = 80;
+    private const int RemoteSyntheticMountTurnClearGraceFrames = 3;
+    private const float UseActionBlendPeriod = -0.2f;
+
+    private const float PositionDeltaThresholdSq = 0.0001f;
+    private const float DirectionDeltaThresholdSq = 0.0001f;
+    private const float SpeedDeltaThreshold = 0.01f;
+    private const float AnimationProgressDeltaThreshold = 0.001f;
+    private const float ForcedSyncIntervalSeconds = 0.25f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -49,12 +58,126 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IAgentEquipmentApplier equipmentApplier;
+    private readonly IMovementBatchSender movementBatchSender;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
+    private readonly IAgentVisualActionAccessor visualActionAccessor;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
-
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
     // (this handler is transient), so it can't leak across missions.
     private readonly Dictionary<Agent, Agent> _dismountedHorses = new Dictionary<Agent, Agent>();
+
+    // Vanilla can rotate a stopped AI mount's facing without selecting a turn action.
+    private readonly Dictionary<Agent, Vec2> _lastMountDirections = new Dictionary<Agent, Vec2>();
+    private readonly Dictionary<Agent, SyntheticMountTurnState> _syntheticMountTurns =
+        new Dictionary<Agent, SyntheticMountTurnState>();
+    private readonly List<Agent> _completedSyntheticMountTurns =
+        new List<Agent>();
+    private readonly Dictionary<Agent, RemoteSyntheticMountTurnState> _remoteSyntheticMountTurns =
+        new Dictionary<Agent, RemoteSyntheticMountTurnState>();
+    private readonly List<Agent> _completedRemoteSyntheticMountTurns =
+        new List<Agent>();
+
+    private sealed class SyntheticMountTurnState
+    {
+        public readonly int Direction;
+        public readonly Agent Rider;
+        public readonly int ActionIndex;
+        public readonly AgentControllerType OriginalController;
+        public int ElapsedPolls;
+
+        public SyntheticMountTurnState(
+            int direction,
+            Agent rider,
+            int actionIndex,
+            AgentControllerType originalController)
+        {
+            Direction = direction;
+            Rider = rider;
+            ActionIndex = actionIndex;
+            OriginalController = originalController;
+        }
+
+        public float Progress =>
+            Math.Min(0.99f, (float)ElapsedPolls / SyntheticMountTurnPollLimit);
+    }
+
+    private sealed class RemoteSyntheticMountTurnState
+    {
+        public readonly int Direction;
+        public readonly int ActionIndex;
+        public float Progress;
+        public int FramesSinceUpdate;
+        public bool ClearRequested;
+
+        public RemoteSyntheticMountTurnState(
+            int direction,
+            int actionIndex,
+            float progress)
+        {
+            Direction = direction;
+            ActionIndex = actionIndex;
+            Progress = progress;
+        }
+    }
+
+    private sealed class LastSentMovementState
+    {
+        public AgentData AgentData;
+        public AgentMountData MountData;
+        public bool IsMount;
+        public float LastSentTime;
+    }
+
+    private readonly struct ReceivedMovement
+    {
+        public readonly string IdentityScopeId;
+        public readonly ushort CompactId;
+        public readonly Guid CanonicalId;
+        public readonly bool UsesCompactId;
+        public readonly AgentData Data;
+        public readonly AgentMountData MountData;
+        public readonly bool IsMount;
+
+        public ReceivedMovement(
+            string identityScopeId,
+            ushort compactId,
+            Guid canonicalId,
+            bool usesCompactId,
+            AgentData data)
+        {
+            IdentityScopeId = identityScopeId;
+            CompactId = compactId;
+            CanonicalId = canonicalId;
+            UsesCompactId = usesCompactId;
+            Data = data;
+            MountData = null;
+            IsMount = false;
+        }
+
+        public ReceivedMovement(
+            string identityScopeId,
+            ushort compactId,
+            Guid canonicalId,
+            bool usesCompactId,
+            AgentMountData mountData)
+        {
+            IdentityScopeId = identityScopeId;
+            CompactId = compactId;
+            CanonicalId = canonicalId;
+            UsesCompactId = usesCompactId;
+            Data = default;
+            MountData = mountData;
+            IsMount = true;
+        }
+    }
+
+    private readonly Dictionary<Guid, LastSentMovementState> _lastSentMovement =
+        new Dictionary<Guid, LastSentMovementState>();
+    private readonly Dictionary<Guid, float> movementPendingSince =
+        new Dictionary<Guid, float>();
+    private float totalSimulationTime = 0f;
+    private bool sendMountMovementFirst;
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
@@ -77,7 +200,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
-        IAgentEquipmentApplier equipmentApplier)
+        IAgentEquipmentApplier equipmentApplier,
+        IMovementBatchSender movementBatchSender,
+        IPuppetMountStateRepairer puppetMountStateRepairer,
+        IAgentVisualActionAccessor visualActionAccessor)
     {
         Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
 
@@ -87,7 +213,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.equipmentApplier = equipmentApplier;
-
+        this.movementBatchSender = movementBatchSender;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
+        this.visualActionAccessor = visualActionAccessor;
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
         this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -97,7 +225,12 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.packetManager.RegisterPacketHandler(this);
         this.packetManager.RegisterPacketHandler(equipmentApplier);
 
-        _mountMovementApplier = new MountMovementApplier(agentRegistry, _interpolator);
+        _mountMovementApplier = new MountMovementApplier(
+            agentRegistry,
+            _interpolator,
+            puppetMountStateRepairer,
+            UpdateRemoteSyntheticMountTurn,
+            QueueMountMovement);
         this.packetManager.RegisterPacketHandler(_mountMovementApplier);
     }
 
@@ -116,10 +249,20 @@ public class AgentMovementHandler : IAgentMovementHandler
     {
         if (_disposed) return;
         _disposed = true;
-
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         _interpolator.Clear();
+        _lastMountDirections.Clear();
+        _syntheticMountTurns.Clear();
+        _completedSyntheticMountTurns.Clear();
+        _remoteSyntheticMountTurns.Clear();
+        _completedRemoteSyntheticMountTurns.Clear();
+
+        _dismountedHorses.Clear();
+        _lastSentMovement.Clear();
+        movementPendingSince.Clear();
+
+        movementBatchSender.Clear();
 
         packetManager.RemovePacketHandler(this);
         packetManager.RemovePacketHandler(_mountMovementApplier);
@@ -134,43 +277,26 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     public PacketType PacketType => PacketType.Movement;
 
-    private sealed class MovementBatch<T>
-    {
-        public readonly string IdentityScopeId;
-        public readonly List<ushort> CompactIds = new List<ushort>();
-        public readonly List<Guid> CanonicalIds = new List<Guid>();
-        public readonly List<T> Data = new List<T>();
-
-        public MovementBatch(string identityScopeId)
-        {
-            IdentityScopeId = identityScopeId;
-        }
-
-        public void Add(CoopAgentInfo info, T data)
-        {
-            if (IdentityScopeId == null)
-                CanonicalIds.Add(info.AgentId);
-            else
-                CompactIds.Add(info.MovementId);
-            Data.Add(data);
-        }
-    }
-
-    // Broadcast every locally authoritative agent.
+    // Broadcast every locally authoritative agent using delta thresholding.
     public void PollMovement(float dt)
     {
         if (_disposed || Mission.Current == null) return;
 
+        movementBatchSender.BeginFrame(dt);
+        totalSimulationTime += dt;
         movementPollElapsed += dt;
         if (movementPollElapsed < MovementPollingIntervalSeconds) return;
         movementPollElapsed %= MovementPollingIntervalSeconds;
 
         var movementGroups = new Dictionary<string, MovementBatch<AgentData>>();
+        var priorityMovementGroups = new Dictionary<string, MovementBatch<AgentData>>();
         var mountGroups = new Dictionary<string, MovementBatch<AgentMountData>>();
         var equipmentGroups = new Dictionary<string, MovementBatch<AgentEquipmentData>>();
         MovementBatch<AgentData> legacyMovement = null;
+        MovementBatch<AgentData> legacyPriorityMovement = null;
         MovementBatch<AgentMountData> legacyMountMovement = null;
         MovementBatch<AgentEquipmentData> legacyEquipment = null;
+        var broadcastAgentIds = new HashSet<Guid>();
 
         foreach (var agentInfo in agentRegistry.GetAgents(controllerIdProvider.ControllerId))
         {
@@ -181,14 +307,37 @@ public class AgentMovementHandler : IAgentMovementHandler
 
             EnsureLocallyDrivenMountController(agent);
             if (!ShouldBroadcastMovement(agent)) continue;
+            broadcastAgentIds.Add(agentInfo.AgentId);
 
             if (agent.IsMount)
             {
-                AddToBatch(
-                    mountGroups,
-                    ref legacyMountMovement,
-                    agentInfo,
-                    new AgentMountData(agent));
+                int turnDirection = EnsureStationaryMountTurnAnimation(
+                    agent,
+                    out int turnActionIndex,
+                    out float turnProgress,
+                    out bool syntheticTurn);
+                var mountData = new AgentMountData(
+                    agent,
+                    mountAction0TurnDirection: turnDirection == AgentMountData.NoTurn
+                        ? (int?)null
+                        : turnDirection,
+                    mountAction0TurnActionIndex: turnDirection == AgentMountData.NoTurn
+                        ? (int?)null
+                        : turnActionIndex,
+                    mountAction0TurnProgress: turnDirection == AgentMountData.NoTurn
+                        ? (float?)null
+                        : turnProgress,
+                    mountAction0IsSyntheticTurn: syntheticTurn);
+
+                if (ShouldSendMovement(agentInfo.AgentId, mountData))
+                {
+                    MarkMovementPending(agentInfo.AgentId);
+                    AddToBatch(
+                        mountGroups,
+                        ref legacyMountMovement,
+                        agentInfo,
+                        mountData);
+                }
             }
             else
             {
@@ -198,15 +347,43 @@ public class AgentMovementHandler : IAgentMovementHandler
                     out ushort mountMovementId,
                     out string mountIdentityScopeId,
                     out Guid mountAgentId);
-                AddToBatch(
-                    movementGroups,
-                    ref legacyMovement,
-                    agentInfo,
-                    new AgentData(
-                        agent,
-                        mountMovementId,
-                        mountIdentityScopeId,
-                        mountAgentId));
+                Agent mount = agent.MountAgent;
+                int turnDirection = EnsureStationaryMountTurnAnimation(
+                    mount,
+                    out int turnActionIndex,
+                    out float turnProgress,
+                    out bool syntheticTurn);
+                var agentData = new AgentData(
+                    agent,
+                    mountMovementId,
+                    mountIdentityScopeId,
+                    mountAgentId,
+                    turnDirection == AgentMountData.NoTurn ? (int?)null : turnDirection,
+                    turnDirection == AgentMountData.NoTurn ? (int?)null : turnActionIndex,
+                    turnDirection == AgentMountData.NoTurn ? (float?)null : turnProgress,
+                    mountAction0IsSyntheticTurn: syntheticTurn);
+
+                if (ShouldSendMovement(agentInfo.AgentId, agentData))
+                {
+                    MarkMovementPending(agentInfo.AgentId);
+                    if (ReferenceEquals(agent, Agent.Main))
+                    {
+                        AddToBatch(
+                            priorityMovementGroups,
+                            ref legacyPriorityMovement,
+                            agentInfo,
+                            agentData,
+                            isPriority: true);
+                    }
+                    else
+                    {
+                        AddToBatch(
+                            movementGroups,
+                            ref legacyMovement,
+                            agentInfo,
+                            agentData);
+                    }
+                }
 
                 var equipment = new AgentEquipmentData(agent);
                 if (!lastEquipment.TryGetValue(agentInfo.AgentId, out var previousEquipment))
@@ -233,28 +410,508 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
         }
 
+        RemoveStaleLocalState(broadcastAgentIds);
         SendEquipment(equipmentGroups.Values);
         SendEquipment(legacyEquipment);
-        SendMovement(movementGroups.Values);
-        SendMovement(legacyMovement);
-        SendMountMovement(mountGroups.Values);
-        SendMountMovement(legacyMountMovement);
+        int maxPayloadBytes = client.GetMaxUnreliablePayloadBytes();
+        // The local player's current input/position gets first access to each refill. Formation AI then uses
+        // the rotating cursor, so responsiveness stays high without letting early registry entries monopolize it.
+        MovementSendResult priorityResult = movementBatchSender.Send(
+            priorityMovementGroups.Values,
+            legacyPriorityMovement,
+            maxPayloadBytes,
+            CreateMovementPacket,
+            RecordSentMovement);
+        MovementSendResult movementResult;
+        MovementSendResult mountResult;
+        if (sendMountMovementFirst)
+        {
+            mountResult = movementBatchSender.Send(
+                mountGroups.Values,
+                legacyMountMovement,
+                maxPayloadBytes,
+                CreateMountMovementPacket,
+                RecordSentMovement);
+            movementResult = movementBatchSender.Send(
+                movementGroups.Values,
+                legacyMovement,
+                maxPayloadBytes,
+                CreateMovementPacket,
+                RecordSentMovement);
+        }
+        else
+        {
+            movementResult = movementBatchSender.Send(
+                movementGroups.Values,
+                legacyMovement,
+                maxPayloadBytes,
+                CreateMovementPacket,
+                RecordSentMovement);
+            mountResult = movementBatchSender.Send(
+                mountGroups.Values,
+                legacyMountMovement,
+                maxPayloadBytes,
+                CreateMountMovementPacket,
+                RecordSentMovement);
+        }
+        sendMountMovementFirst = !sendMountMovementFirst;
+
+        movementBatchSender.EndFrame(
+            priorityResult.DeferredCount +
+                movementResult.DeferredCount +
+                mountResult.DeferredCount,
+            GetMaximumDeferredAge());
+    }
+
+    private bool ShouldSendMovement(Guid agentId, AgentData current)
+    {
+        if (!_lastSentMovement.TryGetValue(agentId, out var lastState))
+            return true;
+
+        if (lastState.IsMount ||
+            HasMovementChanged(lastState.AgentData, current) ||
+            IsHeartbeatDue(lastState))
+            return true;
+
+        return false;
+    }
+
+    private bool ShouldSendMovement(Guid agentId, AgentMountData current)
+    {
+        if (!_lastSentMovement.TryGetValue(agentId, out var lastState))
+            return true;
+
+        if (!lastState.IsMount ||
+            HasMountMovementChanged(lastState.MountData, current) ||
+            IsHeartbeatDue(lastState))
+            return true;
+
+        return false;
+    }
+
+    private void RecordSentMovement(Guid agentId, AgentData current)
+    {
+        _lastSentMovement[agentId] = new LastSentMovementState
+        {
+            AgentData = current,
+            MountData = null,
+            IsMount = false,
+            LastSentTime = totalSimulationTime
+        };
+        movementPendingSince.Remove(agentId);
+    }
+
+    private void RecordSentMovement(Guid agentId, AgentMountData current)
+    {
+        _lastSentMovement[agentId] = new LastSentMovementState
+        {
+            AgentData = default,
+            MountData = current,
+            IsMount = true,
+            LastSentTime = totalSimulationTime
+        };
+        movementPendingSince.Remove(agentId);
+    }
+
+    private void MarkMovementPending(Guid agentId)
+    {
+        if (!movementPendingSince.ContainsKey(agentId))
+            movementPendingSince[agentId] = totalSimulationTime;
+    }
+
+    private float GetMaximumDeferredAge()
+    {
+        float maximumAge = 0f;
+        foreach (float pendingSince in movementPendingSince.Values)
+            maximumAge = Math.Max(maximumAge, totalSimulationTime - pendingSince);
+        return maximumAge;
+    }
+
+    private bool IsHeartbeatDue(LastSentMovementState state)
+    {
+        return totalSimulationTime - state.LastSentTime >= ForcedSyncIntervalSeconds;
+    }
+
+    private static bool HasMovementChanged(AgentData previous, AgentData current)
+    {
+        return (current.Position - previous.Position).LengthSquared > PositionDeltaThresholdSq ||
+               (current.MovementDirection - previous.MovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               (current.InputVector - previous.InputVector).LengthSquared > DirectionDeltaThresholdSq ||
+               (current.LookDirection - previous.LookDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               Math.Abs(current.Speed - previous.Speed) > SpeedDeltaThreshold ||
+               HasMountMovementChanged(previous.MountData, current.MountData);
+    }
+
+    private static bool HasMountMovementChanged(AgentMountData previous, AgentMountData current)
+    {
+        if (previous == null || current == null)
+            return previous != current;
+
+        return (current.MountPosition - previous.MountPosition).LengthSquared > PositionDeltaThresholdSq ||
+               (current.MountMovementDirection - previous.MountMovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               (current.MountInputVector - previous.MountInputVector).LengthSquared > DirectionDeltaThresholdSq ||
+               (current.MountLookDirection - previous.MountLookDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               Math.Abs(current.MountSpeed - previous.MountSpeed) > SpeedDeltaThreshold ||
+               current.MountAction0Index != previous.MountAction0Index ||
+               current.MountAction0Flag != previous.MountAction0Flag ||
+               current.MountAction0TurnDirection != previous.MountAction0TurnDirection ||
+               current.MountAction0TurnActionIndex != previous.MountAction0TurnActionIndex ||
+               current.MountAction0IsSyntheticTurn != previous.MountAction0IsSyntheticTurn ||
+               (current.MountAction0IsSyntheticTurn &&
+                   Math.Abs(current.MountAction0Progress - previous.MountAction0Progress) >
+                       AnimationProgressDeltaThreshold) ||
+               current.MountAction1Index != previous.MountAction1Index ||
+               current.MountAction1Flag != previous.MountAction1Flag ||
+               current.MountMovementId != previous.MountMovementId ||
+               current.MountAgentId != previous.MountAgentId ||
+               !string.Equals(
+                   current.MountIdentityScopeId,
+                   previous.MountIdentityScopeId,
+                   StringComparison.Ordinal);
+    }
+
+    private void RemoveStaleLocalState(HashSet<Guid> broadcastAgentIds)
+    {
+        var staleAgentIds = new HashSet<Guid>();
+        foreach (Guid agentId in _lastSentMovement.Keys)
+        {
+            if (!broadcastAgentIds.Contains(agentId))
+                staleAgentIds.Add(agentId);
+        }
+        foreach (Guid agentId in movementPendingSince.Keys)
+        {
+            if (!broadcastAgentIds.Contains(agentId))
+                staleAgentIds.Add(agentId);
+        }
+        foreach (Guid agentId in lastEquipment.Keys)
+        {
+            if (!broadcastAgentIds.Contains(agentId))
+                staleAgentIds.Add(agentId);
+        }
+
+        foreach (Guid agentId in staleAgentIds)
+        {
+            _lastSentMovement.Remove(agentId);
+            movementPendingSince.Remove(agentId);
+            lastEquipment.Remove(agentId);
+        }
+    }
+
+    public void ReplaySyntheticMountTurnAnimationsAfterNativeTick()
+    {
+        _completedSyntheticMountTurns.Clear();
+        foreach (var pair in _syntheticMountTurns)
+        {
+            Agent mount = pair.Key;
+            SyntheticMountTurnState syntheticTurn = pair.Value;
+            bool stillLocallyControlled =
+                syntheticTurn.Rider == null
+                    ? mount != null
+                        && mount.RiderAgent == null
+                        && agentRegistry.IsLocallyControlled(mount)
+                    : mount != null
+                        && ReferenceEquals(
+                            mount.RiderAgent,
+                            syntheticTurn.Rider)
+                        && agentRegistry.IsLocallyControlled(
+                            syntheticTurn.Rider);
+            if (mount == null
+                || mount.Mission == null
+                || !mount.IsActive()
+                || !stillLocallyControlled)
+            {
+                _completedSyntheticMountTurns.Add(mount);
+                continue;
+            }
+
+            visualActionAccessor.TrySetAction(
+                mount,
+                0,
+                new ActionIndexCache(syntheticTurn.ActionIndex),
+                syntheticTurn.Progress,
+                UseActionBlendPeriod);
+        }
+        foreach (Agent mount in _completedSyntheticMountTurns)
+            ClearSyntheticMountTurn(mount);
+
+        _completedRemoteSyntheticMountTurns.Clear();
+        foreach (var pair in _remoteSyntheticMountTurns)
+        {
+            Agent mount = pair.Key;
+            RemoteSyntheticMountTurnState syntheticTurn = pair.Value;
+            if (mount == null
+                || mount.Mission == null
+                || !mount.IsActive())
+            {
+                _completedRemoteSyntheticMountTurns.Add(mount);
+                continue;
+            }
+
+            Agent rider = mount.RiderAgent;
+            if (agentRegistry.IsLocallyControlled(mount)
+                || (rider != null
+                    && agentRegistry.IsLocallyControlled(rider)))
+            {
+                _completedRemoteSyntheticMountTurns.Add(mount);
+                continue;
+            }
+
+            visualActionAccessor.TrySetAction(
+                mount,
+                0,
+                new ActionIndexCache(syntheticTurn.ActionIndex),
+                syntheticTurn.Progress,
+                UseActionBlendPeriod);
+            syntheticTurn.FramesSinceUpdate++;
+            if (syntheticTurn.ClearRequested
+                && syntheticTurn.FramesSinceUpdate
+                    >= RemoteSyntheticMountTurnClearGraceFrames)
+            {
+                _completedRemoteSyntheticMountTurns.Add(mount);
+            }
+        }
+
+        foreach (Agent mount in _completedRemoteSyntheticMountTurns)
+            _remoteSyntheticMountTurns.Remove(mount);
+    }
+
+    private void UpdateRemoteSyntheticMountTurn(
+        Agent mount,
+        AgentMountData mountData)
+    {
+        if (mount == null) return;
+
+        bool syntheticTurn =
+            mountData != null
+            && mountData.MountAction0IsSyntheticTurn
+            && mountData.MountSpeed <= AgentMountData.StationarySpeedThreshold
+            && mountData.MountAction0TurnDirection != AgentMountData.NoTurn
+            && mountData.MountAction0TurnActionIndex
+                != AgentMountData.NoActionIndex;
+        if (!syntheticTurn)
+        {
+            if (_remoteSyntheticMountTurns.TryGetValue(
+                    mount,
+                    out RemoteSyntheticMountTurnState completedTurn))
+            {
+                completedTurn.ClearRequested = true;
+            }
+            return;
+        }
+
+        if (!_remoteSyntheticMountTurns.TryGetValue(
+                mount,
+                out RemoteSyntheticMountTurnState activeTurn)
+            || activeTurn.Direction
+                != mountData.MountAction0TurnDirection
+            || activeTurn.ActionIndex
+                != mountData.MountAction0TurnActionIndex)
+        {
+            if (!AgentActionData.TryResolveActionIndex(
+                    mountData.MountAction0TurnActionIndex,
+                    out ActionIndexCache turnAction))
+            {
+                if (activeTurn != null)
+                    activeTurn.ClearRequested = true;
+                return;
+            }
+
+            _remoteSyntheticMountTurns[mount] =
+                new RemoteSyntheticMountTurnState(
+                    mountData.MountAction0TurnDirection,
+                    turnAction.Index,
+                    mountData.MountAction0Progress);
+            return;
+        }
+
+        if (activeTurn.ClearRequested)
+            activeTurn.Progress = mountData.MountAction0Progress;
+        else if (mountData.MountAction0Progress > activeTurn.Progress)
+            activeTurn.Progress = mountData.MountAction0Progress;
+        activeTurn.FramesSinceUpdate = 0;
+        activeTurn.ClearRequested = false;
+    }
+
+    private int EnsureStationaryMountTurnAnimation(
+        Agent mount,
+        out int turnActionIndex,
+        out float turnProgress,
+        out bool syntheticTurn)
+    {
+        turnActionIndex = AgentMountData.NoActionIndex;
+        turnProgress = 0f;
+        syntheticTurn = false;
+        if (mount == null || !mount.IsActive()) return AgentMountData.NoTurn;
+
+        Vec2 currentDirection = mount.GetMovementDirection();
+        bool hasPreviousDirection = _lastMountDirections.TryGetValue(
+            mount,
+            out Vec2 previousDirection);
+        if (_syntheticMountTurns.TryGetValue(
+                mount,
+                out SyntheticMountTurnState pendingTurn)
+            && HasMovementIntent(mount, pendingTurn.Rider))
+        {
+            ClearSyntheticMountTurn(mount);
+            _lastMountDirections[mount] = currentDirection;
+            return AgentMountData.NoTurn;
+        }
+        ActionIndexCache currentAction = mount.GetCurrentAction(0);
+        if (mount.GetRealGlobalVelocity().AsVec2.Length > AgentMountData.StationarySpeedThreshold)
+        {
+            ClearSyntheticMountTurn(mount);
+            bool drivenLocomotion =
+                mount.MovementInputVector.LengthSquared > 0.0001f
+                || AgentMountData.IsLocomotionAction(
+                    currentAction.Index,
+                    null);
+            if (!hasPreviousDirection || drivenLocomotion)
+            {
+                // Retain the final moving facing for the first stationary snapshot.
+                _lastMountDirections[mount] = currentDirection;
+            }
+            return AgentMountData.NoTurn;
+        }
+
+        int activeTurnDirection = AgentMountData.GetStationaryTurnDirection(
+            currentAction.Index);
+        if (_syntheticMountTurns.TryGetValue(
+                mount,
+                out SyntheticMountTurnState activeSyntheticTurn))
+        {
+            if (activeTurnDirection != AgentMountData.NoTurn
+                && currentAction.Index != activeSyntheticTurn.ActionIndex)
+            {
+                ClearSyntheticMountTurn(mount);
+                _lastMountDirections[mount] = currentDirection;
+                turnActionIndex = currentAction.Index;
+                turnProgress = mount.GetCurrentActionProgress(0);
+                return activeTurnDirection;
+            }
+
+            if (!ReferenceEquals(
+                    activeSyntheticTurn.Rider,
+                    mount.RiderAgent))
+            {
+                int direction = activeSyntheticTurn.Direction;
+                int actionIndex = activeSyntheticTurn.ActionIndex;
+                ClearSyntheticMountTurn(mount);
+                StartSyntheticMountTurn(
+                    mount,
+                    direction,
+                    actionIndex);
+                activeSyntheticTurn = _syntheticMountTurns[mount];
+            }
+
+            activeSyntheticTurn.ElapsedPolls++;
+            if (activeSyntheticTurn.ElapsedPolls
+                >= SyntheticMountTurnPollLimit)
+            {
+                ClearSyntheticMountTurn(mount);
+                _lastMountDirections[mount] = currentDirection;
+                return AgentMountData.NoTurn;
+            }
+
+            turnActionIndex = activeSyntheticTurn.ActionIndex;
+            turnProgress = activeSyntheticTurn.Progress;
+            syntheticTurn = true;
+            return activeSyntheticTurn.Direction;
+        }
+
+        if (activeTurnDirection != AgentMountData.NoTurn)
+        {
+            _lastMountDirections[mount] = currentDirection;
+            turnActionIndex = currentAction.Index;
+            turnProgress = mount.GetCurrentActionProgress(0);
+            return activeTurnDirection;
+        }
+
+        if (!hasPreviousDirection)
+        {
+            _lastMountDirections[mount] = currentDirection;
+            return AgentMountData.NoTurn;
+        }
+
+        int turnDirection = AgentMountData.GetTurnDirection(previousDirection, currentDirection);
+        if (turnDirection == AgentMountData.NoTurn)
+            return AgentMountData.NoTurn;
+
+        string desiredActionName = AgentMountData.GetStationaryTurnActionName(
+            null,
+            mount.Monster?.MonsterUsage,
+            turnDirection);
+        ActionIndexCache desiredAction = ActionIndexCache.Create(desiredActionName);
+        turnActionIndex = desiredAction.Index;
+        StartSyntheticMountTurn(
+            mount,
+            turnDirection,
+            desiredAction.Index);
+        _lastMountDirections[mount] = currentDirection;
+        syntheticTurn = true;
+        return turnDirection;
+    }
+
+    private void StartSyntheticMountTurn(
+        Agent mount,
+        int turnDirection,
+        int actionIndex)
+    {
+        Agent rider = mount.RiderAgent;
+        AgentControllerType originalController = mount.Controller;
+        if (originalController != AgentControllerType.None)
+            mount.Controller = AgentControllerType.None;
+        _syntheticMountTurns[mount] =
+            new SyntheticMountTurnState(
+                turnDirection,
+                rider,
+                actionIndex,
+                originalController);
+    }
+
+    private static bool HasMovementIntent(Agent mount, Agent rider)
+    {
+        return mount.MovementInputVector.LengthSquared > 0.0001f
+            || (rider != null
+                && rider.IsActive()
+                && rider.MovementInputVector.LengthSquared > 0.0001f);
+    }
+
+    private void ClearSyntheticMountTurn(Agent mount)
+    {
+        if (!_syntheticMountTurns.TryGetValue(
+                mount,
+                out SyntheticMountTurnState syntheticTurn))
+            return;
+
+        _syntheticMountTurns.Remove(mount);
+        if (mount != null
+            && mount.IsActive()
+            && mount.Controller == AgentControllerType.None
+            && syntheticTurn.OriginalController != AgentControllerType.None
+            && (syntheticTurn.Rider == null
+                ? agentRegistry.IsLocallyControlled(mount)
+                : ReferenceEquals(mount.RiderAgent, syntheticTurn.Rider)
+                    && agentRegistry.IsLocallyControlled(syntheticTurn.Rider)))
+        {
+            mount.Controller = syntheticTurn.OriginalController;
+        }
     }
 
     private static void AddToBatch<T>(
         Dictionary<string, MovementBatch<T>> compactBatches,
         ref MovementBatch<T> legacyBatch,
         CoopAgentInfo agentInfo,
-        T data)
+        T data,
+        bool isPriority = false)
     {
         MovementBatch<T> batch;
         if (agentInfo.MovementId == 0)
         {
-            batch = legacyBatch ??= new MovementBatch<T>(null);
+            batch = legacyBatch ??= new MovementBatch<T>(null, isPriority);
         }
         else if (!compactBatches.TryGetValue(agentInfo.MovementScopeId, out batch))
         {
-            batch = new MovementBatch<T>(agentInfo.MovementScopeId);
+            batch = new MovementBatch<T>(agentInfo.MovementScopeId, isPriority);
             compactBatches[agentInfo.MovementScopeId] = batch;
         }
 
@@ -294,67 +951,26 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
-    private void SendMovement(IEnumerable<MovementBatch<AgentData>> batches)
+    private static IPacket CreateMovementPacket(
+        string identityScopeId,
+        ushort[] compactIds,
+        Guid[] canonicalIds,
+        AgentData[] data)
     {
-        foreach (var batch in batches)
-            SendMovement(batch);
+        return identityScopeId == null
+            ? new MovementPacket(canonicalIds, data)
+            : new MovementPacket(identityScopeId, compactIds, data);
     }
 
-    private void SendMovement(MovementBatch<AgentData> batch)
+    private static IPacket CreateMountMovementPacket(
+        string identityScopeId,
+        ushort[] compactIds,
+        Guid[] canonicalIds,
+        AgentMountData[] data)
     {
-        if (batch == null) return;
-
-        for (int start = 0; start < batch.Data.Count; start += MaxAgentsPerMovementPacket)
-        {
-            int count = Math.Min(MaxAgentsPerMovementPacket, batch.Data.Count - start);
-            var data = new AgentData[count];
-            batch.Data.CopyTo(start, data, 0, count);
-
-            if (batch.IdentityScopeId == null)
-            {
-                var ids = new Guid[count];
-                batch.CanonicalIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new MovementPacket(ids, data));
-            }
-            else
-            {
-                var ids = new ushort[count];
-                batch.CompactIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new MovementPacket(batch.IdentityScopeId, ids, data));
-            }
-        }
-    }
-
-    private void SendMountMovement(IEnumerable<MovementBatch<AgentMountData>> batches)
-    {
-        foreach (var batch in batches)
-            SendMountMovement(batch);
-    }
-
-    private void SendMountMovement(MovementBatch<AgentMountData> batch)
-    {
-        if (batch == null) return;
-
-        for (int start = 0; start < batch.Data.Count; start += MaxAgentsPerMovementPacket)
-        {
-            int count = Math.Min(MaxAgentsPerMovementPacket, batch.Data.Count - start);
-            var data = new AgentMountData[count];
-            batch.Data.CopyTo(start, data, 0, count);
-
-            if (batch.IdentityScopeId == null)
-            {
-                var ids = new Guid[count];
-                batch.CanonicalIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new MountMovementPacket(ids, data));
-            }
-            else
-            {
-                var ids = new ushort[count];
-                batch.CompactIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new MountMovementPacket(
-                    batch.IdentityScopeId, ids, data));
-            }
-        }
+        return identityScopeId == null
+            ? new MountMovementPacket(canonicalIds, data)
+            : new MountMovementPacket(identityScopeId, compactIds, data);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -367,69 +983,126 @@ public class AgentMovementHandler : IAgentMovementHandler
             return;
         }
 
-        // Resolve and apply the whole batch in ONE game-thread action. Resolving here keeps this ordered behind
-        // earlier game-thread spawn/register work that may have been queued by reliable messages.
-        GameThread.RunSafe(() =>
+        if (_disposed) return;
+
+        bool usesCompactIds = movement.AgentIds != null;
+        var snapshots = new ReceivedMovement[idCount];
+        for (int i = 0; i < idCount; i++)
         {
-            if (Mission.Current == null) return;
+            snapshots[i] = new ReceivedMovement(
+                movement.IdentityScopeId,
+                usesCompactIds ? movement.AgentIds[i] : (ushort)0,
+                usesCompactIds ? Guid.Empty : movement.AgentGuids[i],
+                usesCompactIds,
+                movement.Agents[i]);
+        }
 
-            using (new AllowedThread())
+        QueueReceivedMovement(snapshots);
+    }
+
+    private void QueueMountMovement(MountMovementPacket movement)
+    {
+        int idCount = movement.MountIds?.Length ?? movement.MountGuids?.Length ?? 0;
+        if (idCount == 0 || movement.Mounts == null || movement.Mounts.Length != idCount || _disposed)
+            return;
+
+        bool usesCompactIds = movement.MountIds != null;
+        var snapshots = new ReceivedMovement[idCount];
+        for (int i = 0; i < idCount; i++)
+        {
+            snapshots[i] = new ReceivedMovement(
+                movement.IdentityScopeId,
+                usesCompactIds ? movement.MountIds[i] : (ushort)0,
+                usesCompactIds ? Guid.Empty : movement.MountGuids[i],
+                usesCompactIds,
+                movement.Mounts[i]);
+        }
+
+        QueueReceivedMovement(snapshots);
+    }
+
+    private void QueueReceivedMovement(ReceivedMovement[] snapshots)
+    {
+        // Resolve and apply each received packet in one game-thread action so it remains FIFO-ordered
+        // with spawn, deployment, and authority work queued by earlier messages.
+        GameThread.RunSafe(
+            () => ApplyMovement(snapshots),
+            context: nameof(HandlePacket));
+    }
+
+    private void ApplyMovement(IReadOnlyList<ReceivedMovement> snapshots)
+    {
+        if (_disposed || Mission.Current == null) return;
+
+        using (new AllowedThread())
+        {
+            foreach (ReceivedMovement snapshot in snapshots)
             {
-                for (int i = 0; i < idCount; i++)
+                if (snapshot.IsMount)
                 {
-                    CoopAgentInfo agentInfo;
-                    bool found = movement.AgentIds != null
-                        ? agentRegistry.TryGetAgentInfo(
-                            movement.IdentityScopeId, movement.AgentIds[i], out agentInfo)
-                        : agentRegistry.TryGetAgentInfo(
-                            movement.AgentGuids[i], out agentInfo);
-                    if (!found) continue;
+                    _mountMovementApplier.ApplySnapshot(
+                        snapshot.IdentityScopeId,
+                        snapshot.CompactId,
+                        snapshot.CanonicalId,
+                        snapshot.UsesCompactId,
+                        snapshot.MountData);
+                    continue;
+                }
 
-                    Agent agent = agentInfo.Agent;
-                    AgentData data = movement.Agents[i];
+                CoopAgentInfo agentInfo;
+                bool found = snapshot.UsesCompactId
+                    ? agentRegistry.TryGetAgentInfo(
+                        snapshot.IdentityScopeId, snapshot.CompactId, out agentInfo)
+                    : agentRegistry.TryGetAgentInfo(snapshot.CanonicalId, out agentInfo);
+                if (!found) continue;
 
-                    // The agent may have become invalid (player left, mission torn down) between queueing
-                    // and running; only apply while it is still active in the current mission.
-                    if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
-                        continue;
+                Agent agent = agentInfo.Agent;
+                AgentData data = snapshot.Data;
 
-                    // Re-check authority ON the game thread: a packet from the previous owner can be queued
-                    // behind a host-migration adoption (both are game-thread actions queued from the network
-                    // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
-                    // stale position/input snapshot the AI then fights.
-                    if (agentRegistry.IsLocallyControlled(agent))
-                        continue;
+                // The agent may have become invalid (player left, mission torn down) between queueing
+                // and running; only apply while it is still active in the current mission.
+                if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
+                    continue;
 
-                    SyncMountState(agent, movement.IdentityScopeId, data);
+                // Re-check authority ON the game thread: a packet from the previous owner can be queued
+                // behind a host-migration adoption (both are game-thread actions queued from the network
+                // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
+                // stale position/input snapshot the AI then fights.
+                if (agentRegistry.IsLocallyControlled(agent))
+                    continue;
 
-                    // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
-                    if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
-                        puppetMount.Controller = AgentControllerType.None;
+                Agent previousMount = agent.MountAgent;
+                SyncMountState(
+                    agent,
+                    snapshot.IdentityScopeId ?? agentInfo.MovementScopeId,
+                    data);
+                if (previousMount != null && !ReferenceEquals(previousMount, agent.MountAgent))
+                    UpdateRemoteSyntheticMountTurn(previousMount, null);
 
-                    data.Apply(agent);
+                // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
+                if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
+                {
+                    puppetMount.Controller = AgentControllerType.None;
+                    puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
+                }
 
-                    // Position is reconciled per-frame by the interpolator (smoother than a per-packet
-                    // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
-                    if (agent.HasMount && data.MountData != null)
-                    {
-                        // Mounted: feed target frames to the rider, since the mount is driven through its rider.
-                        // Keep the mount position only for rare large-gap snaps and drop any stale direct-horse
-                        // target from before the puppet mounted.
-                        _interpolator.Forget(agent.MountAgent);
-                        _interpolator.SetMountedRiderTarget(
-                            agent,
-                            data.Position,
-                            data.MovementDirection,
-                            data.MountData.MountMovementDirection,
-                            data.MountData.MountPosition);
-                    }
-                    else
-                    {
-                        _interpolator.SetRiderTarget(agent, data.Position, data.MovementDirection);
-                    }
+                data.Apply(agent);
+                if (data.MountData != null && agent.MountAgent is Agent remoteMount)
+                    UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+
+                // Position is reconciled per-frame by the interpolator (smoother than a per-packet
+                // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
+                if (agent.HasMount && data.MountData != null)
+                {
+                    _interpolator.Forget(agent.MountAgent);
+                    _interpolator.SetMountedRiderTarget(agent, data);
+                }
+                else
+                {
+                    _interpolator.SetRiderTarget(agent, data);
                 }
             }
-        });
+        }
     }
 
     // [Game thread] Replicate the owner's mount/dismount onto its puppet. The per-tick AgentData reports
@@ -477,7 +1150,10 @@ public class AgentMovementHandler : IAgentMovementHandler
                 && reported.IsActive() && reported.RiderAgent == null)
             {
                 Agent previous = agent.MountAgent;
-                _interpolator.Forget(previous);
+                if (previous != null)
+                {
+                    _interpolator.Forget(previous);
+                }
                 agent.MountAgent = reported;
                 RestoreLocallyControlledMount(previous);
             }
@@ -490,11 +1166,13 @@ public class AgentMovementHandler : IAgentMovementHandler
     {
         Agent mount = agent.IsMount ? agent : agent.MountAgent;
         if (mount == null || !mount.IsActive() || mount.Mission != Mission.Current) return;
+        if (_syntheticMountTurns.ContainsKey(mount)) return;
         if (mount.RiderAgent is Agent rider && rider.IsActive()
             && !agentRegistry.IsLocallyControlled(rider)) return;
         if (mount.Controller != AgentControllerType.AI)
         {
             mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
+            puppetMountStateRepairer.PrepareForAiControl(mount);
             mount.Controller = AgentControllerType.AI;
         }
     }
@@ -506,7 +1184,10 @@ public class AgentMovementHandler : IAgentMovementHandler
             && !agentRegistry.IsLocallyControlled(mount)) return;
         mount.SetMaximumSpeedLimit(-1f, isMultiplier: false);
         if (mount.Controller != AgentControllerType.AI)
+        {
+            puppetMountStateRepairer.PrepareForAiControl(mount);
             mount.Controller = AgentControllerType.AI;
+        }
     }
 
     /// <summary>
@@ -544,7 +1225,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                     agentRegistry.TryGetAgentInfo(mountData.MountAgentId, out info);
         }
 
-        if (!found) return null;
+        if (!found || info == null) return null;
         return info.Agent != null && info.Agent.IsMount ? info.Agent : null;
     }
 

@@ -1,12 +1,12 @@
 <Tasks>
     <GetItem>
-        <ItemId Value="3039085192"/>
+        <ItemId Value="3770450698"/>
         <!-- Can be found in the URL of your workshop item -->
     </GetItem>
     <UpdateItem>
         <ModuleFolder Value="E:\Mod Development\BannerlordCoop\mb2\Modules\Coop"/>
         <!-- A direct path of your module -->   
-        <ChangeNotes Value="Image update" />
+        <ChangeNotes Value="Changelog&#10;- Fixed a problem with desertions affecting players using older saves.&#10;- Removed a hitch when starting a battle.&#10;- Fixed a crash when joining an in-progress battle.&#10;- Trading companions between players now updates clans correctly.&#10;- Multiplayer traffic now uses fewer bytes, reducing network bandwidth usage.&#10;- Gameplay now pauses automatically when everyone leaves the campaign map.&#10;- Fixed a client crash after mounted troops died in field battles.&#10;- Fixed building construction in settlements.&#10;- City and castle management windows now retain building queues when reopened.&#10;- Returning from Alt+Tab no longer prevents the encyclopedia from opening.&#10;- Hero names now apply correctly after tabbing back, preventing new heroes from remaining nameless.&#10;- Fixed battle rewards for the player who starts a battle when another player joins later.&#10;- Mercenary players can now join and leave kingdoms correctly.&#10;- Fixed mismatched daily gold changes between clients and the server.&#10;- Fixed siege ladders desynchronizing between players.&#10;- Player parties no longer repeat campaign-map behavior calculations every frame and still enter and leave settlements normally.&#10;- Players can now leave or rejoin a siege after their health changes.&#10;- Purchasing many workshops no longer causes the Clan tab to display a black screen.&#10;- Rejoining a session now restores missing workshop details, allowing older saves to recover correctly.&#10;- Settlements containing owned workshops now retain complete warehouse lists, keeping clan stock views complete.&#10;- Players can now reach full workshop capacity without an owned settlement being dropped from storage." />
         <!-- Insert patch notes -->
         <Tags> 
             <!-- You can use the following tags: -->

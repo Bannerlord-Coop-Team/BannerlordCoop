@@ -20,7 +20,10 @@ public sealed class MockMission
     public Mission Shell { get; }
 
     public Agent MainAgent { get; set; }
+    public float DamageToPlayerMultiplier { get; set; } = 1f;
     public bool EndMissionCalled { get; set; }
+    public int AgentFleeingCalls { get; set; }
+    public Agent LastFleeingAgent { get; set; }
     public bool DeploymentInProgress { get; set; }
     public DeploymentMissionController DeploymentController { get; }
         = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();

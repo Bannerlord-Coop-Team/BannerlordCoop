@@ -37,6 +37,9 @@ public interface IOwnedAgentReplicator : IDisposable
     /// </summary>
     void ReplicateCurrentAgentsTo(string controllerId);
 
+    /// <summary>[Owner, game thread] Send newly captured agents as bounded batches once per mission tick.</summary>
+    void FlushPendingSpawns();
+
     /// <summary>
     /// [Owner, game thread] Replicate our own-party troops at their DEPLOYED positions so peers spawn matching
     /// puppets where we placed them. Called on the FIRST deployment commit — until then these were withheld
@@ -58,6 +61,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
     private readonly IBattleDeploymentCoordinator deployment;
+    private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
+    private readonly List<BattleAgentSpawnData> pendingSpawns = new List<BattleAgentSpawnData>();
 
     // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
     // momentarily dismounted still carries the horse's identity — a joiner's puppet spawns a horse from the
@@ -75,7 +80,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
         ICasualtyAttributionMap casualties,
-        IBattleDeploymentCoordinator deployment)
+        IBattleDeploymentCoordinator deployment,
+        IBattleAgentSpawnBatchCodec spawnBatchCodec)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -84,6 +90,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         this.session = session;
         this.casualties = casualties;
         this.deployment = deployment;
+        this.spawnBatchCodec = spawnBatchCodec;
         movementScopeId =
             session.OwnControllerId + ":" + Guid.NewGuid().ToString("N");
 
@@ -93,11 +100,11 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     public void Dispose()
     {
         messageBroker.Unsubscribe<AgentSpawnedInBattle>(Handle_AgentSpawnedInBattle);
+        pendingSpawns.Clear();
     }
 
-    // Reading agent transforms must run on the game thread; the send is inside the same action so the snapshot
-    // and the message stay consistent. Delivery is reliable (MessagePacket -> ReliableOrdered), so the whole
-    // batch fragments and arrives intact.
+    // Reading agent transforms must run on the game thread. SendJoinInfo supplies the blocking barrier when an
+    // already-active battle needs one; pre-activation mission loading must remain non-blocking.
     public void ReplicateCurrentAgentsTo(string controllerId)
     {
         GameThread.RunSafe(() =>
@@ -108,20 +115,47 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             var records = BuildOwnedAgentRecords(ownPartyOnly: false);
             if (records.Count == 0) return;
 
-            network.Send(controllerId, new NetworkSpawnBattleAgents(records.ToArray()));
-            Logger.Information("[BattleSync] Replayed {Count} of our agent(s) to joining {Controller}", records.Count, controllerId);
-        });
+            IReadOnlyList<NetworkSpawnBattleAgents> batches =
+                spawnBatchCodec.Encode(records, SpawnBatchPurpose.CatchUp);
+            foreach (NetworkSpawnBattleAgents batch in batches)
+                network.Send(controllerId, batch);
+
+            LogBatchSend("Replayed", records.Count, batches, controllerId);
+        }, context: nameof(ReplicateCurrentAgentsTo));
+    }
+
+    public void FlushPendingSpawns()
+    {
+        if (pendingSpawns.Count == 0) return;
+
+        IReadOnlyList<NetworkSpawnBattleAgents> batches =
+            spawnBatchCodec.Encode(pendingSpawns, SpawnBatchPurpose.Initial);
+        int recordCount = pendingSpawns.Count;
+        pendingSpawns.Clear();
+
+        foreach (NetworkSpawnBattleAgents batch in batches)
+            network.SendAll(batch);
+
+        LogBatchSend("Broadcast", recordCount, batches, null);
     }
 
     public void BroadcastOwnDeployedTroops()
     {
         if (Mission.Current == null) return;
 
+        // Initial NPC/reinforcement records captured earlier this frame must also be ahead of the deployment
+        // marker. All of these sends use ReliableOrdered, so the receiver observes the same barrier.
+        FlushPendingSpawns();
+
         var records = BuildOwnedAgentRecords(ownPartyOnly: true);
         if (records.Count == 0) return;
 
-        network.SendAll(new NetworkSpawnBattleAgents(records.ToArray()));
-        Logger.Information("[BattleSync] Committed deployment: broadcast {Count} own-party troop(s) at deployed positions", records.Count);
+        IReadOnlyList<NetworkSpawnBattleAgents> batches =
+            spawnBatchCodec.Encode(records, SpawnBatchPurpose.Deployment);
+        foreach (NetworkSpawnBattleAgents batch in batches)
+            network.SendAll(batch);
+
+        LogBatchSend("Committed deployment", records.Count, batches, null);
     }
 
     // [Game thread] Build spawn records for the battle agents WE currently own, at their CURRENT positions.
@@ -172,7 +206,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                 mountOriginalOwnerControllerId:
                     mountInfo?.OriginalOwner ?? info.OriginalOwner,
                 mountMovementScopeId:
-                    mountInfo?.MovementScopeId ?? info.MovementScopeId));
+                    mountInfo?.MovementScopeId ?? info.MovementScopeId,
+                isRunningAway: agent.IsRunningAway));
         }
         return records;
     }
@@ -314,7 +349,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             currentEquipment: new AgentEquipmentData(agent),
             movementScopeId: movementScopeId,
             mountOriginalOwnerControllerId: owner,
-            mountMovementScopeId: movementScopeId);
+            mountMovementScopeId: movementScopeId,
+            isRunningAway: agent.IsRunningAway);
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
         messageBroker.Publish(this, new TrackTroopForUpgrades(mapEventPartyId, characterId));
@@ -330,9 +366,36 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             return;
         }
 
-        // SendAll over the mesh reaches every peer in this battle instance (not us).
-        Logger.Information("[BattleSync] Captured own spawn {Char} (agent {AgentId}); broadcasting over mesh", characterId, agentId);
-        network.SendAll(new NetworkSpawnBattleAgents(new[] { data }));
+        // Coalesce captures from native's spawn loop. The next mission tick emits bounded compressed batches
+        // instead of hundreds of singleton reliable messages.
+        pendingSpawns.Add(data);
+        Logger.Debug("[BattleSync] Captured own spawn {Char} (agent {AgentId}); queued for batched replication", characterId, agentId);
+    }
+
+    private static void LogBatchSend(
+        string action,
+        int recordCount,
+        IReadOnlyList<NetworkSpawnBattleAgents> batches,
+        string controllerId)
+    {
+        int wireBytes = 0;
+        int uncompressedBytes = 0;
+        foreach (NetworkSpawnBattleAgents batch in batches)
+        {
+            wireBytes += batch.Payload?.Length ?? 0;
+            uncompressedBytes += batch.UncompressedLength;
+        }
+
+        Logger.Information(
+            "[BattleTraffic] {Action} spawn transfer {TransferId}: {RecordCount} record(s) in {BatchCount} batch(es), " +
+            "{WireBytes} wire bytes from {UncompressedBytes} protobuf bytes{Controller}",
+            action,
+            batches.Count == 0 ? Guid.Empty : batches[0].TransferId,
+            recordCount,
+            batches.Count,
+            wireBytes,
+            uncompressedBytes,
+            controllerId == null ? string.Empty : $" to {controllerId}");
     }
 
     private ushort AllocateMovementId()

@@ -43,6 +43,7 @@ internal sealed class BanditBarterHandler : IHandler
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly ISessionInteractionsPlayerDataInterface interactions;
     private readonly IBarterClientPresentation barterClientPresentation;
+    private readonly ISafePassagePartyResolver safePassagePartyResolver;
     private readonly ISendCoalescer sendCoalescer;
 
     public BanditBarterHandler(
@@ -53,6 +54,7 @@ internal sealed class BanditBarterHandler : IHandler
         ConversationPartyTracker conversationPartyTracker,
         ISessionInteractionsPlayerDataInterface interactions,
         IBarterClientPresentation barterClientPresentation,
+        ISafePassagePartyResolver safePassagePartyResolver,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -62,6 +64,7 @@ internal sealed class BanditBarterHandler : IHandler
         this.conversationPartyTracker = conversationPartyTracker;
         this.interactions = interactions;
         this.barterClientPresentation = barterClientPresentation;
+        this.safePassagePartyResolver = safePassagePartyResolver;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<NetworkRequestBanditBarter>(HandleRequest);
@@ -102,17 +105,17 @@ internal sealed class BanditBarterHandler : IHandler
 
     private void ProcessRequest(NetPeer peer, NetworkRequestBanditBarter request)
     {
+        Hero playerHero = null;
+        var mutationApplied = false;
         try
         {
-            if (!TryResolveParties(peer, request.BanditPartyId, out var player, out var playerHero, out var playerParty, out var banditParty, out var reason) ||
+            if (!TryResolveParties(peer, request.BanditPartyId, out var player, out playerHero, out var playerParty, out var banditParty, out var reason) ||
                 !HasActiveEngagement(peer, playerParty, banditParty, out reason) ||
                 !TryValidateOffer(request, playerHero, playerParty, banditParty, out var offer, out reason))
             {
                 Reject(peer, request, playerHero?.Gold ?? 0, reason);
                 return;
             }
-
-            ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
 
             var protectionUntil = CampaignTime.HoursFromNow(32);
             foreach (var protectedParty in offer.EnemyParties)
@@ -131,18 +134,24 @@ internal sealed class BanditBarterHandler : IHandler
                 request.BanditPartyId,
                 BanditInteractionsCampaignBehavior.PlayerInteraction.PaidOffParty);
 
-            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
-            FlushHeroGold(playerHero);
-            network.Send(peer, new NetworkBanditBarterResult(
-                request.BanditPartyId,
-                true,
-                playerHero.Gold,
-                requestId: request.RequestId));
+            // Safe passage is now authoritative, so later failures must not leave the request retryable.
+            mutationApplied = true;
+            ApplyOffer(playerHero, playerParty.Party, banditParty.Party, offer);
+
+            CompleteAcceptedRequest(peer, playerHero);
+            Accept(peer, request, playerHero.Gold);
         }
         catch (Exception exception)
         {
             Logger.Error(exception, "Failed to apply an authoritative bandit safe-passage barter");
-            Reject(peer, request, 0, "The server could not process the bandit barter.");
+            if (mutationApplied)
+            {
+                CompleteAcceptedRequest(peer, playerHero);
+                Accept(peer, request, playerHero?.Gold ?? 0);
+                return;
+            }
+
+            Reject(peer, request, playerHero?.Gold ?? 0, "The server could not process the bandit barter.");
         }
     }
 
@@ -208,93 +217,6 @@ internal sealed class BanditBarterHandler : IHandler
         return true;
     }
 
-    private static void GetSafePassageParties(
-        MobileParty playerParty,
-        MobileParty paidBandit,
-        out List<MobileParty> playerSide,
-        out List<MobileParty> enemySide)
-    {
-        playerSide = new List<MobileParty>();
-        enemySide = new List<MobileParty>();
-        var radius = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius;
-        var playerPosition = playerParty.Position.ToVec2();
-        var nearbyParties = MobileParty.StartFindingLocatablesAroundPosition(playerPosition, radius);
-
-        for (var party = MobileParty.FindNextLocatable(ref nearbyParties);
-             party != null;
-             party = MobileParty.FindNextLocatable(ref nearbyParties))
-        {
-            if (party == playerParty ||
-                party.IsActive != true ||
-                party.MapEvent != null ||
-                party.SiegeEvent != null ||
-                party.CurrentSettlement != null ||
-                party.AttachedTo != null ||
-                party.IsInRaftState ||
-                party.IsCurrentlyAtSea != playerParty.IsCurrentlyAtSea)
-            {
-                continue;
-            }
-
-            if (!party.IsLordParty &&
-                !party.IsBandit &&
-                !party.IsPatrolParty &&
-                !party.ShouldJoinPlayerBattles)
-            {
-                continue;
-            }
-
-            var partyFaction = party.MapFaction;
-            var playerFaction = playerParty.MapFaction;
-            var enemyFaction = paidBandit.MapFaction;
-            if (partyFaction == null || playerFaction == null || enemyFaction == null)
-                continue;
-
-            if (!partyFaction.IsAtWarWith(playerFaction) &&
-                partyFaction.IsAtWarWith(enemyFaction) &&
-                enemySide.All(enemy => enemy.MapFaction?.IsAtWarWith(partyFaction) == true))
-            {
-                playerSide.Add(party);
-            }
-
-            if (partyFaction.IsAtWarWith(playerFaction) &&
-                !partyFaction.IsAtWarWith(enemyFaction) &&
-                playerSide.All(ally => ally.MapFaction?.IsAtWarWith(partyFaction) == true))
-            {
-                enemySide.Add(party);
-            }
-        }
-
-        if (enemySide.Any(party => party.ShouldBeIgnored))
-            playerSide.Clear();
-        if (playerSide.Any(party => party.ShouldBeIgnored))
-            enemySide.Clear();
-
-        if (!playerSide.Contains(playerParty))
-            playerSide.Add(playerParty);
-        if (!enemySide.Contains(paidBandit))
-            enemySide.Add(paidBandit);
-
-        foreach (var party in playerSide.ToArray())
-            AddPartyAndAttachments(playerSide, party);
-        foreach (var party in enemySide.ToArray())
-            AddPartyAndAttachments(enemySide, party);
-    }
-
-    private static void AddPartyAndAttachments(ICollection<MobileParty> parties, MobileParty party)
-    {
-        if (party == null) return;
-        if (!parties.Contains(party))
-            parties.Add(party);
-
-        if (party.AttachedParties == null) return;
-        foreach (var attachedParty in party.AttachedParties)
-        {
-            if (attachedParty?.IsActive == true && !parties.Contains(attachedParty))
-                parties.Add(attachedParty);
-        }
-    }
-
     private bool TryValidateOffer(
         NetworkRequestBanditBarter request,
         Hero playerHero,
@@ -335,20 +257,22 @@ internal sealed class BanditBarterHandler : IHandler
             return false;
         }
 
-        GetSafePassageParties(playerParty, banditParty, out var playerSide, out var enemySide);
+        var safePassageParties = safePassagePartyResolver.Resolve(
+            playerParty,
+            banditParty);
         offer = new ValidatedOffer(
             request.PlayerGold,
             playerItems,
             playerPrisoners,
-            enemySide);
+            safePassageParties.OpponentSide);
 
         var offeredValue = GetOfferValueForBandits(playerHero, playerParty, banditParty, offer);
         var requiredValue = GetRequiredSafePassageValue(
             playerHero,
             playerParty,
             banditParty,
-            playerSide,
-            enemySide);
+            safePassageParties.PlayerSide,
+            safePassageParties.OpponentSide);
         if (offeredValue < requiredValue)
         {
             offer = null;
@@ -567,6 +491,36 @@ internal sealed class BanditBarterHandler : IHandler
         if (sendCoalescer == null || !objectManager.TryGetId(hero, out var heroId)) return;
 
         sendCoalescer.FlushInstance(heroId, network);
+    }
+
+    private void CompleteAcceptedRequest(NetPeer peer, Hero playerHero)
+    {
+        try
+        {
+            ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Failed to end an accepted bandit barter engagement");
+        }
+
+        try
+        {
+            FlushHeroGold(playerHero);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "Failed to flush player gold after an accepted bandit barter");
+        }
+    }
+
+    private void Accept(NetPeer peer, NetworkRequestBanditBarter request, int playerGold)
+    {
+        network.Send(peer, new NetworkBanditBarterResult(
+            request.BanditPartyId,
+            true,
+            playerGold,
+            requestId: request.RequestId));
     }
 
     private void Reject(NetPeer peer, NetworkRequestBanditBarter request, int playerGold, string reason)

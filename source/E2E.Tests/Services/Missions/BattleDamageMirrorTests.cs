@@ -25,6 +25,47 @@ public class BattleDamageMirrorTests : MissionTestEnvironment
 {
     public BattleDamageMirrorTests(ITestOutputHelper output) : base(output) { }
 
+    [Theory]
+    [InlineData(true, 0.25f, 90f)]
+    [InlineData(true, 0.5f, 80f)]
+    [InlineData(true, 1f, 60f)]
+    [InlineData(false, 0.25f, 60f)]
+    public void RoutedDamage_UsesPlayerDamageMultiplierOnlyForMainAgent(
+        bool isMainAgent,
+        float damageToPlayerMultiplier,
+        float expectedHealth)
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "owner");
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            mock.DamageToPlayerMultiplier = damageToPlayerMultiplier;
+            var controller = client.Resolve<CoopBattleController>();
+            var registry = client.Resolve<INetworkAgentRegistry>();
+
+            var agent = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(isMainAgent ? AgentControllerType.Player : AgentControllerType.AI));
+            if (isMainAgent)
+                mock.MainAgent = agent;
+
+            var victimId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("owner", victimId, agent));
+
+            var blow = new Blow(0) { InflictedDamage = 40, DamageType = DamageTypes.Pierce };
+            var collisionData = new AttackCollisionData { InflictedDamage = 40 };
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkApplyBattleDamage(victimId, Guid.Empty, blow, collisionData));
+
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.Equal(expectedHealth, mirror.Health);
+            GC.KeepAlive(controller);
+        });
+    }
+
     [Fact]
     public void RoutedMissileBlow_AppliesToOwner_WithoutMissilesDictionaryThrow()
     {

@@ -1,8 +1,10 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Common.Network.Packets;
+using GameInterface.Services.Save.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
@@ -25,6 +27,7 @@ public class TransferSaveState : ConnectionStateBase
 
     public TransferSaveState(
         IConnectionLogic connectionLogic,
+        IMessageBroker messageBroker,
         INetwork network,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
@@ -51,37 +54,63 @@ public class TransferSaveState : ConnectionStateBase
                 Logger.Error(ex, "Failed to flush coalesced sends before the join save snapshot");
             }
 
-            var saveResults = saveInterface.SaveCurrentGame();
-
-            // Disconnect peer on failure — before touching Data, which a failed snapshot may leave null.
-            if (!saveResults.Success)
+            try
             {
-                Logger.Error("Join save snapshot failed for peer {PeerId}; disconnecting", connectionLogic.Peer.Id);
-                connectionLogic.Peer.Disconnect();
-                return;
+                try
+                {
+                    messageBroker.Publish(this, new GameSaveStateChanged(true));
+                    // The poll thread is blocked on this action, so flush before the save starts.
+                    network.FlushPendingMessages();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to broadcast the join save start");
+                }
+
+                var saveResults = saveInterface.SaveCurrentGame();
+
+                // Disconnect peer on failure — before touching Data, which a failed snapshot may leave null.
+                if (!saveResults.Success)
+                {
+                    Logger.Error("Join save snapshot failed for peer {PeerId}; disconnecting", connectionLogic.Peer.Id);
+                    connectionLogic.Peer.Disconnect();
+                    return;
+                }
+
+                // Clone the mutable session DTOs at the same boundary as the campaign save. Compression and
+                // packet serialization run after the game-thread action returns, while campaign ticks resume.
+                snapshot = new GameSaveDataPacket(
+                    saveResults.Data,
+                    saveResults.CampaignId,
+                    Clone(coopSessionProvider.CoopSession?.CraftingPlayerData),
+                    Clone(coopSessionProvider.CoopSession?.WorkshopPlayerData),
+                    Clone(coopSessionProvider.CoopSession?.CaravansPlayerData),
+                    Clone(coopSessionProvider.CoopSession?.AlleyPlayerData),
+                    Clone(coopSessionProvider.CoopSession?.InteractionsPlayerData),
+                    Clone(coopSessionProvider.CoopSession?.TradePlayerData),
+                    Clone(coopSessionProvider.CoopSession?.InventoryPlayerData),
+                    attachmentIdMapper.BuildServerMap(),
+                    serverOptionsProvider.GetServerOptions());
+
+                // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
+                // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
+                // parked for its duration and cannot broadcast a received delta that races the snapshot;
+                // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
+                // Dropping) from "after the save" (queued for replay).
+                connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
+                snapshotCreated = true;
             }
-
-            // Clone the mutable session DTOs at the same boundary as the campaign save. Compression and
-            // packet serialization run after the game-thread action returns, while campaign ticks resume.
-            snapshot = new GameSaveDataPacket(
-                saveResults.Data,
-                saveResults.CampaignId,
-                Clone(coopSessionProvider.CoopSession?.CraftingPlayerData),
-                Clone(coopSessionProvider.CoopSession?.WorkshopPlayerData),
-                Clone(coopSessionProvider.CoopSession?.CaravansPlayerData),
-                Clone(coopSessionProvider.CoopSession?.AlleyPlayerData),
-                Clone(coopSessionProvider.CoopSession?.InteractionsPlayerData),
-                Clone(coopSessionProvider.CoopSession?.TradePlayerData),
-                attachmentIdMapper.BuildServerMap(),
-                serverOptionsProvider.GetServerOptions());
-
-            // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
-            // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
-            // parked for its duration and cannot broadcast a received delta that races the snapshot;
-            // taking the cut right after the snapshot cleanly separates "in the save" (dropped while
-            // Dropping) from "after the save" (queued for replay).
-            connectionMessageQueue.BeginQueueing(ConnectionLogic.Peer);
-            snapshotCreated = true;
+            finally
+            {
+                try
+                {
+                    messageBroker.Publish(this, new GameSaveStateChanged(false));
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to broadcast the join save end");
+                }
+            }
         }, blocking: true);
 
         if (!snapshotCreated) return;
@@ -127,6 +156,7 @@ public class TransferSaveState : ConnectionStateBase
                 chunkIndex == 0 ? snapshot.AlleyPlayerData : null,
                 chunkIndex == 0 ? snapshot.InteractionsPlayerData : null,
                 chunkIndex == 0 ? snapshot.TradePlayerData : null,
+                chunkIndex == 0 ? snapshot.InventoryPlayerData : null,
                 chunkIndex == 0 ? snapshot.AttachmentIdMap : null,
                 chunkIndex == 0 ? snapshot.ServerOptions : null);
 

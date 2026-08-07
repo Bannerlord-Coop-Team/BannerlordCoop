@@ -7,6 +7,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Missions;
 
@@ -47,6 +48,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // Aim replication: -1000 sentinel (a valid angle can be -1) and vanilla's own re-send threshold.
     private const float AimSentinel = -1000f;
     private const float AimEpsilon = 0.02f;
+    private const float LadderAnimationSentinel = -1f;
+    private const float LadderAnimationEpsilon = 0.01f;
+    private const float LadderFrameEpsilon = 0.001f;
 
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeMachineStateReplicator>();
 
@@ -61,10 +65,14 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly List<UsableMachine> machines = new List<UsableMachine>();
     private readonly Dictionary<int, UsableMachine> machinesById = new Dictionary<int, UsableMachine>();
     private readonly Dictionary<int, NetworkSiegeMachineState> lastSent = new Dictionary<int, NetworkSiegeMachineState>();
+    private readonly Dictionary<int, NetworkSiegeLadderAnimationState> lastSentLadderAnimations =
+        new Dictionary<int, NetworkSiegeLadderAnimationState>();
     private readonly HashSet<int> deactivated = new HashSet<int>();
     // States that arrived before their MissionObject registered (catch-up during a peer's scene load);
     // re-applied once the object appears. Keyed by machine id, latest state wins.
     private readonly Dictionary<int, NetworkSiegeMachineState> pendingByMachineId = new Dictionary<int, NetworkSiegeMachineState>();
+    private readonly Dictionary<int, NetworkSiegeLadderAnimationState> pendingLadderAnimationsById =
+        new Dictionary<int, NetworkSiegeLadderAnimationState>();
     // Peer-side: last RangedSiegeWeapon.WeaponState applied per machine, so the wind-up/reload animation fires
     // only on a state transition (the state message re-sends whenever any field, e.g. HitPoints, changes).
     private readonly Dictionary<int, int> peerWeaponState = new Dictionary<int, int>();
@@ -103,6 +111,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         this.hostEpochPolicy = hostEpochPolicy;
 
         messageBroker.Subscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
+        messageBroker.Subscribe<NetworkSiegeLadderAnimationState>(Handle_NetworkLadderAnimationState);
         messageBroker.Subscribe<NetworkSiegeMachineClaim>(Handle_NetworkMachineClaim);
         messageBroker.Subscribe<NetworkSiegeMachineAuthority>(Handle_NetworkMachineAuthority);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
@@ -112,6 +121,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
+        messageBroker.Unsubscribe<NetworkSiegeLadderAnimationState>(Handle_NetworkLadderAnimationState);
         messageBroker.Unsubscribe<NetworkSiegeMachineClaim>(Handle_NetworkMachineClaim);
         messageBroker.Unsubscribe<NetworkSiegeMachineAuthority>(Handle_NetworkMachineAuthority);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
@@ -156,8 +166,10 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (trackedMission != mission)
         {
             lastSent.Clear();
+            lastSentLadderAnimations.Clear();
             deactivated.Clear();
             pendingByMachineId.Clear();
+            pendingLadderAnimationsById.Clear();
             peerWeaponState.Clear();
             claimedMachines.Clear();
             pendingClaimSeconds.Clear();
@@ -214,24 +226,56 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!isHost && !simulatedLocally) continue;
 
             var state = CaptureState(machine, isHost, simulatedLocally);
-
-            if (lastSent.TryGetValue(machineId, out var previous)
-                && previous.HitPoints == state.HitPoints
-                && previous.DestructionState == state.DestructionState
-                && previous.GateState == state.GateState
-                && previous.LadderState == state.LadderState
-                && previous.HasArrived == state.HasArrived
-                && previous.WeaponState == state.WeaponState
-                && Math.Abs(previous.MoveDistance - state.MoveDistance) < MoveDistanceThreshold
-                && Math.Abs(previous.AimDirection - state.AimDirection) < AimEpsilon
-                && Math.Abs(previous.AimReleaseAngle - state.AimReleaseAngle) < AimEpsilon)
+            if (!MachineStatesEqual(machineId, state))
             {
-                continue;
+                lastSent[machineId] = state;
+                network.SendAll(Stamp(state));
             }
 
-            lastSent[machineId] = state;
-            network.SendAll(Stamp(state));
+            if (simulatedLocally && machine is SiegeLadder ladder)
+            {
+                var ladderAnimation = CaptureLadderAnimationState(ladder);
+                if (!LadderAnimationStatesEqual(machineId, ladderAnimation))
+                {
+                    lastSentLadderAnimations[machineId] = ladderAnimation;
+                    network.SendAll(Stamp(ladderAnimation));
+                }
+            }
         }
+    }
+
+    private bool MachineStatesEqual(int machineId, NetworkSiegeMachineState state)
+    {
+        return lastSent.TryGetValue(machineId, out var previous)
+            && previous.HitPoints == state.HitPoints
+            && previous.DestructionState == state.DestructionState
+            && previous.GateState == state.GateState
+            && previous.LadderState == state.LadderState
+            && previous.HasArrived == state.HasArrived
+            && previous.WeaponState == state.WeaponState
+            && Math.Abs(previous.MoveDistance - state.MoveDistance) < MoveDistanceThreshold
+            && Math.Abs(previous.AimDirection - state.AimDirection) < AimEpsilon
+            && Math.Abs(previous.AimReleaseAngle - state.AimReleaseAngle) < AimEpsilon;
+    }
+
+    private bool LadderAnimationStatesEqual(int ladderId, NetworkSiegeLadderAnimationState state)
+    {
+        return lastSentLadderAnimations.TryGetValue(ladderId, out var previous)
+            && Math.Abs(previous.AnimationSpeed - state.AnimationSpeed) < LadderAnimationEpsilon
+            && Math.Abs(previous.AnimationProgress - state.AnimationProgress) < LadderAnimationEpsilon
+            && previous.AnimationState == state.AnimationState
+            && Math.Abs(previous.FallAngularSpeed - state.FallAngularSpeed) < LadderAnimationEpsilon
+            && previous.AnimationIndex == state.AnimationIndex
+            && LadderFramesEqual(previous.Frame, state.Frame);
+    }
+
+    private static bool LadderFramesEqual(MatrixFrame left, MatrixFrame right)
+    {
+        float thresholdSquared = LadderFrameEpsilon * LadderFrameEpsilon;
+        return (left.origin - right.origin).LengthSquared < thresholdSquared
+            && (left.rotation.s - right.rotation.s).LengthSquared < thresholdSquared
+            && (left.rotation.f - right.rotation.f).LengthSquared < thresholdSquared
+            && (left.rotation.u - right.rotation.u).LengthSquared < thresholdSquared;
     }
 
     // BR-102: an outgoing state asserts this sender's simulation authority NOW, so stamp the current
@@ -242,6 +286,19 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         return new NetworkSiegeMachineState(state.MachineId, state.HitPoints, state.DestructionState,
             state.GateState, state.LadderState, state.MoveDistance, state.HasArrived, state.WeaponState,
             state.AimDirection, state.AimReleaseAngle, session.HostEpoch);
+    }
+
+    private NetworkSiegeLadderAnimationState Stamp(NetworkSiegeLadderAnimationState state)
+    {
+        return new NetworkSiegeLadderAnimationState(
+            state.LadderId,
+            state.AnimationSpeed,
+            state.AnimationProgress,
+            state.AnimationState,
+            state.FallAngularSpeed,
+            state.Frame,
+            state.AnimationIndex,
+            session.HostEpoch);
     }
 
     // BR-102: drop a host-authority message stamped by an earlier hosting generation (a deposed host
@@ -290,6 +347,27 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
         return new NetworkSiegeMachineState(machine.Id.Id, hitPoints, destructionState, gateState, ladderState,
             moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle);
+    }
+
+    private static NetworkSiegeLadderAnimationState CaptureLadderAnimationState(SiegeLadder ladder)
+    {
+        int animationIndex = ladder._ladderSkeleton.GetAnimationIndexAtChannel(0);
+        float animationSpeed = LadderAnimationSentinel;
+        float animationProgress = LadderAnimationSentinel;
+        if (animationIndex >= 0)
+        {
+            animationSpeed = ladder._ladderSkeleton.GetAnimationSpeedAtChannel(0);
+            animationProgress = ladder._ladderSkeleton.GetAnimationParameterAtChannel(0);
+        }
+
+        return new NetworkSiegeLadderAnimationState(
+            ladder.Id.Id,
+            animationSpeed,
+            animationProgress,
+            (int)ladder._animationState,
+            ladder._fallAngularSpeed,
+            ladder._ladderObject.GameEntity.GetGlobalFrame(),
+            animationIndex);
     }
 
     private void DeactivateNewMachines()
@@ -907,11 +985,21 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // buffer only fills from received states, so a client that receives none skips it.
     private void DrainPendingMachineStates()
     {
-        if (pendingByMachineId.Count == 0) return;
+        DrainPendingGeneralMachineStates();
+        DrainPendingLadderAnimationStates();
+    }
 
+    private void DrainPendingGeneralMachineStates()
+    {
         List<int> applied = null;
         foreach (var pending in pendingByMachineId)
         {
+            if (DropStaleHostEpoch(pending.Value.HostEpoch, nameof(NetworkSiegeMachineState)))
+            {
+                if (applied == null) applied = new List<int>();
+                applied.Add(pending.Key);
+                continue;
+            }
             if (!machinesById.TryGetValue(pending.Key, out var machine)) continue;
 
             SiegeMissionAuthorityGate.SuppressCapture = true;
@@ -940,6 +1028,32 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
         if (applied == null) return;
         foreach (var id in applied) pendingByMachineId.Remove(id);
+    }
+
+    private void DrainPendingLadderAnimationStates()
+    {
+        List<int> applied = null;
+        foreach (var pending in pendingLadderAnimationsById)
+        {
+            if (DropStaleHostEpoch(pending.Value.HostEpoch, nameof(NetworkSiegeLadderAnimationState)))
+            {
+                if (applied == null) applied = new List<int>();
+                applied.Add(pending.Key);
+                continue;
+            }
+            if (!machinesById.TryGetValue(pending.Key, out var machine)) continue;
+
+            if (machine is SiegeLadder ladder
+                && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(pending.Key))
+            {
+                ApplyLadderAnimation(ladder, pending.Value);
+            }
+            if (applied == null) applied = new List<int>();
+            applied.Add(pending.Key);
+        }
+
+        if (applied == null) return;
+        foreach (var id in applied) pendingLadderAnimationsById.Remove(id);
     }
 
     private static void ReadState(UsableMachine machine, out float hitPoints, out int destructionState,
@@ -1010,11 +1124,12 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 {
                     // The MissionObject isn't registered yet (catch-up during scene load); buffer and re-apply
                     // from Tick once RefreshMachineCache sees it, instead of dropping it permanently.
-                    pendingByMachineId[obj.MachineId] = obj;
+                    BufferMachineState(obj);
                     return;
                 }
             }
 
+            pendingByMachineId.Remove(obj.MachineId);
             SiegeMissionAuthorityGate.SuppressCapture = true;
             try
             {
@@ -1037,6 +1152,52 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 ApplyWeaponAnimation(machine, obj.WeaponState);
             }
         });
+    }
+
+    private void Handle_NetworkLadderAnimationState(MessagePayload<NetworkSiegeLadderAnimationState> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (Mission.Current == null) return;
+            if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeLadderAnimationState))) return;
+
+            RefreshMachineCache();
+            if (!machinesById.TryGetValue(obj.LadderId, out var machine))
+            {
+                trackedObjectCount = -1;
+                RefreshMachineCache();
+                if (!machinesById.TryGetValue(obj.LadderId, out machine))
+                {
+                    BufferLadderAnimationState(obj);
+                    return;
+                }
+            }
+
+            if (pendingByMachineId.ContainsKey(obj.LadderId))
+            {
+                BufferLadderAnimationState(obj);
+                return;
+            }
+
+            pendingLadderAnimationsById.Remove(obj.LadderId);
+            if (machine is SiegeLadder ladder
+                && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.LadderId))
+            {
+                ApplyLadderAnimation(ladder, obj);
+            }
+        });
+    }
+
+    private void BufferMachineState(NetworkSiegeMachineState state)
+    {
+        pendingByMachineId[state.MachineId] = state;
+    }
+
+    private void BufferLadderAnimationState(NetworkSiegeLadderAnimationState state)
+    {
+        pendingLadderAnimationsById[state.LadderId] = state;
     }
 
     private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
@@ -1096,9 +1257,18 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             gateTower.State = (SiegeTower.GateState)state.GateState;
         }
 
-        if (state.LadderState >= 0 && machine is SiegeLadder ladder && (int)ladder.State != state.LadderState)
+        if (state.LadderState >= 0 && machine is SiegeLadder ladder)
         {
-            ladder.State = (SiegeLadder.LadderState)state.LadderState;
+            var targetState = (SiegeLadder.LadderState)state.LadderState;
+            if (ladder.State != targetState)
+            {
+                // Poll snapshots can skip vanilla's synchronous transition states that start or finish animations.
+                foreach (var transitionState in GetLadderTransitionStates(ladder.State, targetState))
+                {
+                    ladder.State = transitionState;
+                }
+                ladder.State = targetState;
+            }
         }
 
         if (state.HitPoints >= 0f && machine.DestructionComponent != null)
@@ -1114,6 +1284,82 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             {
                 destruction.SetDestructionLevel(state.DestructionState, -1, 0f, TaleWorlds.Library.Vec3.Zero, TaleWorlds.Library.Vec3.Zero);
             }
+        }
+    }
+
+    private static void ApplyLadderAnimation(SiegeLadder ladder, NetworkSiegeLadderAnimationState state)
+    {
+        ladder._animationState = (SiegeLadder.LadderAnimationState)state.AnimationState;
+        ladder._fallAngularSpeed = state.FallAngularSpeed;
+        ladder._lastDotProductOfAnimationAndTargetRotation = -1000f;
+
+        var ladderFrame = state.Frame;
+        ladderFrame.rotation.Orthonormalize();
+        ladder._ladderObject.GameEntity.SetGlobalFrame(ladderFrame);
+
+        if (state.AnimationIndex < 0) return;
+
+        ladder._ladderSkeleton.SetAnimationAtChannel(state.AnimationIndex, 0);
+        ladder._ladderSkeleton.SetAnimationSpeedAtChannel(0, state.AnimationSpeed);
+        ladder._ladderSkeleton.SetAnimationParameterAtChannel(
+            0,
+            MBMath.ClampFloat(state.AnimationProgress, 0f, 1f));
+        ladder._ladderSkeleton.ForceUpdateBoneFrames();
+    }
+
+    internal static IEnumerable<SiegeLadder.LadderState> GetLadderTransitionStates(
+        SiegeLadder.LadderState currentState,
+        SiegeLadder.LadderState targetState)
+    {
+        if (targetState == SiegeLadder.LadderState.BeingRaised)
+        {
+            if (currentState == SiegeLadder.LadderState.OnLand
+                || currentState == SiegeLadder.LadderState.FallToLand)
+            {
+                yield return SiegeLadder.LadderState.BeingRaisedStartFromGround;
+            }
+            else if (currentState == SiegeLadder.LadderState.OnWall
+                || currentState == SiegeLadder.LadderState.FallToWall)
+            {
+                yield return SiegeLadder.LadderState.BeingPushedBackStartFromWall;
+                yield return SiegeLadder.LadderState.BeingPushedBack;
+                yield return SiegeLadder.LadderState.BeingPushedBackStopped;
+            }
+            else if (currentState == SiegeLadder.LadderState.BeingPushedBack
+                || currentState == SiegeLadder.LadderState.BeingPushedBackStartFromWall)
+            {
+                yield return SiegeLadder.LadderState.BeingPushedBackStopped;
+            }
+        }
+        else if (targetState == SiegeLadder.LadderState.BeingPushedBack)
+        {
+            if (currentState == SiegeLadder.LadderState.OnWall
+                || currentState == SiegeLadder.LadderState.FallToWall)
+            {
+                yield return SiegeLadder.LadderState.BeingPushedBackStartFromWall;
+            }
+            else if (currentState == SiegeLadder.LadderState.OnLand
+                || currentState == SiegeLadder.LadderState.FallToLand)
+            {
+                yield return SiegeLadder.LadderState.BeingRaisedStartFromGround;
+                yield return SiegeLadder.LadderState.BeingRaised;
+                yield return SiegeLadder.LadderState.BeingRaisedStopped;
+            }
+            else if (currentState == SiegeLadder.LadderState.BeingRaised
+                || currentState == SiegeLadder.LadderState.BeingRaisedStartFromGround)
+            {
+                yield return SiegeLadder.LadderState.BeingRaisedStopped;
+            }
+        }
+        else if (targetState == SiegeLadder.LadderState.OnWall
+            && currentState != SiegeLadder.LadderState.FallToWall)
+        {
+            yield return SiegeLadder.LadderState.FallToWall;
+        }
+        else if (targetState == SiegeLadder.LadderState.OnLand
+            && currentState != SiegeLadder.LadderState.FallToLand)
+        {
+            yield return SiegeLadder.LadderState.FallToLand;
         }
     }
 
@@ -1222,9 +1468,25 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 (machineId, simulatedLocally) => CaptureState(machinesById[machineId], isHost, simulatedLocally),
                 state => network.Send(controllerId, Stamp(state)));
 
+            int ladderAnimationsSent = 0;
+            foreach (var machine in machines)
+            {
+                if (!(machine is SiegeLadder ladder)
+                    || !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id))
+                {
+                    continue;
+                }
+
+                network.Send(controllerId, Stamp(CaptureLadderAnimationState(ladder)));
+                ladderAnimationsSent++;
+            }
+
             if (sent > 0)
                 Logger.Information("[BattleSync] Replayed {Count} siege machine state(s) to joining {Controller} as {Role}",
                     sent, controllerId, isHost ? "host" : "claimant");
+            if (ladderAnimationsSent > 0)
+                Logger.Information("[BattleSync] Replayed {Count} siege ladder animation state(s) to joining {Controller}",
+                    ladderAnimationsSent, controllerId);
         });
     }
 
