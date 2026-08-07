@@ -324,18 +324,30 @@ public class VillageNeedsToolsIssueTests : IDisposable
         var fixture = SetupVillageOwner();
         CreateIssueOnServer(fixture);
 
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
             var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("player-A", "", "", "", "")));
+            Assert.True(playerManager.AddPlayer(new Player("player-A", "", partyId, "", "")));
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
 
+        VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest quest = null;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
             IssueOwnershipRegistry.SetOwner(owner, "player-A");
+            quest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(owner.Issue.IssueQuest);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            using (new AllowedThread())
+            {
+                party.ItemRoster.AddToCounts(quest._requestedTradeGood, quest._numberOfRequestedGood);
+            }
         });
 
         Server.Call(() =>
@@ -374,6 +386,43 @@ public class VillageNeedsToolsIssueTests : IDisposable
                 Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
             });
         }
+    }
+
+    [Fact]
+    public void RequestIssueRemoved_ClaimingQuestSuccessWithoutTheRealItems_IsRejected()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", "", partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+            IssueOwnershipRegistry.SetOwner(owner, "player-A");
+        });
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestSuccess));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(owner.Issue.IssueQuest);
+        });
     }
 
     [Fact]

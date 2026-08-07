@@ -10,6 +10,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMaterials;
@@ -148,6 +149,14 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         AlternativeSolutionCompletionRunner.TryTriggerOwnedCompletion(owner,
             o => MessageBroker.Instance.Publish(o, new VillageCraftingIssueAlternativeSolutionCompletionRequested(o)));
 
+    private static bool ValidateQuestSuccess(Issue issue, MobileParty party)
+    {
+        if (party == null) return false;
+        if (issue.IssueQuest is not Quest quest) return false;
+
+        return party.ItemRoster.GetItemNumber(quest._requestedItem) >= quest._requestedItemAmount;
+    }
+
     static VillageNeedsCraftingMaterialsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("VillageNeedsCraftingMaterials")
@@ -157,6 +166,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithCreationTrigger(OnGenuineCreation)
             .WithQuestSolutionAcceptTrigger(OnGenuineQuestSolutionAccept)
             .WithAlternativeAcceptTrigger(OnGenuineAlternativeAccept)
+            .WithQuestSuccessValidation(ValidateQuestSuccess)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);

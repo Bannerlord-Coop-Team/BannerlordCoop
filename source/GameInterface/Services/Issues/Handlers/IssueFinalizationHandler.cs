@@ -9,6 +9,7 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Handlers;
 
@@ -83,6 +84,26 @@ internal class IssueFinalizationHandler : IHandler
                 Logger.Error("Rejecting {Message} from {Requester}, who is not the recorded owner of {Owner}",
                     nameof(RequestIssueRemoved), player.ControllerId, ownerId);
                 return;
+            }
+
+            if (reason == IssueFinalizeReason.QuestSuccess)
+            {
+                var validator = QuestTypeRegistry.Get(owner.Issue)?.ValidateQuestSuccess;
+                if (validator != null)
+                {
+                    MobileParty party = null;
+                    if (player.MobilePartyId != null)
+                    {
+                        objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party);
+                    }
+
+                    if (!validator(owner.Issue, party))
+                    {
+                        Logger.Error("Rejecting {Message} claiming QuestSuccess for owner {Owner} - completion condition not met for the requester's real party",
+                            nameof(RequestIssueRemoved), ownerId);
+                        return;
+                    }
+                }
             }
 
             IssueFinalizationSupport.FinalizeMirror(owner, reason);

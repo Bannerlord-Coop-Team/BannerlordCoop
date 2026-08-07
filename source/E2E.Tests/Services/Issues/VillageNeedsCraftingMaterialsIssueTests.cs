@@ -394,18 +394,30 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         CreateIssueOnServer(fixture.HeroId);
         ForcePromisedPaymentEverywhere(fixture.HeroId);
 
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
             var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("player-A", "", "", "", "")));
+            Assert.True(playerManager.AddPlayer(new Player("player-A", "", partyId, "", "")));
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
 
+        VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest quest = null;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
             IssueOwnershipRegistry.SetOwner(owner, "player-A");
+            quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            using (new AllowedThread())
+            {
+                party.ItemRoster.AddToCounts(quest._requestedItem, quest._requestedItemAmount);
+            }
         });
 
         foreach (var instance in AllInstances)

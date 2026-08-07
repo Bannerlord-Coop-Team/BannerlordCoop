@@ -3,6 +3,7 @@ using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.CreationCapture;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Generic;
 
@@ -18,13 +19,16 @@ public abstract class QuestTypeDescriptor
 
     public Action<Hero, string> OnGenuineAlternativeAccept { get; }
 
+    public Func<IssueBase, MobileParty, bool> ValidateQuestSuccess { get; }
+
     protected QuestTypeDescriptor(
         Type issueType,
         Type questType,
         string displayName,
         Action<IssueBase> onGenuineCreation,
         Action<Hero, string> onGenuineQuestSolutionAccept,
-        Action<Hero, string> onGenuineAlternativeAccept)
+        Action<Hero, string> onGenuineAlternativeAccept,
+        Func<IssueBase, MobileParty, bool> validateQuestSuccess)
     {
         IssueType = issueType ?? throw new ArgumentNullException(nameof(issueType));
         QuestType = questType ?? throw new ArgumentNullException(nameof(questType));
@@ -32,6 +36,7 @@ public abstract class QuestTypeDescriptor
         OnGenuineCreation = onGenuineCreation;
         OnGenuineQuestSolutionAccept = onGenuineQuestSolutionAccept;
         OnGenuineAlternativeAccept = onGenuineAlternativeAccept;
+        ValidateQuestSuccess = validateQuestSuccess;
     }
 }
 
@@ -53,14 +58,16 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         object bespokeModule,
         Action<TIssue> onGenuineCreation,
         Action<Hero, string> onGenuineQuestSolutionAccept,
-        Action<Hero, string> onGenuineAlternativeAccept)
+        Action<Hero, string> onGenuineAlternativeAccept,
+        Func<TIssue, MobileParty, bool> validateQuestSuccess)
         : base(
             typeof(TIssue),
             typeof(TQuest),
             displayName,
             onGenuineCreation == null ? (Action<IssueBase>)null : issue => { if (issue is TIssue typed) onGenuineCreation(typed); },
             onGenuineQuestSolutionAccept,
-            onGenuineAlternativeAccept)
+            onGenuineAlternativeAccept,
+            validateQuestSuccess == null ? (Func<IssueBase, MobileParty, bool>)null : (issue, party) => issue is TIssue typed && validateQuestSuccess(typed, party))
     {
         _creationCaptureStrategy = creationCaptureStrategy;
         _questSolutionAcceptMirrorStrategy = questSolutionAcceptMirrorStrategy;
@@ -97,6 +104,7 @@ public static class QuestDescriptorBuilder
         private Action<TIssue> _onGenuineCreation;
         private Action<Hero, string> _onGenuineQuestSolutionAccept;
         private Action<Hero, string> _onGenuineAlternativeAccept;
+        private Func<TIssue, MobileParty, bool> _validateQuestSuccess;
 
         internal Builder(string displayName)
         {
@@ -145,8 +153,14 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
+        public Builder<TIssue, TQuest> WithQuestSuccessValidation(Func<TIssue, MobileParty, bool> validateQuestSuccess)
+        {
+            _validateQuestSuccess = validateQuestSuccess;
+            return this;
+        }
+
         public QuestTypeDescriptor<TIssue, TQuest> Build()
             => new(_displayName, _creationCapture, _questSolutionAccept, _alternativeAccept, _bespokeModule,
-                _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept);
+                _onGenuineCreation, _onGenuineQuestSolutionAccept, _onGenuineAlternativeAccept, _validateQuestSuccess);
     }
 }

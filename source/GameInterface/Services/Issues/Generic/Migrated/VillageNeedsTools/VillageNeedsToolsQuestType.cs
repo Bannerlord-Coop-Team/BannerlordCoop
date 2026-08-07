@@ -9,6 +9,7 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.VillageNeedsTools;
@@ -80,11 +81,20 @@ internal static class VillageNeedsToolsQuestType
         network.SendAll(new RequestAlternativeSolutionCompletion(ownerId));
     }
 
+    private static bool ValidateQuestSuccess(Issue issue, MobileParty party)
+    {
+        if (party == null) return false;
+        if (issue.IssueQuest is not Quest quest) return false;
+
+        return party.ItemRoster.GetItemNumber(quest._requestedTradeGood) >= quest._numberOfRequestedGood;
+    }
+
     static VillageNeedsToolsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("VillageNeedsTools")
             .WithCreationCapture(CreationCaptureStrategy)
             .WithCreationTrigger(OnGenuineCreation)
+            .WithQuestSuccessValidation(ValidateQuestSuccess)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
