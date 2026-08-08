@@ -12,6 +12,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Save.Messages;
 using Moq;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -128,6 +129,28 @@ public class SaveGameHandlerTests
     }
 
     [Fact]
+    public void AllGameObjectsRegistered_PublishesRestoredAfterEveryRegistration()
+    {
+        var first = new Player("PlayerOne", LiveHeroId, "Party_A", "Clan_One", "Character_A");
+        var second = new Player("PlayerTwo", StaleHeroId, "Party_B", "Clan_Two", "Character_B");
+        var order = new List<string>();
+
+        var playerRegistry = new Mock<IPlayerManager>();
+        playerRegistry
+            .Setup(registry => registry.AddPlayer(It.IsAny<Player>()))
+            .Callback(() => order.Add("registered"))
+            .Returns(true);
+
+        using var handler = CreateHandler(
+            playerRegistry,
+            new[] { first, second },
+            configureBroker: broker => broker.Subscribe<SavedPlayerRegistrationsRestored>(
+                _ => order.Add("restored")));
+
+        Assert.Equal(new[] { "registered", "registered", "restored" }, order);
+    }
+
+    [Fact]
     public void AllGameObjectsRegistered_RepairsSavedPlayerBeforeRegistration()
     {
         var player = new Player(ControllerId, LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
@@ -183,7 +206,8 @@ public class SaveGameHandlerTests
     private static SaveGameHandler CreateHandler(
         Mock<IPlayerManager> playerRegistry,
         Player[] savedPlayers,
-        Mock<IPlayerPartyRestorer> playerPartyRestorer = null)
+        Mock<IPlayerPartyRestorer> playerPartyRestorer = null,
+        Action<TestMessageBroker>? configureBroker = null)
     {
         var messageBroker = new TestMessageBroker();
         if (playerPartyRestorer == null)
@@ -197,6 +221,7 @@ public class SaveGameHandlerTests
                     .Returns(player.HeroId == LiveHeroId || player.HeroId == StaleHeroId);
             }
         }
+        configureBroker?.Invoke(messageBroker);
 
         var objectManager = new Mock<IObjectManager>();
         Hero liveHero = null!;
