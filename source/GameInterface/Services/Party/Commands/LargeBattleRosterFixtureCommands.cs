@@ -37,6 +37,8 @@ internal static class LargeBattleRosterFixtureCommands
         public MobileParty Party;
         public TroopRosterElement[] MemberRoster;
         public string Fingerprint;
+        public Hero LeaderHero;
+        public Dictionary<Hero, int> HeroHitPoints;
         public bool HasBehavior;
         public PartyBehaviorUpdateData Behavior;
     }
@@ -193,8 +195,8 @@ internal static class LargeBattleRosterFixtureCommands
             bool firstBehaviorRestored = RestoreBehavior(firstSnapshot);
             bool secondBehaviorRestored = RestoreBehavior(secondSnapshot);
             bool restored =
-                Fingerprint(firstParty.MemberRoster) == firstSnapshot.Fingerprint &&
-                Fingerprint(secondParty.MemberRoster) == secondSnapshot.Fingerprint &&
+                IsPartyStateRestored(firstSnapshot) &&
+                IsPartyStateRestored(secondSnapshot) &&
                 firstBehaviorRestored &&
                 secondBehaviorRestored;
             if (restored) fixture = null;
@@ -300,15 +302,11 @@ internal static class LargeBattleRosterFixtureCommands
             ? "WARNING: the restored roster contains a dead hero and may be invalid.\n"
             : string.Empty;
 
-        string firstFingerprint = Fingerprint(
-            activeFixture.FirstParty.Party.MemberRoster);
-        string secondFingerprint = Fingerprint(
-            activeFixture.SecondParty.Party.MemberRoster);
-        if (firstFingerprint != activeFixture.FirstParty.Fingerprint
-            || secondFingerprint != activeFixture.SecondParty.Fingerprint
+        if (!IsPartyStateRestored(activeFixture.FirstParty)
+            || !IsPartyStateRestored(activeFixture.SecondParty)
             || !behaviorRestored)
         {
-            return "Large-battle fixture restoration did not restore the original rosters and movement behavior.\n" +
+            return "Large-battle fixture restoration did not restore the original rosters, heroes, leaders, and movement behavior.\n" +
                    warning +
                    FormatState(
                        "restore-failed",
@@ -381,12 +379,27 @@ internal static class LargeBattleRosterFixtureCommands
 
     private static PartySnapshot Capture(MobileParty party)
     {
+        TroopRosterElement[] memberRoster = CopyRoster(party.MemberRoster);
+        var heroHitPoints = new Dictionary<Hero, int>();
+        foreach (TroopRosterElement element in memberRoster)
+        {
+            Hero hero = element.Character.HeroObject;
+            if (hero != null && !heroHitPoints.ContainsKey(hero))
+                heroHitPoints.Add(hero, hero.HitPoints);
+        }
+
+        Hero leaderHero = party.LeaderHero;
+        if (leaderHero != null && !heroHitPoints.ContainsKey(leaderHero))
+            heroHitPoints.Add(leaderHero, leaderHero.HitPoints);
+
         return new PartySnapshot
         {
             PartyId = party.StringId,
             Party = party,
-            MemberRoster = CopyRoster(party.MemberRoster),
+            MemberRoster = memberRoster,
             Fingerprint = Fingerprint(party.MemberRoster),
+            LeaderHero = leaderHero,
+            HeroHitPoints = heroHitPoints,
         };
     }
 
@@ -496,8 +509,21 @@ internal static class LargeBattleRosterFixtureCommands
                 true);
         }
 
+        foreach (KeyValuePair<Hero, int> hero in snapshot.HeroHitPoints)
+        {
+            if (!hero.Key.IsDead)
+                hero.Key.HitPoints = hero.Value;
+        }
+        if (snapshot.Party.LeaderHero != snapshot.LeaderHero)
+            snapshot.Party.ChangePartyLeader(snapshot.LeaderHero);
+
         return restoredDeadHero;
     }
+
+    private static bool IsPartyStateRestored(PartySnapshot snapshot) =>
+        Fingerprint(snapshot.Party.MemberRoster) == snapshot.Fingerprint &&
+        snapshot.Party.LeaderHero == snapshot.LeaderHero &&
+        snapshot.HeroHitPoints.All(hero => hero.Key.HitPoints == hero.Value);
 
     private static void ClearRoster(TroopRoster roster)
     {
@@ -563,8 +589,11 @@ internal static class LargeBattleRosterFixtureCommands
             wounded += element.WoundedNumber;
         }
 
+        Hero leader = party.LeaderHero;
+
         output.AppendLine(
             $"party={party.StringId}|total={total}|wounded={wounded}|healthy={total - wounded}|" +
+            $"leader={leader?.StringId ?? "none"}|leaderHitPoints={leader?.HitPoints.ToString() ?? "none"}|" +
             $"position={party.Position.X:R},{party.Position.Y:R},{party.Position.IsOnLand}|" +
             $"moveMode={party.PartyMoveMode}|" +
             $"fingerprint={Fingerprint(roster)}");
