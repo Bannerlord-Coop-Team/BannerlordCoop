@@ -97,6 +97,9 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
     {
         if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
+        // Skip adding duplicate settlements to list
+        if (InteractionsPlayerData.PlayerMetArenaMasters[playerHeroId]?.Contains(settlementId) == true) return;
+
         InteractionsPlayerData.PlayerMetArenaMasters[playerHeroId]?.Add(settlementId);
     }
 
