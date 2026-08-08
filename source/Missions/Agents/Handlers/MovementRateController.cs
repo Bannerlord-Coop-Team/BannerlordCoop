@@ -116,7 +116,7 @@ public interface IMovementRateController : IDisposable
     void ReportSend(
         double elapsedMilliseconds,
         MovementTrafficFrame traffic,
-        bool bulkPoll);
+        bool includesAuthoritativeAgents);
     void ReportReceive(
         double queueMilliseconds,
         double applyMilliseconds,
@@ -359,7 +359,7 @@ public sealed class MovementRateController : IMovementRateController
     public void ReportSend(
         double elapsedMilliseconds,
         MovementTrafficFrame traffic,
-        bool bulkPoll)
+        bool includesAuthoritativeAgents)
     {
         lock (gate)
         {
@@ -374,7 +374,7 @@ public sealed class MovementRateController : IMovementRateController
             maximumDeferredAgeSeconds = Math.Max(
                 maximumDeferredAgeSeconds,
                 traffic.MaximumDeferredAgeSeconds);
-            if (bulkPoll)
+            if (includesAuthoritativeAgents)
                 bulkPolls++;
             else
                 priorityOnlyPolls++;

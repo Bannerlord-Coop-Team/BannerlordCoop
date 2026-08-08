@@ -50,6 +50,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
 
+    // Preserve the former 80-poll window at 40 Hz as a cadence-independent two-second animation.
     private const float SyntheticMountTurnDurationSeconds = 2f;
     private const int RemoteSyntheticMountTurnClearGraceFrames = 3;
     private const float UseActionBlendPeriod = -0.2f;
@@ -59,6 +60,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private const float SpeedDeltaThreshold = 0.01f;
     private const float AnimationProgressDeltaThreshold = 0.001f;
     private const float ForcedSyncIntervalSeconds = 0.25f;
+    private const float PopulationSampleIntervalSeconds = 1f;
 
     private readonly IPacketManager packetManager;
     private readonly IBattleNetwork client;
@@ -205,7 +207,9 @@ public class AgentMovementHandler : IAgentMovementHandler
     private float priorityPollElapsed;
     private float bulkSampleElapsed;
     private float prioritySampleElapsed;
+    private float populationSampleElapsed;
     private bool firstMovementPoll = true;
+    private bool firstPopulationSample = true;
 
     public AgentMovementHandler(
         IBattleNetwork client,
@@ -322,41 +326,54 @@ public class AgentMovementHandler : IAgentMovementHandler
         priorityPollElapsed += elapsedSeconds;
         bulkSampleElapsed += elapsedSeconds;
         prioritySampleElapsed += elapsedSeconds;
+        populationSampleElapsed += elapsedSeconds;
 
         float bulkInterval = 1f / rate.BulkHz;
         float priorityInterval = 1f / rate.PriorityHz;
-        bool bulkDue = firstMovementPoll || bulkPollElapsed >= bulkInterval;
-        bool priorityDue = firstMovementPoll || priorityPollElapsed >= priorityInterval;
-        if (!bulkDue && !priorityDue) return;
+        bool authoritativeAgentsDue = firstMovementPoll || bulkPollElapsed >= bulkInterval;
+        bool priorityAgentDue = firstMovementPoll || priorityPollElapsed >= priorityInterval;
+        if (!authoritativeAgentsDue && !priorityAgentDue) return;
+
+        bool samplePopulation = authoritativeAgentsDue &&
+            (firstPopulationSample ||
+                populationSampleElapsed >= PopulationSampleIntervalSeconds);
 
         float elapsedSinceBulkSample = bulkSampleElapsed;
         float elapsedSincePrioritySample = prioritySampleElapsed;
-        if (bulkDue)
+        if (authoritativeAgentsDue)
         {
             bulkPollElapsed = firstMovementPoll ? 0f : bulkPollElapsed % bulkInterval;
             bulkSampleElapsed = 0f;
         }
-        if (priorityDue)
+        if (priorityAgentDue)
         {
             priorityPollElapsed = firstMovementPoll ? 0f : priorityPollElapsed % priorityInterval;
             prioritySampleElapsed = 0f;
         }
+        if (samplePopulation)
+        {
+            populationSampleElapsed = firstPopulationSample
+                ? 0f
+                : populationSampleElapsed % PopulationSampleIntervalSeconds;
+            firstPopulationSample = false;
+        }
         firstMovementPoll = false;
 
-        IReadOnlyCollection<CoopAgentInfo> agents = bulkDue
+        IReadOnlyCollection<CoopAgentInfo> agents = authoritativeAgentsDue
             ? agentRegistry.GetAgents(controllerIdProvider.ControllerId)
             : GetPriorityAgents();
         long startedAt = Stopwatch.GetTimestamp();
         MovementTrafficFrame traffic = PollMovementAgents(
             agents,
-            bulkDue,
-            priorityDue,
+            authoritativeAgentsDue,
+            priorityAgentDue,
+            samplePopulation,
             elapsedSinceBulkSample,
             elapsedSincePrioritySample);
         movementRateController.ReportSend(
             ElapsedMilliseconds(startedAt),
             traffic,
-            bulkDue);
+            authoritativeAgentsDue);
     }
 
     private IReadOnlyCollection<CoopAgentInfo> GetPriorityAgents()
@@ -372,18 +389,15 @@ public class AgentMovementHandler : IAgentMovementHandler
         return new[] { agentInfo };
     }
 
+    // Authoritative-agent ticks walk every agent controlled by this peer; priority-only ticks sample Agent.Main.
     private MovementTrafficFrame PollMovementAgents(
         IReadOnlyCollection<CoopAgentInfo> agentInfos,
-        bool pollBulk,
-        bool pollPriority,
+        bool includeAuthoritativeAgents,
+        bool includePriorityAgent,
+        bool samplePopulation,
         float bulkSampleElapsed,
         float prioritySampleElapsed)
     {
-        if (pollBulk)
-            movementRateController.ReportPopulation(
-                CountActiveMissionAgents(),
-                CountActiveLocallyControlledAgents(agentInfos));
-
         var movementGroups = new Dictionary<string, MovementBatch<AgentData>>();
         var priorityMovementGroups = new Dictionary<string, MovementBatch<AgentData>>();
         var mountGroups = new Dictionary<string, MovementBatch<AgentMountData>>();
@@ -393,6 +407,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         MovementBatch<AgentMountData> legacyMountMovement = null;
         MovementBatch<AgentEquipmentData> legacyEquipment = null;
         var broadcastAgentIds = new HashSet<Guid>();
+        int activeLocallyControlledAgents = 0;
 
         foreach (CoopAgentInfo agentInfo in agentInfos)
         {
@@ -400,13 +415,16 @@ public class AgentMovementHandler : IAgentMovementHandler
             // Skip agents whose native object is already gone (dead/removed but not yet deregistered):
             // building the snapshot calls into the agent, which can access-violate after native teardown.
             if (agent == null || agent.Mission == null || !agent.IsActive()) continue;
+            if (samplePopulation)
+                activeLocallyControlledAgents++;
 
             EnsureLocallyDrivenMountController(agent);
             if (!ShouldBroadcastMovement(agent)) continue;
             bool isPriority = ReferenceEquals(agent, Agent.Main);
-            if (pollBulk)
+            if (includeAuthoritativeAgents)
                 broadcastAgentIds.Add(agentInfo.AgentId);
-            if ((isPriority && !pollPriority) || (!isPriority && !pollBulk))
+            if ((isPriority && !includePriorityAgent) ||
+                (!isPriority && !includeAuthoritativeAgents))
                 continue;
             float sampleElapsed = isPriority
                 ? prioritySampleElapsed
@@ -515,7 +533,11 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
         }
 
-        if (pollBulk)
+        if (samplePopulation)
+            movementRateController.ReportPopulation(
+                CountActiveMissionAgents(),
+                activeLocallyControlledAgents);
+        if (includeAuthoritativeAgents)
             RemoveStaleLocalState(broadcastAgentIds);
         SendEquipment(equipmentGroups.Values);
         SendEquipment(legacyEquipment);
@@ -575,18 +597,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         foreach (Agent agent in Mission.Current.Agents)
         {
             if (agent != null && agent.IsActive()) count++;
-        }
-        return count;
-    }
-
-    private static int CountActiveLocallyControlledAgents(
-        IReadOnlyCollection<CoopAgentInfo> agentInfos)
-    {
-        int count = 0;
-        foreach (CoopAgentInfo agentInfo in agentInfos)
-        {
-            Agent agent = agentInfo.Agent;
-            if (agent != null && agent.Mission != null && agent.IsActive()) count++;
         }
         return count;
     }

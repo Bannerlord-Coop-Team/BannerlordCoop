@@ -115,6 +115,75 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_SamplesPopulationImmediatelyAndThenOncePerSecond()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            component.AgentMovementHandler.Dispose();
+            var populationReports = new List<(int ActiveAgents, int LocallyControlledAgents)>();
+            var rateController = new Mock<IMovementRateController>();
+            rateController
+                .Setup(controller => controller.AdvanceFrame(It.IsAny<float>()))
+                .Returns(new MovementCadence(60, 60));
+            rateController
+                .Setup(controller => controller.ReportPopulation(It.IsAny<int>(), It.IsAny<int>()))
+                .Callback<int, int>((activeAgents, locallyControlledAgents) =>
+                    populationReports.Add((activeAgents, locallyControlledAgents)));
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            using var handler = new AgentMovementHandler(
+                network,
+                peer.Resolve<IPacketManager>(),
+                peer.Resolve<IMessageBroker>(),
+                registry,
+                peer.Resolve<IControllerIdProvider>(),
+                peer.Resolve<IAgentEquipmentApplier>(),
+                new MovementBatchSender(
+                    network,
+                new MovementPacketCompressor(serializer)),
+                peer.Resolve<IPuppetMountStateRepairer>(),
+                peer.Resolve<IAgentVisualActionAccessor>(),
+                rateController.Object);
+
+            Agent locallyControlledAgent = SpawnRider(mock);
+            Agent remoteControlledAgent = SpawnRider(mock);
+            SpawnRider(mock);
+            Assert.True(registry.TryRegisterAgent(
+                "peer",
+                Guid.NewGuid(),
+                1,
+                locallyControlledAgent));
+            Assert.True(registry.TryRegisterAgent(
+                "remote-peer",
+                Guid.NewGuid(),
+                2,
+                remoteControlledAgent));
+
+            handler.PollMovement(0f);
+
+            Assert.Equal(new[] { (ActiveAgents: 3, LocallyControlledAgents: 1) },
+                populationReports);
+
+            for (int i = 0; i < 59; i++)
+                handler.PollMovement(1f / 60f);
+
+            Assert.Single(populationReports);
+
+            handler.PollMovement(0.02f);
+
+            Assert.Equal(2, populationReports.Count);
+            Assert.Equal((3, 1), populationReports[1]);
+        });
+    }
+
+    [Fact]
     public void PollMovement_BattlePriorityCadenceIncludesPlayerAndCurrentMount()
     {
         using var fixture = new MissionEngineFixture();

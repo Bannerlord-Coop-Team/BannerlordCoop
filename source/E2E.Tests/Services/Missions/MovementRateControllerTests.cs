@@ -201,7 +201,7 @@ public sealed class MovementRateControllerTests
         fixture.Controller.ReportSend(
             elapsedMilliseconds: 0d,
             new MovementTrafficFrame(125, 0, 0f),
-            bulkPoll: true);
+            includesAuthoritativeAgents: true);
 
         fixture.Controller.AdvanceFrame(1f);
 
