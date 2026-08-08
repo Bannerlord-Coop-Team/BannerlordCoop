@@ -116,7 +116,7 @@ public class TournamentSpectatorAgentManager : ITournamentSpectatorAgentManager
 
     public void UpdateCombatPermissions()
     {
-        foreach (SpectatorAgentRecord record in spectators.Values.ToArray())
+        foreach (SpectatorAgentRecord record in spectators.Values)
             UpdateCombatPermissions(record.Agent);
     }
 
