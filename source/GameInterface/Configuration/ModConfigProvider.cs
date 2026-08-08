@@ -49,6 +49,8 @@ public readonly struct ModOptions
     [ProtoMember(14)]
     public readonly float MaximumLootersMultiplier { get; } = 1f;
     [ProtoMember(15)]
+    public readonly float LooterPartySizeMultiplier { get; } = 1f;
+    [ProtoMember(16)]
     public readonly LordDefectionRetryMode LordDefectionRetries { get; } = LordDefectionRetryMode.Vanilla;
 
     public ModOptions(ModOptionsData modOptionsData)
@@ -67,6 +69,7 @@ public readonly struct ModOptions
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
         MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;
+        LooterPartySizeMultiplier = modOptionsData.LooterPartySizeMultiplier ?? LooterPartySizeMultiplier;
         LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;
     }
 }

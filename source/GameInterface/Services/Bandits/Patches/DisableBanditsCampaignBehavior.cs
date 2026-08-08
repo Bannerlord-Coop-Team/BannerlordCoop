@@ -21,4 +21,11 @@ internal class BanditSpawnCampaignBehaviorPatches
     {
         __result = (int)(__result * ModConfigProvider.ModOptions.MaximumLootersMultiplier);
     }
+
+    [HarmonyPatch(nameof(BanditSpawnCampaignBehavior._numberOfMaxBanditCountPerClanHideout), MethodType.Getter)]
+    [HarmonyPostfix]
+    public static void NumberOfMaxBanditCountPerClanHideoutGetterPostfix(ref int __result)
+    {
+        __result = (int)(__result * ModConfigProvider.ModOptions.MaximumLootersMultiplier);
+    }
 }

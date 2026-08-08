@@ -96,11 +96,17 @@
     // Stamina is stored as an integer and ticks are rounded up to ensure heroes always recover some stamina.
     "smithingStaminaRecoveryMultiplier": 0.1,
 
-    // Set a multiplier for increasing/decreasing the number of looter parties.
+    // Set a multiplier for increasing/decreasing the number of looter/bandit parties.
     // The higher the multiplier, the more looter parties can exist on the map at a time.
     // WARNING: Setting this value too high will cause performance issues.
     // The default is 1, which is equivalent to the vanilla spawn limit.
     "maximumLootersMultiplier": 1.0,
+
+    // Set a multiplier for increasing/decreasing the size of looter/bandit parties.
+    // The higher the multiplier, the more looters/bandits in these parties.
+    // This only applies to new parties, existing bandit parties in a save game will not increase in size.
+    // The default is 1, which is equivalent to the vanilla party size.
+    "looterPartySizeMultiplier": 1.0,
 
     // How long a lord remembers refusing to defect to your kingdom.
     // Vanilla records each failed persuasion and refuses that lord until the
