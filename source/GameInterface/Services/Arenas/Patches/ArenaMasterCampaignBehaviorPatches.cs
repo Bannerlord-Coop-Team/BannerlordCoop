@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Arenas.Messages;
+using GameInterface.Services.Tournaments.UI;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System.Linq;
@@ -39,9 +40,11 @@ internal class DisableArenaMasterCampaignBehavior
     [HarmonyPrefix]
     public static bool ConversationArenaJoinTournamentOnConsequencePrefix()
     {
-        Mission.Current.EndMission();
+        var menuId = CoopTournamentCampaignBehavior.EnterTournamentAndGetMenuId();
 
-        // REPLACE WITH LOADING COOP TOURNAMENT UI
+        Mission.Current.EndMission();
+        Campaign.Current.GameMenuManager.SetNextMenu(menuId);
+
         return false;
     }
 
