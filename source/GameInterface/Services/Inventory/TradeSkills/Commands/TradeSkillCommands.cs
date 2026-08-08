@@ -28,7 +28,7 @@ internal class TradeSkillCommands
                 stringBuilder.AppendLine($"{playerTradeData.Key}");
                 foreach (var itemIdTradeData in playerTradeData.Value)
                 {
-                    stringBuilder.AppendLine($"{itemIdTradeData.Key} (Total Purchased: {itemIdTradeData.Value.Item1}, Average price: {itemIdTradeData.Value.Item2})");
+                    stringBuilder.AppendLine($"{itemIdTradeData.Key} (Total Purchased: {itemIdTradeData.Value.Item2}, Average price: {itemIdTradeData.Value.Item1})");
                 }
             }
         }
