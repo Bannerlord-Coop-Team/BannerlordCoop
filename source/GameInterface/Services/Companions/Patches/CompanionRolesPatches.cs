@@ -116,7 +116,11 @@ internal class CompanionRolesPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // Skip CompanionRescued when a party was created
-        if (__instance._partyCreatedAfterRescueForCompanion) return false;
+        if (__instance._partyCreatedAfterRescueForCompanion)
+        {
+            __instance._partyCreatedAfterRescueForCompanion = false;
+            return false;
+        }
 
         if (Hero.OneToOneConversationHero.IsPrisoner)
         {
