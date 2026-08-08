@@ -122,8 +122,8 @@ public class NetworkBarterSerializationTest
         var original = new NetworkAuthorizeLordBarter(
             "lord-request",
             "target-lord",
-            PeaceConversationContext.MapParty,
-            "target-party",
+            PeaceConversationContext.Settlement,
+            "settlement-id",
             LordBarterKind.JoinKingdomAsClan,
             "target-kingdom");
 
@@ -131,8 +131,8 @@ public class NetworkBarterSerializationTest
 
         Assert.Equal("lord-request", result.RequestId);
         Assert.Equal("target-lord", result.TargetHeroId);
-        Assert.Equal((int)PeaceConversationContext.MapParty, result.Context);
-        Assert.Equal("target-party", result.ContextId);
+        Assert.Equal((int)PeaceConversationContext.Settlement, result.Context);
+        Assert.Equal("settlement-id", result.ContextId);
         Assert.Equal((int)LordBarterKind.JoinKingdomAsClan, result.Kind);
         Assert.Equal("target-kingdom", result.TargetKingdomId);
     }
@@ -186,8 +186,8 @@ public class NetworkBarterSerializationTest
         var original = new NetworkAuthorizeMarriageBarter(
             "marriage-request",
             "counterparty-hero",
-            MarriageConversationContext.MapParty,
-            "party-id",
+            MarriageConversationContext.Settlement,
+            "settlement-id",
             "hero-being-proposed-to",
             "proposing-hero");
 
@@ -195,8 +195,8 @@ public class NetworkBarterSerializationTest
 
         Assert.Equal("marriage-request", result.RequestId);
         Assert.Equal("counterparty-hero", result.CounterpartyHeroId);
-        Assert.Equal((int)MarriageConversationContext.MapParty, result.Context);
-        Assert.Equal("party-id", result.ContextId);
+        Assert.Equal((int)MarriageConversationContext.Settlement, result.Context);
+        Assert.Equal("settlement-id", result.ContextId);
         Assert.Equal("hero-being-proposed-to", result.HeroBeingProposedToId);
         Assert.Equal("proposing-hero", result.ProposingHeroId);
     }

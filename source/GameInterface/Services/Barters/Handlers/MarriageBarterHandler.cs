@@ -25,6 +25,7 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Romance = TaleWorlds.CampaignSystem.Romance;
@@ -151,6 +152,7 @@ internal sealed class MarriageBarterHandler : IHandler
         using var playerContext = new BarterPlayerContext(
             playerHero,
             GetPlayerParty(player, playerHero)?.MobileParty);
+        var mutationApplied = false;
         try
         {
             if (!TryConsumeAuthorization(peer, request))
@@ -206,32 +208,27 @@ internal sealed class MarriageBarterHandler : IHandler
                 return;
             }
 
-            var offeredBarterables = barterData.GetOfferedBarterables();
-            foreach (var barterable in offeredBarterables)
-                barterable.Apply();
-            CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, barterData.OtherHero, offeredBarterables);
-            ApplyOverpayRelationBonus(playerHero, barterData.OtherHero, MathF.Max(0f, offerValue));
-            if (heroBeingProposedTo.Spouse != proposingHero || proposingHero.Spouse != heroBeingProposedTo)
-            {
-                Reject(peer, request, playerHero.Gold, "The marriage could not be completed.");
-                return;
-            }
-
-            FlushHeroGold(playerHero);
-            FlushHeroGold(barterData.OtherHero);
-            FlushHeroGold(heroBeingProposedTo);
-            FlushHeroGold(proposingHero);
-            network.Send(peer, new NetworkMarriageBarterResult(
-                request.CounterpartyHeroId,
-                request.HeroBeingProposedToId,
-                request.ProposingHeroId,
-                true,
-                playerHero.Gold,
-                requestId: request.RequestId));
+            ApplyMarriage(
+                peer,
+                request,
+                playerHero,
+                barterData,
+                heroBeingProposedTo,
+                proposingHero,
+                offerValue,
+                ref mutationApplied);
         }
         catch (Exception exception)
         {
             Logger.Error(exception, "Failed to apply an authoritative marriage barter");
+            if (mutationApplied)
+            {
+                // The marriage is already done server-side; telling the client it failed would be
+                // the desync, not the fix. Report success and let the replicated state stand.
+                Accept(peer, request, playerHero.Gold);
+                return;
+            }
+
             Reject(
                 peer,
                 request,
@@ -240,11 +237,64 @@ internal sealed class MarriageBarterHandler : IHandler
         }
     }
 
+    /// <summary>
+    /// Commits the marriage and reports success.
+    /// </summary>
+    /// <remarks>
+    /// Sets <paramref name="mutationApplied"/> as soon as the barterables land. Past that point the
+    /// marriage and any gold have already moved on the authoritative server, so nothing here may be
+    /// reported as a rejection - the client would roll its UI back over a change that really happened.
+    /// </remarks>
+    private void ApplyMarriage(
+        NetPeer peer,
+        NetworkRequestMarriageBarter request,
+        Hero playerHero,
+        BarterData barterData,
+        Hero heroBeingProposedTo,
+        Hero proposingHero,
+        float offerValue,
+        ref bool mutationApplied)
+    {
+        var offeredBarterables = barterData.GetOfferedBarterables();
+        foreach (var barterable in offeredBarterables)
+            barterable.Apply();
+
+        mutationApplied = true;
+
+        CampaignEventDispatcher.Instance.OnBarterAccepted(playerHero, barterData.OtherHero, offeredBarterables);
+        ApplyOverpayRelationBonus(playerHero, barterData.OtherHero, MathF.Max(0f, offerValue));
+
+        if (heroBeingProposedTo.Spouse != proposingHero || proposingHero.Spouse != heroBeingProposedTo)
+        {
+            // The barterables have already been applied and any gold has already moved, so this
+            // cannot be reported as a rejection - that is the desync, not the fix. Report success
+            // and let the replicated state stand; log it, because a spouse link that did not take
+            // is a real problem worth seeing even though the client must not roll back.
+            Logger.Error(
+                "Marriage barter applied but the spouse links did not take: {Proposing} <-> {Proposed}",
+                proposingHero?.StringId,
+                heroBeingProposedTo?.StringId);
+        }
+
+        FlushHeroGold(playerHero);
+        FlushHeroGold(barterData.OtherHero);
+        FlushHeroGold(heroBeingProposedTo);
+        FlushHeroGold(proposingHero);
+        Accept(peer, request, playerHero.Gold);
+    }
+
     private void ProcessAuthorization(NetPeer peer, NetworkAuthorizeMarriageBarter request)
     {
-        if (string.IsNullOrEmpty(request.RequestId) ||
-            !TryResolveRequester(peer, out _, out var player, out var playerHero, out _) ||
-            !TryResolveMarriageContext(
+        if (string.IsNullOrEmpty(request.RequestId))
+        {
+            Logger.Warning("Rejected marriage barter authorization from peer {Peer}: the request id is empty", peer.Id);
+            return;
+        }
+
+        if (!TryResolveRequester(peer, out _, out var player, out var playerHero, out var reason))
+            return;
+
+        if (!TryResolveMarriageContext(
                 peer,
                 player,
                 playerHero,
@@ -257,8 +307,13 @@ internal sealed class MarriageBarterHandler : IHandler
                 out _,
                 out _,
                 out _,
-                out _))
+                out reason))
         {
+            Logger.Warning(
+                "Rejected marriage barter authorization {RequestId} from peer {Peer}: {Reason}",
+                request.RequestId,
+                peer.Id,
+                reason);
             return;
         }
 
@@ -362,8 +417,9 @@ internal sealed class MarriageBarterHandler : IHandler
             return false;
         }
 
-        if (requireActiveConversation &&
-            !IsActiveConversation(peer, player, counterpartyHero, (MarriageConversationContext)contextValue, contextId))
+        var context = (MarriageConversationContext)contextValue;
+        if ((requireActiveConversation || context == MarriageConversationContext.Settlement) &&
+            !IsActiveConversation(peer, player, counterpartyHero, context, contextId))
         {
             reason = "The marriage conversation is no longer active.";
             return false;
@@ -448,6 +504,16 @@ internal sealed class MarriageBarterHandler : IHandler
                    objectManager.TryGetId(counterpartyHero.CharacterObject, out var characterId) &&
                    locationConversationTracker.TryGetEngagement(peer, out var npcKey) &&
                    npcKey == LocationConversationTracker.ComposeKey(contextId, characterId);
+        }
+
+        if (context == MarriageConversationContext.Settlement)
+        {
+            return !string.IsNullOrEmpty(player.MobilePartyId) &&
+                   objectManager.TryGetObject(contextId, out Settlement settlement) &&
+                   objectManager.TryGetObject(player.MobilePartyId, out MobileParty settlementPlayerParty) &&
+                   settlementPlayerParty.IsActive &&
+                   settlementPlayerParty.CurrentSettlement == settlement &&
+                   counterpartyHero.CurrentSettlement == settlement;
         }
 
         if (string.IsNullOrEmpty(player.MobilePartyId) ||
@@ -652,6 +718,17 @@ internal sealed class MarriageBarterHandler : IHandler
     {
         if (sendCoalescer == null || hero == null || !objectManager.TryGetId(hero, out var heroId)) return;
         sendCoalescer.FlushInstance(heroId, network);
+    }
+
+    private void Accept(NetPeer peer, NetworkRequestMarriageBarter request, int playerGold)
+    {
+        network.Send(peer, new NetworkMarriageBarterResult(
+            request.CounterpartyHeroId,
+            request.HeroBeingProposedToId,
+            request.ProposingHeroId,
+            true,
+            playerGold,
+            requestId: request.RequestId));
     }
 
     private void Reject(NetPeer peer, NetworkRequestMarriageBarter request, int playerGold, string reason)

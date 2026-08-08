@@ -1,10 +1,13 @@
 ﻿using Common;
+using Common.Messaging;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Tournaments.Data;
 using HarmonyLib;
 using Missions;
 using Missions.Agents.Patches;
+using Missions.Messages;
+using Missions.Services.Network;
 using Missions.Tournaments;
 using Missions.Tournaments.Messages;
 using System.Reflection;
@@ -427,6 +430,32 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                     NetworkApplyTournamentDamage>());
             Assert.True(AgentMirror.TryGet(victim, out var mirror));
             Assert.Equal(64f, mirror.Health);
+        });
+    }
+
+    [Fact]
+    public void OnLeaving_ClearsMissionContextControllers()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "local-player");
+
+        client.Call(() =>
+        {
+            fixture.CreateMission(client);
+            var missionContext = client.Resolve<IMissionContext>();
+            client.Resolve<IMessageBroker>().Publish(
+                this,
+                new NetworkMissionPeerEntered(
+                    "former-tournament-peer",
+                    "tournament-instance"));
+            Assert.Contains(
+                "former-tournament-peer",
+                missionContext.ControllersInMission);
+
+            InvokeOnLeaving(client.Resolve<CoopTournamentController>());
+
+            Assert.Empty(missionContext.ControllersInMission);
         });
     }
 

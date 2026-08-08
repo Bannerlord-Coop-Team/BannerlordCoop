@@ -14,6 +14,7 @@ using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
 
@@ -28,6 +29,7 @@ internal class SaveGameHandler : IHandler
     private readonly ICoopSaveManager saveManager;
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IPlayerManager playerRegistry;
+    private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly HashSet<object> activeSaveSources = new HashSet<object>();
@@ -37,6 +39,7 @@ internal class SaveGameHandler : IHandler
         ICoopSaveManager saveManager,
         ICoopSessionProvider coopSessionProvider,
         IPlayerManager playerRegistry,
+        IPlayerPartyRestorer playerPartyRestorer,
         INetwork network,
         IObjectManager objectManager)
     {
@@ -44,6 +47,7 @@ internal class SaveGameHandler : IHandler
         this.saveManager = saveManager;
         this.coopSessionProvider = coopSessionProvider;
         this.playerRegistry = playerRegistry;
+        this.playerPartyRestorer = playerPartyRestorer;
         this.network = network;
         this.objectManager = objectManager;
 
@@ -131,25 +135,35 @@ internal class SaveGameHandler : IHandler
 
         foreach (var player in SelectOneRegistrationPerController(savedSession.Players))
         {
-            if (!playerRegistry.AddPlayer(player))
+            if (!playerPartyRestorer.TryRestore(player, out var registration))
+            {
+                Logger.Error(
+                    "Skipped saved registration for controller {ControllerId} (hero {HeroId}): " +
+                    "the player graph could not be restored",
+                    player.ControllerId,
+                    player.HeroId);
+                continue;
+            }
+
+            if (!playerRegistry.AddPlayer(registration))
                 Logger.Warning(
                     "Skipped saved registration for controller {ControllerId} (hero {HeroId}): " +
                     "that controller is already registered",
-                    player?.ControllerId, player?.HeroId);
+                    registration?.ControllerId, registration?.HeroId);
         }
     }
 
     /// <summary>
     /// Picks the single registration to restore per controller. A save written before controller
-    /// ids were unique can carry more than one, in either order, so keep the one whose hero still
-    /// exists rather than the one that happens to come first: the campaign decides which
-    /// registration is real. Keeping the first would as often keep the dead one, which leaves the
-    /// live hero unregistered and sends its owner off to build yet another character.
+    /// ids were unique can carry more than one, in either order, so keep the one whose hero and
+    /// party still exist rather than the one that happens to come first: the campaign decides
+    /// which registration is real. Keeping the first can retain an incomplete player graph, which
+    /// leaves the live party unregistered and sends its owner off to build another character.
     /// </summary>
     private IEnumerable<Player> SelectOneRegistrationPerController(IEnumerable<Player> players)
     {
-        // AllGameObjectsRegistered means the campaign's objects are resolvable, so a hero lookup
-        // here is authoritative about which registration still has something behind it.
+        // AllGameObjectsRegistered means the campaign's objects are resolvable, so these lookups
+        // are authoritative about which registration still has a complete player graph.
         foreach (var group in players.Where(player => player != null).GroupBy(player => player.ControllerId))
         {
             var registrations = group.ToArray();
@@ -159,7 +173,9 @@ internal class SaveGameHandler : IHandler
                 continue;
             }
 
-            var live = registrations.FirstOrDefault(HeroExists) ?? registrations[0];
+            var live = registrations.FirstOrDefault(PlayerGraphExists) ??
+                registrations.FirstOrDefault(PlayerHeroExists) ??
+                registrations[0];
 
             Logger.Warning(
                 "Save carries {Count} registrations for controller {ControllerId} (heroes {HeroIds}); " +
@@ -173,6 +189,13 @@ internal class SaveGameHandler : IHandler
         }
     }
 
-    private bool HeroExists(Player player) =>
-        !string.IsNullOrEmpty(player.HeroId) && objectManager.TryGetObject<Hero>(player.HeroId, out _);
+    private bool PlayerGraphExists(Player player) =>
+        !string.IsNullOrEmpty(player.HeroId) &&
+        !string.IsNullOrEmpty(player.MobilePartyId) &&
+        objectManager.TryGetObject<Hero>(player.HeroId, out _) &&
+        objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out _);
+
+    private bool PlayerHeroExists(Player player) =>
+        !string.IsNullOrEmpty(player.HeroId) &&
+        objectManager.TryGetObject<Hero>(player.HeroId, out _);
 }

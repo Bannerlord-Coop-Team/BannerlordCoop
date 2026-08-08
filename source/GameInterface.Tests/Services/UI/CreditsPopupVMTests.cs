@@ -30,9 +30,10 @@ public class CreditsPopupVMTests
     {
         var viewModel = new CreditsPopupVM(() => { });
 
+        Assert.Equal(ExpectedSectionText(CreditsRoster.Sponsors), viewModel.SponsorsText);
+        Assert.Equal(ExpectedSectionText(CreditsRoster.Supporters), viewModel.SupportersText);
         Assert.Equal(ExpectedSectionText(CreditsRoster.Contributors), viewModel.ContributorsText);
         Assert.Equal(ExpectedSectionText(CreditsRoster.Community), viewModel.CommunityText);
-        Assert.Equal(ExpectedSectionText(CreditsRoster.Supporters), viewModel.SupportersText);
     }
 
     [Fact]
