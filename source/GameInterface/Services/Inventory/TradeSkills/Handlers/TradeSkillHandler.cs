@@ -13,19 +13,21 @@ namespace GameInterface.Services.Inventory.TradeSkills.Handlers;
 
 internal class TradeSkillHandler : IHandler
 {
-    private static readonly ILogger logger = LogManager.GetLogger<TradeSkillHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<TradeSkillHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
-    private readonly ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface;
+    private readonly ISessionTradePlayerDataInterface sessionTradePlayerDataInterface;
 
     public TradeSkillHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface)
+        ISessionTradePlayerDataInterface sessionTradePlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
-        this.tradeSkillCampaignBehaviorInterface = tradeSkillCampaignBehaviorInterface;
+        this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
+
         messageBroker.Subscribe<NetworkUpdateTradeData>(Handle_NetworkUpdateTradeData);
     }
 
@@ -41,7 +43,7 @@ internal class TradeSkillHandler : IHandler
         // Locally update trade data on clients
         GameThread.RunSafe(() =>
         {
-            if (!tradeSkillCampaignBehaviorInterface.TryGetTradeSkillBehavior(out var tradeSkillBehavior)) return;
+            if (!sessionTradePlayerDataInterface.TryGetTradeSkillBehavior(out var tradeSkillBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
 
             if (playerHero != Hero.MainHero) return;

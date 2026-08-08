@@ -498,6 +498,12 @@ namespace Coop
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
+            
+            if (isServer)
+            {
+                ManagedOptions.SetConfig(ManagedOptions.ManagedOptionsType.StopGameOnFocusLost, 0f);
+            }
+
             CrashDiagnostics.SetPhase("main-menu");
             startupModuleWarningReady = true;
             InformationManager.DisplayMessage(new InformationMessage(ClientServerModeMessage));

@@ -2,6 +2,9 @@
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using Moq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit;
 
 namespace GameInterface.Tests.Services.GameState;
@@ -25,5 +28,33 @@ public class GameStateInterfaceTests
                 It.IsAny<object>(),
                 It.IsAny<MainMenuEntered>()),
             Times.Never);
+    }
+
+    [Fact]
+    public void ClearTransferredMapNotices_DropsHistoryWithoutSuppressingFutureNotices()
+    {
+        var informationManager = new CampaignInformationManager();
+        informationManager._mapNotices.Add(new TestInformationData("Historical"));
+
+        GameStateInterface.ClearTransferredMapNotices(informationManager);
+        informationManager.OnGameLoaded();
+
+        Assert.Empty(informationManager._mapNotices);
+
+        var liveNotice = new TestInformationData("Live");
+        informationManager.NewMapNoticeAdded(liveNotice);
+
+        Assert.Same(liveNotice, Assert.Single(informationManager._mapNotices));
+    }
+
+    private sealed class TestInformationData : InformationData
+    {
+        public TestInformationData(string description) : base(new TextObject(description))
+        {
+        }
+
+        public override TextObject TitleText => DescriptionText;
+
+        public override string SoundEventPath => string.Empty;
     }
 }
