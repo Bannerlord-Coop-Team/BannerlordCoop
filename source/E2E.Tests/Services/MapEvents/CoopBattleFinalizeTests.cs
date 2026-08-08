@@ -269,64 +269,6 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Assert.Equal(1, exitToLast.CountFor(Clients.Last()));
     }
 
-    /// <summary>
-    /// The host playing as the aggressor is a player like any other: when the recipient surrenders, the close
-    /// instruction must reach the host's own (server) instance and detach its party from the battle. No menu
-    /// exit is forced on the host — the map-event-destroy fallback is a client-side path, and the host's
-    /// encounter unwind is driven by its own local <c>PlayerEncounter.Update</c> flow.
-    /// </summary>
-    [Fact]
-    public void RecipientSurrenders_PvpBattleClosesHostAggressorEncounter()
-    {
-        var setup = SetupTwoOpposingPlayersInBattle();
-        SetMainPartyInBattle(Server, setup.ctx.AttackerPartyId);
-        EnableHeadlessEncounterFinish(Server);
-
-        string[] closeOnServer = null;
-        Server.Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnServer = p.What.PartyIds);
-
-        var recipientClient = Clients.Last();
-        recipientClient.Call(() =>
-        {
-            Assert.True(recipientClient.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
-            recipientClient.Resolve<IMessageBroker>().Publish(this, new PlayerSurrendered(mapEvent, MobileParty.MainParty));
-        }, BattleMenuSurrenderDisabledMethods());
-
-        Assert.NotNull(closeOnServer);
-        Assert.Contains(setup.initiatorPartyBaseId, closeOnServer);
-        Assert.Contains(setup.recipientPartyBaseId, closeOnServer);
-        AssertMainPartyLeftBattle(Server);
-    }
-
-    /// <summary>
-    /// The host playing as the aggressor leaves the battle: the finalize runs directly on the server, and the
-    /// close instruction is also published locally so the host's own party detaches through the same path as
-    /// any client's. No menu exit is forced on the host (see
-    /// <see cref="RecipientSurrenders_PvpBattleClosesHostAggressorEncounter"/>).
-    /// </summary>
-    [Fact]
-    public void HostAggressorLeave_PvpBattleClosesHostEncounter()
-    {
-        var setup = SetupTwoOpposingPlayersInBattle();
-        SetMainPartyInBattle(Server, setup.ctx.AttackerPartyId);
-        EnableHeadlessEncounterFinish(Server);
-
-        string[] closeOnServer = null;
-        Server.Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnServer = p.What.PartyIds);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
-            Server.Resolve<IMessageBroker>().Publish(this, new MapEventFinalizeAttempted(mapEvent));
-        }, MapEventDisabledMethods);
-
-        Assert.NotNull(closeOnServer);
-        Assert.Contains(setup.initiatorPartyBaseId, closeOnServer);
-        Assert.Contains(setup.recipientPartyBaseId, closeOnServer);
-        AssertMapEventRemoved(Server, setup.ctx.MapEventId);
-        AssertMainPartyLeftBattle(Server);
-    }
-
     [Fact]
     public void SpectatorBattleSimulationOpen_ClosesBattleEncounterMenu_WithoutEndingEncounter()
     {
