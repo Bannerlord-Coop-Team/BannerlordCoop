@@ -1,6 +1,9 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
@@ -10,10 +13,19 @@ namespace GameInterface.Services.Clans.Patches;
 [HarmonyPatch(typeof(ClanPartiesVM))]
 internal class ClanPartiesVMPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ClanPartiesVMPatches>();
+
     [HarmonyPatch(nameof(ClanPartiesVM.CreateNewClanParty))]
     [HarmonyPrefix]
     public static bool CreateNewClanPartyPrefix(ClanPartiesVM __instance, Hero newLeader, int partyGoldLowerThreshold)
     {
+        // Reject forming a new party with a player hero
+        if (newLeader.IsPlayerHero())
+        {
+            Logger.Error($"Rejecting new clan mobile party because newLeader is a player hero ({newLeader.StringId}).");
+            return false;
+        }
+
         if (newLeader.PartyBelongedTo == MobileParty.MainParty)
         {
             __instance._openPartyAsManage(newLeader);
@@ -52,6 +64,11 @@ internal class ClanPartiesVMPatches
         popupParty = null;
 
         var oldLeader = selectedParty?.Party?.LeaderHero;
+        if (oldLeader.IsPlayerHero())
+        {
+            Logger.Error($"Rejecting change of leader in clan mobile party because oldLeader is a player hero ({newLeader.StringId}).");
+            return false;
+        }
 
         // Change clan party leader on the server
         var message = new ClanPartyLeaderChanged(Hero.MainHero, newLeader, oldLeader, selectedParty, MobileParty.MainParty);
