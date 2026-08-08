@@ -16,16 +16,20 @@ internal class PartyTradeGoldCapPatch
     [HarmonyPostfix]
     public static void PartyTradeGoldSetterPostfix(MobileParty __instance)
     {
-        if (__instance.Owner == null || !__instance.Owner.IsPlayerHero()) return;
+        if (__instance.PartyTradeGold <= PartyTradeGoldIncomeThreshold) return;
 
-        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
+        if (ModInformation.IsClient) return;
 
         // Cap party trade gold for disconnected players based on config
         // When capped at PartyTradeGoldIncomeThreshold (10000), rejoining players won't see a spike in caravan/party profits
-        if (ModInformation.IsServer
-            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeForDisconnectedPlayers
-            && playerManager.IsOwnerOfHeroDisconnected(__instance.Owner)
-            && __instance.PartyTradeGold > PartyTradeGoldIncomeThreshold)
+        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeForDisconnectedPlayers) return;
+
+        if (ContainerProvider.TryResolve<IPlayerManager>(out IPlayerManager playerManager) == false) return;
+
+        var owner = __instance.Owner;
+        if (owner == null || !owner.IsPlayerHero()) return;
+
+        if (playerManager.IsOwnerOfHeroDisconnected(owner))
         {
             __instance.PartyTradeGold = PartyTradeGoldIncomeThreshold;
         }
