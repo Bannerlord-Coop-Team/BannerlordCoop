@@ -84,6 +84,20 @@ internal static class BattleSimulationReplay
         isSpectator = spectator;
     }
 
+    /// <summary>
+    /// Drops any in-flight playback. For session/test-environment boundaries: a playback left
+    /// active under a stale map-event id would swallow ticks for an unrelated future battle that
+    /// reuses the id.
+    /// </summary>
+    public static void Reset()
+    {
+        arrivedRounds.Clear();
+        mapEventId = null;
+        finishRequested = false;
+        skipRequested = false;
+        isSpectator = false;
+    }
+
     /// <summary>Queue a round streamed from the server (applied on the next tick).</summary>
     public static void EnqueueRound(ResolvedChange[] round)
     {

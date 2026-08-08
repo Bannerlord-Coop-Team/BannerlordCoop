@@ -232,6 +232,10 @@ public class GameThread : IUpdateable
                 throw new OperationCanceledException(
                     $"The game-thread session ended before the blocking {nameof(Run)} action was queued.");
             }
+            // This return is one of the few places marshalled work can vanish without a trace;
+            // name the dropped action so a lost state-apply is diagnosable from the log.
+            Logger.Warning("Dropping game-thread action {Label}: the session was cancelled before it was queued",
+                label ?? BuildLabel(callerFile, callerMember));
             return;
         }
 
@@ -384,6 +388,51 @@ public class GameThread : IUpdateable
     public void MarkGameThread()
     {
         m_GameLoopThreadId = Thread.CurrentThread.ManagedThreadId;
+    }
+
+    /// <summary>
+    /// The currently registered game-loop thread id (0 when unmarked). Pair with
+    /// <see cref="RestoreGameThread"/> so a scope that re-marks the game thread (e.g. a test harness
+    /// running a call on a worker thread) can put the previous registration back instead of leaving
+    /// the mark on a thread that may never pump the queue again.
+    /// </summary>
+    public int GameThreadId => m_GameLoopThreadId;
+
+    /// <summary>
+    /// Restores a registration previously read from <see cref="GameThreadId"/>.
+    /// </summary>
+    public void RestoreGameThread(int threadId)
+    {
+        m_GameLoopThreadId = threadId;
+    }
+
+    /// <summary>
+    /// Discards every queued action without running it, releasing any blocked callers waiting on
+    /// them. For test harnesses at environment boundaries: an action queued by a previous test
+    /// would otherwise execute inside a later environment's pump against a torn-down container.
+    /// </summary>
+    public void DiscardQueuedActions()
+    {
+        List<(Action Act, EventWaitHandle Wait, string Label, CancellationToken Cancellation)> discarded;
+        lock (m_QueueLock)
+        {
+            discarded = new List<(Action, EventWaitHandle, string, CancellationToken)>(m_Queue);
+            m_Queue.Clear();
+        }
+
+        if (discarded.Count > 0)
+        {
+            // A non-empty queue here means marshalled work was enqueued but never pumped — for a
+            // test harness that is a silently lost state-apply, so name every dropped action.
+            Logger.Warning("Discarding {Count} queued game-thread action(s) that no pump ever ran: {Labels}",
+                discarded.Count,
+                string.Join(", ", discarded.Select(task => task.Label ?? "(unlabeled)")));
+        }
+
+        foreach (var task in discarded)
+        {
+            task.Wait?.Set();
+        }
     }
 
     /// <summary>

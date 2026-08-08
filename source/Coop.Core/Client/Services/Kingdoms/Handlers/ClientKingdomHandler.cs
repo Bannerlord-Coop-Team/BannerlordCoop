@@ -14,6 +14,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.ScreenSystem;
+using SandBox.GauntletUI;
 
 namespace Coop.Core.Client.Services.Kingdoms.Handlers;
 
@@ -58,6 +60,8 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
         messageBroker.Subscribe<DestroyKingdom>(HandleDestroyKingdom);
         messageBroker.Subscribe<RulingClanChanged>(HandleRulingClanChanged);
+        messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
+        messageBroker.Subscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
     }
 
     private void HandleKingdomCreationRequested(MessagePayload<KingdomCreationRequested> obj)
@@ -81,6 +85,36 @@ public class ClientKingdomHandler : IHandler
             partyId,
             settlementId);
         network.SendAll(message);
+    }
+
+    private void HandleKingdomNameChangeRequested(MessagePayload<KingdomNameChangeRequested> obj)
+    {
+        var payload = obj.What;
+
+        if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return;
+
+        var message = new NetworkRequestChangeKingdomName(kingdomId, payload.Name);
+        network.SendAll(message);
+    }
+
+    private void HandleNetworkKingdomNameChanged(MessagePayload<NetworkKingdomNameChanged> obj)
+    {
+        var kingdomId = obj.What.KingdomId;
+
+        GameThread.RunSafe(() =>
+        {
+            if (ScreenManager.TopScreen is not GauntletKingdomScreen kingdomScreen) return;
+
+            var dataSource = kingdomScreen.DataSource;
+            if (dataSource == null) return;
+
+            if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom)) return;
+
+            if (!ReferenceEquals(dataSource.Kingdom, kingdom)) return;
+            
+            dataSource.OnRefresh();
+            dataSource.RefreshValues();
+        }, context: nameof(ClientKingdomHandler));
     }
 
     private void HandleNetworkPlayerKingdomCreated(MessagePayload<NetworkPlayerKingdomCreated> obj)
@@ -390,6 +424,8 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<DecisionAdded>(HandleLocalDecisionAdded);
         messageBroker.Unsubscribe<DestroyKingdom>(HandleDestroyKingdom);
         messageBroker.Unsubscribe<RulingClanChanged>(HandleRulingClanChanged);
+        messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
+        messageBroker.Unsubscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
     }
 
     private readonly struct PendingSettlementRestore

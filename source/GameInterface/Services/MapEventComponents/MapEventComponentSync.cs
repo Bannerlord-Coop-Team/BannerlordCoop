@@ -11,5 +11,6 @@ internal class MapEventComponentSync : IAutoSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventComponent), nameof(MapEventComponent.MapEvent)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventComponent), nameof(MapEventComponent._isFinished)));
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(HideoutEventComponent), nameof(HideoutEventComponent.IsSendTroops)));
     }
 }

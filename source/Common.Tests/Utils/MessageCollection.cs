@@ -10,7 +10,20 @@ public class MessageCollection : IEnumerable<IMessage>
 {
     public readonly List<IMessage> Messages = new List<IMessage>();
 
-    public int Count => Messages.Count;
+    // Test-spawned background threads can send (append) while the test thread enumerates for an
+    // assertion; an unguarded List race loses entries or tears the enumeration with no exception.
+    private readonly object gate = new object();
+
+    public int Count
+    {
+        get
+        {
+            lock (gate)
+            {
+                return Messages.Count;
+            }
+        }
+    }
 
     /// <summary>
     /// Gets an iterator for all messages with type <typeparamref name="TMessage"/>
@@ -19,7 +32,7 @@ public class MessageCollection : IEnumerable<IMessage>
     /// <returns>Iterator for all messages with type <typeparamref name="TMessage"/></returns>
     public IEnumerable<TMessage> GetMessages<TMessage>() where TMessage : IMessage
     {
-        return Messages
+        return Snapshot()
             .Where(msg => typeof(TMessage).IsAssignableFrom(msg.GetType()))
             .Select(msg => (TMessage)msg);
     }
@@ -38,11 +51,31 @@ public class MessageCollection : IEnumerable<IMessage>
     /// Adds a message to the collection
     /// </summary>
     /// <param name="message">Message to add to the collection</param>
-    public void Add(IMessage message) => Messages.Add(message);
+    public void Add(IMessage message)
+    {
+        lock (gate)
+        {
+            Messages.Add(message);
+        }
+    }
 
-    public IEnumerator<IMessage> GetEnumerator() => Messages.GetEnumerator();
+    public IEnumerator<IMessage> GetEnumerator() => Snapshot().GetEnumerator();
 
-    IEnumerator IEnumerable.GetEnumerator() => Messages.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    public void Clear() => Messages.Clear();
+    public void Clear()
+    {
+        lock (gate)
+        {
+            Messages.Clear();
+        }
+    }
+
+    private List<IMessage> Snapshot()
+    {
+        lock (gate)
+        {
+            return new List<IMessage>(Messages);
+        }
+    }
 }

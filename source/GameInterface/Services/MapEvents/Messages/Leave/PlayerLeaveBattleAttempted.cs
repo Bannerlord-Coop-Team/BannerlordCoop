@@ -7,9 +7,11 @@ namespace GameInterface.Services.MapEvents.Messages.Leave;
 public readonly struct PlayerLeaveBattleAttempted : IEvent
 {
     public readonly PartyBase LeavingParty;
+    public readonly bool FinishLocalMenus;
 
-    public PlayerLeaveBattleAttempted(PartyBase leavingParty)
+    public PlayerLeaveBattleAttempted(PartyBase leavingParty, bool finishLocalMenus = true)
     {
         LeavingParty = leavingParty;
+        FinishLocalMenus = finishLocalMenus;
     }
 }

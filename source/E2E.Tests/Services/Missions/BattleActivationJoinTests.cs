@@ -1,12 +1,18 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using Common;
 using Common.Messaging;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents.Messages;
+using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -75,6 +81,135 @@ public class BattleActivationJoinTests : MissionTestEnvironment
 
         GC.KeepAlive(hostController);
         GC.KeepAlive(joinerController);
+    }
+
+    [Fact]
+    public void LateJoiner_ReceivesOwnedAgentAndDeploymentSnapshotsBeforeBattleActivation()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "joiner");
+        var host = Clients.First();
+        var joiner = Clients.Skip(1).First();
+        string characterId = CreateRegisteredObject<CharacterObject>();
+
+        CoopBattleController hostController = null!;
+        Agent ownedAgent = null!;
+        host.Call(() =>
+        {
+            fixture.CreateMission(host);
+            hostController = host.Resolve<CoopBattleController>();
+        });
+        EnterBattle(host, mapEventId);
+        host.Call(() =>
+        {
+            Assert.True(host.ObjectManager.TryGetObject(characterId, out CharacterObject character));
+            ownedAgent = Mission.Current.SpawnAgent(
+                new AgentBuildData(character).Controller(AgentControllerType.AI));
+            host.Resolve<IMessageBroker>().Publish(this, new AgentSpawnedInBattle(ownedAgent));
+            hostController.OnDeploymentFinished();
+        });
+
+        joiner.Call(() =>
+        {
+            fixture.CreateMission(joiner);
+            joiner.Resolve<CoopBattleController>().Session.TryBegin(mapEventId);
+        });
+        host.Call(() =>
+        {
+            Assert.True(ownedAgent.IsActive());
+            Assert.Single(host.Resolve<INetworkAgentRegistry>().GetAgents("host"));
+        });
+        var hostBattleNetwork = host.Resolve<MockBattleNetwork>();
+        hostBattleNetwork.NetworkSentMessages.Clear();
+
+        host.Call(() =>
+        {
+            Exception failure = null!;
+            bool finished = false;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    host.Resolve<IMessageBroker>().Publish(
+                        host,
+                        // Keep this poll-thread ordering probe sender-only. Routing synchronously into the
+                        // in-process joiner would contend on the test harness's static game-instance lock.
+                        new NetworkMissionPeerEntered("unrouted-joiner", mapEventId));
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                }
+                finally
+                {
+                    Volatile.Write(ref finished, true);
+                }
+            });
+            thread.Start();
+            while (!Volatile.Read(ref finished))
+            {
+                GameThread.Instance.Update(TimeSpan.Zero);
+                Thread.Yield();
+            }
+            thread.Join();
+            if (failure != null) throw failure;
+        });
+
+        int spawnIndex = hostBattleNetwork.NetworkSentMessages.Messages.FindIndex(
+            message => message is NetworkSpawnBattleAgents);
+        int deploymentIndex = hostBattleNetwork.NetworkSentMessages.Messages.FindIndex(
+            message => message is NetworkBattleDeploymentFinished);
+        int activationIndex = hostBattleNetwork.NetworkSentMessages.Messages.FindIndex(
+            message => message is NetworkBattleActivated);
+        Assert.InRange(spawnIndex, 0, int.MaxValue);
+        Assert.InRange(deploymentIndex, 0, int.MaxValue);
+        Assert.True(spawnIndex < activationIndex);
+        Assert.True(deploymentIndex < activationIndex);
+
+        GC.KeepAlive(hostController);
+    }
+
+    [Fact]
+    public void InitialJoinBeforeActivation_DoesNotWaitForGameThreadPump()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "joiner");
+        var host = Clients.First();
+
+        CoopBattleController hostController = null!;
+        host.Call(() =>
+        {
+            fixture.CreateMission(host);
+            hostController = host.Resolve<CoopBattleController>();
+            hostController.Session.TryBegin(mapEventId);
+        });
+
+        Exception failure = null!;
+        using var started = new ManualResetEventSlim();
+        var thread = new Thread(() =>
+        {
+            started.Set();
+            try
+            {
+                host.Resolve<IMessageBroker>().Publish(
+                    host,
+                    new NetworkMissionPeerEntered("joiner", mapEventId));
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+
+        thread.Start();
+        started.Wait();
+        bool completedWithoutPump = thread.Join(TimeSpan.FromSeconds(1));
+        host.Call(() => GameThread.Instance.Update(TimeSpan.Zero));
+        Assert.True(thread.Join(TimeSpan.FromSeconds(5)), "the join handler should finish after queued work drains");
+        if (failure != null) throw failure;
+
+        Assert.True(completedWithoutPump, "a pre-activation join must not block on the game-thread queue");
+        GC.KeepAlive(hostController);
     }
 
     [Fact]
