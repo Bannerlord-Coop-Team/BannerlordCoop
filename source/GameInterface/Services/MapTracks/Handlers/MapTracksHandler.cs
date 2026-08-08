@@ -2,13 +2,14 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Caravans.Handlers;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapTracks.Interfaces;
 using GameInterface.Services.MapTracks.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
@@ -17,22 +18,25 @@ namespace GameInterface.Services.MapTracks.Handlers;
 
 internal class MapTracksHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CaravansCampaignBehaviorHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MapTracksHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly IMapTracksCampaignBehaviorInterface mapTracksCampaignBehaviorInterface;
 
     public MapTracksHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         IMapTracksCampaignBehaviorInterface mapTracksCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.mapTracksCampaignBehaviorInterface = mapTracksCampaignBehaviorInterface;
 
         messageBroker.Subscribe<UpdateClientsMapTrackData>(Handle_UpdateClientsMapTrackData);
@@ -59,9 +63,34 @@ internal class MapTracksHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            var message = new NetworkUpdateClientsMapTrackData(obj.What.VisibleTrackChange, obj.What.IsRemovingTracks);
-            network.SendAll(message);
+            // Send track changes per party to associated peer
+            foreach (var playerTrackChanges in obj.What.VisibleTrackChange)
+            {
+                if (playerTrackChanges.Value.Count == 0) continue;
+                if (!TryGetPeerForParty(playerTrackChanges.Key, out var peer)) continue;
+
+                var playerVisibleTrackChanges = new Dictionary<string, List<Track>>
+                {
+                    [playerTrackChanges.Key] = playerTrackChanges.Value
+                };
+
+                network.Send(peer, new NetworkUpdateClientsMapTrackData(playerVisibleTrackChanges, obj.What.IsRemovingTracks));
+            }
         });
+    }
+
+    private bool TryGetPeerForParty(string playerPartyId, out NetPeer peer)
+    {
+        peer = null;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (player.MobilePartyId != playerPartyId) continue;
+
+            return playerManager.TryGetPeer(player.ControllerId, out peer);
+        }
+
+        return false;
     }
 
     private void Handle_NetworkUpdateClientsMapTrackData(MessagePayload<NetworkUpdateClientsMapTrackData> obj)
@@ -96,6 +125,8 @@ internal class MapTracksHandler : IHandler
 
     private void Handle_NetworkInitializePlayerTracksKeys(MessagePayload<NetworkInitializePlayerTracksKeys> obj)
     {
+        if (ModInformation.IsClient) return;
+
         GameThread.RunSafe(() =>
         {
             if (!TryGetMapTracksBehavior(out var mapTracksBehavior)) return;
@@ -107,10 +138,7 @@ internal class MapTracksHandler : IHandler
             // When a player joins, calculate the tracks for their party and update
             var visibleTrackChanges = mapTracksCampaignBehaviorInterface.DetectTracksForPlayerParty(mapTracksBehavior, playerParty);
 
-            if (visibleTrackChanges.Count > 0)
-            {
-                network.Send(obj.Who as NetPeer, new NetworkUpdateClientInitialVisibleTracks(visibleTrackChanges));
-            }
+            network.Send(obj.Who as NetPeer, new NetworkUpdateClientInitialVisibleTracks(visibleTrackChanges));
         });
     }
 
@@ -120,6 +148,7 @@ internal class MapTracksHandler : IHandler
         {
             if (!TryGetMapTracksBehavior(out var mapTracksBehavior)) return;
 
+            mapTracksCampaignBehaviorInterface.ClearVisibleTracks(mapTracksBehavior);
             mapTracksCampaignBehaviorInterface.ApplyVisibleTrackChanges(mapTracksBehavior, obj.What.VisibleTrackChanges, false);
         });
     }

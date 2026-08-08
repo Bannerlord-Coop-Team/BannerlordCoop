@@ -1,7 +1,7 @@
 using Common.Messaging;
-using GameInterface.Extentions;
 using GameInterface.Services.MapTracks.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Helpers;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,23 +57,31 @@ public interface IMapTracksCampaignBehaviorInterface : IGameAbstraction
     /// Client method
     /// Use received changes from the server to update visible tracks cache
     /// </summary>
-    void ApplyVisibleTrackChanges(MapTracksCampaignBehavior behavior, List<Track> visibleTrackChanges, bool IsRemovingTracks);
+    void ApplyVisibleTrackChanges(MapTracksCampaignBehavior behavior, List<Track> visibleTrackChanges, bool isRemovingTracks);
+
+    /// <summary>
+    /// Client method
+    /// Removes every visible track, used when the server re-sends a full set of visible tracks
+    /// </summary>
+    void ClearVisibleTracks(MapTracksCampaignBehavior behavior);
 }
 
 public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInterface
 {
-    //private readonly PlayerMapTracksData playerMapTracksData = new(new());
-    Dictionary<string, MBList<Track>> playerDetectedTracks = new();
+    private readonly Dictionary<string, HashSet<Track>> playerDetectedTracks = new();
 
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
+    private readonly IPlayerManager playerManager;
 
     public MapTracksCampaignBehaviorInterface(
         IObjectManager objectManager,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
+        this.playerManager = playerManager;
     }
 
     public void PublishUpdateClientsMapTrackData(Dictionary<string, List<Track>> visibleTrackChanges, bool isRemovingTracks)
@@ -93,25 +101,26 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
     {
         var visibleTrackChanges = InitializeVisibleTrackChanges();
 
+        var expiredTracks = new List<Track>();
+        var playerParties = GetPlayerParties();
+
         for (int i = behavior._allTracks.Count - 1; i >= 0; i--)
         {
             Track track = behavior._allTracks[i];
-            if (track.IsExpired)
+            if (!track.IsExpired) continue;
+
+            behavior._allTracks.RemoveAt(i);
+            expiredTracks.Add(track);
+
+            // Do this for every player
+            foreach (var playerParty in playerParties)
             {
-                behavior._allTracks.Remove(track);
+                if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId)) continue;
+                if (!playerDetectedTracks.TryGetValue(playerPartyId, out var detectedTracks)) continue;
 
-                // Do this for every player
-                foreach (var playerParty in Campaign.Current.CampaignObjectManager.GetPlayerMobileParties())
+                if (detectedTracks.Remove(track))
                 {
-                    if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId)) continue;
-                    if (!playerDetectedTracks.ContainsKey(playerPartyId)) continue;
-
-                    if (playerDetectedTracks[playerPartyId].Contains(track))
-                    {
-                        playerDetectedTracks[playerPartyId].Remove(track);
-
-                        visibleTrackChanges[playerPartyId].Add(track);
-                    }
+                    visibleTrackChanges[playerPartyId].Add(track);
                 }
             }
         }
@@ -120,14 +129,10 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
 
         // Reset and clear tracks after sending updated data to clients
         // Otherwise comparison won't match as party name and culture get reset
-        for (int i = behavior._allTracks.Count - 1; i >= 0; i--)
+        foreach (var expiredTrack in expiredTracks)
         {
-            Track track = behavior._allTracks[i];
-            if (track.IsExpired)
-            {
-                behavior._trackLocator.RemoveLocatable(track);
-                behavior._trackPool.ReleaseTrack(track);
-            }
+            behavior._trackLocator.RemoveLocatable(expiredTrack);
+            behavior._trackPool.ReleaseTrack(expiredTrack);
         }
     }
 
@@ -136,12 +141,10 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         var visibleTrackChanges = InitializeVisibleTrackChanges();
 
         // Run for all player parties instead of just one
-        foreach (var playerParty in Campaign.Current.CampaignObjectManager.GetPlayerMobileParties())
+        foreach (var playerParty in GetPlayerParties())
         {
             if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId)) continue;
             if (!playerDetectedTracks.ContainsKey(playerPartyId)) continue;
-
-            if (!playerParty.Party.IsValid) continue;
 
             visibleTrackChanges[playerPartyId] = DetectTracksForPlayerParty(behavior, playerParty);
         }
@@ -155,6 +158,9 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
 
         if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId)) return visibleTrackChanges;
 
+        if (!playerDetectedTracks.TryGetValue(playerPartyId, out var detectedTracks)) return visibleTrackChanges;
+        if (!playerParty.Party.IsValid) return visibleTrackChanges;
+
         int effectiveScoutingSkill = (playerParty.EffectiveScout != null) ? playerParty.EffectiveScout.GetSkillValue(DefaultSkills.Scouting) : 0;
         if (effectiveScoutingSkill != 0)
         {
@@ -162,12 +168,10 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
             LocatableSearchData<Track> locatableSearchData = behavior._trackLocator.StartFindingLocatablesAroundPosition(playerParty.Position.ToVec2(), maxTrackSpottingDistanceForPlayerParty);
             for (Track track = behavior._trackLocator.FindNextLocatable(ref locatableSearchData); track != null; track = behavior._trackLocator.FindNextLocatable(ref locatableSearchData))
             {
-                if (!IsDetectedByPlayerParty(playerPartyId, track) && behavior._allTracks.Contains(track) && GetTrackDetectionDifficultyForPlayerParty(playerParty, track, maxTrackSpottingDistanceForPlayerParty) < (float)effectiveScoutingSkill)
+                if (!detectedTracks.Contains(track) && behavior._allTracks.Contains(track) && GetTrackDetectionDifficultyForPlayerParty(playerParty, track, maxTrackSpottingDistanceForPlayerParty) < (float)effectiveScoutingSkill)
                 {
-                    if (!playerDetectedTracks.ContainsKey(playerPartyId)) continue;
-
-                    playerDetectedTracks[playerPartyId].Add(track);
-                    SkillLevelingManager.OnTrackDetected(track);
+                    detectedTracks.Add(track);
+                    GrantTrackDetectionXp(playerParty, track);
 
                     visibleTrackChanges.Add(track);
                 }
@@ -185,18 +189,22 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
             return false;
         }
 
-        // Find the closest party to determine if the track should be dropped
-        // Safe to use server MainParty as baseline as MainParty.IsActive is false
-        MobileParty closestParty = MobileParty.MainParty;
-        foreach (var playerParty in Campaign.Current.CampaignObjectManager.GetPlayerMobileParties())
+        // Find and use the closet player party to determine if a track should be dropped.
+        MobileParty closestParty = null;
+        float closestPlayerPartyDistance = float.MaxValue;
+        foreach (var playerParty in GetPlayerParties())
         {
-            if (mobileParty.Position.DistanceSquared(playerParty.Position) < mobileParty.Position.DistanceSquared(closestParty.Position))
+            float playerPartyDistance = mobileParty.Position.DistanceSquared(playerParty.Position);
+            if (playerPartyDistance < closestPlayerPartyDistance)
             {
+                closestPlayerPartyDistance = playerPartyDistance;
                 closestParty = playerParty;
             }
         }
 
-        float closestPlayerPartyDistance = mobileParty.Position.DistanceSquared(closestParty.Position);
+        // No player to drop a track for
+        if (closestParty == null) return false;
+
         float num2 = closestParty.IsActive ? (closestParty._lastCalculatedSpeed * Campaign.Current.Models.MapTrackModel.MaxTrackLife) : 0f;
         return num2 * num2 > closestPlayerPartyDistance;
     }
@@ -204,14 +212,14 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
     public void AddPlayerPartyKeys(string playerPartyId)
     {
         // If a player rejoins, their visible tracks will be lost. Reset server side detected tracks
-        playerDetectedTracks[playerPartyId] = new MBList<Track>();
+        playerDetectedTracks[playerPartyId] = new HashSet<Track>();
     }
 
-    public void ApplyVisibleTrackChanges(MapTracksCampaignBehavior behavior, List<Track> visibleTrackChanges, bool IsRemovingTracks)
+    public void ApplyVisibleTrackChanges(MapTracksCampaignBehavior behavior, List<Track> visibleTrackChanges, bool isRemovingTracks)
     {
         foreach (var changedTrack in visibleTrackChanges)
         {
-            if (IsRemovingTracks) // Delete expired track
+            if (isRemovingTracks) // Delete expired track
             {
                 // Find a matching track to delete. Done this way instead of registering every track to reduce network traffic
                 if (!FindMatchingTrack(behavior, changedTrack, out var targetTrack)) continue;
@@ -221,6 +229,8 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
             }
             else // Detect new track
             {
+                if (changedTrack.Culture == null) continue;
+
                 changedTrack.IsDetected = true;
                 behavior._detectedTracksCache.Add(changedTrack);
 
@@ -232,14 +242,26 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         }
     }
 
-    private bool IsDetectedByPlayerParty(string playerPartyId, Track targetTrack)
+    public void ClearVisibleTracks(MapTracksCampaignBehavior behavior)
     {
-        foreach (var track in playerDetectedTracks[playerPartyId])
+        foreach (var track in behavior._detectedTracksCache.ToList())
         {
-            if (track == targetTrack)
-                return true;
+            behavior._detectedTracksCache.Remove(track);
+            CampaignEventDispatcher.Instance.TrackLost(track);
         }
-        return false;
+    }
+
+    private List<MobileParty> GetPlayerParties()
+    {
+        var playerParties = new List<MobileParty>();
+        foreach (var player in playerManager.Players)
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var playerParty)) continue;
+
+            playerParties.Add(playerParty);
+        }
+
+        return playerParties;
     }
 
     private bool FindMatchingTrack(MapTracksCampaignBehavior behavior, Track inputTrack, out Track outputTrack)
@@ -266,6 +288,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
                a.Culture == b.Culture &&
                a.Speed == b.Speed &&
                a.NumberOfAllMembers == b.NumberOfAllMembers &&
+               a.NumberOfHealthyMembers == b.NumberOfHealthyMembers &&
                a.NumberOfMenWithHorse == b.NumberOfMenWithHorse &&
                a.NumberOfMenWithoutHorse == b.NumberOfMenWithoutHorse &&
                a.NumberOfPackAnimals == b.NumberOfPackAnimals &&
@@ -283,6 +306,12 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
             visibleTrackChanges[playerPartyId] = new();
         }
         return visibleTrackChanges;
+    }
+
+    private void GrantTrackDetectionXp(MobileParty playerParty, Track track)
+    {
+        float scoutingXp = Campaign.Current.Models.MapTrackModel.GetSkillFromTrackDetected(track);
+        playerParty.EffectiveScout?.AddSkillXp(DefaultSkills.Scouting, scoutingXp);
     }
 
     // Replacement for GetMaxTrackSpottingDistanceForMainParty to work for any player party instead of just MobileParty.MainParty
