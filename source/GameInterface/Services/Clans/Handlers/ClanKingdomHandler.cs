@@ -4,16 +4,20 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Clans.Patches;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 
 namespace GameInterface.Services.Clans.Handlers;
 
 internal class ClanKingdomHandler : IHandler
 {
-    private readonly ILogger Logger = LogManager.GetLogger<ClanKingdomHandler>();
-
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(KingdomInterface));
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -22,102 +26,146 @@ internal class ClanKingdomHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network)
-    {
+    { 
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
 
-        messageBroker.Subscribe<ClanEntersKingdom>(Handle_ClanEntersKingdom);
-        messageBroker.Subscribe<NetworkClanEntersKingdom>(Handle_NetworkClanEntersKingdom);
-
-        messageBroker.Subscribe<ClanLeavesKingdom>(Handle_ClanLeavesKingdom);
-        messageBroker.Subscribe<NetworkClanLeavesKingdom>(Handle_NetworkClanLeavesKingdom);
-
-        messageBroker.Subscribe<UpdateBannerColorsOfClan>(Handle_UpdateBannerColorsOfClan);
-        messageBroker.Subscribe<NetworkUpdateBannerColorsOfClan>(Handle_NetworkUpdateBannerColorsOfClan);
+        messageBroker.Subscribe<SetClanKingdom>(HandleSetClanKingdom);
+        messageBroker.Subscribe<NetworkSetClanKingdom>(HandleNetworkSetClanKingdom);
+        messageBroker.Subscribe<OnClanChangedKingdom>(HandleOnClanChangedKingdom);
+        messageBroker.Subscribe<NetworkOnClanChangedKingdom>(HandleNetworkOnClanChangedKingdom);
+        messageBroker.Subscribe<OnClanSupported>(HandleOnClanSupported);
+        messageBroker.Subscribe<NetworkOnClanSupported>(HandleNetworkOnClanSupported);
+        messageBroker.Subscribe<NetworkOnClanSupportedApplied>(HandleNetworkOnClanSupportedApplied);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<ClanEntersKingdom>(Handle_ClanEntersKingdom);
-        messageBroker.Unsubscribe<NetworkClanEntersKingdom>(Handle_NetworkClanEntersKingdom);
-
-        messageBroker.Unsubscribe<ClanLeavesKingdom>(Handle_ClanLeavesKingdom);
-        messageBroker.Unsubscribe<NetworkClanLeavesKingdom>(Handle_NetworkClanLeavesKingdom);
-
-        messageBroker.Unsubscribe<UpdateBannerColorsOfClan>(Handle_UpdateBannerColorsOfClan);
-        messageBroker.Unsubscribe<NetworkUpdateBannerColorsOfClan>(Handle_NetworkUpdateBannerColorsOfClan);
+        messageBroker.Unsubscribe<SetClanKingdom>(HandleSetClanKingdom);
+        messageBroker.Unsubscribe<NetworkSetClanKingdom>(HandleNetworkSetClanKingdom);
+        messageBroker.Unsubscribe<OnClanChangedKingdom>(HandleOnClanChangedKingdom);
+        messageBroker.Unsubscribe<NetworkOnClanChangedKingdom>(HandleNetworkOnClanChangedKingdom);
+        messageBroker.Unsubscribe<OnClanSupported>(HandleOnClanSupported);
+        messageBroker.Unsubscribe<NetworkOnClanSupported>(HandleNetworkOnClanSupported);
+        messageBroker.Unsubscribe<NetworkOnClanSupportedApplied>(HandleNetworkOnClanSupportedApplied);
     }
 
-    private void Handle_ClanEntersKingdom(MessagePayload<ClanEntersKingdom> obj)
+    private void HandleSetClanKingdom(MessagePayload<SetClanKingdom> payload)
     {
-        var data = obj.What;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
+        string kingdomId = null;
+        if (payload.What.Kingdom != null)
+        {
+            if (!objectManager.TryGetIdWithLogging(payload.What.Kingdom, out kingdomId)) return;
+        }
 
-        if (!objectManager.TryGetIdWithLogging(data.Clan, out var clanId)) return;
-
-        network.SendAll(new NetworkClanEntersKingdom(clanId));
+        network.SendAll(new NetworkSetClanKingdom(clanId, kingdomId));
     }
 
-    private void Handle_NetworkClanEntersKingdom(MessagePayload<NetworkClanEntersKingdom> obj)
+    private void HandleNetworkSetClanKingdom(MessagePayload<NetworkSetClanKingdom> payload)
     {
         var data = obj.What;
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+            Kingdom kingdom = null;
+            if (payload.What.KingdomId != null)
+            {
+                if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out kingdom)) return;
+            }
 
             using (new AllowedThread())
             {
-                clan._kingdom.AddClanInternal(clan);
+                clan.SetKingdomInternal(kingdom);
             }
         });
     }
 
-    private void Handle_ClanLeavesKingdom(MessagePayload<ClanLeavesKingdom> obj)
+    private void HandleOnClanChangedKingdom(MessagePayload<OnClanChangedKingdom> payload)
     {
-        var data = obj.What;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clan, out var clanId)) return;
+        string oldKingdomId = null;
+        if (payload.What.OldKingdom != null)
+        {
+            if (!objectManager.TryGetIdWithLogging(payload.What.OldKingdom, out oldKingdomId)) return;
+        }
+        string newKingdomId = null;
+        if (payload.What.NewKingdom != null)
+        {
+            if (!objectManager.TryGetIdWithLogging(payload.What.NewKingdom, out newKingdomId)) return;
+        }
 
-        if (!objectManager.TryGetIdWithLogging(data.Clan, out var clanId)) return;
-
-        network.SendAll(new NetworkClanLeavesKingdom(clanId));
+        network.SendAll(new NetworkOnClanChangedKingdom(clanId, oldKingdomId, newKingdomId, payload.What.Detail));
     }
 
-    private void Handle_NetworkClanLeavesKingdom(MessagePayload<NetworkClanLeavesKingdom> obj)
+    private void HandleNetworkOnClanChangedKingdom(MessagePayload<NetworkOnClanChangedKingdom> payload)
     {
         var data = obj.What;
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
-
-            using (new AllowedThread())
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+            Kingdom oldKingdom = null;
+            if (payload.What.OldKingdomId != null)
             {
-                clan._kingdom.RemoveClanInternal(clan);
+                if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.OldKingdomId, out oldKingdom)) return;
+            }
+            Kingdom newKingdom = null;
+            if (payload.What.NewKingdomId != null)
+            {
+                if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.NewKingdomId, out newKingdom)) return;
+            }
+
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(clan, oldKingdom, newKingdom, payload.What.Detail, true);
+        });
+    }
+
+    private void HandleOnClanSupported(MessagePayload<OnClanSupported> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.SupporterClan, out var supporterClanId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.SupportedClan, out var supportedClanId)) return;
+
+        network.SendAll(new NetworkOnClanSupported(supporterClanId, supportedClanId));
+    }
+
+    private void HandleNetworkOnClanSupported(MessagePayload<NetworkOnClanSupported> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.SupporterClanId, out var supporterClan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.SupportedClanId, out var supportedClan)) return;
+            DiplomacyModel diplomacyModel = Campaign.Current.Models.DiplomacyModel;
+            int influenceCostOfSupportingClan = diplomacyModel.GetInfluenceCostOfSupportingClan();
+            if (!(payload.Who is NetPeer peer))
+            {
+                Logger.Error("Received {Message} without a registered peer", nameof(NetworkOnClanSupported));
+                return;
+            }
+            if (supporterClan.Influence >= (float)influenceCostOfSupportingClan)
+            {
+                int influenceValueOfSupportingClan = diplomacyModel.GetInfluenceValueOfSupportingClan();
+                int relationValueOfSupportingClan = diplomacyModel.GetRelationValueOfSupportingClan();
+
+                ChangeClanInfluenceAction.Apply(supporterClan, (float)(-(float)influenceCostOfSupportingClan));
+                ChangeClanInfluenceAction.Apply(supportedClan, (float)influenceValueOfSupportingClan);
+                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(supporterClan.Leader, supportedClan.Leader, relationValueOfSupportingClan, true);
+                network.Send(peer, new NetworkOnClanSupportedApplied());
             }
         });
     }
 
-    private void Handle_UpdateBannerColorsOfClan(MessagePayload<UpdateBannerColorsOfClan> obj)
+    private void HandleNetworkOnClanSupportedApplied(MessagePayload<NetworkOnClanSupportedApplied> payload)
     {
-        var data = obj.What;
-
-        if (!objectManager.TryGetIdWithLogging(data.Clan, out var clanId)) return;
-
-        network.SendAll(new NetworkUpdateBannerColorsOfClan(clanId));
-    }
-
-    private void Handle_NetworkUpdateBannerColorsOfClan(MessagePayload<NetworkUpdateBannerColorsOfClan> obj)
-    {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
+            var vm = KingdomClanVMPatch.Current;
+            if (vm == null) return;
 
-            using (new AllowedThread())
-            {
-                clan.UpdateBannerColorsAccordingToKingdom();
-            }
+            Clan clan = vm.CurrentSelectedClan.Clan;
+            vm.RefreshClan();
+            vm.SelectClan(clan);
         });
     }
 }

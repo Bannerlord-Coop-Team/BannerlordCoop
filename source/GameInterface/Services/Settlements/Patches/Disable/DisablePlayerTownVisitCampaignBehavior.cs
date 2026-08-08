@@ -1,11 +1,22 @@
-﻿using HarmonyLib;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.Settlements.Messages;
+using HarmonyLib;
+using Helpers;
+using Serilog;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Settlements.Patches.Disable;
 
 [HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior))]
 internal class DisablePlayerTownVisitCampaignBehavior
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<DisablePlayerTownVisitCampaignBehavior>();
     /// <summary>
     /// Disables entering the arena from the town menu
     /// </summary>
@@ -146,6 +157,60 @@ internal class DisablePlayerTownVisitCampaignBehavior
         return true;
     }
 
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_manage_garrison_on_consequence))]
+    [HarmonyPrefix]
+    private static bool Prefix(PlayerTownVisitCampaignBehavior __instance)
+    {
+        Settlement currentSettlement = Hero.MainHero.CurrentSettlement;
+        if (currentSettlement.Town.GarrisonParty != null)
+        {
+            PartyScreenHelper.OpenScreenAsManageTroops(currentSettlement.Town.GarrisonParty);
+            return false;
+        }
+        MessageBroker.Instance.Publish(__instance, new NewGarrisonParty(currentSettlement));
+        CheckGarrisonReady(currentSettlement, isDonate: false);
+        return false;
+    }
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_leave_troops_garrison_on_consequece))]
+    [HarmonyPrefix]
+    private static bool Prefixx(PlayerTownVisitCampaignBehavior __instance)
+    {
+        Settlement currentSettlement = Hero.MainHero.CurrentSettlement;
+        if (currentSettlement.Town.GarrisonParty != null)
+        {
+            PartyScreenHelper.OpenScreenAsDonateGarrisonWithCurrentSettlement();
+            return false;
+        }
+        MessageBroker.Instance.Publish(__instance, new NewGarrisonParty(currentSettlement));
+        CheckGarrisonReady(currentSettlement, isDonate: true);
+        return false;
+    }
+    private static void CheckGarrisonReady(Settlement settlement, bool isDonate)
+    {
+        if (settlement.Town.GarrisonParty != null)
+        {
+            if (isDonate)
+                PartyScreenHelper.OpenScreenAsDonateGarrisonWithCurrentSettlement();
+            else
+                PartyScreenHelper.OpenScreenAsManageTroops(settlement.Town.GarrisonParty);
+            return;
+        }
+        GameThread.EnqueueSafe(() => CheckGarrisonReady(settlement, isDonate));
+    }
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_town_on_init))]
+    [HarmonyPrefix]
+    private static bool GameMenuTownOnInitPrefix(PlayerTownVisitCampaignBehavior __instance, MenuCallbackArgs args)
+    {
+        PlayerTownVisitCampaignBehavior.SetIntroductionText(Settlement.CurrentSettlement, false);
+        PlayerTownVisitCampaignBehavior.UpdateMenuLocations(args.MenuContext.GameMenu.StringId);
+        Settlement currentSettlement = Settlement.CurrentSettlement;
+        if (MenuHelper.CheckAndOpenNextLocation(args))
+        {
+            return false;
+        }
+        args.MenuTitle = new TextObject("{=mVKcvY2U}Town Center", null);
+        return false;
+    }
     /// <summary>
     /// Disables entering the village buy goods from the village menu
     /// </summary>

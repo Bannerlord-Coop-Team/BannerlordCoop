@@ -15,6 +15,7 @@ internal static class PendingMapEventPartyMovementPatch
 
     internal static bool IsPending(PartyBase party) =>
         party != null &&
-        ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) &&
+        ContainerProvider.TryGetContainer(out var lifetimeScope) &&
+        MapEventInitializationBarrierBinding.TryGet(lifetimeScope, out var barrier) &&
         barrier.IsPartyPending(party);
 }

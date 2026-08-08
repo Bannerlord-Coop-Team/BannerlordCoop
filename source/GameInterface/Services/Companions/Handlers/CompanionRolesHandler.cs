@@ -3,9 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Util;
+using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
 using LiteNetLib;
 using Serilog;
@@ -31,6 +34,8 @@ internal class CompanionRolesHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ICompanionRolesCampaignBehaviorInterface companionRolesCampaignBehaviorInterface;
+    private readonly ITroopRosterInterface troopRosterInterface;
     private readonly ISendCoalescer sendCoalescer;
     private string pendingFireCompanionRequestId;
     private string pendingFireCompanionHeroId;
@@ -39,11 +44,15 @@ internal class CompanionRolesHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        ICompanionRolesCampaignBehaviorInterface companionRolesCampaignBehaviorInterface,
+        ITroopRosterInterface troopRosterInterface,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.companionRolesCampaignBehaviorInterface = companionRolesCampaignBehaviorInterface;
+        this.troopRosterInterface = troopRosterInterface;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<ClanNameSelectionDone>(Handle_ClanNameSelectionDone);
@@ -411,20 +420,16 @@ internal class CompanionRolesHandler : IHandler
 
     private void Handle_PartyScreenClosedFromRescuing(MessagePayload<PartyScreenClosedFromRescuing> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.LeftOwnerParty, out var leftOwnerPartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.LeftMemberRoster, out var leftMemberRosterId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.LeftPrisonRoster, out var leftPrisonRosterId)) return;
+        // These rosters are not registered yet, send data instead of ids
+        var leftMemberData = troopRosterInterface.PackTroopRosterData(obj.What.LeftMemberRoster);
+        var leftPrisonerData = troopRosterInterface.PackTroopRosterData(obj.What.LeftPrisonRoster);
+
         if (!objectManager.TryGetIdWithLogging(obj.What.RightOwnerParty, out var rightOwnerPartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.RightMemberRoster, out var rightMemberRosterId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.What.RightPrisonRoster, out var rightPrisonRosterId)) return;
 
         var message = new DoPartyScreenClosedFromRescuing(
-            leftOwnerPartyId,
-            leftMemberRosterId,
-            leftPrisonRosterId,
-            rightOwnerPartyId,
-            rightMemberRosterId,
-            rightPrisonRosterId
+            leftMemberData,
+            leftPrisonerData,
+            rightOwnerPartyId
         );
 
         network.SendAll(message);
@@ -436,22 +441,15 @@ internal class CompanionRolesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.LeftOwnerPartyId, out var leftOwnerParty)) return;
-            if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.LeftMemberRosterId, out var leftMemberRoster)) return;
-            if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.LeftPrisonRosterId, out var leftPrisonRoster)) return;
+            var leftMemberElements = troopRosterInterface.UnpackTroopRosterData(obj.What.LeftMemberRosterData);
+            var leftPrisonerElements = troopRosterInterface.UnpackTroopRosterData(obj.What.LeftPrisonRosterData);
+
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.RightOwnerPartyId, out var rightOwnerParty)) return;
-            if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.RightMemberRosterId, out var rightMemberRoster)) return;
-            if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.RightPrisonRosterId, out var rightPrisonRoster)) return;
 
-            var companionRolesCampaignBehavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
-
-            companionRolesCampaignBehavior.PartyScreenClosed(
-                leftOwnerParty,
-                leftMemberRoster,
-                leftPrisonRoster,
+            companionRolesCampaignBehaviorInterface.PartyScreenClosed(
+                leftMemberElements,
+                leftPrisonerElements,
                 rightOwnerParty,
-                rightMemberRoster,
-                rightPrisonRoster,
                 false
             );
         });

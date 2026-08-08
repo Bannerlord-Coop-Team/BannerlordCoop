@@ -8,6 +8,8 @@ using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -184,6 +186,13 @@ public class MissionDisconnectDetectionTests
         {
             var controllerId = $"Client{++i}";
             client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+            TestEnvironment.Server.Call(() =>
+            {
+                var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
+                Assert.True(playerManager.AddPlayer(
+                    new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
+                playerManager.SetPeer(controllerId, client.NetPeer);
+            });
             members.Add(new Member(client, controllerId));
         }
         return members;
@@ -198,7 +207,7 @@ public class MissionDisconnectDetectionTests
 
     /// <summary>
     /// Simulates the campaign server observing the member's connection drop ungracefully. Handle_PlayerDisconnected
-    /// resolves the instance from the bare peer via <c>MissionManager.TryHandleDisconnect</c>.
+    /// resolves the instance from the bare peer via <c>MissionManager.HandleDisconnect</c>.
     /// </summary>
     private void Disconnect(Member member) =>
         GameThreadTestRunner.Run(() =>

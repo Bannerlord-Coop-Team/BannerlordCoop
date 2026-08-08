@@ -27,7 +27,7 @@ public class CustomPartyComponentTests : SyncTestBase
         HarmonyLib.AccessTools.Field(typeof(CustomPartyComponent), nameof(CustomPartyComponent._owner)).SetValue(component, null);
 
         // _name is initialized to TextObject("") in the CustomPartyComponent constructor
-        TestEnvironment.AssertField<CustomPartyComponent, TextObject>(nameof(CustomPartyComponent._name), new TextObject("name"), PartyId, new TextObject(""));
+        TestEnvironment.AssertField<CustomPartyComponent, TextObject>(nameof(CustomPartyComponent._name), new TextObject("name", new()), PartyId, new TextObject(""));
         TestEnvironment.AssertReferenceField<CustomPartyComponent, Settlement>(nameof(CustomPartyComponent._homeSettlement), PartyId);
         TestEnvironment.AssertReferenceField<CustomPartyComponent, Hero>(nameof(CustomPartyComponent._owner), PartyId);
         TestEnvironment.AssertField<CustomPartyComponent, float>(nameof(CustomPartyComponent._customPartyBaseSpeed), 5f, PartyId, 2f);

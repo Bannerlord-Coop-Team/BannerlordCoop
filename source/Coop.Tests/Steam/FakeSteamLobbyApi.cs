@@ -13,6 +13,7 @@ namespace Coop.Tests.Steam
         public bool OverlayEnabled = true;
         public string PersonaName = "Test Host";
         public ulong UserSteamId = 76561198000000777;
+        public uint SteamServerTime = 1_700_000_000;
         public ulong NextCreatedLobbyId = 1001;
         public ulong LobbyOwner = 76561198000000001;
         public bool CreateSucceeds = true;
@@ -47,6 +48,7 @@ namespace Coop.Tests.Steam
         public bool IsOverlayEnabled => OverlayEnabled;
         public string LocalPersonaName => PersonaName;
         public ulong LocalSteamId => UserSteamId;
+        public uint ServerRealTime => SteamServerTime;
 
         public event Action<ulong> LobbyJoinRequested;
         public event Action<string> ConnectStringReceived;

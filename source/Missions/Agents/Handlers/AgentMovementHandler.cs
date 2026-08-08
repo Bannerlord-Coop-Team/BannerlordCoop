@@ -62,7 +62,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly IAgentVisualActionAccessor visualActionAccessor;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
-
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
     // (this handler is transient), so it can't leak across missions.
@@ -130,9 +129,55 @@ public class AgentMovementHandler : IAgentMovementHandler
         public float LastSentTime;
     }
 
+    private readonly struct ReceivedMovement
+    {
+        public readonly string IdentityScopeId;
+        public readonly ushort CompactId;
+        public readonly Guid CanonicalId;
+        public readonly bool UsesCompactId;
+        public readonly AgentData Data;
+        public readonly AgentMountData MountData;
+        public readonly bool IsMount;
+
+        public ReceivedMovement(
+            string identityScopeId,
+            ushort compactId,
+            Guid canonicalId,
+            bool usesCompactId,
+            AgentData data)
+        {
+            IdentityScopeId = identityScopeId;
+            CompactId = compactId;
+            CanonicalId = canonicalId;
+            UsesCompactId = usesCompactId;
+            Data = data;
+            MountData = null;
+            IsMount = false;
+        }
+
+        public ReceivedMovement(
+            string identityScopeId,
+            ushort compactId,
+            Guid canonicalId,
+            bool usesCompactId,
+            AgentMountData mountData)
+        {
+            IdentityScopeId = identityScopeId;
+            CompactId = compactId;
+            CanonicalId = canonicalId;
+            UsesCompactId = usesCompactId;
+            Data = default;
+            MountData = mountData;
+            IsMount = true;
+        }
+    }
+
     private readonly Dictionary<Guid, LastSentMovementState> _lastSentMovement =
         new Dictionary<Guid, LastSentMovementState>();
+    private readonly Dictionary<Guid, float> movementPendingSince =
+        new Dictionary<Guid, float>();
     private float totalSimulationTime = 0f;
+    private bool sendMountMovementFirst;
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
     // ticked from CoopMissionController.OnMissionTick, so the ease is decoupled from the bursty poll cadence.
@@ -171,7 +216,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.movementBatchSender = movementBatchSender;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
         this.visualActionAccessor = visualActionAccessor;
-
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
         this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -185,7 +229,8 @@ public class AgentMovementHandler : IAgentMovementHandler
             agentRegistry,
             _interpolator,
             puppetMountStateRepairer,
-            UpdateRemoteSyntheticMountTurn);
+            UpdateRemoteSyntheticMountTurn,
+            QueueMountMovement);
         this.packetManager.RegisterPacketHandler(_mountMovementApplier);
     }
 
@@ -204,7 +249,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     {
         if (_disposed) return;
         _disposed = true;
-
         Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
 
         _interpolator.Clear();
@@ -216,6 +260,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         _dismountedHorses.Clear();
         _lastSentMovement.Clear();
+        movementPendingSince.Clear();
 
         movementBatchSender.Clear();
 
@@ -237,15 +282,18 @@ public class AgentMovementHandler : IAgentMovementHandler
     {
         if (_disposed || Mission.Current == null) return;
 
+        movementBatchSender.BeginFrame(dt);
         totalSimulationTime += dt;
         movementPollElapsed += dt;
         if (movementPollElapsed < MovementPollingIntervalSeconds) return;
         movementPollElapsed %= MovementPollingIntervalSeconds;
 
         var movementGroups = new Dictionary<string, MovementBatch<AgentData>>();
+        var priorityMovementGroups = new Dictionary<string, MovementBatch<AgentData>>();
         var mountGroups = new Dictionary<string, MovementBatch<AgentMountData>>();
         var equipmentGroups = new Dictionary<string, MovementBatch<AgentEquipmentData>>();
         MovementBatch<AgentData> legacyMovement = null;
+        MovementBatch<AgentData> legacyPriorityMovement = null;
         MovementBatch<AgentMountData> legacyMountMovement = null;
         MovementBatch<AgentEquipmentData> legacyEquipment = null;
         var broadcastAgentIds = new HashSet<Guid>();
@@ -283,6 +331,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
                 if (ShouldSendMovement(agentInfo.AgentId, mountData))
                 {
+                    MarkMovementPending(agentInfo.AgentId);
                     AddToBatch(
                         mountGroups,
                         ref legacyMountMovement,
@@ -316,11 +365,24 @@ public class AgentMovementHandler : IAgentMovementHandler
 
                 if (ShouldSendMovement(agentInfo.AgentId, agentData))
                 {
-                    AddToBatch(
-                        movementGroups,
-                        ref legacyMovement,
-                        agentInfo,
-                        agentData);
+                    MarkMovementPending(agentInfo.AgentId);
+                    if (ReferenceEquals(agent, Agent.Main))
+                    {
+                        AddToBatch(
+                            priorityMovementGroups,
+                            ref legacyPriorityMovement,
+                            agentInfo,
+                            agentData,
+                            isPriority: true);
+                    }
+                    else
+                    {
+                        AddToBatch(
+                            movementGroups,
+                            ref legacyMovement,
+                            agentInfo,
+                            agentData);
+                    }
                 }
 
                 var equipment = new AgentEquipmentData(agent);
@@ -352,40 +414,64 @@ public class AgentMovementHandler : IAgentMovementHandler
         SendEquipment(equipmentGroups.Values);
         SendEquipment(legacyEquipment);
         int maxPayloadBytes = client.GetMaxUnreliablePayloadBytes();
-        movementBatchSender.Send(
-            movementGroups.Values,
-            legacyMovement,
+        // The local player's current input/position gets first access to each refill. Formation AI then uses
+        // the rotating cursor, so responsiveness stays high without letting early registry entries monopolize it.
+        MovementSendResult priorityResult = movementBatchSender.Send(
+            priorityMovementGroups.Values,
+            legacyPriorityMovement,
             maxPayloadBytes,
-            CreateMovementPacket);
-        movementBatchSender.Send(
-            mountGroups.Values,
-            legacyMountMovement,
-            maxPayloadBytes,
-            CreateMountMovementPacket);
+            CreateMovementPacket,
+            RecordSentMovement);
+        MovementSendResult movementResult;
+        MovementSendResult mountResult;
+        if (sendMountMovementFirst)
+        {
+            mountResult = movementBatchSender.Send(
+                mountGroups.Values,
+                legacyMountMovement,
+                maxPayloadBytes,
+                CreateMountMovementPacket,
+                RecordSentMovement);
+            movementResult = movementBatchSender.Send(
+                movementGroups.Values,
+                legacyMovement,
+                maxPayloadBytes,
+                CreateMovementPacket,
+                RecordSentMovement);
+        }
+        else
+        {
+            movementResult = movementBatchSender.Send(
+                movementGroups.Values,
+                legacyMovement,
+                maxPayloadBytes,
+                CreateMovementPacket,
+                RecordSentMovement);
+            mountResult = movementBatchSender.Send(
+                mountGroups.Values,
+                legacyMountMovement,
+                maxPayloadBytes,
+                CreateMountMovementPacket,
+                RecordSentMovement);
+        }
+        sendMountMovementFirst = !sendMountMovementFirst;
+
+        movementBatchSender.EndFrame(
+            priorityResult.DeferredCount +
+                movementResult.DeferredCount +
+                mountResult.DeferredCount,
+            GetMaximumDeferredAge());
     }
 
     private bool ShouldSendMovement(Guid agentId, AgentData current)
     {
         if (!_lastSentMovement.TryGetValue(agentId, out var lastState))
-        {
-            _lastSentMovement[agentId] = new LastSentMovementState
-            {
-                AgentData = current,
-                LastSentTime = totalSimulationTime
-            };
             return true;
-        }
 
         if (lastState.IsMount ||
             HasMovementChanged(lastState.AgentData, current) ||
             IsHeartbeatDue(lastState))
-        {
-            lastState.AgentData = current;
-            lastState.MountData = null;
-            lastState.IsMount = false;
-            lastState.LastSentTime = totalSimulationTime;
             return true;
-        }
 
         return false;
     }
@@ -393,28 +479,52 @@ public class AgentMovementHandler : IAgentMovementHandler
     private bool ShouldSendMovement(Guid agentId, AgentMountData current)
     {
         if (!_lastSentMovement.TryGetValue(agentId, out var lastState))
-        {
-            _lastSentMovement[agentId] = new LastSentMovementState
-            {
-                MountData = current,
-                IsMount = true,
-                LastSentTime = totalSimulationTime
-            };
             return true;
-        }
 
         if (!lastState.IsMount ||
             HasMountMovementChanged(lastState.MountData, current) ||
             IsHeartbeatDue(lastState))
-        {
-            lastState.AgentData = default;
-            lastState.MountData = current;
-            lastState.IsMount = true;
-            lastState.LastSentTime = totalSimulationTime;
             return true;
-        }
 
         return false;
+    }
+
+    private void RecordSentMovement(Guid agentId, AgentData current)
+    {
+        _lastSentMovement[agentId] = new LastSentMovementState
+        {
+            AgentData = current,
+            MountData = null,
+            IsMount = false,
+            LastSentTime = totalSimulationTime
+        };
+        movementPendingSince.Remove(agentId);
+    }
+
+    private void RecordSentMovement(Guid agentId, AgentMountData current)
+    {
+        _lastSentMovement[agentId] = new LastSentMovementState
+        {
+            AgentData = default,
+            MountData = current,
+            IsMount = true,
+            LastSentTime = totalSimulationTime
+        };
+        movementPendingSince.Remove(agentId);
+    }
+
+    private void MarkMovementPending(Guid agentId)
+    {
+        if (!movementPendingSince.ContainsKey(agentId))
+            movementPendingSince[agentId] = totalSimulationTime;
+    }
+
+    private float GetMaximumDeferredAge()
+    {
+        float maximumAge = 0f;
+        foreach (float pendingSince in movementPendingSince.Values)
+            maximumAge = Math.Max(maximumAge, totalSimulationTime - pendingSince);
+        return maximumAge;
     }
 
     private bool IsHeartbeatDue(LastSentMovementState state)
@@ -462,8 +572,18 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     private void RemoveStaleLocalState(HashSet<Guid> broadcastAgentIds)
     {
-        var staleAgentIds = new List<Guid>();
+        var staleAgentIds = new HashSet<Guid>();
         foreach (Guid agentId in _lastSentMovement.Keys)
+        {
+            if (!broadcastAgentIds.Contains(agentId))
+                staleAgentIds.Add(agentId);
+        }
+        foreach (Guid agentId in movementPendingSince.Keys)
+        {
+            if (!broadcastAgentIds.Contains(agentId))
+                staleAgentIds.Add(agentId);
+        }
+        foreach (Guid agentId in lastEquipment.Keys)
         {
             if (!broadcastAgentIds.Contains(agentId))
                 staleAgentIds.Add(agentId);
@@ -472,6 +592,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         foreach (Guid agentId in staleAgentIds)
         {
             _lastSentMovement.Remove(agentId);
+            movementPendingSince.Remove(agentId);
             lastEquipment.Remove(agentId);
         }
     }
@@ -780,16 +901,17 @@ public class AgentMovementHandler : IAgentMovementHandler
         Dictionary<string, MovementBatch<T>> compactBatches,
         ref MovementBatch<T> legacyBatch,
         CoopAgentInfo agentInfo,
-        T data)
+        T data,
+        bool isPriority = false)
     {
         MovementBatch<T> batch;
         if (agentInfo.MovementId == 0)
         {
-            batch = legacyBatch ??= new MovementBatch<T>(null);
+            batch = legacyBatch ??= new MovementBatch<T>(null, isPriority);
         }
         else if (!compactBatches.TryGetValue(agentInfo.MovementScopeId, out batch))
         {
-            batch = new MovementBatch<T>(agentInfo.MovementScopeId);
+            batch = new MovementBatch<T>(agentInfo.MovementScopeId, isPriority);
             compactBatches[agentInfo.MovementScopeId] = batch;
         }
 
@@ -861,85 +983,126 @@ public class AgentMovementHandler : IAgentMovementHandler
             return;
         }
 
-        // Resolve and apply the whole batch in ONE game-thread action. Resolving here keeps this ordered behind
-        // earlier game-thread spawn/register work that may have been queued by reliable messages.
-        GameThread.RunSafe(() =>
+        if (_disposed) return;
+
+        bool usesCompactIds = movement.AgentIds != null;
+        var snapshots = new ReceivedMovement[idCount];
+        for (int i = 0; i < idCount; i++)
         {
-            if (Mission.Current == null) return;
+            snapshots[i] = new ReceivedMovement(
+                movement.IdentityScopeId,
+                usesCompactIds ? movement.AgentIds[i] : (ushort)0,
+                usesCompactIds ? Guid.Empty : movement.AgentGuids[i],
+                usesCompactIds,
+                movement.Agents[i]);
+        }
 
-            using (new AllowedThread())
+        QueueReceivedMovement(snapshots);
+    }
+
+    private void QueueMountMovement(MountMovementPacket movement)
+    {
+        int idCount = movement.MountIds?.Length ?? movement.MountGuids?.Length ?? 0;
+        if (idCount == 0 || movement.Mounts == null || movement.Mounts.Length != idCount || _disposed)
+            return;
+
+        bool usesCompactIds = movement.MountIds != null;
+        var snapshots = new ReceivedMovement[idCount];
+        for (int i = 0; i < idCount; i++)
+        {
+            snapshots[i] = new ReceivedMovement(
+                movement.IdentityScopeId,
+                usesCompactIds ? movement.MountIds[i] : (ushort)0,
+                usesCompactIds ? Guid.Empty : movement.MountGuids[i],
+                usesCompactIds,
+                movement.Mounts[i]);
+        }
+
+        QueueReceivedMovement(snapshots);
+    }
+
+    private void QueueReceivedMovement(ReceivedMovement[] snapshots)
+    {
+        // Resolve and apply each received packet in one game-thread action so it remains FIFO-ordered
+        // with spawn, deployment, and authority work queued by earlier messages.
+        GameThread.RunSafe(
+            () => ApplyMovement(snapshots),
+            context: nameof(HandlePacket));
+    }
+
+    private void ApplyMovement(IReadOnlyList<ReceivedMovement> snapshots)
+    {
+        if (_disposed || Mission.Current == null) return;
+
+        using (new AllowedThread())
+        {
+            foreach (ReceivedMovement snapshot in snapshots)
             {
-                for (int i = 0; i < idCount; i++)
+                if (snapshot.IsMount)
                 {
-                    CoopAgentInfo agentInfo;
-                    bool found = movement.AgentIds != null
-                        ? agentRegistry.TryGetAgentInfo(
-                            movement.IdentityScopeId, movement.AgentIds[i], out agentInfo)
-                        : agentRegistry.TryGetAgentInfo(
-                            movement.AgentGuids[i], out agentInfo);
-                    if (!found) continue;
+                    _mountMovementApplier.ApplySnapshot(
+                        snapshot.IdentityScopeId,
+                        snapshot.CompactId,
+                        snapshot.CanonicalId,
+                        snapshot.UsesCompactId,
+                        snapshot.MountData);
+                    continue;
+                }
 
-                    Agent agent = agentInfo.Agent;
-                    AgentData data = movement.Agents[i];
+                CoopAgentInfo agentInfo;
+                bool found = snapshot.UsesCompactId
+                    ? agentRegistry.TryGetAgentInfo(
+                        snapshot.IdentityScopeId, snapshot.CompactId, out agentInfo)
+                    : agentRegistry.TryGetAgentInfo(snapshot.CanonicalId, out agentInfo);
+                if (!found) continue;
 
-                    // The agent may have become invalid (player left, mission torn down) between queueing
-                    // and running; only apply while it is still active in the current mission.
-                    if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
-                        continue;
+                Agent agent = agentInfo.Agent;
+                AgentData data = snapshot.Data;
 
-                    // Re-check authority ON the game thread: a packet from the previous owner can be queued
-                    // behind a host-migration adoption (both are game-thread actions queued from the network
-                    // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
-                    // stale position/input snapshot the AI then fights.
-                    if (agentRegistry.IsLocallyControlled(agent))
-                        continue;
+                // The agent may have become invalid (player left, mission torn down) between queueing
+                // and running; only apply while it is still active in the current mission.
+                if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
+                    continue;
 
-                    Agent previousMount = agent.MountAgent;
-                    SyncMountState(
-                        agent,
-                        movement.IdentityScopeId ?? agentInfo.MovementScopeId,
-                        data);
-                    if (previousMount != null
-                        && !ReferenceEquals(previousMount, agent.MountAgent))
-                    {
-                        UpdateRemoteSyntheticMountTurn(
-                            previousMount,
-                            null);
-                    }
+                // Re-check authority ON the game thread: a packet from the previous owner can be queued
+                // behind a host-migration adoption (both are game-thread actions queued from the network
+                // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
+                // stale position/input snapshot the AI then fights.
+                if (agentRegistry.IsLocallyControlled(agent))
+                    continue;
 
-                    // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
-                    if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
-                    {
-                        puppetMount.Controller = AgentControllerType.None;
-                        puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
-                    }
+                Agent previousMount = agent.MountAgent;
+                SyncMountState(
+                    agent,
+                    snapshot.IdentityScopeId ?? agentInfo.MovementScopeId,
+                    data);
+                if (previousMount != null && !ReferenceEquals(previousMount, agent.MountAgent))
+                    UpdateRemoteSyntheticMountTurn(previousMount, null);
 
-                    data.Apply(agent);
-                    if (data.MountData != null
-                        && agent.MountAgent is Agent remoteMount)
-                    {
-                        UpdateRemoteSyntheticMountTurn(
-                            remoteMount,
-                            data.MountData);
-                    }
+                // A puppet horse must not run local AI between owner snapshots and fight their heading/input.
+                if (agent.MountAgent is Agent puppetMount && puppetMount.Controller != AgentControllerType.None)
+                {
+                    puppetMount.Controller = AgentControllerType.None;
+                    puppetMountStateRepairer.PreserveRiderlessPuppet(puppetMount);
+                }
 
-                    // Position is reconciled per-frame by the interpolator (smoother than a per-packet
-                    // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
-                    if (agent.HasMount && data.MountData != null)
-                    {
-                        // Mounted: feed target frames to the rider, since the mount is driven through its rider.
-                        // Keep the mount position only for rare large-gap snaps and drop any stale direct-horse
-                        // target from before the puppet mounted.
-                        _interpolator.Forget(agent.MountAgent);
-                        _interpolator.SetMountedRiderTarget(agent, data);
-                    }
-                    else
-                    {
-                        _interpolator.SetRiderTarget(agent, data);
-                    }
+                data.Apply(agent);
+                if (data.MountData != null && agent.MountAgent is Agent remoteMount)
+                    UpdateRemoteSyntheticMountTurn(remoteMount, data.MountData);
+
+                // Position is reconciled per-frame by the interpolator (smoother than a per-packet
+                // correction bound to the ~10ms poll cadence); push the latest targets it eases toward.
+                if (agent.HasMount && data.MountData != null)
+                {
+                    _interpolator.Forget(agent.MountAgent);
+                    _interpolator.SetMountedRiderTarget(agent, data);
+                }
+                else
+                {
+                    _interpolator.SetRiderTarget(agent, data);
                 }
             }
-        });
+        }
     }
 
     // [Game thread] Replicate the owner's mount/dismount onto its puppet. The per-tick AgentData reports

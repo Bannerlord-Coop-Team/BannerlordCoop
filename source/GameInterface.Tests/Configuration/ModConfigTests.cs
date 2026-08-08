@@ -1,4 +1,4 @@
-using GameInterface.Configuration;
+﻿using GameInterface.Configuration;
 using System;
 using System.IO;
 using Xunit;
@@ -82,6 +82,60 @@ public class ModConfigTests : IDisposable
         Assert.Null(config.Difficulty.AutoAllocateClanMemberPerks);
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
+    }
+
+    /// <summary>
+    /// The options a session runs on BEFORE any config is loaded (server) or received (client) must
+    /// already be the documented defaults. <see cref="ModOptions"/> is a struct declaring no
+    /// parameterless constructor, so a plain <c>new ModOptions()</c> is just <c>default</c>: the
+    /// property initializers never run and every option silently reads back false/0 (no auto-pause,
+    /// no AI joining player battles, no looters, no smithing stamina, no clan-tier requirement for a
+    /// kingdom). The un-loaded default must therefore be built through the real constructor from an
+    /// all-absent config.
+    /// </summary>
+    [Fact]
+    public void UnloadedModOptions_AreTheDocumentedDefaults_NotAZeroedStruct()
+    {
+        var options = ModConfigProvider.ModOptions;
+
+        Assert.True(options.FastForwardEnabled);
+        Assert.True(options.AutoPauseEnabled);
+        Assert.False(options.ClientsCanUseCheats);
+        Assert.True(options.GoldFoodInfluenceChangeInSettlements);
+        Assert.Equal(GoldFoodChangeMode.OneDayMax, options.GoldFoodInfluenceChangeInBattles);
+        Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
+        Assert.Equal(24, options.PlayerBattleAiJoinWindowHours);
+        Assert.True(options.SpeedLimitWhilePlayersInBattle);
+        Assert.Equal(32, options.WandererLimit);
+        Assert.False(options.WandererLimitScalesWithPlayers);
+        Assert.Equal(4, options.PlayerKingdomClanTierRequired);
+        Assert.True(options.SmithingStaminaRecoveryOutsideSettlements);
+        Assert.Equal(0.1f, options.SmithingStaminaRecoveryMultiplier);
+        Assert.Equal(1f, options.MaximumLootersMultiplier);
+        Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
+    }
+
+    /// <summary>
+    /// Unlike the difficulty block, the template's modOptions keys ship LIVE — so each one has to
+    /// name a real schema property (a typo just lands in the overflow and the option silently never
+    /// applies, however carefully the operator edits it), and the values it ships have to be the same
+    /// defaults a session runs on with no file at all.
+    /// </summary>
+    [Fact]
+    public void ShippedTemplate_ModOptions_AllBind_AndAreTheDefaults()
+    {
+        File.Copy(ShippedTemplatePath, ConfigPath);
+
+        var config = NewModConfig().Data;
+
+        Assert.True(config.ModOptions.UnknownKeys == null || config.ModOptions.UnknownKeys.Count == 0,
+            "every modOptions key in the template must name a schema property, but these did not: " +
+            string.Join(", ", config.ModOptions.UnknownKeys?.Keys ?? Array.Empty<string>()));
+
+        // Read back a value rather than only the overflow: an unparsed block would leave every
+        // property null, which the defaults comparison below would accept as a vacuous pass.
+        Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
+        Assert.Equal(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
     }
 
     [Fact]

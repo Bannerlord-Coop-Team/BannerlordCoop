@@ -39,12 +39,12 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool RestartPlayerEncounterPrefix(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement)
     {
+        // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
         if (EncounterManagerPatches.IsPendingParty(attackerParty) ||
             EncounterManagerPatches.IsPendingParty(defenderParty))
             return false;
-
-        // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // The server runs RestartPlayerEncounter locally (authoritative).
         if (ModInformation.IsServer) return true;
@@ -61,15 +61,11 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool StartBattleInternalPrefix(PlayerEncounter __instance, ref MapEvent __result)
     {
-        // Our own handler / replication path (AllowedThread) runs the real creation.
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
         // The server is authoritative and creates the MapEvent locally.
         if (ModInformation.IsServer) return true;
 
-        // Client: every participant must end up with the *same* server-authoritative MapEvent object (same
-        // object-manager id). Instead of creating one locally (which would desync ids), block and ask the server
-        // to create it, then adopt the synced MapEvent once it resolves on this client.
+        // Approved restarts run under AllowedThread, but clients must still adopt the same server-authoritative
+        // MapEvent and id instead of creating an unregistered local copy.
 
         // If a MapEvent is already attached (e.g. the player joined an existing battle), keep vanilla behavior.
         if (__instance._mapEvent != null)

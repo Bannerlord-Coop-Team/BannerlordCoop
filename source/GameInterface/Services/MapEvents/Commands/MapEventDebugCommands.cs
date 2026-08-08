@@ -66,25 +66,15 @@ public class MapEventDebugCommands
         public string JoiningPlayerPartyId { get; set; }
         public string JoiningPlayerMobilePartyId { get; set; }
         public PartyBehaviorUpdateData JoiningPlayerBehavior { get; set; }
-        public string VillageSettlementId { get; set; }
-        public float VillageSettlementHitPoints { get; set; }
-        public string MilitiaMobilePartyId { get; set; }
-        public PartyBehaviorUpdateData MilitiaBehavior { get; set; }
-        public bool AllowRaidAiIntervention { get; set; }
-        public List<FactionStanceSnapshot> FactionStances { get; set; }
+        public string OpponentMobilePartyId { get; set; }
+        public PartyBehaviorUpdateData OpponentBehavior { get; set; }
         public bool JoiningPartyJoined { get; set; }
-    }
-
-    private sealed class FactionStanceSnapshot
-    {
-        public IFaction PlayerFaction { get; set; }
-        public IFaction VillageFaction { get; set; }
-        public StanceType StanceType { get; set; }
     }
 
     private static WoundedAlliedFixture woundedAlliedFixture;
     private static BattleRewardFixture battleRewardFixture;
     private static PlayerFieldBattleFixture playerFieldBattleFixture;
+    private static BanditAttackFixture banditAttackFixture;
 
     private sealed class WoundedAlliedFixture
     {
@@ -136,6 +126,21 @@ public class MapEventDebugCommands
         public IFaction AttackerFaction;
         public IFaction DefenderFaction;
         public bool WasAtWar;
+    }
+
+    private sealed class BanditAttackFixture
+    {
+        public string ControllerId;
+        public MobileParty PlayerParty;
+        public MobileParty BanditParty;
+        public Settlement PlayerSettlement;
+        public Settlement BanditSettlement;
+        public bool BanditWasActive;
+        public TroopRosterElement[] BanditMemberRoster;
+        public MapEvent MapEvent;
+        public PartyBase[] InvolvedParties;
+        public PartyBehaviorUpdateData PlayerBehavior;
+        public PartyBehaviorUpdateData BanditBehavior;
     }
 
     /// <summary>
@@ -588,6 +593,318 @@ public class MapEventDebugCommands
         return $"Started attack by {banditParty.Name} (StringId {banditParty.StringId}, " +
                $"registry id {partyId}, PartyBase id {partyBaseId}) " +
                $"against player {args[0]} after removing {removedTroops} excess fixture troops.";
+    }
+
+    // coop.debug.mapevent.bandit_attack_fixture_prepare PlayerOne mountain_bandits_24
+    /// <summary>Prepares a reversible exact-bandit attack fixture for evidence capture.</summary>
+    [CommandLineArgumentFunction("bandit_attack_fixture_prepare", "coop.debug.mapevent")]
+    public static string PrepareBanditAttackFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.bandit_attack_fixture_prepare <controllerId> <banditPartyId>";
+
+        if (banditAttackFixture != null)
+            return "A bandit attack fixture is already active.";
+
+        if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+            return error;
+
+        if ((!objectManager.TryGetObject(args[1], out MobileParty banditParty) &&
+             !CommandHelpers.TryGetMobileParty(args[1], out banditParty, out error)) ||
+            banditParty?.Party == null)
+        {
+            return $"Unable to resolve bandit party {args[1]}: {error}";
+        }
+
+        if (!banditParty.IsBandit || banditParty.MapEvent != null)
+        {
+            return $"Bandit party {args[1]} must be a bandit outside a map event.";
+        }
+
+        if (playerParty.Army?.LeaderParty == playerParty && playerParty.AttachedParties.Count > 0)
+            return $"Player {args[0]} must not lead an army with attached parties.";
+
+        if (banditParty.CurrentSettlement?.SettlementComponent is Hideout &&
+            banditParty.CurrentSettlement.Parties.Count <= 1)
+        {
+            return $"Bandit party {args[1]} must not be the last party in its hideout.";
+        }
+
+        if (!objectManager.TryGetId(playerParty, out string playerPartyId) ||
+            !objectManager.TryGetId(playerParty.Party, out string playerPartyBaseId) ||
+            !objectManager.TryGetId(banditParty, out string banditPartyId) ||
+            !objectManager.TryGetId(banditParty.Party, out string banditPartyBaseId))
+        {
+            return "The player and bandit parties must have registered MobileParty and PartyBase ids.";
+        }
+
+        if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+            !behaviorSnapshot.TryCreate(playerParty, out PartyBehaviorUpdateData playerBehavior) ||
+            !behaviorSnapshot.TryCreate(banditParty, out PartyBehaviorUpdateData banditBehavior))
+        {
+            return "Unable to capture the original party behavior.";
+        }
+
+        CharacterObject fixtureTroop = null;
+        if (banditParty.MemberRoster.TotalManCount <= 0)
+        {
+            fixtureTroop = MobileParty.All
+                .Where(party => party != banditParty && party.IsActive && party.IsBandit &&
+                                party.MemberRoster.TotalManCount > 0)
+                .SelectMany(party => party.MemberRoster.GetTroopRoster())
+                .Where(element => !element.Character.IsHero && element.Number > 0)
+                .OrderByDescending(element => element.Number)
+                .Select(element => element.Character)
+                .FirstOrDefault();
+            if (fixtureTroop == null)
+                return "No active bandit party has a regular troop for the fixture.";
+        }
+
+        var fixture = new BanditAttackFixture
+        {
+            ControllerId = args[0],
+            PlayerParty = playerParty,
+            BanditParty = banditParty,
+            PlayerSettlement = playerParty.CurrentSettlement,
+            BanditSettlement = banditParty.CurrentSettlement,
+            BanditWasActive = banditParty.IsActive,
+            BanditMemberRoster = banditParty.MemberRoster.GetTroopRoster().ToArray(),
+            PlayerBehavior = playerBehavior,
+            BanditBehavior = banditBehavior,
+        };
+        banditAttackFixture = fixture;
+
+        try
+        {
+            if (playerParty.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(playerParty);
+            if (banditParty.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(banditParty);
+
+            if (fixtureTroop != null)
+                banditParty.MemberRoster.AddToCounts(fixtureTroop, 1);
+            banditParty.IsActive = true;
+            banditParty.Position = new CampaignVec2(
+                new Vec2(playerParty.Position.X - 0.4f, playerParty.Position.Y),
+                isOnLand: true);
+            banditParty.SetMoveModeHold();
+            banditParty.ResetNavigationToHold();
+
+            MessageBroker.Instance.Publish(
+                typeof(MapEventDebugCommands),
+                new PartyBehaviorChangeAttempted(
+                    banditParty,
+                    forcePosition: true,
+                    isCurrentlyAtSea: false,
+                    resetMovementToHold: true));
+
+            return $"Bandit attack fixture prepared: controller={args[0]}, playerParty={playerPartyId}, " +
+                   $"playerPartyBase={playerPartyBaseId}, banditParty={banditPartyId}, " +
+                   $"banditPartyBase={banditPartyBaseId}, banditStringId={banditParty.StringId}, " +
+                   $"originalSettlement={fixture.PlayerSettlement?.StringId ?? "none"}, " +
+                   $"originalBanditSettlement={fixture.BanditSettlement?.StringId ?? "none"}, " +
+                   $"originalBanditActive={fixture.BanditWasActive}, " +
+                   $"originalBanditTroops={fixture.BanditMemberRoster.Sum(element => element.Number)}.";
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to prepare bandit attack fixture");
+            if (TryRestoreBanditAttackFixture(fixture, out var restoreError))
+                banditAttackFixture = null;
+            else
+                return $"Fixture preparation failed: {e.Message}. Cleanup failed: {restoreError}. Run the restore command.";
+
+            return $"Fixture preparation failed: {e.Message}";
+        }
+    }
+
+    // coop.debug.mapevent.bandit_attack_fixture_start PlayerOne mountain_bandits_24
+    /// <summary>Starts the prepared server-authoritative attack by the exact bandit party.</summary>
+    [CommandLineArgumentFunction("bandit_attack_fixture_start", "coop.debug.mapevent")]
+    public static string StartBanditAttackFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.bandit_attack_fixture_start <controllerId> <banditPartyId>";
+
+        if (!TryGetObjectManager(out var objectManager))
+            return "Unable to resolve ObjectManager";
+
+        var fixture = banditAttackFixture;
+        if (fixture == null || fixture.ControllerId != args[0] ||
+            !MatchesPartyId(objectManager, fixture.BanditParty, args[1]))
+        {
+            return $"Prepare the bandit attack fixture for {args[0]} and {args[1]} first.";
+        }
+
+        if (fixture.MapEvent != null)
+            return "The bandit attack fixture was already started.";
+
+        var playerParty = fixture.PlayerParty;
+        var banditParty = fixture.BanditParty;
+        if (!banditParty.IsActive || banditParty.MemberRoster.TotalManCount <= 0 ||
+            playerParty.CurrentSettlement != null || banditParty.CurrentSettlement != null ||
+            playerParty.MapEvent != null || banditParty.MapEvent != null)
+        {
+            return "The prepared bandit attack fixture is no longer ready.";
+        }
+
+        if (!objectManager.TryGetId(playerParty, out string playerPartyId) ||
+            !objectManager.TryGetId(playerParty.Party, out string playerPartyBaseId) ||
+            !objectManager.TryGetId(banditParty, out string banditPartyId) ||
+            !objectManager.TryGetId(banditParty.Party, out string banditPartyBaseId))
+        {
+            return "The player and bandit parties must have registered MobileParty and PartyBase ids.";
+        }
+
+        try
+        {
+            StartBattleAction.Apply(banditParty.Party, playerParty.Party);
+            fixture.MapEvent = playerParty.MapEvent;
+            if (fixture.MapEvent == null || banditParty.MapEvent != fixture.MapEvent)
+                throw new InvalidOperationException("The bandit attack did not create a shared map event.");
+
+            fixture.InvolvedParties = fixture.MapEvent.InvolvedParties.ToArray();
+
+            objectManager.TryGetId(fixture.MapEvent, out string mapEventId);
+            return $"Bandit attack fixture started: controller={args[0]}, playerParty={playerPartyId}, " +
+                   $"playerPartyBase={playerPartyBaseId}, banditParty={banditPartyId}, " +
+                   $"banditPartyBase={banditPartyBaseId}, banditStringId={banditParty.StringId}, " +
+                   $"mapEvent={mapEventId ?? "unregistered"}.";
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to start bandit attack fixture");
+            fixture.MapEvent ??= playerParty.MapEvent ?? banditParty.MapEvent;
+            fixture.InvolvedParties ??= fixture.MapEvent?.InvolvedParties.ToArray();
+            if (TryRestoreBanditAttackFixture(fixture, out var restoreError))
+                banditAttackFixture = null;
+            else
+                return $"Fixture setup failed: {e.Message}. Cleanup failed: {restoreError}. Run the restore command.";
+
+            return $"Fixture setup failed: {e.Message}";
+        }
+    }
+
+    // coop.debug.mapevent.bandit_attack_fixture_state PlayerOne mountain_bandits_24
+    /// <summary>Reports the exact bandit attack state on the server or a client.</summary>
+    [CommandLineArgumentFunction("bandit_attack_fixture_state", "coop.debug.mapevent")]
+    public static string GetBanditAttackFixtureState(List<string> args)
+    {
+        if (args.Count != 2)
+            return "Usage: coop.debug.mapevent.bandit_attack_fixture_state <controllerId> <banditPartyId>";
+
+        if (!TryGetPlayerParty(
+                args[0],
+                requireReady: false,
+                out var objectManager,
+                out var playerParty,
+                out var error,
+                allowActiveMapEvent: true))
+        {
+            return error;
+        }
+
+        if ((!objectManager.TryGetObject(args[1], out MobileParty banditParty) &&
+             !CommandHelpers.TryGetMobileParty(args[1], out banditParty, out error)) ||
+            banditParty == null)
+        {
+            return $"Unable to resolve bandit party {args[1]}: {error}";
+        }
+
+        objectManager.TryGetId(playerParty, out string playerPartyId);
+        objectManager.TryGetId(banditParty, out string banditPartyId);
+        objectManager.TryGetId(playerParty.MapEvent, out string playerMapEventId);
+        objectManager.TryGetId(banditParty.MapEvent, out string banditMapEventId);
+
+        return $"Bandit attack fixture state: controller={args[0]}, local={playerParty == MobileParty.MainParty}, " +
+               $"playerParty={playerPartyId ?? "unregistered"}, banditParty={banditPartyId ?? "unregistered"}, " +
+               $"banditStringId={banditParty.StringId}, playerMapEvent={playerMapEventId ?? "none"}, " +
+               $"banditMapEvent={banditMapEventId ?? "none"}, " +
+               $"sharedMapEvent={playerParty.MapEvent != null && playerParty.MapEvent == banditParty.MapEvent}, " +
+               $"playerSettlement={playerParty.CurrentSettlement?.StringId ?? "none"}, " +
+               $"banditSettlement={banditParty.CurrentSettlement?.StringId ?? "none"}, " +
+               $"banditActive={banditParty.IsActive}, banditTroops={banditParty.MemberRoster.TotalManCount}, " +
+               $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "none"}.";
+    }
+
+    // coop.debug.mapevent.bandit_attack_fixture_restore PlayerOne
+    /// <summary>Finalizes the bandit attack and restores both parties' original behavior.</summary>
+    [CommandLineArgumentFunction("bandit_attack_fixture_restore", "coop.debug.mapevent")]
+    public static string RestoreBanditAttackFixture(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Run this command on the server.";
+
+        if (args.Count != 1)
+            return "Usage: coop.debug.mapevent.bandit_attack_fixture_restore <controllerId>";
+
+        if (banditAttackFixture == null || banditAttackFixture.ControllerId != args[0])
+            return $"No active bandit attack fixture exists for {args[0]}.";
+
+        var fixture = banditAttackFixture;
+        if (!TryRestoreBanditAttackFixture(fixture, out var error))
+            return $"Fixture restore failed: {error}. Retry the restore command.";
+
+        banditAttackFixture = null;
+        return $"Bandit attack fixture restored: controller={args[0]}, banditStringId={fixture.BanditParty.StringId}.";
+    }
+
+    private static bool TryRestoreBanditAttackFixture(BanditAttackFixture fixture, out string error)
+    {
+        try
+        {
+            if (fixture.MapEvent != null && !fixture.MapEvent.IsFinalized)
+                fixture.MapEvent.FinalizeEvent();
+
+            if (HasAttachedParties(fixture.MapEvent, fixture.InvolvedParties))
+                RecoverPartiallyFinalizedMapEvent(fixture.MapEvent, fixture.InvolvedParties);
+
+            if (fixture.PlayerParty.MapEvent != null || fixture.BanditParty.MapEvent != null)
+                throw new InvalidOperationException("The fixture parties are still attached to a map event.");
+
+            if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+                !RestorePartyBehavior(fixture.PlayerParty, fixture.PlayerBehavior, behaviorSnapshot) ||
+                !RestorePartyBehavior(fixture.BanditParty, fixture.BanditBehavior, behaviorSnapshot))
+            {
+                throw new InvalidOperationException("Unable to restore the original party behavior.");
+            }
+
+            MessageBroker.Instance.Publish(
+                typeof(MapEventDebugCommands),
+                new PartyBehaviorChangeAttempted(
+                    fixture.PlayerParty,
+                    forcePosition: true,
+                    isCurrentlyAtSea: fixture.PlayerParty.IsCurrentlyAtSea));
+            MessageBroker.Instance.Publish(
+                typeof(MapEventDebugCommands),
+                new PartyBehaviorChangeAttempted(
+                    fixture.BanditParty,
+                    forcePosition: true,
+                    isCurrentlyAtSea: fixture.BanditParty.IsCurrentlyAtSea));
+
+            RestoreTroopRoster(fixture.BanditParty.MemberRoster, fixture.BanditMemberRoster);
+            fixture.BanditParty.IsActive = fixture.BanditWasActive;
+
+            if (fixture.PlayerSettlement != null)
+                EnterSettlementAction.ApplyForParty(fixture.PlayerParty, fixture.PlayerSettlement);
+            if (fixture.BanditSettlement != null)
+                EnterSettlementAction.ApplyForParty(fixture.BanditParty, fixture.BanditSettlement);
+
+            error = null;
+            return true;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to restore bandit attack fixture");
+            error = e.Message;
+            return false;
+        }
     }
 
     [CommandLineArgumentFunction("finish_non_battle_encounter", "coop.debug.mapevent")]
@@ -1463,15 +1780,24 @@ public class MapEventDebugCommands
     }
 
     private static bool HasAttachedFixtureParties(WoundedAlliedFixture fixture) =>
-        fixture.InvolvedParties?.Any(p => p?._mapEventSide?.MapEvent == fixture.MapEvent) == true ||
-        fixture.MapEvent.AttackerSide?.Parties.Count > 0 ||
-        fixture.MapEvent.DefenderSide?.Parties.Count > 0;
+        HasAttachedParties(fixture.MapEvent, fixture.InvolvedParties);
+
+    private static bool HasAttachedParties(MapEvent mapEvent, PartyBase[] involvedParties) =>
+        mapEvent != null &&
+        (involvedParties?.Any(p => p?._mapEventSide?.MapEvent == mapEvent) == true ||
+         mapEvent.AttackerSide?.Parties.Count > 0 ||
+         mapEvent.DefenderSide?.Parties.Count > 0);
 
     private static void RecoverPartiallyFinalizedMapEvent(WoundedAlliedFixture fixture)
     {
-        foreach (var party in fixture.InvolvedParties ?? Array.Empty<PartyBase>())
+        RecoverPartiallyFinalizedMapEvent(fixture.MapEvent, fixture.InvolvedParties);
+    }
+
+    private static void RecoverPartiallyFinalizedMapEvent(MapEvent mapEvent, PartyBase[] involvedParties)
+    {
+        foreach (var party in involvedParties ?? Array.Empty<PartyBase>())
         {
-            if (party?._mapEventSide?.MapEvent != fixture.MapEvent) continue;
+            if (party?._mapEventSide?.MapEvent != mapEvent) continue;
 
             party._mapEventSide = null;
             if (party.MobileParty != null)
@@ -1479,13 +1805,13 @@ public class MapEventDebugCommands
             party.SetVisualAsDirty();
         }
 
-        fixture.MapEvent.AttackerSide?.Clear();
-        fixture.MapEvent.DefenderSide?.Clear();
-        if (HasAttachedFixtureParties(fixture))
+        mapEvent.AttackerSide?.Clear();
+        mapEvent.DefenderSide?.Clear();
+        if (HasAttachedParties(mapEvent, involvedParties))
             throw new InvalidOperationException("The partially finalized fixture still has attached parties.");
 
-        MessageBroker.Instance.Publish(fixture.MapEvent, new MapEventFinalized(fixture.MapEvent));
-        MessageBroker.Instance.Publish(fixture.MapEvent, new InstanceDestroyed<MapEvent>(fixture.MapEvent));
+        MessageBroker.Instance.Publish(mapEvent, new MapEventFinalized(mapEvent));
+        MessageBroker.Instance.Publish(mapEvent, new InstanceDestroyed<MapEvent>(mapEvent));
     }
 
     private static bool TryRestoreWoundedAlliedFixture(WoundedAlliedFixture fixture, out string error)
@@ -1689,8 +2015,7 @@ public class MapEventDebugCommands
         }
 
         if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) ||
-            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
-            !ContainerProvider.TryResolve<RaidAiInterventionConfigHandler>(out var raidConfigHandler))
+            !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
         {
             return "Unable to resolve the late-join mode fixture services.";
         }
@@ -1701,53 +2026,37 @@ public class MapEventDebugCommands
             return "Unable to capture both players' original movement state.";
         }
 
-        var firstPosition = firstParty.Position.ToVec2();
         var firstFaction = firstParty.MapFaction?.MapFaction ?? firstParty.MapFaction;
         var joiningFaction = joiningParty.MapFaction?.MapFaction ?? joiningParty.MapFaction;
-        var village = Settlement.All
-            .Where(s => s.IsVillage && s.Village.VillageState == Village.VillageStates.Normal &&
-                        s.Party.MapEvent == null && s.MilitiaPartyComponent?.MobileParty?.IsActive == true &&
-                        s.MilitiaPartyComponent.MobileParty.MapEvent == null &&
-                        s.MilitiaPartyComponent.MobileParty.MemberRoster.TotalManCount > 0 &&
-                        firstFaction != (s.MapFaction?.MapFaction ?? s.MapFaction) &&
-                        joiningFaction != (s.MapFaction?.MapFaction ?? s.MapFaction))
-            .OrderBy(s => s.Position.ToVec2().DistanceSquared(firstPosition))
+        var firstPosition = firstParty.Position.ToVec2();
+        var opponentParty = MobileParty.All
+            .Where(p => p.IsActive && p.IsBandit && p.MapEvent == null && p.CurrentSettlement == null &&
+                        p.MemberRoster.TotalHealthyCount > 0 && p.MapFaction != null &&
+                        VillageHostileFactionStanceHelper.HasWarStance(firstFaction, p.MapFaction) &&
+                        VillageHostileFactionStanceHelper.HasWarStance(joiningFaction, p.MapFaction))
+            .OrderBy(p => p.Position.ToVec2().DistanceSquared(firstPosition))
             .FirstOrDefault();
 
-        if (village == null)
+        if (opponentParty == null)
         {
-            return "No normal village with an active militia party was found for both players.";
+            return "No active healthy bandit party hostile to both players was found.";
         }
 
-        var militiaParty = village.MilitiaPartyComponent.MobileParty;
-        if (!behaviorSnapshot.TryCreate(militiaParty, out var militiaBehavior))
+        if (!behaviorSnapshot.TryCreate(opponentParty, out var opponentBehavior))
         {
-            return $"Unable to capture the militia movement state for {village.Name}.";
+            return $"Unable to capture the opponent movement state for {opponentParty.Name}.";
         }
 
         if (!objectManager.TryGetId(firstParty.Party, out string firstPartyId) ||
             !objectManager.TryGetId(firstParty, out string firstMobilePartyId) ||
             !objectManager.TryGetId(joiningParty.Party, out string joiningPartyId) ||
             !objectManager.TryGetId(joiningParty, out string joiningMobilePartyId) ||
-            !objectManager.TryGetId(village, out string villageSettlementId) ||
-            !objectManager.TryGetId(militiaParty, out string militiaMobilePartyId))
+            !objectManager.TryGetId(opponentParty, out string opponentMobilePartyId))
         {
             return "Unable to resolve fixture party ids.";
         }
 
-        var originalVillageHitPoints = village.SettlementHitPoints;
-        var originalAllowRaidAiIntervention = MapEventConfig.AllowRaidAiIntervention;
-        var factionStances = new List<FactionStanceSnapshot>();
-        var villageFaction = village.MapFaction?.MapFaction ?? village.MapFaction;
-        if (!TryApplyTemporaryWarStance(firstFaction, villageFaction, factionStances) ||
-            !TryApplyTemporaryWarStance(joiningFaction, villageFaction, factionStances))
-        {
-            RestoreFactionStances(factionStances);
-            return $"Unable to establish temporary hostility against {village.Name}.";
-        }
-
-        raidConfigHandler.SetAndBroadcast(true);
-        var mapEvent = MapEventBattleFactory.CreateMapEvent(firstParty.Party, village.Party, default);
+        var mapEvent = MapEventBattleFactory.CreateMapEvent(firstParty.Party, opponentParty.Party, default);
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out string mapEventId))
         {
             if (mapEvent != null && !mapEvent.IsFinalized)
@@ -1755,12 +2064,7 @@ public class MapEventDebugCommands
 
             RestorePartyBehavior(firstParty, firstPlayerBehavior, behaviorSnapshot);
             RestorePartyBehavior(joiningParty, joiningPlayerBehavior, behaviorSnapshot);
-            RestorePartyBehavior(militiaParty, militiaBehavior, behaviorSnapshot);
-            if (village.Village.VillageState != Village.VillageStates.Normal)
-                ChangeVillageStateAction.ApplyBySettingToNormal(village);
-            village.SettlementHitPoints = originalVillageHitPoints;
-            raidConfigHandler.SetAndBroadcast(originalAllowRaidAiIntervention);
-            RestoreFactionStances(factionStances);
+            RestorePartyBehavior(opponentParty, opponentBehavior, behaviorSnapshot);
             return "Unable to create or resolve the fixture map event.";
         }
 
@@ -1775,23 +2079,18 @@ public class MapEventDebugCommands
             JoiningPlayerPartyId = joiningPartyId,
             JoiningPlayerMobilePartyId = joiningMobilePartyId,
             JoiningPlayerBehavior = joiningPlayerBehavior,
-            VillageSettlementId = villageSettlementId,
-            VillageSettlementHitPoints = originalVillageHitPoints,
-            MilitiaMobilePartyId = militiaMobilePartyId,
-            MilitiaBehavior = militiaBehavior,
-            AllowRaidAiIntervention = originalAllowRaidAiIntervention,
-            FactionStances = factionStances,
+            OpponentMobilePartyId = opponentMobilePartyId,
+            OpponentBehavior = opponentBehavior,
         };
 
-        var hasVillageMilitiaResistance = mapEvent.EventType == MapEvent.BattleTypes.Raid &&
-                                           mapEvent.MapEventSettlement == village &&
-                                           mapEvent.DefenderSide?.Parties.Any(
-                                               p => p.Party == militiaParty.Party) == true &&
-                                           !mapEvent.IsActiveSlowVillageRaid();
-        if (!hasVillageMilitiaResistance)
+        var hasFieldBattleOpponent = mapEvent.EventType == MapEvent.BattleTypes.FieldBattle &&
+                                     mapEvent.MapEventSettlement == null &&
+                                     mapEvent.DefenderSide?.Parties.Any(
+                                         p => p.Party == opponentParty.Party) == true;
+        if (!hasFieldBattleOpponent)
         {
             CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
-            return $"Village raid fixture {mapEventId} did not create active militia resistance.";
+            return $"Late-join fixture {mapEventId} did not create the required field battle.";
         }
 
         // Route the first player's Attack through the real server handler. The resulting mission-start and mode
@@ -1802,8 +2101,8 @@ public class MapEventDebugCommands
             mapEventId,
             firstMobilePartyId));
 
-        return $"Late-join raid fixture created and first mission requested: mapEvent={mapEventId}, eventType={mapEvent.EventType}, " +
-               $"village={village.Name} ({village.StringId}), militiaParty={militiaParty.Name}, " +
+        return $"Late-join field-battle fixture created and first mission requested: mapEvent={mapEventId}, " +
+               $"eventType={mapEvent.EventType}, opponent={opponentParty.Name} ({opponentParty.StringId}), " +
                $"firstPlayer={args[0]}, joiningPlayer={args[1]}, firstSide=Attacker.";
     }
 
@@ -1848,6 +2147,7 @@ public class MapEventDebugCommands
         }
 
         messageBroker.Publish(joiningPeer, new NetworkRequestJoinBattle(
+            Guid.NewGuid().ToString(),
             fixture.MapEventId,
             fixture.JoiningPlayerPartyId,
             BattleSideEnum.Attacker));
@@ -2018,10 +2318,9 @@ public class MapEventDebugCommands
             ? resolvedId
             : "none";
         var eventType = mapEvent?.EventType.ToString() ?? "none";
-        var village = mapEvent?.MapEventSettlement;
-        var villageName = village != null ? $"{village.Name} ({village.StringId})" : "none";
-        var militiaResistance = mapEvent?.DefenderSide?.Parties.Any(
-            p => p.Party?.MobileParty?.IsMilitia == true) == true;
+        var settlement = mapEvent?.MapEventSettlement;
+        var settlementName = settlement != null ? $"{settlement.Name} ({settlement.StringId})" : "none";
+        var opponentParties = mapEvent?.DefenderSide?.Parties.Count ?? 0;
         var side = playerParty.MapEventSide?.MissionSide.ToString() ?? "none";
         var mode = "Unclaimed";
         if (mapEventId != "none")
@@ -2045,12 +2344,12 @@ public class MapEventDebugCommands
                                Mission.Current?.HasMissionBehavior<DeploymentHandler>() == true;
 
         return $"Late-join mode state: controller={args[0]}, mapEvent={mapEventId}, eventType={eventType}, " +
-               $"village={villageName}, militiaResistance={militiaResistance}, side={side}, mode={mode}, " +
+               $"settlement={settlementName}, opponentParties={opponentParties}, side={side}, mode={mode}, " +
                $"missionActive={missionActive}, missionAgents={missionAgents}, deploymentActive={deploymentActive}.";
     }
 
     // coop.debug.mapevent.late_join_mode_cleanup
-    /// <summary>Removes the fixture raid and restores the village, militia, parties, and raid config.</summary>
+    /// <summary>Removes the fixture field battle and restores each party's movement state.</summary>
     [CommandLineArgumentFunction("late_join_mode_cleanup", "coop.debug.mapevent")]
     public static string CleanupLateJoinModeFixture(List<string> args)
     {
@@ -2079,8 +2378,8 @@ public class MapEventDebugCommands
         var mapEventId = lateJoinModeFixture.MapEventId;
         var restored = CleanupLateJoinModeFixture(messageBroker, behaviorSnapshot, objectManager);
         return restored
-            ? $"Late-join raid fixture {mapEventId} cleaned up and village raid state restored."
-            : $"Late-join raid fixture {mapEventId} cleaned up, but its original state could not be fully restored.";
+            ? $"Late-join field-battle fixture {mapEventId} cleaned up and party movement restored."
+            : $"Late-join field-battle fixture {mapEventId} cleaned up, but its original state could not be fully restored.";
     }
 
     private static bool CleanupLateJoinModeFixture(
@@ -2108,86 +2407,12 @@ public class MapEventDebugCommands
             behaviorSnapshot,
             objectManager) && restored;
         restored = RestorePartyBehavior(
-            fixture.MilitiaMobilePartyId,
-            fixture.MilitiaBehavior,
+            fixture.OpponentMobilePartyId,
+            fixture.OpponentBehavior,
             behaviorSnapshot,
             objectManager) && restored;
-        restored = RestoreVillage(
-            fixture.VillageSettlementId,
-            fixture.VillageSettlementHitPoints,
-            objectManager) && restored;
-        restored = RestoreFactionStances(fixture.FactionStances) && restored;
-
-        if (ContainerProvider.TryResolve<RaidAiInterventionConfigHandler>(out var raidConfigHandler))
-        {
-            MapEventConfig.AllowRaidAiIntervention = fixture.AllowRaidAiIntervention;
-            raidConfigHandler.SetAndBroadcast(fixture.AllowRaidAiIntervention);
-        }
-        else
-        {
-            restored = false;
-        }
 
         lateJoinModeFixture = null;
-        return restored;
-    }
-
-    private static bool RestoreVillage(
-        string settlementId,
-        float settlementHitPoints,
-        IObjectManager objectManager)
-    {
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementId, out var settlement))
-            return false;
-
-        if (settlement.Village.VillageState != Village.VillageStates.Normal)
-            ChangeVillageStateAction.ApplyBySettingToNormal(settlement);
-        settlement.SettlementHitPoints = settlementHitPoints;
-        return settlement.Village.VillageState == Village.VillageStates.Normal &&
-               settlement.SettlementHitPoints == settlementHitPoints;
-    }
-
-    private static bool TryApplyTemporaryWarStance(
-        IFaction playerFaction,
-        IFaction villageFaction,
-        List<FactionStanceSnapshot> snapshots)
-    {
-        if (playerFaction == null || villageFaction == null || playerFaction == villageFaction)
-            return false;
-
-        if (snapshots.Any(snapshot => snapshot.PlayerFaction == playerFaction &&
-                                      snapshot.VillageFaction == villageFaction))
-            return true;
-
-        var stanceLink = FactionManager.Instance.GetStanceLinkInternal(playerFaction, villageFaction);
-        snapshots.Add(new FactionStanceSnapshot
-        {
-            PlayerFaction = playerFaction,
-            VillageFaction = villageFaction,
-            StanceType = stanceLink.StanceType,
-        });
-        VillageHostileFactionStanceHelper.ApplyWarStance(playerFaction, villageFaction);
-        return VillageHostileFactionStanceHelper.HasWarStance(playerFaction, villageFaction);
-    }
-
-    private static bool RestoreFactionStances(List<FactionStanceSnapshot> snapshots)
-    {
-        var restored = true;
-        foreach (var snapshot in snapshots)
-        {
-            FactionManager.SetStance(snapshot.PlayerFaction, snapshot.VillageFaction, snapshot.StanceType);
-            var stanceLink = FactionManager.Instance.GetStanceLinkInternal(
-                snapshot.PlayerFaction,
-                snapshot.VillageFaction);
-            stanceLink.StanceType = snapshot.StanceType;
-            snapshot.PlayerFaction.UpdateFactionsAtWarWith();
-            snapshot.VillageFaction.UpdateFactionsAtWarWith();
-
-            var shouldBeAtWar = snapshot.StanceType == StanceType.War;
-            restored = VillageHostileFactionStanceHelper.HasWarStance(
-                snapshot.PlayerFaction,
-                snapshot.VillageFaction) == shouldBeAtWar && restored;
-        }
         return restored;
     }
 

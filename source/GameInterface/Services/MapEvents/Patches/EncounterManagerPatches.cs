@@ -148,11 +148,11 @@ internal class EncounterManagerPatches
     [HarmonyPrefix]
     private static bool RestartPlayerEncounterPrefix(PartyBase attackerParty, PartyBase defenderParty)
     {
-        if (IsPendingParty(attackerParty) || IsPendingParty(defenderParty))
-            return false;
-
         // Our own server-approved re-run (AllowedThread) runs the real method.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (IsPendingParty(attackerParty) || IsPendingParty(defenderParty))
+            return false;
 
         if (RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty))
             return false;

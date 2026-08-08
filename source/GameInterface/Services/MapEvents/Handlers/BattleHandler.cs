@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Configuration;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -261,7 +262,7 @@ internal class BattleHandler : IHandler
     /// <param name="finalizedMapEvent">A map event being finalized, excluded from the count.</param>
     private void RefreshFastForwardState(MapEvent finalizedMapEvent = null)
     {
-        if (ModInformation.IsClient)
+        if (ModInformation.IsClient || !ModConfigProvider.ModOptions.SpeedLimitWhilePlayersInBattle)
             return;
 
         var count = CountPlayersInMapEvents(finalizedMapEvent);
@@ -287,7 +288,7 @@ internal class BattleHandler : IHandler
     /// </summary>
     private void CapFastForwardForMapEvent()
     {
-        if (ModInformation.IsClient)
+        if (ModInformation.IsClient || !ModConfigProvider.ModOptions.SpeedLimitWhilePlayersInBattle)
             return;
 
         if (AnyPlayerInMapEvent() && timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
@@ -302,7 +303,7 @@ internal class BattleHandler : IHandler
     /// <returns>True if fast-forwarding is allowed, otherwise false</returns>
     private bool FastForwardWhilePlayerInMapEventPolicy()
     {
-        return AnyPlayerInMapEvent() == false;
+        return !ModConfigProvider.ModOptions.SpeedLimitWhilePlayersInBattle || AnyPlayerInMapEvent() == false;
     }
 
     private bool AnyPlayerInMapEvent() => CountPlayersInMapEvents() > 0;
