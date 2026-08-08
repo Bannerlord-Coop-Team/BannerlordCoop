@@ -353,17 +353,33 @@ public class TournamentDebugCommand
             $"DANUSTICA_TOURNAMENT_OBSERVATION role={(ModInformation.IsServer ? "server" : "client")}|" +
             $"townId={townId}|nativeType={nativeGame?.GetType().Name ?? "none"}|" +
             $"sessionSource={sessionSource}|localControllerId={localControllerId ?? "none"}");
-        AppendSessionState(output, snapshot);
+        AppendSessionState(output, snapshot, localControllerId);
         AppendMissionState(output);
         return output.ToString().TrimEnd();
     }
 
-    private static void AppendSessionState(StringBuilder output, TournamentSessionSnapshot snapshot)
+    private static void AppendSessionState(
+        StringBuilder output,
+        TournamentSessionSnapshot snapshot,
+        string localControllerId)
     {
         if (snapshot == null)
         {
             output.AppendLine("session=none");
             return;
+        }
+
+        string localChoice = "none";
+        if (!string.IsNullOrEmpty(localControllerId))
+        {
+            CoopTournamentVM.UIState state = CoopTournamentVM.CalculateUIState(
+                snapshot,
+                localControllerId,
+                false);
+            if (state.CanJoin)
+                localChoice = TournamentPlayerChoice.Join.ToString();
+            else if (state.CanWatch)
+                localChoice = TournamentPlayerChoice.Watch.ToString();
         }
 
         int humans = snapshot.Contestants.Count(contestant =>
@@ -376,7 +392,7 @@ public class TournamentDebugCommand
         output.AppendLine(
             $"session={snapshot.SessionId}|phase={snapshot.Phase}|revision={snapshot.Revision}|" +
             $"bracketRevision={snapshot.BracketRevision}|matchId={snapshot.CurrentMatchId ?? "none"}|" +
-            $"host={snapshot.HostControllerId ?? "none"}|humans={humans}|" +
+            $"host={snapshot.HostControllerId ?? "none"}|localChoice={localChoice}|humans={humans}|" +
             $"spectators={snapshot.SpectatorControllerIds.Length}|ready={snapshot.ReadyCount}|" +
             $"skip={snapshot.SkipCount}|voters={snapshot.VoterCount}|choices={choices}");
     }
