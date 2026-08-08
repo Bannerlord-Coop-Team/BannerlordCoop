@@ -259,13 +259,13 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
                 return;
             }
 
-            if (message.InUse) ApplyPointUse(info.Agent, message.PointId, message.AgentId);
+            if (message.InUse) ApplyPointUse(info.Agent, message.PointId, message.AgentId, resetToPointFrame: false);
             else StopPointUse(info.Agent);
         }, context: nameof(Handle_NetworkNpcPointUse));
     }
 
     // [Game thread] Resolve the scene point by its deterministic MissionObjectId and use it.
-    private void ApplyPointUse(Agent agent, int pointId, Guid agentId)
+    private void ApplyPointUse(Agent agent, int pointId, Guid agentId, bool resetToPointFrame)
     {
         if (agent == null || !agent.IsActive()) return;
 
@@ -287,15 +287,20 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         if (agent.CurrentlyUsedGameObject != null)
             agent.StopUsingGameObject(isSuccessful: true);
 
+        var frame = point.GetUserFrameForAgent(agent);
+        if (resetToPointFrame)
+        {
+            // Catch-up starts from the point's pre-arrival frame; the host position may already
+            // contain the arrive animation's displacement, which the local point will replay.
+            var direction = frame.Rotation.f.AsVec2.Normalized();
+            agent.TeleportToPosition(frame.Origin.GetGroundVec3());
+            agent.SetMovementDirection(in direction);
+        }
+
         agent.UseGameObject(point);
 
-        // Plant the puppet on the point's user frame — the same thing native MP does for remote
-        // users (UsableMissionObject.OnUse client branch). The alignment the point issues natively
-        // is AI-scripted movement a Controller.None agent ignores, and the point's arrive gate
-        // (AnimationPoint.IsTargetReached) measures the agent against its ENGINE TARGET — left
-        // stale it passes wherever the puppet stands, playing the sit displaced beside the seat.
-        // With the target set, the puppet walks the last step, faces the seat, then sits on it.
-        var frame = point.GetUserFrameForAgent(agent);
+        // Controller.None ignores the point's AI-scripted alignment, so give its arrive gate the
+        // same engine target native multiplayer assigns to remote users.
         agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
     }
 
@@ -366,11 +371,11 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
             if (pendingPointUses.TryGetValue(data.AgentId, out var pendingPointId))
             {
                 pendingPointUses.Remove(data.AgentId);
-                ApplyPointUse(agent, pendingPointId, data.AgentId);
+                ApplyPointUse(agent, pendingPointId, data.AgentId, resetToPointFrame: true);
             }
             else if (data.HasUsedPoint)
             {
-                ApplyPointUse(agent, data.UsedPointId, data.AgentId);
+                ApplyPointUse(agent, data.UsedPointId, data.AgentId, resetToPointFrame: true);
             }
         }
 
