@@ -6,6 +6,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using TaleWorlds.Library;
 
 namespace GameInterface.Configuration;
@@ -19,8 +20,8 @@ namespace GameInterface.Configuration;
 /// client-hosted session that is Documents\Mount and Blade II
 /// Bannerlord\CoopData, beside the mod's CoopMapData. Seeds it from the
 /// module's template when absent, and falls back to defaults if it cannot be
-/// read. Never touches the dedicated server's server-config.json — the two
-/// configs are independent by design.
+/// read. Existing files are migrated in place by activating formerly commented
+/// settings without replacing active operator values.
 /// </summary>
 internal sealed class ModConfig : IModConfig
 {
@@ -32,6 +33,37 @@ internal sealed class ModConfig : IModConfig
 
     /// <summary>Ships in the module root — the only copy of the defaults.</summary>
     private const string TemplateFileName = "mod-config.default.json";
+
+    private static readonly string[] FormerlyCommentedDifficultyKeys =
+    {
+        "playerReceivedDamage",
+        "playerTroopsReceivedDamage",
+        "combatAIDifficulty",
+        "recruitmentDifficulty",
+        "playerMapMovementSpeed",
+        "stealthAndDisguiseDifficulty",
+        "persuasionSuccessChance",
+        "clanMemberDeathChance",
+        "battleDeath",
+        "birthAndDeath",
+        "autoAllocateClanMemberPerks",
+    };
+
+    private static readonly IDictionary<string, JToken> DifficultyDefaults =
+        new Dictionary<string, JToken>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["playerReceivedDamage"] = "VeryEasy",
+            ["playerTroopsReceivedDamage"] = "VeryEasy",
+            ["combatAIDifficulty"] = "VeryEasy",
+            ["recruitmentDifficulty"] = "VeryEasy",
+            ["playerMapMovementSpeed"] = "VeryEasy",
+            ["stealthAndDisguiseDifficulty"] = "VeryEasy",
+            ["persuasionSuccessChance"] = "VeryEasy",
+            ["clanMemberDeathChance"] = "VeryEasy",
+            ["battleDeath"] = "VeryEasy",
+            ["birthAndDeath"] = true,
+            ["autoAllocateClanMemberPerks"] = false,
+        };
 
     private static readonly ILogger Logger = LogManager.GetLogger<ModConfig>();
 
@@ -65,9 +97,13 @@ internal sealed class ModConfig : IModConfig
             if (!File.Exists(path))
             {
                 Seed(path);
-                // Template keys are all commented out: identical to defaults.
-                return new ModConfigData();
+                if (!File.Exists(path))
+                {
+                    return new ModConfigData();
+                }
             }
+
+            MigrateDifficultySettings(path);
 
             var loaded = JsonConvert.DeserializeObject<ModConfigData>(File.ReadAllText(path), MakeSettings())
                 ?? new ModConfigData();
@@ -81,6 +117,198 @@ internal sealed class ModConfig : IModConfig
             Logger.Error("mod-config.json UNREADABLE ({Path}) — continuing on defaults: {Reason}", path, ex.Message);
             return new ModConfigData();
         }
+    }
+
+    /// <summary>
+    /// Activates difficulty settings that older templates shipped as comments.
+    /// Existing active values win and entirely missing settings receive their
+    /// documented defaults. The edit is deliberately textual so operator comments,
+    /// ordering, and unrelated settings remain untouched.
+    /// </summary>
+    private static void MigrateDifficultySettings(string path)
+    {
+        string original = File.ReadAllText(path);
+        JObject root;
+        try
+        {
+            root = JObject.Parse(original);
+        }
+        catch
+        {
+            // Leave malformed input byte-for-byte intact; Load owns its warning and
+            // default fallback below.
+            return;
+        }
+
+        JToken difficultyToken = root.GetValue("difficulty", StringComparison.OrdinalIgnoreCase);
+        if (difficultyToken == null)
+        {
+            int rootBrace = original.IndexOf('{');
+            var properties = new List<string>();
+            foreach (string key in FormerlyCommentedDifficultyKeys)
+            {
+                properties.Add("    \"" + key + "\": " +
+                    DifficultyDefaults[key].ToString(Formatting.None) + ",");
+            }
+            string block = Environment.NewLine + "  \"difficulty\": {" +
+                Environment.NewLine + string.Join(Environment.NewLine, properties) +
+                Environment.NewLine + "  },";
+            WriteIfValidMigration(path, original, original.Insert(rootBrace + 1, block));
+            return;
+        }
+        if (!(difficultyToken is JObject difficulty))
+        {
+            // Do not create a duplicate property beside an operator's invalid
+            // difficulty value. The normal loader will report the bad config.
+            return;
+        }
+
+        Match difficultyMatch = Regex.Match(original,
+            "(?:^|[{,])[\\t ]*(?<property>\\\"difficulty\\\"[\\t ]*:[\\t ]*\\{)",
+            RegexOptions.Multiline | RegexOptions.IgnoreCase);
+        if (!difficultyMatch.Success)
+        {
+            return;
+        }
+        int openBrace = original.IndexOf('{', difficultyMatch.Groups["property"].Index);
+        int closeBrace = FindMatchingBrace(original, openBrace);
+        if (closeBrace < 0)
+        {
+            return;
+        }
+
+        string migrated = original;
+        var insertions = new List<string>();
+        foreach (string key in FormerlyCommentedDifficultyKeys)
+        {
+            JToken existing = difficulty.GetValue(key, StringComparison.OrdinalIgnoreCase);
+            if (existing != null)
+            {
+                continue;
+            }
+
+            string commentedBlock = migrated.Substring(openBrace, closeBrace - openBrace + 1);
+            string pattern = "^(?<indent>[\\t ]*)//[\\t ]*(?<setting>\\\"" +
+                Regex.Escape(key) + "\\\"[\\t ]*:[\\t ]*)(?<value>\\\"[^\\\"\\r\\n]*\\\"|true|false)(?<rest>[\\t ]*,?.*)$";
+            Match commented = Regex.Match(commentedBlock, pattern,
+                RegexOptions.Multiline | RegexOptions.IgnoreCase);
+            if (commented.Success)
+            {
+                string replacement = commented.Groups["indent"].Value +
+                    commented.Groups["setting"].Value + commented.Groups["value"].Value +
+                    commented.Groups["rest"].Value;
+                int absolute = openBrace + commented.Index;
+                migrated = migrated.Remove(absolute, commented.Length).Insert(absolute, replacement);
+                int delta = replacement.Length - commented.Length;
+                closeBrace += delta;
+                continue;
+            }
+
+            insertions.Add("    \"" + key + "\": " +
+                DifficultyDefaults[key].ToString(Formatting.None) + ",");
+        }
+
+        if (insertions.Count > 0)
+        {
+            string insertion = Environment.NewLine + string.Join(Environment.NewLine, insertions);
+            migrated = migrated.Insert(openBrace + 1, insertion);
+        }
+
+        WriteIfValidMigration(path, original, migrated);
+    }
+
+    private static void WriteIfValidMigration(string path, string original, string migrated)
+    {
+        if (migrated == original)
+        {
+            return;
+        }
+        try
+        {
+            // Never replace a parseable user config with a bad migration.
+            JObject.Parse(migrated);
+            ReplaceFile(path, migrated);
+            Logger.Information("mod-config.json migrated in place: legacy/server difficulty activated ({Path})", path);
+        }
+        catch (Exception ex)
+        {
+            // A read-only config still needs to load its active user settings.
+            Logger.Warning("could not migrate mod-config.json in place ({Path}): {Reason} — loading the existing file",
+                path, ex.Message);
+        }
+    }
+
+    private static void ReplaceFile(string path, string contents)
+    {
+        string temporary = path + ".migration-" + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, contents);
+            JObject.Parse(File.ReadAllText(temporary));
+            File.Replace(temporary, path, null);
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
+    }
+
+    private static int FindMatchingBrace(string text, int openBrace)
+    {
+        bool inString = false;
+        bool escaped = false;
+        bool lineComment = false;
+        bool blockComment = false;
+        int depth = 0;
+        for (int i = openBrace; i < text.Length; i++)
+        {
+            char current = text[i];
+            char next = i + 1 < text.Length ? text[i + 1] : '\0';
+            if (lineComment)
+            {
+                if (current == '\n') lineComment = false;
+                continue;
+            }
+            if (blockComment)
+            {
+                if (current == '*' && next == '/')
+                {
+                    blockComment = false;
+                    i++;
+                }
+                continue;
+            }
+            if (inString)
+            {
+                if (escaped) escaped = false;
+                else if (current == '\\') escaped = true;
+                else if (current == '"') inString = false;
+                continue;
+            }
+            if (current == '/' && next == '/')
+            {
+                lineComment = true;
+                i++;
+                continue;
+            }
+            if (current == '/' && next == '*')
+            {
+                blockComment = true;
+                i++;
+                continue;
+            }
+            if (current == '"')
+            {
+                inString = true;
+                continue;
+            }
+            if (current == '{') depth++;
+            else if (current == '}' && --depth == 0) return i;
+        }
+        return -1;
     }
 
     private string ResolveDirectory()
@@ -160,8 +388,9 @@ internal sealed class ModConfig : IModConfig
         }
     }
 
-    /// <summary>Copies the template out. Every key in it is commented out, so
-    /// seeding can never change an existing world.</summary>
+    /// <summary>Copies the template out on first run. Existing files are never
+    /// replaced; schema migrations above edit only settings that were previously
+    /// shipped as comments.</summary>
     private static void Seed(string path)
     {
         string template = ResolveTemplatePath();
