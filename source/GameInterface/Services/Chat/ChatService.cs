@@ -79,5 +79,4 @@ public sealed class ChatService : IChatService, IDisposable
     {
         network.SendAll(new NetworkRequestChatParticipants());
     }
-
 }
