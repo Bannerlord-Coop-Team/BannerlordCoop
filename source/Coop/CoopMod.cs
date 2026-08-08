@@ -12,6 +12,7 @@ using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Handlers;
+using GameInterface.Services.Chat;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
@@ -488,6 +489,9 @@ namespace Coop
             if (ContainerProvider.TryResolve<IGameInterface>(out var gameInterface))
                 gameInterface.PatchGameStarted();
 
+            if (ModInformation.IsClient && ContainerProvider.TryResolve<IChatService>(out var chatService))
+                chatService.Initialize();
+
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
@@ -498,6 +502,12 @@ namespace Coop
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
+            
+            if (isServer)
+            {
+                ManagedOptions.SetConfig(ManagedOptions.ManagedOptionsType.StopGameOnFocusLost, 0f);
+            }
+
             CrashDiagnostics.SetPhase("main-menu");
             startupModuleWarningReady = true;
             InformationManager.DisplayMessage(new InformationMessage(ClientServerModeMessage));

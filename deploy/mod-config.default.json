@@ -101,7 +101,7 @@
     // WARNING: Setting this value too high will cause performance issues.
     // The default is 1, which is equivalent to the vanilla spawn limit.
     "maximumLootersMultiplier": 1.0,
-
+    
     // How long a lord remembers refusing to defect to your kingdom.
     // Vanilla records each failed persuasion and refuses that lord until the
     // record expires after one in-game year. Only the machine that ran the
@@ -110,5 +110,15 @@
     // "NeverExpire": a refusal blocks that lord for the rest of the session.
     // "AlwaysRetry": a refusal never blocks; you can ask the same lord again straight away.
     "lordDefectionRetries": "Vanilla",
+
+    // Toggle players being able to execute heroes.
+    // For now executing other players is always disabled.
+    // Default is true, meaning any player can execute AI clan member.
+    "enableHeroExecutions": true,
+
+    // Toggle players being able to execute each others' clan members.
+    // This includes player companions and family members.
+    // Default is false and won't have any effect if enableHeroExecutions is false.
+    "enablePlayerClanMemberExecutions": false,
   }
 }

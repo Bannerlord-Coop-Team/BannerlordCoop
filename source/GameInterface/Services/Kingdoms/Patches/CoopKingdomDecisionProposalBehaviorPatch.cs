@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using GameInterface;
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -160,6 +161,15 @@ namespace GameInterface.Services.Kingdoms.Patches
                         }
                         else if (decision.TriggerTime.IsPast)
                         {
+                            // An unanswered inbound player peace offer expires as a decline.
+                            // It must never fall through to the forced AI resolution path.
+                            if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision))
+                            {
+                                kingdom.RemoveDecision(decision);
+                                CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, true);
+                                continue;
+                            }
+
                             if (ContainerProvider.TryResolve<IKingdomDecisionVoteManager>(out var voteManager) &&
                                 voteManager.TryResolveDecision(decision, force: true))
                             {

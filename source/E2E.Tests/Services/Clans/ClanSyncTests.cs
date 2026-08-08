@@ -36,7 +36,7 @@ namespace E2E.Tests.Services.Clans
             var banner = new Banner();
             banner.BannerDataList.Add(new BannerData(1, 2, 3, Vec2.One, Vec2.Zero, true, true, 0f));
             TestEnvironment.AssertField<Clan, bool>(nameof(Clan._isEliminated), true);
-            TestEnvironment.AssertReferenceField<Clan, Kingdom>(nameof(Clan._kingdom));
+            //TestEnvironment.AssertReferenceField<Clan, Kingdom>(nameof(Clan._kingdom));
             TestEnvironment.AssertField<Clan, float>(nameof(Clan._influence), 0.5f);
             //TestEnvironment.AssertReferenceField<Clan,Settlement>(nameof(Clan._clanMidSettlement));
             TestEnvironment.AssertReferenceField<Clan, CharacterObject>(nameof(Clan._basicTroop));

@@ -98,7 +98,7 @@ public class PlayerKillFeedColorTests
         var filePath = CreateTempFilePath();
         var viewModel = new CoopOptionsVM(new CoopOptionsStore(filePath), new MessageBroker());
 
-        var tab = Assert.Single(viewModel.Tabs);
+        var tab = viewModel.Tabs[0];
         Assert.Equal(KillFeedOptionsTabProvider.TabName, tab.Name);
         Assert.Equal(KillFeedOptionsTabProvider.TabId, tab.Id);
         Assert.Same(tab, viewModel.SelectedTab);
@@ -218,7 +218,9 @@ public class PlayerKillFeedColorTests
 
     private static KillFeedSection GetKillFeedSection(CoopOptionsVM viewModel)
     {
-        var tab = Assert.Single(viewModel.Tabs);
+        // Change 07-AUG-26 - Stops existing kill feed tests assuming there is only one tab
+        var tab = viewModel.Tabs[0];
+        Assert.Equal(KillFeedOptionsTabProvider.TabId, tab.Id);
         return Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
     }
 

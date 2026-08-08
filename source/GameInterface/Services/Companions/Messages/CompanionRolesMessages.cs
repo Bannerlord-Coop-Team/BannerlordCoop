@@ -69,27 +69,18 @@ public readonly struct CompanionJoinedPartyByRescue : IEvent
 
 public readonly struct PartyScreenClosedFromRescuing : IEvent
 {
-    public readonly PartyBase LeftOwnerParty;
     public readonly TroopRoster LeftMemberRoster;
     public readonly TroopRoster LeftPrisonRoster;
     public readonly PartyBase RightOwnerParty;
-    public readonly TroopRoster RightMemberRoster;
-    public readonly TroopRoster RightPrisonRoster;
 
     public PartyScreenClosedFromRescuing(
-        PartyBase leftOwnerParty,
         TroopRoster leftMemberRoster,
         TroopRoster leftPrisonRoster,
-        PartyBase rightOwnerParty,
-        TroopRoster rightMemberRoster,
-        TroopRoster rightPrisonRoster)
+        PartyBase rightOwnerParty)
     {
-        LeftOwnerParty = leftOwnerParty;
         LeftMemberRoster = leftMemberRoster;
         LeftPrisonRoster = leftPrisonRoster;
         RightOwnerParty = rightOwnerParty;
-        RightMemberRoster = rightMemberRoster;
-        RightPrisonRoster = rightPrisonRoster;
     }
 }
 
