@@ -79,7 +79,7 @@ internal class DefaultPartySizeLimitModelPatches
                 __result.AddToCounts(character, numberToAdd, false, 0, 0, true, -1);
 
                 // Avoid turning bandit parties to zero parties, keep a minimum
-                if (__result.TotalManCount == 0)
+                if (__result.TotalManCount <= 0)
                 {
                     __result.AddToCounts(character, 1, false, 0, 0, true, -1);
                 }
