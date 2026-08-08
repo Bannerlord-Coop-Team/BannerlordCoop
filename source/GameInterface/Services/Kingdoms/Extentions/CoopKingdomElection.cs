@@ -1,4 +1,6 @@
 ﻿using System.Linq;
+using Common;
+using GameInterface.Services.Clans.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Core;
@@ -109,7 +111,10 @@ namespace GameInterface.Services.Kingdoms.Extentions
 
         public void ApplyChosenOutcomeCoop()
         {
-            if (this._decision.OnShowDecision())
+            // The synchronized kingdom decision is the player-facing prompt. Native's peace
+            // notification checks process-local player singletons and must not run again when
+            // the explicit co-op vote is resolved on the authoritative server.
+            if (IsPendingPlayerPeaceOffer(this._decision) || this._decision.OnShowDecision())
             {
                 this.ApplyChosenOutcome();
             }
@@ -118,10 +123,65 @@ namespace GameInterface.Services.Kingdoms.Extentions
         private void ReadyToAiChooseCoop()
         {
             this._chosenOutcome = this.GetAiChoiceCoop(this._possibleOutcomes);
+            if (TryRedirectPlayerPeaceOffer(this._decision, this._chosenOutcome))
+            {
+                return;
+            }
             if (this._decision.OnShowDecision())
             {
                 this.ApplyChosenOutcome();
             }
+        }
+
+        /// <summary>
+        /// An NPC kingdom deciding that it wants peace is only an offer when the opposing
+        /// kingdom contains a player clan. Mirror that offer into the player's kingdom so
+        /// the existing synchronized kingdom vote decides whether peace is accepted.
+        /// </summary>
+        internal static bool TryRedirectPlayerPeaceOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)
+        {
+            if (decision is not MakePeaceKingdomDecision peaceDecision
+                || peaceDecision._isProposedByOpponent
+                || peaceDecision.FactionToMakePeaceWith is not Kingdom playerKingdom
+                || !playerKingdom.Clans.Any(clan => clan.IsPlayerClan()))
+            {
+                return false;
+            }
+
+            // Consume the original NPC decision on every instance. Only the authoritative
+            // server authors the target-side offer that is then replicated to clients.
+            if (chosenOutcome is not MakePeaceKingdomDecision.MakePeaceDecisionOutcome { ShouldPeaceBeDeclared: true }
+                || !ModInformation.IsServer)
+            {
+                return true;
+            }
+
+            Kingdom proposingKingdom = peaceDecision.Kingdom;
+            bool offerAlreadyPending = playerKingdom.UnresolvedDecisions
+                .OfType<MakePeaceKingdomDecision>()
+                .Any(existing => existing._isProposedByOpponent
+                                 && existing.FactionToMakePeaceWith == proposingKingdom);
+            if (offerAlreadyPending || playerKingdom.RulingClan == null)
+            {
+                return true;
+            }
+
+            var playerDecision = new MakePeaceKingdomDecision(
+                playerKingdom.RulingClan,
+                proposingKingdom,
+                -peaceDecision.DailyTributeToBePaid,
+                peaceDecision.DailyTributeDurationInDays,
+                applyResults: true,
+                isProposedByOpponent: true);
+
+            playerKingdom.AddDecision(playerDecision, ignoreInfluenceCost: true);
+            return true;
+        }
+
+        internal static bool IsPendingPlayerPeaceOffer(KingdomDecision decision)
+        {
+            return decision is MakePeaceKingdomDecision { _isProposedByOpponent: true }
+                   && decision.Kingdom?.Clans.Any(clan => clan.IsPlayerClan()) == true;
         }
 
         public DecisionOutcome GetAiChoiceCoop(MBReadOnlyList<DecisionOutcome> possibleOutcomes)

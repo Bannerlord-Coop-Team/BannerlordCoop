@@ -170,6 +170,9 @@ public class AlleyDebugCommand
         {
             sb.AppendLine($"  overseerId={data.OverseerId ?? "none"}");
             sb.AppendLine($"  garrison entries={data.Garrison?.Length ?? 0}");
+            var lastRecruitTime = new CampaignTime(data.LastRecruitTimeTicks);
+            sb.AppendLine($"  lastRecruitTimeTicks={data.LastRecruitTimeTicks}");
+            sb.AppendLine($"  recruitCooldownElapsedDays={lastRecruitTime.ElapsedDaysUntilNow:R}");
         }
 
         return sb.ToString();

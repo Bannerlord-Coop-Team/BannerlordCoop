@@ -58,6 +58,8 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Subscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
         messageBroker.Subscribe<KingdomCreationRequested>(HandleKingdomCreationRequested);
         messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
+        messageBroker.Subscribe<DestroyKingdom>(HandleDestroyKingdom);
+        messageBroker.Subscribe<RulingClanChanged>(HandleRulingClanChanged);
         messageBroker.Subscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Subscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
     }
@@ -394,6 +396,21 @@ public class ClientKingdomHandler : IHandler
         return clan.Kingdom == kingdom;
     }
 
+    private void HandleDestroyKingdom(MessagePayload<DestroyKingdom> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.Kingdom, out var kingdomId)) return;
+
+        network.SendAll(new NetworkDestroyKingdom(kingdomId));
+    }
+
+    private void HandleRulingClanChanged(MessagePayload<RulingClanChanged> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.Kingdom, out var kingdomId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
+
+        network.SendAll(new NetworkRulingClanChanged(kingdomId, clanId));
+    }
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
@@ -405,6 +422,8 @@ public class ClientKingdomHandler : IHandler
         messageBroker.Unsubscribe<KingdomDecisionVoteRequested>(HandleKingdomDecisionVoteRequested);
         messageBroker.Unsubscribe<KingdomCreationRequested>(HandleKingdomCreationRequested);
         messageBroker.Unsubscribe<DecisionAdded>(HandleLocalDecisionAdded);
+        messageBroker.Unsubscribe<DestroyKingdom>(HandleDestroyKingdom);
+        messageBroker.Unsubscribe<RulingClanChanged>(HandleRulingClanChanged);
         messageBroker.Unsubscribe<KingdomNameChangeRequested>(HandleKingdomNameChangeRequested);
         messageBroker.Unsubscribe<NetworkKingdomNameChanged>(HandleNetworkKingdomNameChanged);
     }

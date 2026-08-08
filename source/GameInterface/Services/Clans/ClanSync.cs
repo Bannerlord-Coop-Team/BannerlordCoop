@@ -10,7 +10,7 @@ internal class ClanSync : IAutoSync
     {
         // Fields
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._isEliminated)));
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
+        //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._influence)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._midSettlement)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._basicTroop)));

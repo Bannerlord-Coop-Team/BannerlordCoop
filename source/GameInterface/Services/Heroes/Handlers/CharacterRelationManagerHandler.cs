@@ -5,8 +5,6 @@ using Common.Util;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
