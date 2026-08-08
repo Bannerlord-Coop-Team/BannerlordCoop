@@ -107,27 +107,26 @@ internal class AlleyManagementPatches
     [HarmonyPrefix]
     private static bool PlayerRecruitedTroopsFromAlleyPrefix(AlleyCampaignBehavior __instance)
     {
-        if (ModInformation.IsClient)
-        {
-            var playerAlleyData = __instance._playerOwnedCommonAreaData.FirstOrDefault(
-                data => data.Alley?.Settlement == Settlement.CurrentSettlement);
-            if (playerAlleyData == null) return false;
+        if (ModInformation.IsServer) return false;
 
-            var troops = Campaign.Current.Models.AlleyModel.GetTroopsToRecruitFromAlleyDependingOnAlleyRandom(
-                playerAlleyData.Alley,
-                playerAlleyData.RandomFloatWeekly);
+        var playerAlleyData = __instance._playerOwnedCommonAreaData.FirstOrDefault(
+            data => data.Alley?.Settlement == Settlement.CurrentSettlement);
+        if (playerAlleyData == null) return false;
 
-            MessageBroker.Instance.Publish(
-                playerAlleyData.Alley,
-                new RecruitAlleyTroopsRequested(playerAlleyData.Alley, troops));
+        var troops = Campaign.Current.Models.AlleyModel.GetTroopsToRecruitFromAlleyDependingOnAlleyRandom(
+            playerAlleyData.Alley,
+            playerAlleyData.RandomFloatWeekly);
 
-            MBInformationManager.AddQuickInformation(
-                new TextObject("{=8CW2y0p3}Troops have been joined to your party"),
-                0,
-                null,
-                null,
-                string.Empty);
-        }
+        MessageBroker.Instance.Publish(
+            playerAlleyData.Alley,
+            new RecruitAlleyTroopsRequested(playerAlleyData.Alley, troops));
+
+        MBInformationManager.AddQuickInformation(
+            new TextObject("{=8CW2y0p3}Troops have been joined to your party"),
+            0,
+            null,
+            null,
+            string.Empty);
 
         return false;
     }
