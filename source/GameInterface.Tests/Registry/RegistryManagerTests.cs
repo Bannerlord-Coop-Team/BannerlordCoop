@@ -12,21 +12,6 @@ namespace GameInterface.Tests.Registry;
 public class RegistryManagerTests
 {
     [Fact]
-    public void RegisterUntrackedGameObjects_RegistersWithoutPublishingCompletion()
-    {
-        var autoRegistryFactory = new Mock<IAutoRegistryFactory>();
-        var messageBroker = new Mock<IMessageBroker>();
-        var manager = CreateManager(autoRegistryFactory.Object, messageBroker.Object);
-
-        manager.RegisterUntrackedGameObjects();
-
-        autoRegistryFactory.Verify(factory => factory.RegisterAll(), Times.Once);
-        messageBroker.Verify(
-            broker => broker.Publish(It.IsAny<object>(), It.IsAny<AllGameObjectsRegistered>()),
-            Times.Never);
-    }
-
-    [Fact]
     public void RegisterAllGameObjects_RegistersBeforePublishingCompletion()
     {
         var registrationOrder = new MockSequence();
