@@ -128,7 +128,7 @@ internal class CompanionRolesHandler : IHandler
             // are always cleared even if something below throws
             ResolvedMainHeroContext.ResolvedMainHero = mainHero;
             try
-            {
+            { 
                 int randomBannerIdForNewClan = companionRolesCampaignBehavior.GetRandomBannerIdForNewClan();
                 Clan clan = Clan.CreateCompanionToLordClan(oneToOneConversationHero, selectedFief, textObject, randomBannerIdForNewClan);
                 if (oneToOneConversationHero.PartyBelongedTo == mainParty)

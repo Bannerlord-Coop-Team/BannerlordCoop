@@ -46,7 +46,6 @@ namespace GameInterface.Services.Kingdoms
 
             // Collection fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._armies)));
-
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._clans)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._fiefsCache)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._heroesCache)));

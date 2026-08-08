@@ -65,8 +65,6 @@ internal class ClanKingdomHandler : IHandler
 
     private void HandleNetworkSetClanKingdom(MessagePayload<NetworkSetClanKingdom> payload)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
@@ -102,8 +100,6 @@ internal class ClanKingdomHandler : IHandler
 
     private void HandleNetworkOnClanChangedKingdom(MessagePayload<NetworkOnClanChangedKingdom> payload)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
