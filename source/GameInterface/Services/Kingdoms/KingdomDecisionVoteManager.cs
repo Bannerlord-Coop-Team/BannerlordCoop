@@ -42,6 +42,7 @@ namespace GameInterface.Services.Kingdoms
         void ApplyRemoteVote(string clanId, KingdomDecisionVoteData voteData);
         bool TryResolveDecision(KingdomDecision decision, bool force);
         bool HasEligiblePlayerClan(KingdomDecision decision);
+        bool TryPublishFinalVoteForElection(KingdomElection election);
         IReadOnlyList<KingdomDecisionVoteManager.KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom);
         void ApplyResolved(
             string kingdomId,
@@ -315,6 +316,40 @@ namespace GameInterface.Services.Kingdoms
         public bool HasEligiblePlayerClan(KingdomDecision decision)
         {
             return GetEligibleClanIds(decision).Count > 0;
+        }
+
+        public bool TryPublishFinalVoteForElection(KingdomElection election)
+        {
+            KingdomDecision decision = election?._decision;
+            if (decision == null || !IsLocalPlayerEligible(decision)) return false;
+            if (!TryGetDecisionIndex(decision, out int decisionIndex)) return false;
+            if (!TryGetKingdomId(decision.Kingdom, out string kingdomId)) return false;
+
+            DecisionOutcome chosenOutcome = election._chosenOutcome;
+            bool isAbstain = chosenOutcome == null;
+            int outcomeIndex = -1;
+            string outcomeKey = null;
+
+            if (!isAbstain)
+            {
+                outcomeIndex = GetOutcomeIndex(chosenOutcome, election);
+                if (outcomeIndex < 0) return false;
+                outcomeResolver.TryGetOutcomeKey(chosenOutcome, objectManager, out outcomeKey);
+            }
+
+            var voteData = new KingdomDecisionVoteData(
+                kingdomId,
+                decisionIndex,
+                outcomeIndex,
+                GetSupportWeightValue(isAbstain, Supporter.SupportWeights.FullyPush),
+                isAbstain,
+                true,
+                outcomeKey);
+
+            TryApplyLocalVote(decision, voteData);
+            MessageBroker.Instance.Publish(election, new KingdomDecisionVoteRequested(voteData));
+            LocalSubmittedDecisions.Add(decision);
+            return true;
         }
 
         public IReadOnlyList<KingdomDecisionDebugInfo> GetDecisionDebugInfo(Kingdom kingdom)

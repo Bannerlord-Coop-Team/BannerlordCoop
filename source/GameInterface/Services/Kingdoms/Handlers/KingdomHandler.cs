@@ -1,8 +1,9 @@
-﻿using Common.Logging;
-using Common.Messaging;
-using Common;
+﻿using Common;
 using Common.Extensions;
+using Common.Logging;
+using Common.Messaging;
 using Common.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
@@ -10,11 +11,12 @@ using GameInterface.Services.Players;
 using GameInterface.Registry.Auto;
 using Helpers;
 using Serilog;
-using System.Reflection;
 using System;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -59,6 +61,8 @@ public class KingdomHandler : IHandler
         messageBroker.Subscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Subscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Subscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
+        messageBroker.Subscribe<NetworkDestroyKingdom>(HandleNetworkDestroyKingdom);
+        messageBroker.Subscribe<NetworkRulingClanChanged>(HandleNetworkRulingClanChanged);
         messageBroker.Subscribe<ChangeKingdomName>(HandleChangeKingdomName);
     }
 
@@ -514,7 +518,45 @@ public class KingdomHandler : IHandler
 
         GameThread.RunSafe(action, blocking: true, context: nameof(KingdomHandler));
     }
+    private void HandleNetworkDestroyKingdom(MessagePayload<NetworkDestroyKingdom> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var kingdom)) return;
 
+            Clan rulingClan = kingdom.RulingClan;
+            ChangeKingdomAction.ApplyByLeaveKingdom(rulingClan, true);
+            foreach (Kingdom kingdom2 in Kingdom.All)
+            {
+                if (kingdom2.IsAtWarWith(kingdom))
+                {
+                    if (!kingdom2.IsAtWarWith(rulingClan))
+                    {
+                        DeclareWarAction.ApplyByDefault(kingdom2, rulingClan);
+                    }
+                }
+                else if (kingdom2.IsAtWarWith(rulingClan))
+                {
+                    Debug.FailedAssert("Deviation in peace states between ruling clan & kingdom in abdication", "C:\\BuildAgent\\work\\mb3\\Source\\Bannerlord\\TaleWorlds.CampaignSystem\\KingdomManager.cs", "AbdicateTheThrone", 236);
+                }
+            }
+            if (!kingdom.IsEliminated)
+            {
+                DestroyKingdomAction.Apply(kingdom);
+            }
+        });
+    }
+
+    private void HandleNetworkRulingClanChanged(MessagePayload<NetworkRulingClanChanged> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out var kingdom)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+
+            ChangeRulingClanAction.Apply(kingdom, clan);
+        });
+    }
     public void Dispose()
     {
         messageBroker.Unsubscribe<AddDecision>(HandleAddDecision);
@@ -525,6 +567,8 @@ public class KingdomHandler : IHandler
         messageBroker.Unsubscribe<ApplyKingdomDecisionResolved>(HandleApplyKingdomDecisionResolved);
         messageBroker.Unsubscribe<CreateKingdom>(HandleCreateKingdom);
         messageBroker.Unsubscribe<PlayerKingdomCreated>(HandlePlayerKingdomCreated);
+        messageBroker.Unsubscribe<NetworkDestroyKingdom>(HandleNetworkDestroyKingdom);
+        messageBroker.Unsubscribe<NetworkRulingClanChanged>(HandleNetworkRulingClanChanged);
         messageBroker.Unsubscribe<ChangeKingdomName>(HandleChangeKingdomName);
     }
 }
