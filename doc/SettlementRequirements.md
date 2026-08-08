@@ -151,8 +151,9 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   target is set to `GetUserFrameForAgent` (the native-MP remote-user planting,
   `UsableMissionObject.OnUse` client branch): it walks the last step onto the seat, faces it, then
   sits. A freshly spawned catch-up puppet is first reset to that pre-arrival frame because the
-  host's current position may already include the arrival animation displacement. Adoption
-  re-issues the AI-scripted seat anchor for the same reason (SR-030). Degradation: a
+  host's current position may already include the arrival animation displacement. Adoption keeps
+  the local point's current transform instead of rebasing its animation during AI takeover
+  (SR-030). Degradation: a
   point id that fails to resolve locally leaves that puppet un-animated with a warning (only
   possible on mismatched scenes).
   IMPLEMENTED (live verification outstanding)
