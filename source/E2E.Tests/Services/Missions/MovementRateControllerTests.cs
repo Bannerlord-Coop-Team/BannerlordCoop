@@ -51,15 +51,10 @@ public sealed class MovementRateControllerTests
     }
 
     [Theory]
-    [InlineData(10, 60)]
-    [InlineData(225, 40)]
-    [InlineData(475, 30)]
-    [InlineData(875, 20)]
-    [InlineData(1375, 15)]
-    [InlineData(1800, 10)]
-    public void BattleProfile_AppliesPopulationCeiling(
-        int activeAgents,
-        int expectedHz)
+    [InlineData(10)]
+    [InlineData(600)]
+    [InlineData(1800)]
+    public void BattleProfile_PopulationDoesNotCapStartingRate(int activeAgents)
     {
         using var fixture = new RateControllerFixture(remoteControllers: 1);
         fixture.Controller.Configure(MovementCadenceProfile.Battle);
@@ -67,13 +62,14 @@ public sealed class MovementRateControllerTests
 
         MovementRateSnapshot state = fixture.Controller.Snapshot;
 
-        Assert.Equal(expectedHz, state.LoadCeilingHz);
-        Assert.Equal(expectedHz, state.BulkHz);
-        Assert.Equal(Math.Max(40, expectedHz), state.PriorityHz);
+        Assert.Equal(60, state.PerformanceCeilingHz);
+        Assert.Equal(40, state.BulkHz);
+        Assert.Equal(40, state.PriorityHz);
+        Assert.Equal("battle-start", state.Reason);
     }
 
     [Fact]
-    public void BattleProfile_SlowPeerCapsBulkUntilDisconnect()
+    public void BattleProfile_SlowPeerOnlyCapsThatRecipient()
     {
         using var fixture = new RateControllerFixture();
         fixture.Controller.Configure(MovementCadenceProfile.Battle);
@@ -83,17 +79,20 @@ public sealed class MovementRateControllerTests
             new NetworkMovementReceiverCap("slow-peer", 15, 1));
 
         MovementRateSnapshot capped = fixture.Controller.Snapshot;
-        Assert.Equal(15, capped.BulkHz);
+        Assert.Equal(40, capped.BulkHz);
         Assert.Equal(40, capped.PriorityHz);
         Assert.Equal("slow-peer", capped.PeerReceiverCapSource);
+        Assert.Equal(15, fixture.Controller.GetReceiverCapHz("slow-peer"));
+        Assert.Equal(60, fixture.Controller.GetReceiverCapHz("healthy-peer"));
 
         fixture.Broker.Publish(
             this,
             new MissionPeerDisconnected("slow-peer", "battle"));
 
         MovementRateSnapshot restored = fixture.Controller.Snapshot;
-        Assert.Equal(60, restored.BulkHz);
+        Assert.Equal(40, restored.BulkHz);
         Assert.Null(restored.PeerReceiverCapHz);
+        Assert.Equal(60, fixture.Controller.GetReceiverCapHz("slow-peer"));
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public sealed class MovementRateControllerTests
             advertisement =>
             {
                 Assert.Equal("local", advertisement.ControllerId);
-                Assert.Equal(60, advertisement.MaximumBulkHz);
+                Assert.Equal(40, advertisement.MaximumBulkHz);
                 Assert.Equal(1, advertisement.Sequence);
             });
 
@@ -137,7 +136,7 @@ public sealed class MovementRateControllerTests
 
         NetworkMovementReceiverCap advertisement = Assert.Single(fixture.Advertisements);
         Assert.Equal("local", advertisement.ControllerId);
-        Assert.Equal(60, advertisement.MaximumBulkHz);
+        Assert.Equal(40, advertisement.MaximumBulkHz);
         Assert.Equal(2, advertisement.Sequence);
     }
 
@@ -150,12 +149,46 @@ public sealed class MovementRateControllerTests
         fixture.Broker.Publish(
             this,
             new NetworkMovementReceiverCap("slow-peer", 10, 1));
-        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal(10, fixture.Controller.GetReceiverCapHz("slow-peer"));
 
         fixture.AdvanceClock(4f);
 
-        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
         Assert.Null(fixture.Controller.Snapshot.PeerReceiverCapHz);
+        Assert.Equal(60, fixture.Controller.GetReceiverCapHz("slow-peer"));
+    }
+
+    [Fact]
+    public void BattleProfile_StartsFortyAndRecoversFromMeasuredPerformance()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        for (int i = 0; i < 3; i++)
+            fixture.AdvanceWindow(framesPerSecond: 60);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+
+        fixture.AdvanceWindow(framesPerSecond: 60);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal("battle-recovered", fixture.Controller.Snapshot.Reason);
+
+        fixture.AdvanceWindow(framesPerSecond: 60);
+        Assert.Equal(60, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal("battle-recovered", fixture.Controller.Snapshot.Reason);
+    }
+
+    [Fact]
+    public void BattleProfile_AttributesFortyToMeasuredPerformanceAfterFirstWindow()
+    {
+        using var fixture = new RateControllerFixture();
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+
+        fixture.AdvanceWindow(framesPerSecond: 57);
+
+        Assert.Equal(40, fixture.Controller.Snapshot.PerformanceCeilingHz);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal("battle-performance", fixture.Controller.Snapshot.Reason);
     }
 
     [Fact]
@@ -194,7 +227,7 @@ public sealed class MovementRateControllerTests
     }
 
     [Fact]
-    public void Metrics_MultiplySerializedPayloadByPeerFanout()
+    public void Metrics_CountActualPerRecipientPayloadBytes()
     {
         using var fixture = new RateControllerFixture(remoteControllers: 3);
         fixture.Controller.Configure(MovementCadenceProfile.Location);
@@ -205,7 +238,7 @@ public sealed class MovementRateControllerTests
 
         fixture.Controller.AdvanceFrame(1f);
 
-        Assert.Equal(375, fixture.Controller.Snapshot.WireBytesPerSecond);
+        Assert.Equal(125, fixture.Controller.Snapshot.WireBytesPerSecond);
     }
 
     [Fact]
@@ -214,7 +247,7 @@ public sealed class MovementRateControllerTests
         using var fixture = new RateControllerFixture();
         fixture.Controller.Configure(MovementCadenceProfile.Battle);
         fixture.Controller.ReportPopulation(1800, 900);
-        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
 
         Assert.True(fixture.Controller.TrySetForcedBulkHz(60, out string error));
         Assert.Null(error);
@@ -223,7 +256,7 @@ public sealed class MovementRateControllerTests
 
         Assert.True(fixture.Controller.TrySetForcedBulkHz(null, out error));
         Assert.Null(error);
-        Assert.Equal(10, fixture.Controller.Snapshot.BulkHz);
+        Assert.Equal(40, fixture.Controller.Snapshot.BulkHz);
         Assert.Equal(40, fixture.Controller.Snapshot.PriorityHz);
     }
 

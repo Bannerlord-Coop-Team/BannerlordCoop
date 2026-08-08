@@ -13,13 +13,19 @@ public interface IMovementBatchSender
     void BeginFrame(float elapsedSeconds);
 
     MovementSendResult Send<T>(
+        string controllerId,
         IEnumerable<MovementBatch<T>> scopedBatches,
         MovementBatch<T> legacyBatch,
         int maxPayloadBytes,
         Func<string, ushort[], Guid[], T[], IPacket> createPacket,
         Action<Guid, T> onSent);
 
-    MovementTrafficFrame EndFrame(int deferredSnapshots, float maximumDeferredAgeSeconds);
+    MovementTrafficFrame EndFrame(
+        string controllerId,
+        int deferredSnapshots,
+        float maximumDeferredAgeSeconds);
+
+    void RemoveRecipient(string controllerId);
 
     void Clear();
 }
@@ -64,7 +70,7 @@ public sealed class MovementBatch<T>
     }
 }
 
-/// <summary>Selects and sends the largest movement batches that fit the unreliable route budget.</summary>
+/// <summary>Selects and sends the largest movement batches that fit each recipient's route budget.</summary>
 public sealed class MovementBatchSender : IMovementBatchSender
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MovementBatchSender>();
@@ -72,36 +78,59 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
     private readonly IBattleNetwork client;
     private readonly IMovementPacketCompressor packetCompressor;
-    private readonly IMovementTrafficBudget trafficBudget;
-    private readonly Dictionary<(Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat), int>
-        preferredBatchSizes =
-            new Dictionary<(Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat), int>();
-    private readonly HashSet<(Type SnapshotType, string IdentityScopeId)> canonicalIdFallbacks =
-        new HashSet<(Type SnapshotType, string IdentityScopeId)>();
-    private readonly Dictionary<(Type SnapshotType, string IdentityScopeId, bool IsPriority), int> sendOffsets =
-        new Dictionary<(Type SnapshotType, string IdentityScopeId, bool IsPriority), int>();
-    private readonly Dictionary<(Type SnapshotType, bool IsPriority), int> batchOffsets =
-        new Dictionary<(Type SnapshotType, bool IsPriority), int>();
+    private readonly Func<IMovementTrafficBudget> trafficBudgetFactory;
+    private readonly Dictionary<string, RecipientState> recipients =
+        new Dictionary<string, RecipientState>(StringComparer.Ordinal);
+
+    private sealed class RecipientState
+    {
+        public IMovementTrafficBudget TrafficBudget { get; }
+        public Dictionary<(Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat), int>
+            PreferredBatchSizes { get; } =
+                new Dictionary<(Type, string, MovementIdFormat), int>();
+        public HashSet<(Type SnapshotType, string IdentityScopeId)> CanonicalIdFallbacks { get; } =
+            new HashSet<(Type, string)>();
+        public Dictionary<(Type SnapshotType, string IdentityScopeId, bool IsPriority), int>
+            SendOffsets { get; } =
+                new Dictionary<(Type, string, bool), int>();
+        public Dictionary<(Type SnapshotType, bool IsPriority), int> BatchOffsets { get; } =
+            new Dictionary<(Type, bool), int>();
+
+        public RecipientState(IMovementTrafficBudget trafficBudget)
+        {
+            TrafficBudget = trafficBudget;
+        }
+    }
 
     public MovementBatchSender(
         IBattleNetwork client,
         IMovementPacketCompressor packetCompressor,
-        IMovementTrafficBudget trafficBudget = null)
+        Func<IMovementTrafficBudget> trafficBudgetFactory)
     {
+        if (client == null) throw new ArgumentNullException(nameof(client));
+        if (packetCompressor == null) throw new ArgumentNullException(nameof(packetCompressor));
+        if (trafficBudgetFactory == null) throw new ArgumentNullException(nameof(trafficBudgetFactory));
+
         this.client = client;
         this.packetCompressor = packetCompressor;
-        this.trafficBudget = trafficBudget ?? new MovementTrafficBudget();
+        this.trafficBudgetFactory = trafficBudgetFactory;
     }
 
-    public void BeginFrame(float elapsedSeconds) => trafficBudget.Advance(elapsedSeconds);
+    public void BeginFrame(float elapsedSeconds)
+    {
+        foreach (RecipientState recipient in recipients.Values)
+            recipient.TrafficBudget.Advance(elapsedSeconds);
+    }
 
     public MovementSendResult Send<T>(
+        string controllerId,
         IEnumerable<MovementBatch<T>> scopedBatches,
         MovementBatch<T> legacyBatch,
         int maxPayloadBytes,
         Func<string, ushort[], Guid[], T[], IPacket> createPacket,
         Action<Guid, T> onSent)
     {
+        RecipientState recipient = GetOrCreateRecipient(controllerId);
         var batches = new List<MovementBatch<T>>();
         foreach (MovementBatch<T> batch in scopedBatches)
         {
@@ -114,33 +143,71 @@ public sealed class MovementBatchSender : IMovementBatchSender
         if (batches.Count == 0) return new MovementSendResult();
 
         var fairnessKey = (typeof(T), batches[0].IsPriority);
-        int offset = batchOffsets.TryGetValue(fairnessKey, out int previousOffset)
+        int offset = recipient.BatchOffsets.TryGetValue(fairnessKey, out int previousOffset)
             ? previousOffset % batches.Count
             : 0;
         var result = new MovementSendResult();
         for (int i = 0; i < batches.Count; i++)
         {
             MovementBatch<T> batch = batches[(offset + i) % batches.Count];
-            result = result.Add(SendBatch(batch, maxPayloadBytes, createPacket, onSent));
+            result = result.Add(SendBatch(
+                controllerId,
+                recipient,
+                batch,
+                maxPayloadBytes,
+                createPacket,
+                onSent));
         }
 
-        batchOffsets[fairnessKey] = (offset + 1) % batches.Count;
+        recipient.BatchOffsets[fairnessKey] = (offset + 1) % batches.Count;
         return result;
     }
 
-    public MovementTrafficFrame EndFrame(int deferredSnapshots, float maximumDeferredAgeSeconds) =>
-        trafficBudget.ReportFrame(deferredSnapshots, maximumDeferredAgeSeconds);
+    public MovementTrafficFrame EndFrame(
+        string controllerId,
+        int deferredSnapshots,
+        float maximumDeferredAgeSeconds)
+    {
+        return recipients.TryGetValue(controllerId, out RecipientState recipient)
+            ? recipient.TrafficBudget.ReportFrame(
+                deferredSnapshots,
+                maximumDeferredAgeSeconds)
+            : new MovementTrafficFrame();
+    }
+
+    public void RemoveRecipient(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId)) return;
+        recipients.Remove(controllerId);
+    }
 
     public void Clear()
     {
-        preferredBatchSizes.Clear();
-        canonicalIdFallbacks.Clear();
-        sendOffsets.Clear();
-        batchOffsets.Clear();
-        trafficBudget.Clear();
+        foreach (RecipientState recipient in recipients.Values)
+            recipient.TrafficBudget.Clear();
+        recipients.Clear();
+    }
+
+    private RecipientState GetOrCreateRecipient(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId))
+            throw new ArgumentException("A movement recipient is required.", nameof(controllerId));
+
+        if (recipients.TryGetValue(controllerId, out RecipientState recipient))
+            return recipient;
+
+        IMovementTrafficBudget trafficBudget = trafficBudgetFactory();
+        if (trafficBudget == null)
+            throw new InvalidOperationException("The movement traffic-budget factory returned null.");
+
+        recipient = new RecipientState(trafficBudget);
+        recipients.Add(controllerId, recipient);
+        return recipient;
     }
 
     private MovementSendResult SendBatch<T>(
+        string controllerId,
+        RecipientState recipient,
         MovementBatch<T> batch,
         int maxPayloadBytes,
         Func<string, ushort[], Guid[], T[], IPacket> createPacket,
@@ -155,14 +222,14 @@ public sealed class MovementBatchSender : IMovementBatchSender
         }
 
         var fairnessKey = (typeof(T), batch.IdentityScopeId, batch.IsPriority);
-        int offset = sendOffsets.TryGetValue(fairnessKey, out int previousOffset)
+        int offset = recipient.SendOffsets.TryGetValue(fairnessKey, out int previousOffset)
             ? previousOffset % batch.Data.Count
             : 0;
         MovementBatch<T> orderedBatch = Rotate(batch, offset);
 
         var fallbackKey = (typeof(T), batch.IdentityScopeId);
         MovementIdFormat idFormat =
-            batch.IdentityScopeId == null || canonicalIdFallbacks.Contains(fallbackKey)
+            batch.IdentityScopeId == null || recipient.CanonicalIdFallbacks.Contains(fallbackKey)
                 ? MovementIdFormat.Canonical
                 : MovementIdFormat.Compact;
         bool probeForGrowth = true;
@@ -170,12 +237,14 @@ public sealed class MovementBatchSender : IMovementBatchSender
 
         for (int start = 0; start < orderedBatch.Data.Count;)
         {
-            int availablePayloadBytes = Math.Min(maxPayloadBytes, trafficBudget.AvailableBytes);
+            int availablePayloadBytes = Math.Min(
+                maxPayloadBytes,
+                recipient.TrafficBudget.AvailableBytes);
             if (availablePayloadBytes <= 0) break;
 
             int remaining = orderedBatch.Data.Count - start;
             var preferenceKey = (typeof(T), batch.IdentityScopeId, idFormat);
-            int preferredCount = preferredBatchSizes.TryGetValue(
+            int preferredCount = recipient.PreferredBatchSizes.TryGetValue(
                 preferenceKey, out int previousSafeCount)
                 ? previousSafeCount
                 : InitialBatchSize;
@@ -215,7 +284,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 if (canonicalCandidate.Fits(availablePayloadBytes))
                 {
                     idFormat = MovementIdFormat.Canonical;
-                    canonicalIdFallbacks.Add(fallbackKey);
+                    recipient.CanonicalIdFallbacks.Add(fallbackKey);
                     preferenceKey = (typeof(T), batch.IdentityScopeId, idFormat);
                     candidate = canonicalCandidate;
                 }
@@ -241,22 +310,27 @@ public sealed class MovementBatchSender : IMovementBatchSender
                 continue;
             }
 
-            if (!trafficBudget.TrySpend(candidate.Payload.Length)) break;
-            client.SendAll(candidate.Packet, candidate.Payload);
+            if (!recipient.TrafficBudget.TrySpend(candidate.Payload.Length)) break;
+            client.Send(controllerId, candidate.Packet, candidate.Payload);
             for (int i = 0; i < candidate.Count; i++)
                 onSent?.Invoke(
                     orderedBatch.CanonicalIds[start + i],
                     orderedBatch.Data[start + i]);
 
             if (availablePayloadBytes == maxPayloadBytes)
-                RememberPreferredBatchSize(preferenceKey, candidate.Count, remaining);
+                RememberPreferredBatchSize(
+                    recipient,
+                    preferenceKey,
+                    candidate.Count,
+                    remaining);
             sentCount += candidate.Count;
             start += candidate.Count;
             probeForGrowth = false;
         }
 
         if (batch.Data.Count > 0)
-            sendOffsets[fairnessKey] = (offset + sentCount) % batch.Data.Count;
+            recipient.SendOffsets[fairnessKey] =
+                (offset + sentCount) % batch.Data.Count;
 
         return new MovementSendResult(
             sentCount,
@@ -319,16 +393,19 @@ public sealed class MovementBatchSender : IMovementBatchSender
             maxPayloadBytes);
     }
 
-    private void RememberPreferredBatchSize(
+    private static void RememberPreferredBatchSize(
+        RecipientState recipient,
         (Type SnapshotType, string IdentityScopeId, MovementIdFormat IdFormat) preferenceKey,
         int safeCount,
         int remaining)
     {
         if (safeCount < remaining ||
-            !preferredBatchSizes.TryGetValue(preferenceKey, out int previousSafeCount) ||
+            !recipient.PreferredBatchSizes.TryGetValue(
+                preferenceKey,
+                out int previousSafeCount) ||
             safeCount > previousSafeCount)
         {
-            preferredBatchSizes[preferenceKey] = safeCount;
+            recipient.PreferredBatchSizes[preferenceKey] = safeCount;
         }
     }
 

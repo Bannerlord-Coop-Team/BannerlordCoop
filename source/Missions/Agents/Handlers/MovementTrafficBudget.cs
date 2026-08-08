@@ -28,6 +28,12 @@ public readonly struct MovementTrafficFrame
         DeferredSnapshots = deferredSnapshots;
         MaximumDeferredAgeSeconds = maximumDeferredAgeSeconds;
     }
+
+    public MovementTrafficFrame Add(MovementTrafficFrame other) =>
+        new MovementTrafficFrame(
+            SentBytes + other.SentBytes,
+            DeferredSnapshots + other.DeferredSnapshots,
+            Math.Max(MaximumDeferredAgeSeconds, other.MaximumDeferredAgeSeconds));
 }
 
 /// <summary>Per-route token bucket that leaves most of Steam's minimum send rate available to reliable traffic.</summary>
@@ -35,7 +41,7 @@ public sealed class MovementTrafficBudget : IMovementTrafficBudget
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MovementTrafficBudget>();
 
-    // The same serialized payload is sent once per route, so total egress metrics apply peer fanout later.
+    // Each recipient owns one budget, so reported bytes already represent its actual route traffic.
     internal const int DefaultBytesPerSecond = 1024 * 1024;
     internal const int DefaultBurstBytes = 128 * 1024;
     private const float ReportIntervalSeconds = 1f;

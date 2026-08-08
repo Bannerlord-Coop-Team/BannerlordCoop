@@ -31,7 +31,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -86,7 +86,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -255,7 +255,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceHorse = mock.SpawnMount();
             Agent puppetHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
@@ -279,7 +279,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceHorse = mock.SpawnMount();
             Agent puppetHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
@@ -299,7 +299,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceHorse = mock.SpawnMount();
             Agent puppetHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
@@ -330,7 +330,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceRider = SpawnRider(mock);
             Agent sourceHorse = mock.SpawnMount(sourceRider);
             Agent puppetRider = SpawnRider(mock);
@@ -382,7 +382,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceHorse = mock.SpawnMount();
             Agent puppetHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
@@ -413,7 +413,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceHorse = mock.SpawnMount();
             Agent puppetHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
@@ -495,7 +495,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceHorse = mock.SpawnMount();
             Agent puppetHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
@@ -519,7 +519,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceHorse = mock.SpawnMount();
             Agent puppetHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
@@ -588,7 +588,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -651,7 +651,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -696,7 +696,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -742,7 +742,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -793,7 +793,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -914,7 +914,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -1071,7 +1071,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -1182,7 +1182,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceRider = SpawnRider(mock);
             Agent sourceHorse = mock.SpawnMount(sourceRider);
             Agent puppetRider = SpawnRider(mock);
@@ -1251,7 +1251,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceRider = SpawnRider(mock);
             Agent sourceHorse = mock.SpawnMount(sourceRider);
             Agent puppetRider = SpawnRider(mock);
@@ -1337,7 +1337,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceRider = SpawnRider(mock);
             mock.SpawnMount(sourceRider);
             Agent puppetRider = SpawnRider(mock);
@@ -1388,7 +1388,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent source = SpawnRider(mock);
             Agent puppet = SpawnRider(mock);
             Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
@@ -1437,7 +1437,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent source = SpawnRider(mock);
             Agent puppet = SpawnRider(mock);
             Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
@@ -1492,7 +1492,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent source = SpawnRider(mock);
             Agent puppet = SpawnRider(mock);
             Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
@@ -1542,7 +1542,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent sourceHorse = mock.SpawnMount();
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
             sourceHorseMirror.RealGlobalVelocity = new Vec3(3f, 4f, 12f);
@@ -1568,7 +1568,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -1607,7 +1607,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent rider = SpawnRider(mock);
             Agent horse = mock.SpawnMount(rider);
             Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
@@ -1638,7 +1638,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent rider = SpawnRider(mock);
             Agent horse = mock.SpawnMount(rider);
             Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
@@ -1694,7 +1694,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent rider = SpawnRider(mock);
             Agent horse = mock.SpawnMount(rider);
             Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
@@ -1733,7 +1733,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent rider = SpawnRider(mock);
             Agent horse = mock.SpawnMount(rider);
             Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
@@ -1764,7 +1764,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             Agent rider = SpawnRider(mock);
             Agent horse = mock.SpawnMount(rider);
             Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
@@ -1798,7 +1798,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -1838,7 +1838,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -1876,7 +1876,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -1923,7 +1923,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             const string movementScopeId = "owner-movement-scope";
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             Guid riderId = Guid.NewGuid();
@@ -1958,7 +1958,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
 
@@ -2027,7 +2027,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -2075,7 +2075,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var horseId = Guid.NewGuid();
@@ -2114,7 +2114,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var horseId = Guid.NewGuid();
@@ -2169,7 +2169,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var horseId = Guid.NewGuid();

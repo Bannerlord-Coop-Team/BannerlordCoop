@@ -35,7 +35,7 @@ public sealed class MovementRateSnapshot
     public MovementCadenceProfile Profile { get; }
     public int BulkHz { get; }
     public int PriorityHz { get; }
-    public int LoadCeilingHz { get; }
+    public int PerformanceCeilingHz { get; }
     public int LocalAdaptiveHz { get; }
     public int AdvertisedReceiverCapHz { get; }
     public int? PeerReceiverCapHz { get; }
@@ -60,7 +60,7 @@ public sealed class MovementRateSnapshot
         MovementCadenceProfile profile,
         int bulkHz,
         int priorityHz,
-        int loadCeilingHz,
+        int performanceCeilingHz,
         int localAdaptiveHz,
         int advertisedReceiverCapHz,
         int? peerReceiverCapHz,
@@ -84,7 +84,7 @@ public sealed class MovementRateSnapshot
         Profile = profile;
         BulkHz = bulkHz;
         PriorityHz = priorityHz;
-        LoadCeilingHz = loadCeilingHz;
+        PerformanceCeilingHz = performanceCeilingHz;
         LocalAdaptiveHz = localAdaptiveHz;
         AdvertisedReceiverCapHz = advertisedReceiverCapHz;
         PeerReceiverCapHz = peerReceiverCapHz;
@@ -121,11 +121,12 @@ public interface IMovementRateController : IDisposable
         double queueMilliseconds,
         double applyMilliseconds,
         int snapshots);
+    int GetReceiverCapHz(string controllerId);
     bool TrySetForcedBulkHz(int? hz, out string error);
     bool TrySetForcedReceiverCapHz(int? hz, out string error);
 }
 
-/// <summary>Selects mission movement cadence from explicit policy, load, measured work, and peer limits.</summary>
+/// <summary>Selects local movement production cadence from explicit policy and measured work.</summary>
 public sealed class MovementRateController : IMovementRateController
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MovementRateController>();
@@ -151,10 +152,10 @@ public sealed class MovementRateController : IMovementRateController
     private bool disposed;
     private int bulkHz = 40;
     private int priorityHz = 40;
-    private int loadCeilingHz = 40;
+    private int performanceCeilingHz = 40;
     private int localAdaptiveHz = 40;
-    private int automaticReceiverCapHz = 60;
-    private int advertisedReceiverCapHz = 60;
+    private int automaticReceiverCapHz = 40;
+    private int advertisedReceiverCapHz = 40;
     private int? peerReceiverCapHz;
     private string peerReceiverCapSource;
     private int? forcedBulkHz;
@@ -274,19 +275,25 @@ public sealed class MovementRateController : IMovementRateController
             switch (profile)
             {
                 case MovementCadenceProfile.Location:
-                    loadCeilingHz = 40;
+                    performanceCeilingHz = 40;
                     localAdaptiveHz = 40;
+                    automaticReceiverCapHz = 40;
+                    advertisedReceiverCapHz = forcedReceiverCapHz ?? automaticReceiverCapHz;
                     localReason = "location-fixed";
                     break;
                 case MovementCadenceProfile.Tournament:
-                    loadCeilingHz = 60;
+                    performanceCeilingHz = 60;
                     localAdaptiveHz = 60;
+                    automaticReceiverCapHz = 60;
+                    advertisedReceiverCapHz = forcedReceiverCapHz ?? automaticReceiverCapHz;
                     localReason = "tournament-fixed";
                     break;
                 case MovementCadenceProfile.Battle:
-                    loadCeilingHz = 60;
-                    localAdaptiveHz = 60;
-                    localReason = "battle-low-load";
+                    performanceCeilingHz = 60;
+                    localAdaptiveHz = 40;
+                    automaticReceiverCapHz = 40;
+                    advertisedReceiverCapHz = forcedReceiverCapHz ?? automaticReceiverCapHz;
+                    localReason = "battle-start";
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(profile));
@@ -342,17 +349,6 @@ public sealed class MovementRateController : IMovementRateController
 
             this.activeAgents = Math.Max(0, activeAgents);
             this.locallyControlledAgents = Math.Max(0, locallyControlledAgents);
-            if (profile != MovementCadenceProfile.Battle) return;
-
-            int controllerCount = GetControllerCount();
-            loadCeilingHz = CalculateLoadCeiling(this.activeAgents, controllerCount);
-            if (localAdaptiveHz > loadCeilingHz)
-            {
-                localAdaptiveHz = loadCeilingHz;
-                healthyWindows = 0;
-                localReason = "battle-load";
-            }
-            RecomputeEffectiveRate();
         }
     }
 
@@ -366,8 +362,7 @@ public sealed class MovementRateController : IMovementRateController
             if (disposed) return;
 
             sendMilliseconds += Math.Max(0d, elapsedMilliseconds);
-            int recipientCount = missionContext?.ControllersInMission.Count ?? 0;
-            wireBytes += Math.Max(0L, traffic.SentBytes) * recipientCount;
+            wireBytes += Math.Max(0L, traffic.SentBytes);
             maximumDeferredSnapshots = Math.Max(
                 maximumDeferredSnapshots,
                 traffic.DeferredSnapshots);
@@ -378,6 +373,22 @@ public sealed class MovementRateController : IMovementRateController
                 bulkPolls++;
             else
                 priorityOnlyPolls++;
+        }
+    }
+
+    public int GetReceiverCapHz(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId)) return RatesAscending[RatesAscending.Length - 1];
+
+        lock (gate)
+        {
+            if (disposed || profile != MovementCadenceProfile.Battle)
+                return RatesAscending[RatesAscending.Length - 1];
+
+            PruneExpiredReceiverCaps();
+            return receiverCaps.TryGetValue(controllerId, out ReceiverCapEntry receiverCap)
+                ? receiverCap.MaximumBulkHz
+                : RatesAscending[RatesAscending.Length - 1];
         }
     }
 
@@ -511,26 +522,24 @@ public sealed class MovementRateController : IMovementRateController
 
     private void EvaluateBattleRate()
     {
-        int performanceCeiling = CalculatePerformanceCeiling(
+        performanceCeilingHz = CalculatePerformanceCeiling(
             lastFramesPerSecond,
             lastSenderMillisecondsPerSecond + lastReceiverApplyMillisecondsPerSecond,
-            lastMaximumReceiverQueueMilliseconds,
-            lastMaximumDeferredSnapshots,
-            lastMaximumDeferredAgeSeconds);
-        int desired = Math.Min(loadCeilingHz, performanceCeiling);
+            lastMaximumReceiverQueueMilliseconds);
+        int desired = performanceCeilingHz;
         if (desired < localAdaptiveHz)
         {
             localAdaptiveHz = desired;
             healthyWindows = 0;
-            localReason = performanceCeiling < loadCeilingHz
-                ? "battle-performance"
-                : "battle-load";
+            localReason = "battle-performance";
             return;
         }
 
         if (desired <= localAdaptiveHz)
         {
             healthyWindows = 0;
+            if (desired == localAdaptiveHz && desired <= 40)
+                localReason = "battle-performance";
             return;
         }
 
@@ -538,9 +547,7 @@ public sealed class MovementRateController : IMovementRateController
             (lastSenderMillisecondsPerSecond + lastReceiverApplyMillisecondsPerSecond) / 1000d;
         bool healthy = lastFramesPerSecond >= 55f &&
             movementDuty <= 0.03d &&
-            lastMaximumReceiverQueueMilliseconds <= 50d &&
-            lastMaximumDeferredSnapshots == 0 &&
-            lastMaximumDeferredAgeSeconds <= 0.15f;
+            lastMaximumReceiverQueueMilliseconds <= 50d;
         healthyWindows = healthy ? healthyWindows + 1 : 0;
         if (healthyWindows < HealthyWindowsBeforeIncrease) return;
 
@@ -579,20 +586,8 @@ public sealed class MovementRateController : IMovementRateController
         }
         else
         {
-            bulkHz = Math.Min(localAdaptiveHz, advertisedReceiverCapHz);
-            if (peerReceiverCapHz.HasValue)
-                bulkHz = Math.Min(bulkHz, peerReceiverCapHz.Value);
-
-            if (bulkHz < localAdaptiveHz)
-            {
-                reason = bulkHz == advertisedReceiverCapHz
-                    ? "battle-local-receiver-cap"
-                    : $"battle-peer-receiver-cap:{peerReceiverCapSource}";
-            }
-            else
-            {
-                reason = localReason;
-            }
+            bulkHz = localAdaptiveHz;
+            reason = localReason;
         }
 
         priorityHz = Math.Max(40, bulkHz);
@@ -636,7 +631,7 @@ public sealed class MovementRateController : IMovementRateController
             profile,
             bulkHz,
             priorityHz,
-            loadCeilingHz,
+            performanceCeilingHz,
             localAdaptiveHz,
             advertisedReceiverCapHz,
             peerReceiverCapHz,
@@ -661,38 +656,23 @@ public sealed class MovementRateController : IMovementRateController
     private int GetControllerCount() =>
         1 + (missionContext?.ControllersInMission.Count ?? 0);
 
-    internal static int CalculateLoadCeiling(int activeAgents, int controllerCount)
-    {
-        int loadScore = Math.Max(0, activeAgents) +
-            ((Math.Max(1, controllerCount) - 1) * 25);
-        if (loadScore <= 50) return 60;
-        if (loadScore <= 250) return 40;
-        if (loadScore <= 500) return 30;
-        if (loadScore <= 900) return 20;
-        if (loadScore <= 1400) return 15;
-        return 10;
-    }
-
     private static int CalculatePerformanceCeiling(
         float framesPerSecond,
         double movementMillisecondsPerSecond,
-        double maximumQueueMilliseconds,
-        int deferredSnapshots,
-        float maximumDeferredAgeSeconds)
+        double maximumQueueMilliseconds)
     {
         double duty = movementMillisecondsPerSecond / 1000d;
         if (framesPerSecond < 25f || duty > 0.12d ||
-            maximumQueueMilliseconds > 150d || maximumDeferredAgeSeconds > 0.5f)
+            maximumQueueMilliseconds > 150d)
             return 10;
         if (framesPerSecond < 35f || duty > 0.08d ||
-            maximumQueueMilliseconds > 100d || maximumDeferredAgeSeconds > 0.35f)
+            maximumQueueMilliseconds > 100d)
             return 15;
         if (framesPerSecond < 45f || duty > 0.05d ||
-            maximumQueueMilliseconds > 75d || maximumDeferredAgeSeconds > 0.25f)
+            maximumQueueMilliseconds > 75d)
             return 20;
         if (framesPerSecond < 55f || duty > 0.03d ||
-            maximumQueueMilliseconds > 50d || maximumDeferredAgeSeconds > 0.15f ||
-            deferredSnapshots > 0)
+            maximumQueueMilliseconds > 50d)
             return 30;
         if (framesPerSecond < 58f || duty > 0.02d)
             return 40;
@@ -808,6 +788,7 @@ public sealed class MovementRateController : IMovementRateController
         lock (gate)
         {
             if (disposed) return;
+            receiverCaps.Remove(payload.What.ControllerId);
             advertisement = CreateReceiverCapAdvertisement();
         }
 
@@ -850,7 +831,7 @@ public sealed class MovementRateController : IMovementRateController
     {
         Logger.Information(
             "[MovementRate] profile={Profile} bulkHz={BulkHz} priorityHz={PriorityHz} " +
-            "loadCeilingHz={LoadCeilingHz} localAdaptiveHz={LocalAdaptiveHz} " +
+            "performanceCeilingHz={PerformanceCeilingHz} localAdaptiveHz={LocalAdaptiveHz} " +
             "receiverCapHz={ReceiverCapHz} peerCapHz={PeerCapHz} peerCapSource={PeerCapSource} " +
             "agents={ActiveAgents} localAgents={LocalAgents} controllers={Controllers} fps={Fps:0.0} " +
             "senderMsPerSecond={SenderMs:0.00} receiverApplyMsPerSecond={ReceiverMs:0.00} " +
@@ -859,7 +840,7 @@ public sealed class MovementRateController : IMovementRateController
             snapshot.Profile,
             snapshot.BulkHz,
             snapshot.PriorityHz,
-            snapshot.LoadCeilingHz,
+            snapshot.PerformanceCeilingHz,
             snapshot.LocalAdaptiveHz,
             snapshot.AdvertisedReceiverCapHz,
             snapshot.PeerReceiverCapHz,

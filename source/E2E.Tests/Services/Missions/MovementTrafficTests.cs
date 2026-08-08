@@ -15,6 +15,7 @@ using Missions;
 using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
+using Missions.Messages;
 using Missions.Services.Network;
 using Moq;
 using TaleWorlds.Core;
@@ -45,7 +46,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -92,7 +93,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -123,7 +124,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -133,6 +134,9 @@ public class MovementTrafficTests : MissionTestEnvironment
             rateController
                 .Setup(controller => controller.AdvanceFrame(It.IsAny<float>()))
                 .Returns(new MovementCadence(60, 60));
+            rateController
+                .Setup(controller => controller.GetReceiverCapHz(It.IsAny<string>()))
+                .Returns(60);
             rateController
                 .Setup(controller => controller.ReportPopulation(It.IsAny<int>(), It.IsAny<int>()))
                 .Callback<int, int>((activeAgents, locallyControlledAgents) =>
@@ -147,10 +151,12 @@ public class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentEquipmentApplier>(),
                 new MovementBatchSender(
                     network,
-                    new MovementPacketCompressor(serializer)),
+                    new MovementPacketCompressor(serializer),
+                    () => new MovementTrafficBudget()),
                 peer.Resolve<IPuppetMountStateRepairer>(),
                 peer.Resolve<IAgentVisualActionAccessor>(),
-                rateController.Object);
+                rateController.Object,
+                peer.Resolve<IMissionContext>());
 
             Agent locallyControlledAgent = SpawnRider(mock);
             Agent remoteControlledAgent = SpawnRider(mock);
@@ -196,7 +202,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -234,6 +240,103 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_SlowReceiverDoesNotThrottleFastReceiverOrLoseLatestState()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "owner");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            broker.Publish(this, new NetworkMissionPeerEntered("fast", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("slow", "battle"));
+
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent agent = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
+            component.AgentMovementHandler.Configure(MovementCadenceProfile.Battle);
+            broker.Publish(
+                this,
+                new NetworkMovementReceiverCap("slow", 10, 1));
+
+            component.AgentMovementHandler.PollMovement(0f);
+            network.DirectPacketSends.Clear();
+            network.NetworkSentPackets.Packets.Clear();
+
+            for (int i = 1; i <= 4; i++)
+            {
+                mirror.Position = new Vec3(i, 0f, 0f);
+                component.AgentMovementHandler.PollMovement(0.025f);
+            }
+
+            MovementPacket[] fastPackets = network.DirectPacketSends
+                .Where(send => send.ControllerId == "fast")
+                .Select(send => send.Packet)
+                .OfType<MovementPacket>()
+                .ToArray();
+            MovementPacket slowPacket = Assert.Single(network.DirectPacketSends
+                .Where(send => send.ControllerId == "slow")
+                .Select(send => send.Packet)
+                .OfType<MovementPacket>());
+
+            Assert.Equal(4, fastPackets.Length);
+            Assert.Equal(4f, Assert.Single(slowPacket.Agents).Position.X);
+            Assert.Equal(40, component.AgentMovementHandler.MovementRate.BulkHz);
+            Assert.Equal(10, component.AgentMovementHandler.MovementRate.PeerReceiverCapHz);
+        });
+    }
+
+    [Theory]
+    [InlineData(40, 30)]
+    [InlineData(60, 40)]
+    public void PollMovement_RecipientCadencePreservesNonDivisorClockPhase(
+        int sourceHz,
+        int receiverHz)
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "owner");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            broker.Publish(this, new NetworkMissionPeerEntered("receiver", "battle"));
+
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent agent = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
+            component.AgentMovementHandler.Configure(MovementCadenceProfile.Battle);
+            Assert.True(component.AgentMovementHandler.TrySetForcedBulkHz(sourceHz, out _));
+            broker.Publish(
+                this,
+                new NetworkMovementReceiverCap("receiver", receiverHz, 1));
+
+            component.AgentMovementHandler.PollMovement(0f);
+            network.DirectPacketSends.Clear();
+
+            float frameSeconds = 1f / sourceHz;
+            for (int i = 1; i <= sourceHz; i++)
+            {
+                mirror.Position = new Vec3(i, 0f, 0f);
+                component.AgentMovementHandler.PollMovement(frameSeconds);
+            }
+
+            int packets = network.DirectPacketSends.Count(send =>
+                send.ControllerId == "receiver" && send.Packet is MovementPacket);
+            Assert.Equal(receiverHz, packets);
+        });
+    }
+
+    [Fact]
     public void PollMovement_SendsNonPositionalChangesAndHeartbeat()
     {
         using var fixture = new MissionEngineFixture();
@@ -242,7 +345,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -286,7 +389,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -340,7 +443,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -365,7 +468,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -377,9 +480,13 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             handler.PollMovement(0f);
 
-            var pending = Assert.IsAssignableFrom<IDictionary>(typeof(AgentMovementHandler)
-                .GetField("movementPendingSince", BindingFlags.Instance | BindingFlags.NonPublic)
+            var recipientStates = Assert.IsAssignableFrom<IDictionary>(typeof(AgentMovementHandler)
+                .GetField("recipientMovementStates", BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.GetValue(handler));
+            object recipientState = Assert.Single(recipientStates.Values.Cast<object>());
+            var pending = Assert.IsAssignableFrom<IDictionary>(recipientState.GetType()
+                .GetField("MovementPendingSince", BindingFlags.Instance | BindingFlags.Public)
+                ?.GetValue(recipientState));
             var equipment = Assert.IsAssignableFrom<IDictionary>(typeof(AgentMovementHandler)
                 .GetField("lastEquipment", BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.GetValue(handler));
@@ -403,7 +510,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -454,7 +561,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -469,9 +576,14 @@ public class MovementTrafficTests : MissionTestEnvironment
                 registry,
                 peer.Resolve<IControllerIdProvider>(),
                 peer.Resolve<IAgentEquipmentApplier>(),
-                new MovementBatchSender(network, compressor),
+                new MovementBatchSender(
+                    network,
+                    compressor,
+                    () => new MovementTrafficBudget()),
                 peer.Resolve<IPuppetMountStateRepairer>(),
-                peer.Resolve<IAgentVisualActionAccessor>());
+                peer.Resolve<IAgentVisualActionAccessor>(),
+                peer.Resolve<IMovementRateController>(),
+                peer.Resolve<IMissionContext>());
             network.MaxUnreliablePayloadBytes = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
                 serializer,
                 "MapEvent_Created_0000",
@@ -524,7 +636,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -674,10 +786,13 @@ public class MovementTrafficTests : MissionTestEnvironment
         client.ConnectToInstance(instanceId);
 
         Assert.Equal(0, client.GetMaxUnreliablePayloadBytes());
+        Assert.Equal(0, client.GetMaxUnreliablePayloadBytes(unusableControllerId));
 
         missionContext.SetupGet(value => value.ControllersInMission)
             .Returns(new[] { usableControllerId, unusableControllerId });
         Assert.Equal(usableBudget, client.GetMaxUnreliablePayloadBytes());
+        Assert.Equal(usableBudget, client.GetMaxUnreliablePayloadBytes(usableControllerId));
+        Assert.Equal(0, client.GetMaxUnreliablePayloadBytes(unusableControllerId));
 
         client.SendAll(new MovementPacket(
             "scope",
@@ -779,7 +894,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -815,7 +930,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
@@ -841,7 +956,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             var agents = new AgentData[3];
             for (int i = 0; i < agents.Length; i++)
             {
@@ -901,7 +1016,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateMovementMission(fixture, peer);
             _ = peer.Resolve<ICoopMissionComponent>();
             var packetManager = peer.Resolve<IPacketManager>();
             var ids = new ushort[3];
