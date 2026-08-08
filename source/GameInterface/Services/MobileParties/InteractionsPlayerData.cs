@@ -9,6 +9,8 @@ namespace GameInterface.Services.MobileParties;
 /// _interactedCaravans tracks last interaction a player had with a caravan, needs to be unique per player
 /// _interactedBandits tracks last interaction a player had with a bandit party, needs to be unique per player
 /// _interactedPatrolParties tracks last interaction a player had with a patrol, needs to be unique per player
+/// _arenaMasterHasMetInSettlements tracks arena masters a player has met, needs to be unique per player
+/// _knowTournaments is used to allow a player to enter practice fights after they have spoken with an arena master
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class InteractionsPlayerData
@@ -29,15 +31,27 @@ public class InteractionsPlayerData
     [ProtoMember(4)]
     public Dictionary<string, Dictionary<string, long>> PlayerInteractedPatrols { get; }
 
+    // Dictionary<PlayerHeroId, List<SettlementId>>
+    [ProtoMember(5)]
+    public Dictionary<string, List<string>> PlayerMetArenaMasters { get; }
+
+    // Dictionary<PlayerHeroId, KnowTournaments>
+    [ProtoMember(6)]
+    public Dictionary<string, bool> PlayerKnowTournaments { get; }
+
     public InteractionsPlayerData(
         Dictionary<string, Dictionary<string, int>> playerInteractedVillagers,
         Dictionary<string, Dictionary<string, int>> playerInteractedCaravans,
         Dictionary<string, Dictionary<string, int>> playerInteractedBandits,
-        Dictionary<string, Dictionary<string, long>> playerInteractedPatrols)
+        Dictionary<string, Dictionary<string, long>> playerInteractedPatrols,
+        Dictionary<string, List<string>> playerMetArenaMasters,
+        Dictionary<string, bool> playerKnowTournaments)
     {
-        PlayerInteractedVillagers = playerInteractedVillagers;
-        PlayerInteractedCaravans = playerInteractedCaravans;
-        PlayerInteractedBandits = playerInteractedBandits;
-        PlayerInteractedPatrols = playerInteractedPatrols;
+        PlayerInteractedVillagers = playerInteractedVillagers ?? new();
+        PlayerInteractedCaravans = playerInteractedCaravans ?? new();
+        PlayerInteractedBandits = playerInteractedBandits ?? new();
+        PlayerInteractedPatrols = playerInteractedPatrols ?? new();
+        PlayerMetArenaMasters = playerMetArenaMasters ?? new();
+        PlayerKnowTournaments = playerKnowTournaments ?? new();
     }
 }
