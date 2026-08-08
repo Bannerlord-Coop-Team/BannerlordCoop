@@ -49,6 +49,18 @@ public readonly struct SetAlleyGarrisonRequested : IEvent
     }
 }
 
+/// <summary>The player accepted the troop offer from their alley overseer.</summary>
+public readonly struct RecruitAlleyTroopsRequested : IEvent
+{
+    public readonly Alley Alley;
+    public readonly TroopRoster Troops;
+    public RecruitAlleyTroopsRequested(Alley alley, TroopRoster troops)
+    {
+        Alley = alley;
+        Troops = troops;
+    }
+}
+
 /// <summary>
 /// Player won the alley fight and took over the alley. The alley is owned by the acquiring player
 /// (<see cref="Owner"/>) and run by the chosen clan member (<see cref="Overseer"/>) - these are
@@ -134,6 +146,20 @@ public readonly struct RequestSetAlleyGarrison : ICommand
     }
 }
 
+[ProtoContract(SkipConstructor = true)]
+public readonly struct RequestRecruitAlleyTroops : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string AlleyId;
+    [ProtoMember(2)]
+    public readonly TroopRosterElementData[] Troops;
+    public RequestRecruitAlleyTroops(string alleyId, TroopRosterElementData[] troops)
+    {
+        AlleyId = alleyId;
+        Troops = troops;
+    }
+}
+
 // --- Networked server -> clients broadcasts ---
 
 [ProtoContract(SkipConstructor = true)]
@@ -145,11 +171,18 @@ public readonly struct NetworkAlleyManagementUpdated : ICommand
     public readonly string OverseerId;
     [ProtoMember(3)]
     public readonly TroopRosterElementData[] Garrison;
-    public NetworkAlleyManagementUpdated(string alleyId, string overseerId, TroopRosterElementData[] garrison)
+    [ProtoMember(4)]
+    public readonly long LastRecruitTimeTicks;
+    public NetworkAlleyManagementUpdated(
+        string alleyId,
+        string overseerId,
+        TroopRosterElementData[] garrison,
+        long lastRecruitTimeTicks)
     {
         AlleyId = alleyId;
         OverseerId = overseerId;
         Garrison = garrison;
+        LastRecruitTimeTicks = lastRecruitTimeTicks;
     }
 }
 

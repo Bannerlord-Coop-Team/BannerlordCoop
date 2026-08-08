@@ -306,7 +306,8 @@ internal class PartyRolesHandler : IHandler
         mobileParty = null;
         if (heroId != null && !objectManager.TryGetObjectWithLogging(heroId, out hero)) return false;
 
-        if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out mobileParty)) return false;
+        // Mobile party can already be destroyed when this gets called. Don't log a failed retrieval
+        if (!objectManager.TryGetObject(mobilePartyId, out mobileParty)) return false;
 
         return true;
     }

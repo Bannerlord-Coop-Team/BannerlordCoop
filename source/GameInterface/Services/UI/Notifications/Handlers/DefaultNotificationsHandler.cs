@@ -564,12 +564,14 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.Party, out var partyId)) return;
 
-            // Unsure how to send factions over the network
-            string factionStringId = obj.What.CapturerFaction.StringId;
+            string partyId = null;
+            if (obj.What.Party != null && !objectManager.TryGetIdWithLogging(obj.What.Party, out partyId)) return;
 
-            network.SendAll(new NetworkNotifyHeroPrisonerReleased(heroId, partyId, factionStringId, obj.What.Detail, obj.What.ShowNotification));
+            string capturerFactionId = null;
+            if (obj.What.CapturerFaction != null && !objectManager.TryGetIdWithLogging(obj.What.CapturerFaction, out capturerFactionId)) return;
+
+            network.SendAll(new NetworkNotifyHeroPrisonerReleased(heroId, partyId, capturerFactionId, obj.What.Detail, obj.What.ShowNotification));
         });
     }
 
@@ -579,17 +581,12 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.PartyId, out var party)) return;
+
+            PartyBase party = null;
+            if (obj.What.PartyId != null && !objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.PartyId, out party)) return;
 
             IFaction capturerFaction = null;
-            foreach (var faction in Campaign.Current.Factions)
-            {
-                if (faction.StringId == obj.What.FactionId)
-                {
-                    capturerFaction = faction;
-                    break;
-                }
-            }
+            if (obj.What.FactionId != null && !TryGetFaction(obj.What.FactionId, out capturerFaction)) return;
 
             notificationsBehavior.OnHeroPrisonerReleased(hero, party, capturerFaction, obj.What.Detail, obj.What.ShowNotification);
         });
@@ -1423,6 +1420,24 @@ internal class DefaultNotificationsHandler : IHandler
 
             notificationsBehavior.OnHeroTeleportationRequested(hero, targetSettlement, targetParty, obj.What.Detail);
         });
+    }
+
+    private bool TryGetFaction(string id, out IFaction faction)
+    {
+        if (objectManager.TryGetObject(id, out Kingdom kingdom))
+        {
+            faction = kingdom;
+            return true;
+        }
+        if (objectManager.TryGetObject(id, out Clan clan))
+        {
+            faction = clan;
+            return true;
+        }
+
+        Logger.Debug("Faction not found in DefaultNotificationsHandler with id: {id}", id);
+        faction = null;
+        return false;
     }
 
     private bool TryGetNotificationsBehavior(out DefaultNotificationsCampaignBehavior campaignBehavior)
