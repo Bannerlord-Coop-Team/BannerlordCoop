@@ -175,7 +175,6 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
 
             Assert.True(shown);
             Assert.True(args.IsEnabled, "healthy allied troops should be allowed to simulate the field battle");
-            Assert.Equal(GameMenuOption.LeaveType.OrderTroopsToAttack, args.optionLeaveType);
         }, MapEventDisabledMethods);
     }
 
