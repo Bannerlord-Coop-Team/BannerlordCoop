@@ -5,11 +5,13 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
 using GameInterface.Services.Tournaments.UI;
+using SandBox.Tournaments.MissionLogics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.MountAndBlade;
@@ -352,7 +354,8 @@ public class TournamentDebugCommand
         output.AppendLine(
             $"DANUSTICA_TOURNAMENT_OBSERVATION role={(ModInformation.IsServer ? "server" : "client")}|" +
             $"townId={townId}|nativeType={nativeGame?.GetType().Name ?? "none"}|" +
-            $"sessionSource={sessionSource}|localControllerId={localControllerId ?? "none"}");
+            $"sessionSource={sessionSource}|localControllerId={localControllerId ?? "none"}|" +
+            $"encounterSettlement={PlayerEncounter.EncounterSettlement?.StringId ?? "none"}");
         AppendSessionState(output, snapshot, localControllerId);
         AppendMissionState(output);
         return output.ToString().TrimEnd();
@@ -412,11 +415,29 @@ public class TournamentDebugCommand
                 .Select(behavior => behavior.GetType().Name)
                 .Where(name => name.IndexOf("Tournament", StringComparison.OrdinalIgnoreCase) >= 0)
                 .OrderBy(name => name, StringComparer.Ordinal));
+        TournamentBehavior tournamentBehavior = mission.GetMissionBehavior<TournamentBehavior>();
         output.AppendLine(
             $"mission=active|scene={mission.SceneName}|mode={mission.Mode}|" +
             $"ending={mission.IsMissionEnding}|agents={mission.Agents.Count}|" +
             $"mainAgent={mission.MainAgent?.Name ?? "none"}|" +
+            $"nativeBracketReady={IsNativeBracketReady(tournamentBehavior)}|" +
             $"tournamentBehaviors={tournamentBehaviors}");
+    }
+
+    private static bool IsNativeBracketReady(TournamentBehavior behavior)
+    {
+        if (behavior?.Rounds == null ||
+            behavior.CurrentRoundIndex < 0 ||
+            behavior.CurrentRoundIndex >= behavior.Rounds.Length)
+        {
+            return false;
+        }
+
+        TournamentRound round = behavior.Rounds[behavior.CurrentRoundIndex];
+        return round?.Matches != null &&
+               round.CurrentMatchIndex >= 0 &&
+               round.CurrentMatchIndex < round.Matches.Length &&
+               round.Matches[round.CurrentMatchIndex] != null;
     }
 
     private static bool TryResolveDanusticaController(
