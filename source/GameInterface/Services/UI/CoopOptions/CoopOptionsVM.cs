@@ -2,6 +2,7 @@ using Common.Messaging;
 using GameInterface;
 using GameInterface.Services.UI.CoopOptions.Providers;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
+using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
 using GameInterface.Services.UI.Donate;
 using System;
 using TaleWorlds.Library;
@@ -13,7 +14,8 @@ public class CoopOptionsVM : ViewModel
 {
     private static readonly ICoopOptionsTabProvider[] TabDefinitions =
     {
-        new KillFeedOptionsTabProvider()
+        new KillFeedOptionsTabProvider(),
+        new MapTimeOptionsTabProvider()
     };
 
     private readonly ICoopOptionsStore optionsStore;
@@ -59,7 +61,7 @@ public class CoopOptionsVM : ViewModel
 
     [DataSourceProperty]
     public MBBindingList<CoopOptionsTabVM> Tabs { get; }
-
+    
     [DataSourceProperty]
     public CoopOptionsTabVM SelectedTab
     {
@@ -112,12 +114,29 @@ public class CoopOptionsVM : ViewModel
     public void ActionPatreon() => CommunityLinks.OpenPatreon();
 
     public void ActionDiscord() => CommunityLinks.OpenDiscord();
+    
+    [DataSourceProperty]
+    public CoopOptionsTabVM KillFeedTab {get; set;}
+    
+    [DataSourceProperty]
+    public CoopOptionsTabVM MapTimeTab {get; set;}
 
+    // Binding each panel to the specific tab object from the root VM
     private void InitializeTabs(CoopOptionsData options)
     {
         foreach (var provider in TabDefinitions)
         {
-            Tabs.Add(provider.CreateTab(options, messageBroker, SelectTab));
+            var tab = provider.CreateTab(options, messageBroker, SelectTab);
+            Tabs.Add(tab);
+
+            if (tab.Id == KillFeedOptionsTabProvider.TabId)
+            {
+                KillFeedTab = tab;
+            } 
+            else if (tab.Id == MapTimeOptionsTabProvider.TabId)
+            {
+                MapTimeTab = tab;   
+            }
         }
 
         if (Tabs.Count > 0)
