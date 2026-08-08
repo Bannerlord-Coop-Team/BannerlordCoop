@@ -1146,7 +1146,7 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         var client = Clients.First();
         var (playerHeroId, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        RegisterPeer(client, "PlayerOne");
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
         var aiRaiderMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var aiRaiderTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var target = CreateVillageTarget();

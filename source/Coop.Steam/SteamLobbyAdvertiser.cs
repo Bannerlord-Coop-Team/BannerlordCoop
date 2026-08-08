@@ -13,7 +13,7 @@ public class SteamLobbyAdvertiser : ISessionAdvertiser, ISteamLobbyOwner
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SteamLobbyAdvertiser>();
 
-    public const int MaxLobbyMembers = 16;
+    public const int MaxLobbyMembers = 128;
     public const string ConnectLobbyArgument = "+connect_lobby";
 
     protected readonly ISteamLobbyApi lobbyApi;
