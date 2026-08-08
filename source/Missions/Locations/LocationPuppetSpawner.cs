@@ -284,23 +284,32 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         }
 
         if (ReferenceEquals(agent.CurrentlyUsedGameObject, point)) return;
+
+        if (point is SandBox.Objects.AnimationPoints.AnimationPoint)
+        {
+            // Every NEW authoritative performance starts from the local point's canonical
+            // pre-arrival frame. Position reconciliation stops as soon as the point owns the
+            // puppet, so a live transition cannot depend on later snapshots to finish alignment.
+            LocationPointUseLifecycle.RestartFromCanonicalFrame(agent, point);
+            Logger.Debug("[LocationSync] NPC {AgentId} restarted local point {PointId} arrival", agentId, pointId);
+            return;
+        }
+
+        // Preserve the old generic StandingPoint/UsableMissionObject path: unlike AnimationPoint it
+        // does not replace channel 0 with an arrival action. Catch-up still plants a fresh puppet at
+        // its point, while a live transition retains the host-replicated action and movement.
         if (agent.CurrentlyUsedGameObject != null)
             agent.StopUsingGameObject(isSuccessful: true);
 
         var frame = point.GetUserFrameForAgent(agent);
         if (resetToPointFrame)
         {
-            // Catch-up starts from the point's pre-arrival frame; the host position may already
-            // contain the arrive animation's displacement, which the local point will replay.
             var direction = frame.Rotation.f.AsVec2.Normalized();
             agent.TeleportToPosition(frame.Origin.GetGroundVec3());
             agent.SetMovementDirection(in direction);
         }
 
         agent.UseGameObject(point);
-
-        // Controller.None ignores the point's AI-scripted alignment, so give its arrive gate the
-        // same engine target native multiplayer assigns to remote users.
         agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
     }
 

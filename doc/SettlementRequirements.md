@@ -147,14 +147,16 @@ resumes on end, contested notable denied; battle entered/exited mid-session → 
   point's OUTPUTS (the floating/spinning/sliding sitter chain). Non-point ambient one-offs stay on
   the action carve-out. Puppet seating alignment: the point's native alignment is AI-scripted
   movement a `Controller.None` puppet ignores, and `AnimationPoint.IsTargetReached` gates the
-  arrive action on distance to the agent's ENGINE TARGET — so on use application the puppet's
-  target is set to `GetUserFrameForAgent` (the native-MP remote-user planting,
-  `UsableMissionObject.OnUse` client branch): it walks the last step onto the seat, faces it, then
-  sits. A freshly spawned catch-up puppet is first reset to that pre-arrival frame because the
-  host's current position may already include the arrival animation displacement. Adoption keeps
-  the local point's current transform instead of rebasing its animation during AI takeover
-  (SR-030). Degradation: a
-  point id that fails to resolve locally leaves that puppet un-animated with a warning (only
+  arrive action on distance to the agent's ENGINE TARGET — so every new replicated use restarts
+  through the point's public stop/use lifecycle from `GetUserFrameForAgent`, the canonical
+  pre-arrival frame: the puppet is planted and faced there, then the local point calls its configured
+  sit/work/dance arrival and transitions into its loop. This applies to live peer transitions and
+  fresh joiner catch-up because position reconciliation stops while the point owns the puppet.
+  Host-migration adoption force-restarts existing `AnimationPoint` users through the same lifecycle;
+  `OnUseStopped` first restores the canonical locked frame, and `OnUse` resets the private point
+  state before replaying arrival under the new AI host (SR-030). The code never calls a sit action
+  directly, which would bypass root motion, item visibility, paired performances and leave behavior.
+  Degradation: a point id that fails to resolve locally leaves that puppet un-animated with a warning (only
   possible on mismatched scenes).
   IMPLEMENTED (live verification outstanding)
 

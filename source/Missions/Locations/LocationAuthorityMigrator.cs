@@ -126,27 +126,24 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     {
         if (payload.What.InstanceId != session.InstanceId) return;
 
-        AdoptAgentsFrom(payload.What.PreviousHostControllerId, "host migration");
-
         // The departed host may itself have inherited NPCs through an earlier migration — those are
-        // still keyed to older absent controllers here. Sweep every absent authority so nothing stays
-        // frozen. Idempotent: once adopted, the agents are keyed to us.
-        SweepAgentsOfAbsentControllers(payload.What.PreviousHostControllerId);
-    }
+        // still keyed to older absent controllers here. Adopt every absent authority in ONE batch:
+        // paired AnimationPoints can stop users across authority keys, so separate batches could
+        // strand a partner that an earlier batch had already processed.
+        var absentControllers = new HashSet<string>();
+        if (!string.IsNullOrEmpty(payload.What.PreviousHostControllerId))
+            absentControllers.Add(payload.What.PreviousHostControllerId);
 
-    private void SweepAgentsOfAbsentControllers(string previousHost)
-    {
         var present = new HashSet<string>(missionContext.ControllersInMission);
-
         foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
         {
             if (string.IsNullOrEmpty(controllerId)) continue;
-            if (controllerId == previousHost) continue; // the migration adoption already took these
             if (session.IsOwn(controllerId)) continue;
-            if (present.Contains(controllerId)) continue; // still connected — its owner drives them
-
-            AdoptAgentsFrom(controllerId, "location migration orphan sweep");
+            if (present.Contains(controllerId)) continue;
+            absentControllers.Add(controllerId);
         }
+
+        AdoptAgentsFrom(absentControllers, "host migration + orphan sweep");
     }
 
     // Take over the NPCs owned by the departed controller: move authority to us (the movement poller
@@ -154,22 +151,32 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     // origin points at — the native sequence (CampaignAgentComponent.CreateAgentNavigator +
     // entry.AddBehaviors, V5). Other peers keep them as puppets that now follow OUR movement (their
     // movement lookup is scope+id keyed, which survives the authority transfer).
-    private void AdoptAgentsFrom(string controllerId, string reason)
+    private void AdoptAgentsFrom(IEnumerable<string> controllerIds, string reason)
     {
-        if (string.IsNullOrEmpty(controllerId)) return;
-        if (session.IsOwn(controllerId)) return;
+        if (controllerIds == null) return;
+
+        var controllers = new HashSet<string>();
+        foreach (var controllerId in controllerIds)
+        {
+            if (string.IsNullOrEmpty(controllerId) || session.IsOwn(controllerId)) continue;
+            controllers.Add(controllerId);
+        }
+        if (controllers.Count == 0) return;
 
         var registry = coopMissionComponent.AgentRegistry;
 
         GameThread.RunSafe(() =>
         {
             var adopted = new List<CoopAgentInfo>();
-            foreach (var info in registry.GetAgents(controllerId))
+            foreach (var controllerId in controllers)
             {
-                // A lingering non-NPC entry (the departed player's own body whose despawn we somehow
-                // missed) is not ours to adopt; DespawnPlayerPuppet owns it.
-                if (!bindingMap.TryGet(info.AgentId, out _)) continue;
-                adopted.Add(info);
+                foreach (var info in registry.GetAgents(controllerId))
+                {
+                    // A lingering non-NPC entry (the departed player's own body whose despawn we
+                    // somehow missed) is not ours to adopt; DespawnPlayerPuppet owns it.
+                    if (!bindingMap.TryGet(info.AgentId, out _)) continue;
+                    adopted.Add(info);
+                }
             }
 
             if (adopted.Count == 0) return;
@@ -180,6 +187,7 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
             if (Mission.Current == null) return;
 
             var interpolator = coopMissionComponent.AgentMovementHandler.Interpolator;
+            var adoptedHumans = new List<(Agent Agent, AgentNavigator Navigator)>();
             int revived = 0;
             int stationary = 0;
             foreach (var info in adopted)
@@ -191,14 +199,24 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
                 // stale interpolation target overrides the AI and pins the agent in place.
                 interpolator.Forget(agent);
 
-                if (ReviveSettlementAi(agent, info.AgentId)) revived++;
+                if (ReviveSettlementAi(agent, info.AgentId, reconnectPointUse: false)) revived++;
                 else stationary++;
+
+                // Include stationary-fallback humans too. Paired AnimationPoint shutdown can stop
+                // them even without a navigator; they still need their point lifecycle restarted.
+                if (agent.IsHuman)
+                    adoptedHumans.Add((agent, agent.GetComponent<CampaignAgentComponent>()?.AgentNavigator));
 
                 ReapplyConversationHold(agent, info.AgentId);
             }
 
-            Logger.Information("[LocationSync] Adopted {Count} NPC(s) from {Controller} ({Reason}): {Revived} revived, {Stationary} stationary fallback",
-                adopted.Count, controllerId, reason, revived, stationary);
+            // All users must be AI before any paired AnimationPoint is stopped: stopping a pair lead
+            // stops its AI partners too. Snapshot + stop the entire batch, restart pair leads first,
+            // then reconnect every navigator so registry order cannot strand a paired user.
+            RestartAndReconnectAdoptedPointUses(adoptedHumans);
+
+            Logger.Information("[LocationSync] Adopted {Count} NPC(s) from {Controllers} ({Reason}): {Revived} revived, {Stationary} stationary fallback",
+                adopted.Count, string.Join(", ", controllers), reason, revived, stationary);
         }, context: nameof(AdoptAgentsFrom));
     }
 
@@ -209,7 +227,9 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         var registry = coopMissionComponent.AgentRegistry;
         registry.TryTransferAuthority(session.OwnControllerId, agentId);
         coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
-        ReviveSettlementAi(agent, agentId);
+        // The spawner has just applied any catch-up point use from its canonical frame. Preserve that
+        // single fresh lifecycle and only reconnect its newly-live AI navigator; do not stop/reuse it.
+        ReviveSettlementAi(agent, agentId, reconnectPointUse: true);
         ReapplyConversationHold(agent, agentId);
         Logger.Information("[LocationSync] Late-adopted NPC {AgentId} spawned after the migration", agentId);
     }
@@ -232,7 +252,7 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
     // [Game thread] Turn an inert puppet into a locally simulated settlement NPC. Humans get the
     // native AI stack re-created from their roster entry; an unresolvable entry (or an animal) falls
     // back to plain engine AI — stationary for humans (SR-031), native idle wandering for animals.
-    private bool ReviveSettlementAi(Agent agent, System.Guid agentId)
+    private bool ReviveSettlementAi(Agent agent, System.Guid agentId, bool reconnectPointUse)
     {
         // An adopted MOUNT (scene horses) only changes authority — it is not a simulated combatant
         // and must not get an engine AI controller, mirroring battle mount adoption.
@@ -264,21 +284,63 @@ public class LocationAuthorityMigrator : ILocationAuthorityMigrator
         if (component.AgentNavigator == null)
             component.CreateAgentNavigator(entry);
         entry.AddBehaviors(agent);
-        ReconnectAdoptedPointUse(agent, component.AgentNavigator);
+        if (reconnectPointUse)
+            ReconnectAdoptedPointUse(agent, component.AgentNavigator);
         return true;
     }
 
-    // [Game thread] Keep an adopted mid-performance NPC in its seat: wire the fresh navigator and
-    // wander behavior to the point the agent is ALREADY using — the exact steady state the native
-    // pipeline would have produced had this client sent it there (SR-043). Without this, the first
-    // behavior tick sees NoTarget and either retargets (dragging the sitter through the furniture
-    // toward a random new point) or calls SetTarget(null), whose DisableScriptedMovement releases a
-    // still-seated agent's locked seat frame and breaks its facing; native never reaches either path
-    // because a native sitter always carries TargetUsableMachine. IDetachment.AddAgent is
-    // deliberately NOT called — it only assigns VACANT points and would shuffle the agent to a
-    // different seat of the same machine. The natural leave later flows through the untouched native
-    // path (behavior retarget → IDetachment.RemoveAgent → StopUsingGameObjectMT), which the host's
-    // point-usage poll then replicates.
+    // [Game thread] Pair-safe bulk restart. AnimationPoint.OnUseStopped may stop every AI user on
+    // its paired points, so restarting users one at a time makes the result depend on registry order.
+    // Snapshot first, stop every animation user, restart pair activators before their child points,
+    // and only then reconnect every navigator.
+    private void RestartAndReconnectAdoptedPointUses(
+        List<(Agent Agent, AgentNavigator Navigator)> revivedAgents)
+    {
+        var pointUsers = new List<(Agent Agent, AgentNavigator Navigator, StandingPoint Point)>();
+        foreach (var revived in revivedAgents)
+        {
+            if (revived.Agent.CurrentlyUsedGameObject is StandingPoint point)
+                pointUsers.Add((revived.Agent, revived.Navigator, point));
+        }
+
+        foreach (var user in pointUsers)
+        {
+            if (user.Point is AnimationPoint
+                && ReferenceEquals(user.Agent.CurrentlyUsedGameObject, user.Point))
+                user.Agent.StopUsingGameObject(isSuccessful: true);
+        }
+
+        // ActivatePairs.OnUse enables its paired child points. Starting activators first keeps a
+        // child from being reused while the lead still has it disabled from the stop phase.
+        RestartAdoptedAnimationPoints(pointUsers, activatePairs: true);
+        RestartAdoptedAnimationPoints(pointUsers, activatePairs: false);
+
+        foreach (var user in pointUsers)
+            ReconnectAdoptedPointUse(user.Agent, user.Navigator);
+    }
+
+    private void RestartAdoptedAnimationPoints(
+        List<(Agent Agent, AgentNavigator Navigator, StandingPoint Point)> pointUsers,
+        bool activatePairs)
+    {
+        foreach (var user in pointUsers)
+        {
+            if (!(user.Point is AnimationPoint animationPoint)
+                || animationPoint.ActivatePairs != activatePairs)
+                continue;
+
+            LocationPointUseLifecycle.RestartFromCanonicalFrame(user.Agent, animationPoint);
+            Logger.Debug("[LocationSync] Adopted NPC {Agent} restarted point {PointId} arrival {Arrival}",
+                user.Agent.Index, animationPoint.Id.Id, animationPoint.ArriveAction);
+        }
+    }
+
+    // [Game thread] Wire the navigator and wander behavior to the point the agent is using. Without
+    // this, the first behavior tick sees NoTarget and either retargets or calls SetTarget(null),
+    // releasing the point immediately. IDetachment.AddAgent is deliberately NOT called — it only
+    // assigns VACANT points and would shuffle the agent to a different seat of the same machine. The
+    // natural leave later flows through behavior retarget → IDetachment.RemoveAgent →
+    // StopUsingGameObjectMT, which the host's point-usage poll then replicates.
     private void ReconnectAdoptedPointUse(Agent agent, AgentNavigator navigator)
     {
         if (navigator == null || !(agent.CurrentlyUsedGameObject is StandingPoint usedPoint)) return;
