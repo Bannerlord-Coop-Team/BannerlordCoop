@@ -10,6 +10,7 @@ public interface IRegistryManager
 {
     void PatchLifetimes();
     void RegisterAllGameObjects();
+    void RegisterUntrackedGameObjects();
     void ClearAllRegistries();
 }
 
@@ -42,9 +43,14 @@ internal class RegistryManager : IRegistryManager
 
     public void RegisterAllGameObjects()
     {
-        autoRegistryFactory.RegisterAll();
+        RegisterUntrackedGameObjects();
 
         messageBroker.Publish(this, new AllGameObjectsRegistered());
+    }
+
+    public void RegisterUntrackedGameObjects()
+    {
+        autoRegistryFactory.RegisterAll();
     }
 
     public void ClearAllRegistries()

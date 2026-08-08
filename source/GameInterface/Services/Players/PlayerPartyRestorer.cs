@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Registry;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using Serilog;
@@ -22,22 +23,28 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerPartyRestorer>();
 
     private readonly IObjectManager objectManager;
+    private readonly IRegistryManager registryManager;
     private readonly Func<IEnumerable<MobileParty>> getParties;
     private readonly Func<Hero, MobileParty> createParty;
+    private readonly Action<MobileParty> removeParty;
 
-    public PlayerPartyRestorer(IObjectManager objectManager)
-        : this(objectManager, () => MobileParty.All, CreateReplacementParty)
+    public PlayerPartyRestorer(IObjectManager objectManager, IRegistryManager registryManager)
+        : this(objectManager, registryManager, () => MobileParty.All, CreateReplacementParty, RemoveParty)
     {
     }
 
     internal PlayerPartyRestorer(
         IObjectManager objectManager,
+        IRegistryManager registryManager,
         Func<IEnumerable<MobileParty>> getParties,
-        Func<Hero, MobileParty> createParty)
+        Func<Hero, MobileParty> createParty,
+        Action<MobileParty> removeParty)
     {
         this.objectManager = objectManager;
+        this.registryManager = registryManager;
         this.getParties = getParties;
         this.createParty = createParty;
+        this.removeParty = removeParty;
     }
 
     public bool TryRestore(Player player, out Player restoredPlayer)
@@ -80,6 +87,7 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             }
         }
 
+        string partyId;
         if (party == null)
         {
             party = createParty(hero);
@@ -97,9 +105,14 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
                 party.StringId,
                 player.ControllerId,
                 player.HeroId);
-        }
 
-        if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return false;
+            if (!TryRegisterReplacementParty(player, party, out partyId))
+                return false;
+        }
+        else if (!objectManager.TryGetIdWithLogging(party, out partyId))
+        {
+            return false;
+        }
 
         Restore(hero, party);
 
@@ -116,6 +129,61 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         }
 
         return true;
+    }
+
+    private bool TryRegisterReplacementParty(Player player, MobileParty party, out string partyId)
+    {
+        partyId = null;
+
+        try
+        {
+            var registeredPartyId = string.Empty;
+            var registered = objectManager.RunRegistrationTransaction(() =>
+            {
+                registryManager.RegisterUntrackedGameObjects();
+                return objectManager.TryGetIdWithLogging(party, out registeredPartyId);
+            });
+
+            partyId = registeredPartyId;
+            if (registered)
+                return true;
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Cannot restore player {ControllerId} hero {HeroId}: failed to register replacement party {PartyId}",
+                player.ControllerId,
+                player.HeroId,
+                party.StringId);
+            RemoveFailedReplacement(player, party);
+            return false;
+        }
+
+        Logger.Error(
+            "Cannot restore player {ControllerId} hero {HeroId}: replacement party {PartyId} was not registered",
+            player.ControllerId,
+            player.HeroId,
+            party.StringId);
+        RemoveFailedReplacement(player, party);
+        return false;
+    }
+
+    private void RemoveFailedReplacement(Player player, MobileParty party)
+    {
+        try
+        {
+            removeParty(party);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(
+                exception,
+                "Failed to remove replacement party {PartyId} after restoration failed for controller {ControllerId} hero {HeroId}",
+                party.StringId,
+                player.ControllerId,
+                player.HeroId);
+        }
     }
 
     public void Restore(Hero hero, MobileParty party)
@@ -182,5 +250,10 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         var party = MobileParty.CreateParty($"{hero.StringId}_recovered_{Guid.NewGuid():N}", component);
         party.InitializeMobilePartyAtPosition(position);
         return party;
+    }
+
+    private static void RemoveParty(MobileParty party)
+    {
+        party.RemoveParty();
     }
 }

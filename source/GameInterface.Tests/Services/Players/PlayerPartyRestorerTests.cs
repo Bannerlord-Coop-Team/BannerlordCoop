@@ -1,8 +1,10 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Registry;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Tests.Bootstrap;
 using Moq;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,7 +30,7 @@ public class PlayerPartyRestorerTests
     public void Restore_MissingPlayerState_AddsMembershipsAndLeader()
     {
         var (hero, party, clan, character) = CreatePlayerGraph();
-        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>());
+        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>(), Mock.Of<IRegistryManager>());
 
         restorer.Restore(hero, party);
 
@@ -44,7 +46,7 @@ public class PlayerPartyRestorerTests
     public void Restore_ExistingPlayerState_DoesNotAddDuplicates()
     {
         var (hero, party, clan, character) = CreatePlayerGraph();
-        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>());
+        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>(), Mock.Of<IRegistryManager>());
 
         restorer.Restore(hero, party);
         restorer.Restore(hero, party);
@@ -60,7 +62,7 @@ public class PlayerPartyRestorerTests
     {
         var (hero, party, _, _) = CreatePlayerGraph();
         var (_, staleParty, _, _) = CreatePlayerGraph();
-        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>());
+        var restorer = new PlayerPartyRestorer(Mock.Of<IObjectManager>(), Mock.Of<IRegistryManager>());
         restorer.Restore(hero, party);
         hero._partyBelongedTo = staleParty;
 
@@ -90,11 +92,14 @@ public class PlayerPartyRestorerTests
         objectManager.Setup(manager => manager.TryGetIdWithLogging(party, out partyId)).Returns(true);
         objectManager.Setup(manager => manager.TryGetIdWithLogging(hero.Clan, out clanId)).Returns(true);
         objectManager.Setup(manager => manager.TryGetIdWithLogging(hero.CharacterObject, out characterId)).Returns(true);
+        var registryManager = new Mock<IRegistryManager>(MockBehavior.Strict);
 
         var restorer = new PlayerPartyRestorer(
             objectManager.Object,
+            registryManager.Object,
             () => new[] { party },
-            _ => throw new InvalidOperationException("A live owned party should be reused"));
+            _ => throw new InvalidOperationException("A live owned party should be reused"),
+            _ => throw new InvalidOperationException("A reused party should not be removed"));
 
         Assert.True(restorer.TryRestore(player, out var restored));
 
@@ -139,11 +144,27 @@ public class PlayerPartyRestorerTests
         objectManager.Setup(manager => manager.TryGetIdWithLogging(party, out partyId)).Returns(true);
         objectManager.Setup(manager => manager.TryGetIdWithLogging(hero.Clan, out clanId)).Returns(true);
         objectManager.Setup(manager => manager.TryGetIdWithLogging(hero.CharacterObject, out characterId)).Returns(true);
+        var registryManager = new Mock<IRegistryManager>();
+        var registrationOrder = new List<string>();
+        registryManager
+            .Setup(manager => manager.RegisterUntrackedGameObjects())
+            .Callback(() => registrationOrder.Add("refresh"));
+        objectManager
+            .Setup(manager => manager.TryGetIdWithLogging(party, out partyId))
+            .Callback(() => registrationOrder.Add("lookup"))
+            .Returns(true);
+        EnableRegistrationTransactions(objectManager);
 
         var restorer = new PlayerPartyRestorer(
             objectManager.Object,
+            registryManager.Object,
             () => Array.Empty<MobileParty>(),
-            _ => party);
+            replacementHero =>
+            {
+                Assert.Same(hero, replacementHero);
+                return party;
+            },
+            _ => throw new InvalidOperationException("A registered replacement should not be removed"));
 
         Assert.True(restorer.TryRestore(player, out var restored));
 
@@ -155,6 +176,115 @@ public class PlayerPartyRestorerTests
         Assert.Null(hero.PartyBelongedTo);
         Assert.Equal(captivePosition, party.Position);
         Assert.False(party.IsActive);
+        Assert.Equal(new[] { "refresh", "lookup" }, registrationOrder);
+    }
+
+    [Fact]
+    public void TryRestore_ReplacementStillUnregistered_RemovesReplacementAndReturnsFalse()
+    {
+        var (hero, party, _, _) = CreatePlayerGraph();
+        var player = new Player("Controller", "Hero_Saved", "MobileParty_Missing", "Clan_Saved", "Character_Saved");
+        var objectManager = CreateRegisteredPlayerObjectManager(player, hero);
+        var registryManager = new Mock<IRegistryManager>();
+        var registrationOrder = new List<string>();
+        registryManager
+            .Setup(manager => manager.RegisterUntrackedGameObjects())
+            .Callback(() =>
+            {
+                registrationOrder.Add("refresh");
+                Assert.True(objectManager.AddExisting("PartyBase_Partial", party.Party));
+            });
+
+        var restorer = new PlayerPartyRestorer(
+            objectManager,
+            registryManager.Object,
+            () => Array.Empty<MobileParty>(),
+            _ => party,
+            removedParty =>
+            {
+                Assert.Same(party, removedParty);
+                registrationOrder.Add("cleanup");
+            });
+
+        Assert.False(restorer.TryRestore(player, out var restored));
+
+        Assert.Same(player, restored);
+        Assert.Equal(new[] { "refresh", "cleanup" }, registrationOrder);
+        Assert.False(objectManager.TryGetId(party.Party, out _));
+        Assert.True(objectManager.TryGetId(hero, out _));
+        Assert.Equal(0, party.MemberRoster.GetTroopCount(hero.CharacterObject));
+        Assert.Null(party.LeaderHero);
+    }
+
+    [Fact]
+    public void TryRestore_ReplacementRegistrationPartiallyFails_RollsBackAndRemovesReplacement()
+    {
+        var (hero, party, _, _) = CreatePlayerGraph();
+        var player = new Player("Controller", "Hero_Saved", "MobileParty_Missing", "Clan_Saved", "Character_Saved");
+        var objectManager = CreateRegisteredPlayerObjectManager(player, hero);
+        var registryManager = new Mock<IRegistryManager>();
+        var registrationOrder = new List<string>();
+        registryManager
+            .Setup(manager => manager.RegisterUntrackedGameObjects())
+            .Callback(() =>
+            {
+                registrationOrder.Add("refresh");
+                Assert.True(objectManager.AddExisting("MobileParty_Partial", party));
+                Assert.True(objectManager.AddExisting("PartyBase_Partial", party.Party));
+                throw new InvalidOperationException("Registration failed");
+            });
+
+        var restorer = new PlayerPartyRestorer(
+            objectManager,
+            registryManager.Object,
+            () => Array.Empty<MobileParty>(),
+            _ => party,
+            removedParty =>
+            {
+                Assert.Same(party, removedParty);
+                registrationOrder.Add("cleanup");
+            });
+
+        Assert.False(restorer.TryRestore(player, out var restored));
+
+        Assert.Same(player, restored);
+        Assert.Equal(new[] { "refresh", "cleanup" }, registrationOrder);
+        Assert.False(objectManager.TryGetId(party, out _));
+        Assert.False(objectManager.TryGetId(party.Party, out _));
+        Assert.True(objectManager.TryGetId(hero, out _));
+        Assert.Equal(0, party.MemberRoster.GetTroopCount(hero.CharacterObject));
+        Assert.Null(party.LeaderHero);
+    }
+
+    [Fact]
+    public void TryRestore_ReplacementCleanupThrows_ReturnsOriginalFailure()
+    {
+        var (hero, party, _, _) = CreatePlayerGraph();
+        var player = new Player("Controller", "Hero_Saved", "MobileParty_Missing", "Clan_Saved", "Character_Saved");
+        var objectManager = CreateMissingPartyObjectManager(player, hero);
+        string missingPartyId = string.Empty;
+        objectManager
+            .Setup(manager => manager.TryGetIdWithLogging(party, out missingPartyId))
+            .Returns(false);
+        var cleanupCalled = false;
+
+        var restorer = new PlayerPartyRestorer(
+            objectManager.Object,
+            Mock.Of<IRegistryManager>(),
+            () => Array.Empty<MobileParty>(),
+            _ => party,
+            _ =>
+            {
+                cleanupCalled = true;
+                throw new InvalidOperationException("Cleanup failed");
+            });
+
+        Assert.False(restorer.TryRestore(player, out var restored));
+
+        Assert.Same(player, restored);
+        Assert.True(cleanupCalled);
+        Assert.Equal(0, party.MemberRoster.GetTroopCount(hero.CharacterObject));
+        Assert.Null(party.LeaderHero);
     }
 
     [Fact]
@@ -167,8 +297,10 @@ public class PlayerPartyRestorerTests
 
         var restorer = new PlayerPartyRestorer(
             objectManager.Object,
+            Mock.Of<IRegistryManager>(),
             () => Array.Empty<MobileParty>(),
-            _ => throw new InvalidOperationException("The saved party should be reused"));
+            _ => throw new InvalidOperationException("The saved party should be reused"),
+            _ => throw new InvalidOperationException("The saved party should not be removed"));
 
         Assert.True(restorer.TryRestore(player, out _));
         Assert.Same(party, party.PartyComponent.MobileParty);
@@ -185,8 +317,10 @@ public class PlayerPartyRestorerTests
 
         var restorer = new PlayerPartyRestorer(
             objectManager.Object,
+            Mock.Of<IRegistryManager>(),
             () => new[] { party },
-            _ => null);
+            _ => null,
+            _ => throw new InvalidOperationException("No replacement was created"));
 
         Assert.False(restorer.TryRestore(player, out _));
     }
@@ -218,12 +352,14 @@ public class PlayerPartyRestorerTests
         var createCalled = false;
         var restorer = new PlayerPartyRestorer(
             objectManager.Object,
+            Mock.Of<IRegistryManager>(),
             () => new[] { party },
             _ =>
             {
                 createCalled = true;
                 return null;
-            });
+            },
+            _ => throw new InvalidOperationException("No replacement was created"));
 
         Assert.False(restorer.TryRestore(player, out _));
         Assert.True(createCalled);
@@ -278,5 +414,42 @@ public class PlayerPartyRestorerTests
         objectManager.Setup(manager => manager.TryGetIdWithLogging(hero.Clan, out clanId)).Returns(true);
         objectManager.Setup(manager => manager.TryGetIdWithLogging(hero.CharacterObject, out characterId)).Returns(true);
         return objectManager;
+    }
+
+    private static Mock<IObjectManager> CreateMissingPartyObjectManager(Player player, Hero hero)
+    {
+        var objectManager = new Mock<IObjectManager>();
+        Hero resolvedHero = hero;
+        MobileParty missingParty = null!;
+        string clanId = player.ClanId;
+        string characterId = player.CharacterObjectId;
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out resolvedHero))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObject(player.MobilePartyId, out missingParty))
+            .Returns(false);
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(hero.Clan, out clanId)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(hero.CharacterObject, out characterId)).Returns(true);
+        EnableRegistrationTransactions(objectManager);
+        return objectManager;
+    }
+
+    private static global::GameInterface.Services.ObjectManager.ObjectManager CreateRegisteredPlayerObjectManager(
+        Player player,
+        Hero hero)
+    {
+        var objectManager = new global::GameInterface.Services.ObjectManager.ObjectManager(Mock.Of<ILogger>());
+        Assert.True(objectManager.AddExisting(player.HeroId, hero));
+        Assert.True(objectManager.AddExisting(player.ClanId, hero.Clan));
+        Assert.True(objectManager.AddExisting(player.CharacterObjectId, hero.CharacterObject));
+        return objectManager;
+    }
+
+    private static void EnableRegistrationTransactions(Mock<IObjectManager> objectManager)
+    {
+        objectManager
+            .Setup(manager => manager.RunRegistrationTransaction(It.IsAny<Func<bool>>()))
+            .Returns((Func<bool> registerAndValidate) => registerAndValidate());
     }
 }
