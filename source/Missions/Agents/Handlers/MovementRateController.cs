@@ -464,7 +464,14 @@ public sealed class MovementRateController : IMovementRateController
             receiverCaps.Clear();
         }
 
-        receiverCapHeartbeatTimer?.Dispose();
+        if (receiverCapHeartbeatTimer != null)
+        {
+            using (var callbackCompleted = new System.Threading.ManualResetEvent(false))
+            {
+                if (receiverCapHeartbeatTimer.Dispose(callbackCompleted))
+                    callbackCompleted.WaitOne();
+            }
+        }
         messageBroker.Unsubscribe<NetworkMovementReceiverCap>(Handle_ReceiverCap);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -736,14 +743,15 @@ public sealed class MovementRateController : IMovementRateController
 
     internal void PublishReceiverCapHeartbeat()
     {
+        NetworkMovementReceiverCap? advertisement;
         lock (gate)
         {
             if (disposed) return;
-
-            NetworkMovementReceiverCap? advertisement = CreateReceiverCapAdvertisement();
-            if (advertisement.HasValue)
-                network.SendAll(advertisement.Value);
+            advertisement = CreateReceiverCapAdvertisement();
         }
+
+        if (advertisement.HasValue)
+            network.SendAll(advertisement.Value);
     }
 
     private void TryPublishReceiverCapHeartbeat()

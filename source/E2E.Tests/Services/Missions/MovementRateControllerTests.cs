@@ -7,6 +7,7 @@ using Missions.Messages;
 using Missions.Services.Network;
 using Moq;
 using System;
+using System.Threading;
 using Xunit;
 
 namespace E2E.Tests.Services.Missions;
@@ -138,6 +139,80 @@ public sealed class MovementRateControllerTests
         Assert.Equal("local", advertisement.ControllerId);
         Assert.Equal(40, advertisement.MaximumBulkHz);
         Assert.Equal(2, advertisement.Sequence);
+    }
+
+    [Fact]
+    public void BattleProfile_HeartbeatSendsAfterReleasingControllerGate()
+    {
+        MovementRateController controller = null;
+        bool inspectHeartbeat = false;
+        using var fixture = new RateControllerFixture(
+            onSendAll: _ =>
+            {
+                if (!inspectHeartbeat) return;
+
+                var advanceThread = new Thread(() => controller.AdvanceFrame(0f))
+                {
+                    IsBackground = true,
+                };
+                advanceThread.Start();
+                Assert.True(advanceThread.Join(TimeSpan.FromSeconds(5)));
+            });
+        controller = fixture.Controller;
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+        inspectHeartbeat = true;
+
+        fixture.Controller.PublishReceiverCapHeartbeat();
+    }
+
+    [Fact]
+    public void Dispose_WaitsForInFlightHeartbeat()
+    {
+        using var blockHeartbeat = new ManualResetEventSlim(false);
+        using var heartbeatStarted = new ManualResetEventSlim(false);
+        using var releaseHeartbeat = new ManualResetEventSlim(false);
+        using var disposeStarted = new ManualResetEventSlim(false);
+
+        using var fixture = new RateControllerFixture(
+            enableHeartbeat: true,
+            onSendAll: _ =>
+            {
+                if (!blockHeartbeat.IsSet) return;
+
+                heartbeatStarted.Set();
+                releaseHeartbeat.Wait();
+            });
+        fixture.Controller.Configure(MovementCadenceProfile.Battle);
+        blockHeartbeat.Set();
+        Assert.True(heartbeatStarted.Wait(TimeSpan.FromSeconds(5)));
+
+        Exception disposeException = null;
+        var disposeThread = new Thread(() =>
+        {
+            try
+            {
+                disposeStarted.Set();
+                fixture.Controller.Dispose();
+            }
+            catch (Exception ex)
+            {
+                disposeException = ex;
+            }
+        });
+        disposeThread.Start();
+
+        try
+        {
+            Assert.True(disposeStarted.Wait(TimeSpan.FromSeconds(5)));
+            Assert.False(disposeThread.Join(TimeSpan.FromMilliseconds(250)));
+        }
+        finally
+        {
+            releaseHeartbeat.Set();
+            Assert.True(disposeThread.Join(TimeSpan.FromSeconds(5)));
+        }
+
+        Assert.Null(disposeException);
     }
 
     [Fact]
@@ -287,7 +362,10 @@ public sealed class MovementRateControllerTests
                 new System.Collections.Generic.List<(string, NetworkMovementReceiverCap)>();
         public MovementRateController Controller { get; }
 
-        public RateControllerFixture(int remoteControllers = 0)
+        public RateControllerFixture(
+            int remoteControllers = 0,
+            bool enableHeartbeat = false,
+            Action<IMessage> onSendAll = null)
         {
             var network = new Mock<IBattleNetwork>();
             network
@@ -296,6 +374,7 @@ public sealed class MovementRateControllerTests
                 {
                     if (message is NetworkMovementReceiverCap advertisement)
                         Advertisements.Add(advertisement);
+                    onSendAll?.Invoke(message);
                 });
             network
                 .Setup(value => value.Send(It.IsAny<string>(), It.IsAny<IMessage>()))
@@ -321,7 +400,7 @@ public sealed class MovementRateControllerTests
                 missionContext.Object,
                 () => timestamp,
                 TimestampFrequency,
-                enableHeartbeat: false);
+                enableHeartbeat);
         }
 
         public void AdvanceClock(float seconds)
