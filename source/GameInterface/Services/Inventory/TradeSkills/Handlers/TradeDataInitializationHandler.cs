@@ -1,21 +1,15 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
-using GameInterface.Services.MobileParties;
-using GameInterface.Services.MobileParties.Handlers;
-using GameInterface.Services.MobileParties.Interfaces;
-using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
@@ -28,7 +22,7 @@ internal class TradeDataInitializationHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface;
+    private readonly ISessionTradePlayerDataInterface sessionTradePlayerDataInterface;
 
     private TradePlayerData tradePlayerData;
 
@@ -36,13 +30,12 @@ internal class TradeDataInitializationHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
-        ITradeSkillCampaignBehaviorInterface tradeSkillCampaignBehaviorInterface)
+        ISessionTradePlayerDataInterface sessionTradePlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.tradeSkillCampaignBehaviorInterface = tradeSkillCampaignBehaviorInterface;
+        this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
 
         messageBroker.Subscribe<InitializeClientTradeData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -61,21 +54,27 @@ internal class TradeDataInitializationHandler : IHandler
         tradePlayerData = obj.What.TradePlayerData;
     }
 
-    // Need to load interactions data when the hero changes for the player
+    // Need to load trade data when the hero changes for the player
     private void Handle(MessagePayload<PlayerHeroChanged> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.NewHero, out string playerHeroId)) return;
 
         TradeSkillCampaignBehavior tradeSkillCampaignBehavior = Campaign.Current.GetCampaignBehavior<TradeSkillCampaignBehavior>();
+        TradeRumorsCampaignBehavior tradeRumorsCampaignBehavior = Campaign.Current.GetCampaignBehavior<TradeRumorsCampaignBehavior>();
 
         tradeSkillCampaignBehavior.ItemsTradeData = GetItemsTradeData(playerHeroId);
+        tradeRumorsCampaignBehavior._tradeRumors = GetTradeRumors(playerHeroId);
+        tradeRumorsCampaignBehavior._enteredSettlements = GetEnteredSettlements(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerTradeDataKeys(playerHeroId));
     }
 
     private void Handle(MessagePayload<NetworkInitializeServerTradeDataKeys> obj)
     {
-        tradeSkillCampaignBehaviorInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        GameThread.RunSafe(() =>
+        {
+            sessionTradePlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        });
     }
 
     private Dictionary<ItemObject, TradeSkillCampaignBehavior.ItemTradeData> GetItemsTradeData(string playerHeroId)
@@ -93,5 +92,45 @@ internal class TradeDataInitializationHandler : IHandler
         }
 
         return itemsTradeData;
+    }
+
+    private List<TradeRumor> GetTradeRumors(string playerHeroId)
+    {
+        var tradeRumors = new List<TradeRumor>();
+
+        // Null and key check for players without existing trade rumors data
+        if (tradePlayerData?.PlayerTradeRumors?.ContainsKey(playerHeroId) != true) return tradeRumors;
+
+        foreach (var tradeRumorData in tradePlayerData.PlayerTradeRumors[playerHeroId])
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(tradeRumorData.SettlementId, out var settlement)) continue;
+            if (!objectManager.TryGetObjectWithLogging<ItemObject>(tradeRumorData.ItemObjectId, out var itemObject)) continue;
+
+            var tradeRumor = new TradeRumor(settlement, itemObject, tradeRumorData.BuyPrice, tradeRumorData.SellPrice, 0)
+            {
+                RumorEndTime = new CampaignTime(tradeRumorData.RumorEndTime)
+            };
+
+            tradeRumors.Add(tradeRumor);
+        }
+
+        return tradeRumors;
+    }
+
+    private Dictionary<Settlement, CampaignTime> GetEnteredSettlements(string playerHeroId)
+    {
+        var enteredSettlements = new Dictionary<Settlement, CampaignTime>();
+
+        // Null and key check for players without existing entered settlements data
+        if (tradePlayerData?.PlayerEnteredSettlements?.ContainsKey(playerHeroId) != true) return enteredSettlements;
+
+        foreach (var enteredSettlementData in tradePlayerData.PlayerEnteredSettlements[playerHeroId])
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(enteredSettlementData.Key, out var settlement)) continue;
+
+            enteredSettlements.Add(settlement, new CampaignTime(enteredSettlementData.Value));
+        }
+
+        return enteredSettlements;
     }
 }

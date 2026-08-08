@@ -205,6 +205,223 @@ public class LordBarterSyncTests : MapEventTestBase
         });
     }
 
+    /// <summary>
+    /// A lord standing INSIDE a settlement still leads an active party, so the settlement must be
+    /// resolved before the map party. MobileParty.IsActive is only cleared by RemoveParty, player
+    /// captivity and load - entering a settlement leaves it true - so resolving the map party first
+    /// classifies every settlement-menu barter as MapParty. The server then requires a conversation
+    /// hold that a settlement menu never acquires, and refuses the barter after the player has
+    /// already played out the conversation.
+    /// </summary>
+    /// <remarks>
+    /// StationarySettlementConversation_ClientResolversUseSettlementContext above does NOT cover this:
+    /// it asserts the target has no party at all, so the map-party branch cannot match either way.
+    /// </remarks>
+    [Fact]
+    public void SettlementConversation_WithLordLeadingAnActiveParty_StillResolvesSettlementContext()
+    {
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        SetMainHero(player.HeroId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            playerParty.CurrentSettlement = settlement;
+            targetParty.CurrentSettlement = settlement;
+        });
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
+
+            // The premise of the bug: the lord's party is inside the settlement AND still active.
+            Assert.True(targetParty.IsActive);
+            Assert.Same(playerParty.CurrentSettlement, targetParty.CurrentSettlement);
+
+            var barter = new BarterData(playerHero, targetHero, playerParty.Party, targetParty.Party, null);
+
+            Assert.True(LordBarterPatch.TryGetConversationContext(
+                barter, client.ObjectManager, out var lordContext, out var lordContextId));
+            Assert.Equal(PeaceConversationContext.Settlement, lordContext);
+            Assert.Equal(settlementId, lordContextId);
+
+            Assert.True(PeaceBarterPatch.TryGetConversationContext(
+                barter, client.ObjectManager, out var peaceContext, out var peaceContextId));
+            Assert.Equal(PeaceConversationContext.Settlement, peaceContext);
+            Assert.Equal(settlementId, peaceContextId);
+        });
+    }
+
+    /// <summary>
+    /// The reordering above must not steal an ordinary map conversation: on the map neither side has a
+    /// CurrentSettlement, so the settlement branch cannot match and the map party still wins.
+    /// </summary>
+    [Fact]
+    public void MapConversation_WithNeitherSideInASettlement_StillResolvesMapPartyContext()
+    {
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+
+        SetMainHero(player.HeroId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
+
+            Assert.Null(playerParty.CurrentSettlement);
+            Assert.Null(targetParty.CurrentSettlement);
+
+            var barter = new BarterData(playerHero, targetHero, playerParty.Party, targetParty.Party, null);
+
+            Assert.True(LordBarterPatch.TryGetConversationContext(
+                barter, client.ObjectManager, out var lordContext, out _));
+            Assert.Equal(PeaceConversationContext.MapParty, lordContext);
+
+            Assert.True(PeaceBarterPatch.TryGetConversationContext(
+                barter, client.ObjectManager, out var peaceContext, out _));
+            Assert.Equal(PeaceConversationContext.MapParty, peaceContext);
+        });
+    }
+
+    /// <summary>
+    /// A settlement-menu conversation acquires no engagement, so authority comes from co-location - and
+    /// co-location is NOT exclusive: every player standing in the settlement satisfies it. Without a
+    /// reservation, two kingdom leaders could each authorize, each pay, and each move the same clan in
+    /// turn, which is the very duplication the map-party hold exists to prevent.
+    /// </summary>
+    [Fact]
+    public void SettlementConversation_WhenAnotherPlayerHoldsTheLord_RefusesTheSecondAuthorization()
+    {
+        const int initialPlayerGold = 1_000_000;
+        const int offeredGold = 100_000;
+        var clientOne = Clients.First();
+        var clientTwo = Clients.Skip(1).First();
+        var playerOne = CreatePartyWithRegisteredLeader();
+        var playerTwo = CreatePartyWithRegisteredLeader();
+        var targetHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var requestOne = Guid.NewGuid().ToString("N");
+        var requestTwo = Guid.NewGuid().ToString("N");
+
+        RegisterPlayer(clientOne, playerOne.HeroId, playerOne.MobilePartyId, "PlayerOne");
+        RegisterPlayer(clientTwo, playerTwo.HeroId, playerTwo.MobilePartyId, "PlayerTwo");
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerOne.HeroId, out var heroOne));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerTwo.HeroId, out var heroTwo));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerOne.MobilePartyId, out var partyOne));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerTwo.MobilePartyId, out var partyTwo));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            heroOne.Gold = initialPlayerGold;
+            heroTwo.Gold = initialPlayerGold;
+            // Both players are standing in the same settlement as the lord, so both satisfy co-location.
+            partyOne.CurrentSettlement = settlement;
+            partyTwo.CurrentSettlement = settlement;
+            targetHero.StayingInSettlement = settlement;
+        });
+        Server.NetworkSentMessages.Clear();
+
+        clientOne.Call(() => clientOne.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+            requestOne, targetHeroId, PeaceConversationContext.Settlement, settlementId, LordBarterKind.Generic)));
+        clientTwo.Call(() => clientTwo.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+            requestTwo, targetHeroId, PeaceConversationContext.Settlement, settlementId, LordBarterKind.Generic)));
+
+        // The second player never got an authorization, so their request must be refused outright.
+        clientTwo.Call(() => clientTwo.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+            targetHeroId, PeaceConversationContext.Settlement, settlementId, LordBarterKind.Generic,
+            new[] { new PeaceBarterTerm(PeaceBarterTermType.Gold, playerTwo.HeroId, null, null, true, offeredGold) },
+            requestTwo)));
+        TestEnvironment.FlushCoalescer();
+
+        var refused = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+        Assert.False(refused.Accepted);
+        Server.NetworkSentMessages.Clear();
+
+        // The holder is unaffected: their barter still goes through.
+        clientOne.Call(() => clientOne.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+            targetHeroId, PeaceConversationContext.Settlement, settlementId, LordBarterKind.Generic,
+            new[] { new PeaceBarterTerm(PeaceBarterTermType.Gold, playerOne.HeroId, null, null, true, offeredGold) },
+            requestOne)));
+        TestEnvironment.FlushCoalescer();
+
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+        Assert.True(accepted.Accepted);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerOne.HeroId, out var heroOne));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerTwo.HeroId, out var heroTwo));
+            // Paid exactly once, by the holder.
+            Assert.Equal(initialPlayerGold - offeredGold, heroOne.Gold);
+            Assert.Equal(initialPlayerGold, heroTwo.Gold);
+        });
+    }
+
+    /// <summary>
+    /// The reservation must not lock a lord for the rest of the session. Cancelling releases it, which is
+    /// the path a player takes by backing out of the conversation; expiry uses the same released-if-not-live
+    /// check in IsTargetHeldByAnotherPeer.
+    /// </summary>
+    [Fact]
+    public void SettlementConversation_AfterTheHolderCancels_TheLordIsAvailableAgain()
+    {
+        var clientOne = Clients.First();
+        var clientTwo = Clients.Skip(1).First();
+        var playerOne = CreatePartyWithRegisteredLeader();
+        var playerTwo = CreatePartyWithRegisteredLeader();
+        var targetHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var requestOne = Guid.NewGuid().ToString("N");
+        var requestTwo = Guid.NewGuid().ToString("N");
+
+        RegisterPlayer(clientOne, playerOne.HeroId, playerOne.MobilePartyId, "PlayerOne");
+        RegisterPlayer(clientTwo, playerTwo.HeroId, playerTwo.MobilePartyId, "PlayerTwo");
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerOne.MobilePartyId, out var partyOne));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerTwo.MobilePartyId, out var partyTwo));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            partyOne.CurrentSettlement = settlement;
+            partyTwo.CurrentSettlement = settlement;
+            targetHero.StayingInSettlement = settlement;
+        });
+
+        clientOne.Call(() => clientOne.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+            requestOne, targetHeroId, PeaceConversationContext.Settlement, settlementId, LordBarterKind.Generic)));
+        clientOne.Call(() => clientOne.Resolve<INetwork>().SendAll(
+            new NetworkCancelLordBarterAuthorization(requestOne)));
+
+        clientTwo.Call(() => clientTwo.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+            requestTwo, targetHeroId, PeaceConversationContext.Settlement, settlementId, LordBarterKind.Generic)));
+        Server.NetworkSentMessages.Clear();
+
+        clientTwo.Call(() => clientTwo.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+            targetHeroId, PeaceConversationContext.Settlement, settlementId, LordBarterKind.Generic,
+            Array.Empty<PeaceBarterTerm>(), requestTwo)));
+        TestEnvironment.FlushCoalescer();
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+        Assert.True(result.Accepted);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -953,8 +1170,10 @@ public class LordBarterSyncTests : MapEventTestBase
     }
 
     private void RegisterPlayer(EnvironmentInstance client, string heroId, string mobilePartyId)
+        => RegisterPlayer(client, heroId, mobilePartyId, "PlayerOne");
+
+    private void RegisterPlayer(EnvironmentInstance client, string heroId, string mobilePartyId, string controllerId)
     {
-        const string controllerId = "PlayerOne";
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
         RegisterAsPlayerParty(controllerId, heroId, mobilePartyId);
         Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer);

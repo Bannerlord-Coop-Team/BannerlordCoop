@@ -93,15 +93,21 @@ internal class PartyCommands
         if (strings.Count != 1)
             return "Usage: coop.debug.mobileparty.position <partyId>";
 
-        MobileParty party = Campaign.Current?.CampaignObjectManager.Find<MobileParty>(strings[0]);
-        if (party == null) return $"Party with id {strings[0]} not found";
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty party))
+            return $"Party with id {strings[0]} not found";
 
         CampaignVec2 position = party.Position;
+        var partyId = objectManager.TryGetId(party, out string resolvedPartyId)
+            ? resolvedPartyId
+            : strings[0];
         return
-            $"party={party.StringId}|" +
+            $"id={partyId}|party={party.StringId}|" +
             $"x={position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
             $"y={position.Y.ToString("R", CultureInfo.InvariantCulture)}|" +
-            $"isOnLand={position.IsOnLand}|moveMode={party.PartyMoveMode}";
+            $"isOnLand={position.IsOnLand}|" +
+            $"settlement={party.CurrentSettlement?.StringId ?? "none"}|" +
+            $"moveMode={party.PartyMoveMode}";
     }
 
     /// <summary>

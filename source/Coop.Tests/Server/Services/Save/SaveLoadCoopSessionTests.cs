@@ -52,7 +52,7 @@ namespace Coop.Tests.Server.Services.Save
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
                 new InteractionsPlayerData(new(), new(), new(), new()),
-                new TradePlayerData(new()),
+                new TradePlayerData(new(), new(), new()),
                 new InventoryPlayerData(new(), new()));
 
             string saveFile = sessionData.UniqueGameId;
@@ -94,7 +94,7 @@ namespace Coop.Tests.Server.Services.Save
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
                 new InteractionsPlayerData(new(), new(), new(), new()),
-                new TradePlayerData(new()),
+                new TradePlayerData(new(), new(), new()),
                 new InventoryPlayerData(new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
