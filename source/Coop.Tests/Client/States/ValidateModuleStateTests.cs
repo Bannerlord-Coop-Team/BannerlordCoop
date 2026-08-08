@@ -1,11 +1,16 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Common;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Modules;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
@@ -165,6 +170,46 @@ namespace Coop.Tests.Client.States
 
             var popup = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
             Assert.Contains("Timed out", popup.Text);
+        }
+
+        [Fact]
+        public void ControllerIdentityPersistenceFailure_FinalizesWithVisibleReason()
+        {
+            var logic = new Mock<IClientLogic>();
+            var controllerIdProvider = new Mock<IControllerIdProvider>();
+            controllerIdProvider
+                .Setup(provider => provider.SetControllerAsPlatformId())
+                .Throws(new InvalidOperationException("identity file is not writable"));
+            controllerIdProvider
+                .Setup(provider => provider.SetControllerFromProgramArgs())
+                .Throws(new InvalidOperationException("identity file is not writable"));
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            ValidateModuleState validateState = null!;
+            logic.SetupGet(client => client.State).Returns(() => validateState);
+
+            validateState = new ValidateModuleState(
+                logic.Object,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                controllerIdProvider.Object,
+                coopFinalizer.Object,
+                new Mock<IGameStateInterface>().Object,
+                new Mock<IModuleInfoProvider>().Object);
+
+            try
+            {
+                DrainGameThread();
+
+                coopFinalizer.Verify(
+                    finalizer => finalizer.Finalize(It.Is<string>(reason =>
+                        reason.Contains("persistent player identity"))),
+                    Times.Once);
+                Assert.Empty(clientComponent.TestNetwork.SentNetworkMessages);
+            }
+            finally
+            {
+                validateState.Dispose();
+            }
         }
 
         [Fact]
@@ -335,5 +380,7 @@ namespace Coop.Tests.Client.States
             clientLogic.ValidateModules();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
+
+        private static void DrainGameThread() => GameThread.Run(() => { }, blocking: true);
     }
 }

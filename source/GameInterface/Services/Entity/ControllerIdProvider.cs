@@ -18,8 +18,20 @@ public interface IControllerIdProvider
 public class ControllerIdProvider : IControllerIdProvider
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ControllerIdProvider>();
+    private readonly IControllerIdStore controllerIdStore;
 
     public string ControllerId { get; private set; }
+
+    public ControllerIdProvider() : this(new ControllerIdStore())
+    {
+    }
+
+    public ControllerIdProvider(IControllerIdStore controllerIdStore)
+    {
+        if (controllerIdStore == null) throw new ArgumentNullException(nameof(controllerIdStore));
+
+        this.controllerIdStore = controllerIdStore;
+    }
 
     public void SetControllerFromProgramArgs()
     {
@@ -39,14 +51,24 @@ public class ControllerIdProvider : IControllerIdProvider
 
     public void SetControllerAsPlatformId()
     {
-        string controllerId = PlatformServices.UserId;
+        SetControllerAsPlatformId(PlatformServices.ProviderName, PlatformServices.UserId);
+    }
 
-        if (string.IsNullOrEmpty(controllerId))
+    internal void SetControllerAsPlatformId(string providerName, string platformUserId)
+    {
+        string provider = NormalizeProviderName(providerName);
+
+        if (IsUsablePlatformId(platformUserId))
         {
-            Logger.Error("{userId} was null", nameof(PlatformServices.UserId));
+            ControllerId = provider + ":" + platformUserId.Trim();
+            return;
         }
 
-        ControllerId = PlatformServices.UserId;
+        string installationId = controllerIdStore.GetOrCreateId();
+        ControllerId = provider + ":local:" + installationId;
+        Logger.Warning(
+            "Platform {Provider} returned no usable user id; using persistent installation id",
+            provider);
     }
 
     public void SetControllerId(string controllerId)
@@ -57,5 +79,25 @@ public class ControllerIdProvider : IControllerIdProvider
     public void SetAsDefault()
     {
         ControllerId = "DefaultId";
+    }
+
+    private static string NormalizeProviderName(string providerName)
+    {
+        if (string.IsNullOrWhiteSpace(providerName)) return "unknown";
+
+        string normalized = new string(providerName
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+
+        return string.IsNullOrEmpty(normalized) ? "unknown" : normalized;
+    }
+
+    private static bool IsUsablePlatformId(string platformUserId)
+    {
+        if (string.IsNullOrWhiteSpace(platformUserId)) return false;
+
+        string trimmed = platformUserId.Trim();
+        return !ulong.TryParse(trimmed, out ulong numericId) || numericId != 0;
     }
 }

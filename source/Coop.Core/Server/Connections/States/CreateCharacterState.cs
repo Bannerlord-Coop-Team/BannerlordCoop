@@ -57,8 +57,15 @@ public class CreateCharacterState : ConnectionStateBase
 
         if (netPeer != ConnectionLogic.Peer) return;
 
-        var controllerId = obj.What.PlayerId;
+        var controllerId = ConnectionLogic.ControllerId;
         var data = obj.What.PlayerHero;
+
+        if (string.IsNullOrEmpty(controllerId))
+        {
+            Logger.Error("Connection has no validated controller id; disconnecting the joining peer");
+            ConnectionLogic.Peer.Disconnect();
+            return;
+        }
 
         Logger.Debug("Unpacking hero for {ControllerId}", controllerId);
 

@@ -76,11 +76,23 @@ public class ValidateModuleState : ClientStateBase
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
 
+        try
+        {
 #if DEBUG
-        controllerIdProvider.SetControllerFromProgramArgs();
+            controllerIdProvider.SetControllerFromProgramArgs();
 #else
-        controllerIdProvider.SetControllerAsPlatformId();
+            controllerIdProvider.SetControllerAsPlatformId();
 #endif
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Could not initialize a persistent controller identity");
+            disconnectReason =
+                "Could not create a persistent player identity.\n" +
+                "Check that the BannerlordCoop config directory is writable, then reconnect.";
+            GameThread.EnqueueSafe(Disconnect, context: "Controller identity initialization failure");
+            return;
+        }
 
         network.SendAll(new NetworkModuleVersionsValidate(moduleInfoProvider.GetModuleInfos()));
 

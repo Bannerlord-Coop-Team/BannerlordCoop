@@ -57,11 +57,11 @@ public class ServerMissionMembershipHandlerTests
     }
 
     [Fact]
-    public void MissionEntered_ManagedDirectLoopbackHostFallsBackToNumericControllerId()
+    public void MissionEntered_ManagedDirectLoopbackHostFallsBackToNamespacedSteamControllerId()
     {
         RunWithManagedServer(ownerProcessId: 42, () =>
         {
-            const string hostControllerId = "76561198000000042";
+            const string hostControllerId = "steam:76561198000000042";
             var hostEndpoint = new IPEndPoint(IPAddress.Loopback, 51003);
             var tunneledEndpoint = new IPEndPoint(IPAddress.Loopback, 51004);
             var host = CreatePeer(hostEndpoint, 3);
@@ -84,9 +84,14 @@ public class ServerMissionMembershipHandlerTests
     }
 
     [Theory]
-    [InlineData(0, "127.0.0.1")]
-    [InlineData(42, "203.0.113.10")]
-    public void MissionEntered_UnmappedNonHostPeerKeepsRelayFallback(int ownerProcessId, string address)
+    [InlineData(0, "127.0.0.1", "steam:76561198000000042")]
+    [InlineData(42, "203.0.113.10", "steam:76561198000000042")]
+    [InlineData(42, "127.0.0.1", "gog:76561198000000042")]
+    [InlineData(42, "127.0.0.1", "76561198000000042")]
+    public void MissionEntered_UnmappedNonHostPeerKeepsRelayFallback(
+        int ownerProcessId,
+        string address,
+        string controllerId)
     {
         RunWithManagedServer(ownerProcessId, () =>
         {
@@ -95,7 +100,7 @@ public class ServerMissionMembershipHandlerTests
             var tunnelHost = new Mock<ISessionTunnelIdentityResolver>();
 
             var network = PublishEntry(
-                newcomer, "76561198000000042", existing, "existing", tunnelHost.Object);
+                newcomer, controllerId, existing, "existing", tunnelHost.Object);
 
             var sentToExisting = Assert.Single(
                 network.GetPeerMessagesFromType<NetworkMissionPeerEntered>(existing));

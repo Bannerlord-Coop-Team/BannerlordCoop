@@ -370,5 +370,18 @@ namespace Coop.Tests.Server.Connections.States
 
             Assert.Empty(messages.OfType<NetworkClientValidated>());
         }
+
+        [Fact]
+        public void NetworkClientValidate_BindsControllerIdToConnection()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate("gog:local:installation-id")));
+
+            Assert.Equal("gog:local:installation-id", connectionLogic.ControllerId);
+            Assert.IsType<CreateCharacterState>(connectionLogic.State);
+        }
     }
 }

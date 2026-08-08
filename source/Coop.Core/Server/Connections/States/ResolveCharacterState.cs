@@ -128,6 +128,13 @@ public class ResolveCharacterState : ConnectionStateBase
 
     private void ResolveCharacter(NetPeer peer, string controllerId)
     {
+        if (!ConnectionLogic.TrySetControllerId(controllerId))
+        {
+            Logger.Error("Connection supplied an invalid or changed controller id; disconnecting peer {Peer}", peer.Id);
+            peer.Disconnect();
+            return;
+        }
+
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
             var heroExists = false;

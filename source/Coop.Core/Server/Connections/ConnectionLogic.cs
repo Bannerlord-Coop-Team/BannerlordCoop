@@ -14,7 +14,9 @@ namespace Coop.Core.Server.Connections;
 public interface IConnectionLogic : IConnectionState
 {
     NetPeer Peer { get; }
+    string ControllerId { get; }
     IConnectionState State { get; }
+    bool TrySetControllerId(string controllerId);
     TState SetState<TState>() where TState : IConnectionState;
 }
 
@@ -28,6 +30,8 @@ public class ConnectionLogic : IConnectionLogic
     private readonly IReadOnlyDictionary<Type, Func<IConnectionState>> stateFactories;
     private readonly object stateGate = new object();
     private bool disposed;
+
+    public string ControllerId { get; private set; }
 
     public IConnectionState State
     {
@@ -51,6 +55,22 @@ public class ConnectionLogic : IConnectionLogic
     }
 
     public bool IsLoading => State?.IsLoading ?? false;
+
+    public bool TrySetControllerId(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId)) return false;
+
+        lock (stateGate)
+        {
+            if (ControllerId == null)
+            {
+                ControllerId = controllerId;
+                return true;
+            }
+
+            return ControllerId == controllerId;
+        }
+    }
 
     public TState SetState<TState>() where TState : IConnectionState
     {

@@ -9,6 +9,7 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
+using System;
 using System.Globalization;
 using System.Net;
 
@@ -112,11 +113,16 @@ public class ServerMissionMembershipHandler : IHandler
             return steamId;
 
         // The hosting client reaches its spawned server directly over loopback, so it has no tunnel
-        // endpoint to map. In Release its controller id is its Steam id; constrain that fallback to a
-        // managed server's local peer so arbitrary direct-IP controller ids are never treated as Steam.
+        // endpoint to map. Constrain the fallback to a namespaced Steam identity on the managed server.
+        const string steamControllerPrefix = "steam:";
         if (ManagedServerConfig.IsManagedServer
             && IPAddress.IsLoopback(peer.Address)
-            && ulong.TryParse(controllerId, NumberStyles.None, CultureInfo.InvariantCulture, out steamId))
+            && controllerId?.StartsWith(steamControllerPrefix, StringComparison.Ordinal) == true
+            && ulong.TryParse(
+                controllerId.Substring(steamControllerPrefix.Length),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out steamId))
         {
             return steamId;
         }
