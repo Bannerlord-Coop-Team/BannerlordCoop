@@ -46,7 +46,7 @@ public class ModConfigTests : IDisposable
 
         Assert.True(File.Exists(ConfigPath), "first load should create mod-config.json");
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
-        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.True(config.Difficulty.BirthAndDeath);
     }
 
@@ -57,9 +57,14 @@ public class ModConfigTests : IDisposable
 
         var config = NewModConfig().Data;
 
-        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerTroopsReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.RecruitmentDifficulty);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerMapMovementSpeed);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.StealthAndDisguiseDifficulty);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PersuasionSuccessChance);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.ClanMemberDeathChance);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
         Assert.True(config.Difficulty.BirthAndDeath);
         Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
@@ -133,7 +138,7 @@ public class ModConfigTests : IDisposable
 
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
         Assert.True(config.Difficulty.BirthAndDeath);
-        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
         Assert.Contains("// unrelated operator note", firstMigration);
@@ -153,7 +158,7 @@ public class ModConfigTests : IDisposable
 
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
         Assert.True(config.Difficulty.BirthAndDeath);
-        Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
         Assert.Contains("// preserve this operator file", firstMigration);

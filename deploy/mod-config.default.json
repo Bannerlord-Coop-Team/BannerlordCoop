@@ -7,12 +7,12 @@
   // are allowed here.
 
   // Campaign difficulty, applied by the HOSTING side at every boot; joining
-  // players inherit the values with the save transfer.
+  // players inherit the values with the save transfer. These values mirror a
+  // newly created vanilla Bannerlord campaign.
   // Levels: "VeryEasy" | "Easy" | "Realistic".
   "difficulty": {
-    // Damage players take. Realistic avoids the dedicated server's headless
-    // profile pushing quarter damage to every joining player.
-    "playerReceivedDamage": "Realistic",
+    // Damage players take. VeryEasy is Bannerlord's new-campaign default.
+    "playerReceivedDamage": "VeryEasy",
 
     "playerTroopsReceivedDamage": "VeryEasy",
     "combatAIDifficulty": "VeryEasy",

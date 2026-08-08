@@ -52,7 +52,7 @@ internal sealed class ModConfig : IModConfig
     private static readonly IDictionary<string, JToken> DifficultyDefaults =
         new Dictionary<string, JToken>(StringComparer.OrdinalIgnoreCase)
         {
-            ["playerReceivedDamage"] = "Realistic",
+            ["playerReceivedDamage"] = "VeryEasy",
             ["playerTroopsReceivedDamage"] = "VeryEasy",
             ["combatAIDifficulty"] = "VeryEasy",
             ["recruitmentDifficulty"] = "VeryEasy",
