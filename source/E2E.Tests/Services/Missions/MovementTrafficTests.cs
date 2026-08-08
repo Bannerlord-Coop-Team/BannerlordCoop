@@ -147,7 +147,7 @@ public class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentEquipmentApplier>(),
                 new MovementBatchSender(
                     network,
-                new MovementPacketCompressor(serializer)),
+                    new MovementPacketCompressor(serializer)),
                 peer.Resolve<IPuppetMountStateRepairer>(),
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 rateController.Object);
@@ -155,9 +155,10 @@ public class MovementTrafficTests : MissionTestEnvironment
             Agent locallyControlledAgent = SpawnRider(mock);
             Agent remoteControlledAgent = SpawnRider(mock);
             SpawnRider(mock);
+            Guid locallyControlledAgentId = Guid.NewGuid();
             Assert.True(registry.TryRegisterAgent(
                 "peer",
-                Guid.NewGuid(),
+                locallyControlledAgentId,
                 1,
                 locallyControlledAgent));
             Assert.True(registry.TryRegisterAgent(
@@ -175,11 +176,14 @@ public class MovementTrafficTests : MissionTestEnvironment
                 handler.PollMovement(1f / 60f);
 
             Assert.Single(populationReports);
+            Assert.True(registry.TryTransferAuthority(
+                "remote-peer",
+                locallyControlledAgentId));
 
             handler.PollMovement(0.02f);
 
             Assert.Equal(2, populationReports.Count);
-            Assert.Equal((3, 1), populationReports[1]);
+            Assert.Equal((3, 0), populationReports[1]);
         });
     }
 
