@@ -108,6 +108,7 @@ internal class PartyCommands
             $"y={position.Y.ToString("R", CultureInfo.InvariantCulture)}|" +
             $"isOnLand={position.IsOnLand}|" +
             $"settlement={party.CurrentSettlement?.StringId ?? "none"}|" +
+            $"armyLeader={party.Army?.LeaderParty?.StringId ?? "none"}|" +
             $"moveMode={party.PartyMoveMode}";
     }
 
