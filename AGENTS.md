@@ -168,7 +168,7 @@ Avoid:
 - Headers, bullet scaffolding, or multi-section structure inside a single review comment.
 - Overstating mechanism. Verify a claim against the actual code before asserting it. I will push back on anything that isn't literally true (e.g. "turns off all our harmony patches" when it's really a thread flag the patches check).
 
-Examples of my actual comments:
+Examples of actual comments:
 
 - "shouldnt 5f be 1f? or 0f?"
 - "this still used?"
