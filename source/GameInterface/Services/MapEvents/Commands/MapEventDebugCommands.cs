@@ -2948,6 +2948,24 @@ public class MapEventDebugCommands
         }
     }
 
+    /// <summary>Invokes the real fast-forward action on the current Send Troops simulation.</summary>
+    [CommandLineArgumentFunction("battle_simulation_fast_forward", "coop.debug.mapevent")]
+    public static string FastForwardBattleSimulation(List<string> args)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client with an active battle simulation.";
+
+        if (args.Count != 0)
+            return "Usage: coop.debug.mapevent.battle_simulation_fast_forward";
+
+        var simulation = PlayerEncounter.CurrentBattleSimulation;
+        if (simulation == null)
+            return "No active battle simulation.";
+
+        simulation.FastForward();
+        return "Battle simulation fast-forward requested.";
+    }
+
     private static string FormatMapEvent(MapEvent mapEvent, IObjectManager objectManager)
     {
         if (mapEvent == null) return "<null>";
