@@ -132,7 +132,7 @@ public class UnsupportedModuleWarningHandler
                                          modules.Any(module => IsCoopVariant(module, CoopNightlyModuleId));
         unsupportedModuleIds = modules
             .Where(module => IsUnsupported(module) ||
-                             hasConflictingCoopVariants && IsCoopVariant(module))
+                             (hasConflictingCoopVariants && IsCoopVariant(module)))
             .Select(module => module.Id)
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.OrdinalIgnoreCase)
