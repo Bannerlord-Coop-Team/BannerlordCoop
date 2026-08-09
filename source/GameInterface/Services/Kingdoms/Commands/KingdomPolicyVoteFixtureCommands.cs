@@ -272,9 +272,11 @@ public class KingdomPolicyVoteFixtureCommands
             KingdomPolicyDecision.PolicyDecisionOutcome outcome && outcome.ShouldDecisionBeEnforced;
         string role = ModInformation.IsServer ? "server" : "client";
         string localKingdom = Clan.PlayerClan?.Kingdom?.StringId ?? "none";
+        bool localKingdomMatches = Clan.PlayerClan?.Kingdom == kingdom;
 
         return $"POLICY_VOTE_FIXTURE_STATE role={role} kingdomFound={Bool(kingdomFound)} " +
                $"kingdomEliminated={Bool(kingdom?.IsEliminated ?? false)} localKingdom={localKingdom} " +
+               $"localKingdomMatches={Bool(localKingdomMatches)} " +
                $"policyActive={Bool(kingdom?.ActivePolicies?.Contains(policy) ?? false)} " +
                $"unresolvedPolicy={Bool(policyDecision != null)} screenActive={Bool(ScreenManager.TopScreen is GauntletKingdomScreen)} " +
                $"policyScreenReady={Bool(policyScreenReady)} canPropose={Bool(canPropose)} " +
