@@ -13,6 +13,7 @@ using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using SandBox.GauntletUI;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -26,6 +27,9 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
+using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -615,6 +619,288 @@ public class KingdomDebugCommand
     public static string FinalVoteKingdomDecision(List<string> args)
     {
         return VoteKingdomDecision(args, isFinal: true);
+    }
+
+    // coop.debug.kingdom.open_current_decision
+    /// <summary>
+    /// Accepts the active Kingdom decision inquiry through its real affirmative action.
+    /// </summary>
+    /// <param name="args">kingdomId and 1-based decision index</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("open_current_decision", "coop.debug.kingdom")]
+    public static string OpenCurrentDecision(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+        {
+            return "This command can only be run on a client.";
+        }
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+        {
+            return message;
+        }
+        if (ScreenManager.TopScreen is MapScreen mapScreen)
+        {
+            if (InformationManager.IsAnyInquiryActive())
+            {
+                return "Another inquiry is already active on the campaign map.";
+            }
+
+            Kingdom playerKingdom = Clan.PlayerClan?.Kingdom;
+            if (playerKingdom == null)
+            {
+                return "The local player is not in a kingdom.";
+            }
+
+            KingdomDecision nextDecision = playerKingdom.UnresolvedDecisions
+                .FirstOrDefault(candidate => candidate.NotifyPlayer &&
+                                             candidate.IsEnforced &&
+                                             candidate.IsPlayerParticipant &&
+                                             !candidate.ShouldBeCancelled());
+            if (nextDecision != decision)
+            {
+                string nextDecisionType = nextDecision?.GetType().Name ?? "none";
+                return $"The next map decision is {nextDecisionType}, expected {decision.GetType().Name}.";
+            }
+
+            InquiryData mapInquiry = null;
+            void CaptureInquiry(InquiryData data, bool pauseGameActiveState, bool prioritize)
+            {
+                mapInquiry = data;
+            }
+
+            InformationManager.OnShowInquiry += CaptureInquiry;
+            try
+            {
+                mapScreen.OnHourlyTick();
+                mapScreen.ShowNextKingdomDecisionPopup();
+            }
+            finally
+            {
+                InformationManager.OnShowInquiry -= CaptureInquiry;
+            }
+
+            string expectedText = decision.GetChooseTitle().ToString();
+            if (mapInquiry?.AffirmativeAction == null ||
+                !string.Equals(mapInquiry.Text, expectedText, StringComparison.Ordinal))
+            {
+                InformationManager.HideInquiry();
+                return $"The real map inquiry did not target {decision.GetType().Name}.";
+            }
+
+            mapInquiry.AffirmativeAction();
+            InformationManager.HideInquiry();
+            return $"Entered the real Kingdom decision screen for {decision.GetType().Name} through the map inquiry.";
+        }
+        if (!(ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen))
+        {
+            return "The Kingdom decision screen is not active.";
+        }
+
+        KingdomDecisionsVM decisions = kingdomScreen.DataSource?.Decision;
+        if (decisions?.CurrentDecision?.KingdomDecisionMaker?._decision == decision)
+        {
+            return $"The real decision UI is already active for {decision.GetType().Name}.";
+        }
+        if (decisions?._queryData?.AffirmativeAction == null)
+        {
+            return $"The decision inquiry is not available for {decision.GetType().Name}.";
+        }
+        if (!InformationManager.IsAnyInquiryActive())
+        {
+            return $"The decision inquiry is not active for {decision.GetType().Name}.";
+        }
+
+        Action affirmativeAction = decisions._queryData.AffirmativeAction;
+        affirmativeAction();
+        InformationManager.HideInquiry();
+        DecisionItemBaseVM decisionItem = decisions.CurrentDecision;
+        if (decisionItem?.KingdomDecisionMaker?._decision != decision || !decisionItem.IsActive)
+        {
+            return $"The real decision UI did not activate for {decision.GetType().Name}.";
+        }
+
+        return $"Opened real decision UI for {decision.GetType().Name}: " +
+               $"decisionActive={decisionItem.IsActive}, playerRole={(decisionItem.IsPlayerSupporter ? "Supporter" : "Chooser")}.";
+    }
+
+    // coop.debug.kingdom.select_current_decision
+    /// <summary>
+    /// Selects an outcome and support weight through the active client decision view model.
+    /// </summary>
+    /// <param name="args">kingdomId, 1-based decision index, 1-based outcome index or abstain, support weight</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("select_current_decision", "coop.debug.kingdom")]
+    public static string SelectCurrentDecision(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+        {
+            return "This command can only be run on a client.";
+        }
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+        {
+            return message;
+        }
+        if (args.Count < 4)
+        {
+            return "Usage: coop.debug.kingdom.select_current_decision <kingdomId> <decisionIndex> <outcomeIndex|abstain> <supportWeight>";
+        }
+        if (!(ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen))
+        {
+            return "The Kingdom decision screen is not active.";
+        }
+
+        DecisionItemBaseVM decisionItem = kingdomScreen.DataSource?.Decision?.CurrentDecision;
+        if (decisionItem?.KingdomDecisionMaker?._decision != decision)
+        {
+            string currentDecision = decisionItem?.KingdomDecisionMaker?._decision?.GetType().Name ?? "none";
+            return $"The active decision is {currentDecision}, expected {decision.GetType().Name}.";
+        }
+        if (!decisionItem.IsActive || !kingdomScreen.DataSource.Decision.IsActive)
+        {
+            return "The active decision UI is not ready for selection.";
+        }
+
+        bool isAbstain = args[2].Equals("abstain", StringComparison.OrdinalIgnoreCase);
+        DecisionOptionVM selectedOption;
+        if (isAbstain)
+        {
+            selectedOption = decisionItem.DecisionOptionsList.FirstOrDefault(option => option.IsOptionForAbstain);
+        }
+        else
+        {
+            if (!int.TryParse(args[2], out int parsedOutcomeIndex))
+            {
+                return $"Outcome index is not a number: {args[2]}";
+            }
+
+            selectedOption = decisionItem.DecisionOptionsList
+                .Where(option => !option.IsOptionForAbstain)
+                .ElementAtOrDefault(parsedOutcomeIndex - 1);
+        }
+        if (selectedOption == null)
+        {
+            return $"The active decision has no outcome at index {args[2]}.";
+        }
+        if (!TryParseSupportWeight(args[3], out Supporter.SupportWeights supportWeight))
+        {
+            return $"Support weight is invalid: {args[3]}. Use Choose, StayNeutral, SlightlyFavor, StronglyFavor, or FullyPush.";
+        }
+
+        int? supportIndex = null;
+        if (decisionItem.IsPlayerSupporter && !selectedOption.IsOptionForAbstain)
+        {
+            switch (supportWeight)
+            {
+                case Supporter.SupportWeights.SlightlyFavor:
+                    supportIndex = 0;
+                    break;
+                case Supporter.SupportWeights.StronglyFavor:
+                    supportIndex = 1;
+                    break;
+                case Supporter.SupportWeights.FullyPush:
+                    supportIndex = 2;
+                    break;
+                default:
+                    return "A supporting player must use SlightlyFavor, StronglyFavor, or FullyPush.";
+            }
+        }
+        else if (!selectedOption.IsOptionForAbstain && supportWeight != Supporter.SupportWeights.Choose)
+        {
+            return "A choosing player must use Choose.";
+        }
+
+        selectedOption.ExecuteSelection();
+        if (supportIndex.HasValue)
+        {
+            selectedOption.OnSupportStrengthChange(supportIndex.Value);
+        }
+        if (decisionItem._currentSelectedOption != selectedOption || !decisionItem.CanEndDecision)
+        {
+            return "The selected decision outcome did not become finalizable.";
+        }
+
+        return $"Selected real outcome for {decision.GetType().Name}: " +
+               $"outcome={args[2]}, support={selectedOption.CurrentSupportWeight}, " +
+               $"playerRole={(decisionItem.IsPlayerSupporter ? "Supporter" : "Chooser")}, " +
+               $"canEnd={decisionItem.CanEndDecision}.";
+    }
+
+    // coop.debug.kingdom.submit_current_decision
+    /// <summary>
+    /// Submits the active finalizable decision through DecisionItemBaseVM.ExecuteFinalSelection.
+    /// </summary>
+    /// <param name="args">kingdomId and 1-based decision index</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("submit_current_decision", "coop.debug.kingdom")]
+    public static string SubmitCurrentDecision(List<string> args)
+    {
+        if (!ModInformation.IsClient)
+        {
+            return "This command can only be run on a client.";
+        }
+        if (!TryGetKingdomDecisionByIndex(args, out Kingdom _, out KingdomDecision decision, out int _, out string message))
+        {
+            return message;
+        }
+        if (!(ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen))
+        {
+            return "The Kingdom decision screen is not active.";
+        }
+
+        DecisionItemBaseVM decisionItem = kingdomScreen.DataSource?.Decision?.CurrentDecision;
+        if (decisionItem?.KingdomDecisionMaker?._decision != decision)
+        {
+            string currentDecision = decisionItem?.KingdomDecisionMaker?._decision?.GetType().Name ?? "none";
+            return $"The active decision is {currentDecision}, expected {decision.GetType().Name}.";
+        }
+        if (!decisionItem.CanEndDecision)
+        {
+            return "The active decision is not finalizable.";
+        }
+
+        decisionItem.ExecuteFinalSelection();
+        string nextDecision = kingdomScreen.DataSource?.Decision?.CurrentDecision?
+            .KingdomDecisionMaker?._decision?.GetType().Name ?? "none";
+        return $"Executed real final selection for {decision.GetType().Name}: " +
+               $"finalSelectionDone={decisionItem._finalSelectionDone}, decisionActive={decisionItem.IsActive}, " +
+               $"decisionPanelActive={kingdomScreen.DataSource.Decision.IsActive}, currentDecision={nextDecision}.";
+    }
+
+    // coop.debug.kingdom.current_decision_ui_state
+    /// <summary>
+    /// Reports the current Kingdom decision view-model state without changing it.
+    /// </summary>
+    /// <param name="args">no arguments</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("current_decision_ui_state", "coop.debug.kingdom")]
+    public static string CurrentDecisionUiState(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.kingdom.current_decision_ui_state";
+        }
+        if (!ModInformation.IsClient)
+        {
+            return "This command can only be run on a client.";
+        }
+        if (!(ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen))
+        {
+            string topScreen = ScreenManager.TopScreen?.GetType().Name ?? "none";
+            return $"screenActive=False inquiryActive={InformationManager.IsAnyInquiryActive()} " +
+                   $"topScreen={topScreen} currentDecision=none.";
+        }
+
+        DecisionItemBaseVM decisionItem = kingdomScreen.DataSource?.Decision?.CurrentDecision;
+        string currentDecision = decisionItem?.KingdomDecisionMaker?._decision?.GetType().Name ?? "none";
+        string playerRole = decisionItem == null
+            ? "none"
+            : decisionItem.IsPlayerSupporter ? "Supporter" : "Chooser";
+        return $"screenActive=True inquiryActive={InformationManager.IsAnyInquiryActive()} " +
+               $"decisionPanelActive={kingdomScreen.DataSource?.Decision?.IsActive ?? false} " +
+               $"currentDecision={currentDecision} decisionActive={decisionItem?.IsActive ?? false} " +
+               $"playerRole={playerRole} " +
+               $"canEnd={decisionItem?.CanEndDecision ?? false} " +
+               $"finalSelectionDone={decisionItem?._finalSelectionDone ?? false}.";
     }
 #endif
 
