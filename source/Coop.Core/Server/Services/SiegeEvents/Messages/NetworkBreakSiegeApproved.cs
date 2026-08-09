@@ -3,28 +3,42 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.SiegeEvents.Messages;
 
+public enum SiegeBreakOutcome
+{
+    Rejected,
+    Applied,
+    AlreadyLeft,
+}
+
 /// <summary>
-/// Server approved the requester leaving its siege camp.
+/// Server result for a request to leave a siege camp.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public record NetworkBreakSiegeApproved : IEvent
 {
     [ProtoMember(1)]
-    public bool Approved { get; }
-    [ProtoMember(2)]
-    public bool BattleLeaveApplied { get; }
+    public SiegeBreakOutcome Outcome { get; }
 
     /// <summary>
-    /// Echo of the request's flag: when false the requester's native flow already ran its own menu
-    /// continuation, so the approval must not finish the local encounter or exit a menu.
+    /// Echo of the request's local-continuation flag.
     /// </summary>
-    [ProtoMember(3)]
+    [ProtoMember(2)]
     public bool FinishLocalMenus { get; }
 
-    public NetworkBreakSiegeApproved(bool approved, bool battleLeaveApplied, bool finishLocalMenus)
+    /// <summary>
+    /// True when an active siege assault owns the leave.
+    /// Its replicated battle-leave path removes both battle and camp state and performs the client cleanup.
+    /// </summary>
+    [ProtoMember(3)]
+    public bool BattleLeaveApplied { get; }
+
+    public NetworkBreakSiegeApproved(
+        SiegeBreakOutcome outcome,
+        bool finishLocalMenus = true,
+        bool battleLeaveApplied = false)
     {
-        Approved = approved;
-        BattleLeaveApplied = battleLeaveApplied;
+        Outcome = outcome;
         FinishLocalMenus = finishLocalMenus;
+        BattleLeaveApplied = battleLeaveApplied;
     }
 }

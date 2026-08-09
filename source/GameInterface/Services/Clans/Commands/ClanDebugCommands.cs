@@ -1,13 +1,20 @@
 ﻿using Autofac;
 using Common;
+using Common.Network;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
+using SandBox.GauntletUI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands
@@ -25,6 +32,66 @@ namespace GameInterface.Services.GameDebug.Commands
             if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
             return container.TryResolve(out objectManager);
+        }
+
+        [CommandLineArgumentFunction("open", "coop.debug.clan")]
+        public static string OpenClanScreen(List<string> args)
+        {
+            if (!ModInformation.IsClient) return "Command can only be run on a client.";
+            if (args.Count != 0) return "Usage: coop.debug.clan.open";
+            if (Game.Current?.GameStateManager == null) return "The game-state manager is unavailable.";
+            if (Game.Current.GameStateManager.ActiveState is ClanState) return "CLAN_SCREEN_ALREADY_OPEN";
+            if (Hero.MainHero == null || Hero.MainHero.IsDead)
+                return "The local main hero is unavailable.";
+
+            Game.Current.GameStateManager.PushState(
+                Game.Current.GameStateManager.CreateState<ClanState>(), 0);
+            return "CLAN_SCREEN_OPENED";
+        }
+
+        [CommandLineArgumentFunction("close", "coop.debug.clan")]
+        public static string CloseClanScreen(List<string> args)
+        {
+            if (!ModInformation.IsClient) return "Command can only be run on a client.";
+            if (args.Count != 0) return "Usage: coop.debug.clan.close";
+            if (!(Game.Current?.GameStateManager?.ActiveState is ClanState))
+                return "No active Clan screen.";
+
+            Game.Current.GameStateManager.PopState(0);
+            return "CLAN_SCREEN_CLOSED";
+        }
+
+        [CommandLineArgumentFunction("screen_state", "coop.debug.clan")]
+        public static string ClanScreenState(List<string> args)
+        {
+            if (!ModInformation.IsClient) return "Command can only be run on a client.";
+            if (args.Count != 0) return "Usage: coop.debug.clan.screen_state";
+
+            var clanScreen = ScreenManager.TopScreen as GauntletClanScreen;
+            return $"CLAN_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is ClanState} " +
+                $"topScreen={clanScreen != null} dataSource={clanScreen?._dataSource != null} " +
+                $"parties={clanScreen?._dataSource?.ClanParties?._parties?.Count ?? -1} " +
+                $"mainHero={Hero.MainHero?.StringId ?? "none"}";
+        }
+
+        [CommandLineArgumentFunction("refresh_burst", "coop.debug.clan")]
+        public static string RefreshBurst(List<string> args)
+        {
+            if (!ModInformation.IsServer) return "Command can only be run on the server.";
+            if (args.Count != 2 || !int.TryParse(args[1], out var count) || count < 1 || count > 500)
+                return "Usage: coop.debug.clan.refresh_burst <party id> <count 1-500>";
+            if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+            if (!objectManager.TryGetObject(args[0], out MobileParty _))
+                return $"Party with id {args[0]} not found.";
+            if (!ContainerProvider.TryResolve<INetwork>(out var network))
+                return "Unable to resolve Network.";
+
+            for (int i = 0; i < count; i++)
+            {
+                network.SendAll(new RefreshAfterRoleAssignment(args[0]));
+            }
+
+            return $"REFRESH_BURST_SENT party={args[0]} count={count}";
         }
 
         // coop.debug.clan.list

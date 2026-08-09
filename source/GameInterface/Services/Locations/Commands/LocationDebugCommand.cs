@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Settlements.Interfaces;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -41,8 +42,13 @@ public class LocationDebugCommand
 
         if (PlayerEncounter.Current == null)
         {
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
-            return $"Requested an encounter with '{settlement.StringId}'.";
+            if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
+                return "Unable to resolve the settlement interface.";
+
+            settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            return PlayerEncounter.Current == null
+                ? $"Unable to start a local encounter with '{settlement.StringId}'."
+                : $"Started a local encounter with '{settlement.StringId}'.";
         }
 
         if (PlayerEncounter.EncounterSettlement != settlement)

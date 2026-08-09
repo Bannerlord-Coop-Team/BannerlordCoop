@@ -11,6 +11,7 @@ using SandBox.CampaignBehaviors;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -18,6 +19,7 @@ using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Siege;
@@ -562,12 +564,14 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.Party, out var partyId)) return;
 
-            // Unsure how to send factions over the network
-            string factionStringId = obj.What.CapturerFaction.StringId;
+            string partyId = null;
+            if (obj.What.Party != null && !objectManager.TryGetIdWithLogging(obj.What.Party, out partyId)) return;
 
-            network.SendAll(new NetworkNotifyHeroPrisonerReleased(heroId, partyId, factionStringId, obj.What.Detail, obj.What.ShowNotification));
+            string capturerFactionId = null;
+            if (obj.What.CapturerFaction != null && !objectManager.TryGetIdWithLogging(obj.What.CapturerFaction, out capturerFactionId)) return;
+
+            network.SendAll(new NetworkNotifyHeroPrisonerReleased(heroId, partyId, capturerFactionId, obj.What.Detail, obj.What.ShowNotification));
         });
     }
 
@@ -577,17 +581,12 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.PartyId, out var party)) return;
+
+            PartyBase party = null;
+            if (obj.What.PartyId != null && !objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.PartyId, out party)) return;
 
             IFaction capturerFaction = null;
-            foreach (var faction in Campaign.Current.Factions)
-            {
-                if (faction.StringId == obj.What.FactionId)
-                {
-                    capturerFaction = faction;
-                    break;
-                }
-            }
+            if (obj.What.FactionId != null && !TryGetFaction(obj.What.FactionId, out capturerFaction)) return;
 
             notificationsBehavior.OnHeroPrisonerReleased(hero, party, capturerFaction, obj.What.Detail, obj.What.ShowNotification);
         });
@@ -816,7 +815,6 @@ internal class DefaultNotificationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
 
             Kingdom oldKingdom = null;
@@ -827,8 +825,32 @@ internal class DefaultNotificationsHandler : IHandler
             if (obj.What.NewKingdomId != null &&
                 !objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.NewKingdomId, out newKingdom)) return;
 
-            notificationsBehavior.OnClanChangedFaction(clan, oldKingdom, newKingdom, obj.What.Detail, obj.What.ShowNotification);
+            if (TryGetNotificationsBehavior(out var notificationsBehavior))
+                notificationsBehavior.OnClanChangedFaction(clan, oldKingdom, newKingdom, obj.What.Detail, obj.What.ShowNotification);
+
+            ShowJoinKingdomScene(clan, newKingdom, obj.What.Detail, obj.What.ShowNotification);
         });
+    }
+
+    private static void ShowJoinKingdomScene(
+        Clan clan,
+        Kingdom newKingdom,
+        ChangeKingdomAction.ChangeKingdomActionDetail detail,
+        bool showNotification)
+    {
+        if (!showNotification || newKingdom == null) return;
+
+        var shouldShowScene =
+            (clan == Clan.PlayerClan && detail == ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom) ||
+            (Clan.PlayerClan?.Kingdom == newKingdom && detail == ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdomByDefection);
+        if (!shouldShowScene || !TryRestoreSceneCharacterCulture(clan.Leader)) return;
+
+        foreach (var hero in CampaignSceneNotificationHelper.GetMilitaryAudienceForKingdom(newKingdom).Take(5))
+        {
+            if (!TryRestoreSceneCharacterCulture(hero)) return;
+        }
+
+        MBInformationManager.ShowSceneNotification(new JoinKingdomSceneNotificationItem(clan, newKingdom));
     }
 
     private void Handle_NotifyArmyCreated(MessagePayload<NotifyArmyCreated> obj)
@@ -1067,12 +1089,40 @@ internal class DefaultNotificationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.FirstHeroId, out var firstHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.SecondHeroId, out var secondHero)) return;
 
-            notificationsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
+            if (TryGetNotificationsBehavior(out var notificationsBehavior))
+                notificationsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
+
+            var firstHeroHasCulture = TryRestoreSceneCharacterCulture(firstHero);
+            var secondHeroHasCulture = TryRestoreSceneCharacterCulture(secondHero);
+            if (firstHeroHasCulture && secondHeroHasCulture)
+                ShowMarriageSceneForMainHero(firstHero, secondHero);
         });
+    }
+
+    private static void ShowMarriageSceneForMainHero(Hero firstHero, Hero secondHero)
+    {
+        if (firstHero != Hero.MainHero && secondHero != Hero.MainHero) return;
+
+        var husband = firstHero.IsFemale ? secondHero : firstHero;
+        MBInformationManager.ShowSceneNotification(
+            new MarriageSceneNotificationItem(husband, husband.Spouse, CampaignTime.Now, default));
+    }
+
+    private static bool TryRestoreSceneCharacterCulture(Hero hero)
+    {
+        BasicCharacterObject character = hero.CharacterObject;
+        if (character.Culture != null) return true;
+
+        using (new AllowedThread())
+            character.Culture = hero.Culture ?? hero.Clan?.Culture;
+
+        if (character.Culture != null) return true;
+
+        Logger.Warning("Skipping scene notification because hero {heroId} has no character culture", hero.StringId);
+        return false;
     }
 
     private void Handle_NotifyChildConceived(MessagePayload<NotifyChildConceived> obj)
@@ -1370,6 +1420,24 @@ internal class DefaultNotificationsHandler : IHandler
 
             notificationsBehavior.OnHeroTeleportationRequested(hero, targetSettlement, targetParty, obj.What.Detail);
         });
+    }
+
+    private bool TryGetFaction(string id, out IFaction faction)
+    {
+        if (objectManager.TryGetObject(id, out Kingdom kingdom))
+        {
+            faction = kingdom;
+            return true;
+        }
+        if (objectManager.TryGetObject(id, out Clan clan))
+        {
+            faction = clan;
+            return true;
+        }
+
+        Logger.Debug("Faction not found in DefaultNotificationsHandler with id: {id}", id);
+        faction = null;
+        return false;
     }
 
     private bool TryGetNotificationsBehavior(out DefaultNotificationsCampaignBehavior campaignBehavior)

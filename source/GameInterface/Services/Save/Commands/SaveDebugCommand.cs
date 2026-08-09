@@ -1,5 +1,6 @@
 ﻿using Common;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -8,9 +9,41 @@ namespace GameInterface.Services.Save.Commands
 {
     public class SaveDebugCommand
     {
+        private static readonly Regex SafeSaveName = new("^[A-Za-z0-9_-]{1,64}$");
+
 #if DEBUG
         private static int evidenceHoldMilliseconds;
 #endif
+
+        [CommandLineArgumentFunction("save_as", "coop.debug.save")]
+        public static string SaveAs(List<string> args)
+        {
+            if (!ModInformation.IsServer)
+                return "Command can only be run on the server.";
+            if (args.Count != 1 || !SafeSaveName.IsMatch(args[0]))
+                return "Usage: coop.debug.save.save_as <1-64 letters, digits, underscores, or hyphens>";
+
+            SaveHandler saveHandler = Campaign.Current?.SaveHandler;
+            if (saveHandler == null)
+                return "No active campaign / SaveHandler.";
+            if (saveHandler.IsSaving)
+                return "A save is already queued.";
+
+            saveHandler.SaveAs(args[0]);
+            return $"Enqueued save as {args[0]} on the server.";
+        }
+
+        [CommandLineArgumentFunction("state", "coop.debug.save")]
+        public static string State(List<string> args)
+        {
+            if (args.Count != 0)
+                return "Usage: coop.debug.save.state";
+
+            SaveHandler saveHandler = Campaign.Current?.SaveHandler;
+            return saveHandler == null
+                ? "saveHandler=unavailable"
+                : $"saveHandler=ready|isSaving={saveHandler.IsSaving}";
+        }
 
         /// <summary>
         /// Enqueues a native autosave (the same path SaveHandler uses on a timer) so the

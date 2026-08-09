@@ -10,6 +10,9 @@ using Coop.LiveTesting;
 #endif
 using Coop.UI.LoadGameUI;
 using GameInterface;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Handlers;
+using GameInterface.Services.Chat;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Tournaments.UI;
 using GameInterface.Services.UI;
@@ -52,6 +55,8 @@ namespace Coop
         private string activeLogFilePath;
         private string informationalVersion = "unknown";
         private CrashReportingConsentCoordinator crashReportingConsent;
+        private UnsupportedModuleWarningHandler unsupportedModuleWarning;
+        private bool startupModuleWarningReady;
         private bool automaticCrashReportsRequested;
         private DateTime nextWatchdogRetryUtc;
 
@@ -108,6 +113,17 @@ namespace Coop
 
             SetupLogging();
             InitializeCrashReporting();
+
+            // Creates the handler during launch
+            if (!isServer)
+            {
+                unsupportedModuleWarning = new UnsupportedModuleWarningHandler(
+                    new TaleWorldsModuleInfoProvider(),
+                    new CoopOptionsStore(),
+                    exception => Logger.Warning(
+                        exception,
+                        "Unsupported module wwarning preference could not be saved"));
+            }
 
             if (ManagedServerConfig.IsManagedServer)
             {
@@ -473,6 +489,9 @@ namespace Coop
             if (ContainerProvider.TryResolve<IGameInterface>(out var gameInterface))
                 gameInterface.PatchGameStarted();
 
+            if (ModInformation.IsClient && ContainerProvider.TryResolve<IChatService>(out var chatService))
+                chatService.Initialize();
+
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
                 campaignGameStarter.AddBehavior(new PlayerPartyInteractionCampaignBehavior());
@@ -483,7 +502,14 @@ namespace Coop
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
+            
+            if (isServer)
+            {
+                ManagedOptions.SetConfig(ManagedOptions.ManagedOptionsType.StopGameOnFocusLost, 0f);
+            }
+
             CrashDiagnostics.SetPhase("main-menu");
+            startupModuleWarningReady = true;
             InformationManager.DisplayMessage(new InformationMessage(ClientServerModeMessage));
         }
 
@@ -526,6 +552,7 @@ namespace Coop
 
             var isAtMainMenu = GameStateManager.Current?.ActiveState is InitialState;
             TryApplyAutomaticCrashReports();
+            TryShowUnsupportedModuleWarning(isAtMainMenu);
             TryShowCrashReportingConsent(isAtMainMenu);
 
             // Boot Steam services once the main menu is up, so a +connect_lobby launch resolves while joining is possible.
@@ -557,6 +584,19 @@ namespace Coop
             }
 
             crashReportingConsent.TryShowPrompt(
+                isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
+                inquiry => InformationManager.ShowInquiry(inquiry));
+        }
+        
+        // Show the one-time unsupported module warning when the client startup UI is available.
+        private void TryShowUnsupportedModuleWarning(bool isAtMainMenu)
+        {
+            if (unsupportedModuleWarning == null || !startupModuleWarningReady || isServer || isAutoConnect)
+            {
+                return;
+            }
+            
+            unsupportedModuleWarning.TryShowPrompt(
                 isAtMainMenu && !InformationManager.IsAnyInquiryActive(),
                 inquiry => InformationManager.ShowInquiry(inquiry));
         }

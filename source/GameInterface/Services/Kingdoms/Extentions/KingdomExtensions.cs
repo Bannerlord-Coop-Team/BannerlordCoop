@@ -1,6 +1,6 @@
 ﻿using Common.Logging;
 using GameInterface.Services.Clans.Extensions;
-using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Kingdoms.Extentions;
@@ -34,11 +34,8 @@ internal static class KingdomExtensions
     /// </summary>
     public static bool IsPlayerKingdom(this Kingdom kingdom)
     {
-        foreach (var clan in kingdom._clans)
-        {
-            if (clan.IsPlayerClan()) return true;
-        }
+        if (kingdom is null) return false;
 
-        return false;
+        return kingdom.Clans.Any(clan => clan.IsPlayerClan());
     }
 }

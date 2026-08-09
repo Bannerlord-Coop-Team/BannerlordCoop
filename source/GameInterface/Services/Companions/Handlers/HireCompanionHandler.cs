@@ -4,10 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.UI.Notifications.Messages;
-using LiteNetLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -62,27 +59,17 @@ internal class HireCompanionHandler : IHandler
     private void Handle_HireCompanion(MessagePayload<HireCompanion> obj)
     {
         var data = obj.What;
-        var peer = obj.Who as NetPeer;
 
-        // The hire applies vanilla game actions; defer them to the game-loop thread so they
-        // run there instead of on the network (poller) thread that delivered the message.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
-                if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanId, out var playerClan)) return;
-                if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanId, out var playerClan)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
-                GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, data.HiringPrice, false);
-                AddCompanionAction.Apply(playerClan, oneToOneConversationHero);
-                AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
-            }
-            catch (Exception e)
-            {
-                logger.Error(e, "Failed to apply {Message}", nameof(HireCompanion));
-            }
+            GiveGoldAction.ApplyBetweenCharacters(mainHero, oneToOneConversationHero, data.HiringPrice, false);
+            AddCompanionAction.Apply(playerClan, oneToOneConversationHero);
+            AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
         });
     }
 }

@@ -81,6 +81,22 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
         }
     }
 
+    public uint ServerRealTime
+    {
+        get
+        {
+            try
+            {
+                return SteamUtils.GetServerRealTime();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to query Steam server time");
+                return 0;
+            }
+        }
+    }
+
     private void OnGameLobbyJoinRequested(GameLobbyJoinRequested_t callback)
     {
         try
