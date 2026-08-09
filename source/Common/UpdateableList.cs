@@ -12,12 +12,9 @@ namespace Common
     /// </summary>
     public class UpdateableList
     {
-        // Resolved per call rather than held in a static field, the same reason BootPatches uses a
-        // property: CoopMod's static Updateables list is built while the runtime initializes CoopMod,
-        // which happens on entry to NoHarmonyInit — before its first statement installs the mod's
-        // assembly binding redirects. A static field here would build the Serilog graph at that moment,
-        // and the FileNotFoundException it throws surfaces as a TypeInitializationException that kills
-        // the process during module load. Only the fault path below logs, so the cost is irrelevant.
+        // A property, like BootPatches uses: CoopMod's static list of these is built before the mod
+        // installs its assembly binding redirects, and a static field would build the Serilog graph
+        // that early, killing the process during module load. Only the fault path below logs.
         private static ILogger Logger => LogManager.GetLogger<UpdateableList>();
 
         private List<IUpdateable> m_UpdateablesSorted = new List<IUpdateable>();

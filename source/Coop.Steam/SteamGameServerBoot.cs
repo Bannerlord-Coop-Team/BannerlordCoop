@@ -142,8 +142,8 @@ public static class SteamGameServerBoot
 
     /// <summary>
     /// Dispatches the game-server callbacks; called every tick by the pump. Stops once <see cref="Shutdown"/>
-    /// has run: the pump stays registered in the update list after teardown, and dispatching into the
-    /// unloaded native module throws on every remaining tick.
+    /// has run, which happens on the process-exit hook while the pump is still registered in the update
+    /// list, so any tick that still lands would dispatch into an unloaded native module.
     /// </summary>
     public static void RunCallbacks()
     {
