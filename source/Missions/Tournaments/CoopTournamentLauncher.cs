@@ -3,6 +3,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.UI;
+using GameInterface.Services.Time.UI;
 using HarmonyLib;
 using SandBox;
 using SandBox.Missions.MissionLogics;
@@ -41,22 +42,26 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         typeof(MissionOptionsComponent),
         typeof(HighlightsController),
         typeof(SandboxHighlightsController),
-        typeof(CoopTournamentController)
+        typeof(MissionMapTimeView),
+        typeof(CoopTournamentController),
     };
 
     private readonly IObjectManager objectManager;
     private readonly ITournamentGameInterface tournamentGameInterface;
     private readonly Func<CoopTournamentController> controllerFactory;
+    private readonly Func<MissionMapTimeView> mapTimeViewFactory;
 
     public CoopTournamentLauncher(
         Harmony harmony,
         IObjectManager objectManager,
         ITournamentGameInterface tournamentGameInterface,
-        Func<CoopTournamentController> controllerFactory)
+        Func<CoopTournamentController> controllerFactory,
+        Func<MissionMapTimeView> mapTimeViewFactory)
     {
         this.objectManager = objectManager;
         this.tournamentGameInterface = tournamentGameInterface;
         this.controllerFactory = controllerFactory;
+        this.mapTimeViewFactory = mapTimeViewFactory;
         TournamentCombatPatchInstaller.Install(harmony);
     }
 
@@ -145,6 +150,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
             new MissionOptionsComponent(),
             new HighlightsController(),
             new SandboxHighlightsController(),
+            mapTimeViewFactory(),
             coopController
         };
         if (!behaviors.Select(behavior => behavior.GetType()).SequenceEqual(BehaviorOrder))

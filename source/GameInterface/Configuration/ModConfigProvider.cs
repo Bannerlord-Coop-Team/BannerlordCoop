@@ -52,6 +52,10 @@ public readonly struct ModOptions
     public readonly float LooterPartySizeMultiplier { get; } = 1f;
     [ProtoMember(16)]
     public readonly LordDefectionRetryMode LordDefectionRetries { get; } = LordDefectionRetryMode.Vanilla;
+    [ProtoMember(17)]  
+    public readonly bool EnableHeroExecutions { get; } = true;
+    [ProtoMember(18)]
+    public readonly bool EnablePlayerClanMemberExecutions { get; } = false;
 
     public ModOptions(ModOptionsData modOptionsData)
     {
@@ -71,5 +75,7 @@ public readonly struct ModOptions
         MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;
         LooterPartySizeMultiplier = modOptionsData.LooterPartySizeMultiplier ?? LooterPartySizeMultiplier;
         LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;
+        EnableHeroExecutions = modOptionsData.EnableHeroExecutions ?? EnableHeroExecutions;
+        EnablePlayerClanMemberExecutions = modOptionsData.EnablePlayerClanMemberExecutions ?? EnablePlayerClanMemberExecutions;
     }
 }

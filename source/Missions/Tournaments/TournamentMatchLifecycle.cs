@@ -84,7 +84,7 @@ public class TournamentMatchLifecycle : IDisposable
             foreach (Agent agent in mission.Agents?.ToArray() ?? Array.Empty<Agent>())
             {
                 if (agent == null || agent.Mission != mission || !agent.IsActive()) continue;
-                if (agent.Team == Team.Invalid) continue;
+                if (agent.Team == Team.Invalid && !registry.TryGetAgentInfo(agent, out _)) continue;
 
                 // This is a withdrawal from the finished arena set, never a campaign casualty.
                 agent.FadeOut(true, true);

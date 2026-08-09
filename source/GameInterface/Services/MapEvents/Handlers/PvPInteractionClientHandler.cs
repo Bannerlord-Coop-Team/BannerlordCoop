@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -139,6 +139,8 @@ internal class PvPInteractionClientHandler : IHandler
     /// </summary>
     private void Handle_NetworkClosePvpEncounter(MessagePayload<NetworkClosePvpEncounter> payload)
     {
+        if (ModInformation.IsServer) return;
+
         var message = payload.What;
 
         GameThread.RunSafe(() => ClosePvpEncounter(message), context: nameof(Handle_NetworkClosePvpEncounter));
