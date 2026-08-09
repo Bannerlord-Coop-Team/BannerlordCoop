@@ -1,4 +1,4 @@
-using GameInterface;
+﻿using GameInterface;
 using GameInterface.Services.Kingdoms;
 using HarmonyLib;
 using System;
@@ -72,8 +72,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
             if (!voteManager.ShouldBlockLocalResolution(__instance)) return true;
 
-            voteManager.TryPublishFinalVote(__instance);
-            return false;
+            return !voteManager.TryPublishFinalVote(__instance);
         }
 
         [HarmonyPatch("OnFinalize")]
