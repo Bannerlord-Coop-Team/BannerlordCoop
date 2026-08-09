@@ -1359,14 +1359,32 @@ public class MapEventDebugCommands
 
         var encounter = PlayerEncounter.Current;
         var mainParty = PartyBase.MainParty;
+        var conversationManager = Campaign.Current?.ConversationManager;
+        var conversationOptions = conversationManager?.CurOptions == null
+            ? "none"
+            : string.Join("|", conversationManager.CurOptions.Select(option => option.Id));
+        var capturedHeroes = encounter?._capturedHeroes == null
+            ? "none"
+            : string.Join("|", encounter._capturedHeroes.Select(element => element.Character?.StringId ?? "none"));
+        var partyPrisonerHeroes = mainParty?.PrisonRoster == null
+            ? "none"
+            : string.Join("|", mainParty.PrisonRoster.GetTroopRoster()
+                .Where(element => element.Character?.IsHero == true)
+                .Select(element => element.Character.StringId));
         return $"Battle reward client state: encounter={encounter != null}, " +
                $"encounterState={(encounter == null ? "none" : encounter.EncounterState.ToString())}, " +
                $"activeState={GameStateManager.Current?.ActiveState?.GetType().Name ?? "none"}, " +
+               $"conversationActive={conversationManager?.IsConversationInProgress == true}, " +
+               $"conversationContext={Campaign.Current?.CurrentConversationContext.ToString() ?? "none"}, " +
+               $"conversationHero={Hero.OneToOneConversationHero?.StringId ?? "none"}, " +
+               $"conversationOptions={conversationOptions}, " +
+               $"capturedHeroes={capturedHeroes}, " +
                $"pendingItems={encounter?.RosterToReceiveLootItems.Sum(element => element.Amount) ?? 0}, " +
                $"pendingMembers={encounter?.RosterToReceiveLootMembers.TotalManCount ?? 0}, " +
                $"pendingPrisoners={encounter?.RosterToReceiveLootPrisoners.TotalManCount ?? 0}, " +
                $"partyItems={mainParty?.ItemRoster.Sum(element => element.Amount) ?? 0}, " +
-               $"partyPrisoners={mainParty?.PrisonRoster.TotalManCount ?? 0}.";
+               $"partyPrisoners={mainParty?.PrisonRoster.TotalManCount ?? 0}, " +
+               $"partyPrisonerHeroes={partyPrisonerHeroes}.";
     }
 
     // coop.debug.mapevent.battle_reward_fixture_restore
