@@ -1,16 +1,15 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.MapTracks.Messages;
 
 public readonly struct UpdateClientsMapTrackData : IEvent
 {
-    public readonly Dictionary<string, List<Track>> VisibleTrackChange;
+    public readonly Dictionary<string, List<MapTrackData>> VisibleTrackChange;
     public readonly bool IsRemovingTracks;
 
     public UpdateClientsMapTrackData(
-        Dictionary<string, List<Track>> visibleTrackChange,
+        Dictionary<string, List<MapTrackData>> visibleTrackChange,
         bool isRemovingTracks)
     {
         VisibleTrackChange = visibleTrackChange;

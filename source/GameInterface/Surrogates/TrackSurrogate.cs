@@ -50,6 +50,12 @@ internal class TrackSurrogate
     [ProtoMember(14)]
     public Track.PartyTypeEnum PartyType { get; set; }
 
+    // Map arrows (quest pointers) are tracks with no culture and no source party. Losing this flag
+    // turns them into ordinary tracks, which the model then titles, describes and colours as a
+    // spotted party.
+    [ProtoMember(15)]
+    public bool IsPointer { get; set; }
+
     public static implicit operator TrackSurrogate(Track track)
     {
         if (track is null)
@@ -70,7 +76,8 @@ internal class TrackSurrogate
             NumberOfPrisoners = track.NumberOfPrisoners,
             CreationTime = track.CreationTime,
             Life = track.Life,
-            PartyType = track.PartyType
+            PartyType = track.PartyType,
+            IsPointer = track.IsPointer
         };
     }
 
@@ -95,7 +102,8 @@ internal class TrackSurrogate
             NumberOfPrisoners = surrogate.NumberOfPrisoners,
             CreationTime = surrogate.CreationTime,
             Life = surrogate.Life,
-            PartyType = surrogate.PartyType
+            PartyType = surrogate.PartyType,
+            IsPointer = surrogate.IsPointer
         };
 
         return track;

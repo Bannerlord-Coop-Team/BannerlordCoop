@@ -69,7 +69,7 @@ internal class MapTracksHandler : IHandler
                 if (playerTrackChanges.Value.Count == 0) continue;
                 if (!TryGetPeerForParty(playerTrackChanges.Key, out var peer)) continue;
 
-                var playerVisibleTrackChanges = new Dictionary<string, List<Track>>
+                var playerVisibleTrackChanges = new Dictionary<string, List<MapTrackData>>
                 {
                     [playerTrackChanges.Key] = playerTrackChanges.Value
                 };
@@ -135,8 +135,9 @@ internal class MapTracksHandler : IHandler
             mapTracksCampaignBehaviorInterface.AddPlayerPartyKeys(obj.What.PlayerPartyId);
 
             // Track data is not kept as part of the save game even in vanilla Bannerlord.
-            // When a player joins, calculate the tracks for their party and update
-            var visibleTrackChanges = mapTracksCampaignBehaviorInterface.DetectTracksForPlayerParty(mapTracksBehavior, playerParty);
+            // When a player joins, calculate the tracks for their party and update.
+            // Separately initialize to avoid awarding duplicate scouting xp
+            var visibleTrackChanges = mapTracksCampaignBehaviorInterface.InitializePlayerVisibleTracks(mapTracksBehavior, playerParty);
 
             network.Send(obj.Who as NetPeer, new NetworkUpdateClientInitialVisibleTracks(visibleTrackChanges));
         });

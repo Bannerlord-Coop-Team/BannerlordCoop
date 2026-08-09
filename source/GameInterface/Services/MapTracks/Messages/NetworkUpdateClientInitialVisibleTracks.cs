@@ -1,7 +1,6 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using ProtoBuf;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.MapTracks.Messages;
 
@@ -9,9 +8,9 @@ namespace GameInterface.Services.MapTracks.Messages;
 internal readonly struct NetworkUpdateClientInitialVisibleTracks : ICommand
 {
     [ProtoMember(1)]
-    public readonly List<Track> VisibleTrackChanges;
+    public readonly List<MapTrackData> VisibleTrackChanges;
 
-    public NetworkUpdateClientInitialVisibleTracks(List<Track> visibleTrackChanges)
+    public NetworkUpdateClientInitialVisibleTracks(List<MapTrackData> visibleTrackChanges)
     {
         VisibleTrackChanges = visibleTrackChanges;
     }

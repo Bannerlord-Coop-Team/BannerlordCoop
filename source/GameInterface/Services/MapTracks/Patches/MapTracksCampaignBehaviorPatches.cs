@@ -4,6 +4,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapTracks.Patches;
 
@@ -62,19 +63,17 @@ internal class MapTracksCampaignBehaviorPatches
 
         return false;
     }
-}
 
-[HarmonyPatch(typeof(MapTracksCampaignBehavior.TrackPool))]
-internal class TrackPoolPatches
-{
-    [HarmonyPatch(nameof(MapTracksCampaignBehavior.TrackPool.RequestTrack))]
-    [HarmonyPostfix]
-    public static void RequestTrackPostfix(Track __result)
+    [HarmonyPatch(nameof(MapTracksCampaignBehavior.AddTrack))]
+    [HarmonyPrefix]
+    public static bool AddTrackPrefix(MapTracksCampaignBehavior __instance, MobileParty party, CampaignVec2 trackPosition, Vec2 trackDirection)
     {
-        if (ModInformation.IsClient || __result == null) return;
+        if (ModInformation.IsClient) return false;
 
-        __result.IsEnemy = false; // Server doesn't have enemies
-        __result.IsPointer = false; // Doesn't seem to be used in vanilla
-        __result.IsDetected = false; // Not used as more than player can detect a track
+        ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface);
+
+        mapTracksCampaignBehaviorInterface.AddTrack(__instance, party, trackPosition, trackDirection);
+
+        return false;
     }
 }
