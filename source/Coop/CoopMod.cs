@@ -22,6 +22,7 @@ using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -36,6 +37,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.ScreenSystem;
+using static TaleWorlds.Library.CommandLineFunctionality;
 using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop
@@ -81,6 +83,7 @@ namespace Coop
 
         private bool isServer = false;
         private bool isAutoConnect = false;
+        private bool deferClientAutoConnect = false;
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
@@ -99,6 +102,7 @@ namespace Coop
             }
 
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
+            deferClientAutoConnect = args.Any(a => a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase));
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
@@ -630,6 +634,8 @@ namespace Coop
 
             if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
             {
+                if (!isServer && deferClientAutoConnect) return;
+
                 _autoStarted = true;
                 try
                 {
@@ -651,6 +657,18 @@ namespace Coop
                     Logger.Error(ex, "[AutoConnect] Exception during auto-start");
                 }
             }
+        }
+
+        [CommandLineArgumentFunction("join", "coop.debug.connection")]
+        public static string JoinFromMainMenu(List<string> args)
+        {
+            if (ModInformation.IsServer) return "This command can only be run on a client.";
+            if (args.Count != 0) return "Usage: coop.debug.connection.join";
+            if (!(GameStateManager.Current?.ActiveState is InitialState)) return "The client is not at the main menu.";
+            if (Coop == null) return "The co-op experience is not initialized.";
+
+            Coop.StartAsClient();
+            return "Client join started.";
         }
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
