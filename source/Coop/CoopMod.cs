@@ -22,6 +22,7 @@ using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -36,6 +37,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.ScreenSystem;
+using static TaleWorlds.Library.CommandLineFunctionality;
 using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace Coop
@@ -81,6 +83,7 @@ namespace Coop
 
         private bool isServer = false;
         private bool isAutoConnect = false;
+        private bool deferClientAutoConnect;
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
@@ -99,6 +102,8 @@ namespace Coop
             }
 
             isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
+            deferClientAutoConnect = args.Any(a =>
+                a.Equals("/cooptestmanualjoin", StringComparison.OrdinalIgnoreCase));
 
             // GetFullCommandLineString splits on spaces, which would cut a quoted save
             // name apart; the managed-server arguments need real Windows arg parsing.
@@ -639,7 +644,8 @@ namespace Coop
             // The auto-load-save start path owns this process's startup.
             if (ManagedServerConfig.HasAutoLoadSave) return;
 
-            if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
+            if (isAutoConnect && !deferClientAutoConnect && !_autoStarted &&
+                GameStateManager.Current?.ActiveState is InitialState)
             {
                 _autoStarted = true;
                 try
@@ -683,4 +689,31 @@ namespace Coop
             base.OnAfterGameInitializationFinished(game, starterObject);
         }
     }
+
+#if DEBUG
+    internal static class JoinFixtureCommands
+    {
+        [CommandLineArgumentFunction("start", "coop.debug.connection")]
+        public static string Start(List<string> args)
+        {
+            if (args.Count != 0)
+            {
+                return "Usage: coop.debug.connection.start";
+            }
+
+            if (ModInformation.IsServer)
+            {
+                return "start must be run on a client.";
+            }
+
+            if (CoopMod.Coop.Running)
+            {
+                return "Client is already running a co-op session.";
+            }
+
+            CoopMod.Coop.StartAsClient();
+            return "Client co-op connection started.";
+        }
+    }
+#endif
 }
