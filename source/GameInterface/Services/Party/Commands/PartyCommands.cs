@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using Helpers;
 using SandBox.GauntletUI;
 using Serilog;
 using System.Collections.Generic;
@@ -137,6 +138,45 @@ internal class PartyCommands
             $"Movement order submitted for {party.StringId}.\n" +
             $"From: {current.X:R},{current.Y:R}\n" +
             $"Target: {target.X:R},{target.Y:R}";
+    }
+
+    /// <summary>
+    /// Issues the same local player-party engage order as clicking another party on the campaign map.
+    /// </summary>
+    [CommandLineArgumentFunction("engage_party", "coop.debug.mobileparty")]
+    public static string EngagePartyCommand(List<string> strings)
+    {
+        if (!ModInformation.IsClient) return "Command can only be run on a client.";
+        if (strings.Count != 1)
+            return "Usage: coop.debug.mobileparty.engage_party <targetPartyId>";
+
+        if (!TryGetObjectManager(out var objectManager)) return "Unable to resolve ObjectManager.";
+        if (!objectManager.TryGetObject(strings[0], out MobileParty targetParty))
+            return $"Party with id {strings[0]} not found";
+
+        var playerParty = Hero.MainHero?.PartyBelongedTo;
+        if (playerParty == null) return "The local player hero has no party.";
+        if (!playerParty.IsActive) return "The local player party is not active.";
+        if (playerParty.CurrentSettlement != null)
+            return $"The local player party is inside {playerParty.CurrentSettlement.StringId}.";
+        if (playerParty.MapEvent != null) return "The local player party is already in a map event.";
+        if (!targetParty.IsActive) return $"Target party {targetParty.StringId} is not active.";
+        if (ReferenceEquals(playerParty, targetParty)) return "The local player party cannot engage itself.";
+        if (targetParty.IsCurrentlyAtSea != playerParty.IsCurrentlyAtSea)
+            return "The local player party and target party are not in the same navigation state.";
+
+        if (!NavigationHelper.CanPlayerNavigateToPosition(targetParty.Position, out var navigationType))
+            return $"The local player party cannot navigate to {targetParty.StringId}.";
+
+        playerParty.SetMoveEngageParty(targetParty, navigationType);
+        MessageBroker.Instance.Publish(
+            typeof(PartyCommands),
+            new PartyBehaviorChangeAttempted(playerParty));
+
+        var targetPartyId = objectManager.TryGetId(targetParty, out string resolvedTargetPartyId)
+            ? resolvedTargetPartyId
+            : strings[0];
+        return $"Engage order submitted for {playerParty.StringId} targeting {targetPartyId}.";
     }
 
     /// <summary>
