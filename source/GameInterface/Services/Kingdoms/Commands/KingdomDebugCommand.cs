@@ -6,6 +6,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Handlers;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
@@ -600,6 +601,25 @@ public class KingdomDebugCommand
     [CommandLineArgumentFunction("vote_decision", "coop.debug.kingdom")]
     public static string VoteKingdomDecision(List<string> args)
     {
+        return VoteKingdomDecision(args, isFinal: false);
+    }
+
+#if DEBUG || DEBUGAUTOCONNECT
+    // coop.debug.kingdom.final_vote_decision
+    /// <summary>
+    /// Requests a final vote for a queued kingdom decision from the local client.
+    /// </summary>
+    /// <param name="args">kingdomId, 1-based decision index, 1-based outcome index or abstain, support weight</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("final_vote_decision", "coop.debug.kingdom")]
+    public static string FinalVoteKingdomDecision(List<string> args)
+    {
+        return VoteKingdomDecision(args, isFinal: true);
+    }
+#endif
+
+    private static string VoteKingdomDecision(List<string> args, bool isFinal)
+    {
         if (!TryGetKingdomDecisionByIndex(args, out Kingdom kingdom, out KingdomDecision decision, out int decisionIndex, out string message))
         {
             return message;
@@ -635,10 +655,58 @@ public class KingdomDebugCommand
             return "Unable to resolve kingdom id.";
         }
 
-        MessageBroker.Instance.Publish(decision, new KingdomDecisionVoteRequested(
-            new KingdomDecisionVoteData(kingdomId, decisionIndex, outcomeIndex, (int)supportWeight, isAbstain)));
+        string outcomeKey = null;
+        if (isFinal && !isAbstain &&
+            !TryGetOutcomeKey(decision, outcomeIndex, objectManager, out outcomeKey, out message))
+        {
+            return message;
+        }
 
-        return $"Requested vote for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}.";
+        MessageBroker.Instance.Publish(decision, new KingdomDecisionVoteRequested(
+            new KingdomDecisionVoteData(
+                kingdomId,
+                decisionIndex,
+                outcomeIndex,
+                (int)supportWeight,
+                isAbstain,
+                isFinal,
+                outcomeKey)));
+
+        string voteType = isFinal ? "final vote" : "vote";
+        return $"Requested {voteType} for {decision.GetType().Name}: outcome={args[2]}, support={supportWeight}.";
+    }
+
+    private static bool TryGetOutcomeKey(
+        KingdomDecision decision,
+        int outcomeIndex,
+        IObjectManager objectManager,
+        out string outcomeKey,
+        out string message)
+    {
+        outcomeKey = null;
+        var election = new CoopKingdomElection(decision);
+        election.SetupPlayerVoteElection();
+
+        if (outcomeIndex < 0 || outcomeIndex >= election._possibleOutcomes.Count)
+        {
+            message = $"Outcome index is out of range: {outcomeIndex + 1}.";
+            return false;
+        }
+
+        if (!ContainerProvider.TryResolve<IKingdomDecisionOutcomeResolver>(out var outcomeResolver))
+        {
+            message = "Unable to resolve KingdomDecisionOutcomeResolver";
+            return false;
+        }
+
+        if (!outcomeResolver.TryGetOutcomeKey(election._possibleOutcomes[outcomeIndex], objectManager, out outcomeKey))
+        {
+            message = $"Unable to resolve outcome key for outcome index: {outcomeIndex + 1}.";
+            return false;
+        }
+
+        message = string.Empty;
+        return true;
     }
 
     // coop.debug.kingdom.resolve_decision
