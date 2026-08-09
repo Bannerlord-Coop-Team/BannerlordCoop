@@ -37,6 +37,7 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IBattleSession session;
     private readonly IGuardedHitWindow guardedHitWindow;
     private readonly Func<Agent, bool?> mountAuthorityProbe;
+    private readonly Func<Agent, Vec2?> remoteGlobalVelocityProbe;
     private readonly object inboundDamageGate = new();
     private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
     private readonly Queue<PendingLocalDamage> pendingLocalDamage = new();
@@ -134,6 +135,8 @@ public class BattleDamageRouter : IBattleDamageRouter
         messageBroker.Subscribe<MissileReconstructed>(Handle_MissileReconstructed);
         mountAuthorityProbe = ProbeMountAuthority;
         BattleSpawnGate.MountAuthorityProbe = mountAuthorityProbe;
+        remoteGlobalVelocityProbe = ProbeRemoteGlobalVelocity;
+        BattleSpawnGate.RemoteGlobalVelocityProbe = remoteGlobalVelocityProbe;
     }
 
     public void Dispose()
@@ -157,6 +160,8 @@ public class BattleDamageRouter : IBattleDamageRouter
 
         if (BattleSpawnGate.MountAuthorityProbe == mountAuthorityProbe)
             BattleSpawnGate.MountAuthorityProbe = null;
+        if (BattleSpawnGate.RemoteGlobalVelocityProbe == remoteGlobalVelocityProbe)
+            BattleSpawnGate.RemoteGlobalVelocityProbe = null;
 
         guardedHitWindow.Dispose();
     }
@@ -166,6 +171,30 @@ public class BattleDamageRouter : IBattleDamageRouter
         if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(mount, out var info))
             return null;
         return info.CurrentAuthority != session.OwnControllerId;
+    }
+
+    private Vec2? ProbeRemoteGlobalVelocity(Agent agent)
+    {
+        if (agent == null)
+            return null;
+
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info))
+        {
+            Agent rider = agent.RiderAgent;
+            if (rider == null ||
+                !coopMissionComponent.AgentRegistry.TryGetAgentInfo(rider, out info))
+            {
+                return null;
+            }
+        }
+
+        if (info.CurrentAuthority == session.OwnControllerId)
+            return null;
+
+        return coopMissionComponent.AgentMovementHandler.Interpolator
+            .TryGetAuthoritativeGlobalVelocity(agent, out Vec2 globalVelocity)
+            ? globalVelocity
+            : null;
     }
 
     private void Handle_MissileReconstructed(MessagePayload<MissileReconstructed> payload)

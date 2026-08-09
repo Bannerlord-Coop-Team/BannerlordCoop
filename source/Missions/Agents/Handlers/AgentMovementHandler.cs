@@ -538,6 +538,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                (current.MovementDirection - previous.MovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
                (current.InputVector - previous.InputVector).LengthSquared > DirectionDeltaThresholdSq ||
                (current.LookDirection - previous.LookDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               current.HasGlobalVelocity != previous.HasGlobalVelocity ||
+               (current.GlobalVelocity - previous.GlobalVelocity).LengthSquared > DirectionDeltaThresholdSq ||
                Math.Abs(current.Speed - previous.Speed) > SpeedDeltaThreshold ||
                HasMountMovementChanged(previous.MountData, current.MountData);
     }
@@ -551,6 +553,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                (current.MountMovementDirection - previous.MountMovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
                (current.MountInputVector - previous.MountInputVector).LengthSquared > DirectionDeltaThresholdSq ||
                (current.MountLookDirection - previous.MountLookDirection).LengthSquared > DirectionDeltaThresholdSq ||
+               current.HasGlobalVelocity != previous.HasGlobalVelocity ||
+               (current.GlobalVelocity - previous.GlobalVelocity).LengthSquared > DirectionDeltaThresholdSq ||
                Math.Abs(current.MountSpeed - previous.MountSpeed) > SpeedDeltaThreshold ||
                current.MountAction0Index != previous.MountAction0Index ||
                current.MountAction0Flag != previous.MountAction0Flag ||

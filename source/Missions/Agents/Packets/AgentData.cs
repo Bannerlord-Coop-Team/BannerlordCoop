@@ -41,7 +41,9 @@ namespace Missions.Agents.Packets
             MovementDirection = agent.GetMovementDirection();
             LookDirection = agent.LookDirection;
             InputVector = agent.MovementInputVector;
-            Speed = agent.GetRealGlobalVelocity().AsVec2.Length;
+            GlobalVelocity = agent.GetRealGlobalVelocity().AsVec2;
+            HasGlobalVelocity = true;
+            Speed = GlobalVelocity.Length;
             MovementFlag = (uint)GetLocomotionMovementFlags(
                 agent.MovementFlags);
 
@@ -140,5 +142,11 @@ namespace Missions.Agents.Packets
         /// <summary>The owner's current translation and turn inputs.</summary>
         [ProtoMember(9)]
         public uint MovementFlag { get; }
+        /// <summary>The owner's horizontal world velocity used by native relative-speed damage.</summary>
+        [ProtoMember(10)]
+        public Vec2 GlobalVelocity { get; }
+        /// <summary>Distinguishes a valid stationary sample from a packet sent by an older peer.</summary>
+        [ProtoMember(11)]
+        public bool HasGlobalVelocity { get; }
     }
 }

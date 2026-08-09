@@ -1532,7 +1532,35 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void MountMovementPacket_RoundTripsHorizontalMountSpeed()
+    public void MovementPacket_RoundTripsHorizontalGlobalVelocity()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent source = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
+            sourceMirror.RealGlobalVelocity = new Vec3(3f, 4f, 12f);
+            var agentId = Guid.NewGuid();
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+
+            byte[] wire = serializer.Serialize(
+                new MovementPacket(
+                    new[] { agentId },
+                    new[] { new AgentData(source) }));
+            var result = Assert.IsType<MovementPacket>(serializer.Deserialize<IPacket>(wire));
+            AgentData data = Assert.Single(result.Agents);
+
+            Assert.Equal(5f, data.Speed);
+            Assert.Equal(new Vec2(3f, 4f), data.GlobalVelocity);
+            Assert.True(data.HasGlobalVelocity);
+        });
+    }
+
+    [Fact]
+    public void MountMovementPacket_RoundTripsHorizontalMountVelocity()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -1552,7 +1580,47 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                     new[] { new AgentMountData(sourceHorse, horseId) }));
             var result = Assert.IsType<MountMovementPacket>(serializer.Deserialize<IPacket>(wire));
 
-            Assert.Equal(5f, Assert.Single(result.Mounts).MountSpeed);
+            AgentMountData data = Assert.Single(result.Mounts);
+            Assert.Equal(5f, data.MountSpeed);
+            Assert.Equal(new Vec2(3f, 4f), data.GlobalVelocity);
+            Assert.True(data.HasGlobalVelocity);
+        });
+    }
+
+    [Fact]
+    public void CombatVelocityCache_TracksRiderAndMountOwnerSamples_UntilTheyAreStale()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            Agent sourceRider = SpawnRider(mock);
+            Agent sourceHorse = mock.SpawnMount(sourceRider);
+            Agent puppetRider = SpawnRider(mock);
+            Agent puppetHorse = mock.SpawnMount(puppetRider);
+            Assert.True(AgentMirror.TryGet(sourceRider, out var sourceRiderMirror));
+            Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+            sourceRiderMirror.RealGlobalVelocity = new Vec3(1f, 2f, 9f);
+            sourceHorseMirror.RealGlobalVelocity = new Vec3(3f, 4f, 12f);
+
+            var interpolator = new AgentPositionInterpolator();
+            interpolator.SetMountedRiderTarget(puppetRider, new AgentData(sourceRider));
+
+            Assert.True(interpolator.TryGetAuthoritativeGlobalVelocity(
+                puppetRider,
+                out Vec2 riderVelocity));
+            Assert.Equal(new Vec2(1f, 2f), riderVelocity);
+            Assert.True(interpolator.TryGetAuthoritativeGlobalVelocity(
+                puppetHorse,
+                out Vec2 horseVelocity));
+            Assert.Equal(new Vec2(3f, 4f), horseVelocity);
+
+            interpolator.Tick(0.51f);
+
+            Assert.False(interpolator.TryGetAuthoritativeGlobalVelocity(puppetRider, out _));
+            Assert.False(interpolator.TryGetAuthoritativeGlobalVelocity(puppetHorse, out _));
         });
     }
 

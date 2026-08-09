@@ -4,14 +4,17 @@ using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
 using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
+using MovementAgentData = Missions.Agents.Packets.AgentData;
 
 namespace E2E.Tests.Services.Missions;
 
@@ -24,6 +27,49 @@ namespace E2E.Tests.Services.Missions;
 public class BattleDamageMirrorTests : MissionTestEnvironment
 {
     public BattleDamageMirrorTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void CombatVelocityProbe_ExposesOnlyFreshRemoteVictimSamples()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "owner");
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            var controller = client.Resolve<CoopBattleController>();
+            var componentField = typeof(CoopMissionController).GetField(
+                "coopMissionComponent",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var component = Assert.IsAssignableFrom<ICoopMissionComponent>(
+                componentField?.GetValue(controller));
+            var registry = component.AgentRegistry;
+            Agent remoteVictim = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None));
+            Agent localVictim = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.AI));
+            Agent source = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop));
+            Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
+            sourceMirror.RealGlobalVelocity = new Vec3(3f, 4f, 8f);
+            Assert.True(registry.TryRegisterAgent("remote", Guid.NewGuid(), remoteVictim));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), localVictim));
+
+            MovementAgentData data = new MovementAgentData(source);
+            component.AgentMovementHandler.Interpolator.SetRiderTarget(remoteVictim, data);
+            component.AgentMovementHandler.Interpolator.SetRiderTarget(localVictim, data);
+            Func<Agent, Vec2?> probe = BattleSpawnGate.RemoteGlobalVelocityProbe;
+            Assert.NotNull(probe);
+
+            Assert.Equal(new Vec2(3f, 4f), probe(remoteVictim));
+            Assert.Null(probe(localVictim));
+
+            component.AgentMovementHandler.Interpolator.Tick(0.51f);
+
+            Assert.Null(probe(remoteVictim));
+            GC.KeepAlive(controller);
+        });
+    }
 
     [Theory]
     [InlineData(true, 0.25f, 90f)]

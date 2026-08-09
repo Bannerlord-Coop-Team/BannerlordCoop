@@ -52,7 +52,9 @@ namespace Missions.Agents.Packets
             MountAction0Progress = syntheticStationaryTurn
                 ? mountAction0TurnProgress ?? 0f
                 : mountAgent.GetCurrentActionProgress(0);
-            MountSpeed = mountAgent.GetRealGlobalVelocity().AsVec2.Length;
+            GlobalVelocity = mountAgent.GetRealGlobalVelocity().AsVec2;
+            HasGlobalVelocity = true;
+            MountSpeed = GlobalVelocity.Length;
             string renderedAction0Animation = null;
             float renderedAction0Speed = 1f;
             if (MountSpeed <= StationarySpeedThreshold)
@@ -503,5 +505,11 @@ namespace Missions.Agents.Packets
         /// <summary>Whether channel zero is being driven through the bounded synthetic turn timeline.</summary>
         [ProtoMember(20)]
         public bool MountAction0IsSyntheticTurn { get; }
+        /// <summary>The owner's horizontal world velocity used by native relative-speed damage.</summary>
+        [ProtoMember(21)]
+        public Vec2 GlobalVelocity { get; }
+        /// <summary>Distinguishes a valid stationary sample from a packet sent by an older peer.</summary>
+        [ProtoMember(22)]
+        public bool HasGlobalVelocity { get; }
     }
 }

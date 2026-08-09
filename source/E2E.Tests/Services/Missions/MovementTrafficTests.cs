@@ -117,6 +117,11 @@ public class MovementTrafficTests : MissionTestEnvironment
             Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
 
             network.NetworkSentPackets.Packets.Clear();
+            mirror.RealGlobalVelocity = new Vec3(0f, 1f, 0f);
+            component.AgentMovementHandler.PollMovement(0.025f);
+            Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+
+            network.NetworkSentPackets.Packets.Clear();
             mirror.RealGlobalVelocity = Vec3.Zero;
             component.AgentMovementHandler.PollMovement(0.025f);
             Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
@@ -80,6 +81,13 @@ public static class BattleSpawnGate
     /// rider-keyed gating. Process-global like the rest of this gate: one live battle per game process.
     /// </summary>
     public static Func<Agent, bool?> MountAuthorityProbe { get; set; }
+
+    /// <summary>
+    /// Set by the live battle's <c>BattleDamageRouter</c>: returns the latest fresh owner-reported horizontal
+    /// velocity only when the supplied victim is remotely authoritative. <c>null</c> leaves native combat
+    /// velocity untouched. Process-global like the rest of this gate: one live battle per game process.
+    /// </summary>
+    public static Func<Agent, Vec2?> RemoteGlobalVelocityProbe { get; set; }
 
     /// <summary>Temporarily exposes a routed missile's serialized weapon while vanilla calculates hit rewards.</summary>
     public static void RunWithRoutedAttackerWeapon(WeaponComponentData attackerWeapon, Action applyBlow)

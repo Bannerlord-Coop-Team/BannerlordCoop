@@ -32,6 +32,9 @@ public interface IAgentPositionInterpolator
         out Vec3 lookDirection,
         out long updateSequence);
 
+    /// <summary>Read a fresh horizontal world-velocity sample reported by this puppet's owner.</summary>
+    bool TryGetAuthoritativeGlobalVelocity(Agent agent, out Vec2 globalVelocity);
+
     /// <summary>[Game thread] Apply each tracked agent's latest native target frame.</summary>
     void Tick(float dt);
 
@@ -59,6 +62,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private const float RiderSnapDistance = 6f;
     private const float MountSnapDistance = 12f;
     private const float StaleTargetSeconds = 1f;
+    // Movement heartbeats are sent every 0.25 seconds. Allow one missed heartbeat, then let combat fall back
+    // to the victim's local native velocity rather than applying an old owner sample.
+    private const float CombatVelocityStaleSeconds = 0.5f;
     // Exponential ease rate for the mounted-puppet position follow: fraction MountedFollowRate*dt of the gap is
     // closed each frame, so it tracks the owner with a small lag and settles when the owner stops.
     private const float MountedFollowRate = 12f;
@@ -68,6 +74,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private readonly Dictionary<Agent, TargetFrame> _targets = new Dictionary<Agent, TargetFrame>();
     private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
         new Dictionary<Agent, long>();
+    private readonly Dictionary<Agent, VelocitySample> _globalVelocities =
+        new Dictionary<Agent, VelocitySample>();
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
@@ -76,6 +84,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     public void SetRiderTarget(Agent agent, AgentData data)
     {
         if (agent == null) return;
+        RecordGlobalVelocity(agent, data.HasGlobalVelocity, data.GlobalVelocity);
         _targets[agent] = new TargetFrame(
             data.Position,
             new ContinuousState(
@@ -94,6 +103,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         if (agent == null || data.MountData == null) return;
         Agent mount = agent.MountAgent;
+        RecordGlobalVelocity(agent, data.HasGlobalVelocity, data.GlobalVelocity);
+        RecordGlobalVelocity(
+            mount,
+            data.MountData.HasGlobalVelocity,
+            data.MountData.GlobalVelocity);
         _targets[agent] = new TargetFrame(
             data.Position,
             new ContinuousState(
@@ -116,6 +130,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     public void SetMountTarget(Agent mountAgent, AgentMountData data)
     {
         if (mountAgent == null) return;
+        RecordGlobalVelocity(mountAgent, data.HasGlobalVelocity, data.GlobalVelocity);
         _targets[mountAgent] = new TargetFrame(
             data.MountPosition,
             new ContinuousState(
@@ -155,6 +170,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
         _targets.Remove(agent);
         _mountedGuardProcessedSequences.Remove(agent);
+        _globalVelocities.Remove(agent);
     }
 
     public bool TryGetTargetMovementFlags(
@@ -202,10 +218,47 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         return true;
     }
 
+    public bool TryGetAuthoritativeGlobalVelocity(Agent agent, out Vec2 globalVelocity)
+    {
+        globalVelocity = Vec2.Zero;
+        if (agent == null ||
+            !_globalVelocities.TryGetValue(agent, out VelocitySample sample))
+        {
+            return false;
+        }
+
+        if (elapsed - sample.UpdatedAt > CombatVelocityStaleSeconds)
+        {
+            _globalVelocities.Remove(agent);
+            return false;
+        }
+
+        globalVelocity = sample.GlobalVelocity;
+        return true;
+    }
+
     public void Clear()
     {
         _targets.Clear();
         _mountedGuardProcessedSequences.Clear();
+        _globalVelocities.Clear();
+    }
+
+    private void RecordGlobalVelocity(Agent agent, bool hasGlobalVelocity, Vec2 globalVelocity)
+    {
+        if (agent == null) return;
+
+        if (!hasGlobalVelocity ||
+            float.IsNaN(globalVelocity.X) ||
+            float.IsInfinity(globalVelocity.X) ||
+            float.IsNaN(globalVelocity.Y) ||
+            float.IsInfinity(globalVelocity.Y))
+        {
+            _globalVelocities.Remove(agent);
+            return;
+        }
+
+        _globalVelocities[agent] = new VelocitySample(globalVelocity, elapsed);
     }
 
     private long GetNextUpdateSequence()
@@ -431,6 +484,18 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         public ContinuousState MountedRiderState { get; }
         public float UpdatedAt { get; }
         public long UpdateSequence { get; }
+    }
+
+    private readonly struct VelocitySample
+    {
+        public VelocitySample(Vec2 globalVelocity, float updatedAt)
+        {
+            GlobalVelocity = globalVelocity;
+            UpdatedAt = updatedAt;
+        }
+
+        public Vec2 GlobalVelocity { get; }
+        public float UpdatedAt { get; }
     }
 
     private readonly struct ContinuousState
