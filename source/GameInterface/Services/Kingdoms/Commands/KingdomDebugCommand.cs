@@ -27,6 +27,7 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
+using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Settlements;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -566,6 +567,91 @@ public class KingdomDebugCommand
     }
 
 #if DEBUG || DEBUGAUTOCONNECT
+    // coop.debug.kingdom.annex_settlement
+    /// <summary>
+    /// Requests a settlement through the real Kingdom settlement view model.
+    /// </summary>
+    /// <param name="args">settlementId</param>
+    /// <returns>result message</returns>
+    [CommandLineArgumentFunction("annex_settlement", "coop.debug.kingdom")]
+    public static string AnnexSettlement(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.kingdom.annex_settlement <settlementId>";
+        }
+        if (!ModInformation.IsClient)
+        {
+            return "This command can only be run on a client.";
+        }
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+        if (!objectManager.TryGetObject(args[0], out Settlement settlement))
+        {
+            return $"ID: '{args[0]}' not found";
+        }
+        if (!(ScreenManager.TopScreen is MapScreen mapScreen))
+        {
+            return "The campaign map is not active.";
+        }
+
+        Kingdom playerKingdom = Clan.PlayerClan?.Kingdom;
+        if (playerKingdom == null)
+        {
+            return "The local player is not in a kingdom.";
+        }
+        if (settlement.MapFaction != playerKingdom)
+        {
+            return $"{settlement.Name} is not in the local player's kingdom.";
+        }
+        if (playerKingdom.UnresolvedDecisions.Any(candidate =>
+                candidate is SettlementClaimantPreliminaryDecision preliminaryDecision &&
+                preliminaryDecision.Settlement == settlement))
+        {
+            return $"A preliminary claimant decision already exists for {settlement.Name}.";
+        }
+
+        mapScreen.OpenKingdom();
+        if (!(ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen))
+        {
+            return "The real Kingdom screen did not open.";
+        }
+
+        KingdomSettlementVM settlementVm = kingdomScreen.DataSource?.Settlement;
+        if (settlementVm == null)
+        {
+            return "The Kingdom settlement view model is unavailable.";
+        }
+
+        settlementVm.SelectSettlement(settlement);
+        if (settlementVm.CurrentSelectedSettlement?.Settlement != settlement)
+        {
+            return $"The real Kingdom settlement UI did not select {settlement.Name}.";
+        }
+        if (!settlementVm.CanAnnexCurrentSettlement)
+        {
+            return $"The real Kingdom settlement UI cannot request {settlement.Name}: " +
+                   $"influence={Clan.PlayerClan.Influence}, annexCost={settlementVm.AnnexCost}.";
+        }
+
+        settlementVm.ExecuteAnnex();
+        SettlementClaimantPreliminaryDecision decision = playerKingdom.UnresolvedDecisions
+            .OfType<SettlementClaimantPreliminaryDecision>()
+            .SingleOrDefault(candidate => candidate.Settlement == settlement);
+        DecisionItemBaseVM decisionItem = kingdomScreen.DataSource?.Decision?.CurrentDecision;
+        if (decision == null || decisionItem?.KingdomDecisionMaker?._decision != decision || !decisionItem.IsActive)
+        {
+            return $"The real request-city action did not activate a preliminary decision for {settlement.Name}.";
+        }
+
+        return $"Requested {settlement.Name} through real KingdomSettlementVM.ExecuteAnnex: " +
+               $"annexCost={settlementVm.AnnexCost}, influence={Clan.PlayerClan.Influence}, " +
+               $"decisionActive={decisionItem.IsActive}, " +
+               $"playerRole={(decisionItem.IsPlayerSupporter ? "Supporter" : "Chooser")}.";
+    }
+
     // coop.debug.kingdom.final_vote_decision
     /// <summary>
     /// Requests a final vote for a queued kingdom decision from the local client.
@@ -608,45 +694,30 @@ public class KingdomDebugCommand
                 return "The local player is not in a kingdom.";
             }
 
-            KingdomDecision nextDecision = playerKingdom.UnresolvedDecisions
-                .FirstOrDefault(candidate => candidate.NotifyPlayer &&
-                                             candidate.IsEnforced &&
-                                             candidate.IsPlayerParticipant &&
-                                             !candidate.ShouldBeCancelled());
-            if (nextDecision != decision)
+            if (decision.Kingdom != playerKingdom || !decision.IsPlayerParticipant || decision.ShouldBeCancelled())
             {
-                string nextDecisionType = nextDecision?.GetType().Name ?? "none";
-                return $"The next map decision is {nextDecisionType}, expected {decision.GetType().Name}.";
+                return $"{decision.GetType().Name} is not an active decision for the local player.";
             }
 
-            InquiryData mapInquiry = null;
-            void CaptureInquiry(InquiryData data, bool pauseGameActiveState, bool prioritize)
+            mapScreen.OpenKingdom();
+            if (!(ScreenManager.TopScreen is GauntletKingdomScreen openedKingdomScreen))
             {
-                mapInquiry = data;
+                return "The real Kingdom screen did not open.";
             }
 
-            InformationManager.OnShowInquiry += CaptureInquiry;
-            try
+            KingdomDecisionsVM openedDecisions = openedKingdomScreen.DataSource?.Decision;
+            if (openedDecisions == null)
             {
-                mapScreen.OnHourlyTick();
-                mapScreen.ShowNextKingdomDecisionPopup();
+                return "The Kingdom decision view model is unavailable.";
             }
-            finally
+            openedDecisions.HandleDecision(decision);
+            if (openedDecisions._queryData?.AffirmativeAction == null || !InformationManager.IsAnyInquiryActive())
             {
-                InformationManager.OnShowInquiry -= CaptureInquiry;
-            }
-
-            string expectedText = decision.GetChooseTitle().ToString();
-            if (mapInquiry?.AffirmativeAction == null ||
-                !string.Equals(mapInquiry.Text, expectedText, StringComparison.Ordinal))
-            {
-                InformationManager.HideInquiry();
-                return $"The real map inquiry did not target {decision.GetType().Name}.";
+                return $"The real Kingdom decision inquiry did not open for {decision.GetType().Name}.";
             }
 
-            mapInquiry.AffirmativeAction();
-            InformationManager.HideInquiry();
-            return $"Entered the real Kingdom decision screen for {decision.GetType().Name} through the map inquiry.";
+            return $"Entered the real Kingdom decision screen for {decision.GetType().Name} " +
+                   "through KingdomDecisionsVM.HandleDecision.";
         }
         if (!(ScreenManager.TopScreen is GauntletKingdomScreen kingdomScreen))
         {
