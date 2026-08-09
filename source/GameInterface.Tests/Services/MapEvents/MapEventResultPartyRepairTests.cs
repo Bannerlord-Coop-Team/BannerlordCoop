@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.MapEvents.Patches;
+using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -49,6 +50,27 @@ namespace GameInterface.Tests.Services.MapEvents
                 party => Assert.Same(firstDefender, party),
                 party => Assert.Same(secondDefender, party));
             Assert.Collection(mapEvent.AttackerSide.Parties, party => Assert.Same(attacker, party));
+        }
+
+        [Fact]
+        public void PartyInvalidatedDuringXp_RemovesBeforeRenown()
+        {
+            MapEventParty defender = CreateResolvedParty();
+            MapEventParty attacker = CreateResolvedParty();
+            MapEvent mapEvent = CreateMapEvent(CreateSide(defender), CreateSide(attacker));
+            int renownPartyCount = 0;
+            Action<MapEventSide>[] commitPhases =
+            {
+                side => side.Parties[0].Party = null,
+                side => renownPartyCount += side.Parties.Count
+            };
+
+            int removedPartyCount = MapEventPatches.CommitCalculatedMapEventResults(mapEvent, commitPhases);
+
+            Assert.Equal(2, removedPartyCount);
+            Assert.Equal(0, renownPartyCount);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
         }
 
         private static MapEvent CreateMapEvent(MapEventSide defender, MapEventSide attacker)

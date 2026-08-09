@@ -13,6 +13,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -29,6 +30,14 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class MapEventPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
+    private static readonly Action<MapEventSide>[] CommitResultPhases =
+    {
+        side => side.CommitXpGains(),
+        side => side.CommitRenownChanges(),
+        side => side.CommitInfluenceChanges(),
+        side => side.CommitMoraleChanges(),
+        side => side.CommitGoldChanges()
+    };
 
     [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
     [HarmonyPostfix]
@@ -170,15 +179,6 @@ internal class MapEventPatches
         if (ModInformation.IsClient)
             return false;
 
-        int removedPartyCount = RemovePartiesWithoutParty(__instance);
-        if (removedPartyCount > 0)
-        {
-            Logger.Error(
-                "Removed {PartyCount} map event parties without a Party from {MapEventId} before calculating battle results",
-                removedPartyCount,
-                __instance.StringId);
-        }
-
         // Need to calculate map event results before committing changes
         __instance.CalculateMapEventResults();
 
@@ -228,12 +228,45 @@ internal class MapEventPatches
 
     [HarmonyPatch("CommitCalculatedMapEventResults")]
     [HarmonyPrefix]
-    private static bool Prefix_CommitCalculatedMapEventResults()
+    private static bool Prefix_CommitCalculatedMapEventResults(MapEvent __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
 
-        return ModInformation.IsServer;
+        if (ModInformation.IsClient)
+            return false;
+
+        int removedPartyCount = CommitCalculatedMapEventResults(__instance, CommitResultPhases);
+        if (removedPartyCount > 0)
+        {
+            Logger.Error(
+                "Removed {PartyCount} map event parties without a Party from {MapEventId} before committing battle results",
+                removedPartyCount,
+                __instance.StringId);
+        }
+
+        return false;
+    }
+
+    internal static int CommitCalculatedMapEventResults(
+        MapEvent mapEvent,
+        IReadOnlyList<Action<MapEventSide>> commitPhases)
+    {
+        int removedPartyCount = RemovePartiesWithoutParty(mapEvent);
+
+        foreach (MapEventSide side in mapEvent._sides)
+        {
+            if (side == null)
+                continue;
+
+            foreach (Action<MapEventSide> commitPhase in commitPhases)
+            {
+                commitPhase(side);
+                removedPartyCount += RemovePartiesWithoutParty(mapEvent);
+            }
+        }
+
+        return removedPartyCount;
     }
 
     [HarmonyPatch(nameof(MapEvent.Update))]
