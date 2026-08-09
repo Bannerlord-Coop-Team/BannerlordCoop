@@ -252,18 +252,18 @@ jobs:
 
       - name: Install pinned R2 uploader
         env:
-          RCLONE_VERSION: 1.70.3
-          RCLONE_ARCHIVE_SHA256: 7d69057e69385f6514a9684c7eaa424d972096b130284bb34dd967c4ed4f9dad
+          PINNED_RCLONE_VERSION: 1.70.3
+          PINNED_RCLONE_ARCHIVE_SHA256: 7d69057e69385f6514a9684c7eaa424d972096b130284bb34dd967c4ed4f9dad
         run: |
           set -eu
           archive="$RUNNER_TEMP/rclone.zip"
           curl --fail --silent --show-error --location \
-            "https://downloads.rclone.org/v$RCLONE_VERSION/rclone-v$RCLONE_VERSION-linux-amd64.zip" \
+            "https://downloads.rclone.org/v$PINNED_RCLONE_VERSION/rclone-v$PINNED_RCLONE_VERSION-linux-amd64.zip" \
             --output "$archive"
-          echo "$RCLONE_ARCHIVE_SHA256  $archive" | sha256sum -c -
+          echo "$PINNED_RCLONE_ARCHIVE_SHA256  $archive" | sha256sum -c -
           unzip -q "$archive" -d "$RUNNER_TEMP"
           install -m 0755 \
-            "$RUNNER_TEMP/rclone-v$RCLONE_VERSION-linux-amd64/rclone" \
+            "$RUNNER_TEMP/rclone-v$PINNED_RCLONE_VERSION-linux-amd64/rclone" \
             "$RUNNER_TEMP/rclone"
           "$RUNNER_TEMP/rclone" version
 
