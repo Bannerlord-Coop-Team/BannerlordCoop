@@ -78,10 +78,7 @@ internal class TradeAgreementsHandler : IHandler
 
         if (!TryPackTradeAgreementData(data.TradeAgreement, out var tradeAgreementData)) return;
 
-        if (!objectManager.TryGetIdWithLogging(data.Settlement, out var settlementId)) return;
-        if (!objectManager.TryGetIdWithLogging(data.MobileParty, out var mobilePartyId)) return;
-
-        var message = new NetworkUpdateTradeAgreement(tradeAgreementData, settlementId, mobilePartyId);
+        var message = new NetworkUpdateTradeAgreement(tradeAgreementData);
         network.SendAll(message);
     }
 
@@ -95,12 +92,11 @@ internal class TradeAgreementsHandler : IHandler
             if (!TryGetTradeAgreementsBehavior(out var tradeAgreementsBehavior)) return;
 
             if (!TryUnpackTradeAgreementData(data.TradeAgreementData, out var tradeAgreement)) return;
-            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.TradeAgreementData.Kingdom1Id, out var kingdom1)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(data.TradeAgreementData.Kingdom2Id, out var kingdom2)) return;
 
-            if (!tradeAgreementsBehavior.TryGetTradeAgreement((Kingdom)settlement.MapFaction, (Kingdom)mobileParty.MapFaction, out var agreementIndex)) return;
+            if (!tradeAgreementsBehavior.TryGetTradeAgreement(kingdom1, kingdom2, out var agreementIndex)) return;
 
-            Kingdom kingdom = (Kingdom)settlement.MapFaction;
             tradeAgreementsBehavior._tradeAgreements[agreementIndex] = tradeAgreement;
         });
     }

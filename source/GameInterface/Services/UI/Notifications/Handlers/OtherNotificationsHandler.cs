@@ -107,8 +107,8 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Unsubscribe<NotifyHeroJoinedParty>(Handle_NotifyHeroJoinedParty);
         messageBroker.Unsubscribe<NetworkNotifyHeroJoinedParty>(Handle_NetworkNotifyHeroJoinedParty);
 
-        messageBroker.Subscribe<NotifyTributePaymentEnded>(Handle_NotifyTributePaymentEnded);
-        messageBroker.Subscribe<NetworkNotifyTributePaymentEnded>(Handle_NetworkNotifyTributePaymentEnded);
+        messageBroker.Unsubscribe<NotifyTributePaymentEnded>(Handle_NotifyTributePaymentEnded);
+        messageBroker.Unsubscribe<NetworkNotifyTributePaymentEnded>(Handle_NetworkNotifyTributePaymentEnded);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }

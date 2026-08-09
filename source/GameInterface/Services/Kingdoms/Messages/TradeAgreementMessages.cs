@@ -1,25 +1,17 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Kingdoms.Messages;
 
 public readonly struct UpdateTradeAgreement : IEvent
 {
     public readonly TradeAgreementsCampaignBehavior.TradeAgreement TradeAgreement;
-    public readonly Settlement Settlement;
-    public readonly MobileParty MobileParty;
 
     public UpdateTradeAgreement(
-        TradeAgreementsCampaignBehavior.TradeAgreement tradeAgreement,
-        Settlement settlement,
-        MobileParty mobileParty)
+        TradeAgreementsCampaignBehavior.TradeAgreement tradeAgreement)
     {
         TradeAgreement = tradeAgreement;
-        Settlement = settlement;
-        MobileParty = mobileParty;
     }
 }
 

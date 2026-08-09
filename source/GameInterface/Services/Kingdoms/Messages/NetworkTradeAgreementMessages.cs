@@ -10,20 +10,10 @@ internal readonly struct NetworkUpdateTradeAgreement : ICommand
     [ProtoMember(1)]
     public readonly TradeAgreementData TradeAgreementData;
 
-    [ProtoMember(2)]
-    public readonly string SettlementId;
-
-    [ProtoMember(3)]
-    public readonly string MobilePartyId;
-
     public NetworkUpdateTradeAgreement(
-        TradeAgreementData tradeAgreementData,
-        string settlementId,
-        string mobilePartyId)
+        TradeAgreementData tradeAgreementData)
     {
         TradeAgreementData = tradeAgreementData;
-        SettlementId = settlementId;
-        MobilePartyId = mobilePartyId;
     }
 }
 

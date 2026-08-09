@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -15,6 +16,8 @@ internal class TributesCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnClanEarnedGoldFromTributePrefix(Clan clan, IFaction payerFaction)
     {
+        if (ModInformation.IsClient) return false;
+
         if (clan == null) return false;
 
         StanceLink stanceWith = clan.MapFaction.GetStanceWith(payerFaction);

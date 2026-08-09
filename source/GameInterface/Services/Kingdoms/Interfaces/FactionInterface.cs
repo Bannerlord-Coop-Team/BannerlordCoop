@@ -33,7 +33,7 @@ public class FactionInterface : IFactionInterface
             faction = clan;
             return true;
         }
-        Logger.Debug("Faction not found in FactionStanceHandler with id: {id}", id);
+        Logger.Debug("Faction not found in IFactionInterface with id: {id}", id);
         faction = null;
         return false;
     }

@@ -4,8 +4,6 @@ using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
-using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -15,24 +13,38 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Kingdoms.Patches;
 
 [HarmonyPatch(typeof(TradeAgreementsCampaignBehavior))]
-internal class DisableTradeAgreementsCampaignBehavior
-{
-    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
-    {
-        AccessTools.Method(typeof(TradeAgreementsCampaignBehavior), nameof(TradeAgreementsCampaignBehavior.OnKingdomDestroyed)),
-        AccessTools.Method(typeof(TradeAgreementsCampaignBehavior), nameof(TradeAgreementsCampaignBehavior.WarDeclared)),
-        AccessTools.Method(typeof(TradeAgreementsCampaignBehavior), nameof(TradeAgreementsCampaignBehavior.SettlementEntered)),
-        AccessTools.Method(typeof(TradeAgreementsCampaignBehavior), nameof(TradeAgreementsCampaignBehavior.MakeTradeAgreement)),
-        AccessTools.Method(typeof(TradeAgreementsCampaignBehavior), nameof(TradeAgreementsCampaignBehavior.EndTradeAgreement)),
-        AccessTools.Method(typeof(TradeAgreementsCampaignBehavior), nameof(TradeAgreementsCampaignBehavior.OnTradeGoldDistributedInKingdom)),
-    };
-
-    static bool Prefix() => CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
-}
-
-[HarmonyPatch(typeof(TradeAgreementsCampaignBehavior))]
 internal class TradeAgreementsCampaignBehaviorPatches
 {
+    [HarmonyPatch(nameof(TradeAgreementsCampaignBehavior.OnKingdomDestroyed))]
+    [HarmonyPrefix]
+    public static bool OnKingdomDestroyedPrefix() =>
+        CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(TradeAgreementsCampaignBehavior.WarDeclared))]
+    [HarmonyPrefix]
+    public static bool WarDeclaredPrefix() =>
+        CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(TradeAgreementsCampaignBehavior.SettlementEntered))]
+    [HarmonyPrefix]
+    public static bool SettlementEnteredPrefix() =>
+        CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(TradeAgreementsCampaignBehavior.MakeTradeAgreement))]
+    [HarmonyPrefix]
+    public static bool MakeTradeAgreementPrefix() => 
+        CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(TradeAgreementsCampaignBehavior.EndTradeAgreement))]
+    [HarmonyPrefix]
+    public static bool EndTradeAgreementPrefix() => 
+        CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(TradeAgreementsCampaignBehavior.OnTradeGoldDistributedInKingdom))]
+    [HarmonyPrefix]
+    public static bool OnTradeGoldDistributedInKingdomPrefix() => 
+        CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
+
     [HarmonyPatch(nameof(TradeAgreementsCampaignBehavior.SettlementEntered))]
     [HarmonyPostfix]
     public static void SettlementEnteredPostfix(TradeAgreementsCampaignBehavior __instance, MobileParty party, Settlement settlement, Hero hero)
@@ -52,7 +64,7 @@ internal class TradeAgreementsCampaignBehaviorPatches
             && __instance.TryGetTradeAgreement((Kingdom)settlement.MapFaction, (Kingdom)party.MapFaction, out var index)
             && !party.IsFleeing())
         {
-            var message = new UpdateTradeAgreement(__instance._tradeAgreements[index], settlement, party);
+            var message = new UpdateTradeAgreement(__instance._tradeAgreements[index]);
             MessageBroker.Instance.Publish(__instance, message);
         }
     }
@@ -64,10 +76,12 @@ internal class TradeAgreementsCampaignBehaviorPatches
         // Vanilla uses a check for player hostility to apply penalty for player.
         // Player hero that caused the war to be declared isn't available here.
         Hero hero = kingdom.Leader;
-        ChangeRelationAction.ApplyRelationChangeBetweenHeroes(hero, otherKingdom.Leader, -50, true);
+
+        // TODO: Replace otherKingdom.Leader relation penalty with actual client declaring war
+        //ChangeRelationAction.ApplyRelationChangeBetweenHeroes(hero, otherKingdom.Leader, -50, true);
         if (hero.IsPlayerHero())
         {
-            // TODO
+            // TODO: Traits not synced yet
             //TraitLevelingHelper.OnTradeAgreementBroken();
         }
 
@@ -88,7 +102,7 @@ internal class TradeAgreementsCampaignBehaviorPatches
     }
 
     [HarmonyPatch(nameof(TradeAgreementsCampaignBehavior.OnTradeGoldDistributedInKingdom))]
-    [HarmonyPrefix]
+    [HarmonyPostfix]
     public static void OnTradeGoldDistributedInKingdomPostfix(TradeAgreementsCampaignBehavior __instance, Kingdom kingdom1, Kingdom kingdom2, Clan clan, int share)
     {
         if (ModInformation.IsClient) return;
