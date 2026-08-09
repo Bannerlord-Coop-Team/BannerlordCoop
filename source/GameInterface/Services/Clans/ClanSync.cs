@@ -23,8 +23,8 @@ internal class ClanSync : IAutoSync
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanDebtToKingdom)));
 
         // Properties
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InformalName)));
+        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
+        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InformalName)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Culture)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LastFactionChangeTime)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.AutoRecruitmentExpenses)));
