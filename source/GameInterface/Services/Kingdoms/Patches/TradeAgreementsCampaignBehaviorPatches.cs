@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -75,15 +74,19 @@ internal class TradeAgreementsCampaignBehaviorPatches
     {
         // Vanilla uses a check for player hostility to apply penalty for player.
         // Player hero that caused the war to be declared isn't available here.
-        Hero hero = kingdom.Leader;
-
-        // TODO: Replace otherKingdom.Leader relation penalty with actual client declaring war
-        //ChangeRelationAction.ApplyRelationChangeBetweenHeroes(hero, otherKingdom.Leader, -50, true);
-        if (hero.IsPlayerHero())
+        var targetHero = kingdom.Leader;
+        if (detail == DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility)
         {
-            // TODO: Traits not synced yet
+            // TODO: Apply the penalty to the hero of the client that declared the war once it is passed down here
+            // Traits are not synced yet either.
+            //targetHero = playerHero;
             //TraitLevelingHelper.OnTradeAgreementBroken();
+            return false;
         }
+
+        if (kingdom.Leader == null || otherKingdom.Leader == null) return false;
+
+        ChangeRelationAction.ApplyRelationChangeBetweenHeroes(targetHero, otherKingdom.Leader, -50, true);
 
         return false;
     }

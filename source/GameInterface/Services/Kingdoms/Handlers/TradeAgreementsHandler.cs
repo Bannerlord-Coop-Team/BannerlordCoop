@@ -9,8 +9,6 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.CampaignBehaviors.TradeAgreementsCampaignBehavior;
 
 namespace GameInterface.Services.Kingdoms.Handlers;
@@ -156,6 +154,14 @@ internal class TradeAgreementsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.Kingdom2Id, out var kingdom2)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
 
+            if (!tradeAgreementsBehavior.TryGetTradeAgreement(kingdom1, kingdom2, out var _))
+            {
+                Logger.Debug("Skipping trade gold distribution between {kingdom1} and {kingdom2} because the agreement is not present.",
+                    kingdom1.Name,
+                    kingdom2.Name);
+                return;
+            }
+
             using (new AllowedThread())
             {
                 tradeAgreementsBehavior.OnTradeGoldDistributedInKingdom(kingdom1, kingdom2, clan, data.Share);
@@ -183,6 +189,14 @@ internal class TradeAgreementsHandler : IHandler
             if (!TryGetTradeAgreementsBehavior(out var tradeAgreementsBehavior)) return;
 
             if (!TryUnpackTradeAgreementData(data.NewTradeAgreementData, out var newTradeAgreement)) return;
+
+            if (tradeAgreementsBehavior.TryGetTradeAgreement(newTradeAgreement.Kingdom1, newTradeAgreement.Kingdom2, out var _))
+            {
+                Logger.Debug("Skipping forming new trade agreement between {kingdom1} and {kingdom2} because an agreement is already present.",
+                    newTradeAgreement.Kingdom1.Name,
+                    newTradeAgreement.Kingdom1.Name);
+                return;
+            }
 
             tradeAgreementsBehavior._tradeAgreements.Add(newTradeAgreement);
         });

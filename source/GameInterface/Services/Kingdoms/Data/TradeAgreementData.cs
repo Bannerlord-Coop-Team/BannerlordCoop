@@ -2,7 +2,7 @@
 
 namespace GameInterface.Services.Kingdoms.Data;
 
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public readonly struct TradeAgreementData
 {
     [ProtoMember(1)]
