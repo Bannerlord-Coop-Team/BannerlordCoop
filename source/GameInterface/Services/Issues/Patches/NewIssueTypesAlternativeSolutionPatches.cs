@@ -49,7 +49,6 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void GangLeaderNeedsRecruitsRegisterEventsPostfix(GangLeaderNeedsRecruitsIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Tier 1 Group 1B additions - same shared choke point, no new per-type file needed.
     [HarmonyPatch(typeof(LandLordNeedsManualLaborersIssueBehavior), nameof(LandLordNeedsManualLaborersIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void LandLordNeedsManualLaborersRegisterEventsPostfix(LandLordNeedsManualLaborersIssueBehavior __instance) =>
@@ -65,11 +64,6 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void LordNeedsGarrisonTroopsRegisterEventsPostfix(LordNeedsGarrisonTroopsIssueQuestBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Tier 1 Group 1C/1D additions - same shared choke point, no new per-type file needed. RuralNotableInnAndOut/
-    // ProdigalSon/TheSpyParty are SandBox.dll types (this project's first cross-assembly issue types) - the
-    // compile-time-typed [HarmonyPatch(typeof(...))] attribute works identically regardless of which assembly
-    // the behavior lives in, since GameInterface.csproj already references SandBox.dll directly (see
-    // DisableAllIssueBehaviorsExceptAllowlist's doc comment).
     [HarmonyPatch(typeof(NearbyBanditBaseIssueBehavior), nameof(NearbyBanditBaseIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void NearbyBanditBaseRegisterEventsPostfix(NearbyBanditBaseIssueBehavior __instance) =>
@@ -95,112 +89,56 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     private static void TheSpyPartyRegisterEventsPostfix(SandBox.Issues.TheSpyPartyIssueQuestBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Village Needs Grain Seeds - same shared choke point, no new per-type file needed.
-    // HeadmanNeedsGrainIssue.AlternativeSolutionScaleFlags is Duration only (confirmed against the decompiled
-    // source - no FailureRisk flag), so like every type above except CapturedByBountyHunters, its alternative
-    // solution always succeeds deterministically: AlternativeSolutionEndWithFailureConsequence exists on the
-    // Issue class but is unreachable in practice (IssueBase._failureChance only becomes nonzero when
-    // AlternativeSolutionScaleFlags has FailureRisk), so routing it through this generic, success-only trigger
-    // is safe.
     [HarmonyPatch(typeof(HeadmanNeedsGrainIssueBehavior), nameof(HeadmanNeedsGrainIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void HeadmanNeedsGrainRegisterEventsPostfix(HeadmanNeedsGrainIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Deliver the Herd to Town - same shared choke point, no new per-type file needed.
-    // HeadmanNeedsToDeliverAHerdIssue.AlternativeSolutionScaleFlags is Duration only (confirmed against the
-    // decompiled source), so like Grain Seeds above, its alternative solution always succeeds deterministically
-    // and routing it through this generic, success-only trigger is safe. Added by independent review of the
-    // Deliver the Herd pass, which found this type was registered in GenericAcceptMirrorIssueTypes'
-    // AlternativeSolutionMirrorEligible set but the matching HourlyTick registration here was never carried
-    // out - without it, a client-owner's alternative-solution completion could never fire (IssueManager.DailyTick,
-    // the only other path to CompleteIssueWithAlternativeSolution, is server-only), leaving the quest
-    // permanently stuck in SolvingWithAlternativeSolution for that player.
     [HarmonyPatch(typeof(HeadmanNeedsToDeliverAHerdIssueBehavior), nameof(HeadmanNeedsToDeliverAHerdIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void HeadmanNeedsToDeliverAHerdRegisterEventsPostfix(HeadmanNeedsToDeliverAHerdIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Tier 2 Group B additions - same shared choke point, no new per-type file needed. Both confirmed
-    // AlternativeSolutionScaleFlags == None (Artisan does not override it; Gang Leader does not either - see
-    // GenericAcceptMirrorIssueTypes's doc comment), so both always succeed deterministically. Added alongside
-    // the AlternativeSolutionMirrorEligible registration in the same commit this time (see that file's own
-    // lesson-learned comment on Deliver the Herd, where the two were split across commits and the HourlyTick
-    // registration was initially missed).
     [HarmonyPatch(typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior), nameof(ArtisanCantSellProductsAtAFairPriceIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void ArtisanCantSellProductsAtAFairPriceRegisterEventsPostfix(ArtisanCantSellProductsAtAFairPriceIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // GangLeaderNeedsToOffloadStolenGoods is deliberately NOT registered here anymore - see
-    // GangLeaderNeedsToOffloadStolenGoodsAlternativeSolutionCompletionPatches for its own dedicated
-    // server-authoritative trigger.
-
-    // Tier 2 Group A - Smugglers. AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed against
-    // the decompiled source), the same shape as CapturedByBountyHunters above - genuinely can fail, still safe
-    // to route through this generic, ownership-self-limiting trigger.
     [HarmonyPatch(typeof(SmugglersIssueBehavior), nameof(SmugglersIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void SmugglersRegisterEventsPostfix(SmugglersIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Tier 2 Group B (continued) - Artisan Overpriced Goods. AlternativeSolutionScaleFlags is Duration only
-    // (confirmed against the decompiled source - not overridden beyond the base Duration flag), so it always
-    // succeeds deterministically, same as ArtisanCantSellProductsAtAFairPrice above. Registered in the SAME
-    // commit as the AlternativeSolutionMirrorEligible entry (see GenericAcceptMirrorIssueTypes's own
-    // lesson-learned comment on Deliver the Herd, where the two were split across commits and this
-    // registration was initially missed).
     [HarmonyPatch(typeof(ArtisanOverpricedGoodsIssueBehavior), nameof(ArtisanOverpricedGoodsIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void ArtisanOverpricedGoodsRegisterEventsPostfix(ArtisanOverpricedGoodsIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Tier 2 Group A - Caravan Ambush. AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed
-    // against the decompiled source), the same shape as Smugglers/CapturedByBountyHunters above - genuinely
-    // can fail, still safe to route through this generic, ownership-self-limiting trigger.
     [HarmonyPatch(typeof(CaravanAmbushIssueBehavior), nameof(CaravanAmbushIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void CaravanAmbushRegisterEventsPostfix(CaravanAmbushIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Tier 2 Group A - Gang Leader Needs Weapons. AlternativeSolutionScaleFlags is Duration only (confirmed
-    // against the decompiled source - no FailureRisk/Casualties), so it always succeeds deterministically, same
-    // as ArtisanCantSellProductsAtAFairPrice/ArtisanOverpricedGoods above.
     [HarmonyPatch(typeof(GangLeaderNeedsWeaponsIssueQuestBehavior), nameof(GangLeaderNeedsWeaponsIssueQuestBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void GangLeaderNeedsWeaponsRegisterEventsPostfix(GangLeaderNeedsWeaponsIssueQuestBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Tier 2 Group A - Merchant Army of Poachers. AlternativeSolutionScaleFlags is Casualties | FailureRisk
-    // (confirmed against the decompiled source), the same shape as Smugglers/Caravan Ambush above - genuinely
-    // can fail, still safe to route through this generic, ownership-self-limiting trigger.
     [HarmonyPatch(typeof(MerchantArmyOfPoachersIssueBehavior), nameof(MerchantArmyOfPoachersIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void MerchantArmyOfPoachersRegisterEventsPostfix(MerchantArmyOfPoachersIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Tier 2 Group A - Escort Merchant Caravan. AlternativeSolutionScaleFlags is Casualties | FailureRisk
-    // (confirmed against the decompiled source), the same shape as Smugglers/Caravan Ambush/Merchant Army of
-    // Poachers above - genuinely can fail, still safe to route through this generic, ownership-self-limiting
-    // trigger.
     [HarmonyPatch(typeof(EscortMerchantCaravanIssueBehavior), nameof(EscortMerchantCaravanIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void EscortMerchantCaravanRegisterEventsPostfix(EscortMerchantCaravanIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Rival Gang Moving In - SandBox.dll. AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed
-    // against the decompiled source), the same shape as Smugglers/Caravan Ambush/Merchant Army of Poachers/
-    // Escort Merchant Caravan above - genuinely can fail, still safe to route through this generic,
-    // ownership-self-limiting trigger.
     [HarmonyPatch(typeof(SandBox.Issues.RivalGangMovingInIssueBehavior), nameof(SandBox.Issues.RivalGangMovingInIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void RivalGangMovingInRegisterEventsPostfix(SandBox.Issues.RivalGangMovingInIssueBehavior __instance) =>
         CampaignEvents.HourlyTickEvent.AddNonSerializedListener(__instance, OnHourlyTick);
 
-    // Snare the Wealthy - SandBox.dll. AlternativeSolutionScaleFlags is Casualties | FailureRisk (confirmed
-    // against the decompiled source), the same shape as Smugglers/Caravan Ambush/Merchant Army of Poachers/
-    // Escort Merchant Caravan/Rival Gang Moving In above - genuinely can fail, still safe to route through this
-    // generic, ownership-self-limiting trigger.
     [HarmonyPatch(typeof(SandBox.Issues.SnareTheWealthyIssueBehavior), nameof(SandBox.Issues.SnareTheWealthyIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
     private static void SnareTheWealthyRegisterEventsPostfix(SandBox.Issues.SnareTheWealthyIssueBehavior __instance) =>
@@ -210,8 +148,6 @@ internal class NewIssueTypesAlternativeSolutionCompletionPatches
     {
         if (Campaign.Current?.IssueManager == null) return;
 
-        // Snapshot first: a genuine completion mutates IssueManager.Issues (removes the finalized entry), and
-        // MBReadOnlyDictionary's own enumerator doesn't tolerate that mid-iteration.
         var snapshot = new List<KeyValuePair<Hero, IssueBase>>();
         foreach (var kvp in Campaign.Current.IssueManager.Issues)
         {

@@ -8,11 +8,6 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Generic;
 
-// Lets the SERVER's own authoritative CompleteIssueWithAlternativeSolution call bypass the ownership-gate
-// Prefixes (GenericQuestTypeAlternativeSolutionOwnershipGatePatch / NewIssueTypesAlternativeSolutionOwnershipGatePatch):
-// IsLocalPeerOwner compares against ControllerIdProvider's own LOCAL platform id, which a dedicated server's
-// own id can never equal a connected client's, so without this the server could never run the real
-// completion for a client-owned quest at all (see CompleteOnServer's own doc comment for why that matters).
 public sealed class AlternativeSolutionCompletionAuthorityGuard : IDisposable
 {
     [ThreadStatic]
@@ -27,11 +22,6 @@ public sealed class AlternativeSolutionCompletionAuthorityGuard : IDisposable
 
 public static class AlternativeSolutionCompletionRunner
 {
-    // Called from whichever peer's own HourlyTick determines it is the recorded owner. On a client this only
-    // sends a request rather than completing directly: CompleteIssueWithAlternativeSolution rolls an unseeded
-    // MBRandom check and grants every reward/relationship/troop-XP/casualty consequence inline, so running it
-    // client-side would make that peer's own local RNG state and campaign-state writes the sole, unmirrored
-    // source of truth for the outcome instead of the server.
     public static bool TryTriggerOwnedCompletion(Hero owner, Action<Hero> requestServerCompletion)
     {
         if (owner?.Issue is not IssueBase issue) return false;
@@ -50,8 +40,6 @@ public static class AlternativeSolutionCompletionRunner
         return true;
     }
 
-    // The server-side counterpart of TryTriggerOwnedCompletion's request branch - called either directly above
-    // (the owner IS the server, e.g. a listen-server host) or from a validated per-type request handler.
     public static void CompleteOnServer(Hero owner, IssueBase issue)
     {
         IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = IssueFinalizeReason.AlternativeSolutionSuccess;

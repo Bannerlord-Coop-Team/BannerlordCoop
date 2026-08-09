@@ -6,9 +6,6 @@ using TaleWorlds.Core;
 
 namespace E2E.Tests.Services.Issues;
 
-// Real DefaultTradeItemPriceFactorModel NREs on this harness's bare test Town/ItemCategory (no real supply/
-// demand data). Returns the item's own Value directly - deterministic, and lets tests manufacture controllable
-// price divergence across peers. Shared across multiple quest types' E2E tests.
 internal class StubTradeItemPriceFactorModel : TradeItemPriceFactorModel
 {
     public override float GetTradePenalty(ItemObject item, MobileParty clientParty, PartyBase merchant, bool isSelling, float inStore, float supply, float demand) => 0f;

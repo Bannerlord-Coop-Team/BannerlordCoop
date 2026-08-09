@@ -9,8 +9,6 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Commands;
 
-// One entry per real vanilla IssueBase subtype (43 total). A "not wired" entry has a null Resolve and a
-// non-null NotWiredReason, which IssuesDebugCommand reports verbatim rather than silently no-op'ing.
 internal static class IssueGiveCatalog
 {
     private static readonly Dictionary<string, IssueGiveEntry> ByKey = Build();
@@ -24,8 +22,6 @@ internal static class IssueGiveCatalog
 
     private static (PotentialIssueData.StartIssueDelegate Factory, string Error) Fail(string reason)
         => (null, reason);
-
-    // Debug "give" bypasses each type's own eligibility selection - these are simple always-safe defaults.
 
     private static Settlement AnyFortification(Hero hero)
     {
@@ -58,8 +54,6 @@ internal static class IssueGiveCatalog
         var towns = Settlement.All.Where(s => s.IsTown).Take(2).ToList();
         return towns.Count == 2 ? (towns[0], towns[1]) : ((Settlement, Settlement)?)null;
     }
-
-    // --- Catalog -------------------------------------------------------------------------------------------
 
     private static void Wire(
         Dictionary<string, IssueGiveEntry> map, string key, Type issueType,
@@ -143,8 +137,6 @@ internal static class IssueGiveCatalog
         Wire("VillageNeedsCraftingMaterials", typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue),
             hero => Ok(h => new VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue(h)));
 
-        // The hero-minting side effect this project flagged elsewhere lives in the Quest ctor, not this Issue
-        // ctor - not a special risk from this debug command.
         Wire("NotableWantsDaughterFound", typeof(NotableWantsDaughterFoundIssueBehavior.NotableWantsDaughterFoundIssue),
             hero => Ok(h => new NotableWantsDaughterFoundIssueBehavior.NotableWantsDaughterFoundIssue(h)));
 
@@ -352,7 +344,6 @@ internal static class IssueGiveCatalog
     }
 }
 
-// One catalog row. A null Resolve means this type is a deliberate "known, not yet wired" gap.
 internal sealed class IssueGiveEntry
 {
     public string Key { get; }

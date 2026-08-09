@@ -17,30 +17,11 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Patches;
 
-/// <summary>
-/// Replaces <see cref="IssueManager.TryToMakeTroopsReturn"/>/<see cref="IssueManager.CheckIfTroopsCanReturnToMainParty"/>
-/// entirely - vanilla's own <c>_awaitingAlternativeSolutionTroops</c> is a single flat, non-per-owner
-/// <see cref="TroopRoster"/> field, which permanently strands a disconnected owner's troops (nothing routes
-/// them back on reconnect) and can duplicate them across every connected client if that field is ever non-empty.
-/// Fixed via <see cref="AwaitingAlternativeSolutionTroopsRegistry"/>, keyed by the owning peer's own
-/// <c>ControllerId</c> (resolved via <see cref="IssueOwnershipRegistry"/>) instead of Hero - by the
-/// time troops reach this point, <c>IssueFinalized()</c> has already cleared the issue's own state, so the
-/// connection identity is the only durable key left. Persisted alongside
-/// <see cref="IssueOwnershipRegistry"/>'s own save record - see
-/// <see cref="AwaitingAlternativeSolutionTroopsPersistencePatches"/>.
-///
-/// Also fixes a separate dedicated-host NRE reachable through the same entry point: vanilla's
-/// <c>DefaultIssueModel.CanTroopsReturnFromAlternativeSolution</c> dereferences <c>Hero.MainHero.IsPrisoner</c>
-/// with no null guard, and <c>Hero.MainHero</c> is null on a dedicated server.
-/// <see cref="TryToMakeTroopsReturnPrefix"/> guards via <see cref="IsLocalMainHeroSafelyAvailable"/> before
-/// ever calling the model gate.
-/// </summary>
 [HarmonyPatch]
 internal class IssueManagerAlternativeSolutionTroopsPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<IssueManagerAlternativeSolutionTroopsPatches>();
 
-    // Prevents a re-entrant HourlyTick (the inquiry callback is async) from stacking a second inquiry.
     private static bool _inquiryInFlight;
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
@@ -50,7 +31,6 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         var troops = issue?.AlternativeSolutionSentTroops;
         if (troops == null || troops.Count == 0) return false;
 
-        // Never call the model gate with a null Hero.MainHero/MobileParty.MainParty.
         bool modelGatePasses = IsLocalMainHeroSafelyAvailable() && MobileParty.MainParty != null
             && Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution();
 
@@ -105,14 +85,8 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         return false;
     }
 
-    /// <summary>
-    /// Checks <c>Game.Current?.PlayerTroop</c> rather than bare <c>Hero.MainHero</c>: <c>Hero.MainHero</c> is
-    /// <c>CharacterObject.PlayerCharacter.HeroObject</c>, and evaluating it at all throws the instant
-    /// <c>Game.Current.PlayerTroop</c> is null - exactly the dedicated-host condition this exists to detect.
-    /// </summary>
     private static bool IsLocalMainHeroSafelyAvailable() => Game.Current?.PlayerTroop != null;
 
-    /// <summary>Reimplementation of vanilla's inquiry-text construction, with a null-companion-Hero guard vanilla itself lacks.</summary>
     private static TextObject BuildReturnedTroopsInquiryText(TroopRoster troops)
     {
         TextObject textObject = new TextObject("{=xPhEQgcI}As you travel, you spot your companions are waiting ahead. They greet you and report that they have returned from their mission with {NUMBER} {?(NUMBER > 1)}troops{?}troop{\\?} and they are all ready to rejoin your party.");
@@ -140,7 +114,6 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         return textObject;
     }
 
-    /// <summary>Reproduction of vanilla's private <c>IssueManager.MakeAlternativeTroopsReturn</c>.</summary>
     private static void MakeAlternativeTroopsReturn(TroopRoster roster)
     {
         foreach (TroopRosterElement item in roster.GetTroopRoster())

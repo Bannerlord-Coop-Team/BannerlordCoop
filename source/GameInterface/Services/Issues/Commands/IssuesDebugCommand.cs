@@ -11,7 +11,6 @@ namespace GameInterface.Services.Issues.Commands;
 
 public static class IssuesDebugCommand
 {
-    // coop.debug.issues.give lord_2_7 VillageNeedsTools
     [CommandLineArgumentFunction("give", "coop.debug.issues")]
     public static string Give(List<string> args)
     {
@@ -34,8 +33,6 @@ public static class IssuesDebugCommand
             return $"Quest type '{key}' is a known vanilla Issue type but is not wired for give: {entry.NotWiredReason}";
         }
 
-        // Vanilla only ever allows one active issue per hero at a time (IssueManager.Issues is keyed by
-        // Hero) - reject rather than silently overwrite an existing one.
         if (hero.Issue != null)
         {
             return $"Hero '{hero.Name}' (StringId '{hero.StringId}') already has an active issue " +
@@ -61,7 +58,6 @@ public static class IssuesDebugCommand
         return StartQuestOrRollback(hero, key);
     }
 
-    // A throw here leaves hero.Issue stuck attached with no live quest - roll it back via DeactivateIssue.
     private static string StartQuestOrRollback(Hero hero, string key)
     {
         bool started;
@@ -103,8 +99,6 @@ public static class IssuesDebugCommand
             $"Issue StringId: '{hero.Issue?.StringId}'. Quest StringId: '{hero.Issue?.IssueQuest?.StringId ?? "none"}'.";
     }
 
-    // coop.debug.issues.complete lord_2_7
-    // coop.debug.issues.complete lord_2_7 fail
     [CommandLineArgumentFunction("complete", "coop.debug.issues")]
     public static string Complete(List<string> args)
     {
@@ -165,7 +159,6 @@ public static class IssuesDebugCommand
         return $"Completed quest for hero '{hero.Name}' (StringId '{hero.StringId}') with outcome '{outcome}'.";
     }
 
-    // coop.debug.issues.list_types
     [CommandLineArgumentFunction("list_types", "coop.debug.issues")]
     public static string ListTypes(List<string> args)
     {

@@ -11,8 +11,6 @@ namespace GameInterface.Services.Issues.Generic.Dispatch;
 [HarmonyPatch(typeof(IssueManager))]
 internal class GenericQuestTypeCreationTriggerPatch
 {
-    // HarmonyPriority(First): this dispatch must publish before another postfix on the same method recurses
-    // through network.SendAll into another peer's own MessageBroker context.
     [HarmonyPriority(Priority.First)]
     [HarmonyPatch(nameof(IssueManager.CreateNewIssue))]
     [HarmonyPostfix]
@@ -34,9 +32,6 @@ internal class GenericQuestTypeQuestSolutionAcceptTriggerPatch
     [HarmonyPostfix]
     private static void Postfix(Hero issueOwner, bool __result)
     {
-        // A mirror replay runs under AllowedThread - skip re-publishing so it doesn't loop back through the
-        // network again. A genuine server-side replay only runs under IssueDispatchReplayGuard, so other
-        // unrelated patches still fire normally.
         if (CallOriginalPolicy.IsOriginalAllowed() || IssueDispatchReplayGuard.IsActive) return;
         if (!__result) return;
 

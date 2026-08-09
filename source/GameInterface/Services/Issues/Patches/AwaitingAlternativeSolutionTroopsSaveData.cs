@@ -33,7 +33,6 @@ internal sealed class AwaitingAlternativeSolutionTroopsSaveData
     }
 }
 
-/// <summary>Base id 44_187_000 - must stay unique among this project's SaveableTypeDefiners.</summary>
 public sealed class AwaitingAlternativeSolutionTroopsSaveableTypeDefiner : SaveableTypeDefiner
 {
     private const int SaveBaseId = 44_187_000;

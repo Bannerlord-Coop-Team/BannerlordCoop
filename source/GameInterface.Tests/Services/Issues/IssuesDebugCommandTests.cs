@@ -12,13 +12,6 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Issues;
 
-/// <summary>
-/// Lightweight guard-clause coverage matching <c>HeroDebugCommandTests</c>'s own pattern - the real,
-/// happy-path give/complete flows (a genuine <see cref="IssueManager.CreateNewIssue"/>/
-/// <see cref="IssueManager.StartIssueQuest"/>/<see cref="TaleWorlds.CampaignSystem.QuestBase"/> completion
-/// cascade) are covered end-to-end in <c>E2E.Tests/Services/Issues/IssuesDebugCommandTests.cs</c> instead,
-/// where a real campaign fixture exists.
-/// </summary>
 [Collection(ModInformationRoleCollection.Name)]
 public class IssuesDebugCommandTests : System.IDisposable
 {
@@ -43,8 +36,6 @@ public class IssuesDebugCommandTests : System.IDisposable
         return hero;
     }
 
-    // --- give: client rejection ---
-
     [Fact]
     public void Give_WhenClient_ReturnsServerOnlyError()
     {
@@ -65,8 +56,6 @@ public class IssuesDebugCommandTests : System.IDisposable
         }
     }
 
-    // --- give: missing hero ---
-
     [Fact]
     public void Give_WithUnknownHeroId_ReturnsNotFoundError()
     {
@@ -85,8 +74,6 @@ public class IssuesDebugCommandTests : System.IDisposable
             ModInformation.IsServer = wasServer;
         }
     }
-
-    // --- give: unknown quest type key ---
 
     [Fact]
     public void Give_WithUnknownTypeKey_ReturnsUnknownKeyError()
@@ -110,8 +97,6 @@ public class IssuesDebugCommandTests : System.IDisposable
         }
     }
 
-    // --- give: known but not-wired quest type key ---
-
     [Fact]
     public void Give_WithKnownButNotWiredTypeKey_ReturnsNotWiredReason()
     {
@@ -132,8 +117,6 @@ public class IssuesDebugCommandTests : System.IDisposable
             ModInformation.IsServer = wasServer;
         }
     }
-
-    // --- give: hero already has an issue ---
 
     [Fact]
     public void Give_WhenHeroAlreadyHasAnIssue_ReturnsAlreadyHasIssueError()
@@ -158,8 +141,6 @@ public class IssuesDebugCommandTests : System.IDisposable
         }
     }
 
-    // --- complete: client rejection ---
-
     [Fact]
     public void Complete_WhenClient_ReturnsServerOnlyError()
     {
@@ -180,8 +161,6 @@ public class IssuesDebugCommandTests : System.IDisposable
         }
     }
 
-    // --- complete: missing hero ---
-
     [Fact]
     public void Complete_WithUnknownHeroId_ReturnsNotFoundError()
     {
@@ -200,8 +179,6 @@ public class IssuesDebugCommandTests : System.IDisposable
             ModInformation.IsServer = wasServer;
         }
     }
-
-    // --- complete: hero has no issue ---
 
     [Fact]
     public void Complete_WhenHeroHasNoIssue_ReturnsNoActiveIssueError()
@@ -223,8 +200,6 @@ public class IssuesDebugCommandTests : System.IDisposable
             ModInformation.IsServer = wasServer;
         }
     }
-
-    // --- complete: issue exists but no live quest yet ---
 
     [Fact]
     public void Complete_WhenIssueHasNoLiveQuestYet_ReturnsNoQuestError()

@@ -3,17 +3,10 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Interfaces;
 
-/// <summary>
-/// Replacement for vanilla <c>IssueManager._awaitingAlternativeSolutionTroops</c> (a single flat, non-per-owner
-/// roster). Keyed by the owning peer's <c>ControllerId</c> rather than <see cref="TaleWorlds.CampaignSystem.Hero"/>
-/// - by the time troops reach this point, <c>IssueBase.IssueFinalized()</c> has already cleared the issue's own
-/// state, so the connection identity is the only durable key left.
-/// </summary>
 internal static class AwaitingAlternativeSolutionTroopsRegistry
 {
     private static readonly Dictionary<string, TroopRoster> TroopsByOwnerControllerId = new();
 
-    /// <summary>Additive, not a replace, in case more than one of this owner's issues is awaiting return at once.</summary>
     public static void Deposit(string ownerControllerId, TroopRoster troops)
     {
         if (string.IsNullOrEmpty(ownerControllerId) || troops == null || troops.Count == 0) return;
@@ -46,7 +39,6 @@ internal static class AwaitingAlternativeSolutionTroopsRegistry
         TroopsByOwnerControllerId.Clear();
     }
 
-    /// <summary>Replace, not additive - used only while rehydrating from save data.</summary>
     public static void Restore(string ownerControllerId, TroopRoster troops)
     {
         if (string.IsNullOrEmpty(ownerControllerId) || troops == null || troops.Count == 0) return;

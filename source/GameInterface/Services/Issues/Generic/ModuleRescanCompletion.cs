@@ -20,8 +20,6 @@ internal sealed class ModuleRescanCompletionRunner : IModuleRescanCompletionRunn
         if (spec?.TryTriggerOwnedCompletion == null) return;
         if (Campaign.Current?.IssueManager == null) return;
 
-        // Snapshot first: a genuine completion inside the loop mutates IssueManager.Issues, and
-        // MBReadOnlyDictionary's enumerator doesn't tolerate that.
         var snapshot = new List<KeyValuePair<Hero, IssueBase>>();
         foreach (var kvp in Campaign.Current.IssueManager.Issues)
         {
