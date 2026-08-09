@@ -34,11 +34,33 @@ internal class MapEventPatches
     private static readonly Action<MapEventParty>[] CommitResultPhases =
     {
         party => party.CommitXpGain(),
-        party => party.CommitRenownChanges(),
+        CommitRenownChanges,
         party => party.CommitInfluenceChanges(),
         party => party.CommitMoraleChanges(),
         party => party.CommitGoldChanges()
     };
+
+    private static void CommitRenownChanges(MapEventParty party)
+    {
+        Hero leaderHero = party.Party.LeaderHero;
+        if (CanCommitRenownChanges(leaderHero))
+        {
+            party.CommitRenownChanges();
+            return;
+        }
+
+        if (party.GainedRenown <= 0f)
+            return;
+
+        Logger.Error(
+            "Skipped {Renown} renown for map event party {PartyId} because leader hero {HeroId} has no clan",
+            party.GainedRenown,
+            party.Party.Id,
+            leaderHero.StringId);
+    }
+
+    internal static bool CanCommitRenownChanges(Hero leaderHero) =>
+        leaderHero == null || leaderHero.Clan != null;
 
     [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
     [HarmonyPostfix]

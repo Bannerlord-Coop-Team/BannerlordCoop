@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -16,6 +17,8 @@ namespace GameInterface.Tests.Services.MapEvents
             typeof(MapEvent).GetField("_sides", BindingFlags.NonPublic | BindingFlags.Instance)!;
         private static readonly FieldInfo BattlePartiesField =
             typeof(MapEventSide).GetField("_battleParties", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        private static readonly FieldInfo HeroClanField =
+            typeof(Hero).GetField("_clan", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         [Fact]
         public void PartiesWithoutParty_RemovesFromBothSides()
@@ -100,6 +103,36 @@ namespace GameInterface.Tests.Services.MapEvents
             Assert.Equal(new[] { firstDefender, attacker }, committedParties);
             Assert.Collection(mapEvent.DefenderSide.Parties, party => Assert.Same(firstDefender, party));
             Assert.Collection(mapEvent.AttackerSide.Parties, party => Assert.Same(attacker, party));
+        }
+
+        [Fact]
+        public void CanCommitRenownChanges_LeaderWithoutClan_ReturnsFalse()
+        {
+            Hero leaderHero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+
+            bool result = MapEventPatches.CanCommitRenownChanges(leaderHero);
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public void CanCommitRenownChanges_LeaderWithClan_ReturnsTrue()
+        {
+            Hero leaderHero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Clan clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
+            HeroClanField.SetValue(leaderHero, clan);
+
+            bool result = MapEventPatches.CanCommitRenownChanges(leaderHero);
+
+            Assert.True(result);
+        }
+
+        [Fact]
+        public void CanCommitRenownChanges_MissingLeader_ReturnsTrue()
+        {
+            bool result = MapEventPatches.CanCommitRenownChanges(null);
+
+            Assert.True(result);
         }
 
         private static MapEvent CreateMapEvent(MapEventSide defender, MapEventSide attacker)
