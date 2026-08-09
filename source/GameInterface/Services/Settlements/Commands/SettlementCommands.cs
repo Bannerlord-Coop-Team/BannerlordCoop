@@ -20,15 +20,21 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("enter_random_castle", "coop.debug.settlements")]
     public static string EnterRandomCastle(List<string> strings)
     {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (strings.Count > 1)
+            return "Usage: coop.debug.settlements.enter_random_castle [castleId]";
+
         var castles = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsCastle).ToArray();
+        var castle = strings.Count == 0
+            ? castles[new Random().Next(castles.Length)]
+            : castles.FirstOrDefault(settlement => settlement.StringId == strings[0]);
+        if (castle == null)
+            return $"Castle '{strings[0]}' was not found.";
 
-        Random random = new Random();
+        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, castle);
 
-        var randomCastle = castles[random.Next(castles.Length)];
-
-        EncounterManager.StartSettlementEncounter(MobileParty.MainParty, randomCastle);
-
-        return $"Entering {randomCastle.Name} castle";
+        return $"Requested settlement encounter with {castle.Name} ({castle.StringId}).";
     }
 
     [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
