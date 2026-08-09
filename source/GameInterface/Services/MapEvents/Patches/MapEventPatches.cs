@@ -202,7 +202,8 @@ internal class MapEventPatches
         if (ModInformation.IsClient)
             return false;
 
-        // Need to calculate map event results before committing changes
+        // Vanilla calculates plunder from each defeated participant's Party reference.
+        RemovePartiesWithoutParty(__instance);
         __instance.CalculateMapEventResults();
 
         if (__instance.ContainsPlayerParty())
