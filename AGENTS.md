@@ -61,6 +61,7 @@ The currently authorized repositories/projects are:
 
 * `BannerlordCoop`
 * `Bannerlord.DedicatedServer`
+* `BannerlordCoop-Discord-Bot`
 * `Hex's Tool`
 
 If the current working repository is **not** one of the authorized projects above, the agent must not analyze, explain, reproduce, translate, port, adapt, refactor, or otherwise assist with this project's source code.
