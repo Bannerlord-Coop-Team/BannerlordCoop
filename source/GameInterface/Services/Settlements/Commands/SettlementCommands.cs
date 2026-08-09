@@ -1,5 +1,7 @@
 ﻿using Autofac;
 using Common;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -7,6 +9,7 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
@@ -35,6 +38,48 @@ internal class SettlementCommands
         EncounterManager.StartSettlementEncounter(MobileParty.MainParty, castle);
 
         return $"Requested settlement encounter with {castle.Name} ({castle.StringId}).";
+    }
+
+    [CommandLineArgumentFunction("teleport_main_party_to_castle", "coop.debug.settlements")]
+    public static string TeleportMainPartyToCastle(List<string> strings)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (strings.Count != 1)
+            return "Usage: coop.debug.settlements.teleport_main_party_to_castle <castleId>";
+
+        var castle = Campaign.Current.CampaignObjectManager.Settlements
+            .FirstOrDefault(settlement => settlement.IsCastle && settlement.StringId == strings[0]);
+        if (castle == null)
+            return $"Castle '{strings[0]}' was not found.";
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null)
+            return "Failed: no main party.";
+        if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
+            return "Leave the active settlement or map event before teleporting.";
+
+        var originalPosition = mainParty.Position;
+        try
+        {
+            mainParty.Position = castle.GatePosition;
+            MessageBroker.Instance.Publish(
+                mainParty,
+                new PartyBehaviorChangeAttempted(
+                    mainParty,
+                    forcePosition: true,
+                    isCurrentlyAtSea: false,
+                    resetMovementToHold: true));
+        }
+        finally
+        {
+            // The later forced-position echo proves the dedicated server applied the request.
+            mainParty.Position = originalPosition;
+        }
+
+        return
+            $"Requested authoritative teleport to {castle.Name} ({castle.StringId}) gate " +
+            $"at {castle.GatePosition.X:R},{castle.GatePosition.Y:R}.";
     }
 
     [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
