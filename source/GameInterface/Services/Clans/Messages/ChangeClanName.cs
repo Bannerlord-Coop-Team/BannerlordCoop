@@ -1,27 +1,21 @@
 ﻿using Common.Messaging;
-using ProtoBuf;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Messages;
 
-[ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkChangeClanName : ICommand
+public readonly struct ChangeClanName : IEvent
 {
-    [ProtoMember(1)]
-    public readonly string ClanId;
-
-    [ProtoMember(2)]
+    public readonly Clan Clan;
     public readonly TextObject Name;
-
-    [ProtoMember(3)]
     public readonly TextObject InformalName;
 
-    public NetworkChangeClanName(
-        string clanId,
+    public ChangeClanName(
+        Clan clan,
         TextObject name,
         TextObject informalName)
     {
-        ClanId = clanId;
+        Clan = clan;
         Name = name;
         InformalName = informalName;
     }
