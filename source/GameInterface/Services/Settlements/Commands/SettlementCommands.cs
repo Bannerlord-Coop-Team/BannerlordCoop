@@ -20,6 +20,8 @@ namespace GameInterface.Services.Template.Commands;
 
 internal class SettlementCommands
 {
+    private static CampaignVec2? mainPartyPositionBeforeCastleTeleport;
+
     [CommandLineArgumentFunction("enter_random_castle", "coop.debug.settlements")]
     public static string EnterRandomCastle(List<string> strings)
     {
@@ -58,8 +60,11 @@ internal class SettlementCommands
             return "Failed: no main party.";
         if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
             return "Leave the active settlement or map event before teleporting.";
+        if (mainPartyPositionBeforeCastleTeleport.HasValue)
+            return "Restore the existing castle teleport fixture before starting another.";
 
         var originalPosition = mainParty.Position;
+        mainPartyPositionBeforeCastleTeleport = originalPosition;
         try
         {
             mainParty.Position = castle.GatePosition;
@@ -80,6 +85,44 @@ internal class SettlementCommands
         return
             $"Requested authoritative teleport to {castle.Name} ({castle.StringId}) gate " +
             $"at {castle.GatePosition.X:R},{castle.GatePosition.Y:R}.";
+    }
+
+    [CommandLineArgumentFunction("restore_main_party_castle_teleport", "coop.debug.settlements")]
+    public static string RestoreMainPartyCastleTeleport(List<string> strings)
+    {
+        if (ModInformation.IsServer)
+            return "Run this command on a client.";
+        if (strings.Count != 0)
+            return "Usage: coop.debug.settlements.restore_main_party_castle_teleport";
+        if (!mainPartyPositionBeforeCastleTeleport.HasValue)
+            return "No castle teleport fixture is active.";
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null)
+            return "Failed: no main party.";
+        if (mainParty.CurrentSettlement != null || mainParty.MapEvent != null || PlayerEncounter.Current != null)
+            return "Leave the active settlement or map event before restoring the teleport fixture.";
+
+        var livePosition = mainParty.Position;
+        var originalPosition = mainPartyPositionBeforeCastleTeleport.Value;
+        try
+        {
+            mainParty.Position = originalPosition;
+            MessageBroker.Instance.Publish(
+                mainParty,
+                new PartyBehaviorChangeAttempted(
+                    mainParty,
+                    forcePosition: true,
+                    isCurrentlyAtSea: false,
+                    resetMovementToHold: true));
+            mainPartyPositionBeforeCastleTeleport = null;
+        }
+        finally
+        {
+            mainParty.Position = livePosition;
+        }
+
+        return $"Requested authoritative restoration to {originalPosition.X:R},{originalPosition.Y:R}.";
     }
 
     [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
