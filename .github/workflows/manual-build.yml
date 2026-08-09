@@ -13,9 +13,14 @@ on:
         required: true
         type: string
       build_id:
-        description: Discord interaction id used as the temporary R2 identity
+        description: Discord interaction id used as the R2 publication identity
         required: true
         type: string
+      release:
+        description: Publish an immutable stable release candidate
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -36,23 +41,46 @@ jobs:
       image: garrettluskey/bannerlordcoop:latest
 
     steps:
-      - name: Checkout requested commit
+      - name: Checkout protected development policy
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.commit_sha }}
+          ref: development
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Trust and validate checkout
+      - name: Validate request against protected development
         env:
           REQUESTED_SHA: ${{ inputs.commit_sha }}
           SERVER_SHA: ${{ inputs.server_sha }}
           BUILD_ID: ${{ inputs.build_id }}
+          RELEASE: ${{ inputs.release }}
         run: |
           set -eu
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           printf '%s' "$REQUESTED_SHA" | grep -Eq '^[a-f0-9]{40}$'
           printf '%s' "$SERVER_SHA" | grep -Eq '^[a-f0-9]{40}$'
           printf '%s' "$BUILD_ID" | grep -Eq '^[0-9]{17,20}$'
+          case "$RELEASE" in
+            true|false) ;;
+            *) echo 'release must be true or false' >&2; exit 1 ;;
+          esac
+          if [ "$RELEASE" = true ] && ! git merge-base --is-ancestor "$REQUESTED_SHA" HEAD; then
+            echo 'Stable releases require a client commit already merged to development.' >&2
+            exit 1
+          fi
+
+      - name: Checkout requested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate requested checkout
+        env:
+          REQUESTED_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -eu
           test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
 
       - name: Link Bannerlord assemblies
