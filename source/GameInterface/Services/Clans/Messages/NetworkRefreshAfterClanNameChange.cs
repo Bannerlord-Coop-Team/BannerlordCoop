@@ -5,7 +5,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Clans.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkChangeClanName : ICommand
+internal readonly struct NetworkRefreshAfterClanNameChange : ICommand
 {
     [ProtoMember(1)]
     public readonly string ClanId;
@@ -16,7 +16,7 @@ public readonly struct NetworkChangeClanName : ICommand
     [ProtoMember(3)]
     public readonly TextObject InformalName;
 
-    public NetworkChangeClanName(
+    public NetworkRefreshAfterClanNameChange(
         string clanId,
         TextObject name,
         TextObject informalName)

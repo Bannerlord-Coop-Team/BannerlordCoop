@@ -91,7 +91,14 @@ internal class DefaultNotificationsCampaignBehaviorPatches
         MessageBroker.Instance.Publish(__instance, message);
     }
 
-    // OnCompanionRemoved (managed with RemoveCompanionActionPatch)
+    [HarmonyPatch(nameof(DefaultNotificationsCampaignBehavior.OnCompanionRemoved))]
+    [HarmonyPrefix]
+    public static bool OnCompanionRemovedPrefix()
+    {
+        // Running this notification on the server NREs because Clan.PlayerClan is not part of a kingdom
+        // Actual notification to client comes from RemoveCompanionActionPatch
+        return ModInformation.IsClient;
+    }
 
     // OnIssueUpdated
 
