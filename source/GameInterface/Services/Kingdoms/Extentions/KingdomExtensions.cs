@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using GameInterface.Services.Clans.Extensions;
+using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 
