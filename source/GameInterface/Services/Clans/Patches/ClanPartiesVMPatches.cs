@@ -94,7 +94,7 @@ internal class ClanPartiesVMPatches
         }
 
         // Change clan party leader on the server
-        var message = new ClanPartyLeaderChanged(Hero.MainHero, newLeader, oldLeader, selectedParty, MobileParty.MainParty);
+        var message = new ClanPartyLeaderChanged(Hero.MainHero, newLeader, selectedParty, MobileParty.MainParty);
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;

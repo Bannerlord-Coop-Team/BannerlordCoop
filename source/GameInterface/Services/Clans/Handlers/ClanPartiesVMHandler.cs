@@ -105,14 +105,12 @@ internal class ClanPartiesVMHandler : IHandler
         string newLeaderId = null;
         if (data.NewLeader != null && !objectManager.TryGetIdWithLogging(data.NewLeader, out newLeaderId)) return;
 
-        string oldLeaderId = null;
-        if (data.OldLeader != null && !objectManager.TryGetIdWithLogging(data.OldLeader, out oldLeaderId)) return;
-
         string selectedPartyId = null;
         if (data.SelectedParty != null && !objectManager.TryGetIdWithLogging(data.SelectedParty, out selectedPartyId)) return;
+
         if (!objectManager.TryGetIdWithLogging(data.MainParty, out var mainPartyId)) return;
 
-        network.SendAll(new ChangeClanPartyLeader(mainHeroId, newLeaderId, oldLeaderId, selectedPartyId, mainPartyId));
+        network.SendAll(new ChangeClanPartyLeader(mainHeroId, newLeaderId, selectedPartyId, mainPartyId));
     }
 
     private void Handle_ChangeClanPartyLeader(MessagePayload<ChangeClanPartyLeader> obj)
@@ -126,12 +124,7 @@ internal class ClanPartiesVMHandler : IHandler
             Hero newLeader = null;
             if (data.NewLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(data.NewLeaderId, out newLeader)) return;
 
-            Hero oldLeader = null;
-            if (data.OldLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(data.OldLeaderId, out oldLeader)) return;
-
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.SelectedPartyId, out var selectedParty)) return;
-
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
             // Block changing leader if party is a player party
             if (selectedParty.IsPlayerParty())
@@ -148,9 +141,11 @@ internal class ClanPartiesVMHandler : IHandler
             }
 
             var isDisbanding = newLeader == null;
-            var existingOldLeader = oldLeader != null;
+            var existingOldLeader = selectedParty?.Party?.LeaderHero != null;
             if (existingOldLeader)
             {
+                var oldLeader = selectedParty.Party.LeaderHero;
+
                 if (isDisbanding) // Disbanding party
                 {
                     selectedParty.RemovePartyLeader();
@@ -158,6 +153,7 @@ internal class ClanPartiesVMHandler : IHandler
                 }
                 else // Swapping with new leader
                 {
+                    if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
                     TeleportHeroAction.ApplyDelayedTeleportToParty(oldLeader, mainParty);
                 }
             }
