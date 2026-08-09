@@ -64,6 +64,7 @@ internal class InteractionsInitializationHandler : IHandler
         BanditInteractionsCampaignBehavior banditInteractionsCampaignBehavior = Campaign.Current.GetCampaignBehavior<BanditInteractionsCampaignBehavior>();
         PatrolPartiesCampaignBehavior patrolPartiesCampaignBehavior = Campaign.Current.GetCampaignBehavior<PatrolPartiesCampaignBehavior>();
         ArenaMasterCampaignBehavior arenaMasterCampaignBehavior = Campaign.Current.GetCampaignBehavior<ArenaMasterCampaignBehavior>();
+        PerkResetCampaignBehavior perkResetCampaignBehavior = Campaign.Current.GetCampaignBehavior<PerkResetCampaignBehavior>();
 
         villagerCampaignBehavior._interactedVillagers = GetInteractedVillagers(playerHeroId);
         caravansCampaignBehavior._interactedCaravans = GetInteractedCaravans(playerHeroId);
@@ -71,6 +72,7 @@ internal class InteractionsInitializationHandler : IHandler
         patrolPartiesCampaignBehavior._interactedPatrolParties = GetInteractedPatrols(playerHeroId);
         arenaMasterCampaignBehavior._arenaMasterHasMetInSettlements = GetMetArenaMasters(playerHeroId);
         arenaMasterCampaignBehavior._knowTournaments = GetKnowTournaments(playerHeroId);
+        perkResetCampaignBehavior._warningTime = GetWarningTime(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerInteractionsDataKeys(playerHeroId));
     }
@@ -170,5 +172,12 @@ internal class InteractionsInitializationHandler : IHandler
         if (interactionsPlayerData?.PlayerKnowTournaments?.ContainsKey(playerHeroId) != true) return false;
 
         return interactionsPlayerData.PlayerKnowTournaments[playerHeroId];
+    }
+
+    private CampaignTime GetWarningTime(string playerHeroId)
+    {
+        if (interactionsPlayerData?.PlayerWarningTime?.ContainsKey(playerHeroId) != true) return CampaignTime.Zero;
+
+        return new CampaignTime(interactionsPlayerData.PlayerWarningTime[playerHeroId]);
     }
 }

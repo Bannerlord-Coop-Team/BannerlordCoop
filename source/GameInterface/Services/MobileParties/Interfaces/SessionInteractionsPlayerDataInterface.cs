@@ -18,6 +18,7 @@ public interface ISessionInteractionsPlayerDataInterface : IGameAbstraction
     void SetPlayerPatrolInteraction(string playerHeroId, string settlementId, CampaignTime interactedTime);
     void AddMetArenaMaster(string playerHeroId, string settlementId);
     void SetKnowTournaments(string playerHeroId, bool knowTournaments);
+    void UpdateWarningTime(string playerHeroId, long warningTimeNumTicks);
     void RemoveInteractedVillagersForAllPlayers(string mobilePartyId);
     void RemoveInteractedCaravanForAllPlayers(string mobilePartyId);
     void RemoveInteractedBanditsForAllPlayers(string mobilePartyId);
@@ -110,6 +111,13 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         InteractionsPlayerData.PlayerKnowTournaments[playerHeroId] = knowTournaments;
     }
 
+    public void UpdateWarningTime(string playerHeroId, long warningTimeNumTicks)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerWarningTime[playerHeroId] = warningTimeNumTicks;
+    }
+
     private void RemoveInteractedPartyForAllPlayers(string mobilePartyId, Dictionary<string, Dictionary<string, int>> interactionDictionary)
     {
         foreach (var player in playerManager.Players)
@@ -189,6 +197,10 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         if (!InteractionsPlayerData.PlayerKnowTournaments.ContainsKey(playerHeroId))
         {
             InteractionsPlayerData.PlayerKnowTournaments[playerHeroId] = false;
+        }
+        if (!InteractionsPlayerData.PlayerWarningTime.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerWarningTime[playerHeroId] = 0L;
         }
     }
 

@@ -4,6 +4,24 @@ using ProtoBuf;
 namespace GameInterface.Services.Companions.Messages;
 
 [ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkUpdateCompanionWarningTime : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string MainHeroId;
+
+    [ProtoMember(2)]
+    public readonly long WarningTimeNumTicks;
+
+    public NetworkUpdateCompanionWarningTime(
+        string mainHeroId,
+        long warningTimeNumTicks)
+    {
+        MainHeroId = mainHeroId;
+        WarningTimeNumTicks = warningTimeNumTicks;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkResetPerksByArenaMaster : ICommand
 {
     [ProtoMember(1)]

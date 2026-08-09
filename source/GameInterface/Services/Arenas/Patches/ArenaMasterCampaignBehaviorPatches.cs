@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Arenas.Messages;
 using GameInterface.Services.Tournaments.UI;
 using HarmonyLib;
@@ -18,6 +19,10 @@ namespace GameInterface.Services.Arenas.Patches;
 [HarmonyPatch(typeof(ArenaMasterCampaignBehavior))]
 internal class DisableArenaMasterCampaignBehavior
 {
+    [HarmonyPatch(nameof(ArenaMasterCampaignBehavior.OnGameLoadFinished))]
+    [HarmonyPrefix]
+    public static bool OnGameLoadFinishedPrefix() => ModInformation.IsClient;
+
     private static readonly bool ArenasDisabled = true;
 
     [HarmonyPatch(nameof(ArenaMasterCampaignBehavior.game_menu_enter_practice_fight_on_condition))]

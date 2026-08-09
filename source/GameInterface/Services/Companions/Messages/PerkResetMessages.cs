@@ -4,6 +4,20 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Companions.Messages;
 
+public readonly struct UpdateCompanionWarningTime : IEvent
+{
+    public readonly Hero MainHero;
+    public readonly long WarningTimeNumTicks;
+
+    public UpdateCompanionWarningTime(
+        Hero mainHero,
+        long warningTimeNumTicks)
+    {
+        MainHero = mainHero;
+        WarningTimeNumTicks = warningTimeNumTicks;
+    }
+}
+
 public readonly struct ResetPerksByArenaMaster : IEvent
 {
     public readonly Hero MainHero;

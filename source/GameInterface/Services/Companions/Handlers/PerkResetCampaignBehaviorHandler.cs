@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Companions.Messages;
+using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Linq;
@@ -21,15 +22,21 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
 
     public PerkResetCampaignBehaviorHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+
+        messageBroker.Subscribe<UpdateCompanionWarningTime>(Handle_UpdateCompanionWarningTime);
+        messageBroker.Subscribe<NetworkUpdateCompanionWarningTime>(Handle_NetworkUpdateCompanionWarningTime);
 
         messageBroker.Subscribe<ResetPerksByArenaMaster>(Handle_ResetPerksByArenaMaster);
         messageBroker.Subscribe<NetworkResetPerksByArenaMaster>(Handle_NetworkResetPerksByArenaMaster);
@@ -40,11 +47,40 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<UpdateCompanionWarningTime>(Handle_UpdateCompanionWarningTime);
+        messageBroker.Unsubscribe<NetworkUpdateCompanionWarningTime>(Handle_NetworkUpdateCompanionWarningTime);
+
         messageBroker.Unsubscribe<ResetPerksByArenaMaster>(Handle_ResetPerksByArenaMaster);
         messageBroker.Unsubscribe<NetworkResetPerksByArenaMaster>(Handle_NetworkResetPerksByArenaMaster);
 
         messageBroker.Unsubscribe<RemoveACompanionFromPlayerParty>(Handle_RemoveACompanionFromPlayerParty);
         messageBroker.Unsubscribe<NetworkRemoveACompanionFromPlayerParty>(Handle_NetworkRemoveACompanionFromPlayerParty);
+    }
+
+    private void Handle_UpdateCompanionWarningTime(MessagePayload<UpdateCompanionWarningTime> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.MainHero, out var mainHeroId)) return;
+
+        var message = new NetworkUpdateCompanionWarningTime(
+            mainHeroId,
+            data.WarningTimeNumTicks
+        );
+
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkUpdateCompanionWarningTime(MessagePayload<NetworkUpdateCompanionWarningTime> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
+
+            sessionInteractionsPlayerDataInterface.UpdateWarningTime(data.MainHeroId, data.WarningTimeNumTicks);
+        });
     }
 
     private void Handle_ResetPerksByArenaMaster(MessagePayload<ResetPerksByArenaMaster> obj)
@@ -98,6 +134,8 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanId, out var playerClan)) return;
+
+            if (playerClan.Companions.Count <= playerClan.CompanionLimit) return;
 
             // Re-implement vanilla to not use Clan.PlayerClan
             int companionsCount = playerClan.Companions.Count;
