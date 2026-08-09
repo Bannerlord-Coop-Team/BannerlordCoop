@@ -5,6 +5,7 @@ using System.Text;
 using System.Xml.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace E2E.Tests.Services.Missions.Tournaments;
 
@@ -269,6 +270,31 @@ public class TournamentSpectatorRulesTests
     {
         Assert.Equal(expected, TournamentSpectatorOrange.ShouldDisappearOnCollision(isSpectator, isOrange));
     }
+
+    [Fact]
+    public void SpectatorCombatFlags_WithOrangesAllowThrowsButBlockKicks()
+    {
+        AgentFlag initialFlags = AgentFlag.CanAttack | AgentFlag.CanKick | AgentFlag.CanWieldWeapon;
+
+        AgentFlag combatFlags = TournamentSpectatorOrange.GetCombatFlags(initialFlags, true);
+
+        Assert.True(combatFlags.HasFlag(AgentFlag.CanAttack));
+        Assert.False(combatFlags.HasFlag(AgentFlag.CanKick));
+        Assert.True(combatFlags.HasFlag(AgentFlag.CanWieldWeapon));
+    }
+
+    [Fact]
+    public void SpectatorCombatFlags_WithoutOrangesBlockAllMeleeAttacks()
+    {
+        AgentFlag initialFlags = AgentFlag.CanAttack | AgentFlag.CanKick | AgentFlag.CanWieldWeapon;
+
+        AgentFlag combatFlags = TournamentSpectatorOrange.GetCombatFlags(initialFlags, false);
+
+        Assert.False(combatFlags.HasFlag(AgentFlag.CanAttack));
+        Assert.False(combatFlags.HasFlag(AgentFlag.CanKick));
+        Assert.True(combatFlags.HasFlag(AgentFlag.CanWieldWeapon));
+    }
+
     private static TournamentSessionSnapshot Snapshot(TournamentSessionPhase phase)
     {
         TournamentContestantData[] contestants =

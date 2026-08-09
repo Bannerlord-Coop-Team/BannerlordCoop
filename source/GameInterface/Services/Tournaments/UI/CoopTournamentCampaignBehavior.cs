@@ -34,7 +34,7 @@ public sealed class CoopTournamentCampaignBehavior : CampaignBehaviorBase
 
         starter.AddGameMenu(
             PreparationMenuId,
-            "{=coop_tournament_preparation_description}Coop tournaments are in BETA. It is recommended to make a save before starting a tournament.\n\nLords in tournament: {TOURNAMENT_LORD_COUNT}\n\nTournament prize: {TOURNAMENT_PRIZE}\n\nEnrolled competitors:\n{TOURNAMENT_PLAYERS}",
+            "{=coop_tournament_preparation_description}Lords in tournament: {TOURNAMENT_LORD_COUNT}\n\nTournament prize: {TOURNAMENT_PRIZE}\n\nEnrolled competitors:\n{TOURNAMENT_PLAYERS}",
             InitializePreparationMenu,
             GameMenu.MenuOverlayType.SettlementWithBoth,
             GameMenu.MenuFlags.None,
