@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -51,6 +52,7 @@ internal class BattleSimulationRunHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IMapEventLogger mapEventLogger;
+    private readonly IPlayerManager playerManager;
 
     private sealed class ActiveSimulation
     {
@@ -67,12 +69,14 @@ internal class BattleSimulationRunHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IMapEventLogger mapEventLogger)
+        IMapEventLogger mapEventLogger,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.mapEventLogger = mapEventLogger;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
@@ -166,9 +170,18 @@ internal class BattleSimulationRunHandler : IHandler
         }
 
         var observer = new ForwardingBattleObserver(objectManager);
+        bool setupAccepted = false;
 
         GameThread.RunSafe(() =>
         {
+            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty))
+            {
+                Logger.Warning("Rejecting battle simulation start for map event {MapEventId}: requester is not an authoritative participant", mapEventId);
+                return;
+            }
+
+            MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
+
             // v1: simulate the full participating troop count (null), not the player's selected subset.
             var previousObserver = mapEvent.BattleObserver;
             mapEvent.BattleObserver = observer;
@@ -185,7 +198,15 @@ internal class BattleSimulationRunHandler : IHandler
                     PreviousObserver = previousObserver,
                 };
             }
+            setupAccepted = true;
         }, blocking: true, context: nameof(Handle_NetworkBattleStartRequest));
+
+        if (!setupAccepted)
+        {
+            ServerBattleModeArbiter.Release(mapEventId);
+            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
+            return;
+        }
 
         // Mirror the simulation onto every other client in this map event. Each client opens the window only if its
         // own party is in the event; the requesting client and uninvolved clients ignore it. The requester keeps
@@ -197,6 +218,24 @@ internal class BattleSimulationRunHandler : IHandler
         network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, true));
 
         mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation set up; awaiting client-paced advances");
+    }
+
+    private bool TryGetRequestingParticipant(
+        NetPeer requester,
+        NetworkBattleStartRequest request,
+        MapEvent mapEvent,
+        out MobileParty party)
+    {
+        party = null;
+        if (requester == null ||
+            !playerManager.TryGetPlayer(requester, out var player) ||
+            !string.Equals(player.MobilePartyId, request.AttackerPartyId, StringComparison.Ordinal) ||
+            !objectManager.TryGetObject(player.MobilePartyId, out party))
+        {
+            return false;
+        }
+
+        return mapEvent.FindMapEventParty(party.Party) != null;
     }
 
     /// <summary>
