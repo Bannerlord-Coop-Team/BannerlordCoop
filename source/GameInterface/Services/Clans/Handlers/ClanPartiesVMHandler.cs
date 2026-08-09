@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Helpers;
@@ -71,6 +72,13 @@ internal class ClanPartiesVMHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewLeaderId, out var newLeader)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.TargetClanId, out var targetClan)) return;
 
+            // Don't create a party for a hero a player controls.
+            if (newLeader.IsPlayerHero())
+            {
+                Logger.Error($"Blocked clan party creation for player hero {newLeader.Name}, {newLeader.StringId}");
+                return;
+            }
+
             MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeader, targetClan);
             if (newLeader.Gold < data.PartyGoldLowerThreshold)
             {
@@ -79,10 +87,10 @@ internal class ClanPartiesVMHandler : IHandler
             mobileParty.SetMoveModeHold();
 
             // Flush troop roster to show actual member count on clients after refresh
-            objectManager.TryGetId(mobileParty.MemberRoster, out var rosterId);
-            var compactId = Compact(rosterId, typeof(TroopRoster));
-
-            sendCoalescer?.FlushInstance(compactId, network);
+            if (objectManager.TryGetId(mobileParty.MemberRoster, out var rosterId))
+            {
+                sendCoalescer?.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
+            }
 
             network.Send(obj.Who as NetPeer, new RefreshPartiesList());
         });
@@ -129,6 +137,13 @@ internal class ClanPartiesVMHandler : IHandler
             if (selectedParty.IsPlayerParty())
             {
                 Logger.Error($"Blocked clan party leader change for player party {selectedParty.Name}, {selectedParty.StringId}");
+                return;
+            }
+
+            // Block changing leader if new leader is a player hero
+            if (newLeader != null && newLeader.IsPlayerHero())
+            {
+                Logger.Error($"Blocked clan party leader change to player hero {newLeader.Name}, {newLeader.StringId}");
                 return;
             }
 

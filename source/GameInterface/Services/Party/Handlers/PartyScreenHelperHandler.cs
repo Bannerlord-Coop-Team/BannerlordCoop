@@ -94,6 +94,13 @@ internal class PartyScreenHelperHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
 
+            // Don't create a party for a hero a player controls.
+            if (newLeaderHero.IsPlayerHero())
+            {
+                logger.Error($"Blocked clan party creation for player hero {newLeaderHero.Name}, {newLeaderHero.StringId}");
+                return;
+            }
+
             int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
             if (newLeaderHero.Gold < partyGoldLowerThreshold)
             {
@@ -115,10 +122,10 @@ internal class PartyScreenHelperHandler : IHandler
             }
 
             // Flush troop roster to show actual member count on clients after refresh
-            objectManager.TryGetId(mobileParty.MemberRoster, out var rosterId);
-            var compactId = Compact(rosterId, typeof(TroopRoster));
-
-            sendCoalescer?.FlushInstance(compactId, network);
+            if (objectManager.TryGetId(mobileParty.MemberRoster, out var rosterId))
+            {
+                sendCoalescer?.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
+            }
 
             network.Send(obj.Who as NetPeer, new RefreshPartiesList());
         });

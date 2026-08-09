@@ -18,7 +18,7 @@ internal class DisbandPartyActionPatches
     {
         if (disbandParty == null || !disbandParty.IsPlayerParty()) return true;
 
-        Logger.Warning($"Blocked DisbandPartyAction.StartDisband for player party {disbandParty.Name}, {disbandParty.StringId}");
+        Logger.Warning("Blocked DisbandPartyAction.StartDisband for player party {StringId}", disbandParty.StringId);
 
         return false;
     }
