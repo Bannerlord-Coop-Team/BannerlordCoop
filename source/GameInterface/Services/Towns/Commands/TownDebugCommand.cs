@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Patches;
 using Helpers;
@@ -6,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -481,6 +483,23 @@ public class TownDebugCommand
 
         RebellionsCampaignBehaviorPatches.PublishTownInRebelliousStateChanged(town, inRebelliousState);
         return $"Town InRebelliousState has changed to: {town.InRebelliousState}.";
+    }
+
+    [CommandLineArgumentFunction("start_rebellion", "coop.debug.town")]
+    public static string StartRebellion(List<string> args)
+    {
+        if (ModInformation.IsClient) return "Run coop.debug.town.start_rebellion on the server.";
+        if (args.Count != 1) return "Usage: coop.debug.town.start_rebellion <townId>";
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager";
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+        if (town.OwnerClan.IsRebelClan) return $"{town.Name} is already owned by a rebel clan.";
+
+        RebellionsCampaignBehavior behavior = Campaign.Current.GetCampaignBehavior<RebellionsCampaignBehavior>();
+        if (behavior == null) return "Unable to resolve RebellionsCampaignBehavior";
+
+        behavior.StartRebellionEvent(town.Settlement);
+        return $"Started the vanilla rebellion in {town.Name}. New owner: {town.OwnerClan.Name} (rebel={town.OwnerClan.IsRebelClan}).";
     }
 
     // coop.debug.town.set_garrison_auto_recruitment town_comp_V1 false
