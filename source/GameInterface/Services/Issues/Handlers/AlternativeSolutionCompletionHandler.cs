@@ -41,14 +41,25 @@ internal class AlternativeSolutionCompletionHandler : IHandler
         var requester = payload.Who as NetPeer;
         GameThread.RunSafe(() =>
         {
-            if (requester == null || !playerManager.TryGetPlayer(requester, out var player)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
-            if (!IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner)) return;
-            if (recordedOwner != player.ControllerId) return;
-            if (owner.Issue is not IssueBase issue) return;
-            if (!issue.IsSolvingWithAlternative || !issue.AlternativeSolutionReturnTimeForTroops.IsPast) return;
+            if (!TryResolveAuthorizedOwner(requester, ownerId, out var owner, out var issue)) return;
 
             AlternativeSolutionCompletionRunner.CompleteOnServer(owner, issue);
         });
+    }
+
+    private bool TryResolveAuthorizedOwner(NetPeer requester, string ownerId, out Hero owner, out IssueBase issue)
+    {
+        owner = null;
+        issue = null;
+
+        if (requester == null || !playerManager.TryGetPlayer(requester, out var player)) return false;
+        if (!objectManager.TryGetObjectWithLogging(ownerId, out owner)) return false;
+        if (!IssueOwnershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner)) return false;
+        if (recordedOwner != player.ControllerId) return false;
+        if (owner.Issue is not IssueBase resolvedIssue) return false;
+        if (!resolvedIssue.IsSolvingWithAlternative || !resolvedIssue.AlternativeSolutionReturnTimeForTroops.IsPast) return false;
+
+        issue = resolvedIssue;
+        return true;
     }
 }
