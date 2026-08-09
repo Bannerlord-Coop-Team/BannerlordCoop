@@ -170,6 +170,15 @@ internal class MapEventPatches
         if (ModInformation.IsClient)
             return false;
 
+        int removedPartyCount = RemovePartiesWithoutParty(__instance);
+        if (removedPartyCount > 0)
+        {
+            Logger.Error(
+                "Removed {PartyCount} map event parties without a Party from {MapEventId} before calculating battle results",
+                removedPartyCount,
+                __instance.StringId);
+        }
+
         // Need to calculate map event results before committing changes
         __instance.CalculateMapEventResults();
 
@@ -193,6 +202,28 @@ internal class MapEventPatches
         battleObserver.BattleResultsReady();
 
         return false;
+    }
+
+    internal static int RemovePartiesWithoutParty(MapEvent mapEvent)
+    {
+        int removedPartyCount = 0;
+
+        foreach (MapEventSide side in mapEvent._sides)
+        {
+            if (side == null)
+                continue;
+
+            for (int i = side._battleParties.Count - 1; i >= 0; i--)
+            {
+                if (side._battleParties[i]?.Party != null)
+                    continue;
+
+                side._battleParties.RemoveAt(i);
+                removedPartyCount++;
+            }
+        }
+
+        return removedPartyCount;
     }
 
     [HarmonyPatch("CommitCalculatedMapEventResults")]
