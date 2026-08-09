@@ -67,6 +67,7 @@ public class SettlementRebelClanInitializationHandlerTests
                     typeof(Clan),
                     nameof(Clan.CreateSettlementRebelClan),
                     new[] { typeof(Settlement), typeof(Hero), typeof(int) })),
+            new CodeInstruction(OpCodes.Nop),
             new CodeInstruction(OpCodes.Stloc_0),
             new CodeInstruction(OpCodes.Ldloc_0),
             new CodeInstruction(OpCodes.Ldc_I4_1),
@@ -78,10 +79,10 @@ public class SettlementRebelClanInitializationHandlerTests
         var rewritten = new List<CodeInstruction>(
             RebellionsCampaignBehaviorPatches.CreateRebelPartyAndClanTranspiler(instructions));
 
-        Assert.Equal(OpCodes.Call, rewritten[4].opcode);
+        Assert.Equal(OpCodes.Call, rewritten[5].opcode);
         Assert.Equal(
             AccessTools.Method(typeof(RebellionsCampaignBehaviorPatches), nameof(RebellionsCampaignBehaviorPatches.PublishRebelClanIsNoble)),
-            rewritten[4].operand);
+            rewritten[5].operand);
     }
 
     [Fact]
@@ -122,6 +123,33 @@ public class SettlementRebelClanInitializationHandlerTests
                     nameof(Clan.CreateSettlementRebelClan),
                     new[] { typeof(Settlement), typeof(Hero), typeof(int) })),
             new CodeInstruction(OpCodes.Stloc_1),
+            new CodeInstruction(OpCodes.Ldloc_1),
+            new CodeInstruction(OpCodes.Ldc_I4_1),
+            new CodeInstruction(
+                OpCodes.Callvirt,
+                AccessTools.PropertySetter(typeof(Clan), nameof(Clan.IsNoble)))
+        };
+
+        Assert.Throws<InvalidOperationException>(() => new List<CodeInstruction>(
+            RebellionsCampaignBehaviorPatches.CreateRebelPartyAndClanTranspiler(instructions)));
+    }
+
+    [Fact]
+    public void CreateRebelPartyAndClanTranspiler_AmbiguousIsNobleSetters_Throws()
+    {
+        var instructions = new[]
+        {
+            new CodeInstruction(
+                OpCodes.Call,
+                AccessTools.Method(
+                    typeof(Clan),
+                    nameof(Clan.CreateSettlementRebelClan),
+                    new[] { typeof(Settlement), typeof(Hero), typeof(int) })),
+            new CodeInstruction(OpCodes.Ldloc_0),
+            new CodeInstruction(OpCodes.Ldc_I4_1),
+            new CodeInstruction(
+                OpCodes.Callvirt,
+                AccessTools.PropertySetter(typeof(Clan), nameof(Clan.IsNoble))),
             new CodeInstruction(OpCodes.Ldloc_1),
             new CodeInstruction(OpCodes.Ldc_I4_1),
             new CodeInstruction(
