@@ -125,55 +125,48 @@ internal class BattleSimulationRunHandler : IHandler
         }
 
         var mapEventId = payload.What.MapEventId;
-
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
-            return;
-
-        if (mapEvent.HasWinner)
-        {
-            mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation requested for an already finished map event; rejecting");
-            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
-            return;
-        }
-        if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
-        {
-            Logger.Warning("Rejecting battle simulation for map event {MapEventId}: this hostile action does not support multiple player parties", mapEventId);
-            network.Send(requestingPeer, new NetworkBattleSimulationFinished(mapEventId));
-            return;
-        }
-
-        // Server-authoritative mode gate: accept the auto-resolve only if no live mission already owns this event.
-        // On reject the requesting client never opened its scoreboard (the prefix deferred it), so there is nothing
-        // to tear down — the request is simply dropped.
-        if (!ServerBattleModeArbiter.TryClaimSimulation(mapEventId))
-        {
-            mapEventLogger.DebugMapEvent(mapEvent, "Rejecting battle simulation: a live mission is already underway for this event");
-            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
-            return;
-        }
-
-        // Guard against a double-start: two clients can both click auto-resolve for the same event inside the
-        // broadcast-latency window, and TryClaimSimulation lets the second through — it only rejects the OTHER
-        // mode, so an already-simulation claim still succeeds. Without this the second request would set the
-        // simulation up again (overwriting the first's activeSimulations entry, orphaning its observer) and its
-        // requester would also become a pacer. Reject the duplicate so the first stays the sole pacer; the
-        // arbiter claim is left intact (the first still owns it). Reliable on the single network thread: the
-        // first request only returns after its blocking GameThread.Run below has populated activeSimulations.
-        lock (simLock)
-        {
-            if (activeSimulations.ContainsKey(mapEventId))
-            {
-                mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation already active for this event; rejecting duplicate start");
-                network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
-                return;
-            }
-        }
-
         var observer = new ForwardingBattleObserver(objectManager);
+        MapEvent mapEvent = null;
         bool setupAccepted = false;
+        bool claimAcquired = false;
+        bool unsupportedHostileAction = false;
 
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging(mapEventId, out mapEvent))
+                return;
+
+            if (mapEvent.HasWinner)
+            {
+                mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation requested for an already finished map event; rejecting");
+                return;
+            }
+            if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
+            {
+                Logger.Warning("Rejecting battle simulation for map event {MapEventId}: this hostile action does not support multiple player parties", mapEventId);
+                unsupportedHostileAction = true;
+                return;
+            }
+
+            // Server-authoritative mode gate: accept the auto-resolve only if no live mission already owns this event.
+            if (!ServerBattleModeArbiter.TryClaimSimulation(mapEventId))
+            {
+                mapEventLogger.DebugMapEvent(mapEvent, "Rejecting battle simulation: a live mission is already underway for this event");
+                return;
+            }
+            claimAcquired = true;
+
+            // An existing simulation owns the arbiter claim, so a duplicate rejection must not release it.
+            lock (simLock)
+            {
+                if (activeSimulations.ContainsKey(mapEventId))
+                {
+                    mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation already active for this event; rejecting duplicate start");
+                    claimAcquired = false;
+                    return;
+                }
+            }
+
             if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty))
             {
                 Logger.Warning("Rejecting battle simulation start for map event {MapEventId}: requester is not an authoritative participant", mapEventId);
@@ -203,8 +196,13 @@ internal class BattleSimulationRunHandler : IHandler
 
         if (!setupAccepted)
         {
-            ServerBattleModeArbiter.Release(mapEventId);
-            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
+            if (claimAcquired)
+                ServerBattleModeArbiter.Release(mapEventId);
+
+            if (unsupportedHostileAction)
+                network.Send(requestingPeer, new NetworkBattleSimulationFinished(mapEventId));
+            else
+                network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
             return;
         }
 

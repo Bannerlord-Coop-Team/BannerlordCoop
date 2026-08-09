@@ -65,9 +65,9 @@ internal class BattleSimulationStartPatch
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return true;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId))
-            return true;
+            return false;
         if (!objectManager.TryGetId(MobileParty.MainParty, out var attackerPartyId))
-            return true;
+            return false;
 
         // Block until the server accepts/rejects. The menu stays open during the wait (the consequence is frozen
         // mid-call). On reject, skip the native consequence so nothing opens and the menu stays.
