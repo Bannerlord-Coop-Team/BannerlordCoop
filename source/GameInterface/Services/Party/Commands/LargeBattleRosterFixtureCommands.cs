@@ -18,7 +18,9 @@ namespace GameInterface.Services.Party.Commands;
 internal static class LargeBattleRosterFixtureCommands
 {
     private const string FixtureTroopId = "imperial_recruit";
+    private const string BoostTroopId = "imperial_legionary";
     private static LargeBattleRosterFixture fixture;
+    private static PartyBoostFixture boostFixture;
 
     private sealed class LargeBattleRosterFixture
     {
@@ -33,6 +35,118 @@ internal static class LargeBattleRosterFixtureCommands
         public MobileParty Party;
         public TroopRosterElement[] MemberRoster;
         public string Fingerprint;
+    }
+
+    private sealed class PartyBoostFixture
+    {
+        public Campaign Campaign;
+        public PartySnapshot Party;
+        public int AddedTroops;
+    }
+
+    [CommandLineArgumentFunction("battle_roster_boost_begin", "coop.debug.mobileparty")]
+    public static string BeginBoost(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
+        if (args.Count != 2
+            || !int.TryParse(args[1], out int addedTroops)
+            || addedTroops < 1
+            || addedTroops > 500)
+        {
+            return "Usage: coop.debug.mobileparty.battle_roster_boost_begin " +
+                   "<partyId> <troops:1-500>";
+        }
+        if (boostFixture != null)
+            return "A battle-roster boost fixture is already pending restoration.";
+        if (!TryGetObjectManager(out IObjectManager objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!TryResolveParty(
+                objectManager,
+                args[0],
+                out MobileParty party,
+                out string partyError))
+        {
+            return partyError;
+        }
+        if (!objectManager.TryGetObject(
+                BoostTroopId,
+                out CharacterObject boostTroop))
+        {
+            return $"Unable to resolve fixture troop {BoostTroopId}.";
+        }
+
+        var activeFixture = new PartyBoostFixture
+        {
+            Campaign = Campaign.Current,
+            Party = Capture(party),
+            AddedTroops = addedTroops,
+        };
+        boostFixture = activeFixture;
+        party.MemberRoster.AddToCounts(boostTroop, addedTroops);
+
+        return
+            $"BATTLE_ROSTER_BOOST_STARTED troop={BoostTroopId} added={addedTroops}\n" +
+            FormatBoostState("active", activeFixture);
+    }
+
+    [CommandLineArgumentFunction("battle_roster_boost_status", "coop.debug.mobileparty")]
+    public static string BoostStatus(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mobileparty.battle_roster_boost_status " +
+                   "<partyId>";
+        }
+        if (!TryGetObjectManager(out IObjectManager objectManager))
+            return "Unable to resolve ObjectManager.";
+        if (!TryResolveParty(
+                objectManager,
+                args[0],
+                out MobileParty party,
+                out string partyError))
+        {
+            return partyError;
+        }
+
+        if (boostFixture == null || boostFixture.Party.PartyId != party.StringId)
+            return FormatPartyState("none", party, 0);
+
+        boostFixture.Party.Party = party;
+        return FormatBoostState("active", boostFixture);
+    }
+
+    [CommandLineArgumentFunction("battle_roster_boost_restore", "coop.debug.mobileparty")]
+    public static string RestoreBoost(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Run this command on the server.";
+        if (args.Count != 0)
+            return "Usage: coop.debug.mobileparty.battle_roster_boost_restore";
+        if (boostFixture == null)
+            return "No battle-roster boost fixture is pending restoration.";
+
+        PartyBoostFixture activeFixture = boostFixture;
+        if (activeFixture.Campaign != Campaign.Current)
+        {
+            boostFixture = null;
+            return "The fixture belongs to a previous campaign and was discarded.";
+        }
+
+        Restore(activeFixture.Party);
+        string restoredFingerprint = Fingerprint(activeFixture.Party.Party.MemberRoster);
+        if (restoredFingerprint != activeFixture.Party.Fingerprint)
+        {
+            return "Battle-roster boost restoration did not reproduce the original fingerprint.\n" +
+                   FormatBoostState("restore-failed", activeFixture);
+        }
+
+        boostFixture = null;
+        return
+            "BATTLE_ROSTER_BOOST_RESTORED\n" +
+            FormatPartyState("none", activeFixture.Party.Party, 0);
     }
 
     [CommandLineArgumentFunction("large_battle_roster_begin", "coop.debug.mobileparty")]
@@ -316,6 +430,37 @@ internal static class LargeBattleRosterFixtureCommands
         AppendPartyState(output, firstParty);
         AppendPartyState(output, secondParty);
         return output.ToString().TrimEnd();
+    }
+
+    private static string FormatBoostState(
+        string state,
+        PartyBoostFixture activeFixture)
+    {
+        return FormatPartyState(
+            state,
+            activeFixture.Party.Party,
+            activeFixture.AddedTroops);
+    }
+
+    private static string FormatPartyState(
+        string state,
+        MobileParty party,
+        int addedTroops)
+    {
+        TroopRoster roster = party.MemberRoster;
+        int total = 0;
+        int wounded = 0;
+        for (int index = 0; index < roster.Count; index++)
+        {
+            TroopRosterElement element = roster.GetElementCopyAtIndex(index);
+            total += element.Number;
+            wounded += element.WoundedNumber;
+        }
+
+        return
+            $"BATTLE_ROSTER_BOOST state={state}|party={party.StringId}|" +
+            $"added={addedTroops}|total={total}|wounded={wounded}|healthy={total - wounded}|" +
+            $"fingerprint={Fingerprint(roster)}";
     }
 
     private static void AppendPartyState(
