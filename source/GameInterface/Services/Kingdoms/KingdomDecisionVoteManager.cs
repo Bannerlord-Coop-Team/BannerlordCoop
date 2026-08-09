@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Data;
@@ -61,6 +61,9 @@ namespace GameInterface.Services.Kingdoms
         private readonly HashSet<KingdomDecision> LocalSubmittedDecisions = new HashSet<KingdomDecision>();
         private readonly List<DecisionItemBaseVM> ActiveDecisionItems = new List<DecisionItemBaseVM>();
         private readonly List<PendingKingdomDecisionVote> PendingRemoteVotes = new List<PendingKingdomDecisionVote>();
+#if DEBUG
+        private bool failNextFinalVotePublication;
+#endif
 
         private readonly IPlayerManager playerManager;
         private readonly IObjectManager objectManager;
@@ -85,7 +88,17 @@ namespace GameInterface.Services.Kingdoms
             LocalSubmittedDecisions.Clear();
             ActiveDecisionItems.Clear();
             PendingRemoteVotes.Clear();
+#if DEBUG
+            failNextFinalVotePublication = false;
+#endif
         }
+
+#if DEBUG
+        internal void ArmFinalVotePublicationFailure()
+        {
+            failNextFinalVotePublication = true;
+        }
+#endif
 
         public void RegisterDecision(KingdomDecision decision)
         {
@@ -169,6 +182,14 @@ namespace GameInterface.Services.Kingdoms
 
         public bool TryPublishFinalVote(DecisionItemBaseVM decisionItem)
         {
+#if DEBUG
+            if (failNextFinalVotePublication)
+            {
+                failNextFinalVotePublication = false;
+                Logger.Warning("Unable to publish final kingdom decision vote from the local decision UI.");
+                return false;
+            }
+#endif
             if (decisionItem == null || decisionItem._currentSelectedOption == null) return false;
             if (HasLocalPlayerSubmittedVote(decisionItem.KingdomDecisionMaker?._decision))
             {

@@ -244,7 +244,12 @@ public class KingdomPolicyVoteFixtureCommands
         {
             return "No finalizable kingdom decision item.";
         }
+        if (!ContainerProvider.TryResolve(out KingdomDecisionVoteManager voteManager))
+        {
+            return "Unable to resolve KingdomDecisionVoteManager.";
+        }
 
+        voteManager.ArmFinalVotePublicationFailure();
         decisionItem.ExecuteFinalSelection();
         return "POLICY_VOTE_FINAL_SELECTION_EXECUTED";
     }
