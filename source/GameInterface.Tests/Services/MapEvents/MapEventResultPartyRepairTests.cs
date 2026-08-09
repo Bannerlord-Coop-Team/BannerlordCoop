@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.MapEvents.Patches;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -59,10 +60,10 @@ namespace GameInterface.Tests.Services.MapEvents
             MapEventParty attacker = CreateResolvedParty();
             MapEvent mapEvent = CreateMapEvent(CreateSide(defender), CreateSide(attacker));
             int renownPartyCount = 0;
-            Action<MapEventSide>[] commitPhases =
+            Action<MapEventParty>[] commitPhases =
             {
-                side => side.Parties[0].Party = null,
-                side => renownPartyCount += side.Parties.Count
+                party => party.Party = null,
+                party => renownPartyCount++
             };
 
             int removedPartyCount = MapEventPatches.CommitCalculatedMapEventResults(mapEvent, commitPhases);
@@ -71,6 +72,34 @@ namespace GameInterface.Tests.Services.MapEvents
             Assert.Equal(0, renownPartyCount);
             Assert.Empty(mapEvent.DefenderSide.Parties);
             Assert.Empty(mapEvent.AttackerSide.Parties);
+        }
+
+        [Fact]
+        public void PartyInvalidatedDuringPhase_RemovesBeforeItsCommit()
+        {
+            MapEventParty firstDefender = CreateResolvedParty();
+            MapEventParty invalidatedDefender = CreateResolvedParty();
+            MapEventParty attacker = CreateResolvedParty();
+            MapEvent mapEvent = CreateMapEvent(
+                CreateSide(firstDefender, invalidatedDefender),
+                CreateSide(attacker));
+            var committedParties = new List<MapEventParty>();
+            Action<MapEventParty>[] commitPhases =
+            {
+                party =>
+                {
+                    committedParties.Add(party);
+                    if (party == firstDefender)
+                        invalidatedDefender.Party = null;
+                }
+            };
+
+            int removedPartyCount = MapEventPatches.CommitCalculatedMapEventResults(mapEvent, commitPhases);
+
+            Assert.Equal(1, removedPartyCount);
+            Assert.Equal(new[] { firstDefender, attacker }, committedParties);
+            Assert.Collection(mapEvent.DefenderSide.Parties, party => Assert.Same(firstDefender, party));
+            Assert.Collection(mapEvent.AttackerSide.Parties, party => Assert.Same(attacker, party));
         }
 
         private static MapEvent CreateMapEvent(MapEventSide defender, MapEventSide attacker)

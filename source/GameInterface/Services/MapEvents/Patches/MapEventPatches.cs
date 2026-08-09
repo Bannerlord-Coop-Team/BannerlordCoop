@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Configuration;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
@@ -30,13 +31,13 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class MapEventPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
-    private static readonly Action<MapEventSide>[] CommitResultPhases =
+    private static readonly Action<MapEventParty>[] CommitResultPhases =
     {
-        side => side.CommitXpGains(),
-        side => side.CommitRenownChanges(),
-        side => side.CommitInfluenceChanges(),
-        side => side.CommitMoraleChanges(),
-        side => side.CommitGoldChanges()
+        party => party.CommitXpGain(),
+        party => party.CommitRenownChanges(),
+        party => party.CommitInfluenceChanges(),
+        party => party.CommitMoraleChanges(),
+        party => party.CommitGoldChanges()
     };
 
     [HarmonyPatch(nameof(MapEvent.AddInvolvedPartyInternal))]
@@ -230,13 +231,14 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static bool Prefix_CommitCalculatedMapEventResults(MapEvent __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-            return true;
-
         if (ModInformation.IsClient)
-            return false;
+            return CallOriginalPolicy.IsOriginalAllowed();
 
-        int removedPartyCount = CommitCalculatedMapEventResults(__instance, CommitResultPhases);
+        int removedPartyCount;
+        using (AllowedThread.Suspend())
+        {
+            removedPartyCount = CommitCalculatedMapEventResults(__instance, CommitResultPhases);
+        }
         if (removedPartyCount > 0)
         {
             Logger.Error(
@@ -250,7 +252,7 @@ internal class MapEventPatches
 
     internal static int CommitCalculatedMapEventResults(
         MapEvent mapEvent,
-        IReadOnlyList<Action<MapEventSide>> commitPhases)
+        IReadOnlyList<Action<MapEventParty>> commitPhases)
     {
         int removedPartyCount = RemovePartiesWithoutParty(mapEvent);
 
@@ -259,10 +261,17 @@ internal class MapEventPatches
             if (side == null)
                 continue;
 
-            foreach (Action<MapEventSide> commitPhase in commitPhases)
+            foreach (Action<MapEventParty> commitPhase in commitPhases)
             {
-                commitPhase(side);
-                removedPartyCount += RemovePartiesWithoutParty(mapEvent);
+                MapEventParty[] parties = side.Parties.ToArray();
+                foreach (MapEventParty party in parties)
+                {
+                    if (!side._battleParties.Contains(party) || party?.Party == null)
+                        continue;
+
+                    commitPhase(party);
+                    removedPartyCount += RemovePartiesWithoutParty(mapEvent);
+                }
             }
         }
 
