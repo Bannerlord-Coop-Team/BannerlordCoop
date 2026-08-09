@@ -154,5 +154,4 @@ public sealed class SteamSessionProvider : ISessionProvider
             remove => SteamGameServerBoot.LoggedOn -= value;
         }
     }
-
 }

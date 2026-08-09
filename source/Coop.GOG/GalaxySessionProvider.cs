@@ -191,5 +191,4 @@ public sealed class GalaxySessionProvider : ISessionProvider
             remove => GalaxyGameServerBoot.Ready -= value;
         }
     }
-
 }
