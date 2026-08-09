@@ -6,9 +6,12 @@ using GameInterface.Services.Clans.Handlers;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Settlements.Patches;
+using HarmonyLib;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -30,7 +33,7 @@ public class SettlementRebelClanInitializationHandlerTests
     }
 
     [Fact]
-    public void CreateSettlementRebelClanPostfix_Server_PublishesCompletedClan()
+    public void CreateSettlementRebelClanPostfix_Server_PublishesFactorySnapshot()
     {
         var clan = ObjectHelper.SkipConstructor<Clan>();
         var messages = new List<SettlementRebelClanInitialized>();
@@ -49,6 +52,108 @@ public class SettlementRebelClanInitializationHandlerTests
             MessageBroker.Instance.Unsubscribe(capture);
         }
 
+        SettlementRebelClanInitialized message = Assert.Single(messages);
+        Assert.Same(clan, message.Clan);
+    }
+
+    [Fact]
+    public void CreateRebelPartyAndClanTranspiler_ReplacesIsNobleSetterWithSnapshotPublisher()
+    {
+        var instructions = new[]
+        {
+            new CodeInstruction(
+                OpCodes.Call,
+                AccessTools.Method(
+                    typeof(Clan),
+                    nameof(Clan.CreateSettlementRebelClan),
+                    new[] { typeof(Settlement), typeof(Hero), typeof(int) })),
+            new CodeInstruction(OpCodes.Stloc_0),
+            new CodeInstruction(OpCodes.Ldloc_0),
+            new CodeInstruction(OpCodes.Ldc_I4_1),
+            new CodeInstruction(
+                OpCodes.Callvirt,
+                AccessTools.PropertySetter(typeof(Clan), nameof(Clan.IsNoble)))
+        };
+
+        var rewritten = new List<CodeInstruction>(
+            RebellionsCampaignBehaviorPatches.CreateRebelPartyAndClanTranspiler(instructions));
+
+        Assert.Equal(OpCodes.Call, rewritten[4].opcode);
+        Assert.Equal(
+            AccessTools.Method(typeof(RebellionsCampaignBehaviorPatches), nameof(RebellionsCampaignBehaviorPatches.PublishRebelClanIsNoble)),
+            rewritten[4].operand);
+    }
+
+    [Fact]
+    public void CreateRebelPartyAndClanTranspiler_MissingFactorySequence_Throws()
+    {
+        var instructions = new[]
+        {
+            new CodeInstruction(
+                OpCodes.Callvirt,
+                AccessTools.PropertySetter(typeof(Clan), nameof(Clan.IsNoble)))
+        };
+
+        Assert.Throws<InvalidOperationException>(() => new List<CodeInstruction>(
+            RebellionsCampaignBehaviorPatches.CreateRebelPartyAndClanTranspiler(instructions)));
+    }
+
+    [Fact]
+    public void CreateRebelPartyAndClanTranspiler_AmbiguousFactorySequences_Throws()
+    {
+        var instructions = new[]
+        {
+            new CodeInstruction(
+                OpCodes.Call,
+                AccessTools.Method(
+                    typeof(Clan),
+                    nameof(Clan.CreateSettlementRebelClan),
+                    new[] { typeof(Settlement), typeof(Hero), typeof(int) })),
+            new CodeInstruction(OpCodes.Stloc_0),
+            new CodeInstruction(OpCodes.Ldloc_0),
+            new CodeInstruction(OpCodes.Ldc_I4_1),
+            new CodeInstruction(
+                OpCodes.Callvirt,
+                AccessTools.PropertySetter(typeof(Clan), nameof(Clan.IsNoble))),
+            new CodeInstruction(
+                OpCodes.Call,
+                AccessTools.Method(
+                    typeof(Clan),
+                    nameof(Clan.CreateSettlementRebelClan),
+                    new[] { typeof(Settlement), typeof(Hero), typeof(int) })),
+            new CodeInstruction(OpCodes.Stloc_1),
+            new CodeInstruction(OpCodes.Ldloc_1),
+            new CodeInstruction(OpCodes.Ldc_I4_1),
+            new CodeInstruction(
+                OpCodes.Callvirt,
+                AccessTools.PropertySetter(typeof(Clan), nameof(Clan.IsNoble)))
+        };
+
+        Assert.Throws<InvalidOperationException>(() => new List<CodeInstruction>(
+            RebellionsCampaignBehaviorPatches.CreateRebelPartyAndClanTranspiler(instructions)));
+    }
+
+    [Fact]
+    public void PublishRebelClanIsNoble_Server_SetsAndPublishesCompletedClan()
+    {
+        var clan = ObjectHelper.SkipConstructor<Clan>();
+        var messages = new List<SettlementRebelClanInitialized>();
+        Action<MessagePayload<SettlementRebelClanInitialized>> capture = payload => messages.Add(payload.What);
+        bool wasServer = ModInformation.IsServer;
+
+        MessageBroker.Instance.Subscribe(capture);
+        ModInformation.IsServer = true;
+        try
+        {
+            RebellionsCampaignBehaviorPatches.PublishRebelClanIsNoble(clan, true);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+            MessageBroker.Instance.Unsubscribe(capture);
+        }
+
+        Assert.True(clan.IsNoble);
         SettlementRebelClanInitialized message = Assert.Single(messages);
         Assert.Same(clan, message.Clan);
     }
@@ -74,6 +179,7 @@ public class SettlementRebelClanInitializationHandlerTests
         clan.BannerBackgroundColorSecondary = 14;
         clan.BannerIconColor = 15;
         clan.IsRebelClan = true;
+        clan.IsNoble = true;
 
         var messageBroker = new Mock<IMessageBroker>();
         ServerMessageHandler serverHandler = null!;
@@ -116,6 +222,7 @@ public class SettlementRebelClanInitializationHandlerTests
         Assert.Equal(14u, message.BannerBackgroundColorSecondary);
         Assert.Equal(15u, message.BannerIconColor);
         Assert.True(message.IsRebelClan);
+        Assert.True(message.IsNoble);
     }
 
     [Fact]
@@ -157,6 +264,7 @@ public class SettlementRebelClanInitializationHandlerTests
             13,
             14,
             15,
+            true,
             true);
 
         Assert.NotNull(networkHandler);
@@ -175,6 +283,7 @@ public class SettlementRebelClanInitializationHandlerTests
         Assert.Equal(14u, clan.BannerBackgroundColorSecondary);
         Assert.Equal(15u, clan.BannerIconColor);
         Assert.True(clan.IsRebelClan);
+        Assert.True(clan.IsNoble);
         Assert.True(clan._distanceToClosestNonAllyFortificationCacheDirty);
     }
 

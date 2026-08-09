@@ -56,6 +56,9 @@ internal readonly struct NetworkInitializeSettlementRebelClan : ICommand
     [ProtoMember(13)]
     public bool IsRebelClan { get; }
 
+    [ProtoMember(14)]
+    public bool IsNoble { get; }
+
     public NetworkInitializeSettlementRebelClan(
         string clanId,
         string cultureId,
@@ -69,7 +72,8 @@ internal readonly struct NetworkInitializeSettlementRebelClan : ICommand
         uint bannerBackgroundColorPrimary,
         uint bannerBackgroundColorSecondary,
         uint bannerIconColor,
-        bool isRebelClan)
+        bool isRebelClan,
+        bool isNoble)
     {
         ClanId = clanId;
         CultureId = cultureId;
@@ -84,5 +88,6 @@ internal readonly struct NetworkInitializeSettlementRebelClan : ICommand
         BannerBackgroundColorSecondary = bannerBackgroundColorSecondary;
         BannerIconColor = bannerIconColor;
         IsRebelClan = isRebelClan;
+        IsNoble = isNoble;
     }
 }

@@ -58,7 +58,8 @@ internal sealed class SettlementRebelClanInitializationHandler : IHandler
             clan.BannerBackgroundColorPrimary,
             clan.BannerBackgroundColorSecondary,
             clan.BannerIconColor,
-            clan.IsRebelClan));
+            clan.IsRebelClan,
+            clan.IsNoble));
     }
 
     private void Handle(MessagePayload<NetworkInitializeSettlementRebelClan> payload)
@@ -87,6 +88,7 @@ internal sealed class SettlementRebelClanInitializationHandler : IHandler
                 clan.BannerBackgroundColorSecondary = data.BannerBackgroundColorSecondary;
                 clan.BannerIconColor = data.BannerIconColor;
                 clan.IsRebelClan = data.IsRebelClan;
+                clan.IsNoble = data.IsNoble;
                 clan._distanceToClosestNonAllyFortificationCacheDirty = true;
             }
         }, context: nameof(NetworkInitializeSettlementRebelClan));
