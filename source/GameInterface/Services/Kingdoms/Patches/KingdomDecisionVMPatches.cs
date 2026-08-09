@@ -84,6 +84,22 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             voteManager.UnregisterDecisionItem(__instance);
         }
+        [HarmonyPatch("InitValues")]
+        [HarmonyPostfix]
+        private static void InitValuesPostfix(DecisionItemBaseVM __instance)
+        {
+            bool isLocalPlayerChooser = __instance.KingdomDecisionMaker._chooser == Clan.PlayerClan;
+
+            __instance.CurrentStageIndex = isLocalPlayerChooser ? 1 : 0;
+            __instance.IsPlayerSupporter = !isLocalPlayerChooser;
+
+            __instance.TitleText = isLocalPlayerChooser
+                ? __instance.KingdomDecisionMaker._decision.GetChooseTitle().ToString()
+                : __instance.KingdomDecisionMaker._decision.GetSupportTitle().ToString();
+            __instance.DescriptionText = isLocalPlayerChooser
+                ? __instance.KingdomDecisionMaker._decision.GetChooseDescription().ToString()
+                : __instance.KingdomDecisionMaker._decision.GetSupportDescription().ToString();
+        }
     }
 
     [HarmonyPatch(typeof(DecisionOptionVM))]
@@ -96,6 +112,12 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
 
             voteManager.TryPublishVote(__instance);
+        }
+        [HarmonyPatch(MethodType.Constructor, typeof(DecisionOutcome), typeof(KingdomDecision), typeof(KingdomElection), typeof(Action<DecisionOptionVM>), typeof(Action<DecisionOptionVM>))]
+        [HarmonyPostfix]
+        private static void Postfix(DecisionOptionVM __instance, KingdomElection kingdomDecisionMaker)
+        {
+            __instance.IsPlayerSupporter = kingdomDecisionMaker._chooser != Clan.PlayerClan;
         }
     }
 

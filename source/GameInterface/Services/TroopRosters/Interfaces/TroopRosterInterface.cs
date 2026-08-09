@@ -119,12 +119,12 @@ internal class TroopRosterInterface : ITroopRosterInterface
         // Only preserve heroes in a player's troopRoster
         bool preserveHeroes = mainHero != null && mainHero.IsPlayerHero() && targetTroopRoster.OwnerParty?.MemberRoster == targetTroopRoster;
 
-        // If preserving heroes, clear without removing mainHero and player companions
-        // Causes issues if mainHero or player companions are removed from a player's party
+        // If preserving heroes, clear without removing mainHero and heroes in the same clan (companions & family members)
+        // Causes issues if mainHero, player companions or family members are removed from a player's party
         for (int i = targetTroopRoster._count - 1; i >= 0; i--)
         {
             var character = targetTroopRoster.data[i].Character;
-            if (preserveHeroes && (character?.HeroObject == mainHero || character?.HeroObject?.IsPlayerCompanion == true)) continue;
+            if (preserveHeroes && (character?.HeroObject == mainHero || character?.HeroObject?.Clan == mainHero.Clan)) continue;
             targetTroopRoster.AddToCounts(character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
         }
 

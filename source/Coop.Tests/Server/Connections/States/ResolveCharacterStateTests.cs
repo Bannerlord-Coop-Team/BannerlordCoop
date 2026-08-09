@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
@@ -211,6 +212,12 @@ namespace Coop.Tests.Server.Connections.States
             var objectManager = serverComponent.Container.Resolve<IObjectManager>();
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             Assert.True(objectManager.AddExisting(player.HeroId, hero));
+            var restoredPlayer = player;
+
+            serverComponent.Container
+                .Resolve<Mock<IPlayerPartyRestorer>>()
+                .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                .Returns(true);
 
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
@@ -226,6 +233,48 @@ namespace Coop.Tests.Server.Connections.States
 
             Assert.True(message.HeroExists);
             Assert.Equal(player, message.Player);
+        }
+
+        [Fact]
+        public void NetworkClientValidate_RegisteredHeroWithStaleParty_RepairsWithoutCreatingCharacter()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var player = new Player("MyPlayer", "MyHero", "MissingParty", "MyClan", "MyCharacter");
+            var repaired = new Player("MyPlayer", "MyHero", "RecoveredParty", "MyClan", "MyCharacter");
+            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+            var registeredPlayer = player;
+            playerManager
+                .Setup(manager => manager.TryGetPlayer(player.ControllerId, out registeredPlayer))
+                .Returns(true);
+            playerManager.Setup(manager => manager.ReplacePlayer(player, repaired)).Returns(true);
+
+            var objectManager = serverComponent.Container.Resolve<IObjectManager>();
+            var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            Assert.True(objectManager.AddExisting(player.HeroId, hero));
+            var restoredPlayer = repaired;
+
+            serverComponent.Container
+                .Resolve<Mock<IPlayerPartyRestorer>>()
+                .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                .Returns(true);
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(player.ControllerId)));
+
+            playerManager.Verify(manager => manager.ReplacePlayer(player, repaired), Times.Once);
+            playerManager.Verify(manager => manager.RemovePlayer(It.IsAny<Player>()), Times.Never);
+
+            var validation = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessages(playerPeer).OfType<NetworkClientValidated>());
+            Assert.True(validation.HeroExists);
+            Assert.Same(repaired, validation.Player);
+
+            var update = Assert.Single(
+                serverComponent.TestNetwork.GetPeerMessages(differentPeer)
+                    .OfType<NetworkPlayerRegistrationUpdated>());
+            Assert.Same(repaired, update.Player);
+            Assert.IsNotType<CreateCharacterState>(connectionLogic.State);
         }
 
         [Fact]

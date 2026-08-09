@@ -65,7 +65,7 @@ internal class KingdomMembershipState : IKingdomMembershipState
         IReadOnlyList<Town> clanFiefs,
         bool publishCollectionChanges)
     {
-        KingdomCollectionSync.AddClan(kingdom, clan, publishCollectionChanges);
+        clan.Kingdom = kingdom;
 
         foreach (var fief in clanFiefs)
         {
@@ -79,7 +79,7 @@ internal class KingdomMembershipState : IKingdomMembershipState
         IReadOnlyList<Town> clanFiefs,
         bool publishCollectionChanges)
     {
-        KingdomCollectionSync.RemoveClan(kingdom, clan, publishCollectionChanges);
+        clan.Kingdom = null;
 
         foreach (var fief in clanFiefs)
         {

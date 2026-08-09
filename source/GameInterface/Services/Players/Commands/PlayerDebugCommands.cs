@@ -1,6 +1,7 @@
-using Common;
+﻿using Common;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -46,6 +47,34 @@ internal class PlayerDebugCommands
         sb.AppendLine($"PlayerObjects entries (resolved & controlled): {controlledObjects}");
 
         return sb.ToString();
+    }
+
+    [CommandLineArgumentFunction("party_state", "coop.debug.players")]
+    public static string PartyState(List<string> args)
+    {
+        if (!ModInformation.IsServer)
+            return "Command can only be run on the server.";
+        if (args.Count != 1)
+            return "Usage: coop.debug.players.party_state <controllerId>";
+        if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) == false)
+            return $"Unable to get {nameof(IPlayerManager)}";
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            return $"Unable to get {nameof(IObjectManager)}";
+        if (!playerManager.TryGetPlayer(args[0], out var player))
+            return $"Controller {args[0]} is not registered.";
+        if (!objectManager.TryGetObject(player.MobilePartyId, out MobileParty party))
+            return $"Party {player.MobilePartyId} is not resolved.";
+
+        string mapEventId = party.MapEvent?.StringId ?? "none";
+        bool hasVisual = party.Party.GetPartyVisual() != null;
+
+        return
+            $"controller={player.ControllerId}|" +
+            $"party={party.StringId}|" +
+            $"connected={playerManager.IsConnected(player)}|" +
+            $"active={party.IsActive}|" +
+            $"mapEvent={mapEventId}|" +
+            $"visual={hasVisual}";
     }
 
     /// <summary>

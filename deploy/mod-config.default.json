@@ -2,30 +2,29 @@
   // Bannerlord Coop gameplay configuration — owned by the Coop mod itself and
   // applied wherever the coop server runs (dedicated server or player-hosted
   // session). Settings for how a dedicated server PROCESS runs (save name,
-  // password, ports, autosaves) live in server-config.json instead, next to
-  // the server executable. Comments and trailing commas are allowed here.
+  // password, ports, autosaves) live in the dedicated server's own
+  // DedicatedServer\server-config.json instead. Comments and trailing commas
+  // are allowed here.
 
   // Campaign difficulty, applied by the HOSTING side at every boot; joining
-  // players inherit the values with the save transfer. A commented-out key
-  // keeps the save's own setting. Levels: "VeryEasy" | "Easy" | "Realistic".
+  // players inherit the values with the save transfer. These values mirror a
+  // newly created vanilla Bannerlord campaign.
+  // Levels: "VeryEasy" | "Easy" | "Realistic".
   "difficulty": {
-    // Damage players take. Left unset on a HEADLESS server (dedicated/container)
-    // this defaults to Realistic — the headless profile would otherwise push
-    // quarter damage to every joining player. On a player-hosted session the
-    // host's own game setting stays in charge unless set here.
-    // "playerReceivedDamage": "Realistic",
+    // Damage players take. VeryEasy is Bannerlord's new-campaign default.
+    "playerReceivedDamage": "VeryEasy",
 
-    // "playerTroopsReceivedDamage": "VeryEasy",
-    // "combatAIDifficulty": "VeryEasy",
-    // "recruitmentDifficulty": "VeryEasy",
-    // "playerMapMovementSpeed": "VeryEasy",
-    // "stealthAndDisguiseDifficulty": "VeryEasy",
-    // "persuasionSuccessChance": "VeryEasy",
-    // "clanMemberDeathChance": "VeryEasy",
-    // "battleDeath": "VeryEasy",
+    "playerTroopsReceivedDamage": "VeryEasy",
+    "combatAIDifficulty": "VeryEasy",
+    "recruitmentDifficulty": "VeryEasy",
+    "playerMapMovementSpeed": "VeryEasy",
+    "stealthAndDisguiseDifficulty": "VeryEasy",
+    "persuasionSuccessChance": "VeryEasy",
+    "clanMemberDeathChance": "VeryEasy",
+    "battleDeath": "VeryEasy",
 
-    // "birthAndDeath": true,                 // aging, births, natural deaths
-    // "autoAllocateClanMemberPerks": false,
+    "birthAndDeath": true,                 // aging, births, natural deaths
+    "autoAllocateClanMemberPerks": false,
   },
   "modOptions": {
     // Toggle fast forward (2x speed) being enabled
@@ -101,7 +100,7 @@
     // WARNING: Setting this value too high will cause performance issues.
     // The default is 1, which is equivalent to the vanilla spawn limit.
     "maximumLootersMultiplier": 1.0,
-
+    
     // How long a lord remembers refusing to defect to your kingdom.
     // Vanilla records each failed persuasion and refuses that lord until the
     // record expires after one in-game year. Only the machine that ran the
@@ -110,5 +109,15 @@
     // "NeverExpire": a refusal blocks that lord for the rest of the session.
     // "AlwaysRetry": a refusal never blocks; you can ask the same lord again straight away.
     "lordDefectionRetries": "Vanilla",
+
+    // Toggle players being able to execute heroes.
+    // For now executing other players is always disabled.
+    // Default is true, meaning any player can execute AI clan member.
+    "enableHeroExecutions": true,
+
+    // Toggle players being able to execute each others' clan members.
+    // This includes player companions and family members.
+    // Default is false and won't have any effect if enableHeroExecutions is false.
+    "enablePlayerClanMemberExecutions": false,
   }
 }

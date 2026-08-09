@@ -12,6 +12,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Save.Messages;
 using Moq;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -99,7 +100,7 @@ public class SaveGameHandlerTests
     }
 
     [Fact]
-    public void AllGameObjectsRegistered_DuplicateControllerWithNoLiveHero_RestoresExactlyOne()
+    public void AllGameObjectsRegistered_DuplicateControllerWithNoLiveHero_RegistersNeither()
     {
         var first = new Player(ControllerId, MissingHeroId, "Party_A", "Clan_One", "Character_A");
         var second = new Player(ControllerId, "Hero_AlsoMissing", "Party_B", "Clan_One", "Character_B");
@@ -109,14 +110,11 @@ public class SaveGameHandlerTests
 
         using var handler = CreateHandler(playerRegistry, new[] { first, second });
 
-        // Neither hero resolves, so there is nothing to prefer — but the controller must still end
-        // up with one registration, which its owner heals by joining.
-        playerRegistry.Verify(registry => registry.AddPlayer(It.IsAny<Player>()), Times.Once);
-        playerRegistry.Verify(registry => registry.AddPlayer(first), Times.Once);
+        playerRegistry.Verify(registry => registry.AddPlayer(It.IsAny<Player>()), Times.Never);
     }
 
     [Fact]
-    public void AllGameObjectsRegistered_DistinctControllers_RestoresEvery()
+    public void AllGameObjectsRegistered_DistinctControllers_SkipsUnrestoredRegistration()
     {
         var first = new Player("PlayerOne", LiveHeroId, "Party_A", "Clan_One", "Character_A");
         var second = new Player("PlayerTwo", MissingHeroId, "Party_B", "Clan_Two", "Character_B");
@@ -126,31 +124,78 @@ public class SaveGameHandlerTests
 
         using var handler = CreateHandler(playerRegistry, new[] { first, second });
 
-        // A missing hero is only a tie-breaker between duplicates; on its own it must not cost a
-        // controller its registration, or that player is sent to character creation for nothing.
         playerRegistry.Verify(registry => registry.AddPlayer(first), Times.Once);
-        playerRegistry.Verify(registry => registry.AddPlayer(second), Times.Once);
+        playerRegistry.Verify(registry => registry.AddPlayer(second), Times.Never);
+    }
+
+    [Fact]
+    public void AllGameObjectsRegistered_PublishesRestoredAfterEveryRegistration()
+    {
+        var first = new Player("PlayerOne", LiveHeroId, "Party_A", "Clan_One", "Character_A");
+        var second = new Player("PlayerTwo", StaleHeroId, "Party_B", "Clan_Two", "Character_B");
+        var order = new List<string>();
+
+        var playerRegistry = new Mock<IPlayerManager>();
+        playerRegistry
+            .Setup(registry => registry.AddPlayer(It.IsAny<Player>()))
+            .Callback(() => order.Add("registered"))
+            .Returns(true);
+
+        using var handler = CreateHandler(
+            playerRegistry,
+            new[] { first, second },
+            configureBroker: broker => broker.Subscribe<SavedPlayerRegistrationsRestored>(
+                _ => order.Add("restored")));
+
+        Assert.Equal(new[] { "registered", "registered", "restored" }, order);
     }
 
     [Fact]
     public void AllGameObjectsRegistered_RepairsSavedPlayerBeforeRegistration()
     {
         var player = new Player(ControllerId, LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
+        var repaired = new Player(ControllerId, LiveHeroId, "Party_Repaired", "Clan_One", "Character_Live");
         var calls = new List<string>();
         var playerPartyRestorer = new Mock<IPlayerPartyRestorer>();
         var playerRegistry = new Mock<IPlayerManager>();
+        var restoredPlayer = repaired;
 
         playerPartyRestorer
-            .Setup(restorer => restorer.Restore(player))
-            .Callback(() => calls.Add("repair"));
+            .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+            .Callback(() => calls.Add("repair"))
+            .Returns(true);
         playerRegistry
-            .Setup(registry => registry.AddPlayer(player))
+            .Setup(registry => registry.AddPlayer(repaired))
             .Callback(() => calls.Add("register"))
             .Returns(true);
 
         using var handler = CreateHandler(playerRegistry, new[] { player }, playerPartyRestorer);
 
         Assert.Equal(new[] { "repair", "register" }, calls);
+    }
+
+    [Fact]
+    public void AllGameObjectsRegistered_DuplicateStaleParties_PrefersResolvableHeroForRepair()
+    {
+        var missing = new Player(ControllerId, MissingHeroId, "Party_Missing", "Clan_One", "Character_Missing");
+        var recoverable = new Player(ControllerId, LiveHeroId, "Party_Stale", "Clan_One", "Character_Live");
+        var repaired = new Player(ControllerId, LiveHeroId, LivePartyId, "Clan_One", "Character_Live");
+        var playerPartyRestorer = new Mock<IPlayerPartyRestorer>();
+        var playerRegistry = new Mock<IPlayerManager>();
+        var restoredPlayer = repaired;
+
+        playerPartyRestorer
+            .Setup(restorer => restorer.TryRestore(recoverable, out restoredPlayer))
+            .Returns(true);
+        playerRegistry.Setup(registry => registry.AddPlayer(repaired)).Returns(true);
+
+        using var handler = CreateHandler(
+            playerRegistry,
+            new[] { missing, recoverable },
+            playerPartyRestorer);
+
+        playerRegistry.Verify(registry => registry.AddPlayer(repaired), Times.Once);
+        playerRegistry.Verify(registry => registry.AddPlayer(missing), Times.Never);
     }
 
     /// <summary>
@@ -161,11 +206,22 @@ public class SaveGameHandlerTests
     private static SaveGameHandler CreateHandler(
         Mock<IPlayerManager> playerRegistry,
         Player[] savedPlayers,
-        Mock<IPlayerPartyRestorer> playerPartyRestorer = null)
+        Mock<IPlayerPartyRestorer> playerPartyRestorer = null,
+        Action<TestMessageBroker>? configureBroker = null)
     {
         var messageBroker = new TestMessageBroker();
         if (playerPartyRestorer == null)
+        {
             playerPartyRestorer = new Mock<IPlayerPartyRestorer>();
+            foreach (var player in savedPlayers)
+            {
+                var restoredPlayer = player;
+                playerPartyRestorer
+                    .Setup(restorer => restorer.TryRestore(player, out restoredPlayer))
+                    .Returns(player.HeroId == LiveHeroId || player.HeroId == StaleHeroId);
+            }
+        }
+        configureBroker?.Invoke(messageBroker);
 
         var objectManager = new Mock<IObjectManager>();
         Hero liveHero = null!;

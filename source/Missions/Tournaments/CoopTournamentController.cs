@@ -196,8 +196,6 @@ public class CoopTournamentController : CoopMissionController
         snapshot = updated;
         ApplySessionState(updated);
         Mission.AllowAiTicking = session.IsLocalHost;
-        if (missionReadyForManifest)
-            spectatorAgentManager.Reconcile(updated);
         tournamentBehavior.ApplySnapshot(updated);
         KnockOutDepartingContestants(previous, updated);
         if (wasLocalMember && !HasLocalMissionMember(updated))
@@ -214,6 +212,8 @@ public class CoopTournamentController : CoopMissionController
         BeginUpdatedMatch(previous, updated);
         if (updated.CurrentMatchId != previousMatchId)
             ResetMatchRuntimeState();
+        if (missionReadyForManifest)
+            spectatorAgentManager.Reconcile(updated);
         TryStartHostMatch();
         DrainPendingTournamentPackets();
     }
@@ -1005,6 +1005,7 @@ public class CoopTournamentController : CoopMissionController
             ApplyPendingManifest();
             spectatorAgentManager.Reconcile(snapshot);
         }
+        spectatorAgentManager.UpdateCombatPermissions();
         base.OnMissionTick(dt);
         if (snapshot == null || !session.IsLocalHost) return;
 
