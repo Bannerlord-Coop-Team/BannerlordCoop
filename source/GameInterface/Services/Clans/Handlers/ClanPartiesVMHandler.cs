@@ -108,7 +108,8 @@ internal class ClanPartiesVMHandler : IHandler
         string selectedPartyId = null;
         if (data.SelectedParty != null && !objectManager.TryGetIdWithLogging(data.SelectedParty, out selectedPartyId)) return;
 
-        if (!objectManager.TryGetIdWithLogging(data.MainParty, out var mainPartyId)) return;
+        string mainPartyId = null;
+        if (newLeaderId != null && !objectManager.TryGetIdWithLogging(data.MainParty, out mainPartyId)) return;
 
         network.SendAll(new ChangeClanPartyLeader(mainHeroId, newLeaderId, selectedPartyId, mainPartyId));
     }
@@ -146,6 +147,13 @@ internal class ClanPartiesVMHandler : IHandler
             {
                 var oldLeader = selectedParty.Party.LeaderHero;
 
+                // Block changing leader if old leader is a player hero
+                if (oldLeader.IsPlayerHero())
+                {
+                    Logger.Error($"Blocked clan party leader change for player hero {oldLeader.Name}, {oldLeader.StringId}");
+                    return;
+                }
+
                 if (isDisbanding) // Disbanding party
                 {
                     selectedParty.RemovePartyLeader();
@@ -153,8 +161,10 @@ internal class ClanPartiesVMHandler : IHandler
                 }
                 else // Swapping with new leader
                 {
-                    if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
-                    TeleportHeroAction.ApplyDelayedTeleportToParty(oldLeader, mainParty);
+                    if (objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty))
+                    {
+                        TeleportHeroAction.ApplyDelayedTeleportToParty(oldLeader, mainParty);
+                    }
                 }
             }
             if (newLeader != null) // Teleport new leader to party
