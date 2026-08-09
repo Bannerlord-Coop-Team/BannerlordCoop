@@ -1,5 +1,5 @@
 name: Manual Build
-run-name: Manual client ${{ inputs.commit_sha }} for server ${{ inputs.server_sha }}
+run-name: Manual client ${{ inputs.commit_sha }} for server ${{ inputs.server_sha }} (${{ inputs.build_id }})
 
 on:
   workflow_dispatch:
